@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import GeneralSidebar from '../GeneralSidebar';
+import { NavigationHelpers } from '@/lib/navigation/NavigationHelpers';
 
 // NavItem type definition (copied from GeneralSidebar since it's not exported)
 type NavItem = { 
@@ -65,71 +66,67 @@ export function withSidebarLayout(
   };
 }
 
-// Specific layout wrappers for different scopes
-export const TenantLayout = ({ children }: { children: ReactNode }) => {
+// Dynamic tenant layout that accepts nav items with dynamic hrefs
+export const DynamicTenantLayout = ({ children, navItems }: { children: ReactNode; navItems: NavItem[] }) => {
+  return (
+    <SidebarLayout
+      navItems={navItems}
+      scope="tenant"
+      collapsible={true}
+    >
+      {children}
+    </SidebarLayout>
+  );
+};
+
+// Static tenant layout with predefined items
+export const TenantLayout = ({ children, tenantId }: { children: ReactNode; tenantId: string }) => {
   const tenantNavItems: NavItem[] = [
     {
       label: 'Dashboard',
-      href: '/t/[tenantId]',
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-        </svg>
-      )
+      href: `/t/${tenantId}`,
+      icon: NavigationHelpers.getStandardIcon('DASHBOARD'),
     },
     {
       label: 'Inventory',
-      href: '/t/[tenantId]/items',
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-        </svg>
-      )
+      href: `/t/${tenantId}/items`,
+      icon: NavigationHelpers.getStandardIcon('INVENTORY_CENTER'),
     },
     {
       label: 'Categories',
-      href: '/t/[tenantId]/categories',
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-        </svg>
-      ),
+      href: `/t/${tenantId}/categories`,
+      icon: NavigationHelpers.getStandardIcon('STORE_CENTER'),
       children: [
         {
           label: 'All Categories',
-          href: '/t/[tenantId]/categories'
+          href: `/t/${tenantId}/categories`
         },
         {
           label: 'Quick Start',
-          href: '/t/[tenantId]/categories/quick-start'
+          href: `/t/${tenantId}/categories/quick-start`
         },
         {
           label: 'Google Sync',
-          href: '/t/[tenantId]/categories/google-sync'
+          href: `/t/${tenantId}/categories/google-sync`
         }
       ]
     },
     {
       label: 'Settings',
-      href: '/t/[tenantId]/settings',
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
+      href: `/t/${tenantId}/settings`,
+      icon: NavigationHelpers.getStandardIcon('USER_PANEL'),
       children: [
         {
           label: 'General',
-          href: '/t/[tenantId]/settings'
+          href: `/t/${tenantId}/settings`
         },
         {
           label: 'Business Profile',
-          href: '/t/[tenantId]/settings/business'
+          href: `/t/${tenantId}/settings/business`
         },
         {
           label: 'Integrations',
-          href: '/t/[tenantId]/settings/integrations'
+          href: `/t/${tenantId}/settings/integrations`
         }
       ]
     }
@@ -151,20 +148,12 @@ export const AdminLayout = ({ children }: { children: ReactNode }) => {
     {
       label: 'Admin Dashboard',
       href: '/settings/admin',
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-        </svg>
-      )
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_DASHBOARD'),
     },
     {
       label: 'User Management',
       href: '/settings/admin/users',
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-        </svg>
-      ),
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_USERS'),
       children: [
         {
           label: 'All Users',
@@ -183,11 +172,7 @@ export const AdminLayout = ({ children }: { children: ReactNode }) => {
     {
       label: 'Tenant Management',
       href: '/settings/admin/tenants',
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>
-      ),
+      icon: NavigationHelpers.getStandardIcon('STORE'),
       children: [
         {
           label: 'All Tenants',
@@ -206,11 +191,7 @@ export const AdminLayout = ({ children }: { children: ReactNode }) => {
     {
       label: 'Security',
       href: '/settings/admin/security',
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-        </svg>
-      ),
+      icon: NavigationHelpers.getStandardIcon('ADMIN'),
       children: [
         {
           label: 'Security Dashboard',
@@ -229,20 +210,19 @@ export const AdminLayout = ({ children }: { children: ReactNode }) => {
     {
       label: 'System Settings',
       href: '/settings/admin/system',
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_SETTINGS'),
       children: [
         {
           label: 'Platform Settings',
-          href: '/settings/admin/system'
+          href: '/settings/admin/platform'
         },
         {
           label: 'Feature Flags',
           href: '/settings/admin/features'
+        },
+        {
+          label: 'Sentry',
+          href: '/settings/admin/sentry'
         },
         {
           label: 'Analytics',
@@ -256,6 +236,125 @@ export const AdminLayout = ({ children }: { children: ReactNode }) => {
     <SidebarLayout
       navItems={adminNavItems}
       scope="admin"
+      collapsible={true}
+    >
+      {children}
+    </SidebarLayout>
+  );
+};
+
+export const PlatformLayout = ({ children, tenantCount = 0 }: { children: ReactNode; tenantCount?: number }) => {
+  const platformNavItems: NavItem[] = [
+    {
+      label: 'Platform Dashboard',
+      href: '/',
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_DASHBOARD'),
+      children: [
+        {
+          label: 'Overview',
+          href: '/'
+        },
+        {
+          label: 'Admin Controls',
+          href: '/settings/admin',
+          accessLevel: 'admin',
+          children: [
+            {
+              label: 'User Management',
+              href: '/settings/admin/users'
+            },
+            {
+              label: 'Tenant Management',
+              href: '/settings/admin/tenants'
+            },
+            {
+              label: 'System Settings',
+              href: '/settings/admin/system'
+            },
+            {
+              label: 'Feature Flags',
+              href: '/settings/admin/features'
+            }
+          ]
+        },
+        {
+          label: 'Insights',
+          href: '/insights',
+          children: [
+            {
+              label: 'Analytics',
+              href: '/insights/analytics'
+            },
+            {
+              label: 'Reports',
+              href: '/insights/reports'
+            },
+            {
+              label: 'Performance',
+              href: '/insights/performance'
+            }
+          ]
+        }
+      ]
+    },
+    {
+      label: 'Tenants',
+      href: '/tenants',
+      icon: NavigationHelpers.getStandardIcon('STORE'),
+      badge: {
+        text: String(tenantCount),
+        variant: 'default'
+      },
+      children: [
+        {
+          label: 'All Tenants',
+          href: '/tenants'
+        },
+        {
+          label: 'Create Tenant',
+          href: '/tenants/create'
+        }
+      ]
+    },
+    {
+      label: 'Directory',
+      href: '/directory',
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_INSIGHTS'),
+    },
+    {
+      label: 'Settings',
+      href: '/settings',
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_SETTINGS'),
+      children: [
+        {
+          label: 'Account',
+          href: '/settings/account'
+        },
+        {
+          label: 'Organization',
+          href: '/settings/organization',
+          badge: {
+            text: 'ORG',
+            variant: 'org'
+          }
+        },
+        {
+          label: 'Subscription',
+          href: '/settings/subscription'
+        },
+        {
+          label: 'Admin Panel',
+          href: '/settings/admin',
+          accessLevel: 'admin'
+        }
+      ]
+    }
+  ];
+
+  return (
+    <SidebarLayout
+      navItems={platformNavItems}
+      scope="platform"
       collapsible={true}
     >
       {children}

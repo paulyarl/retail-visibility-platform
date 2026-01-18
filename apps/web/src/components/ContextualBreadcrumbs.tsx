@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import NavigationStandards, { NavigationHelpers } from '@/lib/navigation/NavigationStandards';
+import NavigationStandards from '@/lib/navigation/NavigationStandards';
+import { NavigationHelpers } from '@/lib/navigation/NavigationHelpers';
+import { NavigationData } from '@/lib/navigation/NavigationData';
 
 
 // Force edge runtime to prevent prerendering issues
@@ -255,7 +257,7 @@ function getContextualLabel(segment: string, fullPath: string, isTenantContext: 
 
 // Get contextual icon for segment
 function getContextualIcon(segment: string, fullPath: string): React.ReactNode | undefined {
-  const iconMappings: Record<string, keyof typeof NavigationStandards.ICONS> = {
+  const iconMappings: Record<string, keyof typeof NavigationData.ICON_KEYS> = {
     // Dashboard/Onboarding
     'dashboard': 'DASHBOARD',
     'onboarding': 'HELP',
@@ -273,12 +275,12 @@ function getContextualIcon(segment: string, fullPath: string): React.ReactNode |
 
     // Store Center
     'store': 'STORE_CENTER',
-    'profile': 'STORE_PROFILE',
-    'sync': 'STORE_SYNC',
-    'settings': 'STORE_SETTINGS',
-    'platforms': 'STORE_PLATFORM',
-    'organization': 'STORE_ORGANIZATION',
-    'subscription': 'STORE_SUBSCRIPTION',
+    'profile': 'USER_PANEL',
+    'sync': 'STORE_CENTER',
+    'settings': 'STORE_CENTER',
+    'platforms': 'STORE_CENTER',
+    'organization': 'ORGANIZATION',
+    'subscription': 'SUBSCRIPTION',
 
     // Inventory Center
     'inventory': 'INVENTORY_CENTER',
@@ -317,7 +319,7 @@ function getContextualIcon(segment: string, fullPath: string): React.ReactNode |
   };
 
   const iconKey = iconMappings[segment];
-  return iconKey ? NavigationHelpers.getStandardIcon(iconKey) : undefined;
+  return iconKey ? NavigationHelpers.getStandardIcon(iconKey as keyof typeof NavigationData.ICON_KEYS) : undefined;
 }
 
 // Determine scope from path

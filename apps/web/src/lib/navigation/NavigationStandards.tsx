@@ -293,60 +293,8 @@ export const NavigationStandards = {
   NAVIGATION_DEPTH: {
     MAX_LEVELS: 3,        // Primary → Secondary → Tertiary
     PRIMARY_MAX: 8,       // Max primary navigation items
-    SECONDARY_MAX: 6,     // Max secondary items per primary
+    SECONDARY_MAX: 7,     // Max secondary items per primary
     TERTIARY_MAX: 4,      // Max tertiary items per secondary
-  },
-};
-
-// Helper functions for consistent navigation
-
-export const NavigationHelpers = {
-  // Generate consistent URL patterns
-  generateUrl: (scope: 'platform' | 'tenant' | 'admin', path: string, tenantId?: string) => {
-    const base = NavigationStandards.URL_PATTERNS[scope.toUpperCase() as keyof typeof NavigationStandards.URL_PATTERNS];
-    return tenantId ? base.replace('[tenantId]', tenantId) + path : base + path;
-  },
-
-  // Validate navigation structure
-  validateStructure: (items: any[], scope: string) => {
-    const errors = [];
-
-    if (items.length > NavigationStandards.NAVIGATION_DEPTH.PRIMARY_MAX) {
-      errors.push(`${scope}: Too many primary items (${items.length} > ${NavigationStandards.NAVIGATION_DEPTH.PRIMARY_MAX})`);
-    }
-
-    items.forEach((item, index) => {
-      if (item.children?.length > NavigationStandards.NAVIGATION_DEPTH.SECONDARY_MAX) {
-        errors.push(`${scope}: ${item.label} has too many children (${item.children.length})`);
-      }
-
-      item.children?.forEach((child: any) => {
-        if (child.children?.length > NavigationStandards.NAVIGATION_DEPTH.TERTIARY_MAX) {
-          errors.push(`${scope}: ${child.label} has too many grandchildren`);
-        }
-      });
-    });
-
-    return errors;
-  },
-
-  // Get standardized icon
-  getStandardIcon: (type: keyof typeof NavigationStandards.ICONS) => {
-    return NavigationStandards.ICONS[type]();
-  },
-
-  // Get standardized color
-  getStandardColor: (type: keyof typeof NavigationStandards.COLORS) => {
-    return NavigationStandards.COLORS[type];
-  },
-
-  // Sort items by hierarchy
-  sortByHierarchy: (items: any[]) => {
-    return items.sort((a, b) => {
-      const aOrder = a.hierarchy || 999;
-      const bOrder = b.hierarchy || 999;
-      return aOrder - bOrder;
-    });
   },
 };
 

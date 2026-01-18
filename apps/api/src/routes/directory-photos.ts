@@ -43,7 +43,7 @@ async function resolveListing(identifier: string) {
 
 r.post("/:listingId/photos", upload.single("file"), async (req, res) => {
   try {
-    const listingId = req.params.listingId;
+    const listingId = Array.isArray(req.params.listingId) ? req.params.listingId[0] : req.params.listingId;
 
     console.log(`[Directory Photos] Looking for listing with identifier: "${listingId}"`);
     const listing = await resolveListing(listingId);

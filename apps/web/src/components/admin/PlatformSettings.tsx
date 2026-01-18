@@ -5,24 +5,42 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/Switch';
 import { Label } from '@/components/ui/Label';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Shield, Settings } from 'lucide-react';
+import { Loader2, Shield, Settings, BarChart3, Zap } from 'lucide-react';
+import RateLimitTrends from './RateLimitTrends';
 
 interface PlatformSettingsData {
   rateLimitingEnabled: boolean;
   updatedAt: string;
   updatedBy: string;
+  rateLimitConfigurations?: Array<{
+    id: string;
+    route_type: string;
+    max_requests: number;
+    window_minutes: number;
+    enabled: boolean;
+    created_at: string;
+    updated_at: string;
+  }>;
 }
 
 export default function PlatformSettings() {
   const [settings, setSettings] = useState<PlatformSettingsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [rateLimitConfigs, setRateLimitConfigs] = useState(settings?.rateLimitConfigurations || []);
   const { toast } = useToast();
 
   useEffect(() => {
     loadSettings();
   }, []);
+
+  useEffect(() => {
+    if (settings?.rateLimitConfigurations) {
+      setRateLimitConfigs(settings.rateLimitConfigurations);
+    }
+  }, [settings]);
 
   const loadSettings = async () => {
     try {
@@ -54,12 +72,17 @@ export default function PlatformSettings() {
   const saveSettings = async (newSettings: Partial<PlatformSettingsData>) => {
     setSaving(true);
     try {
+      const payload = {
+        rateLimitingEnabled: newSettings.rateLimitingEnabled ?? settings?.rateLimitingEnabled ?? true,
+        rateLimitConfigurations: rateLimitConfigs
+      };
+
       const response = await fetch('/api/admin/platform-settings', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newSettings),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -84,8 +107,25 @@ export default function PlatformSettings() {
     }
   };
 
-  const handleRateLimitingToggle = (enabled: boolean) => {
-    saveSettings({ rateLimitingEnabled: enabled });
+  const updateRateLimitConfig = (routeType: string, field: string, value: any) => {
+    setRateLimitConfigs(prev =>
+      prev.map(config =>
+        config.route_type === routeType
+          ? { ...config, [field]: value }
+          : config
+      )
+    );
+  };
+
+  const getRouteTypeDescription = (routeType: string) => {
+    const descriptions = {
+      auth: 'Authentication routes (/api/auth)',
+      admin: 'Admin routes (/api/admin)',
+      strict: 'Sensitive API routes',
+      standard: 'Regular API routes',
+      exempt: 'Public browsing routes (directory, items, storefront)'
+    };
+    return descriptions[routeType as keyof typeof descriptions] || routeType;
   };
 
   if (loading) {
@@ -133,7 +173,7 @@ export default function PlatformSettings() {
               <Switch
                 id="rate-limiting"
                 checked={settings?.rateLimitingEnabled ?? true}
-                onCheckedChange={handleRateLimitingToggle}
+                onCheckedChange={(enabled) => saveSettings({ rateLimitingEnabled: enabled })}
                 disabled={saving}
               />
             </div>
@@ -159,17 +199,91 @@ export default function PlatformSettings() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Additional Settings</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Rate Limit Thresholds
+            </CardTitle>
             <CardDescription>
-              More platform configuration options coming soon
+              Configure request limits for different route types. Warnings are logged when limits are exceeded.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              This section will include additional platform-wide settings in future updates.
-            </p>
-          </CardContent>
-        </Card>
+          <CardContent className="space-y-6">
+            {rateLimitConfigs.map((config) => (
+              <div key={config.route_type} className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Label className="font-medium capitalize">{config.route_type} Routes</Label>
+                    <Switch
+                      checked={config.enabled}
+                      onCheckedChange={(enabled) => updateRateLimitConfig(config.route_type, 'enabled', enabled)}
+                      disabled={saving}
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {getRouteTypeDescription(config.route_type)}
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor={`max-${config.route_type}`} className="text-sm">
+                        Max Requests:
+                      </Label>
+                      <Input
+                        id={`max-${config.route_type}`}
+                        type="number"
+                        value={config.max_requests}
+                        onChange={(e) => updateRateLimitConfig(config.route_type, 'max_requests', parseInt(e.target.value) || 1)}
+                        className="w-20"
+                        min="1"
+                        max="10000"
+                        disabled={saving || !config.enabled}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor={`window-${config.route_type}`} className="text-sm">
+                        Per Minute:
+                      </Label>
+                      <Input
+                        id={`window-${config.route_type}`}
+                        type="number"
+                        value={config.window_minutes}
+                        onChange={(e) => updateRateLimitConfig(config.route_type, 'window_minutes', parseInt(e.target.value) || 1)}
+                        className="w-16"
+                        min="1"
+                        max="60"
+                        disabled={saving || !config.enabled}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+          <div className="flex justify-end">
+            <Button
+              onClick={() => saveSettings({})}
+              disabled={saving}
+            >
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Rate Limiting Settings
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Rate Limiting Analytics
+          </CardTitle>
+          <CardDescription>
+            Monitor rate limiting trends and identify potential threats
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RateLimitTrends />
+        </CardContent>
+      </Card>
       </div>
     </div>
   );

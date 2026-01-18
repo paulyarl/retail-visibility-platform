@@ -25,13 +25,13 @@ export default function InventorySidebar({ tenantId, className }: InventorySideb
     {
       label: 'Barcode Scanner',
       href: `/t/${tenantId}/scan`,
-      icon: NavigationHelpers.getStandardIcon('BARCODE'),
+      icon: NavigationHelpers.getStandardIcon('INVENTORY_SCANNER'),
       description: 'Scan products to add or update inventory'
     },
     {
       label: 'Quick Start',
       href: `/t/${tenantId}/quick-start`,
-      icon: NavigationHelpers.getStandardIcon('QUICK_START'),
+      icon: NavigationHelpers.getStandardIcon('INVENTORY_QUICKSTART'),
       description: 'Get started with sample products and photos'
     }
   ];

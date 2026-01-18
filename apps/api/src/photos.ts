@@ -28,7 +28,7 @@ const supabase =
  */
 r.post("/:id/photos", upload.single("file"), async (req, res) => {
   try {
-    const itemId = req.params.id;
+    const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
     // verify item exists & get tenant
     const item = await prisma.inventory_items.findUnique({ where: { id: itemId } });

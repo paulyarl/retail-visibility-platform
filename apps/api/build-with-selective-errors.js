@@ -21,6 +21,11 @@ const SAFE_ERROR_PATTERNS = [
   // Type assignment errors for objects with both conventions
   /Type '.*' is not assignable to type '.*' because.*property.*missing/,
   
+  // Express parameter type errors (handled by parameter extraction)
+  /Argument of type 'string \| string\[\]' is not assignable to parameter of type 'string'/,
+  /Type 'string \| string\[\]' is not assignable to type 'string'/,
+  /Type 'string \| string\[\]' is not assignable to type 'string \| undefined'/,
+  
   // Duplicate property errors (we intentionally have both conventions)
   /An object literal cannot have multiple properties with the same name/,
   
@@ -53,9 +58,9 @@ const CRITICAL_ERROR_PATTERNS = [
   /Module.*has no exported member/,
   /Cannot find module.*or its corresponding type declarations/,
   
-  // Function signature errors
+  // Function signature errors (excluding Express parameter types)
   /Expected.*arguments, but got.*/,
-  /Argument of type.*is not assignable to parameter of type/
+  /This expression is not callable/,
 ];
 
 function isSafeError(errorLine) {

@@ -40,6 +40,16 @@ import { dailyRatesJob } from "./jobs/rates";
 import { ensureFeedCategoryView } from "./views";
 import { triggerRevalidate } from "./utils/revalidate";
 import { categoryService } from "./services/CategoryService";
+
+// Utility function to safely extract string parameters from Express req.params
+function getParam(params: any, key: string): string {
+  const value = params[key];
+  if (Array.isArray(value)) {
+    return value[0] || '';
+  }
+  return value || '';
+}
+
 // Temporarily disable ALL route imports to isolate startup issue
 // import businessHoursRoutes from './routes/business-hours';
 // import tenantFlagsRoutes from './routes/tenant-flags';
@@ -81,6 +91,7 @@ import billingRoutes from './routes/billing';
 // import categoryRoutes from './routes/categories';
 import photosRouter from './photos';
 import directoryPhotosRouter from './routes/directory-photos';
+import rateLimitWarningsRoutes from './routes/rate-limit-warnings';
 
 // v3.6.2-prep imports - temporarily disabled
 // import feedJobsRoutes from './routes/feed-jobs';
@@ -557,7 +568,7 @@ app.get("/api/tenants/my-subdomains", authenticateToken, async (req, res) => {
 app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
     let tenant = await prisma.tenants.findUnique({ 
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       select: {
         id: true,
         name: true,
@@ -777,7 +788,7 @@ app.put("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
     if (parsed.data.region !== undefined) data.region = parsed.data.region;
     if (parsed.data.language !== undefined) data.language = parsed.data.language;
     if (parsed.data.currency !== undefined) data.currency = parsed.data.currency;
-    const tenant = await prisma.tenants.update({ where: { id: req.params.id }, data });
+    const tenant = await prisma.tenants.update({ where: { id: req.params.id as string }, data });
     res.json(tenant);
   } catch (e) {
     console.error('[PUT /tenants/:id] Error updating tenant:', e);
@@ -796,7 +807,7 @@ app.patch("/api/tenants/:id", authenticateToken, requireAdmin, validateTierAssig
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
   try {
     const tenant = await prisma.tenants.update({ 
-      where: { id: req.params.id }, 
+      where: { id: req.params.id as string }, 
       data: parsed.data 
     });
     res.json(tenant);
@@ -969,15 +980,15 @@ app.delete("/api/tenants/:id", authenticateToken, checkTenantAccess, requireTena
     
     // Explicitly delete directory-related data to prevent orphaned listings
     await prisma.directory_featured_listings_list.deleteMany({
-      where: { tenant_id },
+      where: { tenant_id: req.params.id as string },
     });
     
     await prisma.directory_settings_list.deleteMany({
-      where: { tenant_id },
+      where: { tenant_id: req.params.id as string },
     });
     
     // Delete the tenant (cascade will handle other relations)
-    await prisma.tenants.delete({ where: { id: tenant_id } });
+    await prisma.tenants.delete({ where: { id: req.params.id as string } });
     
     console.log(`[Audit] Tenant deleted: ${tenant_id} (including directory listings)`);
     res.status(204).end();
@@ -1043,7 +1054,7 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
           ? userRole as UserRole
           : 'TENANT_VIEWER';
     }
-    const tenantRole = req.user?.tenantIds?.includes(id) ? 'TENANT_ADMIN' : normalizedRole;
+    const tenantRole = req.user?.tenantIds?.includes(id as string) ? 'TENANT_ADMIN' : normalizedRole;
 
     console.log(`[PATCH /tenants/${id}/status] Permission check`, {
       userRole,
@@ -1062,7 +1073,7 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
 
     // Get current tenant
     console.log(`[PATCH /tenants/${id}/status] Fetching tenant data`);
-    const tenant = await prisma.tenants.findUnique({ where: { id } });
+    const tenant = await prisma.tenants.findUnique({ where: { id:id as string } });
     if (!tenant) {
       console.log(`[PATCH /tenants/${id}/status] Tenant not found`);
       return res.status(404).json({ error: "tenant_not_found" });
@@ -1103,7 +1114,7 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
 
     // Update tenant status (location status logs are ignored in Prisma schema)
     const updated = await basePrisma.tenants.update({
-      where: { id },
+      where: { id: id as string },
       data: {
         location_status: status,
         status_changed_at: new Date(),
@@ -1140,7 +1151,7 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
     // Sync to Google Business Profile (async, don't block response)
     const { syncLocationStatusToGoogle } = await import('./services/GoogleBusinessStatusSync');
     console.log(`[PATCH /tenants/${id}/status] Triggering GBP sync`);
-    syncLocationStatusToGoogle(id, status, reopening_date ? new Date(reopening_date) : null)
+    syncLocationStatusToGoogle(id as string, status, reopening_date ? new Date(reopening_date) : null)
       .then((result) => {
         if (result.success) {
           console.log(`[Status Change] Google sync successful for tenant ${id}:`, result.gbpStatus);
@@ -1185,7 +1196,7 @@ app.post("/api/tenants/:id/status/preview", authenticateToken, checkTenantAccess
     const { id } = req.params;
     const { status } = req.body;
 
-    const tenant = await prisma.tenants.findUnique({ where: { id } });
+    const tenant = await prisma.tenants.findUnique({ where: { id: id as string } });
     if (!tenant) {
       return res.status(404).json({ error: "tenant_not_found" });
     }
@@ -2470,9 +2481,9 @@ app.get("/api/tenants/:tenant_id/categories", authenticateToken, checkTenantAcce
     const { getCategoryCounts, getUncategorizedCount, getTotalProductCount } = await import('./utils/category-counts');
     
     // Get categories with counts (ALL items, not just public)
-    const categories = await getCategoryCounts(tenant_id, true);
-    const uncategorizedCount = await getUncategorizedCount(tenant_id, true);
-    const totalCount = await getTotalProductCount(tenant_id, true);
+    const categories = await getCategoryCounts(tenant_id as string, true);
+    const uncategorizedCount = await getUncategorizedCount(tenant_id as string, true);
+    const totalCount = await getTotalProductCount(tenant_id as string, true);
     
     res.json({
       categories,
@@ -2845,7 +2856,7 @@ app.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req, r
     });
 
     // Verify tenant exists
-    const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
+    const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id as string } });
     if (!tenant) {
       console.log(`[Logo Upload] Tenant not found: ${tenant_id}`);
       return res.status(404).json({ error: "tenant_not_found" });
@@ -2947,7 +2958,7 @@ app.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req, r
 
     // Update tenant metadata with logo URL
     const updatedTenant = await prisma.tenants.update({
-      where: { id: tenant_id },
+      where: { id: tenant_id as string },
       data: {
         metadata: {
           ...(tenant.metadata as any || {}),
@@ -2959,7 +2970,7 @@ app.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req, r
     // Also update business profile logo_url for directory listings (if profile exists)
     try {
       await prisma.tenant_business_profiles_list.update({
-        where: { tenant_id },
+        where: { tenant_id: tenant_id as string },
         data: { logo_url: publicUrl },
       });
     } catch (profileError: any) {
@@ -2985,7 +2996,7 @@ app.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req, r
 // Banner upload endpoint (similar to logo but for wide banners)
 app.post("/api/tenant/:id/banner", logoUploadMulter.single("file"), async (req, res) => {
   try {
-    const tenant_id = req.params.id;
+    const tenant_id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     console.log(`[Banner Upload] Starting upload for tenant ${tenant_id}`);
 
     // Verify tenant exists
@@ -3781,8 +3792,9 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
 });
 
 app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"], async (req, res) => {
+  const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const it = await prisma.inventory_items.findUnique({
-    where: { id: req.params.id },
+    where: { id: itemId },
   });
   if (!it) return res.status(404).json({ error: "not_found" });
 
@@ -4103,8 +4115,9 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     
     console.log('[PUT /items/:id] Final update data:', JSON.stringify(updateData));
     
+    const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const updated = await prisma.inventory_items.update({
-      where: { id: req.params.id },
+      where: { id: itemId },
       data: updateData,
     });
     
@@ -5488,6 +5501,10 @@ app.get("/api/gbp/categories", async (req, res) => {
 /* ------------------------------ platform settings ------------------------------ */
 app.use('/api', platformSettingsRoutes);
 console.log('✅ Platform settings routes mounted at /api');
+
+/* ------------------------------ rate limit warnings ------------------------------ */
+app.use('/api', rateLimitWarningsRoutes);
+console.log('✅ Rate limit warnings routes mounted at /api');
 
 /* ------------------------------ permissions ------------------------------ */
 app.use('/api/permissions', permissionRoutes);

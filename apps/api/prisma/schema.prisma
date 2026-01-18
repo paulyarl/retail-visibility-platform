@@ -2460,3 +2460,33 @@ model product_variants {
   @@index([sku])
   @@index([is_active])
 }
+
+model rate_limit_configurations {
+  id              String   @id @default(cuid())
+  route_type      String   // 'auth', 'admin', 'strict', 'standard', 'exempt'
+  max_requests    Int      @default(100)
+  window_minutes  Int      @default(1)
+  enabled         Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@unique([route_type])
+}
+
+model rate_limit_warnings {
+  id              String   @id @default(cuid())
+  client_id       String
+  pathname        String
+  request_count   Int
+  max_requests    Int
+  window_ms       Int
+  ip_address      String?
+  user_agent      String?
+  occurred_at      DateTime @default(now())
+  blocked         Boolean  @default(false)
+
+  @@index([client_id, occurred_at(sort: Desc)], map: "idx_rate_limit_warnings_client_id_occurred_at_desc")
+  @@index([pathname, occurred_at(sort: Desc)], map: "idx_rate_limit_warnings_pathname_occurred_at_desc")
+  @@index([occurred_at(sort: Desc)], map: "idx_rate_limit_warnings_occurred_at_desc")
+  @@map("rate_limit_warnings")
+}

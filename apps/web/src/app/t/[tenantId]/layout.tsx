@@ -1,13 +1,13 @@
 import { cookies } from 'next/headers';
 import { redirect, notFound } from 'next/navigation';
 import RememberTenantRoute from '@/components/client/RememberTenantRoute';
-import ClientTenantShell from '@/components/tenant/ClientTenantShell';
+import { DynamicTenantLayout } from '@/components/navigation/SidebarLayout';
 import { getTenantContext } from '@/lib/tenantContext';
 import TenantContextProvider from '@/components/tenant/TenantContextProvider';
 import { isFeatureEnabled } from '@/lib/featureFlags';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
-export default async function TenantLayout({ children, params }: { children: React.ReactNode; params: Promise<{ tenantId: string }> | { tenantId: string } }) {
+export default async function TenantPageLayout({ children, params }: { children: React.ReactNode; params: Promise<{ tenantId: string }> | { tenantId: string } }) {
   const cookieStore = await cookies();
   const token = cookieStore.get('access_token')?.value;
   const resolvedParams = (params && typeof params === 'object' && 'then' in (params as any)) 
@@ -76,15 +76,68 @@ export default async function TenantLayout({ children, params }: { children: Rea
   const ffTenantUrls = isFeatureEnabled('FF_TENANT_URLS', tenantId);
   const ffAppShellNav = isFeatureEnabled('FF_APP_SHELL_NAV', tenantId);
 
+  // Dynamic nav items with template literals (like the old system)
   const nav = [
-    { label: 'My Locations', href: `/tenants` },
-    { label: 'Dashboard', href: `/t/${tenantId}/dashboard` },    
-    { label: 'Intentory', href: `/t/${tenantId}/items` },
-    { label: 'Barcode Scan', href: `/t/${tenantId}/scan` },
-    { label: 'Quick Start', href: `/t/${tenantId}/quick-start` },
-    { label: 'Categories', href: `/t/${tenantId}/categories` },
-    { label: 'Onboarding', href: `/t/${tenantId}/onboarding` },
-    { label: 'Settings', href: `/t/${tenantId}/settings` },
+    { label: 'Dashboard', href: `/t/${tenantId}` },
+    { 
+      label: 'Order Processing', 
+      href: `/t/${tenantId}/orders`,
+      children: [
+        { label: 'Order Management', href: `/t/${tenantId}/orders` },
+        { label: 'Payment Gateways', href: `/t/${tenantId}/settings/payment-gateways` },
+        { label: 'Fulfillment Options', href: `/t/${tenantId}/settings/fulfillment` },
+      ]
+    },
+    { 
+      label: 'Inventory', 
+      href: `/t/${tenantId}/items`,
+      children: [
+        { label: 'Items', href: `/t/${tenantId}/items` },
+        { label: 'Barcode Scan', href: `/t/${tenantId}/scan` },
+        { label: 'Quick Start', href: `/t/${tenantId}/quick-start` },
+        { label: 'Categories', href: `/t/${tenantId}/categories` },
+      ]
+    },
+    { 
+      label: 'Onboarding', 
+      href: `/t/${tenantId}/onboarding`,
+      children: [
+        // Profile & Identity
+        { label: 'Store Profile', href: `/t/${tenantId}/settings/tenant` },
+        { label: 'My Account', href: `/t/${tenantId}/settings/account` },
+        { label: 'Branding', href: `/t/${tenantId}/settings/branding` },
+        { label: 'Custom Subdomain', href: `/t/${tenantId}/settings/subdomain` },
+        
+        // Business Information
+        { label: 'Business Hours', href: `/t/${tenantId}/settings/hours` },
+        { label: 'Business Category', href: `/t/${tenantId}/settings/gbp-category` },
+        { label: 'Directory Settings', href: `/t/${tenantId}/settings/directory` },
+        { label: 'Location Status', href: `/t/${tenantId}/settings/location-status` },
+        
+        // Team & Organization
+        { label: 'Team Members', href: `/t/${tenantId}/settings/users` },
+        { label: 'Organization Settings', href: `/t/${tenantId}/settings/organization` },
+        
+        // Getting Started
+        { label: 'Featured Products', href: `/t/${tenantId}/settings/products/featuring` },
+      ]
+    },
+    { 
+      label: 'Settings', 
+      href: `/t/${tenantId}/settings`,
+      children: [
+        // Account & Preferences
+        { label: 'Appearance', href: `/t/${tenantId}/settings/appearance` },
+        { label: 'Language & Region', href: `/t/${tenantId}/settings/language` },
+        
+        // Advanced Settings
+        { label: 'Propagation Control', href: `/t/${tenantId}/settings/propagation` },
+        
+        // Subscription
+        { label: 'Platform Offerings', href: `/settings/offerings` },
+        { label: 'My Subscription', href: `/t/${tenantId}/settings/subscription` },
+      ]
+    },
   ];
 
   return (
@@ -93,15 +146,9 @@ export default async function TenantLayout({ children, params }: { children: Rea
       <RememberTenantRoute tenantId={tenantId} />
       <ProtectedRoute>
         <TenantContextProvider value={{ tenantId: tenantCtx.tenantId ?? tenantId, tenantSlug: tenantCtx.tenantSlug, aud: tenantCtx.aud }}>
-          <ClientTenantShell 
-            tenantId={tenantId} 
-            initialTenantName={tenantName}
-            initialTenantLogoUrl={tenantLogoUrl}
-            nav={nav} 
-            tenants={tenantList}
-          >
+          <DynamicTenantLayout navItems={nav}>
             {children}
-          </ClientTenantShell>
+          </DynamicTenantLayout>
         </TenantContextProvider>
       </ProtectedRoute>
     </>

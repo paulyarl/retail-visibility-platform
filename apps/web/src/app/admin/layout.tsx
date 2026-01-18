@@ -91,7 +91,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
             </div>
             <Link
-              href="/settings/admin"
+              href="/admin"
               className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               <Home className="w-3 h-3 sm:w-4 sm:h-4" />

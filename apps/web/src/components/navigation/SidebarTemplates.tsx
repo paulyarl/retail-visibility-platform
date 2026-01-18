@@ -1,6 +1,9 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import GeneralSidebar from '../GeneralSidebar';
-import NavigationStandards, { NavigationHelpers } from '@/lib/navigation/NavigationStandards';
+import NavigationStandards from '@/lib/navigation/NavigationStandards';
+import { NavigationHelpers } from '@/lib/navigation/NavigationHelpers';
 
 // NavItem type definition (copied from GeneralSidebar since it's not exported)
 type NavItem = {
@@ -12,17 +15,8 @@ type NavItem = {
     variant: 'default' | 'success' | 'warning' | 'error' | 'org'
   }
   children?: NavItem[]
-  accessLevel?: 'public' | 'user' | 'admin' | 'owner'
   hierarchy?: number
 }
-
-// Icon components - Use NavigationStandards for consistency
-const DashboardIcon = NavigationHelpers.getStandardIcon('ANALYTICS');
-const InventoryIcon = NavigationHelpers.getStandardIcon('STORE');
-const UsersIcon = NavigationHelpers.getStandardIcon('TEAM');
-const SettingsIcon = NavigationHelpers.getStandardIcon('SETTINGS');
-const StoreIcon = NavigationHelpers.getStandardIcon('STORE');
-const AnalyticsIcon = NavigationHelpers.getStandardIcon('ANALYTICS');
 
 // Tenant-scoped sidebar template
 export const TenantSidebarTemplate = () => {
@@ -158,13 +152,13 @@ export const TenantSidebarTemplate = () => {
     {
       label: 'Orders',
       href: '/t/[tenantId]/orders',
-      icon: NavigationHelpers.getStandardIcon('ANALYTICS'),
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_INSIGHTS'),
       hierarchy: NavigationStandards.GROUP_HIERARCHY.BUSINESS_OPERATIONS,
     },
     {
       label: 'Categories',
       href: '/t/[tenantId]/categories',
-      icon: NavigationHelpers.getStandardIcon('ANALYTICS'),
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_INSIGHTS'),
       hierarchy: NavigationStandards.GROUP_HIERARCHY.BUSINESS_OPERATIONS,
       children: [
         {
@@ -184,7 +178,7 @@ export const TenantSidebarTemplate = () => {
     {
       label: 'Settings',
       href: '/t/[tenantId]/settings',
-      icon: NavigationHelpers.getStandardIcon('SETTINGS'),
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_SETTINGS'),
       hierarchy: NavigationStandards.GROUP_HIERARCHY.ADVANCED_FEATURES,
       children: [
         {
@@ -225,74 +219,74 @@ export const AdminSidebarTemplate = () => {
   const adminNavItems: NavItem[] = NavigationHelpers.sortByHierarchy([
     {
       label: 'Admin Dashboard',
-      href: '/admin',
+      href: '/settings/admin',
       icon: NavigationHelpers.getStandardIcon('ADMIN'),
       hierarchy: NavigationStandards.GROUP_HIERARCHY.PLATFORM_ADMIN,
     },
     {
       label: 'User Management',
-      href: '/admin/users',
-      icon: NavigationHelpers.getStandardIcon('TEAM'),
+      href: '/settings/admin/users',
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_USERS'),
       hierarchy: NavigationStandards.GROUP_HIERARCHY.PLATFORM_USERS,
       children: [
         {
           label: 'All Users',
-          href: '/admin/users'
+          href: '/settings/admin/users'
         },
         {
           label: 'Invitations',
-          href: '/admin/invitations'
+          href: '/settings/admin/invitations'
         },
         {
           label: 'Permissions',
-          href: '/admin/permissions'
+          href: '/settings/admin/permissions'
         }
       ]
     },
     {
       label: 'Tenant Management',
-      href: '/admin/tenants',
+      href: '/settings/admin/tenants',
       icon: NavigationHelpers.getStandardIcon('STORE'),
       hierarchy: NavigationStandards.GROUP_HIERARCHY.PLATFORM_USERS,
       children: [
         {
           label: 'All Tenants',
-          href: '/admin/tenants'
+          href: '/settings/admin/tenants'
         },
         {
           label: 'Tenant Limits',
-          href: '/admin/limits'
+          href: '/settings/admin/limits'
         },
         {
           label: 'Capacity Overview',
-          href: '/admin/capacity'
+          href: '/settings/admin/capacity'
         }
       ]
     },
     {
       label: 'Platform Settings',
-      href: '/admin/settings',
-      icon: NavigationHelpers.getStandardIcon('SETTINGS'),
+      href: '/settings/admin/settings',
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_SETTINGS'),
       hierarchy: NavigationStandards.GROUP_HIERARCHY.PLATFORM_SETTINGS,
       children: [
         {
           label: 'General Settings',
-          href: '/admin/settings'
+          href: '/settings/admin/settings'
         },
         {
           label: 'Feature Flags',
-          href: '/admin/features'
+          href: '/settings/admin/features'
         },
         {
           label: 'Integrations',
-          href: '/admin/integrations'
+          href: '/settings/admin/integrations'
         }
       ]
     },
     {
       label: 'Insights & Analytics',
       href: '/insights',
-      icon: NavigationHelpers.getStandardIcon('ANALYTICS'),
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_INSIGHTS'),
       hierarchy: NavigationStandards.GROUP_HIERARCHY.PLATFORM_INSIGHTS,
       children: [
         {
@@ -322,6 +316,28 @@ export const AdminSidebarTemplate = () => {
 
 // Platform-scoped sidebar template
 export const PlatformSidebarTemplate = () => {
+  const [tenants, setTenants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Fetch tenants for dynamic sidebar
+  useEffect(() => {
+    const fetchTenants = async () => {
+      try {
+        const response = await fetch('/api/tenants');
+        if (response.ok) {
+          const data = await response.json();
+          setTenants(data.tenants || data || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch tenants:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchTenants();
+  }, []);
+
   const platformNavItems: NavItem[] = NavigationHelpers.sortByHierarchy([
     {
       label: 'Platform Dashboard',
@@ -335,24 +351,24 @@ export const PlatformSidebarTemplate = () => {
         },
         {
           label: 'Admin Controls',
-          href: '/admin',
+          href: '/settings/admin',
           accessLevel: 'admin',
           children: [
             {
               label: 'User Management',
-              href: '/admin/users'
+              href: '/settings/admin/users'
             },
             {
               label: 'Tenant Management',
-              href: '/admin/tenants'
+              href: '/settings/admin/tenants'
             },
             {
               label: 'System Settings',
-              href: '/admin/system'
+              href: '/settings/admin/system'
             },
             {
               label: 'Feature Flags',
-              href: '/admin/features'
+              href: '/settings/admin/features'
             }
           ]
         },
@@ -382,20 +398,42 @@ export const PlatformSidebarTemplate = () => {
       icon: NavigationHelpers.getStandardIcon('STORE'),
       hierarchy: NavigationStandards.GROUP_HIERARCHY.BUSINESS_OPERATIONS,
       badge: {
-        text: '12',
+        text: loading ? '...' : String(tenants.length),
         variant: 'default'
-      }
+      },
+      children: [
+        {
+          label: 'All Tenants',
+          href: '/tenants'
+        },
+        {
+          label: 'Create Tenant',
+          href: '/tenants/create'
+        },
+        ...(tenants.length > 0 ? [
+          { label: '─', href: '#' }, // Separator
+          ...tenants.map((tenant: any) => ({
+            label: tenant.name || 'Unknown Tenant',
+            href: `/tenants/${tenant.id}`,
+            badge: tenant.locationStatus ? {
+              text: tenant.locationStatus,
+              variant: tenant.locationStatus === 'active' ? 'success' : 
+                      tenant.locationStatus === 'pending' ? 'warning' : 'default'
+            } : undefined
+          }))
+        ] : [])
+      ]
     },
     {
       label: 'Directory',
       href: '/directory',
-      icon: NavigationHelpers.getStandardIcon('ANALYTICS'),
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_INSIGHTS'),
       hierarchy: NavigationStandards.GROUP_HIERARCHY.BUSINESS_OPERATIONS,
     },
     {
       label: 'Settings',
       href: '/settings',
-      icon: NavigationHelpers.getStandardIcon('SETTINGS'),
+      icon: NavigationHelpers.getStandardIcon('PLATFORM_SETTINGS'),
       hierarchy: NavigationStandards.GROUP_HIERARCHY.ADVANCED_FEATURES,
       children: [
         {
