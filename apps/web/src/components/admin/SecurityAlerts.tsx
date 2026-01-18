@@ -171,9 +171,9 @@ export default function SecurityAlerts() {
       ) : (
         <div className="space-y-3">
           {alerts.map((alert) => {
-          const deviceInfo = extractEnhancedDeviceInfo(alert.metadata);
-          
-          return (
+            const deviceInfo = extractEnhancedDeviceInfo(alert.metadata);
+            
+            return (
             <Card key={alert.id} className={`border-l-4 border-l-${
               alert.severity === 'critical' ? 'red' : 
               alert.severity === 'warning' ? 'orange' : 
@@ -336,6 +336,18 @@ export default function SecurityAlerts() {
             </Card>
           );
         })}  // Close alerts.map function
+        </div>
+      )}
+      
+      {/* Pagination Controls */}
+      {pagination && (
+        <div className="mt-6">
+          <SecurityPagination
+            pagination={pagination}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            loading={loading}
+          />
         </div>
       )}
     </div>
