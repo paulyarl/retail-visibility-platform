@@ -25,6 +25,7 @@ interface ProductData {
   has_variants?: boolean;
   has_active_payment_gateway?: boolean;
   availability?: 'in_stock' | 'out_of_stock' | 'preorder';
+  isFeatured?: boolean;
   tenantCategory?: {
     id: string;
     name: string;
@@ -395,11 +396,21 @@ export default function SmartProductCard({
                       {displayBrand}
                     </p>
                   )}
-                  {showCategory && product.tenantCategory && (
-                    <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
-                      {product.tenantCategory.name}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {product.isFeatured && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg">
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                        FEATURED
+                      </span>
+                    )}
+                    {showCategory && product.tenantCategory && (
+                      <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
+                        {product.tenantCategory.name}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <Link href={`/products/${product.id}`}>
                   <h3 className="font-semibold text-lg text-neutral-900 dark:text-white mb-2 hover:text-primary-600 dark:hover:text-primary-400">

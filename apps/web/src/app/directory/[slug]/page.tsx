@@ -69,6 +69,26 @@ async function getStorefrontCategories(tenantId: string) {
   }
 }
 
+async function getActualProductCount(tenantId: string) {
+  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  
+  try {
+    const res = await fetch(`${apiUrl}/api/storefront/${tenantId}/products?limit=1`, {
+      next: { revalidate: 300 }, // Revalidate every 5 minutes
+    });
+
+    if (!res.ok) {
+      return 0;
+    }
+
+    const data = await res.json();
+    return data.pagination?.totalItems || 0;
+  } catch (error) {
+    console.error('Error fetching actual product count:', error);
+    return 0;
+  }
+}
+
 async function getBusinessProfile(tenantId: string) {
   const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
   
@@ -369,12 +389,14 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
     businessProfile,
     businessHours,
     relatedProducts,
-    storefrontCategories
+    storefrontCategories,
+    actualProductCount
   ] = await Promise.all([
     getBusinessProfile(listing.tenantId),
     getBusinessHours(listing.tenantId),
     primaryCategory ? getRelatedProducts(primaryCategory.slug, listing.tenantId, 6) : Promise.resolve([]),
-    getStorefrontCategories(listing.tenantId)
+    getStorefrontCategories(listing.tenantId),
+    getActualProductCount(listing.tenantId)
   ]);
   
   // Compute store status from business hours data
@@ -538,7 +560,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                           <svg className="w-4 h-4 mr-1.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                           </svg>
-                          {storefrontCategories.categories.reduce((sum: number, cat: any) => sum + (cat.count || 0), 0) + storefrontCategories.uncategorizedCount} products available
+                          {actualProductCount > 0 ? actualProductCount : (listing.productCount || 0)} products available
                         </span>
                       </div>
                     )}

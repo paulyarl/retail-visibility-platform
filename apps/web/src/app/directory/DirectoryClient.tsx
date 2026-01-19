@@ -3,7 +3,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Map, Grid3x3, List, Sparkles } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Map, Grid3x3, List, Sparkles, ShoppingCart } from 'lucide-react';
 import DirectorySearch from '@/components/directory/DirectorySearch';
 import DirectoryGrid from '@/components/directory/DirectoryGrid';
 import DirectoryList from '@/components/directory/DirectoryList';
@@ -15,6 +16,7 @@ import RandomFeaturedProducts from '@/components/directory/RandomFeaturedProduct
 import { Pagination } from '@/components/ui';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { useMultiCart } from '@/hooks/useMultiCart';
 import dynamic from 'next/dynamic';
 
 // Cache configuration for directory data
@@ -157,6 +159,8 @@ interface DirectoryResponse {
 
 export default function DirectoryClient() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { totalItems: cartTotalItems } = useMultiCart();
   const [data, setData] = useState<DirectoryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -205,6 +209,11 @@ export default function DirectoryClient() {
     setPageSize(size);
     localStorage.setItem('directory-page-size', size.toString());
     // Fetch categories (locations endpoint disabled for now)
+  };
+
+  // Handle view cart
+  const handleViewCart = () => {
+    router.push('/carts');
   };
 
   useEffect(() => {
@@ -440,6 +449,20 @@ export default function DirectoryClient() {
                       <span>Results for</span>
                       <span className="font-semibold text-neutral-900 dark:text-white ml-1">"{searchParams.get('q')}"</span>
                     </div>
+                  )}
+                  {/* Cart Button - Only show if items in cart */}
+                  {cartTotalItems > 0 && (
+                    <button
+                      onClick={handleViewCart}
+                      className="relative inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                      title="View your shopping cart"
+                    >
+                      <ShoppingCart className="w-4 h-4" />
+                      <span className="hidden sm:inline">Cart</span>
+                      <span className="absolute -top-2 -right-2 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
+                        {cartTotalItems > 99 ? '99+' : cartTotalItems}
+                      </span>
+                    </button>
                   )}
                 </div>
               )}

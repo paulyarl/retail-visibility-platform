@@ -21,6 +21,7 @@ interface LastViewedStore {
   ratingAvg?: number;
   ratingCount?: number;
   productCount?: number;
+  isFeatured?: boolean;
 }
 
 interface LastViewedProduct {
@@ -35,6 +36,7 @@ interface LastViewedProduct {
   productCurrency?: string;
   productStock?: number;
   productAvailability?: string;
+  isFeatured?: boolean;
   storeName?: string;
   storeSlug?: string;
   storeLogo?: string;
@@ -152,7 +154,8 @@ export default function LastViewed({
                 reason: item.reason,
                 hasActivePaymentGateway: item.hasActivePaymentGateway,
                 tenantLogo: item.tenantLogo,
-                tenantCategory: item.tenantCategory
+                tenantCategory: item.tenantCategory,
+                isFeatured: item.isFeatured
               }
             };
           } else {
@@ -171,7 +174,8 @@ export default function LastViewed({
                 logoUrl: item.logoUrl,
                 ratingAvg: item.ratingAvg,
                 ratingCount: item.ratingCount,
-                productCount: item.productCount
+                productCount: item.productCount,
+                isFeatured: item.isFeatured
               }
             };
           }
@@ -253,6 +257,7 @@ export default function LastViewed({
                       ratingAvg: storeData.ratingAvg,
                       ratingCount: storeData.ratingCount,
                       productCount: storeData.productCount,
+                      isFeatured: storeData.isFeatured,
                       reason: storeData.reason,
                       directoryPublished: true
                     }}
@@ -282,10 +287,11 @@ export default function LastViewed({
                     has_active_payment_gateway: productData.hasActivePaymentGateway,
                     payment_gateway_type: productData.defaultGatewayType,
                     tenantCategory: productData.tenantCategory,
+                    isFeatured: productData.isFeatured
                   }}
                   tenantName={productData.businessName || productData.storeName}
                   tenantLogo={productData.tenantLogo || productData.storeLogo}
-                  variant="grid"
+                  variant={productData.isFeatured ? 'featured' : 'grid'}
                   showCategory={true}
                   showDescription={true}
                   className="h-full"

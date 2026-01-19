@@ -238,6 +238,7 @@ export default function RandomFeaturedProducts() {
                   has_variants: false,
                   has_active_payment_gateway: product.hasActivePaymentGateway,
                   payment_gateway_type: product.paymentGatewayType,
+                  isFeatured: true // All products in RandomFeaturedProducts are featured
                 }}
                 tenantName={product.storeName}
                 tenantLogo={product.storeLogo}
@@ -251,129 +252,37 @@ export default function RandomFeaturedProducts() {
           /* List View */
           <div className="space-y-4">
             {products.map((product) => (
-              <div key={product.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                <div className="flex flex-col md:flex-row gap-6">
-                  {/* Product Image */}
-                  <div className="flex-shrink-0">
-                    <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden">
-                      {product.imageUrl ? (
-                        <img
-                          src={product.imageUrl}
-                          alt={product.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Package className="w-8 h-8 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Product Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{product.name}</h3>
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                        Featured
-                      </span>
-                    </div>
-                    {product.brand && (
-                      <p className="text-sm text-gray-500 mb-2">{product.brand}</p>
-                    )}
-                    {product.categoryName && (
-                      <p className="text-sm text-blue-600 font-medium mb-2">{product.categoryName}</p>
-                    )}
-                    {product.distanceKm !== null && product.distanceKm !== undefined ? (
-                      <p className="text-sm text-green-600 font-medium mb-2">
-                        📍 {Math.round(product.distanceKm)} km away
-                      </p>
-                    ) : (
-                      <p className="text-sm text-gray-500 font-medium mb-2">
-                        📍 {product.storeCity}, {product.storeState}
-                      </p>
-                    )}
-                    {product.description && (
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">{product.description}</p>
-                    )}
-                    
-                    {/* Store Info */}
-                    <div className="flex items-center space-x-3 mb-3">
-                      {product.storeLogo ? (
-                        <img
-                          src={product.storeLogo}
-                          alt={product.storeName}
-                          className="w-6 h-6 rounded-full"
-                        />
-                      ) : (
-                        <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
-                          <Package className="w-3 h-3 text-gray-400" />
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{product.storeName}</p>
-                        {(product.storeCity || product.storeState) && (
-                          <p className="text-xs text-gray-500">
-                            {product.storeCity && product.storeState 
-                              ? `${product.storeCity}, ${product.storeState}`
-                              : product.storeCity || product.storeState
-                            }
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Price and Actions */}
-                  <div className="flex flex-col items-end space-y-3 ml-4">
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-gray-900">
-                        ${(product.priceCents / 100).toFixed(2)}
-                      </p>
-                      <p className="text-sm text-gray-500">{product.currency}</p>
-                    </div>
-                    
-                    <div className="flex space-x-2">
-                      <SmartProductCard
-                        product={{
-                          id: product.id,
-                          sku: product.id,
-                          name: product.name,
-                          title: product.name,
-                          brand: product.brand || '',
-                          description: product.description || '',
-                          priceCents: product.priceCents,
-                          stock: product.stock,
-                          imageUrl: product.imageUrl,
-                          tenantId: product.tenantId,
-                          availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined) || 'in_stock',
-                          tenantCategory: product.categoryName ? {
-                            id: product.categorySlug || product.categoryName,
-                            name: product.categoryName,
-                            slug: product.categorySlug || product.categoryName,
-                          } : undefined,
-                          has_variants: false,
-                          has_active_payment_gateway: product.hasActivePaymentGateway,
-                          payment_gateway_type: product.paymentGatewayType,
-                        }}
-                        tenantName={product.storeName}
-                        tenantLogo={product.storeLogo}
-                        variant="compact"
-                        showCategory={false}
-                        showDescription={false}
-                      />
-                      
-                      <Link
-                        href={`/directory/${product.storeSlug}`}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center"
-                        title={`More from ${product.storeName}`}
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <SmartProductCard
+                key={product.id}
+                product={{
+                  id: product.id,
+                  sku: product.id,
+                  name: product.name,
+                  title: product.name,
+                  brand: product.brand || '',
+                  description: product.description || '',
+                  priceCents: product.priceCents,
+                  stock: product.stock,
+                  imageUrl: product.imageUrl,
+                  tenantId: product.tenantId,
+                  availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined) || 'in_stock',
+                  tenantCategory: product.categoryName ? {
+                    id: product.categorySlug || product.categoryName,
+                    name: product.categoryName,
+                    slug: product.categorySlug || product.categoryName,
+                  } : undefined,
+                  has_variants: false,
+                  has_active_payment_gateway: product.hasActivePaymentGateway,
+                  payment_gateway_type: product.paymentGatewayType,
+                  isFeatured: true // All products in RandomFeaturedProducts are featured
+                }}
+                tenantName={product.storeName}
+                tenantLogo={product.storeLogo}
+                variant="list"
+                showCategory={true}
+                showDescription={true}
+                className="w-full"
+              />
             ))}
           </div>
         )}

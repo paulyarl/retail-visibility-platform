@@ -793,7 +793,8 @@ export async function getLastViewedItems(
                 WHERE ii.tenant_id = dcl.tenant_id
                   AND ii.item_status = 'active'
                   AND ii.visibility = 'public'
-              ), 0)
+              ), 0),
+              'isFeatured', dcl.is_featured
             )
             FROM directory_listings_list dcl
             WHERE (dcl.tenant_id = rv.entity_id OR dcl.slug = rv.entity_id)
@@ -812,6 +813,7 @@ export async function getLastViewedItems(
               'currency', sp.currency,
               'stock', sp.stock,
               'availability', sp.availability,
+              'isFeatured', sp.is_featured,
               'storeName', dcl.business_name,
               'storeSlug', dcl.slug,
               'storeLogo', dcl.logo_url,
@@ -863,7 +865,8 @@ export async function getLastViewedItems(
             logoUrl: data.logoUrl,
             ratingAvg: data.ratingAvg,
             ratingCount: data.ratingCount,
-            productCount: data.productCount
+            productCount: data.productCount,
+            isFeatured: data.isFeatured
           } as Recommendation;
         } else if (row.entity_type === 'product') {
           return {
@@ -884,6 +887,7 @@ export async function getLastViewedItems(
             productStock: data.stock,
             productAvailability: data.availability,
             productCurrency: data.currency,
+            isFeatured: data.isFeatured,
             tenantLogo: data.storeLogo,
             tenantCategory: data.tenantCategory,
             hasActivePaymentGateway: data.hasActivePaymentGateway,
