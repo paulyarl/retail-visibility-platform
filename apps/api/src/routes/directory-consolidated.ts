@@ -34,6 +34,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       featuredProductsResult,
       storeTypesResult,
       categoryCountsResult,
+      randomFeaturedProductsResult,
       recommendationsResult,
       lastViewedResult
     ] = await Promise.allSettled([
@@ -100,7 +101,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           custom_cta,
           social_links,
           landing_page_theme,
-          directory_category_id,
+          category_id,
           category_name,
           category_slug,
           is_featured,
@@ -141,6 +142,40 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
         []
       ),
 
+      // 5. Random featured products
+      pool.query(
+        `SELECT 
+          sp.id,
+          sp.name,
+          sp.price_cents,
+          sp.currency,
+          sp.image_url,
+          sp.brand,
+          sp.description,
+          sp.stock,
+          sp.availability,
+          sp.tenant_id,
+          sp.category_name,
+          sp.category_slug,
+          sp.has_active_payment_gateway,
+          sp.default_gateway_type,
+          dsl.slug as store_slug,
+          dsl.business_name as store_name,
+          dsl.logo_url as store_logo,
+          dsl.city as store_city,
+          dsl.state as store_state,
+          sp.updated_at
+        FROM storefront_products sp
+        JOIN directory_listings_list dsl ON dsl.tenant_id = sp.tenant_id
+        WHERE sp.is_actively_featured = true 
+          AND dsl.is_published = true
+          AND sp.has_image = true
+          AND sp.stock > 0
+        ORDER BY RANDOM() 
+        LIMIT 12`,
+        []
+      ),
+
       // Note: Recommendations and last viewed are fetched separately by the frontend
       // since they require user/session context that isn't available in this endpoint
       Promise.resolve({ rows: [] }), // Placeholder for consistency
@@ -162,6 +197,31 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
 
     const categoryCounts = categoryCountsResult.status === 'fulfilled' 
       ? categoryCountsResult.value.rows 
+      : [];
+
+    const randomFeaturedProducts = randomFeaturedProductsResult.status === 'fulfilled' 
+      ? randomFeaturedProductsResult.value.rows.map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          priceCents: row.price_cents,
+          currency: row.currency,
+          imageUrl: row.image_url,
+          brand: row.brand,
+          description: row.description,
+          stock: row.stock,
+          availability: row.availability,
+          tenantId: row.tenant_id,
+          categoryName: row.category_name,
+          categorySlug: row.category_slug,
+          hasActivePaymentGateway: row.has_active_payment_gateway,
+          paymentGatewayType: row.default_gateway_type,
+          storeSlug: row.store_slug,
+          storeName: row.store_name,
+          storeLogo: row.store_logo,
+          storeCity: row.store_city,
+          storeState: row.store_state,
+          updatedAt: row.updated_at
+        }))
       : [];
 
     const recommendations = recommendationsResult.status === 'fulfilled' 
@@ -316,6 +376,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
         featuredProducts,
         storeTypes,
         categoryCounts,
+        randomFeaturedProducts,
         recommendations,
         lastViewed,
         paymentGatewayStatus,
@@ -327,6 +388,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
             featuredProducts: featuredProductsResult.status,
             storeTypes: storeTypesResult.status,
             categoryCounts: categoryCountsResult.status,
+            randomFeaturedProducts: randomFeaturedProductsResult.status,
             recommendations: recommendationsResult.status,
             lastViewed: lastViewedResult.status
           }

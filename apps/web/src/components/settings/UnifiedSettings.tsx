@@ -147,9 +147,9 @@ export default function UnifiedSettings({ config }: UnifiedSettingsProps) {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {group.cards.map((card) => (
+                {group.cards.map((card, index) => (
                   <CachedProtectedCard
-                    key={card.title}
+                    key={`${card.title}-${index}`}
                     accessOptions={card.accessOptions}
                     tenantId={config.tenantId}
                   >

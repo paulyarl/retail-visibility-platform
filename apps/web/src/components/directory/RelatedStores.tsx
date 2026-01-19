@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { UnifiedStoreCard } from './UnifiedStoreCard';
 import { Skeleton } from '@/components/ui';
 
@@ -108,9 +109,17 @@ export default function RelatedStores({
   return (
     <div className="bg-white border-t">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">
-          {title}
-        </h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">
+            {title}
+          </h2>
+          <Link
+            href="/directory"
+            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+          >
+            Browse All Stores →
+          </Link>
+        </div>
 
         {loading ? (
           // Loading skeleton

@@ -215,7 +215,7 @@ export function calculatePopularityScore(
   // Performance logging (development only)
   if (process.env.NODE_ENV === 'development') {
     const endTime = performance.now();
-    console.log(`🎯 Score calculation: ${(endTime - startTime).toFixed(3)}ms`);
+    // console.log(`🎯 Score calculation: ${(endTime - startTime).toFixed(3)}ms`);
   }
 
   return result;

@@ -51,6 +51,15 @@ export default function SmartProductCard({
   showDescription = true,
   className = '',
 }: SmartProductCardProps) {
+  // Debug logging for featured products
+  /* console.log('[SmartProductCard] Rendering product:', {
+    id: product.id,
+    name: product.name,
+    variant,
+    hasImage: !!product.imageUrl,
+    priceCents: product.priceCents
+  }); */
+
   // Try to use context first (performance optimization)
   const contextPayment = useTenantPaymentOptional();
   

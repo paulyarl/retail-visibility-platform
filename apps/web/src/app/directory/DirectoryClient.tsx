@@ -11,6 +11,7 @@ import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
 import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBrowser';
 import DirectoryStoreTypeBrowser from '@/components/directory/DirectoryStoreTypeBrowser';
 import LastViewed from '@/components/directory/LastViewed'; // NEW: LastViewed component import
+import RandomFeaturedProducts from '@/components/directory/RandomFeaturedProducts'; // NEW: Random featured products
 import { Pagination } from '@/components/ui';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
@@ -246,7 +247,7 @@ export default function DirectoryClient() {
               productCount: 0, // Not relevant for directory categories
             }));
             
-            console.log('[DirectoryClient] Processed categories:', categories);
+            // console.log('[DirectoryClient] Processed categories:', categories);
             
             // Cache the fresh data
             setCachedData(CACHE_CONFIG.categories.key, categories);
@@ -264,17 +265,17 @@ export default function DirectoryClient() {
         }
         
         let storeTypes = getCachedData(CACHE_CONFIG.storeTypes.key);
-        console.log('[DirectoryClient] Store types cache check:', storeTypes ? 'HIT' : 'MISS');
+        // console.log('[DirectoryClient] Store types cache check:', storeTypes ? 'HIT' : 'MISS');
         
         if (!storeTypes) {
-          console.log('[DirectoryClient] Making fresh API call to /api/directory/store-types');
+          // console.log('[DirectoryClient] Making fresh API call to /api/directory/store-types');
           // Fetch store types
           const storeTypesRes = await fetch(`${apiBaseUrl}/api/directory/store-types`);
           
           if (storeTypesRes.ok) {
             const typesData = await storeTypesRes.json();
             storeTypes = typesData.data?.storeTypes || [];
-            console.log('[DirectoryClient] API response:', storeTypes);
+           // console.log('[DirectoryClient] API response:', storeTypes);
             
             // Cache the fresh data
             setCachedData(CACHE_CONFIG.storeTypes.key, storeTypes);
@@ -463,6 +464,9 @@ export default function DirectoryClient() {
         locations={locations} 
       />
 
+      {/* Random Featured Products */}
+      <RandomFeaturedProducts />
+
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         {/* Error State */}
@@ -473,34 +477,43 @@ export default function DirectoryClient() {
         )}
 
         {/* Results Header with View Toggle and Page Size */}
-        {!loading && data && data.listings.length > 0 && (
-          <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <p className="text-neutral-600 dark:text-neutral-400">
-                Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalItems)} of {totalItems.toLocaleString()} stores
-              </p>
-              
-              {/* Page Size Dropdown */}
-              <div className="flex items-center gap-2">
-                <label htmlFor="pageSize" className="text-sm text-neutral-500 dark:text-neutral-400">
-                  Show:
-                </label>
-                <select
-                  id="pageSize"
-                  value={pageSize}
-                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                  className="px-2 py-1 text-sm border border-neutral-200 dark:border-neutral-700 rounded-md bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value={12}>12</option>
-                  <option value={24}>24</option>
-                  <option value={48}>48</option>
-                  <option value={96}>96</option>
-                </select>
-              </div>
+        {/* Store Listings Section */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">All Stores</h2>
+            <div className="text-sm text-neutral-500">
+              {totalItems.toLocaleString()} stores total
             </div>
-            
-            {/* View Toggle */}
-            <div className="flex items-center gap-2 bg-white dark:bg-neutral-800 rounded-lg p-1 border border-neutral-200 dark:border-neutral-700">
+          </div>
+
+          {!loading && data && data.listings.length > 0 && (
+            <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-4">
+                <p className="text-neutral-600 dark:text-neutral-400">
+                  Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalItems)} of {totalItems.toLocaleString()} stores
+                </p>
+                
+                {/* Page Size Dropdown */}
+                <div className="flex items-center gap-2">
+                  <label htmlFor="pageSize" className="text-sm text-neutral-500 dark:text-neutral-400">
+                    Show:
+                  </label>
+                  <select
+                    id="pageSize"
+                    value={pageSize}
+                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    className="px-2 py-1 text-sm border border-neutral-200 dark:border-neutral-700 rounded-md bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value={12}>12</option>
+                    <option value={24}>24</option>
+                    <option value={48}>48</option>
+                    <option value={96}>96</option>
+                  </select>
+                </div>
+              </div>
+              
+              {/* View Toggle */}
+              <div className="flex items-center gap-2 bg-white dark:bg-neutral-800 rounded-lg p-1 border border-neutral-200 dark:border-neutral-700">
               <button
                 onClick={() => handleViewModeChange('grid')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
@@ -584,6 +597,7 @@ export default function DirectoryClient() {
             />
           </div>
         )}
+        </div> {/* Close Store Listings Section */}
 
         {/* Browse Sections - Show immediately when collapsed (no search active) */}
         {!searchParams.get('q') && !searchParams.get('category') && (

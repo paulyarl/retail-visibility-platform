@@ -36,7 +36,7 @@ function getAccessToken(): string | null {
   // Try localStorage first (legacy)
   const localToken = localStorage.getItem('access_token');
   if (localToken) {
-    console.log('[API] Found token in localStorage access_token');
+    // console.log('[API] Found token in localStorage access_token');
     return localToken;
   }
 
@@ -111,7 +111,7 @@ export async function apiRequest(
   // Add Authorization header if token exists (for ALL requests, not just writes)
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
-    console.log('[API] Adding Authorization header to request:', endpoint);
+   // console.log('[API] Adding Authorization header to request:', endpoint);
   } else {
     console.log('[API] No token available for request:', endpoint);
   }

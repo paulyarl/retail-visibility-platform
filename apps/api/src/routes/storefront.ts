@@ -39,7 +39,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     
     // When no specific category is selected, only show products that have categories
     if (!category) {
-      conditions.push('sp.directory_category_id IS NOT NULL');
+      conditions.push('sp.category_id IS NOT NULL');
     }
     
     // Category filter - match by slug (MV uses category_slug)
@@ -88,7 +88,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         sp.custom_sections,
         sp.landing_page_theme,
         sp.category_slug,
-        sp.directory_category_id,
+        sp.category_id,
         sp.has_image,
         sp.in_stock,
         sp.has_gallery,
@@ -121,9 +121,9 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
       console.log(`[Storefront] Category: ${category}, Count: ${totalCount}, Returned: ${itemsResult.rows.length}`);
     }
     
-    // Fetch categories by slug (from category_slug) and id (from directory_category_id)
+    // Fetch categories by slug (from category_slug) and id (from category_id)
     const categorySlugs = [...new Set(itemsResult.rows.map((item: any) => item.category_slug).filter(Boolean))];
-    const categoryIds = [...new Set(itemsResult.rows.map((item: any) => item.directory_category_id).filter(Boolean))];
+    const categoryIds = [...new Set(itemsResult.rows.map((item: any) => item.category_id).filter(Boolean))];
     
     // Build category query to fetch by slug OR id
     let categoriesResult = { rows: [] as any[] };
@@ -155,13 +155,13 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     
     // Transform to camelCase for frontend compatibility
     const items = itemsResult.rows.map((row: any) => {
-      // Find tenant category - prefer category_path, fallback to directory_category_id
+      // Find tenant category - prefer category_path, fallback to category_id
       let tenantCategory = null;
       if (row.category_path && row.category_path.length > 0) {
         tenantCategory = categoryBySlug.get(row.category_path[0]) || null;
       }
-      if (!tenantCategory && row.directory_category_id) {
-        tenantCategory = categoryById.get(row.directory_category_id) || null;
+      if (!tenantCategory && row.category_id) {
+        tenantCategory = categoryById.get(row.category_id) || null;
       }
       
       return {
@@ -237,22 +237,19 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'tenant_required' });
     }
     
-    // Query product category counts - join on BOTH category_path array AND directory_category_id
+    // Query product category counts - join on BOTH category_path array AND category_id
     // This handles products that use either method of category assignment
     const query = `
       SELECT
         sp.category_name,
         sp.category_slug,
         sp.google_category_id,
-        COUNT(DISTINCT sp.id) as count,
-        COUNT(DISTINCT sp.id) FILTER (WHERE sp.has_image = true) as products_with_images,
-        COUNT(DISTINCT sp.id) FILTER (WHERE sp.description IS NOT NULL OR sp.marketing_description IS NOT NULL) as products_with_descriptions,
-        AVG(sp.price_cents) as avg_price_cents,
+        COUNT(DISTINCT sp.id) as product_count,
         MIN(sp.price_cents) as min_price_cents,
         MAX(sp.price_cents) as max_price_cents
       FROM storefront_products sp
       WHERE sp.tenant_id = $1
-        AND sp.directory_category_id IS NOT NULL
+        AND sp.category_id IS NOT NULL
       GROUP BY sp.category_name, sp.category_slug, sp.google_category_id
       HAVING COUNT(DISTINCT sp.id) > 0
       ORDER BY sp.category_name ASC
@@ -263,7 +260,7 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       SELECT COUNT(*) as count
       FROM storefront_products sp
       WHERE sp.tenant_id = $1
-        AND sp.directory_category_id IS NULL
+        AND sp.category_id IS NULL
     `;
     
     const [categoriesResult, uncategorizedResult] = await Promise.all([

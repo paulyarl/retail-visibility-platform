@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Search, Package, Tag, Calendar, DollarSign, Star, Plus, X, ArrowUpDown } from 'lucide-react';
+import { apiRequest } from '@/lib/api';
 
 interface FeaturedProduct {
   id: string;
@@ -95,7 +96,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
 
   const fetchFeaturedProducts = async () => {
     try {
-      const response = await fetch(`/api/tenants/${tenantId}/featured`);
+      const response = await apiRequest(`/api/tenants/${tenantId}/featured`);
       const data = await response.json();
       if (data.success) {
         setFeaturedProducts(data.data.grouped);
@@ -109,7 +110,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
 
   const fetchAvailableProducts = async () => {
     try {
-      const response = await fetch(
+      const response = await apiRequest(
         `/api/tenants/${tenantId}/available-featured?type=${selectedType}&search=${searchTerm}`
       );
       const data = await response.json();
@@ -124,9 +125,8 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
   const handleSaveFeatured = async () => {
     setIsManaging(true);
     try {
-      const response = await fetch(`/api/tenants/${tenantId}/featured/${selectedType}`, {
+      const response = await apiRequest(`/api/tenants/${tenantId}/featured/${selectedType}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productIds: selectedProducts,
           priorities: selectedProducts.map((_, index) => selectedProducts.length - index)
@@ -155,9 +155,8 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
 
   const removeFeaturedProduct = async (productId: string) => {
     try {
-      const response = await fetch(`/api/tenants/${tenantId}/featured/${selectedType}`, {
+      const response = await apiRequest(`/api/tenants/${tenantId}/featured/${selectedType}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productIds: currentFeatured.filter(p => p.id !== productId).map(p => p.id),
           priorities: currentFeatured.filter(p => p.id !== productId).map((_, index) => currentFeatured.length - index - 1)

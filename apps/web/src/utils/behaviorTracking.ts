@@ -193,7 +193,7 @@ class BehaviorTrackingCache {
         }
       };
 
-      console.log('[BehaviorTracking] Sending batch data:', JSON.stringify(batchData, null, 2));
+      //console.log('[BehaviorTracking] Sending batch data:', JSON.stringify(batchData, null, 2));
 
       const response = await api.post(`${apiUrl}/api/recommendations/track-batch`, batchData);
 
@@ -609,7 +609,7 @@ export function trackBehaviorClient(trackingData: Omit<TrackingData, 'durationSe
     // context is already included from trackingData
   };
   
-  console.log('[Tracking Debug] Adding event:', eventWithUser);
+  //console.log('[Tracking Debug] Adding event:', eventWithUser);
   cache.addEvent(eventWithUser);
 }
 

@@ -3323,6 +3323,162 @@ import directoryConsolidatedRoutes from './routes/directory-consolidated';
 app.use('/api/directory', directoryConsolidatedRoutes);
 console.log('✅ Directory consolidated routes mounted at /api/directory');
 
+// Mount random featured products route
+import directoryRandomFeaturedRoutes from './routes/directory-random-featured';
+app.use('/api/directory', directoryRandomFeaturedRoutes);
+console.log('✅ Directory random featured routes mounted at /api/directory');
+
+// Direct route handler for random-featured to bypass catch-all conflicts
+app.get('/api/directory/random-featured', async (req, res) => {
+  try {
+    const { getDirectPool } = await import('./utils/db-pool');
+    const pool = getDirectPool();
+    
+    // Get user location from query params (lat, lng) or use defaults
+    const userLat = parseFloat(req.query.lat as string) || 40.7128; // Default: New York
+    const userLng = parseFloat(req.query.lng as string) || -74.0060; // Default: New York
+    const maxDistance = parseFloat(req.query.maxDistance as string) || 500; // Default: 500km
+    
+    console.log('[Random Featured Direct] User location:', { userLat, userLng, maxDistance });
+    
+    // Query for random featured products with proximity weighting
+    const query = `
+      WITH featured_products AS (
+        SELECT 
+          sp.id,
+          sp.name,
+          sp.price_cents,
+          sp.currency,
+          sp.image_url,
+          sp.brand,
+          sp.description,
+          sp.stock,
+          sp.availability,
+          sp.tenant_id,
+          sp.category_id,
+          sp.category_name,
+          sp.category_slug,
+          sp.google_category_id,
+          sp.has_active_payment_gateway,
+          sp.default_gateway_type,
+          dsl.slug as store_slug,
+          dsl.business_name as store_name,
+          dsl.logo_url as store_logo,
+          dsl.city as store_city,
+          dsl.state as store_state,
+          dsl.latitude,
+          dsl.longitude,
+          sp.updated_at,
+          -- Calculate distance in kilometers using Haversine formula
+          CASE 
+            WHEN dsl.latitude IS NOT NULL AND dsl.longitude IS NOT NULL THEN
+              6371 * acos(
+                cos(radians($1)) * cos(radians(dsl.latitude)) * 
+                cos(radians(dsl.longitude) - radians($2)) + 
+                sin(radians($1)) * sin(radians(dsl.latitude))
+              )
+            ELSE NULL
+          END as distance_km,
+          -- Geographic relevance score based on city/state when lat/lng missing
+          CASE 
+            WHEN dsl.latitude IS NOT NULL AND dsl.longitude IS NOT NULL THEN 1.0
+            WHEN dsl.state = 'NY' THEN 0.8 -- High priority for same state
+            WHEN dsl.state IN ('NJ', 'CT', 'PA', 'MA') THEN 0.6 -- Nearby states
+            WHEN dsl.city IS NOT NULL THEN 0.4 -- Has city info
+            ELSE 0.1 -- No location info
+          END as geographic_relevance
+        FROM storefront_products sp
+        JOIN directory_listings_list dsl ON dsl.tenant_id = sp.tenant_id
+        WHERE sp.is_actively_featured = true 
+          AND dsl.is_published = true
+          AND sp.has_image = true
+          AND sp.stock > 0
+      ),
+      weighted_products AS (
+        SELECT *,
+          -- Weight: combine geographic relevance with distance and randomness
+          CASE 
+            WHEN distance_km IS NOT NULL AND distance_km <= $3 THEN 
+              -- Has precise location and within radius: use distance + geographic relevance
+              (1.0 / (1 + distance_km/100)) * geographic_relevance * (0.7 + random() * 0.3)
+            WHEN distance_km IS NULL THEN 
+              -- No precise location: use geographic relevance + randomness
+              geographic_relevance * (0.5 + random() * 0.5)
+            ELSE 
+              -- Far away: low weight but still some chance
+              0.1 * random()
+          END as weight
+        FROM featured_products
+      )
+      SELECT * FROM weighted_products
+      ORDER BY weight DESC, RANDOM()
+      LIMIT 12
+    `;
+    
+    const result = await pool.query(query, [userLat, userLng, maxDistance]);
+    
+    console.log('[Random Featured Direct] Query returned', result.rows.length, 'rows');
+    if (result.rows.length > 0) {
+      console.log('[Random Featured Direct] Sample product:', {
+        id: result.rows[0].id,
+        name: result.rows[0].name,
+        tenant_id: result.rows[0].tenant_id,
+        store_name: result.rows[0].store_name,
+        category_id: result.rows[0].category_id,
+        category_name: result.rows[0].category_name,
+        category_slug: result.rows[0].category_slug,
+        google_category_id: result.rows[0].google_category_id,
+        distance_km: result.rows[0].distance_km,
+        has_active_payment_gateway: result.rows[0].has_active_payment_gateway
+      });
+    }
+    
+    // Transform to camelCase for frontend compatibility
+    const products = result.rows.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      priceCents: row.price_cents,
+      currency: row.currency,
+      imageUrl: row.image_url,
+      brand: row.brand,
+      description: row.description,
+      stock: row.stock,
+      availability: row.availability,
+      tenantId: row.tenant_id,
+      categoryName: row.category_name,
+      categorySlug: row.category_slug,
+      googleCategoryId: row.google_category_id,
+      distanceKm: row.distance_km,
+      hasActivePaymentGateway: row.has_active_payment_gateway,
+      paymentGatewayType: row.default_gateway_type,
+      storeSlug: row.store_slug,
+      storeName: row.store_name,
+      storeLogo: row.store_logo,
+      storeCity: row.store_city,
+      storeState: row.store_state,
+      updatedAt: row.updated_at
+    }));
+    
+    console.log('[Random Featured Direct] Returning', products.length, 'products');
+    
+    res.json({
+      products,
+      total: products.length,
+      refreshed_at: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('[Random Featured Direct] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch random featured products',
+      products: [],
+      total: 0,
+      refreshed_at: new Date().toISOString()
+    });
+  }
+});
+console.log('✅ Direct random-featured route handler registered');
+
 // Mount store-types route BEFORE any other /api/directory routes
 // VERY SIMPLE TEST - This should definitely work
 app.get('/api/directory/simple-test', (req, res) => {
@@ -3361,6 +3517,11 @@ app.get('/api/directory/store-types', async (req, res) => {
 import directoryStoreTypesRoutes from './routes/directory-store-types';
 app.use('/api/directory/store-types', directoryStoreTypesRoutes);
 console.log('✅ Directory store types routes mounted at /api/directory/store-types');
+
+// Mount featured stores router BEFORE other directory routes to avoid conflicts
+import directoryFeaturedStoresRoutes from './routes/directory-featured-stores';
+app.use('/api/directory/featured-stores', directoryFeaturedStoresRoutes);
+console.log('✅ Directory featured stores routes mounted at /api/directory/featured-stores');
 
 // Mount photos router (handles all photo endpoints with position support)
 app.use('/api/directory', directoryPhotosRouter);

@@ -354,6 +354,13 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
   const recommendations = consolidatedData.recommendations || [];
   const paymentGatewayStatus = consolidatedData.paymentGatewayStatus || { hasActiveGateway: false, defaultGatewayType: null };
 
+  // Debug logging for featured products
+  /* console.log('[Directory Page] Featured products data:', {
+    count: featuredProducts.length,
+    products: featuredProducts.slice(0, 2), // Show first 2 products
+    consolidatedDataKeys: Object.keys(consolidatedData)
+  }); */
+
   // Get primary category early for additional data fetching
   const primaryCategory = listing.categories?.find((c: any) => c.isPrimary) || listing.categories?.[0];
 
@@ -564,7 +571,10 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               </div>
 
               {/* Featured Products - MOVED UP FOR CONVERSION! */}
-              {featuredProducts.length > 0 && (
+              {(() => {
+                console.log('[Directory Page] Rendering featured products check:', featuredProducts.length);
+                return featuredProducts.length > 0;
+              })() && (
                 <TenantPaymentProvider tenantId={listing.tenantId}>
                   <div className="bg-white rounded-lg shadow-sm p-6">
                     <div className="flex items-center justify-between mb-6">
@@ -577,10 +587,12 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                       </Link>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {featuredProducts.map((product: any) => (
-                        <SmartProductCard
-                          key={product.id}
-                          product={{
+                      {(() => {
+                        console.log('[Directory Page] Mapping featured products:', featuredProducts.length);
+                        return featuredProducts.map((product: any) => (
+                          <SmartProductCard
+                            key={product.id}
+                            product={{
                             id: product.id,
                             sku: product.sku || product.id,
                             name: product.name || product.title,
@@ -604,7 +616,8 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                           showCategory={true}
                           showDescription={true}
                         />
-                      ))}
+                        ))
+                      })()}
                     </div>
                   </div>
                 </TenantPaymentProvider>
@@ -762,7 +775,10 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
       {/* Featured Products - REMOVED FROM BOTTOM - MOVED UP! */}
 
       {/* Related Stores */}
-      <RelatedStores currentSlug={slugForRelated} />
+      <RelatedStores 
+        currentSlug={slugForRelated} 
+        title="Similar Stores"
+      />
 
             {/* Platform Branding Footer */}
             <PoweredByFooter />

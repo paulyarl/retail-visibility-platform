@@ -18,6 +18,8 @@ const updateListingSchema = z.object({
   seo_keywords: z.array(z.string()).max(10).optional(),
   primary_category: z.string().optional(),
   secondary_categories: z.array(z.string()).max(5).optional(),
+  is_featured: z.boolean().optional(),
+  featured_until: z.string().datetime().optional(),
 });
 
 /**
@@ -153,6 +155,8 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
       seo_keywords: req.body.seo_keywords,
       primary_category: req.body.primary_category,
       secondary_categories: req.body.secondary_categories,
+      is_featured: req.body.is_featured,
+      featured_until: req.body.featured_until,
     };
     
     const parsed = updateListingSchema.safeParse(cleanBody);
@@ -238,15 +242,34 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
         primary_category = $2,
         secondary_categories = $3,
         description = $4,
+        is_featured = $5,
         updated_at = NOW()
       WHERE tenant_id = $1 AND is_published = true
     `, [
       tenantId,
       parsed.data.primary_category || null,
       parsed.data.secondary_categories || null,
-      parsed.data.seo_description || null
+      parsed.data.seo_description || null,
+      parsed.data.is_featured || false
     ]);
     console.log('[PATCH /tenants/:id/directory/listing] Updated directory_listings_list');
+    
+    // Refresh directory_gbp_listings materialized view to sync featured status
+    // This ensures the featured stores API reflects the changes immediately
+    try {
+      await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY directory_gbp_listings');
+      console.log('[PATCH /tenants/:id/directory/listing] Refreshed directory_gbp_listings MV');
+    } catch (mvError: any) {
+      // If concurrent refresh fails, try non-concurrent
+      if (mvError?.code === '55000') {
+        console.warn('[PATCH /tenants/:id/directory/listing] Concurrent MV refresh failed, trying blocking refresh');
+        await pool.query('REFRESH MATERIALIZED VIEW directory_gbp_listings');
+        console.log('[PATCH /tenants/:id/directory/listing] Refreshed directory_gbp_listings MV (blocking)');
+      } else {
+        console.error('[PATCH /tenants/:id/directory/listing] MV refresh failed:', mvError);
+        // Don't fail the request for MV refresh errors
+      }
+    }
     
     // Refresh materialized view to reflect category changes in directory
     try {
@@ -260,6 +283,22 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
         console.log('[PATCH /tenants/:id/directory/listing] Refreshed directory_category_products MV (blocking)');
       } else {
         console.error('[PATCH /tenants/:id/directory/listing] MV refresh failed:', mvError);
+        // Don't fail the request for MV refresh errors
+      }
+    }
+    
+    // Refresh directory_gbp_stats MV to ensure featured stores API works
+    try {
+      await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY directory_gbp_stats');
+      console.log('[PATCH /tenants/:id/directory/listing] Refreshed directory_gbp_stats MV');
+    } catch (mvError: any) {
+      // If concurrent refresh fails, try non-concurrent
+      if (mvError?.code === '55000') {
+        console.warn('[PATCH /tenants/:id/directory/listing] Concurrent GBP stats MV refresh failed, trying blocking refresh');
+        await pool.query('REFRESH MATERIALIZED VIEW directory_gbp_stats');
+        console.log('[PATCH /tenants/:id/directory/listing] Refreshed directory_gbp_stats MV (blocking)');
+      } else {
+        console.error('[PATCH /tenants/:id/directory/listing] GBP stats MV refresh failed:', mvError);
         // Don't fail the request for MV refresh errors
       }
     }
