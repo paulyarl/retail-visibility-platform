@@ -39,7 +39,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     
     // When no specific category is selected, only show products that have categories
     if (!category) {
-      conditions.push('sp.category_id IS NOT NULL');
+      conditions.push('sp.directory_category_id IS NOT NULL');
     }
     
     // Category filter - match by slug (MV uses category_slug)
@@ -88,7 +88,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         sp.custom_sections,
         sp.landing_page_theme,
         sp.category_slug,
-        sp.category_id as directory_category_id,
+        sp.directory_category_id,
         sp.has_image,
         sp.in_stock,
         sp.has_gallery,
@@ -252,7 +252,7 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
         MAX(sp.price_cents) as max_price_cents
       FROM storefront_products sp
       WHERE sp.tenant_id = $1
-        AND sp.category_id IS NOT NULL
+        AND sp.directory_category_id IS NOT NULL
       GROUP BY sp.category_name, sp.category_slug, sp.google_category_id
       HAVING COUNT(DISTINCT sp.id) > 0
       ORDER BY sp.category_name ASC
@@ -263,7 +263,7 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       SELECT COUNT(*) as count
       FROM storefront_products sp
       WHERE sp.tenant_id = $1
-        AND sp.category_id IS NULL
+        AND sp.directory_category_id IS NULL
     `;
     
     const [categoriesResult, uncategorizedResult] = await Promise.all([

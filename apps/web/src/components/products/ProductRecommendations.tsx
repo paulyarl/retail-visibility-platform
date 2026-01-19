@@ -29,23 +29,37 @@ export function ProductRecommendations({ productId, tenantId }: ProductRecommend
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let abortController = new AbortController();
+    let isMounted = true;
+
     const fetchRecommendations = async () => {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${apiUrl}/api/recommendations/for-product-page/${productId}?limit=6`);
+        const response = await fetch(`${apiUrl}/api/recommendations/for-product-page/${productId}?limit=6`, {
+          signal: abortController.signal,
+        });
 
-        if (response.ok) {
+        if (response.ok && isMounted) {
           const data = await response.json();
           setRecommendations(data.recommendations || []);
         }
-      } catch (error) {
-        console.error('Error fetching product recommendations:', error);
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name !== 'AbortError' && isMounted) {
+          console.error('Error fetching product recommendations:', error);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchRecommendations();
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
   }, [productId]);
 
   if (loading || recommendations.length === 0) {

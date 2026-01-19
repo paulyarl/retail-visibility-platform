@@ -84,23 +84,37 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, maxP
   const config = featuredTypeConfig[type];
 
   useEffect(() => {
-    fetchFeaturedProducts();
-  }, [tenantId, type]);
+    let abortController = new AbortController();
+    let isMounted = true;
 
-  const fetchFeaturedProducts = async () => {
-    try {
-      const response = await fetch(`/api/storefront/${tenantId}/featured-products?type=${type}&limit=${maxProducts}`);
-      const data = await response.json();
-      
-      if (response.ok) {
-        setProducts(data.items || []);
+    const fetchFeaturedProducts = async () => {
+      try {
+        const response = await fetch(`/api/storefront/${tenantId}/featured-products?type=${type}&limit=${maxProducts}`, {
+          signal: abortController.signal,
+        });
+        const data = await response.json();
+        
+        if (response.ok && isMounted) {
+          setProducts(data.items || []);
+        }
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name !== 'AbortError' && isMounted) {
+          console.error('Error fetching featured products:', error);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Error fetching featured products:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    fetchFeaturedProducts();
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
+  }, [tenantId, type]);
 
   if (loading) {
     return (
@@ -185,28 +199,41 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
   const [activeSections, setActiveSections] = useState<string[]>([]);
 
   useEffect(() => {
-    // Check which featured sections have products
-    checkActiveSections();
-  }, [tenantId]);
+    let abortController = new AbortController();
+    let isMounted = true;
 
-  const checkActiveSections = async () => {
-    const types: Array<'new_arrival' | 'seasonal' | 'sale' | 'staff_pick'> = ['new_arrival', 'seasonal', 'sale', 'staff_pick'];
-    const active: string[] = [];
+    const checkActiveSections = async () => {
+      const types: Array<'new_arrival' | 'seasonal' | 'sale' | 'staff_pick'> = ['new_arrival', 'seasonal', 'sale', 'staff_pick'];
+      const active: string[] = [];
 
-    for (const type of types) {
-      try {
-        const response = await fetch(`/api/storefront/${tenantId}/featured-products?type=${type}&limit=1`);
-        const data = await response.json();
-        if (response.ok && data.items && data.items.length > 0) {
-          active.push(type);
+      for (const type of types) {
+        try {
+          const response = await fetch(`/api/storefront/${tenantId}/featured-products?type=${type}&limit=1`, {
+            signal: abortController.signal,
+          });
+          const data = await response.json();
+          if (response.ok && data.items && data.items.length > 0 && isMounted) {
+            active.push(type);
+          }
+        } catch (error: unknown) {
+          if (error instanceof Error && error.name !== 'AbortError' && isMounted) {
+            console.error(`Error checking ${type} featured products:`, error);
+          }
         }
-      } catch (error) {
-        console.error(`Error checking ${type} products:`, error);
       }
-    }
 
-    setActiveSections(active);
-  };
+      if (isMounted) {
+        setActiveSections(active);
+      }
+    };
+
+    checkActiveSections();
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
+  }, [tenantId]);
 
   if (activeSections.length === 0) {
     return null;

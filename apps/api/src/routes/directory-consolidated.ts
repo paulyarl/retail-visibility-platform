@@ -100,7 +100,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           custom_cta,
           social_links,
           landing_page_theme,
-          category_id,
+          directory_category_id,
           category_name,
           category_slug,
           is_featured,

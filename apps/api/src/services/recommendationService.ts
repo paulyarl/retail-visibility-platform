@@ -819,9 +819,9 @@ export async function getLastViewedItems(
               'hasActivePaymentGateway', sp.has_active_payment_gateway,
               'defaultGatewayType', sp.default_gateway_type,
               'tenantCategory', CASE 
-                WHEN sp.category_id IS NOT NULL THEN
+                WHEN sp.directory_category_id IS NOT NULL THEN
                   json_build_object(
-                    'id', sp.category_id,
+                    'id', sp.directory_category_id,
                     'name', sp.category_name,
                     'slug', sp.category_slug
                   )
