@@ -244,7 +244,7 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
         sp.category_name,
         sp.category_slug,
         sp.google_category_id,
-        COUNT(DISTINCT sp.id) as product_count,
+        COUNT(DISTINCT sp.id) as count,
         MIN(sp.price_cents) as min_price_cents,
         MAX(sp.price_cents) as max_price_cents
       FROM storefront_products sp
