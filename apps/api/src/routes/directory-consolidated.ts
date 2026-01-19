@@ -111,6 +111,8 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
           has_image,
           in_stock,
           has_gallery,
+          has_active_payment_gateway,
+          default_gateway_type,
           created_at,
           updated_at
         FROM storefront_products

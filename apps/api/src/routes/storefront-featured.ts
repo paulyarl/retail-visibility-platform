@@ -83,6 +83,8 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
         has_brand,
         has_price,
         in_stock,
+        has_active_payment_gateway,
+        default_gateway_type,
         created_at,
         updated_at
       FROM storefront_products
@@ -134,6 +136,8 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
       hasImage: row.has_image,
       inStock: row.in_stock,
       hasGallery: row.has_gallery,
+      hasActivePaymentGateway: row.has_active_payment_gateway,
+      paymentGatewayType: row.default_gateway_type,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));

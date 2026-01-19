@@ -3,19 +3,26 @@
 import { useState, useEffect } from 'react';
 import { Package, Calendar, DollarSign, Star, Tag } from 'lucide-react';
 import Link from 'next/link';
+import SmartProductCard from '@/components/products/SmartProductCard';
 
 interface FeaturedProduct {
   id: string;
+  sku?: string;
   name: string;
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
   price: number;
   priceCents: number;
+  salePriceCents?: number;
   currency: string;
   stock: number;
   imageUrl?: string;
-  categorySlug?: string;
-  featuredType: string;
+  brand?: string;
+  availability?: string;
+  tenantCategory?: any;
+  has_variants?: boolean;
+  hasActivePaymentGateway?: boolean;
+  paymentGatewayType?: string;
 }
 
 interface FeaturedSectionProps {
@@ -141,50 +148,32 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, maxP
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {products.map((product) => (
-            <Link
+            <SmartProductCard
               key={product.id}
-              href={`/products/${product.id}`}
-              className="group bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
-            >
-              <div className="aspect-square bg-gray-100 relative overflow-hidden">
-                {product.imageUrl ? (
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Package className="w-12 h-12 text-gray-400" />
-                  </div>
-                )}
-                <div className="absolute top-2 right-2">
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${config.bgColor} ${config.textColor}`}>
-                    {config.title.split(' ')[0]}
-                  </span>
-                </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2">
-                  {product.name}
-                </h3>
-                <p className="text-sm text-gray-500 mt-1 line-clamp-2">
-                  {product.description}
-                </p>
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-lg font-bold text-gray-900">
-                    ${product.price.toFixed(2)}
-                  </span>
-                  {product.stock > 0 ? (
-                    <span className="text-xs text-green-600 font-medium">In Stock</span>
-                  ) : (
-                    <span className="text-xs text-red-600 font-medium">Out of Stock</span>
-                  )}
-                </div>
-              </div>
-            </Link>
+              product={{
+                id: product.id,
+                sku: product.sku || product.id,
+                name: product.name,
+                title: product.title || product.name,
+                brand: product.brand || '',
+                description: product.description || '',
+                priceCents: product.priceCents,
+                salePriceCents: product.salePriceCents,
+                stock: product.stock || 0,
+                imageUrl: product.imageUrl,
+                tenantId: tenantId,
+                availability: (product.availability as any) || 'in_stock',
+                tenantCategory: product.tenantCategory,
+                has_variants: product.has_variants || false,
+                has_active_payment_gateway: product.hasActivePaymentGateway,
+                payment_gateway_type: product.paymentGatewayType,
+              }}
+              variant="featured"
+              showCategory={false}
+              showDescription={true}
+            />
           ))}
         </div>
       </div>
