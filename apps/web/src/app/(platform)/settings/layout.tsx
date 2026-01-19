@@ -1,10 +1,6 @@
 import { ReactNode } from 'react';
-import { PlatformLayout } from '@/components/navigation/SidebarLayout';
+import { AdminNavContent } from '@/components/navigation/AdminNavContent';
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
-  return (
-    <PlatformLayout>
-      {children}
-    </PlatformLayout>
-  );
+  return <AdminNavContent>{children}</AdminNavContent>;
 }

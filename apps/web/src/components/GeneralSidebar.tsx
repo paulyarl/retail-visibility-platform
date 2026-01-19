@@ -25,6 +25,7 @@ interface SidebarItemProps {
   isCollapsed: boolean
   expandedItems: Set<string>
   onToggleExpand: (itemId: string) => void
+  onMobileNavClick?: () => void
 }
 
 function BadgeComponent({ badge }: { badge: NavItem['badge'] }) {
@@ -54,7 +55,8 @@ function SidebarItemComponent({
   pathname, 
   isCollapsed, 
   expandedItems, 
-  onToggleExpand 
+  onToggleExpand,
+  onMobileNavClick
 }: SidebarItemProps) {
   const hasChildren = item.children && item.children.length > 0
   const isExpanded = expandedItems.has(item.href || item.label)
@@ -129,6 +131,7 @@ function SidebarItemComponent({
     return (
       <Link
         href={item.href}
+        onClick={onMobileNavClick}
         className={cn(
           'flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors',
           'hover:bg-gray-100 dark:hover:bg-gray-800',
@@ -158,12 +161,14 @@ export default function GeneralSidebar({
   nav, 
   isMobile = false,
   collapsible = false,
-  scope = 'workspace'
+  scope = 'workspace',
+  onMobileNavClick
 }: { 
   nav: NavItem[]
   isMobile?: boolean
   collapsible?: boolean
   scope?: 'workspace' | 'tenant' | 'admin' | 'platform'
+  onMobileNavClick?: () => void
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -282,6 +287,7 @@ export default function GeneralSidebar({
                 isCollapsed={isCollapsed}
                 expandedItems={expandedItems}
                 onToggleExpand={handleToggleExpand}
+                onMobileNavClick={onMobileNavClick}
               />
             )
           }
@@ -292,6 +298,7 @@ export default function GeneralSidebar({
             <Link
               key={item.href}
               href={item.href}
+              onClick={onMobileNavClick}
               className={cn(
                 isMobile 
                   ? 'block px-3 py-3 rounded-md text-base font-medium transition-colors' 

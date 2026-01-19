@@ -13,6 +13,7 @@ import { audit } from '../audit';
 import { user_role, user_tenant_role } from '@prisma/client';
 import { requirePlatformAdmin, requirePlatformUser } from '../middleware/auth';
 import { generateQuickStart, generateUserId, generateUserTenantId } from '../lib/id-generator';
+import * as crypto from 'crypto';
 //import { UserRole } from '../utils/location-status';
 
 const router = Router();
@@ -392,7 +393,7 @@ router.post('/users', requirePlatformAdmin, async (req: Request, res: Response) 
 router.put('/users/:userId', requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    const { firstName, lastName, email, role, isActive } = req.body;
+    const { firstName, lastName, email, role, isActive, emailVerified } = req.body;
 
     // Check if user exists
     const user = await prisma.users.findUnique({
@@ -415,6 +416,7 @@ router.put('/users/:userId', requirePlatformAdmin, async (req: Request, res: Res
         email,
         role: role as user_role,
         is_active: isActive,
+        email_verified: emailVerified !== undefined ? emailVerified : user.email_verified,
         updated_at: new Date(),
       },
       select: {
@@ -424,6 +426,7 @@ router.put('/users/:userId', requirePlatformAdmin, async (req: Request, res: Res
         last_name: true,
         role: true,
         is_active: true,
+        email_verified: true,
         updated_at: true,
       },
     });
@@ -713,6 +716,51 @@ router.get('/tenants', requirePlatformUser, async (req: Request, res: Response) 
     res.status(500).json({
       success: false,
       error: 'Failed to list tenants',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/admin/tenants/all
+ * List ALL tenants in the system (for user management purposes)
+ * - Platform admins and Platform Support can see all tenants
+ * - Used specifically for managing user tenant assignments
+ */
+router.get('/tenants/all', requirePlatformUser, async (req: Request, res: Response) => {
+  try {
+    const requestingUser = (req as any).user;
+    
+    // Only Platform Admin and Platform Support can see all tenants for user management
+    if (requestingUser.role !== 'PLATFORM_ADMIN' && requestingUser.role !== 'ADMIN' && requestingUser.role !== 'PLATFORM_SUPPORT') {
+      return res.status(403).json({
+        success: false,
+        error: 'Insufficient permissions to view all tenants',
+      });
+    }
+
+    // Return ALL tenants in the system
+    const tenants = await prisma.tenants.findMany({
+      select: {
+        id: true,
+        name: true,
+        subscription_tier: true,
+        created_at: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    res.json({
+      success: true,
+      tenants,
+    });
+  } catch (error: any) {
+    console.error('[Admin Users] Error listing all tenants:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to list all tenants',
       message: error.message,
     });
   }
@@ -1581,6 +1629,78 @@ router.get('/users/:userId/tenants', requirePlatformUser, async (req: Request, r
 });
 
 /**
+ * POST /api/admin/users/:userId/send-verification-email
+ * Send verification email to user (admin only)
+ */
+router.post('/users/:userId/send-verification-email', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { email } = req.body;
+
+    console.log('[POST /users/:userId/send-verification-email] Request:', {
+      userId,
+      email,
+      userRole: (req as any).user?.role
+    });
+
+    // Check if user exists
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    // Generate verification token
+    const verificationToken = require('crypto').randomBytes(32).toString('hex');
+    
+    // Update user with verification token
+    await prisma.users.update({
+      where: { id: userId },
+      data: {
+        email_verification_token: verificationToken,
+        updated_at: new Date(),
+      },
+    });
+
+    // TODO: Send actual email with verification link
+    // For now, just return success with the token for testing
+    const verificationLink = `${process.env.WEB_BASE_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+    
+    console.log('[Verification Email] Would send email with link:', verificationLink);
+
+    // Audit log
+    await audit({
+      tenantId: 'platform',
+      actor: (req as any).user?.userId || 'system',
+      action: 'admin.user.send_verification_email',
+      payload: { 
+        userId, 
+        email: user.email,
+        verificationToken: verificationToken.substring(0, 8) + '...' // Log only part of token for security
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Verification email sent successfully',
+      verificationLink: process.env.NODE_ENV === 'development' ? verificationLink : undefined, // Only show in development
+    });
+  } catch (error: any) {
+    console.error('[POST /users/:userId/send-verification-email] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send verification email',
+      message: error.message,
+    });
+  }
+});
+
+/**
  * POST /api/admin/users/:userId/tenants
  * Assign user to a tenant with a role
  */
@@ -1588,6 +1708,14 @@ router.post('/users/:userId/tenants', requirePlatformAdmin, async (req: Request,
   try {
     const { userId } = req.params;
     const { tenant_id: tenantIdParam, role: roleParam } = req.body;
+
+    console.log('[POST /users/:userId/tenants] Request:', {
+      userId,
+      tenantIdParam,
+      roleParam,
+      requestBody: req.body,
+      userRole: (req as any).user?.role
+    });
 
     // Validate input
     const schema = z.object({
@@ -1597,6 +1725,11 @@ router.post('/users/:userId/tenants', requirePlatformAdmin, async (req: Request,
 
     const validation = schema.safeParse(req.body as any);
     if (!validation.success) {
+      console.log('[POST /users/:userId/tenants] Validation failed:', {
+        error: validation.error,
+        issues: validation.error.issues,
+        received: req.body
+      });
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
