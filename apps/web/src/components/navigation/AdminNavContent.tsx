@@ -102,6 +102,21 @@ const adminNavItems: NavItem[] = [
     ]
   },
   {
+    label: 'Tier Management',
+    href: '/admin/tiers',
+    icon: NavigationHelpers.getStandardIcon('PLATFORM_TIERS'),
+    children: [
+      {
+        label: 'Subscription Tiers',
+        href: '/admin/tiers'
+      },
+      {
+        label: 'Tier System Configuration',
+        href: '/admin/tier-system'
+      }
+    ]
+  },
+  {
     label: 'Tenant Management',
     href: '/settings/admin/tenants',
     icon: NavigationHelpers.getStandardIcon('STORE'),
@@ -109,6 +124,10 @@ const adminNavItems: NavItem[] = [
       {
         label: 'All Tenants',
         href: '/settings/admin/tenants'
+      },
+      {
+        label: 'Organizations',
+        href: '/admin/organizations'
       },
       {
         label: 'Tenant Categories',
@@ -140,12 +159,26 @@ const adminNavItems: NavItem[] = [
       },
       {
         label: 'Capacity Overview',
-        href: '/settings/admin/capacity'
+        href: '/settings/admin/capacity',
+        children: [
+          {
+            label: 'Overview',
+            href: '/settings/admin/capacity/overview'
+          },
+          {
+            label: 'Location Limits',
+            href: '/settings/admin/capacity/location-limits'
+          },
+          {
+            label: 'Alerts',
+            href: '/settings/admin/capacity/alerts'
+          }
+        ]
       }
     ]
   },
   {
-    label: 'Security',
+    label: 'Security & Platform',
     href: '/settings/admin/security',
     icon: NavigationHelpers.getStandardIcon('ADMIN'),
     children: [
@@ -154,46 +187,15 @@ const adminNavItems: NavItem[] = [
         href: '/settings/admin/security'
       },
       {
-        label: 'Threat Monitor',
-        href: '/settings/admin/security#threats',
-        children: [
-          {
-            label: 'Active Threats',
-            href: '/settings/admin/security/threats/active'
-          },
-          {
-            label: 'Resolved Threats',
-            href: '/settings/admin/security/threats/resolved',
-            children: [
-              {
-                label: 'This Week',
-                href: '/settings/admin/security/threats/resolved/week'
-              },
-              {
-                label: 'This Month',
-                href: '/settings/admin/security/threats/resolved/month'
-              }
-            ]
-          }
-        ]
-      },
-      {
-        label: 'Blocked IPs',
-        href: '/settings/admin/security#blocked-ips'
-      }
-    ]
-  },
-  {
-    label: 'System Settings',
-    href: '/settings/admin/system',
-    icon: NavigationHelpers.getStandardIcon('PLATFORM_SETTINGS'),
-    children: [
-      {
         label: 'Platform Settings',
         href: '/settings/admin/platform'
       },
       {
-        label: 'Feature Flags',
+        label: 'Sentry Monitoring',
+        href: '/settings/admin/sentry'
+      },
+      {
+        label: 'Feature Management',
         href: '/settings/admin/features',
         children: [
           {
@@ -215,14 +217,68 @@ const adminNavItems: NavItem[] = [
             href: '/settings/admin/features/admin'
           }
         ]
+      }
+    ]
+  },
+  {
+    label: 'Content Management',
+    href: '/admin/categories',
+    icon: NavigationHelpers.getStandardIcon('PLATFORM_CATEGORIES'),
+    children: [
+      {
+        label: 'Product Categories',
+        href: '/admin/categories'
       },
       {
-        label: 'Sentry',
-        href: '/settings/admin/sentry'
+        label: 'Platform Categories',
+        href: '/admin/platform-categories'
       },
       {
-        label: 'Analytics',
-        href: '/settings/admin/analytics'
+        label: 'Directory Management',
+        href: '/admin/directory',
+        children: [
+          {
+            label: 'Directory Overview',
+            href: '/admin/directory'
+          },
+          {
+            label: 'All Listings',
+            href: '/admin/directory/listings'
+          },
+          {
+            label: 'Featured Listings',
+            href: '/admin/directory/featured'
+          }
+        ]
+      },
+      {
+        label: 'Featured Products',
+        href: '/admin/featured-products'
+      }
+    ]
+  },
+  {
+    label: 'Analytics & Tools',
+    href: '/admin/enrichment',
+    icon: NavigationHelpers.getStandardIcon('PLATFORM_INSIGHTS'),
+    children: [
+      {
+        label: 'Product Intelligence',
+        href: '/admin/enrichment'
+      },
+      {
+        label: 'Admin Tools',
+        href: '/admin/tools',
+        children: [
+          {
+            label: 'Tools Dashboard',
+            href: '/admin/tools'
+          },
+          {
+            label: 'Cached Products',
+            href: '/admin/tools/cached-products'
+          }
+        ]
       }
     ]
   }

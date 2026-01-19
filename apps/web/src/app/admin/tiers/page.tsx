@@ -86,24 +86,24 @@ export default function AdminTiersPage() {
   const loadTenants = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/api/tenants');
+      const res = await api.get('/api/admin/tiers/tenants');
       if (!res.ok) throw new Error('Failed to load tenants');
       const data = await res.json();
       
-      // Transform snake_case fields to camelCase for frontend compatibility
-      const tenantsArray = Array.isArray(data) ? data : [];
+      // Use the admin tenants endpoint which includes tier information
+      const tenantsArray = data.tenants || [];
       const transformedTenants = tenantsArray.map((tenant: any) => ({
         id: tenant.id,
         name: tenant.name,
-        subscriptionTier: tenant.subscriptionTier,
-        subscriptionStatus: tenant.subscriptionStatus,
-        trialEndsAt: tenant.trialEndsAt,
-        subscriptionEndsAt: tenant.subscriptionEndsAt,
-        createdAt: tenant.createdAt,
+        subscriptionTier: tenant.subscription_tier, // Note: snake_case from API
+        subscriptionStatus: tenant.subscription_status, // Note: snake_case from API
+        trialEndsAt: tenant.trial_ends_at,
+        subscriptionEndsAt: tenant.subscription_ends_at,
+        createdAt: tenant.created_at,
         metadata: tenant.metadata,
-        organization: tenant.organization ? {
-          id: tenant.organization.id,
-          name: tenant.organization.name,
+        organization: tenant.organizations_list ? {
+          id: tenant.organizations_list.id,
+          name: tenant.organizations_list.name,
         } : null,
       }));
       
@@ -121,6 +121,8 @@ export default function AdminTiersPage() {
       setError(null);
       setSuccess(null);
 
+      console.log(`[Tier Management] Updating tenant ${tenantId} to tier: ${tier}, status: ${status}`);
+
       // Call the correct admin tier management endpoint
       const res = await api.patch(`/api/admin/tiers/tenants/${tenantId}`, {
         subscriptionTier: tier,
@@ -136,8 +138,25 @@ export default function AdminTiersPage() {
         throw new Error(data.message || data.error || 'Failed to update tier');
       }
 
+      const responseData = await res.json();
+      console.log(`[Tier Management] Update response:`, responseData);
+
       setSuccess(`Successfully updated tier for location`);
+      
+      // Force refresh to get latest data
+      console.log(`[Tier Management] Refreshing tenant data...`);
       await loadTenants();
+      
+      // Log the updated state for debugging
+      setTimeout(() => {
+        const updatedTenant = tenants.find(t => t.id === tenantId);
+        console.log(`[Tier Management] Updated tenant state:`, {
+          tenantId,
+          newTier: updatedTenant?.subscriptionTier,
+          newStatus: updatedTenant?.subscriptionStatus
+        });
+      }, 100);
+      
     } catch (err: any) {
       console.error('Update tier error:', err);
       setError(err.message || 'Failed to update tier');

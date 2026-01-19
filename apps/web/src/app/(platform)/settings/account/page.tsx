@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Pagination } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { Shield, User, Building2, Crown } from 'lucide-react';
+import { Shield, User, Building2, Crown, Navigation, ArrowRight } from 'lucide-react';
 import TenantLimitBadge from '@/components/tenant/TenantLimitBadge';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 import { useTenantLimits } from '@/hooks/useTenantLimits';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
+import { api } from '@/lib/api';
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -21,6 +22,62 @@ export default function AccountPage() {
   const { status: tenantLimitStatus } = useTenantLimits();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  
+  // Navigation preference state
+  const [navigationPreference, setNavigationPreference] = useState<'last-visited' | 'current-page'>('last-visited');
+  const [savingPreference, setSavingPreference] = useState(false);
+
+  // Load navigation preference from server
+  useEffect(() => {
+    const loadPreference = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const response = await api.get('/user/preferences');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.data?.navigationPreference) {
+            setNavigationPreference(data.data.navigationPreference);
+            // Also update localStorage for immediate use in tenant switcher
+            if (user && user.id) {
+              localStorage.setItem(`user-nav-preference-${user.id}`, data.data.navigationPreference);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load navigation preference:', error);
+      }
+    };
+
+    loadPreference();
+  }, [user?.id]);
+
+  // Save navigation preference to server
+  const saveNavigationPreference = async (preference: 'last-visited' | 'current-page') => {
+    setSavingPreference(true);
+    try {
+      const response = await api.patch('/user/preferences', {
+        preferences: {
+          navigationPreference: preference
+        }
+      });
+
+      if (response.ok) {
+        setNavigationPreference(preference);
+        // Also update localStorage for immediate use in tenant switcher
+        if (user && user.id) {
+          localStorage.setItem(`user-nav-preference-${user.id}`, preference);
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to save preference');
+      }
+    } catch (error) {
+      console.error('Failed to save navigation preference:', error);
+    } finally {
+      setSavingPreference(false);
+    }
+  };
 
   // Helper to get tenant details from tenant-limits API
   const getTenantDetails = (tenantId: string) => {
@@ -239,6 +296,78 @@ export default function AccountPage() {
                 <p className="text-xs font-mono text-gray-600 dark:text-gray-400">{user.id}</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Navigation Preferences */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Navigation className="w-5 h-5" />
+              Navigation Preferences
+            </CardTitle>
+            <CardDescription>
+              Choose how tenant switching behaves for you across all tenants
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                   onClick={() => saveNavigationPreference('last-visited')}>
+                <div className="mt-1">
+                  <input
+                    type="radio"
+                    name="navigation-preference"
+                    checked={navigationPreference === 'last-visited'}
+                    onChange={() => saveNavigationPreference('last-visited')}
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-medium text-gray-900 dark:text-white">Navigate to Last Visited Page</p>
+                    <Badge variant="default" className="text-xs">Default</Badge>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    When switching tenants, go to the last page you visited in that tenant
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                    <ArrowRight className="w-3 h-3" />
+                    <span>Example: Switching from Tenant A dashboard to Tenant B shows Tenant B's last visited page</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                   onClick={() => saveNavigationPreference('current-page')}>
+                <div className="mt-1">
+                  <input
+                    type="radio"
+                    name="navigation-preference"
+                    checked={navigationPreference === 'current-page'}
+                    onChange={() => saveNavigationPreference('current-page')}
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900 dark:text-white mb-1">Stay on Current Page</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    When switching tenants, stay on the same page (if it exists in the new tenant)
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                    <ArrowRight className="w-3 h-3" />
+                    <span>Example: Switching from Tenant A dashboard to Tenant B shows Tenant B's dashboard</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {savingPreference && (
+              <div className="flex items-center gap-2 text-sm text-blue-600">
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <span>Saving preference...</span>
+              </div>
+            )}
           </CardContent>
         </Card>
 

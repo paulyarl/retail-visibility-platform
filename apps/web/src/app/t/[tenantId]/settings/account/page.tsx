@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { Shield, User, Building2, Crown } from 'lucide-react';
+import { Shield, User, Building2, Crown, Navigation, ArrowRight } from 'lucide-react';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 
@@ -14,12 +14,38 @@ import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionS
 export const runtime = 'edge';
 
 // Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
-
-
 export default function TenantAccountPage() {
   const { tenantId } = useParams();
   const { user } = useAuth();
+  
+  // Navigation preference state
+  const [navigationPreference, setNavigationPreference] = useState<'last-visited' | 'current-page'>('last-visited');
+  const [savingPreference, setSavingPreference] = useState(false);
+
+  // Load navigation preference from localStorage (user-specific)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user?.id) {
+      const saved = localStorage.getItem(`user-nav-preference-${user.id}`);
+      if (saved === 'current-page' || saved === 'last-visited') {
+        setNavigationPreference(saved);
+      }
+    }
+  }, [user?.id]);
+
+  // Save navigation preference to localStorage (user-specific)
+  const saveNavigationPreference = async (preference: 'last-visited' | 'current-page') => {
+    setSavingPreference(true);
+    try {
+      if (typeof window !== 'undefined' && user?.id) {
+        localStorage.setItem(`user-nav-preference-${user.id}`, preference);
+        setNavigationPreference(preference);
+      }
+    } catch (error) {
+      console.error('Failed to save navigation preference:', error);
+    } finally {
+      setSavingPreference(false);
+    }
+  };
 
   // Get current tenant info
   const currentTenant = useMemo(() => {
@@ -212,6 +238,78 @@ export default function TenantAccountPage() {
                 <p className="text-sm text-gray-600 dark:text-gray-400">Tenant ID: {currentTenant.id}</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Navigation Preferences */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Navigation className="w-5 h-5" />
+              Navigation Preferences
+            </CardTitle>
+            <CardDescription>
+              Choose how tenant switching behaves for you
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                   onClick={() => saveNavigationPreference('last-visited')}>
+                <div className="mt-1">
+                  <input
+                    type="radio"
+                    name="navigation-preference"
+                    checked={navigationPreference === 'last-visited'}
+                    onChange={() => saveNavigationPreference('last-visited')}
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-medium text-gray-900 dark:text-white">Navigate to Last Visited Page</p>
+                    <Badge variant="default" className="text-xs">Default</Badge>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    When switching tenants, go to the last page you visited in that tenant
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                    <ArrowRight className="w-3 h-3" />
+                    <span>Example: Switching from Tenant A dashboard to Tenant B shows Tenant B's last visited page</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                   onClick={() => saveNavigationPreference('current-page')}>
+                <div className="mt-1">
+                  <input
+                    type="radio"
+                    name="navigation-preference"
+                    checked={navigationPreference === 'current-page'}
+                    onChange={() => saveNavigationPreference('current-page')}
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900 dark:text-white mb-1">Stay on Current Page</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    When switching tenants, stay on the same page (if it exists in the new tenant)
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                    <ArrowRight className="w-3 h-3" />
+                    <span>Example: Switching from Tenant A dashboard to Tenant B shows Tenant B's dashboard</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {savingPreference && (
+              <div className="flex items-center gap-2 text-sm text-blue-600">
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <span>Saving preference...</span>
+              </div>
+            )}
           </CardContent>
         </Card>
 

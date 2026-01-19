@@ -6,6 +6,7 @@
 
 import { isFeatureEnabled } from './featureFlags';
 import { api } from './api';
+import { LocalStorageCache } from './cache/local-storage-cache';
 
 export interface TenantNavigationOptions {
   tenantId: string;
@@ -17,6 +18,43 @@ export interface TenantNavigationOptions {
 export interface OnboardingCheckResult {
   needsOnboarding: boolean;
   redirectUrl?: string;
+}
+
+/**
+ * Store the last visited page for a tenant
+ */
+export async function storeLastVisitedPage(tenantId: string, path: string): Promise<void> {
+  try {
+    // Only store tenant-specific pages (not platform pages)
+    if (path.startsWith('/t/')) {
+      await LocalStorageCache.set('last-visited-page', path, {
+        tenantId,
+        ttl: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+    }
+  } catch (error) {
+    console.warn('[TenantNavigation] Failed to store last visited page:', error);
+  }
+}
+
+/**
+ * Get the last visited page for a tenant
+ */
+export async function getLastVisitedPage(tenantId: string): Promise<string | null> {
+  try {
+    const lastPage = await LocalStorageCache.get<string>('last-visited-page', { tenantId });
+    return lastPage;
+  } catch (error) {
+    console.warn('[TenantNavigation] Failed to get last visited page:', error);
+    return null;
+  }
+}
+
+/**
+ * Track current page as user navigates (call this on route changes)
+ */
+export async function trackCurrentPage(tenantId: string, path: string): Promise<void> {
+  await storeLastVisitedPage(tenantId, path);
 }
 
 /**
@@ -56,8 +94,9 @@ export async function checkTenantOnboarding(tenantId: string): Promise<Onboardin
 /**
  * Get the target URL when switching to a tenant
  * Context-aware: preserves current page when possible (unless preserveCurrentPage is false)
+ * Enhanced: Uses last visited page from cache when appropriate
  */
-export function getTenantNavigationUrl(options: TenantNavigationOptions): string {
+export async function getTenantNavigationUrl(options: TenantNavigationOptions): Promise<string> {
   const { tenantId, currentPath, preserveCurrentPage = true } = options;
   const path = currentPath || (typeof window !== 'undefined' ? window.location.pathname : '/');
   
@@ -70,7 +109,20 @@ export function getTenantNavigationUrl(options: TenantNavigationOptions): string
   if (path.startsWith('/t/')) {
     const pathParts = path.split('/');
     pathParts[2] = tenantId; // Replace tenant ID at index 2
-    return pathParts.join('/');
+    const newPath = pathParts.join('/');
+    
+    // Store this as the last visited page for the tenant
+    await storeLastVisitedPage(tenantId, newPath);
+    
+    return newPath;
+  }
+  
+  // Check if we have a last visited page for this tenant (when coming from platform pages)
+  if (!path.startsWith('/t/')) {
+    const lastVisitedPage = await getLastVisitedPage(tenantId);
+    if (lastVisitedPage) {
+      return lastVisitedPage;
+    }
   }
   
   // Check if tenant URLs are enabled for platform → tenant navigation
@@ -81,7 +133,9 @@ export function getTenantNavigationUrl(options: TenantNavigationOptions): string
   if (tenantUrlsEnabled) {
     // Map platform pages to tenant-scoped equivalents
     if (path === '/' || path === '/dashboard') {
-      return `/t/${encodeURIComponent(tenantId)}/dashboard`;
+      const dashboardUrl = `/t/${encodeURIComponent(tenantId)}/dashboard`;
+      await storeLastVisitedPage(tenantId, dashboardUrl);
+      return dashboardUrl;
     }
     
     if (path.startsWith('/settings')) {
@@ -94,19 +148,27 @@ export function getTenantNavigationUrl(options: TenantNavigationOptions): string
       
       if (settingsPath === '' || settingsPath === '/' || !tenantSettingsRoutes.some(route => settingsPath.startsWith(route))) {
         // Default to tenant dashboard for settings pages without tenant equivalents
-        return `/t/${encodeURIComponent(tenantId)}/dashboard`;
+        const dashboardUrl = `/t/${encodeURIComponent(tenantId)}/dashboard`;
+        await storeLastVisitedPage(tenantId, dashboardUrl);
+        return dashboardUrl;
       }
       
-      return `/t/${encodeURIComponent(tenantId)}/settings${settingsPath}`;
+      const settingsUrl = `/t/${encodeURIComponent(tenantId)}/settings${settingsPath}`;
+      await storeLastVisitedPage(tenantId, settingsUrl);
+      return settingsUrl;
     }
     
     if (path === '/items') {
-      return `/t/${encodeURIComponent(tenantId)}/items`;
+      const itemsUrl = `/t/${encodeURIComponent(tenantId)}/items`;
+      await storeLastVisitedPage(tenantId, itemsUrl);
+      return itemsUrl;
     }
   }
 
   // Default destination: tenant-scoped dashboard
-  return `/t/${encodeURIComponent(tenantId)}/dashboard`;
+  const dashboardUrl = `/t/${encodeURIComponent(tenantId)}/dashboard`;
+  await storeLastVisitedPage(tenantId, dashboardUrl);
+  return dashboardUrl;
 }
 
 /**
@@ -138,8 +200,8 @@ export async function navigateToTenant(
     }
   }
 
-  // Get context-aware navigation URL
-  const targetUrl = getTenantNavigationUrl({ tenantId, currentPath, preserveCurrentPage });
+  // Get context-aware navigation URL (now async)
+  const targetUrl = await getTenantNavigationUrl({ tenantId, currentPath, preserveCurrentPage });
   
   console.log('[TenantNavigation] Navigating to:', targetUrl);
   navigate(targetUrl);
@@ -149,6 +211,6 @@ export async function navigateToTenant(
  * Simple synchronous version for client-side navigation
  * Use when you don't need onboarding checks
  */
-export function getQuickTenantUrl(tenantId: string, currentPath?: string, preserveCurrentPage: boolean = true): string {
-  return getTenantNavigationUrl({ tenantId, currentPath, preserveCurrentPage });
+export async function getQuickTenantUrl(tenantId: string, currentPath?: string, preserveCurrentPage: boolean = true): Promise<string> {
+  return await getTenantNavigationUrl({ tenantId, currentPath, preserveCurrentPage });
 }

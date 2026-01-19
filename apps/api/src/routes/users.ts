@@ -26,18 +26,87 @@ router.get('/preferences', async (req, res) => {
       return res.status(401).json({ error: 'unauthorized' });
     }
 
-    // Mock data for now - replace with actual preferences service
-    const preferences: any[] = [];
+    // Fetch user preferences from database
+    const preferences = await prisma.user_preferences.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: 'asc' }
+    });
+
+    // Convert to key-value object
+    const preferencesObj = preferences.reduce((acc, pref) => {
+      acc[pref.key] = pref.value;
+      return acc;
+    }, {} as Record<string, any>);
 
     res.json({
       success: true,
-      data: preferences,
+      data: preferencesObj,
     });
   } catch (error) {
     console.error('[Preferences Error]', error);
     res.status(500).json({
       error: 'internal_error',
       message: 'Failed to fetch preferences',
+    });
+  }
+});
+
+/**
+ * PATCH /user/preferences - Update user preferences
+ * Updates specific user preferences
+ */
+router.patch('/preferences', async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+
+    const { preferences } = req.body;
+
+    if (!preferences || typeof preferences !== 'object') {
+      return res.status(400).json({
+        error: 'invalid_request',
+        message: 'Preferences object is required',
+      });
+    }
+
+    // Update each preference
+    const updatedPreferences = [];
+    
+    for (const [key, value] of Object.entries(preferences)) {
+      const result = await prisma.user_preferences.upsert({
+        where: {
+          user_id_key: {
+            user_id: userId,
+            key: key
+          }
+        },
+        update: {
+          value: value as any, // Cast to any to satisfy Prisma JSON type
+          updated_at: new Date()
+        },
+        create: {
+          user_id: userId,
+          key: key,
+          value: value as any // Cast to any to satisfy Prisma JSON type
+        }
+      });
+      
+      updatedPreferences.push(result);
+    }
+
+    res.json({
+      success: true,
+      message: 'Preferences updated successfully',
+      data: updatedPreferences,
+    });
+  } catch (error) {
+    console.error('[Preferences Update Error]', error);
+    res.status(500).json({
+      error: 'internal_error',
+      message: 'Failed to update preferences',
     });
   }
 });
