@@ -15,11 +15,16 @@ const router = Router();
  * GET /api/storefront/:tenantId/featured-products
  * Fast featured product listing using materialized view
  * Performance: <5ms (vs 50-100ms with traditional query)
+ * 
+ * Query params:
+ * - type: 'store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick' (default: 'store_selection')
+ * - limit: number of products to return (default: 20)
+ * - includeExpired: show expired featured products (default: false)
  */
 router.get('/:tenantId/featured-products', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
-    const { limit = '20', includeExpired = 'false' } = req.query;
+    const { limit = '20', type = 'store_selection', includeExpired = 'false' } = req.query;
     
     if (!tenantId) {
       return res.status(400).json({ error: 'tenant_required' });
@@ -28,8 +33,12 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
     const showExpired = includeExpired === 'true';
     
-    // Query storefront_products MV for featured products
-    // Uses optimized index: idx_storefront_products_featured
+    // Validate featured type
+    const validTypes = ['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick'];
+    const featuredType = validTypes.includes(type as string) ? type : 'store_selection';
+    
+    // Query storefront_products MV for featured products by type
+    // Uses optimized index: idx_storefront_products_featured_type
     const query = `
       SELECT 
         id,
@@ -65,20 +74,26 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
         featured_at,
         featured_until,
         featured_priority,
+        featured_type,
         is_actively_featured,
         has_image,
-        in_stock,
         has_gallery,
+        has_description,
+        has_marketing_description,
+        has_brand,
+        has_price,
+        in_stock,
         created_at,
         updated_at
       FROM storefront_products
       WHERE tenant_id = $1
+        AND featured_type = $2
         AND ${showExpired ? 'is_featured = true' : 'is_actively_featured = true'}
       ORDER BY featured_priority DESC, featured_at DESC
-      LIMIT $2
+      LIMIT $3
     `;
     
-    const result = await getDirectPool().query(query, [tenantId, limitNum]);
+    const result = await getDirectPool().query(query, [tenantId, featuredType, limitNum]);
     
     // Transform to camelCase for frontend compatibility
     const items = result.rows.map((row: any) => ({

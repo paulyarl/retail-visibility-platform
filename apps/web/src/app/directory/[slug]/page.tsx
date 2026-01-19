@@ -128,8 +128,8 @@ async function getFeaturedProducts(tenantId: string, limit: number = 6) {
   const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
   
   try {
-    // Use the featured products endpoint that queries is_featured from database
-    const res = await fetch(`${apiUrl}/api/storefront/${tenantId}/featured-products?limit=${limit}`, {
+    // Use the featured products endpoint with store_selection type for directory
+    const res = await fetch(`${apiUrl}/api/storefront/${tenantId}/featured-products?type=store_selection&limit=${limit}`, {
       next: { revalidate: 300 },
     });
 
@@ -138,7 +138,7 @@ async function getFeaturedProducts(tenantId: string, limit: number = 6) {
     }
 
     const data = await res.json();
-    return data.products || [];
+    return data.items || [];
   } catch (error) {
     console.error('Error fetching featured products:', error);
     return [];
@@ -563,10 +563,70 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                 </div>
               </div>
 
-              {/* Photo Gallery */}
+              {/* Featured Products - MOVED UP FOR CONVERSION! */}
+              {featuredProducts.length > 0 && (
+                <TenantPaymentProvider tenantId={listing.tenantId}>
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-bold text-gray-900">Featured Products</h2>
+                      <Link
+                        href={`/tenant/${listing.tenantId}`}
+                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        View All Products →
+                      </Link>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {featuredProducts.map((product: any) => (
+                        <SmartProductCard
+                          key={product.id}
+                          product={{
+                            id: product.id,
+                            sku: product.sku || product.id,
+                            name: product.name || product.title,
+                            title: product.title || product.name,
+                            brand: product.brand,
+                            description: product.description,
+                            priceCents: product.priceCents || Math.round((product.price || 0) * 100),
+                            salePriceCents: product.salePriceCents,
+                            stock: product.stock || 999,
+                            imageUrl: product.imageUrl || product.image_url,
+                            tenantId: listing.tenantId,
+                            availability: product.availability || 'in_stock',
+                            tenantCategory: product.tenantCategory,
+                            has_variants: product.has_variants,
+                          }}
+                          tenantName={listing.businessName}
+                          tenantLogo={listing.logoUrl}
+                          variant="featured"
+                          showCategory={true}
+                          showDescription={true}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </TenantPaymentProvider>
+              )}
+
+              {/* Business Description - Brief Trust Building */}
+              {businessProfile?.business_description && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4">About {listing.businessName}</h2>
+                  <div className="prose prose-gray max-w-none">
+                    <p className="text-gray-700 leading-relaxed text-base whitespace-pre-wrap">
+                      {businessProfile.business_description.length > 200 
+                        ? `${businessProfile.business_description.substring(0, 200)}...`
+                        : businessProfile.business_description
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Photo Gallery - Visual Proof */}
               <DirectoryPhotoGalleryDisplay listing={listing} />
 
-              {/* Product Categories - Collapsible */}
+              {/* Product Categories - Browse More */}
               {storefrontCategories.categories.length > 0 && (
                 <ProductCategoriesCollapsible
                   categories={storefrontCategories.categories}
@@ -575,19 +635,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                 />
               )}
 
-              {/* Business Description - Full Width Pane */}
-              {businessProfile?.business_description && (
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">About Us</h2>
-                  <div className="prose prose-gray max-w-none">
-                    <p className="text-gray-700 leading-relaxed text-base whitespace-pre-wrap">
-                      {businessProfile.business_description}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Store Ratings and Reviews */}
+              {/* Store Ratings and Reviews - Social Proof */}
               <StoreRatingsSection tenantId={listing.tenantId} showWriteReview={true} />
             </div>
 
@@ -709,52 +757,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
           </div>
         </div>
 
-      {/* Featured Products - Self-Aware! */}
-      {featuredProducts.length > 0 && (
-        <TenantPaymentProvider tenantId={listing.tenantId}>
-          <div className="bg-white border-t">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Featured Products</h2>
-                <Link
-                  href={`/tenant/${listing.tenantId}`}
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  View All Products →
-                </Link>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {featuredProducts.map((product: any) => (
-                  <SmartProductCard
-                    key={product.id}
-                    product={{
-                      id: product.id,
-                      sku: product.sku || product.id,
-                      name: product.name || product.title,
-                      title: product.title || product.name,
-                      brand: product.brand,
-                      description: product.description,
-                      priceCents: product.priceCents || Math.round((product.price || 0) * 100),
-                      salePriceCents: product.salePriceCents,
-                      stock: product.stock || 999,
-                      imageUrl: product.imageUrl || product.image_url,
-                      tenantId: listing.tenantId,
-                      availability: product.availability || 'in_stock',
-                      tenantCategory: product.tenantCategory,
-                      has_variants: product.has_variants,
-                    }}
-                    tenantName={listing.businessName}
-                    tenantLogo={listing.logoUrl}
-                    variant="featured"
-                    showCategory={true}
-                    showDescription={true}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </TenantPaymentProvider>
-      )}
+      {/* Featured Products - REMOVED FROM BOTTOM - MOVED UP! */}
 
       {/* Related Stores */}
       <RelatedStores currentSlug={slugForRelated} />

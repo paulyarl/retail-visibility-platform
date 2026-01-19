@@ -27,6 +27,7 @@ import ContactInformationCollapsible from '@/components/storefront/ContactInform
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import LastViewed from '@/components/directory/LastViewed';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
+import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -665,6 +666,9 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
       {/* Products Section */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Storefront Featured Products */}
+        <StorefrontFeaturedProducts tenantId={id} />
+        
         <div>
           {/* Product Categories - Collapsible */}
           {productCategories.length > 0 && (

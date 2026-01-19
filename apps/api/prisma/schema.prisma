@@ -719,6 +719,7 @@ model inventory_items {
   featured_at             DateTime?                @map("featured_at") @db.Timestamp(6)
   featured_until          DateTime?                @map("featured_until") @db.Timestamp(6)
   featured_priority       Int?                     @default(0) @map("featured_priority")
+  featured_type           String?                  @default("store_selection")
   digital_access_grants   digital_access_grants[]
   tenant_payment_gateways tenant_payment_gateways? @relation(fields: [payment_gateway_id], references: [id], onUpdate: NoAction, map: "fk_inventory_items_payment_gateway")
   tenants                 tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
@@ -736,6 +737,7 @@ model inventory_items {
   @@index([payment_gateway_id], map: "idx_inventory_items_payment_gateway_id")
   @@index([payment_gateway_type], map: "idx_inventory_items_payment_gateway_type")
   @@index([product_type], map: "idx_inventory_items_product_type")
+  @@index([tenant_id, featured_type, is_featured], map: "idx_inventory_items_featured_type")
 }
 
 model invitations {

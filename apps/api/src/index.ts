@@ -5498,6 +5498,11 @@ app.get("/api/gbp/categories", async (req, res) => {
 // Mount test GBP sync routes
 // app.use('/test', testGbpSyncRoutes);
 
+/* ------------------------------ tenant featured products ------------------------------ */
+import tenantFeaturedRoutes from './routes/tenant-featured';
+app.use('/api', tenantFeaturedRoutes);
+console.log('✅ Tenant featured products routes mounted at /api');
+
 /* ------------------------------ platform settings ------------------------------ */
 app.use('/api', platformSettingsRoutes);
 console.log('✅ Platform settings routes mounted at /api');
