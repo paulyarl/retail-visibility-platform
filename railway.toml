@@ -1,0 +1,97 @@
+# Railway Configuration for RVP Platform
+# Supports API + Redis + Database services
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "apps/api/Dockerfile"
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+startCommand = "npm start"
+
+[[services]]
+name = "api"
+source = "."
+[services.environment]
+NODE_ENV = "production"
+PORT = "8080"
+
+# Redis Configuration
+[services.variables]
+REDIS_URL = "${{REDIS_SERVICE_URL}}"
+REDIS_HOST = "${{REDIS_SERVICE_HOST}}"
+REDIS_PORT = "${{REDIS_SERVICE_PORT}}"
+
+# Database Configuration
+[services.variables]
+DATABASE_URL = "${{POSTGRES_CONNECTION_URL}}"
+DATABASE_HOST = "${{POSTGRES_HOST}}"
+DATABASE_PORT = "${{POSTGRES_PORT}}"
+DATABASE_USER = "${{POSTGRES_USER}}"
+DATABASE_PASSWORD = "${{POSTGRES_PASSWORD}}"
+DATABASE_NAME = "${{POSTGRES_DATABASE}}"
+
+# Application Configuration
+[services.variables]
+JWT_SECRET = "${{JWT_SECRET}}"
+NEXTAUTH_SECRET = "${{NEXTAUTH_SECRET}}"
+NEXTAUTH_URL = "${{NEXTAUTH_URL}}"
+STORAGE_BUCKET = "${{STORAGE_BUCKET}}"
+SUPABASE_URL = "${{SUPABASE_URL}}"
+SUPABASE_ANON_KEY = "${{SUPABASE_ANON_KEY}}"
+SUPABASE_SERVICE_KEY = "${{SUPABASE_SERVICE_KEY}}"
+
+# External Services
+[services.variables]
+SENDGRID_API_KEY = "${{SENDGRID_API_KEY}}"
+STRIPE_SECRET_KEY = "${{STRIPE_SECRET_KEY}}"
+STRIPE_WEBHOOK_SECRET = "${{STRIPE_WEBHOOK_SECRET}}"
+PAYPAL_CLIENT_ID = "${{PAYPAL_CLIENT_ID}}"
+PAYPAL_CLIENT_SECRET = "${{PAYPAL_CLIENT_SECRET}}"
+SQUARE_ACCESS_TOKEN = "${{SQUARE_ACCESS_TOKEN}}"
+SQUARE_ENVIRONMENT = "${{SQUARE_ENVIRONMENT}}"
+
+# Monitoring & Analytics
+[services.variables]
+NEW_RELIC_LICENSE_KEY = "${{NEW_RELIC_LICENSE_KEY}}"
+SENTRY_DSN = "${{SENTRY_DSN}}"
+
+# Cache Configuration
+[services.variables]
+CACHE_TTL_DEFAULT = "900"  # 15 minutes
+CACHE_TTL_SHORT = "300"    # 5 minutes
+CACHE_TTL_LONG = "3600"    # 1 hour
+
+# Health Check Configuration
+[services.health_checks]
+path = "/api/health"
+port = 8080
+timeout_seconds = 30
+interval_seconds = 10
+grace_period_seconds = 60
+
+# Scaling Configuration
+[services.scale]
+min = 1
+max = 3
+target_cpu_percent = 70
+target_memory_percent = 80
+
+# Redis Service Configuration
+[[services]]
+name = "redis"
+source = "railway/redis:7.2"
+[services.variables]
+REDIS_MAXMEMORY = "256mb"
+REDIS_MAXMEMORY_POLICY = "allkeys-lru"
+
+# Database Service Configuration
+[[services]]
+name = "postgres"
+source = "railway/postgresql:16.1"
+[services.variables]
+POSTGRES_USER = "postgres"
+POSTGRES_DB = "rvp_platform"

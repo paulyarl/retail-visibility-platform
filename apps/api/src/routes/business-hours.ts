@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../prisma'
 import { requireFlag } from '../middleware/flags'
 import { generateGbpHoursSyncLogId, generateQuickStart } from '../lib/id-generator'
-import { memoryCache, cacheKeys, CACHE_TTL } from '../utils/cache'
+import CacheService, { CacheKeys } from '../lib/cache-service';
 
 const router = Router()
 
@@ -49,8 +49,8 @@ router.put('/tenant/:tenantId/business-hours',
   })
 
   // Invalidate cache for this tenant's business hours status
-  const cacheKey = cacheKeys.businessHoursStatus(tenantId)
-  memoryCache.delete(cacheKey)
+  const cacheKey = CacheKeys.BUSINESS_HOURS(tenantId)
+  await CacheService.del(cacheKey);
   console.log(`[Business Hours] Invalidated cache for tenant ${tenantId}`)
 
   // Update business profile hours
@@ -105,8 +105,8 @@ router.put('/tenant/:tenantId/business-hours/special',
   await updateBusinessProfileHours(tenantId);
 
   // Invalidate cache for this tenant's business hours status
-  const cacheKey = cacheKeys.businessHoursStatus(tenantId)
-  memoryCache.delete(cacheKey)
+  const cacheKey = CacheKeys.BUSINESS_HOURS(tenantId)
+  await CacheService.del(cacheKey);
   console.log(`[Business Hours] Invalidated cache for tenant ${tenantId} (special hours update)`)
 
   res.json({ success: true })
@@ -147,8 +147,8 @@ router.get('/tenant/:tenantId/business-hours/status',
 
   try {
     // Check cache first
-    const cacheKey = cacheKeys.businessHoursStatus(tenantId)
-    const cachedResult = memoryCache.get(cacheKey)
+    const cacheKey = CacheKeys.BUSINESS_HOURS(tenantId)
+    const cachedResult = await CacheService.get(cacheKey);
 
     if (cachedResult) {
       console.log(`[Business Hours] Cache hit for tenant ${tenantId}`)
@@ -227,7 +227,7 @@ router.get('/tenant/:tenantId/business-hours/status',
     }
 
     // Cache the result
-    memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
+    await CacheService.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
 
     res.json(result)
   } catch (error) {
@@ -326,7 +326,7 @@ router.get('/business-hours/status/:tenantId',
     }
 
     // Cache the result
-    memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
+    await CacheService.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
 
     res.json(result)
   } catch (error) {

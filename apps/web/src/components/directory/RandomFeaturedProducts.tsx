@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Package, ExternalLink, Grid3x3, List } from 'lucide-react';
+import { Package, ExternalLink, Grid3x3, List, MapPin } from 'lucide-react';
 import SmartProductCard from '@/components/products/SmartProductCard';
 
 interface RandomFeaturedProduct {
@@ -29,12 +29,23 @@ interface RandomFeaturedProduct {
   distanceKm: number | null;
 }
 
+// Utility function to format distance
+const formatDistance = (distanceKm: number | null): string => {
+  if (distanceKm === null) return '';
+  if (distanceKm < 1) {
+    return `${Math.round(distanceKm * 1000)}m away`;
+  }
+  return `${Math.round(distanceKm)}km away`;
+};
+
 export default function RandomFeaturedProducts() {
   const [products, setProducts] = useState<RandomFeaturedProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isClient, setIsClient] = useState(false);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [isCached, setIsCached] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<string>('');
 
   // Get user location on component mount
   useEffect(() => {
@@ -100,6 +111,8 @@ export default function RandomFeaturedProducts() {
         if (response.ok && isMounted) {
           const data = await response.json();
           setProducts(data.products || []);
+          setIsCached(data.cached || false);
+          setLastRefreshed(data.refreshed_at || '');
         }
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError' && isMounted) {
@@ -130,7 +143,12 @@ export default function RandomFeaturedProducts() {
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Featured Products Near You</h2>
             <p className="text-gray-600">Discover amazing products from stores in your area</p>
-            <p className="text-sm text-gray-500 mt-1">📍 Getting your location...</p>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <p className="text-sm text-gray-500">
+                {userLocation ? '📍 Finding nearby products...' : '📍 Getting your location...'}
+              </p>
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {[...Array(12)].map((_, i) => (
@@ -174,11 +192,24 @@ export default function RandomFeaturedProducts() {
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Featured Products</h2>
           <p className="text-gray-600">Discover amazing products from stores near you</p>
-          {userLocation && (
-            <p className="text-sm text-gray-500 mt-1">
-              📍 Location-aware recommendations based on your position
-            </p>
-          )}
+          <div className="flex items-center justify-center gap-4 mt-2 text-sm text-gray-500">
+            {userLocation && (
+              <span className="flex items-center gap-1">
+                <MapPin className="w-4 h-4" />
+                Location-aware recommendations
+              </span>
+            )}
+            {isCached && (
+              <span className="flex items-center gap-1">
+                ⚡ Fast cached results
+              </span>
+            )}
+            {lastRefreshed && (
+              <span className="text-xs">
+                Updated {new Date(lastRefreshed).toLocaleTimeString()}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* View Toggle */}
@@ -224,7 +255,9 @@ export default function RandomFeaturedProducts() {
                   name: product.name,
                   title: product.name,
                   brand: product.brand || '',
-                  description: product.description || '',
+                  description: product.distanceKm !== null 
+                    ? `${product.description || ''} ${formatDistance(product.distanceKm)}`.trim()
+                    : product.description || '',
                   priceCents: product.priceCents,
                   stock: product.stock,
                   imageUrl: product.imageUrl,
@@ -260,7 +293,9 @@ export default function RandomFeaturedProducts() {
                   name: product.name,
                   title: product.name,
                   brand: product.brand || '',
-                  description: product.description || '',
+                  description: product.distanceKm !== null 
+                    ? `${product.description || ''} ${formatDistance(product.distanceKm)}`.trim()
+                    : product.description || '',
                   priceCents: product.priceCents,
                   stock: product.stock,
                   imageUrl: product.imageUrl,

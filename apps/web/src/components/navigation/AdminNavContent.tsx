@@ -199,6 +199,10 @@ const adminNavItems: NavItem[] = [
         href: '/settings/admin/features',
         children: [
           {
+            label: 'Feature Overrides',
+            href: '/settings/admin/feature-overrides'
+          },
+          {
             label: 'User Features',
             href: '/settings/admin/features/users',
             children: [
@@ -215,6 +219,26 @@ const adminNavItems: NavItem[] = [
           {
             label: 'Admin Features',
             href: '/settings/admin/features/admin'
+          }
+        ]
+      },
+      {
+        label: 'Analytics & Monitoring',
+        href: '/settings/admin/analytics',
+        children: [
+          {
+            label: 'Scan Metrics',
+            href: '/settings/admin/scan-metrics'
+          }
+        ]
+      },
+      {
+        label: 'Domain Management',
+        href: '/settings/admin/domains',
+        children: [
+          {
+            label: 'Subdomain Management',
+            href: '/settings/admin/subdomain'
           }
         ]
       }
