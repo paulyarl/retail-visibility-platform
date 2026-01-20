@@ -40,6 +40,7 @@ import { dailyRatesJob } from "./jobs/rates";
 import { ensureFeedCategoryView } from "./views";
 import { triggerRevalidate } from "./utils/revalidate";
 import { categoryService } from "./services/CategoryService";
+import { FeaturedProductsService } from "./services/FeaturedProductsService";
 
 // Utility function to safely extract string parameters from Express req.params
 function getParam(params: any, key: string): string {
@@ -3876,6 +3877,25 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
       prisma.inventory_items.count({ where }),
     ]);
     
+    // Fetch featured types for all items in batch
+    const itemIds = items.map(item => item.id);
+    const featuredTypesMap = new Map();
+    
+    if (itemIds.length > 0) {
+      // Get featured types for all items at once
+      const featuredTypesForAllItems = await Promise.all(
+        itemIds.map(async (itemId) => {
+          const featuredTypes = await FeaturedProductsService.getFeaturedTypesForItem(itemId);
+          return { itemId, featuredTypes };
+        })
+      );
+      
+      // Create lookup map
+      featuredTypesForAllItems.forEach(({ itemId, featuredTypes }) => {
+        featuredTypesMap.set(itemId, featuredTypes);
+      });
+    }
+    
     // Fetch all unique category slugs from items' category_path arrays
     const categorySlugs = [...new Set(items.flatMap(item => item.category_path || []).filter(Boolean))];
     const categories = categorySlugs.length > 0 
@@ -3911,8 +3931,11 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
     // Create a category lookup map by ID
     const categoryByIdMap = new Map(directCategories.map(cat => [cat.id, cat]));
     
-    const itemsWithoutPriceCents = items.map((item: { [x: string]: any; price?: any; price_cents?: any; directory_category_id?: any; image_url?: any; category_path?: any; }) => {
-      const { price_cents, directory_category_id, image_url, ...itemWithoutPriceCents } = item;
+    const itemsWithoutPriceCents = items.map((item: { [x: string]: any; price?: any; price_cents?: any; directory_category_id?: any; image_url?: any; category_path?: any; id: string }) => {
+      const { price_cents, directory_category_id, image_url, id, ...itemWithoutPriceCents } = item;
+      
+      // Get featured types for this item
+      const featuredTypes = featuredTypesMap.get(id) || [];
       
       // Find tenant category - prefer directory_category_id, fallback to category_path
       let tenantCategory = null;
@@ -3925,6 +3948,10 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         tenantCategory = categoryMap.get(item.category_path[0]) || null;
       }
       
+      // Extract featured types array and maintain backward compatibility
+      const featuredTypesArray = featuredTypes.map((ft: any) => ft.featured_type);
+      const primaryFeaturedType = featuredTypesArray.length > 0 ? featuredTypesArray[0] : null;
+      
       return {
         ...itemWithoutPriceCents,
         price: item.price !== null && item.price !== undefined ? Number(item.price) : null,
@@ -3932,6 +3959,15 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         tenantCategory: tenantCategory || null,
         imageUrl: image_url || null, // Map image_url to imageUrl for frontend
         categoryPath: item.category_path || [], // Also include category_path for completeness
+        // Multi-type featured products support
+        featuredTypes: featuredTypesArray, // Array of featured types
+        featuredProducts: featuredTypes, // Full featured product details with expirations
+        // Backward compatibility
+        featuredType: primaryFeaturedType, // Primary featured type (first one)
+        is_featured: featuredTypesArray.length > 0, // Boolean for backward compatibility
+        featured_at: featuredTypes.length > 0 ? featuredTypes[0].featured_at : null,
+        featured_priority: featuredTypes.length > 0 ? featuredTypes[0].featured_priority : null,
+        featured_until: featuredTypes.length > 0 ? featuredTypes[0].featured_expires_at : null,
       };
     });
 
@@ -4045,6 +4081,11 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     }
   }
 
+  // Get featured types for this item
+  const featuredTypes = await FeaturedProductsService.getFeaturedTypesForItem(itemId);
+  const featuredTypesArray = featuredTypes.map(ft => ft.featured_type);
+  const primaryFeaturedType = featuredTypesArray.length > 0 ? featuredTypesArray[0] : null;
+
   // Convert Decimal price to number for frontend compatibility
   // Hide price_cents from frontend since price is the authoritative field
   // Map image_url to imageUrl for frontend compatibility
@@ -4059,6 +4100,15 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     tenantCategoryId: it.directory_category_id,
     hasActivePaymentGateway: hasActivePaymentGateway || false,
     defaultGatewayType: defaultGatewayType || null,
+    // Multi-type featured products support
+    featuredTypes: featuredTypesArray, // Array of featured types
+    featuredProducts: featuredTypes, // Full featured product details with expirations
+    // Backward compatibility
+    featuredType: primaryFeaturedType, // Primary featured type (first one)
+    is_featured: featuredTypesArray.length > 0, // Boolean for backward compatibility
+    featured_at: featuredTypes.length > 0 ? featuredTypes[0].featured_at : null,
+    featured_priority: featuredTypes.length > 0 ? featuredTypes[0].featured_priority : null,
+    featured_until: featuredTypes.length > 0 ? featuredTypes[0].featured_expires_at : null,
   };
 
   res.json(transformed);
@@ -5663,6 +5713,11 @@ app.get("/api/gbp/categories", async (req, res) => {
 import tenantFeaturedRoutes from './routes/tenant-featured';
 app.use('/api', tenantFeaturedRoutes);
 console.log('✅ Tenant featured products routes mounted at /api');
+
+/* ------------------------------ multi-type featured products ------------------------------ */
+import featuredProductsRoutes from './routes/featured-products';
+app.use('/api', featuredProductsRoutes);
+console.log('✅ Multi-type featured products routes mounted at /api');
 
 /* ------------------------------ platform settings ------------------------------ */
 app.use('/api', platformSettingsRoutes);

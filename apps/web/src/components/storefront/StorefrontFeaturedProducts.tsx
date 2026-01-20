@@ -89,13 +89,41 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, maxP
 
     const fetchFeaturedProducts = async () => {
       try {
-        const response = await fetch(`/api/storefront/${tenantId}/featured-products?type=${type}&limit=${maxProducts}`, {
+        // Use our new multi-type featured products API
+        const response = await fetch(`/api/tenants/${tenantId}/featured-products/storefront?limit=${maxProducts}`, {
           signal: abortController.signal,
         });
         const data = await response.json();
         
         if (response.ok && isMounted) {
-          setProducts(data.items || []);
+          // The new API returns grouped data by featured type
+          const typeProducts = data[type] || [];
+          // Transform the data to match the expected format
+          const transformedProducts = typeProducts.map((product: any) => ({
+            id: product.inventory_item_id,
+            sku: product.sku,
+            name: product.name,
+            title: product.title,
+            description: product.description,
+            price: product.price || 0,
+            priceCents: Math.round((product.price || 0) * 100),
+            salePriceCents: product.sale_price_cents,
+            currency: 'USD',
+            stock: product.stock || 0,
+            imageUrl: product.image_url,
+            brand: product.brand,
+            availability: product.availability,
+            tenantCategory: product.tenantCategory,
+            has_variants: product.has_variants,
+            hasActivePaymentGateway: product.has_active_payment_gateway,
+            paymentGatewayType: product.payment_gateway_type,
+            // Add multi-type support
+            featuredTypes: [type], // This product is featured for this type
+            featuredType: type, // Backward compatibility
+            isFeatured: true
+          }));
+          
+          setProducts(transformedProducts);
         }
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError' && isMounted) {
@@ -183,6 +211,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, maxP
                 has_variants: product.has_variants || false,
                 has_active_payment_gateway: product.hasActivePaymentGateway,
                 payment_gateway_type: product.paymentGatewayType,
+                featuredType: type, // Pass the featured type
               }}
               variant="featured"
               showCategory={false}

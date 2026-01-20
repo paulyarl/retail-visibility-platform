@@ -71,6 +71,16 @@ export default function DynamicTenantSidebar({ tenantId, children }: DynamicTena
     const baseNav = [
       { label: 'Dashboard', href: `/t/${tenantId}` },
       { 
+        label: 'Google Business Profile', 
+        href: `/t/${tenantId}/settings/hours`,
+        children: [
+          { label: 'Store Hours', href: `/t/${tenantId}/settings/hours` },
+          { label: 'Business Category', href: `/t/${tenantId}/settings/gbp-category` },
+          { label: 'Product Categories', href: `/t/${tenantId}/categories` },
+          { label: 'Directory Settings', href: `/t/${tenantId}/settings/directory` },
+        ]
+      },
+      { 
         label: 'Order Processing', 
         href: `/t/${tenantId}/orders`,
         children: [
@@ -91,6 +101,15 @@ export default function DynamicTenantSidebar({ tenantId, children }: DynamicTena
         ]
       },
       { 
+        label: 'Featured Products', 
+        href: `/t/${tenantId}/settings/products/featuring`,
+        children: [
+          { label: 'Directory Featured Products', href: `/t/${tenantId}/settings/products/featuring` },
+          { label: 'Storefront Featured Products', href: `/t/${tenantId}/settings/featured-products` },
+          { label: 'Inventory Featured Products', href: `/t/${tenantId}/settings/products/inventory-featuring` },
+        ]
+      },
+      { 
         label: 'Onboarding', 
         href: `/t/${tenantId}/onboarding`,
         children: [
@@ -100,18 +119,12 @@ export default function DynamicTenantSidebar({ tenantId, children }: DynamicTena
           { label: 'Branding', href: `/t/${tenantId}/settings/branding` },
           { label: 'Custom Subdomain', href: `/t/${tenantId}/settings/subdomain` },
           
-          // Business Information
-          { label: 'Business Hours', href: `/t/${tenantId}/settings/hours` },
-          { label: 'Business Category', href: `/t/${tenantId}/settings/gbp-category` },
-          { label: 'Directory Settings', href: `/t/${tenantId}/settings/directory` },
+          // Location Status
           { label: 'Location Status', href: `/t/${tenantId}/settings/location-status` },
           
           // Team & Organization
           { label: 'Team Members', href: `/t/${tenantId}/settings/users` },
           { label: 'Organization Settings', href: `/t/${tenantId}/settings/organization` },
-          
-          // Getting Started
-          { label: 'Featured Products', href: `/t/${tenantId}/settings/products/featuring` },
         ]
       },
       { 
@@ -149,7 +162,9 @@ export default function DynamicTenantSidebar({ tenantId, children }: DynamicTena
       label: 'Integrations',
       href: `/t/${tenantId}/settings/integrations`,
       children: [
-        { label: 'Google Business Profile', href: `/t/${tenantId}/settings/integrations/google` },
+        { label: 'Google Business Profile', href: `/t/${tenantId}/settings/integrations/google-business` },
+        { label: 'Google Merchant Center', href: `/t/${tenantId}/settings/integrations/google-merchant` },
+        { label: 'Feed Validation', href: `/t/${tenantId}/feed-validation` },
         { 
           label: 'POS Systems', 
           href: `/t/${tenantId}/settings/integrations`,

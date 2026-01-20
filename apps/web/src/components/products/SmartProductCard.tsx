@@ -7,6 +7,108 @@ import { PriceDisplay } from './PriceDisplay';
 import ProductWithVariants from './ProductWithVariants';
 import { AddToCartButton } from './AddToCartButton';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
+import { Star, Sparkles, Calendar, Tag, Award } from 'lucide-react';
+
+// Helper functions for storefront featured type badges
+const getStorefrontBadgeStyle = (typeId: string): string => {
+  switch (typeId) {
+    case 'store_selection':
+      return 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white';
+    case 'new_arrival':
+      return 'bg-gradient-to-r from-green-500 to-emerald-500 text-white';
+    case 'seasonal':
+      return 'bg-gradient-to-r from-orange-500 to-red-500 text-white';
+    case 'sale':
+      return 'bg-gradient-to-r from-red-500 to-pink-500 text-white';
+    case 'staff_pick':
+      return 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white';
+    default:
+      return 'bg-gradient-to-r from-amber-500 to-orange-500 text-white';
+  }
+};
+
+const getStorefrontBadgeIcon = (typeId: string) => {
+  switch (typeId) {
+    case 'store_selection':
+      return <Star className="w-3.5 h-3.5 fill-white" />;
+    case 'new_arrival':
+      return <Sparkles className="w-3.5 h-3.5 fill-white" />;
+    case 'seasonal':
+      return <Calendar className="w-3.5 h-3.5 fill-white" />;
+    case 'sale':
+      return <Tag className="w-3.5 h-3.5 fill-white" />;
+    case 'staff_pick':
+      return <Award className="w-3.5 h-3.5 fill-white" />;
+    default:
+      return <Star className="w-3.5 h-3.5 fill-white" />;
+  }
+};
+
+const getStorefrontBadgeText = (typeId: string): string => {
+  switch (typeId) {
+    case 'store_selection':
+      return 'FEATURED';
+    case 'new_arrival':
+      return 'NEW ARRIVAL';
+    case 'seasonal':
+      return 'SEASONAL';
+    case 'sale':
+      return 'ON SALE';
+    case 'staff_pick':
+      return 'STAFF PICK';
+    default:
+      return 'FEATURED';
+  }
+};
+
+const getStorefrontGradientBorder = (typeId: string): string => {
+  switch (typeId) {
+    case 'store_selection':
+      return 'bg-gradient-to-br from-blue-400 via-cyan-400 to-teal-400';
+    case 'new_arrival':
+      return 'bg-gradient-to-br from-green-400 via-emerald-400 to-teal-400';
+    case 'seasonal':
+      return 'bg-gradient-to-br from-orange-400 via-red-400 to-pink-400';
+    case 'sale':
+      return 'bg-gradient-to-br from-red-400 via-pink-400 to-rose-400';
+    case 'staff_pick':
+      return 'bg-gradient-to-br from-purple-400 via-indigo-400 to-blue-400';
+    default:
+      return 'bg-gradient-to-br from-amber-400 via-orange-400 to-pink-400';
+  }
+};
+
+// Get all featured types for a product (supports multiple badges)
+const getFeaturedTypes = (product: ProductData): ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[] => {
+  // If multiple types are explicitly provided, use them
+  if (product.featuredTypes && product.featuredTypes.length > 0) {
+    return product.featuredTypes;
+  }
+  
+  // Otherwise, use the single type if available
+  if (product.featuredType) {
+    return [product.featuredType];
+  }
+  
+  return [];
+};
+
+// Get priority order for badge display (most important first)
+const getBadgePriority = (typeId: string): number => {
+  switch (typeId) {
+    case 'sale': return 1; // Sale is most important (drives urgency)
+    case 'new_arrival': return 2; // New arrivals are second
+    case 'seasonal': return 3; // Seasonal items are third
+    case 'staff_pick': return 4; // Staff picks are fourth
+    case 'store_selection': return 5; // Directory featured is fifth
+    default: return 999;
+  }
+};
+
+// Sort badges by priority
+const sortBadgesByPriority = (types: string[]): string[] => {
+  return types.sort((a, b) => getBadgePriority(a) - getBadgePriority(b));
+};
 
 interface ProductData {
   id: string;
@@ -26,6 +128,8 @@ interface ProductData {
   has_active_payment_gateway?: boolean;
   availability?: 'in_stock' | 'out_of_stock' | 'preorder';
   isFeatured?: boolean;
+  featuredType?: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  featuredTypes?: ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[]; // Support multiple types
   tenantCategory?: {
     id: string;
     name: string;
@@ -109,20 +213,31 @@ export default function SmartProductCard({
 
   // Featured variant - Prominent styling for conversion optimization
   if (variant === 'featured') {
+    const featuredTypes = getFeaturedTypes(product);
+    const sortedTypes = sortBadgesByPriority(featuredTypes);
+    const primaryType = sortedTypes[0]; // Use first (highest priority) for gradient border
+    
     return (
       <div className={`group relative bg-white dark:bg-neutral-800 rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-300 ${className}`}>
-        {/* Featured Badge */}
-        <div className="absolute top-3 left-3 z-10">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg">
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-            FEATURED
-          </span>
+        {/* Featured Badges - Support Multiple */}
+        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5">
+          {sortedTypes.slice(0, 3).map((typeId, index) => (
+            <span 
+              key={typeId}
+              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-bold rounded-full shadow-lg ${getStorefrontBadgeStyle(typeId)}`}
+              style={{ 
+                fontSize: index === 0 ? '0.75rem' : '0.625rem', // Primary badge slightly larger
+                padding: index === 0 ? '0.375rem 0.75rem' : '0.25rem 0.5rem'
+              }}
+            >
+              {getStorefrontBadgeIcon(typeId)}
+              {getStorefrontBadgeText(typeId)}
+            </span>
+          ))}
         </div>
 
-        {/* Gradient Border Effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-amber-400 via-orange-400 to-pink-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl" style={{ padding: '2px' }}>
+        {/* Gradient Border Effect - Use primary type */}
+        <div className={`absolute inset-0 ${getStorefrontGradientBorder(primaryType || 'store_selection')} opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl`} style={{ padding: '2px' }}>
           <div className="w-full h-full bg-white dark:bg-neutral-800 rounded-xl"></div>
         </div>
 
@@ -397,14 +512,16 @@ export default function SmartProductCard({
                     </p>
                   )}
                   <div className="flex items-center gap-2">
-                    {product.isFeatured && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg">
-                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                        FEATURED
-                      </span>
-                    )}
+                    {(() => {
+                      const featuredTypes = getFeaturedTypes(product);
+                      const sortedTypes = sortBadgesByPriority(featuredTypes);
+                      return sortedTypes.slice(0, 2).map((typeId) => (
+                        <span key={typeId} className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full shadow-lg ${getStorefrontBadgeStyle(typeId)}`}>
+                          {getStorefrontBadgeIcon(typeId)}
+                          {getStorefrontBadgeText(typeId)}
+                        </span>
+                      ));
+                    })()}
                     {showCategory && product.tenantCategory && (
                       <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
                         {product.tenantCategory.name}
