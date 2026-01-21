@@ -20,22 +20,21 @@ NODE_ENV = "production"
 PORT = "8080"
 
 # Redis Configuration
+# Database Configuration
+# Application Configuration
+# External Services
+# Monitoring & Analytics
+# Cache Configuration
 [services.variables]
 REDIS_URL = "${{REDIS_SERVICE_URL}}"
 REDIS_HOST = "${{REDIS_SERVICE_HOST}}"
 REDIS_PORT = "${{REDIS_SERVICE_PORT}}"
-
-# Database Configuration
-[services.variables]
 DATABASE_URL = "${{POSTGRES_CONNECTION_URL}}"
 DATABASE_HOST = "${{POSTGRES_HOST}}"
 DATABASE_PORT = "${{POSTGRES_PORT}}"
 DATABASE_USER = "${{POSTGRES_USER}}"
 DATABASE_PASSWORD = "${{POSTGRES_PASSWORD}}"
 DATABASE_NAME = "${{POSTGRES_DATABASE}}"
-
-# Application Configuration
-[services.variables]
 JWT_SECRET = "${{JWT_SECRET}}"
 NEXTAUTH_SECRET = "${{NEXTAUTH_SECRET}}"
 NEXTAUTH_URL = "${{NEXTAUTH_URL}}"
@@ -43,9 +42,6 @@ STORAGE_BUCKET = "${{STORAGE_BUCKET}}"
 SUPABASE_URL = "${{SUPABASE_URL}}"
 SUPABASE_ANON_KEY = "${{SUPABASE_ANON_KEY}}"
 SUPABASE_SERVICE_KEY = "${{SUPABASE_SERVICE_KEY}}"
-
-# External Services
-[services.variables]
 SENDGRID_API_KEY = "${{SENDGRID_API_KEY}}"
 STRIPE_SECRET_KEY = "${{STRIPE_SECRET_KEY}}"
 STRIPE_WEBHOOK_SECRET = "${{STRIPE_WEBHOOK_SECRET}}"
@@ -53,14 +49,8 @@ PAYPAL_CLIENT_ID = "${{PAYPAL_CLIENT_ID}}"
 PAYPAL_CLIENT_SECRET = "${{PAYPAL_CLIENT_SECRET}}"
 SQUARE_ACCESS_TOKEN = "${{SQUARE_ACCESS_TOKEN}}"
 SQUARE_ENVIRONMENT = "${{SQUARE_ENVIRONMENT}}"
-
-# Monitoring & Analytics
-[services.variables]
 NEW_RELIC_LICENSE_KEY = "${{NEW_RELIC_LICENSE_KEY}}"
 SENTRY_DSN = "${{SENTRY_DSN}}"
-
-# Cache Configuration
-[services.variables]
 CACHE_TTL_DEFAULT = "900"  # 15 minutes
 CACHE_TTL_SHORT = "300"    # 5 minutes
 CACHE_TTL_LONG = "3600"    # 1 hour
