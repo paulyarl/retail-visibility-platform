@@ -2505,8 +2505,6 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
       return res.status(400).json({ error: "tenant_id_required" });
     }
 
-    console.log(`[Items Complete] Fetching consolidated data for tenant: ${tenant_id}`);
-
     // Parse filters and pagination
     const {
       q: search = '',
@@ -2565,6 +2563,70 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
         orderBy: { created_at: 'desc' },
         skip: offset,
         take: limitNum,
+        select: {
+          id: true,
+          tenant_id: true,
+          sku: true,
+          name: true,
+          title: true,
+          description: true,
+          price_cents: true,
+          stock: true,
+          image_url: true,
+          brand: true,
+          category_path: true,
+          item_status: true,
+          availability: true,
+          has_variants: true,
+          product_type: true,
+          featured_type: true,
+          featured_at: true,
+          featured_priority: true,
+          is_featured: true,
+          visibility: true,
+          created_at: true,
+          updated_at: true,
+          metadata: true,
+          marketing_description: true,
+          image_gallery: true,
+          custom_cta: true,
+          social_links: true,
+          custom_branding: true,
+          custom_sections: true,
+          landing_page_theme: true,
+          audit_log_id: true,
+          condition: true,
+          currency: true,
+          eligibility_reason: true,
+          gtin: true,
+          location_id: true,
+          merchant_name: true,
+          mpn: true,
+          price: true,
+          quantity: true,
+          sync_status: true,
+          synced_at: true,
+          manufacturer: true,
+          source: true,
+          enrichment_status: true,
+          enriched_at: true,
+          enriched_by: true,
+          enriched_from_barcode: true,
+          missing_images: true,
+          missing_description: true,
+          missing_specs: true,
+          missing_brand: true,
+          sale_price_cents: true,
+          payment_gateway_type: true,
+          payment_gateway_id: true,
+          digital_delivery_method: true,
+          digital_assets: true,
+          access_duration_days: true,
+          download_limit: true,
+          license_type: true
+        }
+      }).then(items => {
+        return items;
       }),
 
       // Stats query
@@ -2673,8 +2735,6 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
       },
       _timestamp: new Date().toISOString()
     };
-
-    console.log(`[Items Complete] Returning ${transformedItems.length} items with stats for tenant ${tenant_id}`);
 
     // Cache for 30 seconds (items change more frequently)
     res.setHeader('Cache-Control', 'private, max-age=30');
@@ -3713,18 +3773,39 @@ app.get("/api/tenants/:tenantId/items", authenticateToken, async (req, res) => {
         orderBy: { created_at: 'desc' },
         take: limit,
         skip: skip,
+        include: {
+          // Include any related data if needed
+        }
       }),
       prisma.inventory_items.count({ where }),
     ]);
 
+    // Transform the results to match the materialized view structure
+    const transformedItems = items.map((item: any) => ({
+      ...item,
+      // Add featured types array for multiple support (currently single from base table)
+      featured_types: item.featured_type ? [item.featured_type] : [],
+      // Add additional fields that would be in the materialized view
+      featured_expires_at: item.featured_until,
+      is_featured_active: item.is_featured && (!item.featured_until || new Date(item.featured_until) > new Date()),
+      days_until_expiration: item.featured_until ? Math.ceil((new Date(item.featured_until).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null,
+      is_expired: item.featured_until ? new Date(item.featured_until) <= new Date() : false,
+      is_expiring_soon: item.featured_until ? 
+        Math.ceil((new Date(item.featured_until).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) <= 7 : false,
+      // Default product type since it's not in base table
+      product_type: 'physical',
+    }));
+
+    const totalCount = total;
+
     res.json({
-      items,
+      items: transformedItems,
       pagination: {
-        total,
+        total: totalCount,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
-        hasMore: page * limit < total,
+        totalPages: Math.ceil(totalCount / limit),
+        hasMore: page * limit < totalCount,
       },
     });
   } catch (e: any) {

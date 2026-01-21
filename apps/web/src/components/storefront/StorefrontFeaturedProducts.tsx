@@ -27,7 +27,7 @@ interface FeaturedProduct {
 
 interface FeaturedSectionProps {
   tenantId: string;
-  type: 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  type: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
   title: string;
   description: string;
   icon: React.ReactNode;
@@ -36,6 +36,16 @@ interface FeaturedSectionProps {
 }
 
 const featuredTypeConfig = {
+  store_selection: {
+    title: 'Featured Products',
+    description: 'Hand-picked favorites from our collection',
+    icon: <Star className="w-5 h-5" />,
+    color: 'amber',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-200',
+    textColor: 'text-amber-700',
+    buttonColor: 'bg-amber-600 hover:bg-amber-700'
+  },
   new_arrival: {
     title: 'New Arrivals',
     description: 'Fresh products just added to our store',
@@ -89,34 +99,36 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, maxP
 
     const fetchFeaturedProducts = async () => {
       try {
-        // Use our new multi-type featured products API
-        const response = await fetch(`/api/tenants/${tenantId}/featured-products/storefront?limit=${maxProducts}`, {
+        // Use the public storefront featured products API (no auth required)
+        const response = await fetch(`/api/storefront/${tenantId}/featured-products?limit=${maxProducts}`, {
           signal: abortController.signal,
         });
         const data = await response.json();
         
         if (response.ok && isMounted) {
-          // The new API returns grouped data by featured type
-          const typeProducts = data[type] || [];
+          // The API returns items array, filter by featured type
+          const typeProducts = data.items?.filter((product: any) => product.featuredType === type) || [];
+          console.log(`FeaturedSection ${type}: Found ${typeProducts.length} products`);
+          
           // Transform the data to match the expected format
           const transformedProducts = typeProducts.map((product: any) => ({
-            id: product.inventory_item_id,
+            id: product.id,
             sku: product.sku,
             name: product.name,
             title: product.title,
             description: product.description,
             price: product.price || 0,
-            priceCents: Math.round((product.price || 0) * 100),
-            salePriceCents: product.sale_price_cents,
+            priceCents: product.priceCents,
+            salePriceCents: product.salePriceCents,
             currency: 'USD',
             stock: product.stock || 0,
-            imageUrl: product.image_url,
+            imageUrl: product.imageUrl,
             brand: product.brand,
             availability: product.availability,
             tenantCategory: product.tenantCategory,
             has_variants: product.has_variants,
-            hasActivePaymentGateway: product.has_active_payment_gateway,
-            paymentGatewayType: product.payment_gateway_type,
+            hasActivePaymentGateway: false,
+            paymentGatewayType: null,
             // Add multi-type support
             featuredTypes: [type], // This product is featured for this type
             featuredType: type, // Backward compatibility
@@ -182,7 +194,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, maxP
             </div>
           </div>
           <Link
-            href={`/catalog?featured=${type}`}
+            href={`/tenant/${tenantId}?view=grid&featured=${type}&products_only=true`}
             className={`px-4 py-2 rounded-lg text-white font-medium ${config.buttonColor} transition-colors`}
           >
             View All
@@ -214,7 +226,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, maxP
                 featuredType: type, // Pass the featured type
               }}
               variant="featured"
-              showCategory={false}
+              showCategory={true}
               showDescription={true}
             />
           ))}
@@ -232,27 +244,36 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
     let isMounted = true;
 
     const checkActiveSections = async () => {
-      const types: Array<'new_arrival' | 'seasonal' | 'sale' | 'staff_pick'> = ['new_arrival', 'seasonal', 'sale', 'staff_pick'];
-      const active: string[] = [];
-
-      for (const type of types) {
-        try {
-          const response = await fetch(`/api/storefront/${tenantId}/featured-products?type=${type}&limit=1`, {
-            signal: abortController.signal,
-          });
-          const data = await response.json();
-          if (response.ok && data.items && data.items.length > 0 && isMounted) {
-            active.push(type);
+      try {
+        // Single API call to get all featured products
+        const response = await fetch(`/api/storefront/${tenantId}/featured-products?limit=50`, {
+          signal: abortController.signal,
+        });
+        const data = await response.json();
+        
+        if (response.ok && data.items && isMounted) {
+          // Debug: Log what types we have
+          console.log('Featured products data:', data.items.map((item: any) => item.featuredType));
+          
+          // Check which types have products (include store_selection)
+          const types: Array<'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick'> = ['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick'];
+          const active: string[] = [];
+          
+          for (const type of types) {
+            const hasProducts = data.items.some((product: any) => product.featuredType === type);
+            console.log(`Type ${type}: ${hasProducts ? 'HAS' : 'NO'} products`);
+            if (hasProducts) {
+              active.push(type);
+            }
           }
-        } catch (error: unknown) {
-          if (error instanceof Error && error.name !== 'AbortError' && isMounted) {
-            console.error(`Error checking ${type} featured products:`, error);
-          }
+          
+          console.log('Active sections:', active);
+          setActiveSections(active);
         }
-      }
-
-      if (isMounted) {
-        setActiveSections(active);
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name !== 'AbortError' && isMounted) {
+          console.error('Error checking active sections:', error);
+        }
       }
     };
 

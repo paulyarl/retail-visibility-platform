@@ -106,7 +106,6 @@ export default function DynamicTenantSidebar({ tenantId, children }: DynamicTena
         children: [
           { label: 'Directory Featured Products', href: `/t/${tenantId}/settings/products/featuring` },
           { label: 'Storefront Featured Products', href: `/t/${tenantId}/settings/featured-products` },
-          { label: 'Inventory Featured Products', href: `/t/${tenantId}/settings/products/inventory-featuring` },
         ]
       },
       { 

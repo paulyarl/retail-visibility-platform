@@ -16,7 +16,7 @@ const FEATURING_LIMITS: Record<string, number> = {
   'organization': 100,
 };
 
-// Get featured products for a tenant
+// Get featured products for a tenant (using junction table)
 router.get('/tenants/:tenantId/products/featured', authenticateToken, requireInventoryAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
@@ -24,47 +24,60 @@ router.get('/tenants/:tenantId/products/featured', authenticateToken, requireInv
 
     const where: any = {
       tenant_id: tenantId,
-      is_featured: true,
     };
 
-    // Filter by active (not expired)
+    // Filter by active status
     if (activeOnly === 'true') {
-      where.OR = [
-        { featured_until: null },
-        { featured_until: { gte: new Date() } }
-      ];
+      where.is_active = true;
     }
 
-    const featuredProducts = await prisma.inventory_items.findMany({
+    // Filter by expiration
+    where.OR = [
+      { featured_expires_at: null },
+      { featured_expires_at: { gte: new Date() } }
+    ];
+
+    const featuredProducts = await prisma.featured_products.findMany({
       where,
+      include: {
+        inventory_items: {
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+            title: true,
+            brand: true,
+            description: true,
+            price_cents: true,
+            sale_price_cents: true,
+            stock: true,
+            image_url: true,
+            has_variants: true,
+            availability: true,
+          }
+        }
+      },
       orderBy: [
         { featured_priority: 'desc' },
         { featured_at: 'desc' }
       ],
       take: parseInt(limit as string),
-      select: {
-        id: true,
-        sku: true,
-        name: true,
-        title: true,
-        brand: true,
-        description: true,
-        price_cents: true,
-        sale_price_cents: true,
-        stock: true,
-        image_url: true,
-        is_featured: true,
-        featured_at: true,
-        featured_until: true,
-        featured_priority: true,
-        has_variants: true,
-        availability: true,
-      }
     });
 
+    // Transform the data to match the expected format
+    const transformedProducts = featuredProducts.map(fp => ({
+      ...fp.inventory_items,
+      featured_type: fp.featured_type,
+      featured_priority: fp.featured_priority,
+      featured_at: fp.featured_at,
+      featured_until: fp.featured_expires_at,
+      is_active: fp.is_active,
+      auto_unfeature: fp.auto_unfeature,
+    }));
+
     res.json({
-      products: featuredProducts,
-      count: featuredProducts.length
+      products: transformedProducts,
+      count: transformedProducts.length
     });
   } catch (error) {
     console.error('Error fetching featured products:', error);
@@ -72,7 +85,7 @@ router.get('/tenants/:tenantId/products/featured', authenticateToken, requireInv
   }
 });
 
-// Get featuring status and limits
+// Get featuring status and limits (using junction table)
 router.get('/tenants/:tenantId/products/featuring/status', authenticateToken, requireInventoryAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
@@ -90,14 +103,14 @@ router.get('/tenants/:tenantId/products/featuring/status', authenticateToken, re
     const tier = tenant.subscription_tier || 'trial';
     const limit = FEATURING_LIMITS[tier] || 0;
 
-    // Count current featured products
-    const current = await prisma.inventory_items.count({
+    // Count current featured products from junction table
+    const current = await prisma.featured_products.count({
       where: {
         tenant_id: tenantId,
-        is_featured: true,
+        is_active: true,
         OR: [
-          { featured_until: null },
-          { featured_until: { gte: new Date() } }
+          { featured_expires_at: null },
+          { featured_expires_at: { gte: new Date() } }
         ]
       }
     });
@@ -115,11 +128,11 @@ router.get('/tenants/:tenantId/products/featuring/status', authenticateToken, re
   }
 });
 
-// Feature a product
+// Feature a product (using junction table)
 router.post('/tenants/:tenantId/products/:productId/feature', authenticateToken, requireInventoryAccess, async (req, res) => {
   try {
     const { tenantId, productId } = req.params;
-    const { duration, priority = 0 } = req.body;
+    const { duration, priority = 50 } = req.body;
 
     // Check featuring limit
     const tenant = await prisma.tenants.findUnique({
@@ -134,13 +147,13 @@ router.post('/tenants/:tenantId/products/:productId/feature', authenticateToken,
     const tier = tenant.subscription_tier || 'trial';
     const limit = FEATURING_LIMITS[tier] || 0;
 
-    const currentCount = await prisma.inventory_items.count({
+    const currentCount = await prisma.featured_products.count({
       where: {
         tenant_id: tenantId,
-        is_featured: true,
+        is_active: true,
         OR: [
-          { featured_until: null },
-          { featured_until: { gte: new Date() } }
+          { featured_expires_at: null },
+          { featured_expires_at: { gte: new Date() } }
         ]
       }
     });
@@ -161,32 +174,43 @@ router.post('/tenants/:tenantId/products/:productId/feature', authenticateToken,
       featuredUntil.setDate(featuredUntil.getDate() + parseInt(duration));
     }
 
-    // Feature the product
-    const product = await prisma.inventory_items.update({
-      where: {
-        id: productId,
-        tenant_id: tenantId
-      },
+    // Create featured product record in junction table
+    const featuredProduct = await prisma.featured_products.create({
       data: {
-        is_featured: true,
+        inventory_item_id: productId,
+        tenant_id: tenantId,
+        featured_type: 'store_selection', // Default to store_selection for legacy system
+        featured_priority: parseInt(priority) || 50,
         featured_at: new Date(),
-        featured_until: featuredUntil,
-        featured_priority: parseInt(priority) || 0
+        featured_expires_at: featuredUntil,
+        is_active: true,
+        auto_unfeature: true
       },
-      select: {
-        id: true,
-        sku: true,
-        name: true,
-        is_featured: true,
-        featured_at: true,
-        featured_until: true,
-        featured_priority: true
+      include: {
+        inventory_items: {
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+            title: true,
+            brand: true,
+            price_cents: true,
+            image_url: true,
+          }
+        }
       }
     });
 
     res.json({
       success: true,
-      product
+      product: {
+        ...featuredProduct.inventory_items,
+        featured_type: featuredProduct.featured_type,
+        featured_priority: featuredProduct.featured_priority,
+        featured_at: featuredProduct.featured_at,
+        featured_until: featuredProduct.featured_expires_at,
+        is_active: featuredProduct.is_active,
+      }
     });
   } catch (error) {
     console.error('Error featuring product:', error);
@@ -194,33 +218,26 @@ router.post('/tenants/:tenantId/products/:productId/feature', authenticateToken,
   }
 });
 
-// Unfeature a product
+// Unfeature a product (using junction table)
 router.delete('/tenants/:tenantId/products/:productId/feature', authenticateToken, requireInventoryAccess, async (req, res) => {
   try {
     const { tenantId, productId } = req.params;
 
-    const product = await prisma.inventory_items.update({
+    // Delete from junction table
+    const deletedRecord = await prisma.featured_products.deleteMany({
       where: {
-        id: productId,
+        inventory_item_id: productId,
         tenant_id: tenantId
-      },
-      data: {
-        is_featured: false,
-        featured_at: null,
-        featured_until: null,
-        featured_priority: 0
-      },
-      select: {
-        id: true,
-        sku: true,
-        name: true,
-        is_featured: true
       }
     });
 
+    if (deletedRecord.count === 0) {
+      return res.status(404).json({ error: 'Featured product not found' });
+    }
+
     res.json({
       success: true,
-      product
+      message: 'Product unfeatured successfully'
     });
   } catch (error) {
     console.error('Error unfeaturing product:', error);
@@ -301,6 +318,118 @@ router.post('/tenants/:tenantId/products/feature/bulk', authenticateToken, requi
   } catch (error) {
     console.error('Error bulk featuring products:', error);
     res.status(500).json({ error: 'Failed to bulk feature products' });
+  }
+});
+
+// Update featured product active status (using junction table)
+router.patch('/tenants/:tenantId/products/:productId/feature/active', authenticateToken, requireInventoryAccess, async (req, res) => {
+  try {
+    const { tenantId, productId } = req.params;
+    const { is_active } = req.body;
+
+    const product = await prisma.featured_products.updateMany({
+      where: {
+        inventory_item_id: productId,
+        tenant_id: tenantId
+      },
+      data: {
+        is_active: is_active
+      }
+    });
+
+    if (product.count === 0) {
+      return res.status(404).json({ error: 'Featured product not found' });
+    }
+
+    // Get the updated record to return
+    const updatedRecord = await prisma.featured_products.findFirst({
+      where: {
+        inventory_item_id: productId,
+        tenant_id: tenantId
+      },
+      include: {
+        inventory_items: {
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+            featured_until: true,
+            featured_priority: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      product: {
+        ...updatedRecord?.inventory_items,
+        featured_type: updatedRecord?.featured_type,
+        featured_priority: updatedRecord?.featured_priority,
+        featured_at: updatedRecord?.featured_at,
+        featured_until: updatedRecord?.featured_expires_at,
+        is_active: updatedRecord?.is_active,
+      }
+    });
+  } catch (error) {
+    console.error('Error updating featured active status:', error);
+    res.status(500).json({ error: 'Failed to update featured active status' });
+  }
+});
+
+// Update featured product expiration (using junction table)
+router.patch('/tenants/:tenantId/products/:productId/feature/expiration', authenticateToken, requireInventoryAccess, async (req, res) => {
+  try {
+    const { tenantId, productId } = req.params;
+    const { featured_until } = req.body;
+
+    const product = await prisma.featured_products.updateMany({
+      where: {
+        inventory_item_id: productId,
+        tenant_id: tenantId
+      },
+      data: {
+        featured_expires_at: featured_until ? new Date(featured_until) : null
+      }
+    });
+
+    if (product.count === 0) {
+      return res.status(404).json({ error: 'Featured product not found' });
+    }
+
+    // Get the updated record to return
+    const updatedRecord = await prisma.featured_products.findFirst({
+      where: {
+        inventory_item_id: productId,
+        tenant_id: tenantId
+      },
+      include: {
+        inventory_items: {
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+            featured_until: true,
+            featured_priority: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      product: {
+        ...updatedRecord?.inventory_items,
+        featured_type: updatedRecord?.featured_type,
+        featured_priority: updatedRecord?.featured_priority,
+        featured_at: updatedRecord?.featured_at,
+        featured_until: updatedRecord?.featured_expires_at,
+        is_active: updatedRecord?.is_active,
+      }
+    });
+  } catch (error) {
+    console.error('Error updating featured expiration:', error);
+    res.status(500).json({ error: 'Failed to update featured expiration' });
   }
 });
 

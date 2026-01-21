@@ -15,8 +15,9 @@ const addFeaturedTypeSchema = z.object({
 });
 
 const updateFeaturedTypeSchema = z.object({
-  featured_expires_at: z.string().datetime().nullable(),
+  featured_expires_at: z.string().datetime().nullable().optional(),
   auto_unfeature: z.boolean().optional(),
+  is_active: z.boolean().optional(),
 });
 
 // GET /api/tenants/:tenantId/featured-products - Get all featured products for a tenant
@@ -61,7 +62,8 @@ router.get('/tenants/:tenantId/featured-products/stats', authenticateToken, chec
 });
 
 // GET /api/tenants/:tenantId/featured-products/storefront - Get featured products for storefront display
-router.get('/tenants/:tenantId/featured-products/storefront', authenticateToken, checkTenantAccess, async (req, res) => {
+// Public endpoint - no authentication required for storefront display
+router.get('/tenants/:tenantId/featured-products/storefront', async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { limit = '10' } = req.query;
@@ -256,6 +258,183 @@ router.put('/items/:itemId/featured-types/:featuredType', authenticateToken, asy
     });
   } catch (error: any) {
     console.error('[PUT items/:itemId/featured-types/:featuredType] Error:', error);
+    res.status(500).json({ error: 'failed_to_update_featured_type', message: error.message });
+  }
+});
+
+// POST /api/featured-products/migrate - Migrate legacy featured products to multi-type system
+router.post('/migrate', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId } = req.body;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId required' });
+    }
+
+    // Check user access
+    const isAdmin = req.user?.role === 'PLATFORM_ADMIN';
+    const hasAccess = isAdmin || (req.user?.tenantIds?.includes(tenantId) ?? false);
+
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'tenant_access_denied' });
+    }
+
+    const result = await FeaturedProductsService.migrateLegacyFeaturedProducts(tenantId);
+
+    res.json({
+      message: 'migration_completed',
+      ...result
+    });
+  } catch (error: any) {
+    console.error('[POST /featured-products/migrate] Error:', error);
+    res.status(500).json({ error: 'failed_to_migrate_featured_products', message: error.message });
+  }
+});
+
+// GET /api/featured-products/management - Get all featured products for management (no limits)
+router.get('/management', authenticateToken, async (req, res) => {
+  try {
+    const { tenantId } = req.query;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId required' });
+    }
+
+    // Check user access
+    const isAdmin = req.user?.role === 'PLATFORM_ADMIN';
+    const hasAccess = isAdmin || (req.user?.tenantIds?.includes(tenantId as string) ?? false);
+
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'tenant_access_denied' });
+    }
+
+    const result = await FeaturedProductsService.getAllFeaturedProductsForManagement(tenantId as string);
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('[GET /featured-products/management] Error:', error);
+    res.status(500).json({ error: 'failed_to_get_management_featured_products', message: error.message });
+  }
+});
+
+// GET /api/featured-products/debug - Debug endpoint to check featured products
+router.get('/debug', authenticateToken, async (req, res) => {
+  try {
+    const tenantId = req.query.tenantId as string;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId required' });
+    }
+
+    // Get all featured products for this tenant
+    const featuredProducts = await prisma.featured_products.findMany({
+      where: {
+        tenant_id: tenantId
+      },
+      include: {
+        inventory_items: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            tenant_id: true
+          }
+        }
+      },
+      orderBy: [
+        { featured_priority: 'desc' },
+        { featured_at: 'desc' }
+      ]
+    });
+
+    res.json({
+      tenantId,
+      totalFeatured: featuredProducts.length,
+      featuredProducts: featuredProducts.map(fp => ({
+        id: fp.id,
+        inventory_item_id: fp.inventory_item_id,
+        featured_type: fp.featured_type,
+        featured_priority: fp.featured_priority,
+        featured_at: fp.featured_at,
+        featured_expires_at: fp.featured_expires_at,
+        is_active: fp.is_active,
+        inventory_item: fp.inventory_items
+      }))
+    });
+  } catch (error: any) {
+    console.error('[GET /featured-products/debug] Error:', error);
+    res.status(500).json({ error: 'failed_to_debug_featured_products', message: error.message });
+  }
+});
+
+// PATCH /api/items/:itemId/featured-types/:featuredType - Update featured type expiration (alias for PUT)
+router.patch('/items/:itemId/featured-types/:featuredType', authenticateToken, async (req, res) => {
+  try {
+    const { itemId, featuredType } = req.params;
+    const parsed = updateFeaturedTypeSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        error: 'invalid_request_body', 
+        details: parsed.error.flatten() 
+      });
+    }
+
+    // Validate featured_type
+    if (!['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick'].includes(featuredType)) {
+      return res.status(400).json({ error: 'invalid_featured_type' });
+    }
+
+    // Verify the item exists and user has access
+    const item = await prisma.inventory_items.findUnique({
+      where: { id: itemId },
+      select: { tenant_id: true },
+    });
+
+    if (!item) {
+      return res.status(404).json({ error: 'item_not_found' });
+    }
+
+    // Check tenant access
+    const isAdmin = req.user?.role === 'PLATFORM_ADMIN';
+    const hasAccess = isAdmin || (req.user?.tenantIds?.includes(item.tenant_id) ?? false);
+
+    if (!hasAccess) {
+      // Fallback: check user_tenants table
+      const userTenant = await prisma.user_tenants.findUnique({
+        where: {
+          user_id_tenant_id: {
+            user_id: req.user?.userId || '',
+            tenant_id: item.tenant_id,
+          },
+        },
+      });
+
+      if (!userTenant) {
+        return res.status(403).json({ error: 'tenant_access_denied' });
+      }
+    }
+
+    const updatedFeaturedProduct = await FeaturedProductsService.updateFeaturedType(
+      itemId,
+      featuredType as any,
+      {
+        featured_expires_at: parsed.data.featured_expires_at ? new Date(parsed.data.featured_expires_at) : null,
+        auto_unfeature: parsed.data.auto_unfeature,
+        is_active: parsed.data.is_active
+      }
+    );
+
+    if (!updatedFeaturedProduct) {
+      return res.status(404).json({ error: 'featured_type_not_found' });
+    }
+
+    res.json({
+      message: 'featured_type_updated',
+      featuredProduct: updatedFeaturedProduct,
+    });
+  } catch (error: any) {
+    console.error('[PATCH items/:itemId/featured-types/:featuredType] Error:', error);
     res.status(500).json({ error: 'failed_to_update_featured_type', message: error.message });
   }
 });

@@ -88,10 +88,10 @@ interface Category {
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string; search?: string; category?: string }>;
+  searchParams: Promise<{ page?: string; search?: string; category?: string; products_only?: string; featured?: string; view?: string }>;
 }
 
-async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string, category?: string) {
+async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string, category?: string, featured?: string) {
   try {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
@@ -263,13 +263,24 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       console.error('Failed to fetch categories:', e);
     }
 
-    // Fetch products for this tenant with optional search and category filter
+    // Fetch products for this tenant with optional search, category, and featured filter
     // Using materialized view for 10-30x faster category filtering!
     const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
     const categoryParam = category ? `&category=${encodeURIComponent(category)}` : '';
-    const productsRes = await fetch(`${apiBaseUrl}/api/storefront/${tenantId}/products?page=${page}&limit=${limit}${searchParam}${categoryParam}`, {
-      cache: 'no-store',
-    });
+    const featuredParam = featured ? `&featured=${encodeURIComponent(featured)}` : '';
+    
+    let productsRes;
+    if (featured) {
+      // Use the featured products API when filtering by featured type
+      productsRes = await fetch(`${apiBaseUrl}/api/storefront/${tenantId}/featured-products?limit=${limit}${searchParam}`, {
+        cache: 'no-store',
+      });
+    } else {
+      // Use regular products API for general browsing
+      productsRes = await fetch(`${apiBaseUrl}/api/storefront/${tenantId}/products?page=${page}&limit=${limit}${searchParam}${categoryParam}`, {
+        cache: 'no-store',
+      });
+    }
 
     const productsData = productsRes.ok ? await productsRes.json() : { items: [], pagination: { totalItems: 0 } };
     // Handle both old (array) and new (paginated object) response formats
@@ -287,7 +298,9 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       has_active_payment_gateway: p.hasActivePaymentGateway ?? false, // From MV (camelCase from API)
     }));
 
-    const total = productsData.pagination?.totalItems || productsData.total || products.length;
+    const total = featured 
+      ? productsData.count || products.length // Featured API uses count field
+      : productsData.pagination?.totalItems || productsData.total || products.length;
 
     // Fetch platform settings for footer
     let platformSettings: PlatformSettings = {};
@@ -343,14 +356,29 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function TenantStorefrontPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { page: pageParam, search, category } = await searchParams;
+  const { page: pageParam, search, category, products_only, featured, view } = await searchParams;
   const currentPage = parseInt(pageParam || '1', 10);
+  
+  // Check if products_only mode is enabled
+  const isProductsOnly = products_only === 'true';
 
-  const data = await getTenantWithProducts(id, currentPage, 12, search, category);
+  const data = await getTenantWithProducts(id, currentPage, 12, search, category, featured);
 
   if (!data) {
     notFound();
   }
+
+  // Helper function to get featured type display name
+  const getFeaturedTypeName = (type: string) => {
+    switch (type) {
+      case 'store_selection': return 'Featured Products';
+      case 'new_arrival': return 'New Arrivals';
+      case 'seasonal': return 'Seasonal Specials';
+      case 'sale': return 'Sale Items';
+      case 'staff_pick': return 'Staff Picks';
+      default: return 'Products';
+    }
+  };
 
   const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, paymentGateways } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
@@ -666,8 +694,8 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
       {/* Products Section */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Storefront Featured Products */}
-        <StorefrontFeaturedProducts tenantId={id} />
+        {/* Storefront Featured Products - Hide in products_only mode */}
+        {!isProductsOnly && <StorefrontFeaturedProducts tenantId={id} />}
         
         <div>
           {/* Product Categories - Collapsible */}
@@ -684,13 +712,15 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div>
                 <h2 className="text-2xl font-semibold text-neutral-900 dark:text-white">
-                  {currentCategory ? currentCategory.name : 'All Products'} ({total})
+                  {featured ? getFeaturedTypeName(featured) : (currentCategory ? currentCategory.name : 'All Products')} ({total})
                 </h2>
-                {(search || currentCategory) && (
+                {(search || currentCategory || featured) && (
                   <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-                    {currentCategory && !search && `Showing all ${currentCategory.name.toLowerCase()} products`}
-                    {search && !currentCategory && `Results for "${search}"`}
-                    {search && currentCategory && `Results for "${search}" in ${currentCategory.name}`}
+                    {featured && !search && !currentCategory && `Showing ${getFeaturedTypeName(featured).toLowerCase()}`}
+                    {currentCategory && !search && !featured && `Showing all ${currentCategory.name.toLowerCase()} products`}
+                    {search && !currentCategory && !featured && `Results for "${search}"`}
+                    {search && currentCategory && !featured && `Results for "${search}" in ${currentCategory.name}`}
+                    {search && featured && !currentCategory && `Results for "${search}" in ${getFeaturedTypeName(featured)}`}
                   </p>
                 )}
               </div>

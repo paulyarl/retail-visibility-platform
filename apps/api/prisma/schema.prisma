@@ -721,6 +721,7 @@ model inventory_items {
   featured_priority       Int?                     @default(0) @map("featured_priority")
   featured_type           String?                  @default("store_selection")
   digital_access_grants   digital_access_grants[]
+  featured_products       featured_products[]
   tenant_payment_gateways tenant_payment_gateways? @relation(fields: [payment_gateway_id], references: [id], onUpdate: NoAction, map: "fk_inventory_items_payment_gateway")
   tenants                 tenants                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
   order_items             order_items[]
@@ -1392,6 +1393,7 @@ model tenants {
   directory_featured_listings_list directory_featured_listings_list[]
   directory_photos                 directory_photos[]
   directory_settings_list          directory_settings_list?
+  featured_products                featured_products[]
   gbp_attributes                   gbp_attributes[]
   gbp_media                        gbp_media[]
   gbp_posts                        gbp_posts[]
@@ -2272,6 +2274,28 @@ model rate_limit_warnings {
   @@index([pathname, occurred_at(sort: Desc)], map: "idx_rate_limit_warnings_pathname_occurred_at_desc")
   @@index([occurred_at(sort: Desc)], map: "idx_rate_limit_warnings_occurred_at_desc")
   @@map("rate_limit_warnings")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model featured_products {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  inventory_item_id   String
+  tenant_id           String
+  featured_type       String          @db.VarChar(50)
+  featured_priority   Int?            @default(50)
+  featured_at         DateTime?       @default(now()) @db.Timestamp(6)
+  featured_expires_at DateTime?       @db.Timestamp(6)
+  auto_unfeature      Boolean?        @default(true)
+  is_active           Boolean?        @default(true)
+  inventory_items     inventory_items @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_featured_products_inventory_item")
+  tenants             tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_featured_products_tenant")
+
+  @@unique([inventory_item_id, featured_type], map: "unique_featured_item")
+  @@index([tenant_id, is_active, featured_type], map: "idx_featured_active")
+  @@index([inventory_item_id], map: "idx_featured_item")
+  @@index([featured_priority(sort: Desc)], map: "idx_featured_priority")
+  @@index([tenant_id, featured_type], map: "idx_featured_tenant_type")
+  @@map("featured_products")
 }
 
 enum action {

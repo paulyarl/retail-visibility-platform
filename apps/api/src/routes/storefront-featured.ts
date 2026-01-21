@@ -37,65 +37,60 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
     const validTypes = ['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick'];
     const featuredType = validTypes.includes(type as string) ? type : 'store_selection';
     
-    // Query storefront_products MV for featured products by type
-    // Uses optimized index: idx_storefront_products_featured_type
+    // Query storefront_products_mv for featured types and JOIN with storefront_products for category names
+    // storefront_products_mv has featured_type, storefront_products has category_name and display helpers
+    // Add optional filtering by featured type when specified
+    const featuredTypeFilter = featuredType && featuredType !== 'all' ? `AND mv.featured_type = $3` : '';
     const query = `
       SELECT 
-        id,
-        tenant_id,
-        sku,
-        name,
-        title,
-        description,
-        marketing_description,
-        price,
-        price_cents,
-        currency,
-        stock,
-        quantity,
-        availability,
-        image_url,
-        image_gallery,
-        brand,
-        manufacturer,
-        condition,
-        gtin,
-        mpn,
-        metadata,
-        custom_cta,
-        social_links,
-        custom_branding,
-        custom_sections,
-        landing_page_theme,
-        directory_category_id,
-        category_name,
-        category_slug,
-        is_featured,
-        featured_at,
-        featured_until,
-        featured_priority,
-        featured_type,
-        is_actively_featured,
-        has_image,
-        has_gallery,
-        has_description,
-        has_marketing_description,
-        has_brand,
-        has_price,
-        in_stock,
-        has_active_payment_gateway,
-        default_gateway_type,
-        created_at,
-        updated_at
-      FROM storefront_products
-      WHERE tenant_id = $1
-        AND featured_type = $2
-        AND ${showExpired ? 'is_featured = true' : 'is_actively_featured = true'}
-      ORDER BY featured_priority DESC, featured_at DESC
-      LIMIT $3
+        mv.id,
+        mv.tenant_id,
+        mv.sku,
+        mv.name,
+        mv.title,
+        mv.description,
+        mv.price_cents,
+        mv.sale_price_cents,
+        mv.stock,
+        mv.image_url,
+        mv.brand,
+        mv.item_status,
+        mv.availability,
+        mv.has_variants,
+        mv.tenant_category_id,
+        sp.category_name,
+        sp.category_slug,
+        sp.google_category_id,
+        sp.has_gallery,
+        sp.has_description,
+        sp.has_brand,
+        sp.has_price,
+        mv.created_at,
+        mv.updated_at,
+        mv.metadata,
+        mv.featured_type,
+        mv.featured_priority,
+        mv.featured_at,
+        mv.featured_expires_at,
+        mv.auto_unfeature,
+        mv.is_featured_active,
+        mv.days_until_expiration,
+        mv.is_expired,
+        mv.is_expiring_soon
+      FROM storefront_products_mv mv
+      LEFT JOIN storefront_products sp ON mv.id = sp.id AND mv.tenant_id = sp.tenant_id
+      WHERE mv.tenant_id = $1
+        AND mv.is_featured_active = true
+        ${featuredTypeFilter}
+      ORDER BY mv.featured_priority DESC, mv.featured_at DESC
+      LIMIT $2
     `;
     
-    const result = await getDirectPool().query(query, [tenantId, featuredType, limitNum]);
+    const queryParams = featuredType && featuredType !== 'all' 
+    ? [tenantId, limitNum, featuredType]
+    : [tenantId, limitNum];
+    
+    const result = await getDirectPool().query(query, queryParams);
     
     // Transform to camelCase for frontend compatibility
     const items = result.rows.map((row: any) => ({
@@ -105,39 +100,39 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
       name: row.name,
       title: row.title,
       description: row.description,
-      marketingDescription: row.marketing_description,
-      price: row.price,
+      price: row.price_cents / 100,
       priceCents: row.price_cents,
-      currency: row.currency,
-      stock: row.stock,
-      quantity: row.quantity,
-      availability: row.availability,
+      salePriceCents: row.sale_price_cents,
+      currency: 'USD',
+      stock: row.stock || 0,
       imageUrl: row.image_url,
-      imageGallery: row.image_gallery,
       brand: row.brand,
-      manufacturer: row.manufacturer,
-      condition: row.condition,
-      gtin: row.gtin,
-      mpn: row.mpn,
+      availability: row.availability,
+      tenantCategory: row.category_name || 'Uncategorized', // Use MV's category_name directly
+      tenantCategoryId: row.tenant_category_id, // Keep ID for reference if needed
+      categorySlug: row.category_slug, // For category links
+      googleCategoryId: row.google_category_id, // For analytics
+      has_variants: row.has_variants,
       metadata: row.metadata,
-      customCta: row.custom_cta,
-      socialLinks: row.social_links,
-      customBranding: row.custom_branding,
-      customSections: row.custom_sections,
-      landingPageTheme: row.landing_page_theme,
-      categoryId: row.directory_category_id,
-      categoryName: row.category_name,
-      categorySlug: row.category_slug,
-      isFeatured: row.is_featured,
-      featuredAt: row.featured_at,
-      featuredUntil: row.featured_until,
+      // Display helpers from storefront_products
+      hasGallery: row.has_gallery || false, // Show "more images" indicator
+      hasDescription: row.has_description || false, // UI decisions
+      hasBrand: row.has_brand || false, // UI decisions  
+      hasPrice: row.has_price || false, // UI decisions
+      // Featured fields from storefront_products_mv
+      featuredType: row.featured_type,
       featuredPriority: row.featured_priority,
-      isActivelyFeatured: row.is_actively_featured,
-      hasImage: row.has_image,
-      inStock: row.in_stock,
-      hasGallery: row.has_gallery,
-      hasActivePaymentGateway: row.has_active_payment_gateway,
-      paymentGatewayType: row.default_gateway_type,
+      featuredAt: row.featured_at,
+      featuredExpiresAt: row.featured_expires_at,
+      isFeatured: true,
+      isActivelyFeatured: row.is_featured_active,
+      // Featured status helpers
+      daysUntilExpiration: row.days_until_expiration,
+      isExpired: row.is_expired,
+      isExpiringSoon: row.is_expiring_soon,
+      // Computed fields
+      hasImage: row.image_url !== null,
+      inStock: row.stock > 0,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));

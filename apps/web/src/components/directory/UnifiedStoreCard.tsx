@@ -156,9 +156,17 @@ export function UnifiedStoreCard({
 
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center gap-2">
-                        <Badge variant="info" className="text-xs">
-                          {formattedCategory}
-                        </Badge>
+                        <Link 
+                          href={`/directory?category=${encodeURIComponent(displayCategory.toLowerCase().replace(/\s+/g, '-'))}`}
+                          onClick={(e) => {
+                            // Stop propagation to prevent card click
+                            e.stopPropagation();
+                          }}
+                        >
+                          <Badge variant="info" className="text-xs hover:bg-blue-100 cursor-pointer transition-colors">
+                            {formattedCategory}
+                          </Badge>
+                        </Link>
                         {listing.isFeatured && (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg">
                             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">

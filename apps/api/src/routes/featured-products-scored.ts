@@ -10,8 +10,110 @@
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
 import { MINIMUM_QUALITY_THRESHOLD, getQualityTier } from '../utils/featured-product-scoring';
+import { prisma } from '../prisma';
+import { FeaturedProductsService } from '../services/FeaturedProductsService';
 
 const router = Router();
+
+// GET /api/featured-products/management - Get all featured products for management (no limits)
+router.get('/management', async (req, res) => {
+  try {
+    const { tenantId } = req.query;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId required' });
+    }
+
+    // TODO: Add authentication check when needed
+    // const isAdmin = req.user?.role === 'PLATFORM_ADMIN';
+    // const hasAccess = isAdmin || (req.user?.tenantIds?.includes(tenantId as string) ?? false);
+
+    // if (!hasAccess) {
+    //   return res.status(403).json({ error: 'tenant_access_denied' });
+    // }
+
+    const result = await FeaturedProductsService.getAllFeaturedProductsForManagement(tenantId as string);
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('[GET /featured-products/management] Error:', error);
+    res.status(500).json({ error: 'failed_to_get_management_featured_products', message: error.message });
+  }
+});
+
+// GET /api/featured-products/debug - Debug endpoint to check featured products
+router.get('/debug', async (req, res) => {
+  try {
+    const tenantId = req.query.tenantId as string;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId required' });
+    }
+
+    // Get all featured products for this tenant
+    const featuredProducts = await prisma.featured_products.findMany({
+      where: {
+        tenant_id: tenantId
+      },
+      include: {
+        inventory_items: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            tenant_id: true
+          }
+        }
+      },
+      orderBy: [
+        { featured_priority: 'desc' },
+        { featured_at: 'desc' }
+      ]
+    });
+
+    res.json({
+      tenantId,
+      totalFeatured: featuredProducts.length,
+      featuredProducts: featuredProducts.map(fp => ({
+        id: fp.id,
+        inventory_item_id: fp.inventory_item_id,
+        featured_type: fp.featured_type,
+        featured_priority: fp.featured_priority,
+        featured_at: fp.featured_at,
+        featured_expires_at: fp.featured_expires_at,
+        is_active: fp.is_active,
+        inventory_item: fp.inventory_items
+      }))
+    });
+  } catch (error: any) {
+    console.error('[GET /featured-products/debug] Error:', error);
+    res.status(500).json({ error: 'failed_to_debug_featured_products', message: error.message });
+  }
+});
+
+// POST /api/featured-products/migrate - Migrate legacy featured products to multi-type system
+router.post('/migrate', async (req, res) => {
+  try {
+    const { tenantId } = req.body;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId required' });
+    }
+
+    // Import the FeaturedProductsService
+    const { FeaturedProductsService } = await import('../services/FeaturedProductsService');
+    
+    const result = await FeaturedProductsService.migrateLegacyFeaturedProducts(tenantId);
+
+    res.json({
+      message: 'migration_completed',
+      ...result
+    });
+  } catch (error: any) {
+    console.error('[POST /featured-products/migrate] Error:', error);
+    res.status(500).json({ error: 'failed_to_migrate_featured_products', message: error.message });
+  }
+});
 
 /**
  * GET /api/featured-products/scored

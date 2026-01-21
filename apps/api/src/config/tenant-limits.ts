@@ -18,6 +18,68 @@ export type TenantLimitTier = 'google_only' | 'starter' | 'professional' | 'ente
 export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'canceled' | 'expired';
 
 /**
+ * Featured Products Limits by Subscription Tier
+ * These limits control how many products can be featured for each type
+ */
+export interface FeaturedProductsLimit {
+  store_selection: number;
+  new_arrival: number;
+  seasonal: number;
+  sale: number;
+  staff_pick: number;
+}
+
+/**
+ * Featured products limits by tier
+ */
+export const FEATURED_PRODUCTS_LIMITS: Record<TenantLimitTier, FeaturedProductsLimit> = {
+  google_only: {
+    store_selection: 3,
+    new_arrival: 3,
+    seasonal: 2,
+    sale: 3,
+    staff_pick: 2,
+  },
+  starter: {
+    store_selection: 8,
+    new_arrival: 12,
+    seasonal: 6,
+    sale: 10,
+    staff_pick: 6,
+  },
+  professional: {
+    store_selection: 15,
+    new_arrival: 20,
+    seasonal: 12,
+    sale: 15,
+    staff_pick: 10,
+  },
+  enterprise: {
+    store_selection: 25,
+    new_arrival: 30,
+    seasonal: 20,
+    sale: 25,
+    staff_pick: 15,
+  },
+  organization: {
+    store_selection: 50,
+    new_arrival: 50,
+    seasonal: 40,
+    sale: 50,
+    staff_pick: 30,
+  },
+};
+
+/**
+ * Get featured products limits for a tenant based on their tier
+ * Falls back to starter tier limits if tier not found
+ */
+export function getFeaturedProductsLimits(tier?: TenantLimitTier): FeaturedProductsLimit {
+  if (!tier) return FEATURED_PRODUCTS_LIMITS.starter;
+  return FEATURED_PRODUCTS_LIMITS[tier] || FEATURED_PRODUCTS_LIMITS.starter;
+}
+
+/**
  * Platform support tenant creation limit per owner
  * PLATFORM_SUPPORT can only create up to 3 tenants per owner (regardless of owner's tier)
  * This applies whether creating for themselves or for a customer

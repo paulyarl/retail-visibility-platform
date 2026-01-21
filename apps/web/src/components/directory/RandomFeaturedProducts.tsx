@@ -7,26 +7,47 @@ import SmartProductCard from '@/components/products/SmartProductCard';
 
 interface RandomFeaturedProduct {
   id: string;
+  tenantId: string;
+  sku: string;
   name: string;
+  title?: string;
+  description: string;
   priceCents: number;
-  currency: string;
+  salePriceCents?: number;
+  stock: number;
   imageUrl?: string;
   brand?: string;
-  description?: string;
-  stock: number;
-  availability: string;
-  tenantId: string;
+  itemStatus?: string;
+  availability?: string;
+  hasVariants?: boolean;
+  tenantCategoryId?: string;
+  featuredType?: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  featuredTypes?: ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[];
+  featuredPriority?: number;
+  featuredAt?: string;
+  featuredExpiresAt?: string;
+  isFeaturedActive?: boolean;
+  daysUntilExpiration?: number;
+  isExpired?: boolean;
+  isExpiringSoon?: boolean;
+  metadata?: any;
   categoryName?: string;
   categorySlug?: string;
-  hasActivePaymentGateway?: boolean;
-  paymentGatewayType?: string;
+  googleCategoryId?: string;
+  hasGallery?: boolean;
+  hasDescription?: boolean;
+  hasBrand?: boolean;
+  hasPrice?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
   storeSlug: string;
   storeName: string;
   storeLogo?: string;
   storeCity?: string;
   storeState?: string;
-  updatedAt: string;
-  distanceKm: number | null;
+  storeWebsite?: string;
+  storePhone?: string;
+  distanceKm?: number | null;
 }
 
 // Utility function to format distance
@@ -251,30 +272,42 @@ export default function RandomFeaturedProducts() {
                 key={product.id}
                 product={{
                   id: product.id,
-                  sku: product.id,
+                  sku: product.sku,
                   name: product.name,
-                  title: product.name,
+                  title: product.title || product.name,
                   brand: product.brand || '',
                   description: product.distanceKm !== null 
-                    ? `${product.description || ''} ${formatDistance(product.distanceKm)}`.trim()
+                    ? `${product.description || ''} ${formatDistance(product.distanceKm || null)}`.trim()
                     : product.description || '',
                   priceCents: product.priceCents,
+                  salePriceCents: product.salePriceCents,
                   stock: product.stock,
                   imageUrl: product.imageUrl,
                   tenantId: product.tenantId,
                   availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined) || 'in_stock',
+                  has_variants: product.hasVariants || false,
                   tenantCategory: product.categoryName ? {
                     id: product.categorySlug || product.categoryName,
                     name: product.categoryName,
                     slug: product.categorySlug || product.categoryName,
                   } : undefined,
-                  has_variants: false,
-                  has_active_payment_gateway: product.hasActivePaymentGateway,
-                  payment_gateway_type: product.paymentGatewayType,
-                  isFeatured: true // All products in RandomFeaturedProducts are featured
+                  isFeatured: true, // All products in RandomFeaturedProducts are featured
+                  featuredType: product.featuredType,
+                  featuredTypes: product.featuredTypes,
+                  featuredPriority: product.featuredPriority,
+                  featuredAt: product.featuredAt,
+                  featuredExpiresAt: product.featuredExpiresAt,
+                  isFeaturedActive: product.isFeaturedActive,
+                  daysUntilExpiration: product.daysUntilExpiration,
+                  isExpired: product.isExpired,
+                  isExpiringSoon: product.isExpiringSoon,
+                  metadata: product.metadata,
+                  hasGallery: product.hasGallery,
+                  hasDescription: product.hasDescription,
+                  hasBrand: product.hasBrand,
+                  hasPrice: product.hasPrice,
+                  // Store information (passed as props, not in ProductData)
                 }}
-                tenantName={product.storeName}
-                tenantLogo={product.storeLogo}
                 variant="featured"
                 showCategory={true}
                 showDescription={true}
@@ -289,34 +322,45 @@ export default function RandomFeaturedProducts() {
                 key={product.id}
                 product={{
                   id: product.id,
-                  sku: product.id,
+                  sku: product.sku,
                   name: product.name,
-                  title: product.name,
+                  title: product.title || product.name,
                   brand: product.brand || '',
                   description: product.distanceKm !== null 
-                    ? `${product.description || ''} ${formatDistance(product.distanceKm)}`.trim()
+                    ? `${product.description || ''} ${formatDistance(product.distanceKm || null)}`.trim()
                     : product.description || '',
                   priceCents: product.priceCents,
+                  salePriceCents: product.salePriceCents,
                   stock: product.stock,
                   imageUrl: product.imageUrl,
                   tenantId: product.tenantId,
                   availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined) || 'in_stock',
+                  has_variants: product.hasVariants || false,
                   tenantCategory: product.categoryName ? {
                     id: product.categorySlug || product.categoryName,
                     name: product.categoryName,
                     slug: product.categorySlug || product.categoryName,
                   } : undefined,
-                  has_variants: false,
-                  has_active_payment_gateway: product.hasActivePaymentGateway,
-                  payment_gateway_type: product.paymentGatewayType,
-                  isFeatured: true // All products in RandomFeaturedProducts are featured
+                  isFeatured: true, // All products in RandomFeaturedProducts are featured
+                  featuredType: product.featuredType,
+                  featuredTypes: product.featuredTypes,
+                  featuredPriority: product.featuredPriority,
+                  featuredAt: product.featuredAt,
+                  featuredExpiresAt: product.featuredExpiresAt,
+                  isFeaturedActive: product.isFeaturedActive,
+                  daysUntilExpiration: product.daysUntilExpiration,
+                  isExpired: product.isExpired,
+                  isExpiringSoon: product.isExpiringSoon,
+                  metadata: product.metadata,
+                  hasGallery: product.hasGallery,
+                  hasDescription: product.hasDescription,
+                  hasBrand: product.hasBrand,
+                  hasPrice: product.hasPrice,
+                  // Store information (passed as props, not in ProductData)
                 }}
-                tenantName={product.storeName}
-                tenantLogo={product.storeLogo}
-                variant="list"
+                variant="featured"
                 showCategory={true}
                 showDescription={true}
-                className="w-full"
               />
             ))}
           </div>

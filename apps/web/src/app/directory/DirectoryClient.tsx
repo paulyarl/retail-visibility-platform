@@ -13,6 +13,7 @@ import DirectoryCategoryBrowser from '@/components/directory/DirectoryCategoryBr
 import DirectoryStoreTypeBrowser from '@/components/directory/DirectoryStoreTypeBrowser';
 import LastViewed from '@/components/directory/LastViewed'; // NEW: LastViewed component import
 import RandomFeaturedProducts from '@/components/directory/RandomFeaturedProducts'; // NEW: Random featured products
+import DirectoryPopularTags from '@/components/directory/DirectoryPopularTags'; // NEW: Popular tags
 import { Pagination } from '@/components/ui';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
@@ -435,6 +436,14 @@ export default function DirectoryClient() {
             <div className="max-w-2xl mx-auto mb-4">
               <DirectorySearch />
             </div>
+
+            {/* Popular Tags */}
+            {!loading && data && (
+              <DirectoryPopularTags 
+                listings={data.listings || []} 
+                className="max-w-4xl mx-auto"
+              />
+            )}
 
             {/* Quick Stats & CTA */}
             <div className="flex flex-col items-center gap-4">

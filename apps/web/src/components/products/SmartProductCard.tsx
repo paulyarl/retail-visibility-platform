@@ -130,6 +130,18 @@ interface ProductData {
   isFeatured?: boolean;
   featuredType?: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
   featuredTypes?: ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[]; // Support multiple types
+  featuredPriority?: number;
+  featuredAt?: string;
+  featuredExpiresAt?: string;
+  isFeaturedActive?: boolean;
+  daysUntilExpiration?: number;
+  isExpired?: boolean;
+  isExpiringSoon?: boolean;
+  metadata?: any;
+  hasGallery?: boolean;
+  hasDescription?: boolean;
+  hasBrand?: boolean;
+  hasPrice?: boolean;
   tenantCategory?: {
     id: string;
     name: string;

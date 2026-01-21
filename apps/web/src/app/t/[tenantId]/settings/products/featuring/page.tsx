@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Star, TrendingUp, Eye, Sparkles, Check, X, Search, ArrowUp, ArrowDown } from 'lucide-react';
+import { Star, TrendingUp, Eye, Sparkles, Check, X, Search, ArrowUp, ArrowDown, Package, Download, Layers, AlertTriangle, Timer, Clock, Edit2, Play, Pause } from 'lucide-react';
 import { api } from '@/lib/api';
 import Image from 'next/image';
 
@@ -23,6 +23,17 @@ interface Product {
   featured_priority: number;
   has_variants?: boolean;
   availability?: string;
+  product_type?: string;
+  featured_type?: string;
+  featured_types?: string[]; // New field for multiple featured types
+  // Junction table fields
+  is_active?: boolean;
+  featured_expires_at?: string;
+  featured_types_active?: string[]; // Active featured types from junction table
+  is_featured_active?: boolean;
+  days_until_expiration?: number;
+  is_expired?: boolean;
+  is_expiring_soon?: boolean;
 }
 
 interface FeaturingStatus {
@@ -31,6 +42,139 @@ interface FeaturingStatus {
   current: number;
   available: number;
   canFeature: boolean;
+}
+
+interface Tenant {
+  id: string;
+  name: string;
+  subscription_tier: string;
+}
+
+function SimpleTierBadge({ tier }: { tier: string }) {
+  const getTierInfo = (tierLevel: string) => {
+    switch (tierLevel) {
+      case 'trial':
+        return { color: 'bg-orange-100 text-orange-700 border-orange-300', icon: '🧪', name: 'Trial' };
+      case 'google_only':
+        return { color: 'bg-blue-100 text-blue-700 border-blue-300', icon: '🔍', name: 'Google Only' };
+      case 'starter':
+        return { color: 'bg-neutral-100 text-neutral-700 border-neutral-300', icon: '🌱', name: 'Starter' };
+      case 'growth':
+        return { color: 'bg-green-100 text-green-700 border-green-300', icon: '📈', name: 'Growth' };
+      case 'professional':
+        return { color: 'bg-purple-100 text-purple-700 border-purple-300', icon: '⭐', name: 'Professional' };
+      case 'enterprise':
+        return { color: 'bg-amber-100 text-amber-700 border-amber-300', icon: '🏢', name: 'Enterprise' };
+      case 'organization':
+        return { color: 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border-purple-300', icon: '💎', name: 'Organization' };
+      default:
+        return { color: 'bg-gray-100 text-gray-700 border-gray-300', icon: '📦', name: tierLevel };
+    }
+  };
+
+  const tierInfo = getTierInfo(tier);
+
+  return (
+    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${tierInfo.color}`}>
+      <span className="text-lg">{tierInfo.icon}</span>
+      <span className="font-semibold text-sm">{tierInfo.name}</span>
+    </div>
+  );
+}
+
+// Check if product is "active" (not paused) - for legacy system using featured_until
+const isProductActive = (product: Product): boolean => {
+  if (!product.featured_until) return true; // No expiration means active
+  const now = new Date();
+  const expiresAt = new Date(product.featured_until);
+  return expiresAt > now; // Active if expiration is in the future
+};
+const getExpirationStatus = (product: Product): {
+  isExpired: boolean;
+  isExpiringSoon: boolean;
+  daysRemaining: number;
+  statusColor: string;
+  statusText: string;
+} => {
+  if (!product.featured_until) {
+    return {
+      isExpired: false,
+      isExpiringSoon: false,
+      daysRemaining: -1,
+      statusColor: 'text-gray-500',
+      statusText: 'No expiration'
+    };
+  }
+
+  const now = new Date();
+  const expiresAt = new Date(product.featured_until);
+  const daysRemaining = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  
+  const isExpired = daysRemaining < 0;
+  const isExpiringSoon = daysRemaining >= 0 && daysRemaining <= 3;
+
+  let statusColor = 'text-green-600';
+  let statusText = `${daysRemaining} days`;
+
+  if (isExpired) {
+    statusColor = 'text-red-600';
+    statusText = 'Expired';
+  } else if (isExpiringSoon) {
+    statusColor = 'text-amber-600';
+    statusText = daysRemaining === 0 ? 'Expires today' : `${daysRemaining} days`;
+  }
+
+  return {
+    isExpired,
+    isExpiringSoon,
+    daysRemaining,
+    statusColor,
+    statusText
+  };
+};
+
+function getProductTypeIcon(productType?: string) {
+  switch (productType) {
+    case 'physical':
+      return <Package className="w-4 h-4 text-gray-500" />;
+    case 'digital':
+      return <Download className="w-4 h-4 text-blue-500" />;
+    default:
+      return <Package className="w-4 h-4 text-gray-500" />;
+  }
+}
+
+function getFeaturedTypeBadges(featuredTypes?: string[], featuredType?: string) {
+  // Use featured_types array if available, otherwise fall back to single featured_type
+  const types = featuredTypes || (featuredType ? [featuredType] : []);
+  
+  if (types.length === 0) return null;
+  
+  const badgeConfig = {
+    store_selection: { color: 'bg-blue-100 text-blue-700', label: 'Store Selection' },
+    new_arrival: { color: 'bg-green-100 text-green-700', label: 'New Arrival' },
+    seasonal: { color: 'bg-orange-100 text-orange-700', label: 'Seasonal' },
+    sale: { color: 'bg-red-100 text-red-700', label: 'Sale' },
+    staff_pick: { color: 'bg-purple-100 text-purple-700', label: 'Staff Pick' },
+  };
+  
+  return (
+    <div className="flex flex-wrap gap-1">
+      {types.map((type) => {
+        const config = badgeConfig[type as keyof typeof badgeConfig];
+        if (!config) return null;
+        
+        return (
+          <span
+            key={type}
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${config.color}`}
+          >
+            {config.label}
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function ProductFeaturingPage() {
@@ -43,10 +187,40 @@ export default function ProductFeaturingPage() {
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [availablePage, setAvailablePage] = useState(1);
+  const [editingExpiration, setEditingExpiration] = useState<string | null>(null);
+  const [expirationDate, setExpirationDate] = useState('');
+  const [togglingActive, setTogglingActive] = useState(false);
+  
+  const itemsPerPage = 12;
+
+  // Filter expired products
+  const expiredFeatured = featuredProducts.filter(product => {
+    const status = getExpirationStatus(product);
+    return status.isExpired;
+  });
+
+  const fetchTenant = async () => {
+    try {
+      const response = await api.get(`/api/tenants/${tenantId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setTenant(data);
+      }
+    } catch (error) {
+      console.error('Error fetching tenant:', error);
+    }
+  };
 
   useEffect(() => {
     fetchData();
+    fetchTenant();
   }, [tenantId]);
+
+  useEffect(() => {
+    setAvailablePage(1); // Reset to page 1 when search changes
+  }, [searchQuery]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -123,6 +297,52 @@ export default function ProductFeaturingPage() {
     }
   };
 
+  const handleToggleActive = async (productId: string, isActive: boolean) => {
+    setTogglingActive(true);
+    try {
+      const response = await api.patch(`/api/tenants/${tenantId}/products/${productId}/feature/active`, {
+        is_active: isActive
+      });
+
+      if (response.ok) {
+        await fetchData();
+      } else {
+        const error = await response.json();
+        console.error('Failed to toggle active status:', error);
+        alert(error.message || 'Failed to toggle active status');
+      }
+    } catch (error) {
+      console.error('Error toggling active status:', error);
+      alert('An error occurred. Please try again.');
+    } finally {
+      setTogglingActive(false);
+    }
+  };
+
+  const handleUpdateExpiration = async (productId: string, newExpirationDate: string) => {
+    setProcessing(true);
+    try {
+      const response = await api.patch(`/api/tenants/${tenantId}/products/${productId}/feature/expiration`, {
+        featured_until: newExpirationDate ? new Date(newExpirationDate).toISOString() : null
+      });
+
+      if (response.ok) {
+        await fetchData();
+        setEditingExpiration(null);
+        setExpirationDate('');
+      } else {
+        const error = await response.json();
+        console.error('Failed to update expiration:', error);
+        alert(error.message || 'Failed to update expiration');
+      }
+    } catch (error) {
+      console.error('Error updating expiration:', error);
+      alert('An error occurred. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleUpdatePriority = async (productId: string, newPriority: number) => {
     setProcessing(true);
     try {
@@ -146,6 +366,12 @@ export default function ProductFeaturingPage() {
     p.brand?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Pagination for available products
+  const totalPages = Math.ceil(filteredAvailable.length / itemsPerPage);
+  const startIndex = (availablePage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedAvailable = filteredAvailable.slice(startIndex, endIndex);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -161,13 +387,23 @@ export default function ProductFeaturingPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-          <Sparkles className="w-8 h-8 text-amber-500" />
-          Featured Products
-        </h1>
-        <p className="mt-2 text-gray-600">
-          Highlight your best products with prominent display styling
-        </p>
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+              <Sparkles className="w-8 h-8 text-amber-500" />
+              Featured Products
+            </h1>
+            <p className="mt-2 text-gray-600">
+              Highlight your best products with prominent display styling
+            </p>
+          </div>
+          {tenant?.subscription_tier && (
+            <div className="text-right">
+              <p className="text-xs text-gray-500 mb-1">Current Tier</p>
+              <SimpleTierBadge tier={tenant.subscription_tier} />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Status Card */}
@@ -278,26 +514,138 @@ export default function ProductFeaturingPage() {
                   <p className="text-sm text-gray-600">SKU: {product.sku}</p>
                 </div>
 
-                {/* Priority Controls */}
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-sm text-gray-600">Priority:</span>
+                {/* Active/Inactive Toggle */}
+                <div className="flex items-center justify-between gap-2 p-2 bg-gray-50 rounded-lg mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Display Status:</span>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      (product.is_active !== false && product.is_active !== undefined) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {(product.is_active !== false && product.is_active !== undefined) ? 'Active' : 'Paused'}
+                    </span>
+                  </div>
                   <button
-                    onClick={() => handleUpdatePriority(product.id, Math.min(product.featured_priority + 10, 100))}
-                    disabled={processing}
-                    className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
-                    title="Increase priority"
+                    onClick={() => handleToggleActive(product.id, product.is_active === false)}
+                    disabled={togglingActive}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      (product.is_active !== false && product.is_active !== undefined) ? 'bg-green-600' : 'bg-gray-300'
+                    } ${togglingActive ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    title={(product.is_active !== false && product.is_active !== undefined) ? 'Pause featuring' : 'Resume featuring'}
                   >
-                    <ArrowUp className="w-4 h-4" />
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        (product.is_active !== false && product.is_active !== undefined) ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                    <span className="absolute left-1 top-1/2 -translate-y-1/2">
+                      {(product.is_active !== false && product.is_active !== undefined) ? (
+                        <Play className="w-2 h-2 text-white" />
+                      ) : (
+                        <Pause className="w-2 h-2 text-white" />
+                      )}
+                    </span>
                   </button>
-                  <span className="font-semibold text-gray-900">{product.featured_priority}</span>
-                  <button
-                    onClick={() => handleUpdatePriority(product.id, Math.max(product.featured_priority - 10, 0))}
-                    disabled={processing}
-                    className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
-                    title="Decrease priority"
-                  >
-                    <ArrowDown className="w-4 h-4" />
-                  </button>
+                </div>
+
+                {/* Expiration Status */}
+                <div className="mb-2 flex items-center gap-2 text-xs">
+                  {(() => {
+                    const status = getExpirationStatus(product);
+                    return (
+                      <>
+                        <span className={status.statusColor}>
+                          {status.isExpired && <AlertTriangle className="w-3 h-3" />}
+                          {status.isExpiringSoon && <Timer className="w-3 h-3" />}
+                          {!status.isExpired && !status.isExpiringSoon && <Clock className="w-3 h-3" />}
+                        </span>
+                        <span className="text-gray-600">{status.statusText}</span>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* Priority and Expiration Controls */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    {/* Priority Controls */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">Priority:</span>
+                      <button
+                        onClick={() => handleUpdatePriority(product.id, Math.min(product.featured_priority + 10, 100))}
+                        disabled={processing}
+                        className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
+                        title="Increase priority"
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </button>
+                      <span className="font-semibold text-gray-900">{product.featured_priority}</span>
+                      <button
+                        onClick={() => handleUpdatePriority(product.id, Math.max(product.featured_priority - 10, 0))}
+                        disabled={processing}
+                        className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
+                        title="Decrease priority"
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Expiration Controls */}
+                    <div className="flex items-center gap-2">
+                      {editingExpiration === product.id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="date"
+                            value={expirationDate}
+                            onChange={(e) => setExpirationDate(e.target.value)}
+                            className="px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                          <button
+                            onClick={() => handleUpdateExpiration(product.id, expirationDate)}
+                            disabled={processing}
+                            className="p-1 hover:bg-green-100 rounded text-green-600"
+                            title="Save expiration"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingExpiration(null);
+                              setExpirationDate('');
+                            }}
+                            className="p-1 hover:bg-red-100 rounded text-red-600"
+                            title="Cancel"
+                          >
+                            <AlertTriangle className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingExpiration(product.id);
+                              setExpirationDate(product.featured_until ? new Date(product.featured_until).toISOString().split('T')[0] : '');
+                            }}
+                            disabled={processing}
+                            className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
+                            title="Edit expiration"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          {(() => {
+                            const status = getExpirationStatus(product);
+                            return (
+                              <span className={`text-xs flex items-center gap-1 ${status.statusColor}`}>
+                                {status.isExpired && <AlertTriangle className="w-3 h-3" />}
+                                {status.isExpiringSoon && <Timer className="w-3 h-3" />}
+                                {!status.isExpired && !status.isExpiringSoon && <Clock className="w-3 h-3" />}
+                                <span className="text-gray-600">{status.statusText}</span>
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Unfeature Button */}
@@ -310,6 +658,141 @@ export default function ProductFeaturingPage() {
                 </button>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Expired Featured Products */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <AlertTriangle className="w-6 h-6 text-red-500" />
+          Expired Featured Products ({expiredFeatured.length})
+        </h2>
+
+        {expiredFeatured.length === 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+            <Check className="w-16 h-16 text-green-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Expired Featured Products</h3>
+            <p className="text-gray-600">
+              All your featured products are still active
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-sm text-amber-700">
+                ⚠️ You have {expiredFeatured.length} expired featured products. Choose whether to renew them or remove them from featuring.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {expiredFeatured.map((product) => (
+                <div key={`expired-${product.id}`} className="bg-white rounded-lg border-2 border-red-200 p-4 relative opacity-75">
+                  {/* Expired Badge */}
+                  <div className="absolute top-2 right-2 z-10">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full border border-red-300">
+                      <AlertTriangle className="w-3 h-3" />
+                      EXPIRED
+                    </span>
+                  </div>
+
+                  {/* Product Image */}
+                  <div className="relative h-32 bg-gray-100 rounded-lg mb-3">
+                    {product.image_url ? (
+                      <Image
+                        src={product.image_url}
+                        alt={product.name}
+                        fill
+                        className="object-cover rounded-lg opacity-75"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                        <Eye className="w-8 h-8" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Product Info */}
+                  <div className="mb-3">
+                    <h3 className="font-medium text-gray-900 line-clamp-2 text-sm mb-1">
+                      {product.title || product.name}
+                    </h3>
+                    <p className="text-sm font-bold text-gray-900">
+                      ${(product.price_cents / 100).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-500">SKU: {product.sku}</p>
+                    
+                    {/* Expiration Info */}
+                    <div className="mt-2 text-xs text-red-600">
+                      {(() => {
+                        const status = getExpirationStatus(product);
+                        return (
+                          <div className="flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>Expired {status.daysRemaining === 0 ? 'today' : `${Math.abs(status.daysRemaining)} days ago`}</span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setEditingExpiration(product.id);
+                        setExpirationDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]); // Default to 30 days from now
+                      }}
+                      disabled={processing}
+                      className="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Timer className="w-3 h-3" />
+                      Renew
+                    </button>
+                    <button
+                      onClick={() => handleUnfeature(product.id)}
+                      disabled={processing}
+                      className="flex-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1"
+                    >
+                      <X className="w-3 h-3" />
+                      Remove
+                    </button>
+                  </div>
+
+                  {/* Renewal Edit Mode */}
+                  {editingExpiration === product.id && (
+                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <label className="text-xs font-medium text-gray-700">New expiration date:</label>
+                        <input
+                          type="date"
+                          value={expirationDate}
+                          onChange={(e) => setExpirationDate(e.target.value)}
+                          className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleUpdateExpiration(product.id, expirationDate)}
+                          disabled={processing}
+                          className="flex-1 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50"
+                        >
+                          Save Renewal
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingExpiration(null);
+                            setExpirationDate('');
+                          }}
+                          className="flex-1 px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -336,7 +819,7 @@ export default function ProductFeaturingPage() {
 
         {/* Products Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredAvailable.slice(0, 12).map((product) => (
+          {paginatedAvailable.map((product) => (
             <div key={product.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
               <div className="flex gap-3">
                 {/* Thumbnail */}
@@ -357,13 +840,32 @@ export default function ProductFeaturingPage() {
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-sm text-gray-900 truncate">
-                    {product.name}
-                  </h4>
+                  <div className="flex items-start justify-between mb-1">
+                    <h4 className="font-medium text-sm text-gray-900 truncate">
+                      {product.name}
+                    </h4>
+                    <div className="flex items-center gap-1 ml-2">
+                      {getProductTypeIcon(product.product_type)}
+                      {product.has_variants && (
+                        <Layers className="w-4 h-4 text-purple-500" />
+                      )}
+                    </div>
+                  </div>
                   <p className="text-sm text-gray-600">
                     ${(product.price_cents / 100).toFixed(2)}
                   </p>
                   <p className="text-xs text-gray-500">SKU: {product.sku}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-medium ${
+                        product.stock > 10 ? 'text-green-600' : 
+                        product.stock > 0 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        Stock: {product.stock}
+                      </span>
+                      {getFeaturedTypeBadges(product.featured_types, product.featured_type)}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -379,6 +881,34 @@ export default function ProductFeaturingPage() {
             </div>
           ))}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="mt-6 flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredAvailable.length)} of {filteredAvailable.length} products
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setAvailablePage(prev => Math.max(prev - 1, 1))}
+                disabled={availablePage === 1}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-gray-600">
+                Page {availablePage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setAvailablePage(prev => Math.min(prev + 1, totalPages))}
+                disabled={availablePage === totalPages}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
 
         {filteredAvailable.length === 0 && (
           <div className="text-center py-12 text-gray-500">

@@ -8,7 +8,7 @@ import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { isPlatformAdmin } from '../utils/platform-admin';
-import { getTenantLimitConfig, getRemainingTenantSlots, getPlatformSupportLimit } from '../config/tenant-limits';
+import { getTenantLimitConfig, getRemainingTenantSlots, getPlatformSupportLimit, getFeaturedProductsLimits, TENANT_LIMITS, FEATURED_PRODUCTS_LIMITS } from '../config/tenant-limits';
 import { user_tenant_role } from '@prisma/client';
 
 const router = Router();
@@ -153,17 +153,16 @@ router.get('/status', authenticateToken, async (req, res) => {
 /**
  * GET /api/tenant-limits/tiers
  * 
- * Get all available tiers with their location limits
+ * Get all available tenant tiers and their limits (public endpoint)
+ * This is useful for showing pricing and upgrade options
  */
-router.get('/tiers', async (_req, res) => {
+router.get('/tiers', async (req, res) => {
   try {
-    const { TENANT_LIMITS } = await import('../config/tenant-limits');
-    
-    const tiers = Object.entries(TENANT_LIMITS).map(([key, config]) => ({
-      tier: key,
-      limit: config.limit === Infinity ? 'unlimited' : config.limit,
+    const tiers = Object.entries(TENANT_LIMITS).map(([tier, config]) => ({
+      tier,
       displayName: config.displayName,
       description: config.description,
+      limit: config.limit,
       upgradeMessage: config.upgradeMessage,
       upgradeToTier: config.upgradeToTier,
     }));
@@ -172,6 +171,61 @@ router.get('/tiers', async (_req, res) => {
   } catch (error) {
     console.error('[GET /api/tenant-limits/tiers] Error:', error);
     return res.status(500).json({ error: 'failed_to_get_tiers' });
+  }
+});
+
+/**
+ * GET /api/tenant-limits/featured-products
+ * 
+ * Get featured products limits for a tenant based on their subscription tier
+ */
+router.get('/featured-products', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'authentication_required' });
+    }
+
+    // For now, return starter tier limits for all authenticated users
+    // TODO: Get actual tenant tier from user's tenant
+    const limits = getFeaturedProductsLimits('starter');
+
+    return res.json({
+      limits,
+      tier: 'starter',
+      // Add display names for frontend
+      displayNames: {
+        store_selection: 'Featured Products',
+        new_arrival: 'New Arrivals',
+        seasonal: 'Seasonal Specials',
+        sale: 'Sale Items',
+        staff_pick: 'Staff Picks',
+      }
+    });
+  } catch (error) {
+    console.error('[GET /api/tenant-limits/featured-products] Error:', error);
+    return res.status(500).json({ error: 'failed_to_get_featured_limits' });
+  }
+});
+
+/**
+ * GET /api/tenant-limits/featured-products/all
+ * 
+ * Get featured products limits for all tiers (admin endpoint)
+ */
+router.get('/featured-products/all', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'authentication_required' });
+    }
+
+    // Return all tier limits from the persisted configuration
+    return res.json({
+      limits: FEATURED_PRODUCTS_LIMITS,
+      tiers: Object.keys(FEATURED_PRODUCTS_LIMITS),
+    });
+  } catch (error) {
+    console.error('[GET /api/tenant-limits/featured-products/all] Error:', error);
+    return res.status(500).json({ error: 'failed_to_get_all_featured_limits' });
   }
 });
 
