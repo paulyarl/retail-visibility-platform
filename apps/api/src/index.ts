@@ -320,6 +320,7 @@ const healthRoutes = (req: any, res: any) => {
 };
 
 app.use('/health', healthRoutes);
+app.use('/api/health', healthRoutes);
 
 // PUBLIC STATUS ENDPOINT - No authentication required for status display
 app.get('/public/tenant/:tenantId/business-hours/status', async (req, res) => {
