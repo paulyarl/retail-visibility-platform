@@ -1,0 +1,315 @@
+{
+  "timestamp": "2026-01-23T08:03:44.356Z",
+  "summary": {
+    "totalTests": 27,
+    "totalPassed": 7,
+    "totalFailed": 20,
+    "totalDuration": 1850,
+    "testTypes": {
+      "integration": {
+        "total": 5,
+        "passed": 1,
+        "failed": 4,
+        "duration": 241,
+        "successRate": 20
+      },
+      "performance": {
+        "total": 5,
+        "passed": 4,
+        "failed": 1,
+        "duration": 419,
+        "successRate": 80
+      },
+      "security": {
+        "total": 5,
+        "passed": 1,
+        "failed": 4,
+        "duration": 211,
+        "successRate": 20
+      },
+      "stress": {
+        "total": 5,
+        "passed": 0,
+        "failed": 5,
+        "duration": 827,
+        "successRate": 0
+      },
+      "unit": {
+        "total": 7,
+        "passed": 1,
+        "failed": 6,
+        "duration": 152,
+        "successRate": 14.285714285714285
+      }
+    },
+    "overallSuccessRate": 25.925925925925924,
+    "performanceMetrics": {
+      "averageResponseTime": 49.309174008554855,
+      "cacheHitRatio": 91.22686355984784,
+      "throughput": 18752.877851742545,
+      "memoryUsage": 345.9167242898938
+    },
+    "securityMetrics": {
+      "authenticationPassed": 97.24972764040328,
+      "encryptionPassed": 99.3040075111487,
+      "authorizationPassed": 97.41113649517001,
+      "privateDataProtected": 99.5857558325088
+    },
+    "stressTestResults": {
+      "maxLoadHandled": 91631.02739909888,
+      "breakingPoint": "Not reached",
+      "recoveryTime": 25.432233163437665
+    }
+  },
+  "detailedResults": [
+    {
+      "timestamp": "2026-01-23T08:03:38.412Z",
+      "testType": "integration",
+      "results": {
+        "passed": 1,
+        "failed": 4,
+        "total": 5,
+        "duration": 241,
+        "tests": [
+          {
+            "name": "testSecurityServiceIntegration",
+            "status": "failed",
+            "duration": 66,
+            "error": "Security service integration failed",
+            "details": {}
+          },
+          {
+            "name": "testRateLimitServiceIntegration",
+            "status": "failed",
+            "duration": 41,
+            "error": "Rate limit service integration failed",
+            "details": {}
+          },
+          {
+            "name": "testBehaviorServiceIntegration",
+            "status": "failed",
+            "duration": 49,
+            "error": "Behavior service integration failed",
+            "details": {}
+          },
+          {
+            "name": "testTenantServiceIntegration",
+            "status": "failed",
+            "duration": 50,
+            "error": "Tenant service integration failed",
+            "details": {}
+          },
+          {
+            "name": "testCacheIntegration",
+            "status": "passed",
+            "duration": 32,
+            "error": null,
+            "details": {}
+          }
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-23T08:03:40.672Z",
+      "testType": "performance",
+      "results": {
+        "passed": 4,
+        "failed": 1,
+        "total": 5,
+        "duration": 419,
+        "tests": [
+          {
+            "name": "testCachePerformance",
+            "status": "failed",
+            "duration": 104,
+            "error": "Cache response too slow: 28.63720289926513ms",
+            "details": {}
+          },
+          {
+            "name": "testConcurrentAccess",
+            "status": "passed",
+            "duration": 87,
+            "error": null,
+            "details": {}
+          },
+          {
+            "name": "testMemoryUsage",
+            "status": "passed",
+            "duration": 61,
+            "error": null,
+            "details": {}
+          },
+          {
+            "name": "testResponseTime",
+            "status": "passed",
+            "duration": 71,
+            "error": null,
+            "details": {}
+          },
+          {
+            "name": "testThroughput",
+            "status": "passed",
+            "duration": 96,
+            "error": null,
+            "details": {}
+          }
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-23T08:03:42.211Z",
+      "testType": "security",
+      "results": {
+        "passed": 1,
+        "failed": 4,
+        "total": 5,
+        "duration": 211,
+        "tests": [
+          {
+            "name": "testAuthenticationLevels",
+            "status": "passed",
+            "duration": 45,
+            "error": null,
+            "details": {}
+          },
+          {
+            "name": "testEncryptionSecurity",
+            "status": "failed",
+            "duration": 42,
+            "error": "Encryption security check failed",
+            "details": {}
+          },
+          {
+            "name": "testAuthorization",
+            "status": "failed",
+            "duration": 40,
+            "error": "Authorization check failed",
+            "details": {}
+          },
+          {
+            "name": "testPrivateDataProtection",
+            "status": "failed",
+            "duration": 49,
+            "error": "Private data protection failed",
+            "details": {}
+          },
+          {
+            "name": "testTokenValidation",
+            "status": "failed",
+            "duration": 34,
+            "error": "Token validation failed",
+            "details": {}
+          }
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-23T08:03:44.127Z",
+      "testType": "stress",
+      "results": {
+        "passed": 0,
+        "failed": 5,
+        "total": 5,
+        "duration": 827,
+        "tests": [
+          {
+            "name": "testHighLoad",
+            "status": "failed",
+            "duration": 211,
+            "error": "System failed under high load",
+            "details": {}
+          },
+          {
+            "name": "testCacheOverflow",
+            "status": "failed",
+            "duration": 165,
+            "error": "Cache overflow handling failed",
+            "details": {}
+          },
+          {
+            "name": "testMemoryPressure",
+            "status": "failed",
+            "duration": 182,
+            "error": "Memory pressure handling failed",
+            "details": {}
+          },
+          {
+            "name": "testDatabaseFailure",
+            "status": "failed",
+            "duration": 135,
+            "error": "Database failure handling failed",
+            "details": {}
+          },
+          {
+            "name": "testNetworkIssues",
+            "status": "failed",
+            "duration": 132,
+            "error": "Network issue handling failed",
+            "details": {}
+          }
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-23T08:03:36.009Z",
+      "testType": "unit",
+      "results": {
+        "passed": 1,
+        "failed": 6,
+        "total": 7,
+        "duration": 152,
+        "tests": [
+          {
+            "name": "testSingletonPattern",
+            "status": "failed",
+            "duration": 19,
+            "error": "Singleton instance creation failed",
+            "details": {}
+          },
+          {
+            "name": "testCacheOperations",
+            "status": "failed",
+            "duration": 15,
+            "error": "Cache set operation failed",
+            "details": {}
+          },
+          {
+            "name": "testTTLBehavior",
+            "status": "failed",
+            "duration": 31,
+            "error": "TTL expiration not working",
+            "details": {}
+          },
+          {
+            "name": "testMetricsTracking",
+            "status": "failed",
+            "duration": 6,
+            "error": "Metrics not tracked correctly",
+            "details": {}
+          },
+          {
+            "name": "testAuthentication",
+            "status": "failed",
+            "duration": 16,
+            "error": "Authentication validation failed",
+            "details": {}
+          },
+          {
+            "name": "testEncryption",
+            "status": "failed",
+            "duration": 30,
+            "error": "Encryption/decryption failed",
+            "details": {}
+          },
+          {
+            "name": "testPrivateCache",
+            "status": "passed",
+            "duration": 31,
+            "error": null,
+            "details": {}
+          }
+        ]
+      }
+    }
+  ]
+}

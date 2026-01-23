@@ -4,51 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Package, ExternalLink, Grid3x3, List, MapPin } from 'lucide-react';
 import SmartProductCard from '@/components/products/SmartProductCard';
-
-interface RandomFeaturedProduct {
-  id: string;
-  tenantId: string;
-  sku: string;
-  name: string;
-  title?: string;
-  description: string;
-  priceCents: number;
-  salePriceCents?: number;
-  stock: number;
-  imageUrl?: string;
-  brand?: string;
-  itemStatus?: string;
-  availability?: string;
-  hasVariants?: boolean;
-  tenantCategoryId?: string;
-  featuredType?: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
-  featuredTypes?: ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[];
-  featuredPriority?: number;
-  featuredAt?: string;
-  featuredExpiresAt?: string;
-  isFeaturedActive?: boolean;
-  daysUntilExpiration?: number;
-  isExpired?: boolean;
-  isExpiringSoon?: boolean;
-  metadata?: any;
-  categoryName?: string;
-  categorySlug?: string;
-  googleCategoryId?: string;
-  hasGallery?: boolean;
-  hasDescription?: boolean;
-  hasBrand?: boolean;
-  hasPrice?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-  storeSlug: string;
-  storeName: string;
-  storeLogo?: string;
-  storeCity?: string;
-  storeState?: string;
-  storeWebsite?: string;
-  storePhone?: string;
-  distanceKm?: number | null;
-}
+import { useRandomFeaturedProducts, useProductSingleton } from '@/providers/data/ProductSingleton';
+import type { PublicProduct } from '@/providers/data/ProductSingleton';
 
 // Utility function to format distance
 const formatDistance = (distanceKm: number | null): string => {
@@ -60,14 +17,14 @@ const formatDistance = (distanceKm: number | null): string => {
 };
 
 export default function RandomFeaturedProducts() {
-  const [products, setProducts] = useState<RandomFeaturedProduct[]>([]);
-  const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isClient, setIsClient] = useState(false);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-  const [isCached, setIsCached] = useState(false);
-  const [lastRefreshed, setLastRefreshed] = useState<string>('');
-
+  
+  // Use the new ProductSingleton hook
+  const { products, loading, error, refetch } = useRandomFeaturedProducts(userLocation || undefined, 20);
+  const { actions } = useProductSingleton();
+  
   // Get user location on component mount
   useEffect(() => {
     if (typeof window !== 'undefined' && 'geolocation' in navigator) {
@@ -105,57 +62,10 @@ export default function RandomFeaturedProducts() {
     localStorage.setItem('random-featured-view-mode', mode);
   };
 
+  // Log singleton metrics for debugging
   useEffect(() => {
-    let abortController = new AbortController();
-    let isMounted = true;
-
-    const fetchRandomFeatured = async () => {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        
-        // Build URL with location params if available
-        let url = `${apiUrl}/api/directory/random-featured`;
-        if (userLocation) {
-          const params = new URLSearchParams({
-            lat: userLocation.lat.toString(),
-            lng: userLocation.lng.toString(),
-            maxDistance: '500' // 500km radius
-          });
-          url += `?${params.toString()}`;
-        }
-
-        const response = await fetch(url, {
-          signal: abortController.signal,
-          next: { revalidate: 600 }, // Cache for 10 minutes
-        });
-
-        if (response.ok && isMounted) {
-          const data = await response.json();
-          setProducts(data.products || []);
-          setIsCached(data.cached || false);
-          setLastRefreshed(data.refreshed_at || '');
-        }
-      } catch (error: unknown) {
-        if (error instanceof Error && error.name !== 'AbortError' && isMounted) {
-          console.error('Error fetching random featured products:', error);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    // Only fetch when we have location (or default)
-    if (userLocation) {
-      fetchRandomFeatured();
-    }
-
-    return () => {
-      isMounted = false;
-      abortController.abort();
-    };
-  }, [userLocation]);
+    console.log('ProductSingleton: Products loaded:', products.length);
+  }, [products]);
 
   if (loading) {
     return (
@@ -188,18 +98,32 @@ export default function RandomFeaturedProducts() {
     );
   }
 
-  if (products.length === 0) {
+  if (error || products.length === 0) {
     return (
       <section className="py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Featured Products Near You</h2>
             <p className="text-gray-600">Discover amazing products from stores in your area</p>
-            <p className="text-sm text-gray-500 mt-1">📍 No featured products available in your area</p>
+            <p className="text-sm text-gray-500 mt-1">
+              📍 {error || 'No featured products available in your area'}
+            </p>
           </div>
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <p className="text-gray-500">No featured products available at the moment.</p>
-            <p className="text-sm text-gray-400 mt-2">Check back soon for new discoveries!</p>
+            <p className="text-gray-500">
+              {error || 'No featured products available at the moment.'}
+            </p>
+            <p className="text-sm text-gray-400 mt-2">
+              {error ? 'Please try again later.' : 'Check back soon for new discoveries!'}
+            </p>
+            {error && (
+              <button
+                onClick={() => refetch()}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Try Again
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -220,16 +144,12 @@ export default function RandomFeaturedProducts() {
                 Location-aware recommendations
               </span>
             )}
-            {isCached && (
-              <span className="flex items-center gap-1">
-                ⚡ Fast cached results
-              </span>
-            )}
-            {lastRefreshed && (
-              <span className="text-xs">
-                Updated {new Date(lastRefreshed).toLocaleTimeString()}
-              </span>
-            )}
+            <span className="flex items-center gap-1">
+              ⚡ Powered by ProductSingleton
+            </span>
+            <span className="text-xs">
+              {products.length} products loaded
+            </span>
           </div>
         </div>
 
@@ -267,9 +187,9 @@ export default function RandomFeaturedProducts() {
         {viewMode === 'grid' ? (
           /* Grid View */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product) => (
+            {products.map((product: PublicProduct, index: number) => (
               <SmartProductCard
-                key={product.id}
+                key={`${product.id}-${product.tenantId}-${index}`}
                 product={{
                   id: product.id,
                   sku: product.sku,
@@ -284,23 +204,18 @@ export default function RandomFeaturedProducts() {
                   stock: product.stock,
                   imageUrl: product.imageUrl,
                   tenantId: product.tenantId,
-                  availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined) || 'in_stock',
+                  availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
                   has_variants: product.hasVariants || false,
-                  tenantCategory: product.categoryName ? {
-                    id: product.categorySlug || product.categoryName,
-                    name: product.categoryName,
-                    slug: product.categorySlug || product.categoryName,
+                  tenantCategory: product.category ? {
+                    id: product.category.id,
+                    name: product.category.name,
+                    slug: product.category.slug,
                   } : undefined,
                   isFeatured: true, // All products in RandomFeaturedProducts are featured
                   featuredType: product.featuredType,
-                  featuredTypes: product.featuredTypes,
                   featuredPriority: product.featuredPriority,
                   featuredAt: product.featuredAt,
                   featuredExpiresAt: product.featuredExpiresAt,
-                  isFeaturedActive: product.isFeaturedActive,
-                  daysUntilExpiration: product.daysUntilExpiration,
-                  isExpired: product.isExpired,
-                  isExpiringSoon: product.isExpiringSoon,
                   metadata: product.metadata,
                   hasGallery: product.hasGallery,
                   hasDescription: product.hasDescription,
@@ -311,15 +226,22 @@ export default function RandomFeaturedProducts() {
                 variant="featured"
                 showCategory={true}
                 showDescription={true}
+                hasActivePaymentGateway={product.hasActivePaymentGateway}
+                defaultGatewayType={product.defaultGatewayType}
+                tenantName={product.storeInfo?.storeName}
+                tenantLogo={product.storeInfo?.storeLogo}
+                tenantCity={product.storeInfo?.storeCity}
+                tenantState={product.storeInfo?.storeState}
+                distanceKm={product.distanceKm}
               />
             ))}
           </div>
         ) : (
           /* List View */
           <div className="space-y-4">
-            {products.map((product) => (
+            {products.map((product: PublicProduct, index: number) => (
               <SmartProductCard
-                key={product.id}
+                key={`${product.id}-${product.tenantId}-${index}`}
                 product={{
                   id: product.id,
                   sku: product.sku,
@@ -334,23 +256,18 @@ export default function RandomFeaturedProducts() {
                   stock: product.stock,
                   imageUrl: product.imageUrl,
                   tenantId: product.tenantId,
-                  availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined) || 'in_stock',
+                  availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
                   has_variants: product.hasVariants || false,
-                  tenantCategory: product.categoryName ? {
-                    id: product.categorySlug || product.categoryName,
-                    name: product.categoryName,
-                    slug: product.categorySlug || product.categoryName,
+                  tenantCategory: product.category ? {
+                    id: product.category.id,
+                    name: product.category.name,
+                    slug: product.category.slug,
                   } : undefined,
                   isFeatured: true, // All products in RandomFeaturedProducts are featured
                   featuredType: product.featuredType,
-                  featuredTypes: product.featuredTypes,
                   featuredPriority: product.featuredPriority,
                   featuredAt: product.featuredAt,
                   featuredExpiresAt: product.featuredExpiresAt,
-                  isFeaturedActive: product.isFeaturedActive,
-                  daysUntilExpiration: product.daysUntilExpiration,
-                  isExpired: product.isExpired,
-                  isExpiringSoon: product.isExpiringSoon,
                   metadata: product.metadata,
                   hasGallery: product.hasGallery,
                   hasDescription: product.hasDescription,
@@ -361,6 +278,13 @@ export default function RandomFeaturedProducts() {
                 variant="featured"
                 showCategory={true}
                 showDescription={true}
+                hasActivePaymentGateway={product.hasActivePaymentGateway}
+                defaultGatewayType={product.defaultGatewayType}
+                tenantName={product.storeInfo?.storeName}
+                tenantLogo={product.storeInfo?.storeLogo}
+                tenantCity={product.storeInfo?.storeCity}
+                tenantState={product.storeInfo?.storeState}
+                distanceKm={product.distanceKm}
               />
             ))}
           </div>
@@ -370,11 +294,12 @@ export default function RandomFeaturedProducts() {
         <div className="mt-8 bg-white rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Featured Stores</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {Array.from(new Set(products.map(p => p.storeName))).map((storeName) => {
-              const store = products.find(p => p.storeName === storeName);
+            {Array.from(new Set(products.map(p => p.storeInfo?.storeName))).map((storeName, index) => {
+              const product = products.find(p => p.storeInfo?.storeName === storeName);
+              const store = product?.storeInfo;
               return (
                 <Link
-                  key={store?.storeSlug}
+                  key={`${store?.storeSlug}-${index}`}
                   href={`/directory/${store?.storeSlug}`}
                   className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors"
                 >

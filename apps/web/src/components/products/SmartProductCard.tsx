@@ -153,20 +153,31 @@ interface SmartProductCardProps {
   product: ProductData;
   tenantName?: string;
   tenantLogo?: string;
+  tenantCity?: string;
+  tenantState?: string;
+  distanceKm?: number | null;
   variant?: 'grid' | 'list' | 'compact' | 'featured';
   showCategory?: boolean;
   showDescription?: boolean;
   className?: string;
+  // Payment gateway status to avoid individual API calls
+  hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
 }
 
 export default function SmartProductCard({
   product,
   tenantName,
   tenantLogo,
+  tenantCity,
+  tenantState,
+  distanceKm,
   variant = 'grid',
   showCategory = true,
   showDescription = true,
   className = '',
+  hasActivePaymentGateway: propHasActivePaymentGateway,
+  defaultGatewayType: propDefaultGatewayType,
 }: SmartProductCardProps) {
   // Debug logging for featured products
   /* console.log('[SmartProductCard] Rendering product:', {
@@ -184,11 +195,16 @@ export default function SmartProductCard({
   const [canPurchase, setCanPurchase] = useState(false);
   const [defaultGatewayType, setDefaultGatewayType] = useState<string | undefined>();
 
-  // Priority: product data (from MV) > context > individual API fetch
-  const effectiveCanPurchase = product.has_active_payment_gateway ?? contextPayment?.canPurchase ?? canPurchase;
-  const effectiveGatewayType = product.payment_gateway_type ?? contextPayment?.defaultGatewayType ?? defaultGatewayType;
+  // Priority: props > product data (from MV) > context > individual API fetch
+  const effectiveCanPurchase = propHasActivePaymentGateway ?? product.has_active_payment_gateway ?? contextPayment?.canPurchase ?? canPurchase;
+  const effectiveGatewayType = propDefaultGatewayType ?? product.payment_gateway_type ?? contextPayment?.defaultGatewayType ?? defaultGatewayType;
 
   useEffect(() => {
+    // Skip individual fetch if props are provided
+    if (propHasActivePaymentGateway !== undefined) {
+      return;
+    }
+
     // Skip individual fetch if context is available
     if (contextPayment) {
       return;
@@ -218,7 +234,7 @@ export default function SmartProductCard({
     };
 
     checkPurchaseAbility();
-  }, [product.tenantId, contextPayment, product.has_active_payment_gateway]);
+  }, [product.tenantId, contextPayment, product.has_active_payment_gateway, propHasActivePaymentGateway]);
 
   const displayTitle = product.title || product.name;
   const displayBrand = product.brand || '';
@@ -298,6 +314,36 @@ export default function SmartProductCard({
               )}
             </div>
             
+            {/* Store Information for Directory Context */}
+            {tenantName && (
+              <div className="flex items-center gap-2 mb-3 p-2 bg-neutral-50 dark:bg-neutral-700/50 rounded-lg">
+                {tenantLogo ? (
+                  <Image
+                    src={tenantLogo}
+                    alt={tenantName}
+                    width={24}
+                    height={24}
+                    className="w-6 h-6 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-6 h-6 bg-neutral-200 dark:bg-neutral-600 rounded-lg flex items-center justify-center">
+                    <svg className="w-3 h-3 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-neutral-900 dark:text-white truncate">
+                    {tenantName}
+                  </p>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    {tenantCity && tenantState ? `${tenantCity}, ${tenantState}` : 'Available at this store'}
+                    {distanceKm !== null && distanceKm !== undefined && ` • ${Math.round(distanceKm)}km away`}
+                  </p>
+                </div>
+              </div>
+            )}
+            
             <Link href={`/products/${product.id}`}>
               <h3 className="font-bold text-lg text-neutral-900 dark:text-white line-clamp-2 mb-3 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
                 {displayTitle}
@@ -318,15 +364,17 @@ export default function SmartProductCard({
                 showSavingsBadge={true}
               />
               <div className="text-right">
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                  SKU: {product.sku}
-                </p>
+                {product.sku && (
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    SKU: {product.sku}
+                  </p>
+                )}
                 <p className={`text-xs font-semibold ${
                   product.stock === 0 
                     ? 'text-red-600 dark:text-red-400' 
                     : product.stock < 10 
-                    ? 'text-amber-600 dark:text-amber-400' 
-                    : 'text-green-600 dark:text-green-400'
+                      ? 'text-amber-600 dark:text-amber-400' 
+                      : 'text-green-600 dark:text-green-400'
                 }`}>
                   Stock: {product.stock}
                 </p>
@@ -397,6 +445,34 @@ export default function SmartProductCard({
               <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
                 by {product.brand}
               </p>
+            )}
+            
+            {/* Store Information for Directory Context */}
+            {tenantName && (
+              <div className="flex items-center gap-1 mt-0.5">
+                {tenantLogo ? (
+                  <Image
+                    src={tenantLogo}
+                    alt={tenantName}
+                    width={16}
+                    height={16}
+                    className="w-4 h-4 rounded object-cover"
+                  />
+                ) : (
+                  <div className="w-4 h-4 bg-neutral-200 dark:bg-neutral-600 rounded flex items-center justify-center">
+                    <svg className="w-2 h-2 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400 truncate">
+                    {tenantName}
+                    {tenantCity && tenantState && ` • ${tenantCity}`}
+                    {distanceKm !== null && distanceKm !== undefined && ` • ${Math.round(distanceKm)}km`}
+                  </p>
+                </div>
+              </div>
             )}
             
             <div className="flex items-center gap-1 mt-0.5">
@@ -541,6 +617,36 @@ export default function SmartProductCard({
                     )}
                   </div>
                 </div>
+                
+                {/* Store Information for Directory Context */}
+                {tenantName && (
+                  <div className="flex items-center gap-2 mb-2 p-2 bg-neutral-50 dark:bg-neutral-700/50 rounded-lg">
+                    {tenantLogo ? (
+                      <Image
+                        src={tenantLogo}
+                        alt={tenantName}
+                        width={20}
+                        height={20}
+                        className="w-5 h-5 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="w-5 h-5 bg-neutral-200 dark:bg-neutral-600 rounded-lg flex items-center justify-center">
+                        <svg className="w-2.5 h-2.5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-neutral-900 dark:text-white truncate">
+                        {tenantName}
+                      </p>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                        {tenantCity && tenantState ? `${tenantCity}, ${tenantState}` : 'Available at this store'}
+                        {distanceKm !== null && distanceKm !== undefined && ` • ${Math.round(distanceKm)}km away`}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <Link href={`/products/${product.id}`}>
                   <h3 className="font-semibold text-lg text-neutral-900 dark:text-white mb-2 hover:text-primary-600 dark:hover:text-primary-400">
                     {displayTitle}

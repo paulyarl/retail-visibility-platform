@@ -12,6 +12,15 @@ interface Category {
   count: number;
   category_type?: string;
   is_primary?: boolean;
+  googleCategoryId?: string | null;
+  productsWithImages?: number;
+  productsWithDescriptions?: number;
+  productsWithBrand?: number;
+  productsWithPrice?: number;
+  inStockProducts?: number;
+  avgPriceCents?: number;
+  minPriceCents?: number;
+  maxPriceCents?: number;
 }
 
 interface ProductCategorySidebarProps {
@@ -83,13 +92,20 @@ export default function ProductCategorySidebar({
             }`}
           >
             <span className="truncate">{category.name}</span>
-            <span className={`text-sm flex-shrink-0 ml-2 ${
-              currentCategory === category.slug
-                ? 'text-primary-600 dark:text-primary-400'
-                : 'text-neutral-500 dark:text-neutral-400'
-            }`}>
-              {category.count}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`text-sm flex-shrink-0 ${
+                currentCategory === category.slug
+                  ? 'text-primary-600 dark:text-primary-400'
+                  : 'text-neutral-500 dark:text-neutral-400'
+              }`}>
+                {category.count}
+              </span>
+              {category.inStockProducts !== undefined && category.inStockProducts < category.count && (
+                <span className="text-xs text-amber-600 dark:text-amber-400" title={`${category.count - category.inStockProducts} out of stock`}>
+                  {category.inStockProducts}
+                </span>
+              )}
+            </div>
           </Link>
         ))}
 

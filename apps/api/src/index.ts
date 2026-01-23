@@ -322,6 +322,11 @@ const healthRoutes = (req: any, res: any) => {
 app.use('/health', healthRoutes);
 app.use('/api/health', healthRoutes);
 
+// PUBLIC API ROUTES - Singleton System
+import publicApiRoutes from './routes/public-api';
+app.use('/api/public', publicApiRoutes);
+console.log('✅ Public API routes mounted at /api/public (Singleton System)');
+
 // PUBLIC STATUS ENDPOINT - No authentication required for status display
 app.get('/public/tenant/:tenantId/business-hours/status', async (req, res) => {
   const { tenantId } = req.params;
@@ -3401,7 +3406,7 @@ app.get('/api/directory/random-featured', async (req, res) => {
     const userLng = parseFloat(req.query.lng as string) || -74.0060; // Default: New York
     const maxDistance = parseFloat(req.query.maxDistance as string) || 500; // Default: 500km
     
-    console.log('[Random Featured Direct] User location:', { userLat, userLng, maxDistance });
+    // console.log('[Random Featured Direct] User location:', { userLat, userLng, maxDistance });
     
     // Query for random featured products with proximity weighting
     const query = `
@@ -3479,8 +3484,8 @@ app.get('/api/directory/random-featured', async (req, res) => {
     
     const result = await pool.query(query, [userLat, userLng, maxDistance]);
     
-    console.log('[Random Featured Direct] Query returned', result.rows.length, 'rows');
-    if (result.rows.length > 0) {
+    // console.log('[Random Featured Direct] Query returned', result.rows.length, 'rows');
+    /* if (result.rows.length > 0) {
       console.log('[Random Featured Direct] Sample product:', {
         id: result.rows[0].id,
         name: result.rows[0].name,
@@ -3493,7 +3498,7 @@ app.get('/api/directory/random-featured', async (req, res) => {
         distance_km: result.rows[0].distance_km,
         has_active_payment_gateway: result.rows[0].has_active_payment_gateway
       });
-    }
+    } */
     
     // Transform to camelCase for frontend compatibility
     const products = result.rows.map((row: any) => ({
@@ -3530,7 +3535,7 @@ app.get('/api/directory/random-featured', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[Random Featured Direct] Error:', error);
+    // console.error('[Random Featured Direct] Error:', error);
     res.status(500).json({ 
       error: 'Failed to fetch random featured products',
       products: [],
@@ -5505,6 +5510,11 @@ import directoryRoutes from './routes/directory';
 app.use('/api/directory', directoryRoutes);
 console.log('✅ Directory main routes mounted at /api/directory (includes /:identifier catch-all)');
 
+// Mount enhanced directory categories routes
+import directoryCategoriesEnhancedRoutes from './routes/directory-categories-enhanced';
+app.use('/api/directory', directoryCategoriesEnhancedRoutes);
+console.log('✅ Directory categories enhanced routes mounted at /api/directory');
+
 /* ------------------------------ END PUBLIC ROUTES ------------------------------ */
 
 /* ------------------------------ product variants ------------------------------ */
@@ -5809,6 +5819,45 @@ console.log('✅ Platform settings routes mounted at /api');
 app.use('/api', rateLimitWarningsRoutes);
 console.log('✅ Rate limit warnings routes mounted at /api');
 
+/* ------------------------------ UNIVERSAL SINGLETON SYSTEM ------------------------------ */
+import securityMonitoringRoutes from './routes/security-monitoring';
+app.use('/api/security', authenticateToken, securityMonitoringRoutes);
+console.log('✅ Security Monitoring routes mounted at /api/security (UniversalSingleton)');
+
+import rateLimitingRoutes from './routes/rate-limiting';
+app.use('/api/rate-limit', rateLimitingRoutes);
+console.log('✅ Rate Limiting routes mounted at /api/rate-limit (UniversalSingleton)');
+
+import behaviorTrackingRoutes from './routes/behavior-tracking';
+app.use('/api/behavior', authenticateToken, behaviorTrackingRoutes);
+console.log('✅ Behavior Tracking routes mounted at /api/behavior (UniversalSingleton)');
+
+import tenantProfileRoutes from './routes/tenant-profile';
+app.use('/api/tenant', authenticateToken, tenantProfileRoutes);
+console.log('✅ Tenant Profile routes mounted at /api/tenant (UniversalSingleton)');
+
+import usersRoutes from './routes/users-singleton';
+app.use('/api/users-singleton', authenticateToken, usersRoutes);
+console.log('✅ Users routes mounted at /api/users-singleton (UniversalSingleton)');
+
+import tiersRoutes from './routes/tiers-singleton';
+app.use('/api/tiers-singleton', authenticateToken, tiersRoutes);
+console.log('✅ Tiers routes mounted at /api/tiers-singleton (UniversalSingleton)');
+
+console.log('🚀 UniversalSingleton System Phase 3 fully integrated and ready for production!');
+
+import inventoryRoutes from './routes/inventory-singleton';
+app.use('/api/inventory-singleton', authenticateToken, inventoryRoutes);
+console.log('✅ Inventory routes mounted at /api/inventory-singleton (UniversalSingleton)');
+
+import categoriesRoutes from './routes/categories-singleton';
+app.use('/api/categories-singleton', authenticateToken, categoriesRoutes);
+console.log('✅ Categories routes mounted at /api/categories-singleton (UniversalSingleton)');
+
+console.log('🚀 UniversalSingleton System Phase 4 fully integrated and ready for production!');
+
+console.log('🚀 UniversalSingleton System fully integrated and ready for viral traffic!');
+
 /* ------------------------------ permissions ------------------------------ */
 app.use('/api/permissions', permissionRoutes);
 console.log('✅ Permissions routes mounted at /api/permissions');
@@ -5835,6 +5884,10 @@ console.log('✅ Admin scan metrics routes mounted at /api/admin/scan-metrics');
 app.use('/api/admin/cached-products', cachedProductsRoutes);
 console.log('✅ Admin cached products routes mounted at /api/admin/cached-products');
 
+/* ------------------------------ admin users ------------------------------ */
+app.use('/api/admin/users', authenticateToken, requireAdmin, adminUsersRoutes);
+console.log('✅ Admin users routes mounted at /api/admin/users');
+
 /* ------------------------------ admin tools ------------------------------ */
 app.use('/api/admin/tools', authenticateToken, requireAdmin, adminToolsRoutes);
 console.log('✅ Admin tools routes mounted at /api/admin/tools');
@@ -5843,6 +5896,81 @@ console.log('✅ Admin tools routes mounted at /api/admin/tools');
 import sentryRoutes from './routes/admin/sentry';
 app.use('/api/admin/sentry', authenticateToken, requireAdmin, sentryRoutes);
 console.log('✅ Admin sentry routes mounted at /api/admin/sentry');
+
+/* ------------------------------ gbp advanced sync singleton ------------------------------ */
+import gbpAdvancedSyncSingletonRoutes from './routes/gbp-advanced-sync-singleton';
+app.use('/api/gbp-advanced-sync-singleton', gbpAdvancedSyncSingletonRoutes);
+console.log('✅ GBP Advanced Sync singleton routes mounted at /api/gbp-advanced-sync-singleton');
+
+/* ------------------------------ gmc product sync singleton ------------------------------ */
+import gmcProductSyncSingletonRoutes from './routes/gmc-product-sync-singleton';
+app.use('/api/gmc-product-sync-singleton', gmcProductSyncSingletonRoutes);
+console.log('✅ GMC Product Sync singleton routes mounted at /api/gmc-product-sync-singleton');
+
+/* ------------------------------ clover oauth singleton ------------------------------ */
+import cloverOAuthSingletonRoutes from './routes/clover-oauth-singleton';
+app.use('/api/clover-oauth-singleton', cloverOAuthSingletonRoutes);
+console.log('✅ Clover OAuth singleton routes mounted at /api/clover-oauth-singleton');
+
+/* ------------------------------ oauth singleton ------------------------------ */
+import oauthSingletonRoutes from './routes/oauth-singleton';
+app.use('/api/oauth-singleton', oauthSingletonRoutes);
+console.log('✅ OAuth singleton routes mounted at /api/oauth-singleton');
+
+/* ------------------------------ refund singleton ------------------------------ */
+import refundSingletonRoutes from './routes/refund-singleton';
+app.use('/api/refund-singleton', refundSingletonRoutes);
+console.log('✅ Refund singleton routes mounted at /api/refund-singleton');
+
+/* ------------------------------ taxonomy sync singleton ------------------------------ */
+import taxonomySyncSingletonRoutes from './routes/taxonomy-sync-singleton';
+app.use('/api/taxonomy-sync-singleton', taxonomySyncSingletonRoutes);
+console.log('✅ Taxonomy sync singleton routes mounted at /api/taxonomy-sync-singleton');
+
+/* ------------------------------ gbp sync tracking singleton ------------------------------ */
+import gbpSyncTrackingSingletonRoutes from './routes/gbp-sync-tracking-singleton';
+app.use('/api/gbp-sync-tracking-singleton', gbpSyncTrackingSingletonRoutes);
+console.log('✅ GBP sync tracking singleton routes mounted at /api/gbp-sync-tracking-singleton');
+
+/* ------------------------------ recommendation singleton ------------------------------ */
+import recommendationSingletonRoutes from './routes/recommendation-singleton';
+app.use('/api/recommendation-singleton', recommendationSingletonRoutes);
+console.log('✅ Recommendation singleton routes mounted at /api/recommendation-singleton');
+
+/* ------------------------------ gbp category sync singleton ------------------------------ */
+import gbpCategorySyncSingletonRoutes from './routes/gbp-category-sync-singleton';
+app.use('/api/gbp-category-sync-singleton', gbpCategorySyncSingletonRoutes);
+console.log('✅ GBP category sync singleton routes mounted at /api/gbp-category-sync-singleton');
+
+/* ------------------------------ barcode enrichment singleton ------------------------------ */
+import barcodeEnrichmentSingletonRoutes from './routes/barcode-enrichment-singleton';
+app.use('/api/barcode-enrichment-singleton', barcodeEnrichmentSingletonRoutes);
+console.log('✅ Barcode enrichment singleton routes mounted at /api/barcode-enrichment-singleton');
+
+/* ------------------------------ digital asset singleton ------------------------------ */
+import digitalAssetSingletonRoutes from './routes/digital-asset-singleton';
+app.use('/api/digital-asset-singleton', digitalAssetSingletonRoutes);
+console.log('✅ Digital asset singleton routes mounted at /api/digital-asset-singleton');
+
+/* ------------------------------ product cache singleton ------------------------------ */
+import productCacheSingletonRoutes from './routes/product-cache-singleton';
+app.use('/api/product-cache-singleton', productCacheSingletonRoutes);
+console.log('✅ Product cache singleton routes mounted at /api/product-cache-singleton');
+
+/* ------------------------------ ai image singleton ------------------------------ */
+import aiImageSingletonRoutes from './routes/ai-image-singleton';
+app.use('/api/ai-image-singleton', aiImageSingletonRoutes);
+console.log('✅ AI image singleton routes mounted at /api/ai-image-singleton');
+
+/* ------------------------------ featured products singleton ------------------------------ */
+import featuredProductsSingletonRoutes from './routes/featured-products-singleton';
+app.use('/api/featured-products-singleton', featuredProductsSingletonRoutes);
+console.log('✅ Featured products singleton routes mounted at /api/featured-products-singleton');
+
+/* ------------------------------ reviews singleton ------------------------------ */
+import reviewsSingletonRoutes from './routes/reviews-singleton';
+app.use('/api/reviews-singleton', reviewsSingletonRoutes);
+console.log('✅ Reviews singleton routes mounted at /api/reviews-singleton');
 
 /* ------------------------------ product featuring ------------------------------ */
 import productFeaturingRoutes from './routes/product-featuring';

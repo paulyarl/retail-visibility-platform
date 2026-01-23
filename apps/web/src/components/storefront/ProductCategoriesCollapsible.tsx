@@ -56,16 +56,16 @@ export default function ProductCategoriesCollapsible({
       {/* Collapsible Content */}
       {isExpanded && (
         <div className="px-4 pb-4 border-t border-neutral-200 dark:border-neutral-700">
-          <div className="pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <div className="pt-4 space-y-1">
             {/* All Products */}
             <Link
               href={`/tenant/${tenantId}`}
-              className="flex items-center justify-between p-3 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors group"
+              className="flex items-center justify-between p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors group"
             >
-              <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 group-hover:text-primary-600 dark:group-hover:text-primary-400">
+              <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400 group-hover:text-primary-600 dark:group-hover:text-primary-400">
                 All Products
               </span>
-              <span className="text-xs text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-700 px-2 py-1 rounded-full">
+              <span className="text-xs text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-700 px-1.5 py-0.5 rounded-full">
                 {totalProducts}
               </span>
             </Link>
@@ -75,12 +75,12 @@ export default function ProductCategoriesCollapsible({
               <Link
                 key={category.id}
                 href={`/tenant/${tenantId}?category=${category.slug}`}
-                className="flex items-center justify-between p-3 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors group"
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors group"
               >
-                <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 truncate flex-1 mr-2">
                   {category.name}
                 </span>
-                <span className="text-xs text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-700 px-2 py-1 rounded-full">
+                <span className="text-xs text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
                   {category.count}
                 </span>
               </Link>

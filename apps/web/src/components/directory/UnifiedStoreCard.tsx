@@ -46,6 +46,24 @@ interface UnifiedStoreCardProps {
   linkType?: 'directory' | 'storefront'; // Determines link destination
   showLogo?: boolean; // Whether to display store logos
   className?: string;
+  enhancedStats?: {
+    totalProducts: number;
+    categories: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      count: number;
+      inStockProducts?: number;
+    }>;
+    ratingAvg: number;
+    ratingCount: number;
+    rating3Count: number;
+    rating4Count: number;
+    rating5Count: number;
+    verifiedPurchaseCount: number;
+    lastReviewAt: string | null;
+    isFeatured: boolean;
+  };
 }
 
 // Business hours utility functions
@@ -65,22 +83,32 @@ export function UnifiedStoreCard({
   contextCategory,
   linkType = 'directory',
   showLogo = true,
-  className = ''
+  className = '',
+  enhancedStats
 }: UnifiedStoreCardProps) {
   // Use centralized status hook instead of complex local logic
   const { status: hoursStatus } = useStoreStatus(listing.tenantId);
+  
+  // Use enhanced stats if available, otherwise fall back to basic listing data
+  const ratingAvg = enhancedStats?.ratingAvg || (typeof listing.ratingAvg === 'number' ? listing.ratingAvg : parseFloat(listing.ratingAvg || '0')) || 0;
+  const ratingCount = enhancedStats?.ratingCount || (typeof listing.ratingCount === 'number' ? listing.ratingCount : parseInt(listing.ratingCount || '0')) || 0;
+  const categories = enhancedStats?.categories || [];
+  const totalProducts = enhancedStats?.totalProducts || listing.productCount || 0;
+  const isFeatured = enhancedStats?.isFeatured || listing.isFeatured || false;
+
   // Determine link destination based on linkType
   const linkHref = linkType === 'storefront' 
     ? `/tenant/${listing.tenantId}`
     : `/directory/${listing.slug || listing.tenantId}`;
 
-  // Prioritize category display: contextCategory → gbpPrimaryCategoryName → primaryCategory → category.name
-  const displayCategory =
-    contextCategory ||
-    listing.gbpPrimaryCategoryName ||
-    listing.primaryCategory ||
-    listing.category?.name ||
-    'General Store';
+  // Prioritize category display: enhancedStats → contextCategory → gbpPrimaryCategoryName → primaryCategory → category.name
+  const displayCategory = categories.length > 0 
+    ? categories[0].name  // Use first category from enhanced stats
+    : contextCategory ||
+      listing.gbpPrimaryCategoryName ||
+      listing.primaryCategory ||
+      listing.category?.name ||
+      'General Store';
 
   // Format category name (handle snake_case and underscores)
   const formattedCategory = displayCategory
@@ -96,10 +124,6 @@ export function UnifiedStoreCard({
     listing.state,
     listing.zipCode
   ].filter(Boolean).join(', ');
-
-  // Ensure ratingAvg is a number for safe toFixed() usage
-  const ratingAvg = typeof listing.ratingAvg === 'number' ? listing.ratingAvg : parseFloat(listing.ratingAvg || '0') || 0;
-  const ratingCount = typeof listing.ratingCount === 'number' ? listing.ratingCount : parseInt(listing.ratingCount || '0') || 0;
 
   if (viewMode === 'list') {
     return (
@@ -152,22 +176,52 @@ export function UnifiedStoreCard({
                           )}
                         </div>
                       )}
+
+                      {/* Popular Categories - from enhanced stats */}
+                      {categories.length > 0 && (
+                        <div className="flex items-center gap-1 mt-2">
+                          <span className="text-xs text-neutral-500 dark:text-neutral-400">Popular:</span>
+                          {categories.slice(0, 2).map((category) => (
+                            <button
+                              key={category.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.href = `/tenant/${listing.tenantId}?category=${category.slug}`;
+                              }}
+                              className="text-xs hover:bg-blue-100 cursor-pointer transition-colors px-2 py-1 rounded bg-blue-50 text-blue-700 border border-blue-200"
+                            >
+                              {category.name} ({category.count})
+                            </button>
+                          ))}
+                          {categories.length > 2 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.href = `/tenant/${listing.tenantId}?featured=false`;
+                              }}
+                              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                            >
+                              +{categories.length - 2} more
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center gap-2">
-                        <Link 
-                          href={`/directory?category=${encodeURIComponent(displayCategory.toLowerCase().replace(/\s+/g, '-'))}`}
+                        <button
                           onClick={(e) => {
                             // Stop propagation to prevent card click
                             e.stopPropagation();
+                            // Navigate to category page
+                            window.location.href = `/directory?category=${encodeURIComponent(displayCategory.toLowerCase().replace(/\s+/g, '-'))}`;
                           }}
+                          className="text-xs hover:bg-blue-100 cursor-pointer transition-colors px-2 py-1 rounded bg-blue-50 text-blue-700 border border-blue-200"
                         >
-                          <Badge variant="info" className="text-xs hover:bg-blue-100 cursor-pointer transition-colors">
-                            {formattedCategory}
-                          </Badge>
-                        </Link>
-                        {listing.isFeatured && (
+                          {formattedCategory}
+                        </button>
+                        {isFeatured && (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg">
                             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -183,20 +237,11 @@ export function UnifiedStoreCard({
                       </div>
 
                       <div className="flex items-center space-x-3 text-sm text-gray-500 dark:text-gray-400">
-                        {listing.productCount !== undefined && (
-                          <span>{listing.productCount} products</span>
+                        {totalProducts > 0 && (
+                          <span>{totalProducts} products</span>
                         )}
-                        {hoursStatus && (
-                          <div 
-                            className={`w-2 h-2 rounded-full ${
-                              hoursStatus.status === 'open' ? 'bg-green-500' :
-                              hoursStatus.status === 'closed' ? 'bg-red-500' :
-                              hoursStatus.status === 'opening-soon' ? 'bg-blue-500' :
-                              hoursStatus.status === 'closing-soon' ? 'bg-yellow-500' :
-                              'bg-gray-500' // fallback
-                            }`}
-                            title={hoursStatus.label}
-                          />
+                        {categories.length > 0 && (
+                          <span>{categories.length} categories</span>
                         )}
                       </div>
                     </div>

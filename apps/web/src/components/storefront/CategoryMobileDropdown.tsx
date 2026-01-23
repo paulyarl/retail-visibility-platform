@@ -7,6 +7,15 @@ interface Category {
   name: string;
   slug: string;
   count: number;
+  googleCategoryId?: string | null;
+  productsWithImages?: number;
+  productsWithDescriptions?: number;
+  productsWithBrand?: number;
+  productsWithPrice?: number;
+  inStockProducts?: number;
+  avgPriceCents?: number;
+  minPriceCents?: number;
+  maxPriceCents?: number;
 }
 
 interface CategoryMobileDropdownProps {
@@ -43,6 +52,7 @@ export default function CategoryMobileDropdown({ tenantId, categories, totalProd
         {categories.map((category) => (
           <option key={category.id} value={category.slug}>
             {category.name} ({category.count})
+            {category.inStockProducts !== undefined && category.inStockProducts < category.count && ` (${category.inStockProducts} in stock)`}
           </option>
         ))}
       </select>

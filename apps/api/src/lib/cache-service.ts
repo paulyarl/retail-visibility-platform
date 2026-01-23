@@ -13,6 +13,7 @@ export const CACHE_TTL = {
   LONG: 60 * 60,       // 1 hour
   VERY_LONG: 4 * 60 * 60, // 4 hours
   DAILY: 24 * 60 * 60,  // 1 day
+  FEATURED_PRODUCTS: 10 * 60, // 10 minutes for featured products
 } as const;
 
 // Cache key patterns
@@ -44,6 +45,7 @@ export const CacheKeys = {
   
   // Business hours
   BUSINESS_HOURS: (tenantId: string) => `business:${tenantId}:hours`,
+  BUSINESS_HOURS_STATUS: (tenantId: string) => `business:${tenantId}:status`,
   
   // Quick start data
   QUICK_START_PRODUCTS: () => `quickstart:products`,
@@ -55,12 +57,13 @@ let redisClient: ReturnType<typeof createClient> | null = null;
 let isRedisConnected = false;
 
 // Fallback in-memory cache
-const fallbackCache = new Map<string, { data: any; timestamp: number }>();
+const fallbackCache = new Map<string, CacheEntry>();
 
 // Cache entry interface
 interface CacheEntry {
   data: any;
   timestamp: number;
+  ttl?: number; // TTL in seconds
 }
 
 /**
@@ -74,7 +77,6 @@ const initRedis = async (): Promise<void> => {
       url: process.env.REDIS_URL || 'redis://localhost:6379',
       socket: {
         connectTimeout: 5000,
-        lazyConnect: true,
       },
     });
 
@@ -103,7 +105,7 @@ export const get = async (key: string): Promise<any | null> => {
   if (redisClient) {
     try {
       const cached = await redisClient.get(key);
-      if (cached) {
+      if (cached && typeof cached === 'string') {
         const parsed = JSON.parse(cached);
         return parsed.data;
       }
@@ -220,7 +222,7 @@ export const getStats = async (): Promise<{
 }> => {
   let redisMemory = undefined;
   
-  if (redisClient && isRedisClient) {
+  if (redisClient && isRedisConnected) {
     try {
       const info = await redisClient.info('memory');
       redisMemory = info.split('\n').find(line => line.startsWith('used_memory:'));

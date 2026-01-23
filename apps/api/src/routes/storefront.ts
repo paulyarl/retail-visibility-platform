@@ -60,7 +60,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     
     // Query storefront_products MV for individual products (includes payment gateway info)
     const query = `
-      SELECT 
+      SELECT DISTINCT 
         sp.id,
         sp.tenant_id,
         sp.sku,
@@ -226,7 +226,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
 /**
  * GET /api/storefront/:tenantId/categories
  * Get product category list with counts for storefront sidebar
- * Uses storefront_category_counts materialized view
+ * Uses storefront_category_counts materialized view (FIXED version)
  * Performance: <5ms
  */
 router.get('/:tenantId/categories', async (req: Request, res: Response) => {
@@ -237,30 +237,37 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'tenant_required' });
     }
     
-    // Query product category counts - join on BOTH category_path array AND category_id
-    // This handles products that use either method of category assignment
+    // Query the FIXED storefront_category_counts materialized view
+    // This provides accurate category counts without CROSS JOIN bugs
     const query = `
       SELECT
-        sp.category_name,
-        sp.category_slug,
-        sp.google_category_id,
-        COUNT(DISTINCT sp.id) as count,
-        MIN(sp.price_cents) as min_price_cents,
-        MAX(sp.price_cents) as max_price_cents
-      FROM storefront_products sp
-      WHERE sp.tenant_id = $1
-        AND sp.category_id IS NOT NULL
-      GROUP BY sp.category_name, sp.category_slug, sp.google_category_id
-      HAVING COUNT(DISTINCT sp.id) > 0
-      ORDER BY sp.category_name ASC
+        category_id as id,
+        category_name as name,
+        category_slug as slug,
+        google_category_id as googleCategoryId,
+        product_count as count,
+        products_with_images as productsWithImages,
+        products_with_descriptions as productsWithDescriptions,
+        products_with_brand as productsWithBrand,
+        products_with_price as productsWithPrice,
+        in_stock_products as inStockProducts,
+        avg_price_cents as avgPriceCents,
+        min_price_cents as minPriceCents,
+        max_price_cents as maxPriceCents,
+        last_product_updated as lastProductUpdated,
+        first_product_created as firstProductCreated
+      FROM storefront_category_counts
+      WHERE tenant_id = $1
+        AND category_id IS NOT NULL
+      ORDER BY count DESC, category_name ASC
     `;
     
     // Get uncategorized count - products with NO category assignment
     const uncategorizedQuery = `
       SELECT COUNT(*) as count
-      FROM storefront_products sp
-      WHERE sp.tenant_id = $1
-        AND sp.category_id IS NULL
+      FROM storefront_category_counts
+      WHERE tenant_id = $1
+        AND category_id IS NULL
     `;
     
     const [categoriesResult, uncategorizedResult] = await Promise.all([
@@ -268,30 +275,23 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       getDirectPool().query(uncategorizedQuery, [tenantId]),
     ]);
     
-    // Simple deduplication: group by name and count to avoid duplicate entries
-    // This handles cases where there are identical categories with same name and count
-    const categoryMap = new Map();
-    
-    categoriesResult.rows.forEach((row: any) => {
-      const key = `${row.category_name}-${row.count}`; // Unique key by name and count
-      
-      if (!categoryMap.has(key)) {
-        categoryMap.set(key, {
-          id: row.category_slug, // Use slug as ID since names can be duplicate
-          name: row.category_name,
-          slug: row.category_slug,
-          googleCategoryId: row.google_category_id,
-          count: parseInt(row.count),
-          productsWithImages: row.products_with_images,
-          productsWithDescriptions: row.products_with_descriptions,
-          avgPriceCents: row.avg_price_cents,
-          minPriceCents: row.min_price_cents,
-          maxPriceCents: row.max_price_cents,
-        });
-      }
-    });
-    
-    const categories = Array.from(categoryMap.values());
+    const categories = categoriesResult.rows.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      googleCategoryId: row.googleCategoryId,
+      count: row.count,
+      productsWithImages: row.productsWithImages,
+      productsWithDescriptions: row.productsWithDescriptions,
+      productsWithBrand: row.productsWithBrand,
+      productsWithPrice: row.productsWithPrice,
+      inStockProducts: row.inStockProducts,
+      avgPriceCents: parseFloat(row.avgPriceCents) || 0,
+      minPriceCents: row.minPriceCents,
+      maxPriceCents: row.maxPriceCents,
+      lastProductUpdated: row.lastProductUpdated,
+      firstProductCreated: row.firstProductCreated,
+    }));
     
     const uncategorizedCount = parseInt(uncategorizedResult.rows[0]?.count || '0');
     
@@ -302,6 +302,206 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Storefront categories error:', error);
     return res.status(500).json({ error: 'failed_to_get_categories' });
+  }
+});
+
+/**
+ * GET /api/storefront/:tenantId/storefront/mv-debug
+ * Debug endpoint to examine materialized view structure and data
+ */
+router.get('/:tenantId/storefront/mv-debug', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenant_required' });
+    }
+    
+    // Check MV structure and sample data
+    const structureQuery = `
+      SELECT column_name, data_type, is_nullable
+      FROM information_schema.columns 
+      WHERE table_name = 'storefront_category_counts' 
+        AND table_schema = 'public'
+      ORDER BY ordinal_position
+    `;
+    
+    const structureResult = await getDirectPool().query(structureQuery);
+    
+    // Check sample data with raw SQL
+    const sampleQuery = `
+      SELECT *
+      FROM storefront_category_counts
+      WHERE tenant_id = $1
+      LIMIT 3
+    `;
+    
+    const sampleResult = await getDirectPool().query(sampleQuery, [tenantId]);
+    
+    // Check MV definition
+    const mvDefinitionQuery = `
+      SELECT definition 
+      FROM pg_matviews 
+      WHERE matviewname = 'storefront_category_counts'
+    `;
+    
+    const mvDefinitionResult = await getDirectPool().query(mvDefinitionQuery);
+    
+    // Check if MV is populated
+    const mvStatusQuery = `
+      SELECT 
+        ispopulated,
+        pg_size_pretty(pg_total_relation_size('public.storefront_category_counts')) as size
+      FROM pg_matviews 
+      WHERE matviewname = 'storefront_category_counts'
+    `;
+    
+    const mvStatusResult = await getDirectPool().query(mvStatusQuery);
+    
+    return res.json({
+      tenantId,
+      mvStructure: structureResult.rows,
+      sampleData: sampleResult.rows,
+      mvDefinition: mvDefinitionResult.rows[0],
+      mvStatus: mvStatusResult.rows[0],
+      debug: {
+        columnCount: structureResult.rows.length,
+        sampleCount: sampleResult.rows.length,
+        hasInStockProducts: structureResult.rows.some(col => col.column_name === 'in_stock_products'),
+        sampleInStockValues: sampleResult.rows.map(row => ({
+          category_id: row.category_id,
+          category_name: row.category_name,
+          product_count: row.product_count,
+          in_stock_products: row.in_stock_products,
+          in_stock_type: typeof row.in_stock_products
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('MV Debug error:', error);
+    return res.status(500).json({ error: 'failed_to_debug_mv', details: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/storefront/:tenantId/storefront/categories-stats
+ * Get detailed category statistics for a tenant's storefront
+ * Uses storefront_category_counts materialized view for accurate data
+ */
+router.get('/:tenantId/storefront/categories-stats', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenant_required' });
+    }
+    
+    // Query the storefront_category_counts materialized view for detailed stats
+    const query = `
+      SELECT
+        category_id as id,
+        category_name as name,
+        category_slug as slug,
+        google_category_id as googleCategoryId,
+        product_count as count,
+        products_with_images as productsWithImages,
+        products_with_descriptions as productsWithDescriptions,
+        products_with_brand as productsWithBrand,
+        products_with_price as productsWithPrice,
+        in_stock_products as inStockProducts,
+        avg_price_cents as avgPriceCents,
+        min_price_cents as minPriceCents,
+        max_price_cents as maxPriceCents,
+        last_product_updated as lastProductUpdated,
+        first_product_created as firstProductCreated,
+        -- Rating data from MV (using quoted camelCase aliases to preserve case)
+        store_rating_avg as "storeRatingAvg",
+        store_rating_count as "storeRatingCount",
+        store_rating_1_count as "storeRating1Count",
+        store_rating_2_count as "storeRating2Count",
+        store_rating_3_count as "storeRating3Count",
+        store_rating_4_count as "storeRating4Count",
+        store_rating_5_count as "storeRating5Count",
+        store_verified_purchase_count as "storeVerifiedPurchaseCount",
+        last_review_at as "lastReviewAt"
+      FROM storefront_category_counts
+      WHERE tenant_id = $1
+        AND category_id IS NOT NULL
+      ORDER BY count DESC, category_name ASC
+    `;
+    
+    const result = await getDirectPool().query(query, [tenantId]);
+    
+    const categories = result.rows.map((row: any) => {
+      return {
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        googleCategoryId: row.googlecategoryid,
+        count: row.count,
+        productsWithImages: row.productswithimages,
+        productsWithDescriptions: row.productswithdescriptions,
+        productsWithBrand: row.productswithbrand,
+        productsWithPrice: row.productswithprice,
+        inStockProducts: row.instockproducts || row.count,
+        avgPriceCents: parseFloat(row.avgpricecents) || 0,
+        minPriceCents: row.minpricecents,
+        maxPriceCents: row.maxpricecents,
+        lastProductUpdated: row.lastproductupdated,
+        firstProductCreated: row.firstproductcreated,
+        // Rating data from MV
+        storeRatingAvg: parseFloat(row.storeRatingAvg) || 0,
+        storeRatingCount: parseInt(row.storeRatingCount) || 0,
+        storeRating1Count: parseInt(row.storeRating1Count) || 0,
+        storeRating2Count: parseInt(row.storeRating2Count) || 0,
+        storeRating3Count: parseInt(row.storeRating3Count) || 0,
+        storeRating4Count: parseInt(row.storeRating4Count) || 0,
+        storeRating5Count: parseInt(row.storeRating5Count) || 0,
+        storeVerifiedPurchaseCount: parseInt(row.storeVerifiedPurchaseCount) || 0,
+        lastReviewAt: row.lastReviewAt,
+      };
+    });
+    
+    // Calculate store-level statistics
+    const totalProducts = categories.reduce((sum, cat) => sum + (parseInt(cat.count) || 0), 0);
+    const totalInStock = categories.reduce((sum, cat) => sum + (parseInt(cat.inStockProducts) || 0), 0);
+    const uniqueCategories = categories.length;
+    
+    // Get store-level rating data from first category (all categories have same store rating)
+    const storeRatingData = categories[0] ? {
+      ratingAvg: categories[0].storeRatingAvg,
+      ratingCount: categories[0].storeRatingCount,
+      rating1Count: categories[0].storeRating1Count,
+      rating2Count: categories[0].storeRating2Count,
+      rating3Count: categories[0].storeRating3Count,
+      rating4Count: categories[0].storeRating4Count,
+      rating5Count: categories[0].storeRating5Count,
+      verifiedPurchaseCount: categories[0].storeVerifiedPurchaseCount,
+      lastReviewAt: categories[0].lastReviewAt,
+    } : {
+      ratingAvg: 0,
+      ratingCount: 0,
+      rating1Count: 0,
+      rating2Count: 0,
+      rating3Count: 0,
+      rating4Count: 0,
+      rating5Count: 0,
+      verifiedPurchaseCount: 0,
+      lastReviewAt: null,
+    };
+    
+    return res.json({
+      categories,
+      storeStats: {
+        totalProducts,
+        totalInStock,
+        uniqueCategories,
+        ...storeRatingData  // Include rating data in storeStats
+      }
+    });
+  } catch (error) {
+    console.error('Storefront categories stats error:', error);
+    return res.status(500).json({ error: 'failed_to_get_categories_stats' });
   }
 });
 

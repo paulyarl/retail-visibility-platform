@@ -13,18 +13,170 @@ const router = Router();
 
 /**
  * GET /api/storefront/:tenantId/featured-products
- * Fast featured product listing using materialized view
- * Performance: <5ms (vs 50-100ms with traditional query)
- * 
- * Query params:
- * - type: 'store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick' (default: 'store_selection')
- * - limit: number of products to return (default: 20)
- * - includeExpired: show expired featured products (default: false)
+ * Returns all featured products grouped by type (bucket approach)
+ * Each product appears only in its primary featured type bucket
  */
 router.get('/:tenantId/featured-products', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
-    const { limit = '20', type = 'store_selection', includeExpired = 'false' } = req.query;
+    const { limit = '20', includeExpired = 'false' } = req.query;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenant_required' });
+    }
+    
+    const limitNum = Math.min(100, Math.max(1, Number(limit)));
+    const showExpired = includeExpired === 'true';
+    
+    // Single query to get all featured products, then divide by featured_type
+    // Use DISTINCT to ensure each product appears only once per bucket
+    const query = `
+      SELECT DISTINCT 
+        mv.id,
+        mv.tenant_id,
+        mv.sku,
+        mv.name,
+        mv.title,
+        mv.description,
+        mv.price_cents,
+        mv.sale_price_cents,
+        mv.stock,
+        mv.image_url,
+        mv.brand,
+        mv.item_status,
+        mv.availability,
+        mv.has_variants,
+        mv.tenant_category_id,
+        sp.category_name,
+        sp.category_slug,
+        sp.google_category_id,
+        sp.has_gallery,
+        sp.has_description,
+        sp.has_brand,
+        sp.has_price,
+        mv.created_at,
+        mv.updated_at,
+        mv.metadata,
+        mv.featured_type,
+        mv.featured_priority,
+        mv.featured_at,
+        mv.featured_expires_at,
+        mv.auto_unfeature,
+        mv.is_featured_active,
+        mv.days_until_expiration,
+        mv.is_expired,
+        mv.is_expiring_soon
+      FROM storefront_products_mv mv
+      LEFT JOIN storefront_products sp ON mv.id = sp.id AND mv.tenant_id = sp.tenant_id
+      WHERE mv.tenant_id = $1
+        AND mv.is_featured_active = true
+      ORDER BY mv.featured_priority DESC, mv.featured_at DESC
+      LIMIT $2
+    `;
+    
+    const result = await getDirectPool().query(query, [tenantId, limitNum]);
+    
+    // Divide products by featured_type for component props
+    const buckets: Record<string, any[]> = {
+      staff_pick: [],
+      seasonal: [],
+      sale: [],
+      new_arrival: [],
+      store_selection: []
+    };
+    
+    // Group products by featured_type
+    result.rows.forEach(product => {
+      const featuredType = product.featured_type;
+      if (buckets[featuredType]) {
+        buckets[featuredType].push(product);
+      }
+    });
+    
+    // Calculate total count and bucket counts
+    const totalCount = result.rows.length;
+    const bucketCounts = Object.fromEntries(
+      Object.entries(buckets).map(([type, products]) => [type, products.length])
+    );
+    
+    // Transform to camelCase for frontend compatibility
+    const transformedBuckets = Object.fromEntries(
+      Object.entries(buckets).map(([bucketType, products]) => [
+        bucketType,
+        products.map((product: any) => ({
+          id: product.id,
+          tenantId: product.tenant_id,
+          sku: product.sku,
+          name: product.name,
+          title: product.title,
+          description: product.description,
+          price: typeof product.price_cents === 'number' ? product.price_cents / 100 : 0,
+          priceCents: product.price_cents,
+          salePrice: typeof product.sale_price_cents === 'number' ? product.sale_price_cents / 100 : null,
+          salePriceCents: product.sale_price_cents,
+          stock: product.stock,
+          imageUrl: product.image_url,
+          brand: product.brand,
+          itemStatus: product.item_status,
+          availability: product.availability,
+          hasVariants: product.has_variants,
+          tenantCategoryId: product.tenant_category_id,
+          categoryName: product.category_name,
+          categorySlug: product.category_slug,
+          googleCategoryId: product.google_category_id,
+          hasGallery: product.has_gallery,
+          hasDescription: product.has_description,
+          hasBrand: product.has_brand,
+          hasPrice: product.has_price,
+          createdAt: product.created_at,
+          updatedAt: product.updated_at,
+          metadata: product.metadata,
+          featuredType: product.featured_type,
+          featuredPriority: product.featured_priority,
+          featuredAt: product.featured_at,
+          featuredExpiresAt: product.featured_expires_at,
+          autoUnfeature: product.auto_unfeature,
+          isFeaturedActive: product.is_featured_active,
+          daysUntilExpiration: product.days_until_expiration,
+          isExpired: product.is_expired,
+          isExpiringSoon: product.is_expiring_soon
+        }))
+      ])
+    );
+    
+    res.json({
+      success: true,
+      data: {
+        // Component props structure - ready to pass to individual components
+        staffPick: transformedBuckets.staff_pick,
+        seasonal: transformedBuckets.seasonal,
+        sale: transformedBuckets.sale,
+        newArrival: transformedBuckets.new_arrival,
+        storeSelection: transformedBuckets.store_selection,
+        // Metadata for display
+        totalCount,
+        bucketCounts
+      }
+    });
+    
+  } catch (error) {
+    console.error('[Storefront Featured Products] Error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch featured products' 
+    });
+  }
+});
+
+/**
+ * GET /api/storefront/:tenantId/featured-products/:type
+ * Get products from a specific featured type bucket
+ * This is for individual bucket components
+ */
+router.get('/:tenantId/featured-products/:type', async (req: Request, res: Response) => {
+  try {
+    const { tenantId, type } = req.params;
+    const { limit = '20', includeExpired = 'false' } = req.query;
     
     if (!tenantId) {
       return res.status(400).json({ error: 'tenant_required' });
@@ -34,13 +186,12 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
     const showExpired = includeExpired === 'true';
     
     // Validate featured type
-    const validTypes = ['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick'];
-    const featuredType = validTypes.includes(type as string) ? type : 'store_selection';
+    const validTypes = ['staff_pick', 'seasonal', 'sale', 'new_arrival', 'store_selection'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({ error: 'invalid_featured_type', validTypes });
+    }
     
-    // Query storefront_products_mv for featured types and JOIN with storefront_products for category names
-    // storefront_products_mv has featured_type, storefront_products has category_name and display helpers
-    // Add optional filtering by featured type when specified
-    const featuredTypeFilter = featuredType && featuredType !== 'all' ? `AND mv.featured_type = $3` : '';
+    // Query specific bucket
     const query = `
       SELECT 
         mv.id,
@@ -81,72 +232,68 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
       LEFT JOIN storefront_products sp ON mv.id = sp.id AND mv.tenant_id = sp.tenant_id
       WHERE mv.tenant_id = $1
         AND mv.is_featured_active = true
-        ${featuredTypeFilter}
+        AND mv.featured_type = $2
       ORDER BY mv.featured_priority DESC, mv.featured_at DESC
-      LIMIT $2
+      LIMIT $3
     `;
     
-    const queryParams = featuredType && featuredType !== 'all' 
-    ? [tenantId, limitNum, featuredType]
-    : [tenantId, limitNum];
-    
-    const result = await getDirectPool().query(query, queryParams);
+    const result = await getDirectPool().query(query, [tenantId, type, limitNum]);
     
     // Transform to camelCase for frontend compatibility
-    const items = result.rows.map((row: any) => ({
-      id: row.id,
-      tenantId: row.tenant_id,
-      sku: row.sku,
-      name: row.name,
-      title: row.title,
-      description: row.description,
-      price: row.price_cents / 100,
-      priceCents: row.price_cents,
-      salePriceCents: row.sale_price_cents,
-      currency: 'USD',
-      stock: row.stock || 0,
-      imageUrl: row.image_url,
-      brand: row.brand,
-      availability: row.availability,
-      tenantCategory: row.category_name || 'Uncategorized', // Use MV's category_name directly
-      tenantCategoryId: row.tenant_category_id, // Keep ID for reference if needed
-      categorySlug: row.category_slug, // For category links
-      googleCategoryId: row.google_category_id, // For analytics
-      has_variants: row.has_variants,
-      metadata: row.metadata,
-      // Display helpers from storefront_products
-      hasGallery: row.has_gallery || false, // Show "more images" indicator
-      hasDescription: row.has_description || false, // UI decisions
-      hasBrand: row.has_brand || false, // UI decisions  
-      hasPrice: row.has_price || false, // UI decisions
-      // Featured fields from storefront_products_mv
-      featuredType: row.featured_type,
-      featuredPriority: row.featured_priority,
-      featuredAt: row.featured_at,
-      featuredExpiresAt: row.featured_expires_at,
-      isFeatured: true,
-      isActivelyFeatured: row.is_featured_active,
-      // Featured status helpers
-      daysUntilExpiration: row.days_until_expiration,
-      isExpired: row.is_expired,
-      isExpiringSoon: row.is_expiring_soon,
-      // Computed fields
-      hasImage: row.image_url !== null,
-      inStock: row.stock > 0,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+    const products = result.rows.map((product: any) => ({
+      id: product.id,
+      tenantId: product.tenant_id,
+      sku: product.sku,
+      name: product.name,
+      title: product.title,
+      description: product.description,
+      price: typeof product.price_cents === 'number' ? product.price_cents / 100 : 0,
+      priceCents: product.price_cents,
+      salePrice: typeof product.sale_price_cents === 'number' ? product.sale_price_cents / 100 : null,
+      salePriceCents: product.sale_price_cents,
+      stock: product.stock,
+      imageUrl: product.image_url,
+      brand: product.brand,
+      itemStatus: product.item_status,
+      availability: product.availability,
+      hasVariants: product.has_variants,
+      tenantCategoryId: product.tenant_category_id,
+      categoryName: product.category_name,
+      categorySlug: product.category_slug,
+      googleCategoryId: product.google_category_id,
+      hasGallery: product.has_gallery,
+      hasDescription: product.has_description,
+      hasBrand: product.has_brand,
+      hasPrice: product.has_price,
+      createdAt: product.created_at,
+      updatedAt: product.updated_at,
+      metadata: product.metadata,
+      featuredType: product.featured_type,
+      featuredPriority: product.featured_priority,
+      featuredAt: product.featured_at,
+      featuredExpiresAt: product.featured_expires_at,
+      autoUnfeature: product.auto_unfeature,
+      isFeaturedActive: product.is_featured_active,
+      daysUntilExpiration: product.days_until_expiration,
+      isExpired: product.is_expired,
+      isExpiringSoon: product.is_expiring_soon
     }));
     
     res.json({
-      items,
-      count: items.length,
-      tenantId,
+      success: true,
+      data: {
+        bucketType: type,
+        products,
+        totalCount: products.length
+      }
     });
+    
   } catch (error) {
-    console.error('[Storefront Featured] Error:', error);
+    const featuredType = req.params.type;
+    console.error(`[Storefront Featured Products - ${featuredType}] Error:`, error);
     res.status(500).json({ 
-      error: 'failed_to_fetch_featured_products',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      success: false, 
+      error: `Failed to fetch featured ${featuredType} products` 
     });
   }
 });

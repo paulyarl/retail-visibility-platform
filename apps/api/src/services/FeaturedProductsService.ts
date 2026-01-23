@@ -319,7 +319,7 @@ export class FeaturedProductsService {
       // Remove duplicates by keeping only the latest entry for each inventory_item_id and featured_type
       const uniqueFeaturedProducts = featuredProducts.reduce((acc, fp) => {
         const key = `${fp.inventory_item_id}-${fp.featured_type}`;
-        if (!acc.has(key) || new Date(fp.featured_at) > new Date(acc.get(key).featured_at)) {
+        if (!acc.has(key) || (fp.featured_at && new Date(fp.featured_at) > new Date(acc.get(key).featured_at))) {
           acc.set(key, fp);
         }
         return acc;
@@ -389,8 +389,7 @@ export class FeaturedProductsService {
                 brand: inventoryItem.brand,
                 availability: inventoryItem.availability,
                 has_variants: inventoryItem.has_variants,
-                has_active_payment_gateway: inventoryItem.has_active_payment_gateway,
-                payment_gateway_type: inventoryItem.payment_gateway_type,
+                                payment_gateway_type: inventoryItem.payment_gateway_type,
                 // Convert price from cents to dollars for frontend
                 price: inventoryItem.price_cents ? inventoryItem.price_cents / 100 : 0,
                 // Map image_url to imageUrl for frontend consistency
@@ -503,8 +502,7 @@ export class FeaturedProductsService {
                 brand: inventoryItem.brand,
                 availability: inventoryItem.availability,
                 has_variants: inventoryItem.has_variants,
-                has_active_payment_gateway: inventoryItem.has_active_payment_gateway,
-                payment_gateway_type: inventoryItem.payment_gateway_type,
+                                payment_gateway_type: inventoryItem.payment_gateway_type,
                 // Convert price from cents to dollars for frontend
                 price: inventoryItem.price_cents ? inventoryItem.price_cents / 100 : 0,
                 // Map image_url to imageUrl for frontend consistency

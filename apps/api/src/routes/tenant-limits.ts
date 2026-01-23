@@ -185,16 +185,35 @@ router.get('/featured-products', authenticateToken, async (req, res) => {
       return res.status(401).json({ error: 'authentication_required' });
     }
 
-    // For now, return starter tier limits for all authenticated users
-    // TODO: Get actual tenant tier from user's tenant
-    const limits = getFeaturedProductsLimits('starter');
+    // Get tenant ID from query parameter
+    const { tenantId } = req.query;
+    if (!tenantId || typeof tenantId !== 'string') {
+      return res.status(400).json({ error: 'tenant_id_required' });
+    }
+
+    // Get tenant information
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        subscription_tier: true,
+        subscription_status: true,
+      },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: 'tenant_not_found' });
+    }
+
+    // Get limits based on tenant's actual tier
+    const limits = getFeaturedProductsLimits(tenant.subscription_tier as any);
 
     return res.json({
       limits,
-      tier: 'starter',
+      tier: tenant.subscription_tier,
+      status: tenant.subscription_status,
       // Add display names for frontend
       displayNames: {
-        store_selection: 'Featured Products',
+        store_selection: 'Directory Featured',
         new_arrival: 'New Arrivals',
         seasonal: 'Seasonal Specials',
         sale: 'Sale Items',

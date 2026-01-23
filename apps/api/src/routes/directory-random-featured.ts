@@ -82,6 +82,8 @@ router.get('/', async (req, res) => {
             sp.has_description,
             sp.has_brand,
             sp.has_price,
+            mv.has_active_payment_gateway,
+            mv.default_gateway_type,
             mv.created_at,
             mv.updated_at,
             dsl.slug as store_slug,
@@ -145,13 +147,13 @@ router.get('/', async (req, res) => {
           mv.is_expired,
           mv.is_expiring_soon,
           mv.metadata,
-          sp.category_name,
-          sp.category_slug,
-          sp.google_category_id,
-          sp.has_gallery,
-          sp.has_description,
-          sp.has_brand,
-          sp.has_price,
+          mv.category_name,
+          mv.category_slug,
+          mv.google_category_id,
+          mv.has_gallery,
+          mv.has_description,
+          mv.has_brand,
+          mv.has_price,
           mv.created_at,
           mv.updated_at,
           dsl.slug as store_slug,
@@ -210,6 +212,8 @@ router.get('/', async (req, res) => {
       hasDescription: row.has_description,
       hasBrand: row.has_brand,
       hasPrice: row.has_price,
+      hasActivePaymentGateway: row.has_active_payment_gateway,
+      defaultGatewayType: row.default_gateway_type,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       storeSlug: row.store_slug,
@@ -224,7 +228,7 @@ router.get('/', async (req, res) => {
     
     // Get total count for pagination
     let totalCountQuery;
-    let totalCountParams = [];
+    let totalCountParams: any[] = [];
     
     if (lat && lng) {
       totalCountQuery = `
@@ -290,7 +294,7 @@ router.get('/', async (req, res) => {
     console.error('[GET /api/directory/random-featured] Error:', error);
     return res.status(500).json({
       error: 'Failed to fetch random featured products',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
     });
   }
 });
@@ -314,7 +318,7 @@ router.get('/available', async (req, res) => {
       'mv.stock > 0',
       'dsl.is_published = true'
     ];
-    let queryParams = [limitNum, offset];
+    let queryParams: (string | number)[] = [limitNum, offset];
     
     if (category) {
       whereConditions.push('sp.category_slug = $' + (queryParams.length + 1));
@@ -328,7 +332,7 @@ router.get('/available', async (req, res) => {
     
     const whereClause = whereConditions.join(' AND ');
     
-    // Query for available products with rich data
+    // Fallback: Simple random without proximity (cached globally) with rich data
     const query = `
       SELECT 
         mv.id,
@@ -346,13 +350,15 @@ router.get('/available', async (req, res) => {
         mv.availability,
         mv.has_variants,
         mv.tenant_category_id,
-        sp.category_name,
-        sp.category_slug,
-        sp.google_category_id,
-        sp.has_gallery,
-        sp.has_description,
-        sp.has_brand,
-        sp.has_price,
+        mv.category_name,
+        mv.category_slug,
+        mv.google_category_id,
+        mv.has_gallery,
+        mv.has_description,
+        mv.has_brand,
+        mv.has_price,
+        mv.has_active_payment_gateway,
+        mv.default_gateway_type,
         mv.metadata,
         mv.created_at,
         mv.updated_at,
@@ -365,7 +371,6 @@ router.get('/available', async (req, res) => {
         dsl.phone as store_phone
       FROM storefront_products_mv mv
       JOIN directory_listings_list dsl ON dsl.tenant_id = mv.tenant_id
-      LEFT JOIN storefront_products sp ON mv.id = sp.id AND mv.tenant_id = sp.tenant_id
       WHERE ${whereClause}
       ORDER BY mv.updated_at DESC
       LIMIT $1 OFFSET $2
@@ -418,6 +423,8 @@ router.get('/available', async (req, res) => {
       hasDescription: row.has_description,
       hasBrand: row.has_brand,
       hasPrice: row.has_price,
+      hasActivePaymentGateway: row.has_active_payment_gateway,
+      defaultGatewayType: row.default_gateway_type,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       storeSlug: row.store_slug,
@@ -451,7 +458,7 @@ router.get('/available', async (req, res) => {
     console.error('[GET /api/directory/random-featured/available] Error:', error);
     return res.status(500).json({
       error: 'Failed to fetch available products',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
     });
   }
 });

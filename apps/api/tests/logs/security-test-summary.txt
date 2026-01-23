@@ -1,0 +1,14 @@
+
+Test Summary for security
+===============================
+Total Tests: 5
+Passed: 1
+Failed: 4
+Duration: 211ms
+Success Rate: 20.00%
+
+Failed Tests:
+- testEncryptionSecurity: Encryption security check failed
+- testAuthorization: Authorization check failed
+- testPrivateDataProtection: Private data protection failed
+- testTokenValidation: Token validation failed

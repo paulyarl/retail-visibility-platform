@@ -4,6 +4,13 @@ import { requireFlag } from '../middleware/flags'
 import { generateGbpHoursSyncLogId, generateQuickStart } from '../lib/id-generator'
 import CacheService, { CacheKeys } from '../lib/cache-service';
 
+// Cache TTL constants
+const CACHE_TTL = {
+  BUSINESS_HOURS_STATUS: 5 * 60 * 1000, // 5 minutes
+  BUSINESS_HOURS_SPECIAL: 15 * 60 * 1000, // 15 minutes
+  BUSINESS_HOURS: 30 * 60 * 1000 // 30 minutes
+};
+
 const router = Router()
 
 // Mirror status (attempt counter). Persistence is reflected in BusinessHours rows.
@@ -172,7 +179,7 @@ router.get('/tenant/:tenantId/business-hours/status',
         }
       }
       // Cache the result even for closed stores
-      memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
+      await CacheService.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
       return res.json(result)
     }
 
@@ -246,8 +253,8 @@ router.get('/business-hours/status/:tenantId',
 
   try {
     // Check cache first
-    const cacheKey = cacheKeys.businessHoursStatus(tenantId)
-    const cachedResult = memoryCache.get(cacheKey)
+    const cacheKey = CacheKeys.BUSINESS_HOURS_STATUS(tenantId)
+    const cachedResult = await CacheService.get(cacheKey)
 
     if (cachedResult) {
       console.log(`[Business Hours] Cache hit for tenant ${tenantId} (alias endpoint)`)
@@ -271,7 +278,7 @@ router.get('/business-hours/status/:tenantId',
         }
       }
       // Cache the result even for closed stores
-      memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
+      await CacheService.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
       return res.json(result)
     }
 

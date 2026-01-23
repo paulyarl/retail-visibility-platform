@@ -15,6 +15,21 @@ interface Category {
   primaryStoreCount?: number;
   secondaryStoreCount?: number;
   productCount: number;
+  // Enhanced fields from storefront_category_counts MV
+  totalProducts?: number;
+  totalInStock?: number;
+  avgPriceCents?: number;
+  minPriceCents?: number;
+  maxPriceCents?: number;
+  totalWithImages?: number;
+  totalWithDescriptions?: number;
+  imageCoverage?: number;
+  stockLevel?: number;
+  priceRange?: {
+    min: number;
+    max: number;
+    avg: number;
+  };
 }
 
 interface DirectoryCategoryBrowserProps {
@@ -111,8 +126,21 @@ export default function DirectoryCategoryBrowser({
                       <h3 className="font-medium text-neutral-900 dark:text-white text-sm truncate">
                         {category.name}
                       </h3>
-                      <div className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
-                        {category.storeCount} {category.storeCount === 1 ? 'store' : 'stores'}
+                      <div className="text-xs text-neutral-600 dark:text-neutral-400 mt-1 space-y-1">
+                        <div>
+                          {category.storeCount} {category.storeCount === 1 ? 'store' : 'stores'}
+                          {category.totalProducts && ` • ${category.totalProducts} products`}
+                        </div>
+                        {category.totalInStock !== undefined && category.totalProducts && category.totalInStock < category.totalProducts && (
+                          <div className="text-amber-600 dark:text-amber-400">
+                            {category.totalInStock} in stock
+                          </div>
+                        )}
+                        {category.avgPriceCents && (
+                          <div className="text-green-600 dark:text-green-400">
+                            Avg: ${(category.avgPriceCents / 100).toFixed(2)}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </button>

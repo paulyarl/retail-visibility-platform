@@ -11,6 +11,7 @@ import EditItemModal from '@/components/items/EditItemModal';
 import ItemPhotoGallery from '@/components/items/ItemPhotoGallery';
 import { Item as ItemType } from '@/services/itemsDataService';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import ProductCategoryContext from '@/components/products/ProductCategoryContext';
 
 interface ItemDetailPageProps {
   params: Promise<{
@@ -89,9 +90,12 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [showQRModal, setShowQRModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPhotoGallery, setShowPhotoGallery] = useState(false);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [totalProducts, setTotalProducts] = useState(0);
 
   useEffect(() => {
     loadItemData();
+    loadCategoryData();
   }, [itemId]);
 
   const handleSaveItem = async (updatedItem: ItemType) => {
@@ -273,6 +277,23 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
     }
   };
 
+  const loadCategoryData = async () => {
+    try {
+      // Fetch categories for this tenant
+      const categoriesRes = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/storefront/${tenantId}/categories`);
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json();
+        setCategories(categoriesData.categories || []);
+        
+        // Calculate total products
+        const total = categoriesData.categories.reduce((sum: number, cat: any) => sum + cat.count, 0) + (categoriesData.uncategorizedCount || 0);
+        setTotalProducts(total);
+      }
+    } catch (err) {
+      console.error('Failed to load category data:', err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800">
@@ -350,9 +371,9 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Photos */}
-          <div className="space-y-4">
+          <div className="space-y-4 lg:col-span-2">
             <Card data-section="photos">
               <CardContent className="p-6">
                 <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
@@ -409,6 +430,15 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
           {/* Right Column - Details */}
           <div className="space-y-4">
+            {/* Category Context Widget */}
+            {item.tenantCategory && categories.length > 0 && (
+              <ProductCategoryContext
+                tenantId={tenantId}
+                currentCategory={categories.find(cat => cat.slug === item.tenantCategory?.slug) || categories[0]}
+                allCategories={categories}
+                totalProducts={totalProducts}
+              />
+            )}
             {/* Status & Badges */}
             <Card>
               <CardContent className="p-6">

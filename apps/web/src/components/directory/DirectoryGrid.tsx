@@ -1,7 +1,10 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import { UnifiedStoreCard } from './UnifiedStoreCard';
+import EnhancedStoreCard from './EnhancedStoreCard';
 import { Skeleton } from '@/components/ui';
+import { fetchStoreStats, fetchMultipleStoreStats } from '@/utils/storeStatsCalculator';
 
 interface DirectoryListing {
   id: string;
@@ -22,6 +25,7 @@ interface DirectoryListing {
     icon?: string;
   };
   logoUrl?: string;
+  bannerUrl?: string;
   ratingAvg?: number;
   ratingCount?: number;
   productCount?: number;
@@ -41,11 +45,12 @@ interface Pagination {
 interface DirectoryGridProps {
   listings: DirectoryListing[];
   loading?: boolean;
+  isLoading?: boolean;
+  viewMode?: 'grid' | 'list';
   pagination?: Pagination;
   baseUrl?: string;
   categorySlug?: string;
 }
-
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -55,13 +60,52 @@ export const dynamic = 'force-dynamic';
 
 export default function DirectoryGrid({ 
   listings, 
-  loading, 
+  isLoading = false, 
+  viewMode = 'grid', 
   pagination,
-  baseUrl = '/directory',
-  categorySlug 
+  baseUrl = '', 
+  categorySlug = '' 
 }: DirectoryGridProps) {
+  const [storeStats, setStoreStats] = useState<Record<string, any>>({});
+  const [statsLoading, setStatsLoading] = useState<Record<string, boolean>>({});
+
+  // Fetch store stats for all listings in parallel with caching
+  const fetchAllStoreStats = async () => {
+    // Clear existing state first
+    setStoreStats({});
+    setStatsLoading({});
+    
+    const loading: Record<string, boolean> = {};
+    listings.forEach(listing => {
+      loading[listing.tenantId] = true;
+    });
+    setStatsLoading(loading);
+    
+    // Get all unique tenant IDs
+    const tenantIds = [...new Set(listings.map(listing => listing.tenantId))];
+    
+    // Batch fetch all stats with caching
+    const allStats = await fetchMultipleStoreStats(tenantIds);
+    
+    // Update state with results
+    setStoreStats(allStats);
+    
+    // Clear loading state
+    const finalLoading: Record<string, boolean> = {};
+    tenantIds.forEach(tenantId => {
+      finalLoading[tenantId] = false;
+    });
+    setStatsLoading(finalLoading);
+  };
+
+  useEffect(() => {
+    if (listings.length > 0) {
+      fetchAllStoreStats();
+    }
+  }, [listings]);
+
   // Loading state
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {Array.from({ length: 12 }).map((_, i) => (
@@ -106,17 +150,74 @@ export default function DirectoryGrid({
   // Grid view
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {listings.map((listing, index) => (
-          <UnifiedStoreCard
-            key={listing.id}
-            listing={listing}
-            viewMode="grid"
-            linkType="directory"
-            contextCategory={categorySlug ? categorySlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : undefined}
-          />
-        ))}
-      </div>
+      {viewMode === 'list' ? (
+        // List view - single column layout
+        <div className="space-y-4">
+          {listings.map((listing, index) => {
+            const stats = storeStats[listing.tenantId];
+            const isLoading = statsLoading[listing.tenantId];
+            
+            return (
+              <UnifiedStoreCard
+                key={listing.tenantId}
+                listing={listing}
+                viewMode="list"
+                linkType="storefront"
+                showLogo={true}
+                enhancedStats={stats ? {
+                  totalProducts: stats.totalProducts || 0,
+                  categories: stats.categories || [],
+                  ratingAvg: stats.ratingAvg || 0,
+                  ratingCount: stats.ratingCount || 0,
+                  rating3Count: stats.rating3Count || 0,
+                  rating4Count: stats.rating4Count || 0,
+                  rating5Count: stats.rating5Count || 0,
+                  verifiedPurchaseCount: stats.verifiedPurchaseCount || 0,
+                  lastReviewAt: stats.lastReviewAt || null,
+                  isFeatured: listing.isFeatured || false,
+                } : undefined}
+              />
+            );
+          })}
+        </div>
+      ) : (
+        // Grid view - multi-column layout
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {listings.map((listing, index) => {
+            const stats = storeStats[listing.tenantId];
+            const isLoading = statsLoading[listing.tenantId];
+            
+            return (
+              <EnhancedStoreCard
+                key={listing.tenantId}
+                store={{
+                  id: listing.tenantId,
+                  tenantId: listing.tenantId,
+                  name: listing.businessName,
+                  slug: listing.slug || listing.tenantId,
+                  address: listing.address,
+                  city: listing.city,
+                  state: listing.state,
+                  logo_url: listing.logoUrl,
+                  banner_url: listing.bannerUrl,
+                  totalProducts: stats?.totalProducts || 0,
+                  categories: stats?.categories || [],
+                  ratingAvg: stats?.ratingAvg || 0,
+                  ratingCount: stats?.ratingCount || 0,
+                  rating3Count: stats?.rating3Count || 0,
+                  rating4Count: stats?.rating4Count || 0,
+                  rating5Count: stats?.rating5Count || 0,
+                  verifiedPurchaseCount: stats?.verifiedPurchaseCount || 0,
+                  lastReviewAt: stats?.lastReviewAt || null,
+                  isFeatured: listing.isFeatured || false,
+                }}
+                showCategories={true}
+                maxCategories={3}
+              />
+            );
+          })}
+        </div>
+      )}
 
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (

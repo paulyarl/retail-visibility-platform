@@ -32,6 +32,22 @@ export interface CategoryMetrics {
   avgDistance?: number; // average distance to stores
   recentActivityScore?: number; // recent updates/new items
   localPopularityScore?: number; // local search frequency
+  
+  // Enhanced fields from storefront_category_counts MV
+  totalProducts?: number;
+  totalInStock?: number;
+  avgPriceCents?: number;
+  minPriceCents?: number;
+  maxPriceCents?: number;
+  totalWithImages?: number;
+  totalWithDescriptions?: number;
+  imageCoverage?: number;
+  stockLevel?: number;
+  priceRange?: {
+    min: number;
+    max: number;
+    avg: number;
+  };
 }
 
 export interface ScoringWeights {

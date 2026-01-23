@@ -797,7 +797,7 @@ export async function getLastViewedItems(
               'isFeatured', dcl.is_featured
             )
             FROM directory_listings_list dcl
-            WHERE (dcl.tenant_id = rv.entity_id OR dcl.slug = rv.entity_id)
+            WHERE dcl.tenant_id = rv.entity_id
               AND dcl.is_published = true
             LIMIT 1
           )
@@ -834,6 +834,7 @@ export async function getLastViewedItems(
             JOIN directory_listings_list dcl ON sp.tenant_id = dcl.tenant_id
             WHERE sp.id = rv.entity_id
               AND dcl.is_published = true
+            LIMIT 1
           )
           ELSE NULL
         END as entity_data

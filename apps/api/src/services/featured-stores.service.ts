@@ -27,6 +27,21 @@ interface FeaturedStore {
   directoryPublished: boolean;
   createdAt: string;
   updatedAt: string;
+  activityLevel: 'very_active' | 'active' | 'moderately_active' | 'less_active';
+  
+  // Rich product data from storefront_products_mv
+  actualProductCount: number;
+  productsWithImages: number;
+  avgProductPrice: number;
+  productsWithReviews: number;
+  avgReviewRating: number;
+  
+  // Featured type counts
+  staffPickCount: number;
+  seasonalCount: number;
+  saleCount: number;
+  newArrivalCount: number;
+  storeSelectionCount: number;
 }
 
 interface FeaturedStoreStats {
@@ -64,9 +79,10 @@ class FeaturedStoresService {
       const pool = getDirectPool();
       const maxStores = limit || 50;
       
-      // Build the base query for featured stores
+      // Build the base query for featured stores with product counts from storefront_products_mv
       let featuredStoresQuery = `
         SELECT 
+          -- Directory listing data
           dll.id,
           dll.tenant_id,
           dll.business_name,
@@ -84,15 +100,55 @@ class FeaturedStoresService {
           dll.logo_url,
           dll.rating_avg,
           dll.rating_count,
-          dll.product_count,
           dll.is_featured,
           dll.subscription_tier,
           dll.use_custom_website,
           dll.business_hours,
           dll.is_published,
           dll.created_at,
-          dll.updated_at
+          dll.updated_at,
+          
+          -- Product counts from storefront_products_mv
+          COALESCE(product_counts.total_products, 0) as actual_product_count,
+          COALESCE(product_counts.products_with_images, 0) as products_with_images,
+          COALESCE(product_counts.avg_price, 0) as avg_product_price,
+          COALESCE(product_counts.products_with_reviews, 0) as products_with_reviews,
+          COALESCE(product_counts.avg_review_rating, 0) as avg_review_rating,
+          
+          -- Featured type counts
+          COALESCE(product_counts.staff_pick_count, 0) as staff_pick_count,
+          COALESCE(product_counts.seasonal_count, 0) as seasonal_count,
+          COALESCE(product_counts.sale_count, 0) as sale_count,
+          COALESCE(product_counts.new_arrival_count, 0) as new_arrival_count,
+          COALESCE(product_counts.store_selection_count, 0) as store_selection_count,
+          
+          -- Store activity indicators
+          CASE 
+            WHEN dll.updated_at > NOW() - INTERVAL '7 days' THEN 'very_active'
+            WHEN dll.updated_at > NOW() - INTERVAL '30 days' THEN 'active'
+            WHEN dll.updated_at > NOW() - INTERVAL '90 days' THEN 'moderately_active'
+            ELSE 'less_active'
+          END as activity_level
+          
         FROM directory_listings_list dll
+        LEFT JOIN (
+          SELECT 
+            mv.tenant_id,
+            COUNT(*) as total_products,
+            COUNT(*) FILTER (WHERE mv.image_url IS NOT NULL) as products_with_images,
+            ROUND(AVG(mv.price_cents / 100.0)) as avg_price,
+            COUNT(*) FILTER (WHERE mv.rating_avg > 0) as products_with_reviews,
+            ROUND(AVG(mv.rating_avg)) as avg_review_rating,
+            COUNT(*) FILTER (WHERE mv.featured_type = 'staff_pick') as staff_pick_count,
+            COUNT(*) FILTER (WHERE mv.featured_type = 'seasonal') as seasonal_count,
+            COUNT(*) FILTER (WHERE mv.featured_type = 'sale') as sale_count,
+            COUNT(*) FILTER (WHERE mv.featured_type = 'new_arrival') as new_arrival_count,
+            COUNT(*) FILTER (WHERE mv.featured_type = 'store_selection') as store_selection_count
+          FROM storefront_products mv
+          WHERE mv.item_status = 'active' 
+            AND mv.visibility = 'public'
+          GROUP BY mv.tenant_id
+        ) product_counts ON product_counts.tenant_id = dll.tenant_id
         WHERE dll.is_published = true 
           AND dll.is_featured = true
       `;
@@ -146,7 +202,22 @@ class FeaturedStoresService {
         businessHours: row.business_hours,
         directoryPublished: row.is_published || false,
         createdAt: row.created_at,
-        updatedAt: row.updated_at
+        updatedAt: row.updated_at,
+        activityLevel: row.activity_level || 'less_active',
+        
+        // Rich product data from storefront_products_mv
+        actualProductCount: parseInt(row.actual_product_count) || 0,
+        productsWithImages: parseInt(row.products_with_images) || 0,
+        avgProductPrice: parseFloat(row.avg_product_price) || 0,
+        productsWithReviews: parseInt(row.products_with_reviews) || 0,
+        avgReviewRating: parseFloat(row.avg_review_rating) || 0,
+        
+        // Featured type counts
+        staffPickCount: parseInt(row.staff_pick_count) || 0,
+        seasonalCount: parseInt(row.seasonal_count) || 0,
+        saleCount: parseInt(row.sale_count) || 0,
+        newArrivalCount: parseInt(row.new_arrival_count) || 0,
+        storeSelectionCount: parseInt(row.store_selection_count) || 0
       }));
       
       // Calculate statistics
