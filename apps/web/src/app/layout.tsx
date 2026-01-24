@@ -10,6 +10,7 @@ import DynamicFavicon from "@/components/DynamicFavicon";
 import { QueryClientWrapper } from "@/components/QueryClientWrapper";
 import { GlobalAlertProvider } from "@/components/ui/GlobalAlertProvider";
 import { FloatingCartWidget } from "@/components/cart/FloatingCartWidget";
+import { UniversalProvider } from "@/providers/UniversalProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -47,10 +48,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <CustomAuthProvider>
               <CartWidgetProvider>
                 <GlobalAlertProvider>
-                  <ErrorBoundary>
-                    {children}
-                  </ErrorBoundary>
-                  <FloatingCartWidget />
+                  <UniversalProvider>
+                    <ErrorBoundary>
+                      {children}
+                    </ErrorBoundary>
+                    <FloatingCartWidget />
+                  </UniversalProvider>
                 </GlobalAlertProvider>
               </CartWidgetProvider>
             </CustomAuthProvider>

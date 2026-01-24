@@ -56,93 +56,120 @@ export default function FeaturedProductsSettings({
   const [tenantId, setTenantId] = useState<string>('');
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<any>(null);
 
   useEffect(() => {
-    const initComponent = async () => {
-      const resolvedParams = await params;
-      const id = resolvedParams.tenantId;
-      setTenantId(id);
-
-      // Fetch tenant data
+    async function fetchTenant() {
       try {
-        const response = await apiRequest(`/api/tenants/${id}`, {
-          cache: 'no-store'
-        });
-
+        setLoading(true);
+        setError(null);
+        
+        // Get tenantId from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const id = urlParams.get('tenantId') || 'tid-m8ijkrnk';
+        
+        console.log('FeaturedProductsSettings: Fetching tenant', id);
+        
+        const response = await apiRequest(`/api/tenants/${id}`);
         if (response.ok) {
           const data = await response.json();
+          console.log('FeaturedProductsSettings: Tenant data received', data);
           setTenant(data);
         } else {
-          console.error('Failed to fetch tenant:', response.status);
+          const errorText = await response.text();
+          console.error('FeaturedProductsSettings: Failed to load tenant', errorText);
+          setError(`Failed to load tenant information: ${response.status}`);
         }
-      } catch (error) {
-        console.error('Error fetching tenant:', error);
+      } catch (err) {
+        console.error('FeaturedProductsSettings: Error loading tenant', err);
+        setError('Error loading tenant information');
+        setDebug(err);
       } finally {
         setLoading(false);
       }
-    };
+    }
 
-    initComponent();
-  }, [params]);
+    fetchTenant();
+  }, []);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading featured products...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="text-red-600 mb-4">⚠️</div>
+          <p className="text-gray-600 mb-4">{error}</p>
+          {debug && (
+            <details className="text-left bg-gray-100 p-4 rounded text-xs">
+              <summary>Debug Info</summary>
+              <pre>{JSON.stringify(debug, null, 2)}</pre>
+            </details>
+          )}
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!tenant) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-gray-600 mb-4">📦</div>
+          <p className="text-gray-600">Tenant not found</p>
         </div>
       </div>
     );
   }
 
   return (
-    <>
-      {tenantId ? <SetTenantId tenantId={tenantId} /> : null}
+    <div className="min-h-screen bg-gray-50">
+      <SetTenantId tenantId={tenant.id} />
       
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center space-x-4">
-                <Link
-                  href={`/t/${tenantId}/settings`}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </Link>
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-yellow-100 rounded-lg">
-                    <Star className="w-5 h-5 text-yellow-600" />
-                  </div>
-                  <div>
-                    <h1 className="text-xl font-semibold text-gray-900">
-                      Featured Products Management
-                    </h1>
-                    <p className="text-sm text-gray-500">
-                      Manage featured products for directory and storefront
-                    </p>
-                  </div>
-                </div>
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center">
+              <Link href={`/t/${tenant.id}/settings`} className="flex items-center text-gray-600 hover:text-gray-900 mr-4">
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Back to Settings
+              </Link>
+              <div className="flex items-center">
+                <Star className="w-6 h-6 text-amber-500 mr-3" />
+                <h1 className="text-xl font-semibold text-gray-900">Featured Products</h1>
               </div>
-              {tenant?.subscription_tier && (
-                <div className="flex items-center space-x-3">
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500">Current Tier</p>
-                    <SimpleTierBadge tier={tenant.subscription_tier} />
-                  </div>
-                </div>
-              )}
+              <SimpleTierBadge tier={tenant.subscription_tier} />
             </div>
           </div>
         </div>
 
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <FeaturedProductsManager tenantId={tenantId} />
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700">
+              <strong>Multi-Type Featuring:</strong> Managing all featured product types (Store Selection, New Arrivals, Seasonal, Sale, Staff Picks)
+            </p>
+          </div>
+          <FeaturedProductsManager tenantId={tenant.id} />
         </div>
       </div>
-    </>
+    </div>
   );
 }

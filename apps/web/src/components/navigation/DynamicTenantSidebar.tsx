@@ -113,6 +113,7 @@ export default function DynamicTenantSidebar({ tenantId, children }: DynamicTena
         href: `/t/${tenantId}/onboarding`,
         children: [
           // Profile & Identity
+          { label: 'Setup Store', href: `/t/${tenantId}/onboarding` },
           { label: 'Store Profile', href: `/t/${tenantId}/settings/tenant` },
           { label: 'My Account', href: `/t/${tenantId}/settings/account` },
           { label: 'Branding', href: `/t/${tenantId}/settings/branding` },
@@ -130,6 +131,8 @@ export default function DynamicTenantSidebar({ tenantId, children }: DynamicTena
         label: 'Settings', 
         href: `/t/${tenantId}/settings`,
         children: [
+          // Store Settings
+          { label: 'Store Settings', href: `/t/${tenantId}/settings` },
           // Account & Preferences
           { label: 'Appearance', href: `/t/${tenantId}/settings/appearance` },
           { label: 'Language & Region', href: `/t/${tenantId}/settings/language` },

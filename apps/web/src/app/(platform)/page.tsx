@@ -6,7 +6,7 @@ import Link from "next/link";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, AnimatedCard } from "@/components/ui";
 import { useCountUp } from "@/hooks/useCountUp";
-import { useDashboardData } from "@/hooks/useDashboardData";
+import { usePlatformComplete } from "@/hooks/dashboard/usePlatformComplete";
 import { motion } from "framer-motion";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,8 +35,8 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
   const { isAuthenticated, isLoading: authLoading, logout, user } = useAuth();
   const router = useRouter();
   
-  // Use optimized dashboard data hook
-  const { data: dashboardData, loading, error } = useDashboardData(isAuthenticated, authLoading);
+  // Use consolidated platform dashboard hook
+  const { data: platformData, loading, error, metrics } = usePlatformComplete();
   
   const [scopedLinks, setScopedLinks] = useState<{ items: string; createItem: string; tenants: string; settingsTenant: string }>({
     items: "/items",
@@ -59,16 +59,16 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     platformUptimeFormatted: '99.9%',
   });
   
-  // Extract stats from dashboard data
+  // Extract stats from platform data
   const stats = {
-    total: dashboardData?.stats?.totalItems || 0,
-    active: dashboardData?.stats?.activeItems || 0,
-    syncIssues: dashboardData?.stats?.syncIssues || 0,
-    locations: dashboardData?.stats?.locations || 0,
-    isChain: dashboardData?.isChain || false,
-    organizationName: dashboardData?.organizationName || null,
+    total: platformData?.stats?.totalItems || 0,
+    active: platformData?.stats?.activeItems || 0,
+    syncIssues: 0, // Platform doesn't have sync issues
+    locations: platformData?.stats?.activeTenants || 0,
+    isChain: false, // Platform view shows all tenants
+    organizationName: null, // Platform view
   };
-  const selectedTenantId = dashboardData?.tenant?.id || null;
+  const selectedTenantId = null; // Platform view doesn't have selected tenant
   
   // Fetch public platform stats for visitors
   useEffect(() => {

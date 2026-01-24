@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { requireInventoryAccess } from '../middleware/permissions';
+import FeaturedProductsSingletonService from '../services/FeaturedProductsSingletonService';
+import { prisma } from '../prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
+const featuredProductsService = FeaturedProductsSingletonService.getInstance();
 
 // Tier-based featuring limits
 const FEATURING_LIMITS: Record<string, number> = {
@@ -16,68 +17,91 @@ const FEATURING_LIMITS: Record<string, number> = {
   'organization': 100,
 };
 
-// Get featured products for a tenant (using junction table)
+// Get featured products for a tenant (using singleton service with caching)
 router.get('/tenants/:tenantId/products/featured', authenticateToken, requireInventoryAccess, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { limit = 50, activeOnly = 'true' } = req.query;
 
-    const where: any = {
-      tenant_id: tenantId,
-    };
-
-    // Filter by active status
-    if (activeOnly === 'true') {
-      where.is_active = true;
-    }
-
-    // Filter by expiration
-    where.OR = [
-      { featured_expires_at: null },
-      { featured_expires_at: { gte: new Date() } }
-    ];
-
-    const featuredProducts = await prisma.featured_products.findMany({
-      where,
-      include: {
-        inventory_items: {
-          select: {
-            id: true,
-            sku: true,
-            name: true,
-            title: true,
-            brand: true,
-            description: true,
-            price_cents: true,
-            sale_price_cents: true,
-            stock: true,
-            image_url: true,
-            has_variants: true,
-            availability: true,
-          }
-        }
-      },
-      orderBy: [
-        { featured_priority: 'desc' },
-        { featured_at: 'desc' }
-      ],
-      take: parseInt(limit as string),
+    // Use singleton service with caching for featured products
+    const featuredProducts = await featuredProductsService.getFeaturedProductsByTenant(tenantId, {
+      featuredType: 'store_selection', // Only store_selection managed by this page
+      isActive: activeOnly === 'true',
+      limit: parseInt(limit as string),
+      sortBy: 'priority',
+      sortOrder: 'desc'
     });
 
-    // Transform the data to match the expected format
-    const transformedProducts = featuredProducts.map(fp => ({
-      ...fp.inventory_items,
-      featured_type: fp.featured_type,
-      featured_priority: fp.featured_priority,
-      featured_at: fp.featured_at,
-      featured_until: fp.featured_expires_at,
-      is_active: fp.is_active,
-      auto_unfeature: fp.auto_unfeature,
-    }));
+    // Get inventory items for stock filtering
+    const inventoryItemIds = featuredProducts
+      .map(fp => fp.inventoryItemId)
+      .filter((id): id is string => id !== undefined);
+    
+    const inventoryItems = inventoryItemIds.length > 0 ? await prisma.inventory_items.findMany({
+      where: { id: { in: inventoryItemIds } },
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        title: true,
+        brand: true,
+        description: true,
+        price_cents: true,
+        sale_price_cents: true,
+        stock: true,
+        image_url: true,
+        has_variants: true,
+        availability: true,
+        item_status: true,
+        visibility: true
+      }
+    }) : [];
+
+    // Create inventory items map for stock lookup
+    const inventoryMap = new Map(inventoryItems.map(item => [item.id, item]));
+
+    // Filter by stock and combine data
+    const inStockFeaturedProducts = featuredProducts
+      .filter(fp => {
+        const inventoryItem = inventoryMap.get(fp.inventoryItemId);
+        return inventoryItem && inventoryItem.stock > 0 && 
+               inventoryItem.item_status === 'active' && 
+               inventoryItem.visibility === 'public';
+      })
+      .map(fp => {
+        const inventoryItem = inventoryMap.get(fp.inventoryItemId);
+        if (!inventoryItem) throw new Error('Inventory item not found');
+        
+        return {
+          ...fp,
+          // Add inventory item fields to match expected format
+          id: inventoryItem.id,
+          sku: inventoryItem.sku,
+          name: inventoryItem.name,
+          title: inventoryItem.title,
+          brand: inventoryItem.brand,
+          description: inventoryItem.description,
+          price_cents: inventoryItem.price_cents,
+          sale_price_cents: inventoryItem.sale_price_cents,
+          stock: inventoryItem.stock,
+          image_url: inventoryItem.image_url,
+          has_variants: inventoryItem.has_variants,
+          availability: inventoryItem.availability,
+          item_status: inventoryItem.item_status,
+          visibility: inventoryItem.visibility,
+          // Keep featured fields
+          featured_type: fp.featuredType,
+          featured_priority: fp.priority,
+          featured_at: fp.featuredAt,
+          featured_until: fp.expiresAt,
+          is_active: fp.isActive,
+          auto_unfeature: fp.autoUnfeature
+        };
+      });
 
     res.json({
-      products: transformedProducts,
-      count: transformedProducts.length
+      products: inStockFeaturedProducts,
+      count: inStockFeaturedProducts.length
     });
   } catch (error) {
     console.error('Error fetching featured products:', error);
@@ -103,10 +127,11 @@ router.get('/tenants/:tenantId/products/featuring/status', authenticateToken, re
     const tier = tenant.subscription_tier || 'trial';
     const limit = FEATURING_LIMITS[tier] || 0;
 
-    // Count current featured products from junction table
+    // Count current featured products from junction table (only store_selection)
     const current = await prisma.featured_products.count({
       where: {
         tenant_id: tenantId,
+        featured_type: 'store_selection', // Only count products featured by this manager
         is_active: true,
         OR: [
           { featured_expires_at: null },
@@ -150,6 +175,7 @@ router.post('/tenants/:tenantId/products/:productId/feature', authenticateToken,
     const currentCount = await prisma.featured_products.count({
       where: {
         tenant_id: tenantId,
+        featured_type: 'store_selection', // Only count products featured by this manager
         is_active: true,
         OR: [
           { featured_expires_at: null },
@@ -600,6 +626,133 @@ router.get('/admin/products/featuring/stats', authenticateToken, async (req, res
   } catch (error) {
     console.error('Error fetching featuring stats:', error);
     res.status(500).json({ error: 'Failed to fetch featuring stats' });
+  }
+});
+
+// Get inactive/paused featured products (using singleton service with caching)
+router.get('/tenants/:tenantId/products/featured/inactive', authenticateToken, requireInventoryAccess, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { limit = 50 } = req.query;
+
+    // Query for paused products only
+    const pausedProducts = await prisma.featured_products.findMany({
+      where: {
+        tenant_id: tenantId,
+        is_active: false, // Only paused products
+      },
+      include: {
+        inventory_items: {
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+            title: true,
+            brand: true,
+            description: true,
+            price_cents: true,
+            sale_price_cents: true,
+            stock: true,
+            image_url: true,
+            has_variants: true,
+            availability: true,
+          }
+        }
+      },
+      orderBy: [
+        { featured_at: 'desc' }
+      ],
+      take: parseInt(limit as string)
+    });
+
+    // Transform the data - only include actually paused products
+    const transformedProducts = pausedProducts.map(fp => ({
+      ...fp.inventory_items,
+      featured_type: fp.featured_type,
+      featured_priority: fp.featured_priority,
+      featured_at: fp.featured_at,
+      featured_until: fp.featured_expires_at,
+      is_active: fp.is_active, // This should be false for paused products
+      auto_unfeature: fp.auto_unfeature,
+      inactivityReason: 'paused' as const,
+      reasonText: 'Paused by merchant'
+    }));
+
+    res.json({
+      products: transformedProducts,
+      count: transformedProducts.length
+    });
+  } catch (error) {
+    console.error('Error fetching inactive featured products:', error);
+    res.status(500).json({ error: 'Failed to fetch inactive featured products' });
+  }
+});
+
+// Get previously featured out-of-stock products
+router.get('/tenants/:tenantId/products/featured/out-of-stock', authenticateToken, requireInventoryAccess, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { limit = 50 } = req.query;
+
+    // Get featured products that are now out of stock
+    const outOfStockFeatured = await prisma.featured_products.findMany({
+      where: {
+        tenant_id: tenantId,
+        featured_type: 'store_selection',
+        is_active: true,
+        OR: [
+          { featured_expires_at: null },
+          { featured_expires_at: { gte: new Date() } }
+        ]
+      },
+      include: {
+        inventory_items: {
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+            title: true,
+            brand: true,
+            description: true,
+            price_cents: true,
+            sale_price_cents: true,
+            stock: true,
+            image_url: true,
+            has_variants: true,
+            availability: true,
+          }
+        }
+      },
+      orderBy: [
+        { featured_priority: 'desc' },
+        { featured_at: 'desc' }
+      ],
+      take: parseInt(limit as string),
+      distinct: ['inventory_item_id']
+    });
+
+    // Filter to only out-of-stock products
+    const transformedProducts = outOfStockFeatured
+      .filter(fp => fp.inventory_items.stock <= 0)
+      .map(fp => ({
+        ...fp.inventory_items,
+        featured_type: fp.featured_type,
+        featured_priority: fp.featured_priority,
+        featured_at: fp.featured_at,
+        featured_until: fp.featured_expires_at,
+        is_active: fp.is_active,
+        auto_unfeature: fp.auto_unfeature,
+        inactivityReason: 'out_of_stock' as const,
+        reasonText: 'Previously featured, now out of stock'
+      }));
+
+    res.json({
+      products: transformedProducts,
+      count: transformedProducts.length
+    });
+  } catch (error) {
+    console.error('Error fetching out-of-stock featured products:', error);
+    res.status(500).json({ error: 'Failed to fetch out-of-stock featured products' });
   }
 });
 

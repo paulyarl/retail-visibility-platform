@@ -176,8 +176,6 @@ export default function FeaturedProductsManagerSingleton({ tenantId }: { tenantI
     paginatedInStock,
     paginatedOutOfStock,
     totalPages,
-    startIndex,
-    endIndex,
     
     // Actions
     featureProduct,

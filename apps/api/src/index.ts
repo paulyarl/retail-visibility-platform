@@ -5836,6 +5836,11 @@ import tenantProfileRoutes from './routes/tenant-profile';
 app.use('/api/tenant', authenticateToken, tenantProfileRoutes);
 console.log('✅ Tenant Profile routes mounted at /api/tenant (UniversalSingleton)');
 
+import platformDashboardRoutes from './routes/platform-dashboard';
+app.use('/api/platform', authenticateToken, platformDashboardRoutes);
+console.log('✅ Platform Dashboard routes mounted at /api/platform (UniversalSingleton)');
+console.log('✅ Tenant Profile routes mounted at /api/tenant (UniversalSingleton)');
+
 import usersRoutes from './routes/users-singleton';
 app.use('/api/users-singleton', authenticateToken, usersRoutes);
 console.log('✅ Users routes mounted at /api/users-singleton (UniversalSingleton)');

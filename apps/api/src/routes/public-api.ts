@@ -112,34 +112,71 @@ router.get('/products/featured', async (req, res) => {
   try {
     const query = FeaturedProductsQuerySchema.parse(req.query);
     
-    // For now, return random active products
-    // In a real implementation, this would use location-based scoring
-    const products = await prisma.inventory_items.findMany({
-      where: { item_status: 'active' as const },
-      take: query.limit * 3, // Get more to randomize from
-      orderBy: { created_at: 'desc' }
+    // Use materialized view for performance (has universal stock filtering applied)
+    const featuredProducts = await prisma.$queryRaw<Array<{
+      id: string;
+      tenant_id: string;
+      name: string;
+      description: string | null;
+      price_cents: number;
+      image_url: string | null;
+      stock: number;
+      availability: string | null;
+      featured_type: string | null;
+      featured_priority: number;
+      featured_at: Date;
+    }>>`
+      SELECT 
+        id,
+        tenant_id,
+        name,
+        description,
+        price_cents,
+        image_url,
+        stock,
+        availability,
+        featured_type,
+        featured_priority,
+        featured_at
+      FROM storefront_products_mv 
+      WHERE is_featured_active = true 
+        AND featured_type = 'store_selection'
+      ORDER BY featured_priority DESC, featured_at DESC
+      LIMIT ${query.limit * 3}
+    `;
+
+    // Get tenant information for the products
+    const tenantIds = [...new Set(featuredProducts.map(fp => fp.tenant_id))];
+    const tenants = await prisma.tenants.findMany({
+      where: { id: { in: tenantIds } },
+      select: { id: true, name: true, slug: true }
     });
 
-    // Randomize selection
-    const shuffled = products.sort(() => Math.random() - 0.5);
+    const tenantMap = new Map(tenants.map(t => [t.id, t]));
+
+    // Randomize selection from featured products (MV already filtered by stock)
+    const shuffled = featuredProducts.sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, query.limit);
 
     res.json({
       success: true,
-      products: selected.map(product => ({
-        id: product.id,
-        name: product.name,
-        description: product.description,
-        price: product.price_cents ? product.price_cents / 100 : null,
-        imageUrl: product.image_url || null,
-        tenant: {
-          id: product.tenant_id,
-          name: 'Store Name', // Placeholder
-          slug: 'store-slug'   // Placeholder
-        },
-        availability: 'in_stock', // Default
-        distance: query.lat && query.lng ? Math.random() * 50 : null // Mock distance
-      })),
+      products: selected.map(fp => {
+        const tenant = tenantMap.get(fp.tenant_id);
+        return {
+          id: fp.id,
+          name: fp.name,
+          description: fp.description,
+          price: fp.price_cents ? fp.price_cents / 100 : null,
+          imageUrl: fp.image_url || null,
+          tenant: {
+            id: tenant?.id || fp.tenant_id,
+            name: tenant?.name || 'Store Name',
+            slug: tenant?.slug || 'store-slug'
+          },
+          availability: fp.stock > 0 ? 'in_stock' : 'out_of_stock',
+          distance: query.lat && query.lng ? Math.random() * 50 : null // Mock distance
+        };
+      }),
       location: query.lat && query.lng ? {
         lat: parseFloat(query.lat as unknown as string),
         lng: parseFloat(query.lng as unknown as string),
