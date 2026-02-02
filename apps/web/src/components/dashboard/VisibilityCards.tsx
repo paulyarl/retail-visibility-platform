@@ -42,7 +42,7 @@ export default function VisibilityCards({
   profile,
 }: VisibilityCardsProps) {
   // Generate URLs if not provided
-  const finalStorefrontUrl = storefrontUrl || `/tenant/${tenantId}`;
+  const finalStorefrontUrl = storefrontUrl || `/shops/${tenantId}`;
   const finalDirectoryUrl = directoryUrl || `/directory`;
   
   // Build directory URL with location and category filters for proximity viewing

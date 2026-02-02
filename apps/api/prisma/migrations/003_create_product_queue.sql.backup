@@ -1,0 +1,258 @@
+-- Create Product Queue Migration
+-- Adds persistent queue support with Universal Singleton integration
+
+-- Create product_queue table
+CREATE TABLE IF NOT EXISTS "product_queue" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    
+    -- Tenant isolation
+    "tenant_id" TEXT NOT NULL,
+    
+    -- Basic product info
+    "name" TEXT NOT NULL,
+    "brand" TEXT NOT NULL,
+    
+    -- Queue management
+    "status" TEXT NOT NULL DEFAULT 'queued',
+    "priority" TEXT NOT NULL DEFAULT 'normal',
+    
+    -- Complete product data (JSON)
+    "product_data" JSONB NOT NULL,
+    
+    -- Processing metadata
+    "added_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "processing_started_at" TIMESTAMP(3),
+    "completed_at" TIMESTAMP(3),
+    "estimated_time" INTEGER NOT NULL DEFAULT 5, -- minutes
+    "retry_count" INTEGER NOT NULL DEFAULT 0,
+    "error_message" TEXT,
+    
+    -- Special treatment flags
+    "special_treatment" TEXT[] DEFAULT '{}',
+    
+    -- Session and source tracking
+    "session_id" TEXT NOT NULL,
+    "user_agent" TEXT,
+    "source" TEXT NOT NULL DEFAULT 'wizard',
+    
+    -- Metadata
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Constraints
+    CONSTRAINT "product_queue_tenant_status_check" CHECK (
+        "status" IN ('queued', 'processing', 'completed', 'published', 'enhanced', 'error', 'cancelled')
+    ),
+    
+    CONSTRAINT "product_queue_priority_order" CHECK (
+        "priority" IN ('urgent', 'high', 'normal')
+    )
+);
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS "idx_product_queue_tenant_id" ON "product_queue"("tenant_id");
+CREATE INDEX IF NOT EXISTS "idx_product_queue_status" ON "product_queue"("status");
+CREATE INDEX IF NOT EXISTS "idx_product_queue_priority" ON "product_queue"("priority");
+CREATE INDEX IF NOT EXISTS "idx_product_queue_added_at" ON "product_queue"("added_at");
+CREATE INDEX IF NOT EXISTS "idx_product_queue_tenant_status" ON "product_queue"("tenant_id", "status");
+CREATE INDEX IF NOT EXISTS "idx_product_queue_tenant_priority_status" ON "product_queue"("tenant_id", "priority", "status");
+
+-- Create composite index for queue ordering (tenant + priority + added_at)
+CREATE INDEX IF NOT EXISTS "idx_product_queue_ordering" ON "product_queue"("tenant_id", "priority" DESC, "added_at" ASC);
+
+-- Create index for session tracking
+CREATE INDEX IF NOT EXISTS "idx_product_queue_session_id" ON "product_queue"("session_id");
+
+-- Create index for cleanup operations
+CREATE INDEX IF NOT EXISTS "idx_product_queue_cleanup" ON "product_queue"("status", "completed_at") WHERE "status" IN ('completed', 'error', 'cancelled');
+
+-- Add RLS (Row Level Security) policies
+ALTER TABLE "product_queue" ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only access their own tenant's queue items
+CREATE POLICY "tenant_isolation" ON "product_queue"
+    FOR ALL USING ("tenant_id" = current_setting('app.current_tenant_id', true));
+
+-- Policy: Service accounts can access all queue items
+CREATE POLICY "service_full_access" ON "product_queue"
+    FOR ALL USING (
+        current_setting('app.service_role', true) IN ('admin', 'service', 'queue_worker')
+    );
+
+-- Create trigger for updated_at timestamp
+CREATE OR REPLACE FUNCTION "update_product_queue_updated_at"()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW."updated_at" = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language "plpgsql";
+
+CREATE TRIGGER "product_queue_updated_at"
+    BEFORE UPDATE ON "product_queue"
+    FOR EACH ROW
+    EXECUTE FUNCTION "update_product_queue_updated_at"();
+
+-- Create queue statistics view for analytics
+CREATE OR REPLACE VIEW "product_queue_stats" AS
+SELECT 
+    pq."tenant_id",
+    COUNT(*) as "total_items",
+    COUNT(*) FILTER (WHERE pq."status" = 'queued') as "queued_items",
+    COUNT(*) FILTER (WHERE pq."status" = 'processing') as "processing_items",
+    COUNT(*) FILTER (WHERE pq."status" = 'completed') as "completed_items",
+    COUNT(*) FILTER (WHERE pq."status" = 'published') as "published_items",
+    COUNT(*) FILTER (WHERE pq."status" = 'enhanced') as "enhanced_items",
+    COUNT(*) FILTER (WHERE pq."status" = 'error') as "error_items",
+    COUNT(*) FILTER (WHERE pq."status" = 'cancelled') as "cancelled_items",
+    SUM(pq."estimated_time") FILTER (WHERE pq."status" = 'queued') as "estimated_total_time",
+    AVG(EXTRACT(EPOCH FROM (pq."completed_at" - pq."processing_started_at")) / 60) FILTER (WHERE pq."status" IN ('completed', 'published') AND pq."processing_started_at" IS NOT NULL AND pq."completed_at" IS NOT NULL) as "average_processing_time_minutes",
+    CASE 
+        WHEN COUNT(*) > 0 THEN 
+            ROUND((COUNT(*) FILTER (WHERE pq."status" IN ('completed', 'published'))::decimal / COUNT(*)) * 100, 2)
+        ELSE 0 
+    END as "success_rate_percentage",
+    MAX(pq."added_at") as "last_added_at",
+    MAX(pq."completed_at") as "last_completed_at"
+FROM "product_queue" pq
+GROUP BY pq."tenant_id";
+
+-- Create queue performance view
+CREATE OR REPLACE VIEW "product_queue_performance" AS
+SELECT 
+    pq."tenant_id",
+    DATE_TRUNC('hour', pq."added_at") as "hour_bucket",
+    COUNT(*) as "items_added",
+    COUNT(*) FILTER (WHERE pq."status" IN ('completed', 'published')) as "items_completed",
+    COUNT(*) FILTER (WHERE pq."status" = 'published') as "items_published",
+    COUNT(*) FILTER (WHERE pq."status" = 'enhanced') as "items_enhanced",
+    AVG(pq."estimated_time") as "avg_estimated_time",
+    AVG(EXTRACT(EPOCH FROM (pq."completed_at" - pq."processing_started_at")) / 60) FILTER (WHERE pq."status" IN ('completed', 'published') AND pq."processing_started_at" IS NOT NULL AND pq."completed_at" IS NOT NULL) as "avg_actual_processing_time",
+    COUNT(*) FILTER (WHERE pq."status" = 'error') as "items_failed",
+    COUNT(DISTINCT pq."session_id") as "unique_sessions"
+FROM "product_queue" pq
+WHERE pq."added_at" >= CURRENT_DATE - INTERVAL '7 days'
+GROUP BY pq."tenant_id", DATE_TRUNC('hour', pq."added_at")
+ORDER BY "hour_bucket" DESC;
+
+-- Create function to clean up old queue items
+CREATE OR REPLACE FUNCTION "cleanup_old_queue_items"(
+    p_tenant_id TEXT DEFAULT NULL,
+    p_older_than_days INTEGER DEFAULT 30,
+    p_keep_statuses TEXT[] DEFAULT ARRAY['processing', 'queued', 'enhanced']
+)
+RETURNS INTEGER AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM "product_queue"
+    WHERE 
+        (p_tenant_id IS NULL OR "tenant_id" = p_tenant_id)
+        AND "status" NOT IN (SELECT unnest(p_keep_statuses))
+        AND (
+            ("status" = 'completed' AND "completed_at" < CURRENT_TIMESTAMP - INTERVAL '1 day' * p_older_than_days) OR
+            ("status" = 'published' AND "completed_at" < CURRENT_TIMESTAMP - INTERVAL '1 day' * p_older_than_days) OR
+            ("status" = 'error' AND "updated_at" < CURRENT_TIMESTAMP - INTERVAL '1 day' * p_older_than_days) OR
+            ("status" = 'cancelled' AND "updated_at" < CURRENT_TIMESTAMP - INTERVAL '1 day' * p_older_than_days)
+        );
+    
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    
+    RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create function to get queue processing order
+CREATE OR REPLACE FUNCTION "get_queue_processing_order"(
+    p_tenant_id TEXT,
+    p_limit INTEGER DEFAULT 10,
+    p_include_statuses TEXT[] DEFAULT ARRAY['queued']
+)
+RETURNS TABLE (
+    id TEXT,
+    name TEXT,
+    priority TEXT,
+    added_at TIMESTAMP,
+    estimated_time INTEGER,
+    special_treatment TEXT[]
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        pq."id",
+        pq."name",
+        pq."priority",
+        pq."added_at",
+        pq."estimated_time",
+        pq."special_treatment"
+    FROM "product_queue" pq
+    WHERE 
+        pq."tenant_id" = p_tenant_id
+        AND pq."status" = ANY(p_include_statuses)
+    ORDER BY 
+        CASE pq."priority"
+            WHEN 'urgent' THEN 1
+            WHEN 'high' THEN 2
+            WHEN 'normal' THEN 3
+            ELSE 4
+        END,
+        pq."added_at" ASC
+    LIMIT p_limit;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to automatically update queue statistics cache
+CREATE OR REPLACE FUNCTION "update_queue_stats_cache"()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Invalidate cache for the tenant
+    PERFORM pg_notify('queue_stats_invalidate', NEW."tenant_id");
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create triggers for cache invalidation
+CREATE TRIGGER "product_queue_cache_invalidate_insert"
+    AFTER INSERT ON "product_queue"
+    FOR EACH ROW
+    EXECUTE FUNCTION "update_queue_stats_cache"();
+
+CREATE TRIGGER "product_queue_cache_invalidate_update"
+    AFTER UPDATE ON "product_queue"
+    FOR EACH ROW
+    EXECUTE FUNCTION "update_queue_stats_cache"();
+
+CREATE TRIGGER "product_queue_cache_invalidate_delete"
+    AFTER DELETE ON "product_queue"
+    FOR EACH ROW
+    EXECUTE FUNCTION "update_queue_stats_cache"();
+
+-- Create function to clear all queue items for a tenant
+CREATE OR REPLACE FUNCTION "clear_tenant_queue"(
+    p_tenant_id TEXT,
+    p_action TEXT DEFAULT 'cancel' -- 'cancel' or 'delete'
+)
+RETURNS INTEGER AS $$
+DECLARE
+    updated_count INTEGER;
+BEGIN
+    IF p_action = 'delete' THEN
+        -- Hard delete all items
+        DELETE FROM "product_queue" WHERE "tenant_id" = p_tenant_id;
+        GET DIAGNOSTICS updated_count = ROW_COUNT;
+    ELSIF p_action = 'cancel' THEN
+        -- Soft cancel all active items
+        UPDATE "product_queue" 
+        SET "status" = 'cancelled', "updated_at" = CURRENT_TIMESTAMP
+        WHERE "tenant_id" = p_tenant_id 
+        AND "status" IN ('queued', 'processing', 'completed', 'published', 'enhanced');
+        GET DIAGNOSTICS updated_count = ROW_COUNT;
+    ELSE
+        RAISE EXCEPTION 'Invalid action: %. Use "cancel" or "delete"', p_action;
+    END IF;
+    
+    RETURN updated_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Migration complete

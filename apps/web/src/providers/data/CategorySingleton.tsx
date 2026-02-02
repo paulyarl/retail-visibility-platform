@@ -5,7 +5,7 @@
  * Handles hierarchical category relationships and product counts.
  */
 
-import React, { createContext, useContext, useReducer, useCallback, useRef } from 'react';
+import { createContext, useContext, useReducer, useCallback, useMemo, useRef, ReactNode } from 'react';
 
 // ====================
 // TYPES & INTERFACES
@@ -258,14 +258,14 @@ export const CategoryProvider: React.FC<CategoryProviderProps> = ({ children }) 
     dispatch({ type: 'CLEAR_CACHE' });
   }, []);
 
-  const actions: CategoryActions = {
+  const actions: CategoryActions = useMemo(() => ({
     fetchCategories,
     getCategoryById,
     getCategoryBySlug,
     getCategoriesByParent,
     getCategoryTree,
     clearCache,
-  };
+  }), [fetchCategories, getCategoryById, getCategoryBySlug, getCategoriesByParent, getCategoryTree, clearCache]);
 
   const value = {
     state,

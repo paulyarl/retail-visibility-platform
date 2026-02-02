@@ -11,6 +11,7 @@ import { canEditTenant, canDeleteTenant, canRenameTenant } from "@/lib/auth/acce
 import { ContextBadges } from "@/components/ContextBadges";
 import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
 import ChangeLocationStatusModal from '@/components/tenant/ChangeLocationStatusModal';
+import CreateTenantModal, { TenantCreationData } from './CreateTenantModal';
 
 type Tenant = { 
   id: string; 
@@ -38,6 +39,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   
   // Pagination and search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -152,25 +154,26 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     }
   };
 
-  const onCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
+  const onCreate = async (data: TenantCreationData) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.post("/api/tenants", { name: name.trim() });
-      const data = await res.json();
+      const res = await api.post("/api/tenants", { 
+        name: data.name.trim(),
+        slug: data.slug,
+        city: data.city,
+        state: data.state,
+        country_code: data.country_code,
+      });
+      const responseData = await res.json();
       
       if (!res.ok) {
-        console.error('[TenantsClient] Create failed:', data);
-        throw new Error(data?.message || data?.error || "Failed to create tenant");
+        console.error('[TenantsClient] Create failed:', responseData);
+        throw new Error(responseData?.message || responseData?.error || "Failed to create tenant");
       }
       
-      const newTenant = data as Tenant;
+      const newTenant = responseData as Tenant;
       console.log('[TenantsClient] Tenant created:', newTenant.id);
-      
-      // Backend automatically links tenant to authenticated user
-      setName("");
       
       // Refresh tenant list to get the new tenant
       await refresh();
@@ -179,6 +182,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     } catch (err) {
       console.error('[TenantsClient] Create error:', err);
       setError(err instanceof Error ? err.message : "Failed to create tenant");
+      throw err; // Re-throw to let modal handle it
     } finally {
       setLoading(false);
     }
@@ -311,25 +315,19 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
         <AnimatedCard delay={0} hover={false}>
           <CardHeader>
             <CardTitle>Add New Location</CardTitle>
-            <CardDescription>Create a new store or business location</CardDescription>
+            <CardDescription>Create a new store or business location with professional URL</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={onCreate} className="flex gap-3">
-              <div className="flex-1">
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter location name (e.g., Downtown Store)"
-                  required
-                />
-              </div>
-              <Button type="submit" disabled={loading} loading={loading}>
-                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                {loading ? "Creating…" : "Add Location"}
-              </Button>
-            </form>
+            <Button 
+              onClick={() => setCreateModalOpen(true)} 
+              disabled={loading}
+              className="w-full"
+            >
+              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add New Location
+            </Button>
           </CardContent>
         </AnimatedCard>
 
@@ -589,6 +587,14 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
           onStatusChanged={handleStatusChange}
         />
       )}
+
+      {/* Create Tenant Modal */}
+      <CreateTenantModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onCreate={onCreate}
+        loading={loading}
+      />
     </div>
   );
 }

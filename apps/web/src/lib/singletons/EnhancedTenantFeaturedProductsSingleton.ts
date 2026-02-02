@@ -269,7 +269,7 @@ class EnhancedTenantFeaturedProductsSingleton {
           paths: [
             `/t/${this.tenantId}`,
             `/directory/t/${this.tenantId}`,
-            `/api/featured-products/public?tenantId=${this.tenantId}`
+            `/api/public/products/featured?tenantId=${this.tenantId}`
           ]
         })
       });

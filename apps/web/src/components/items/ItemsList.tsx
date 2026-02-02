@@ -1,7 +1,8 @@
-import { Badge, Button, Card, CardContent } from '@/components/ui';
+import { Badge, Button, Card, CardContent, Tooltip } from '@/components/ui';
 import { Item } from '@/services/itemsDataService';
+import { Copy } from 'lucide-react';
 import SyncStatusIndicator from './SyncStatusIndicator';
-import InlineStockEditor from './InlineStockEditor';
+import QuickStockEditor from '@/components/shared/QuickStockEditor';
 
 interface ItemsListProps {
   items: Item[];
@@ -42,6 +43,13 @@ export default function ItemsList({
   selectedItems = new Set(),
   onToggleSelection,
 }: ItemsListProps) {
+  // Stock status helper function
+  const getStockStatus = (stock: number) => {
+    if (stock === 0) return { status: 'out', color: 'text-red-600 bg-red-50', label: 'Out of Stock' };
+    if (stock < 5) return { status: 'low', color: 'text-orange-600 bg-orange-50', label: 'Low Stock' };
+    return { status: 'good', color: 'text-green-600 bg-green-50', label: 'In Stock' };
+  };
+
   if (items.length === 0) {
     return (
       <div className="text-center py-12">
@@ -63,7 +71,7 @@ export default function ItemsList({
       {items.map((item) => (
         <Card 
           key={item.id} 
-          className="border-2 border-neutral-200 dark:border-neutral-700 rounded-xl shadow-md hover:shadow-xl hover:border-primary-300 dark:hover:border-primary-600 transition-all duration-200 bg-gradient-to-br from-white to-neutral-50 dark:from-neutral-100 dark:to-neutral-200"
+          className={`group hover:shadow-lg transition-all duration-200 ${bulkMode ? 'ring-2 ring-primary-500' : ''} ${selectedItems.has(item.id) ? 'ring-2 ring-primary-500 bg-primary-50/50' : ''} border-2 border-neutral-200 dark:border-neutral-700 rounded-xl shadow-md hover:shadow-xl hover:border-primary-300 dark:hover:border-primary-600 bg-gradient-to-br from-white to-neutral-50 dark:from-neutral-100 dark:to-neutral-200`}
         >
           <CardContent className="p-3 sm:p-4 md:p-5">
             {/* Row 1: Main Info */}
@@ -81,30 +89,44 @@ export default function ItemsList({
               )}
               
               {/* Image - Primary photo - Clickable */}
-              <div 
-                className="flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() => {
-                  if (bulkMode && onToggleSelection) {
-                    onToggleSelection(item.id);
-                  } else {
-                    tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank');
-                  }
-                }}
-                title={bulkMode ? "Click to select" : "View item details"}
-              >
-                {item.imageUrl ? (
-                  <img
-                    src={item.imageUrl}
-                    alt={item.name}
-                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover shadow-md border-2 border-neutral-200 dark:border-neutral-600"
-                  />
-                ) : (
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center border-2 border-neutral-200 dark:border-neutral-600">
-                    <svg className="w-8 h-8 sm:w-10 sm:h-10 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+              <div className="relative flex-shrink-0">
+                <div 
+                  className="cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => {
+                    if (bulkMode && onToggleSelection) {
+                      onToggleSelection(item.id);
+                    } else {
+                      tenantId && window.open(`/t/${tenantId}/items/${item.id}`, '_blank');
+                    }
+                  }}
+                  title={bulkMode ? "Click to select" : "View item details"}
+                >
+                  {item.imageUrl ? (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover shadow-md border-2 border-neutral-200 dark:border-neutral-600"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center border-2 border-neutral-200 dark:border-neutral-600">
+                      <svg className="w-8 h-8 sm:w-10 sm:h-10 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Photo Count Badge */}
+                {item.photoCount && item.photoCount > 1 && (
+                  <div className="absolute -top-1 -right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded-full">
+                    +{item.photoCount - 1}
                   </div>
                 )}
+                
+                {/* Stock Status Badge */}
+                <div className={`absolute -bottom-1 -right-1 ${getStockStatus(item.stock).color} text-xs px-1.5 py-0.5 rounded-full font-medium`}>
+                  {getStockStatus(item.stock).label}
+                </div>
               </div>
 
               {/* Details */}
@@ -119,6 +141,21 @@ export default function ItemsList({
                       {item.name}
                     </h3>
                     <p className="text-xs sm:text-sm text-neutral-500 font-mono">{item.sku}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs sm:text-sm text-neutral-400 font-mono">
+                        /products/{item.id}
+                      </span>
+                      <Tooltip content="Copy product URL">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-5 w-5 p-0 text-blue-600 hover:text-blue-700"
+                          onClick={() => navigator.clipboard.writeText(`${window.location.origin}/products/${item.id}`)}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </Tooltip>
+                    </div>
                     {item.description && (
                       <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-800 mt-1 line-clamp-2">
                         {item.description}
@@ -171,12 +208,14 @@ export default function ItemsList({
                     {onStockUpdate ? (
                       <div className="flex flex-col gap-1">
                         <p className="text-xs text-neutral-500">Stock</p>
-                        <InlineStockEditor
+                        <QuickStockEditor
                           itemId={item.id}
                           itemName={item.name}
                           currentStock={item.stock}
                           onUpdate={onStockUpdate}
                           className="text-lg font-semibold"
+                          compact={false}
+                          showStatus={true}
                         />
                       </div>
                     ) : (

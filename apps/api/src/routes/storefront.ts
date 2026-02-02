@@ -37,10 +37,11 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     const params: any[] = [tenantId];
     let paramIndex = 2;
     
+    // Temporarily removed category filter to test pagination
     // When no specific category is selected, only show products that have categories
-    if (!category) {
-      conditions.push('sp.category_id IS NOT NULL');
-    }
+    // if (!category) {
+    //   conditions.push('sp.category_id IS NOT NULL');
+    // }
     
     // Category filter - match by slug (MV uses category_slug)
     if (category && typeof category === 'string') {
@@ -57,6 +58,19 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     }
     
     const whereClause = conditions.join(' AND ');
+    
+    // Debug logging
+    console.log(`[Storefront API] Query params:`, {
+      tenantId,
+      category,
+      search,
+      page: pageNum,
+      limit: limitNum,
+      skip,
+      conditions,
+      whereClause,
+      params
+    });
     
     // Query storefront_products MV for individual products (includes payment gateway info)
     const query = `
@@ -95,7 +109,17 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         sp.has_active_payment_gateway,
         sp.default_gateway_type,
         sp.created_at,
-        sp.updated_at
+        sp.updated_at,
+        -- Featured status flag
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 FROM featured_products fp2 
+            WHERE fp2.inventory_item_id = sp.id 
+            AND fp2.tenant_id = sp.tenant_id 
+            AND fp2.is_active = true
+          ) THEN true 
+          ELSE false 
+        END as is_featured
       FROM storefront_products sp
       WHERE ${whereClause}
       ORDER BY sp.updated_at DESC
@@ -103,7 +127,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     `;
     
     const countQuery = `
-      SELECT COUNT(*) as count
+      SELECT COUNT(DISTINCT sp.id) as count
       FROM storefront_products sp
       WHERE ${whereClause}
     `;
@@ -115,6 +139,45 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     ]);
     
     const totalCount = parseInt(countResult.rows[0]?.count || '0');
+    
+    // Debug logging for results
+    console.log(`[Storefront API] Results:`, {
+      totalCount,
+      itemsReturned: itemsResult.rows.length,
+      pageNum,
+      limitNum,
+      skip,
+      expectedRange: `${skip + 1}-${Math.min(skip + limitNum, totalCount)}`
+    });
+    
+    // Fetch featured types for the returned products
+    const productIds = itemsResult.rows.map((item: any) => item.id);
+    let featuredTypesMap: Record<string, string[]> = {};
+    
+    if (productIds.length > 0) {
+      const featuredTypesQuery = `
+        SELECT 
+          fp.inventory_item_id as product_id,
+          fp.featured_type
+        FROM featured_products fp
+        WHERE fp.inventory_item_id = ANY($1) 
+          AND fp.tenant_id = $2 
+          AND fp.is_active = true
+      `;
+      
+      const featuredTypesResult = await getDirectPool().query(featuredTypesQuery, [productIds, tenantId]);
+      
+      // Group featured types by product ID
+      featuredTypesMap = featuredTypesResult.rows.reduce((acc: Record<string, string[]>, row: any) => {
+        const productId = row.product_id;
+        const featuredType = row.featured_type;
+        if (!acc[productId]) {
+          acc[productId] = [];
+        }
+        acc[productId].push(featuredType);
+        return acc;
+      }, {});
+    }
     
     // Debug logging for category mismatches
     if (category) {
@@ -204,6 +267,8 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         defaultGatewayType: row.default_gateway_type,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        isFeatured: row.is_featured,
+        featuredTypes: featuredTypesMap[row.id] || [],
       };
     });
     

@@ -41,6 +41,9 @@ interface ProductDisplayProps {
   // New props for singleton integration
   useSingletonData?: boolean; // Whether to enhance with singleton data
   showFeaturedBadges?: boolean; // Whether to show featured type badges
+  // Pagination props
+  initialPageSize?: number; // Initial page size (default: 6)
+  showPageSizeControl?: boolean; // Show page size selector
 }
 
 // Force edge runtime to prevent prerendering issues
@@ -55,16 +58,28 @@ export default function ProductDisplay({
   tenantName, 
   tenantLogo,
   useSingletonData = true,
-  showFeaturedBadges = true 
+  showFeaturedBadges = true,
+  initialPageSize = 6,
+  showPageSizeControl = true
 }: ProductDisplayProps) {
   const { actions: productSingleton } = useProductSingleton();
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'gallery'>('grid');
   const [mounted, setMounted] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'gallery'>('grid');
   const [currentProductIndex, setCurrentProductIndex] = useState(0);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
   const [enhancedProducts, setEnhancedProducts] = useState<UniversalProduct[]>(products);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPageSize);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(enhancedProducts.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedProducts = enhancedProducts.slice(startIndex, endIndex);
 
   // Initialize view mode on client-side only and listen for URL changes
   useEffect(() => {
@@ -523,6 +538,7 @@ export default function ProductDisplay({
                   <div className="pt-4 border-t border-neutral-200 dark:border-neutral-700">
                     <SmartProductCard
                       product={currentProduct}
+                      tenantId={tenantId}
                       tenantName={tenantName}
                       tenantLogo={tenantLogo}
                     />
@@ -597,12 +613,13 @@ export default function ProductDisplay({
         {/* Product Grid/List */}
         <div className={
           viewMode === 'grid'
-            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
+            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'
             : 'space-y-4'
         }>
-          {enhancedProducts.map((product) => (
+          {paginatedProducts.map((product, index) => (
             <SmartProductCard
               key={product.id}
+              tenantId={tenantId}
               product={product}
               tenantName={tenantName}
               tenantLogo={tenantLogo}
@@ -610,6 +627,61 @@ export default function ProductDisplay({
             />
           ))}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-neutral-200 dark:border-neutral-700">
+            {/* Page Info */}
+            <div className="text-sm text-neutral-600 dark:text-neutral-400">
+              Showing {startIndex + 1} to {Math.min(endIndex, enhancedProducts.length)} of {enhancedProducts.length} products
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {/* Page Size Control */}
+              {showPageSizeControl && (
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-neutral-600 dark:text-neutral-400">Show:</label>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1); // Reset to first page
+                    }}
+                    className="px-2 py-1 text-sm border border-neutral-300 dark:border-neutral-600 rounded-md bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
+                  >
+                    <option value={6}>6</option>
+                    <option value={12}>12</option>
+                    <option value={24}>24</option>
+                    <option value={48}>48</option>
+                  </select>
+                </div>
+              )}
+              
+              {/* Page Navigation */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm border border-neutral-300 dark:border-neutral-600 rounded-md hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                
+                <span className="px-3 py-1 text-sm text-neutral-600 dark:text-neutral-400">
+                  {currentPage} of {totalPages}
+                </span>
+                
+                <button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm border border-neutral-300 dark:border-neutral-600 rounded-md hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Empty State */}
         {enhancedProducts.length === 0 && (

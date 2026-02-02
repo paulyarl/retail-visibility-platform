@@ -46,13 +46,24 @@
 
 #### Database
 ```bash
-DATABASE_URL=postgresql://user:password@host:5432/database?sslmode=require
+DATABASE_URL=postgresql://user:password@host:5432/database?sslmode=require&connection_limit=20&pool_timeout=30&connect_timeout=60
 ```
 **Used in:**
 - `apps/api/src/prisma.ts` - Prisma client initialization
 - `apps/api/src/index.ts` - Database connection logging
+- `apps/api/prisma/schema.prisma` - Connection pool configuration
 
 **Purpose:** PostgreSQL connection string for Prisma ORM
+
+**Connection Pool Parameters:**
+- `connection_limit=20` - Maximum connections in pool (default: 10)
+- `pool_timeout=30` - Seconds to wait for available connection (default: 10)
+- `connect_timeout=60` - Seconds to establish new connection (default: 30)
+
+**Production Recommendations:**
+- **Cloud PostgreSQL (Supabase/Neon):** `connection_limit=10` (limited by provider)
+- **Self-hosted PostgreSQL:** `connection_limit=20` (based on server capacity)
+- **Serverless (Vercel):** Lower limits due to ephemeral nature
 
 ---
 

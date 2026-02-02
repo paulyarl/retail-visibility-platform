@@ -166,9 +166,16 @@ export default function AdminLimitsPage() {
       };
       
       try {
-        const featuredResponse = await apiRequest('/api/tenant-limits/featured-products');
+        // Use the all limits endpoint since this is an admin page
+        // and we don't have a specific tenant context here
+        const featuredResponse = await apiRequest('/api/tenant-limits/featured-products/all');
         if (featuredResponse.ok) {
-          featuredData = await featuredResponse.json();
+          const featuredAllData = await featuredResponse.json();
+          // Use starter limits as default for display
+          featuredData = {
+            limits: featuredAllData.limits.starter,
+            tier: 'starter (guest)',
+          };
         }
       } catch (featuredError) {
         // User might not be authenticated, use default starter limits

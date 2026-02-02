@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Modal, ModalFooter, Button, Input, Alert } from '@/components/ui';
 import { useFeatureFlag } from '@/lib/featureFlags';
-import { apiRequest } from '@/lib/api';
+import { useCategorySingleton } from '@/providers/data/CategorySingleton';
 import TenantCategorySelector from './TenantCategorySelector';
 import PaymentGatewaySelector from '@/components/products/PaymentGatewaySelector';
 import ProductTypeSelector, { ProductType } from './ProductTypeSelector';
@@ -10,35 +10,83 @@ import DigitalProductConfig, { DigitalProductData } from './DigitalProductConfig
 import ProductVariants, { ProductVariant } from './ProductVariants';
 import { Item } from '@/services/itemsDataService';
 import { generateSKU, generateTenantKey } from '@/lib/sku-generator';
+import { useVariantsSingleton } from '@/lib/singletons/VariantsSingleton';
 
-// Helper component to display category name by ID
+// Helper component to display category name by ID using CategorySingleton for caching
 function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
   const [categoryName, setCategoryName] = useState<string>('Loading...');
-  const params = useParams();
-  const tenantId = params.tenantId as string;
+  const [fullCategoryPath, setFullCategoryPath] = useState<string>('');
+  const { state, actions } = useCategorySingleton();
 
   useEffect(() => {
-    async function fetchCategory() {
-      try {
-        const response = await apiRequest(`api/v1/tenants/${tenantId}/categories`);
-        if (response.ok) {
-          const result = await response.json();
-          const category = result.data?.find((c: any) => c.id === categoryId);
+    async function loadCategoryName() {
+      if (!categoryId) {
+        setCategoryName('No category');
+        return;
+      }
+
+      // First try to find in tenant categories (using CategorySingleton)
+      if (state.categories.length > 0) {
+        const category = actions.getCategoryById(categoryId);
+        if (category) {
+          setCategoryName(category.name);
+          return;
+        }
+      } else {
+        // Load tenant categories if not already loaded
+        try {
+          await actions.fetchCategories({
+            includeChildren: true,
+            includeProductCount: false
+          });
+          
+          const category = actions.getCategoryById(categoryId);
           if (category) {
             setCategoryName(category.name);
-            if (category.googleCategoryId) {
-              setCategoryName(`${category.name} (${category.googleCategoryId})`);
-            }
+            return;
+          }
+        } catch (error) {
+          console.error('[EditItemModal CategoryNameDisplay] Error loading tenant categories:', error);
+        }
+      }
+
+      // If not found in tenant categories, try Google taxonomy
+      try {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const response = await fetch(`${API_BASE_URL}/public/google-taxonomy/${categoryId}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.path && Array.isArray(data.path)) {
+            const pathString = data.path.join(' > ');
+            const finalCategoryName = data.path[data.path.length - 1]; // Get last element
+            setCategoryName(finalCategoryName);
+            setFullCategoryPath(pathString); // Store full path separately
+            return;
           }
         }
       } catch (error) {
-        setCategoryName('Unknown category');
+        console.error('[EditItemModal CategoryNameDisplay] Error fetching Google taxonomy:', error);
       }
-    }
-    fetchCategory();
-  }, [categoryId, tenantId]);
 
-  return <span className="font-medium">{categoryName}</span>;
+      // If still not found, show unknown category
+      setCategoryName('Unknown category');
+    }
+
+    loadCategoryName();
+  }, [categoryId, state.categories.length]);
+
+  return (
+    <div className="space-y-1">
+      <div className="font-medium">{categoryName}</div>
+      <div className="text-xs text-blue-600 dark:text-blue-400 font-mono bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded inline-block">ID: {categoryId}</div>
+      {fullCategoryPath && categoryName !== 'Unknown category' && categoryName !== 'Loading...' && (
+        <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+          Path: {fullCategoryPath}
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface EditItemModalProps {
@@ -46,9 +94,10 @@ interface EditItemModalProps {
   onClose: () => void;
   item: Item | null;
   onSave: (item: Item) => Promise<void>;
+  onItemUpdated?: () => void; // Callback to refresh item data
 }
 
-export default function EditItemModal({ isOpen, onClose, item, onSave }: EditItemModalProps) {
+export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpdated }: EditItemModalProps) {
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
@@ -81,6 +130,11 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
   });
   const [hasVariants, setHasVariants] = useState(false);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [variantsLoading, setVariantsLoading] = useState(false);
+
+  // Initialize VariantsSingleton
+  const tenantId = getTenantIdFromUrl();
+  const { actions: variantsActions } = useVariantsSingleton(tenantId || '');
 
   // Feature flag: sticky quick actions footer
   const ffQuick = useFeatureFlag('FF_CATEGORY_QUICK_ACTIONS');
@@ -143,24 +197,26 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
 
       // Load variants if item has them
       setHasVariants((item as any).has_variants || false);
-      if ((item as any).has_variants && item.id) {
-        const tenantId = getTenantIdFromUrl();
-        if (tenantId) {
-          // Fetch variants from API
-          apiRequest(`api/items/${item.id}/variants`)
-            .then(async (response) => {
-              if (response.ok) {
-                const data = await response.json();
-                setVariants(data.variants || []);
+      if ((item as any).has_variants && item.id && tenantId) {
+          // Use VariantsSingleton to fetch variants
+          variantsActions.fetchItemVariants(item.id)
+            .then(result => {
+              if (result.success && result.variants) {
+                setVariants(result.variants);
+              } else {
+                console.error('Failed to fetch variants:', result.error);
               }
             })
-            .catch((error) => {
-              console.error('Failed to load variants:', error);
+            .catch(err => {
+              console.error('Error fetching variants:', err);
+            })
+            .finally(() => {
+              setVariantsLoading(false);
             });
+        } else {
+          setVariants([]);
+          setVariantsLoading(false);
         }
-      } else {
-        setVariants([]);
-      }
     } else {
       // Reset form for new item creation
       setSku('');
@@ -301,6 +357,8 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         tenantCategoryId: tenantCategoryId || null,
         payment_gateway_type: gatewaySelection.gateway_type,
         payment_gateway_id: gatewaySelection.gateway_id,
+        // Include has_variants flag when variants are enabled
+        has_variants: hasVariants && variants.length > 0,
         // Digital product fields
         product_type: productType,
         ...(productType === 'digital' || productType === 'hybrid' ? {
@@ -336,40 +394,41 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
             });
 
             // Separate new variants (no id) from existing variants (has id)
-            const newVariants = variantsWithSkus.filter(v => !v.id);
-            const existingVariants = variantsWithSkus.filter(v => v.id);
+            const newVariants = variantsWithSkus.filter((v: ProductVariant) => !v.id);
+            const existingVariants = variantsWithSkus.filter((v: ProductVariant) => v.id);
 
-            // Create new variants
+            // Create new variants using VariantsSingleton
             if (newVariants.length > 0) {
-              const createResponse = await apiRequest(
-                `api/items/${updatedItem.id}/variants/bulk`,
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ variants: newVariants }),
-                }
-              );
-
-              if (!createResponse.ok) {
-                const error = await createResponse.json();
-                throw new Error(error.error || 'Failed to create variants');
+              const createData = newVariants.map(v => ({
+                name: v.variant_name,
+                sku: v.sku,
+                price_cents: v.price_cents,
+                stock: v.stock,
+                attributes: v.attributes
+              }));
+              const createResult = await variantsActions.createBulkVariants(updatedItem.id, createData);
+              if (!createResult.success) {
+                throw new Error(createResult.error || 'Failed to create variants');
               }
             }
 
-            // Update existing variants
-            for (const variant of existingVariants) {
-              const updateResponse = await apiRequest(
-                `api/variants/${variant.id}`,
-                {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(variant),
-                }
-              );
-
-              if (!updateResponse.ok) {
-                const error = await updateResponse.json();
-                throw new Error(error.error || `Failed to update variant ${variant.variant_name}`);
+            // Update existing variants using VariantsSingleton
+            if (existingVariants.length > 0) {
+              const updates = existingVariants
+                .filter(v => v.id) // Only include variants with IDs
+                .map(variant => ({
+                  variantId: variant.id!,
+                  data: {
+                    name: variant.variant_name,
+                    sku: variant.sku,
+                    price_cents: variant.price_cents,
+                    stock: variant.stock,
+                    attributes: variant.attributes
+                  }
+                }));
+              const updateResult = await variantsActions.updateBulkVariants(updates);
+              if (!updateResult.success) {
+                throw new Error(updateResult.error || 'Failed to update variants');
               }
             }
           }
@@ -379,6 +438,11 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           setSaving(false);
           return;
         }
+      }
+
+      // Notify parent that item was updated (especially important when variants were created)
+      if (onItemUpdated) {
+        onItemUpdated();
       }
 
       onClose();
@@ -748,12 +812,15 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
           </p>
         </div>
 
-        {/* Photo Section */}
+        {/* Photo Section - Enhanced with PhotoSingleton */}
         <div>
           <label className="block text-sm font-medium text-neutral-700 mb-2">
-            Product Photo
+            Product Photos
           </label>
           <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700">
+            <p className="text-xs text-neutral-600 dark:text-neutral-400 mb-3">
+              Photo management available on item detail page after saving
+            </p>
             {item?.imageUrl ? (
               <div className="space-y-2">
                 <div className="aspect-square w-32 mx-auto bg-white dark:bg-neutral-900 rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700">
@@ -764,7 +831,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
                   />
                 </div>
                 <p className="text-xs text-center text-neutral-600 dark:text-neutral-400">
-                  Current product photo
+                  Primary photo
                 </p>
               </div>
             ) : (
@@ -772,7 +839,8 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
                 <svg className="w-12 h-12 mx-auto text-neutral-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <p className="text-sm text-neutral-500">No photo</p>
+                <p className="text-sm text-neutral-500">No photos yet</p>
+                <p className="text-xs text-neutral-400 mt-1">Add photos after creating the item</p>
               </div>
             )}
           </div>
@@ -781,7 +849,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
         {/* Category Section */}
         <div>
           <label className="block text-sm font-medium text-neutral-700 mb-2">
-            Product Category
+            Product Category (Google Shopping)
           </label>
           <div className="space-y-3">
             {/* Current Category Display */}
@@ -821,9 +889,11 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
                     <p className="text-sm font-semibold text-green-800 dark:text-green-200">
                       Selected Category (pending save)
                     </p>
-                    <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                      <CategoryNameDisplay categoryId={tenantCategoryId} />
-                    </p>
+                    <div className="text-sm text-green-700 dark:text-green-300 mt-1">
+                      <div className="border border-green-300 dark:border-green-700 rounded-lg p-3 bg-green-50 dark:bg-green-900/20">
+                        <CategoryNameDisplay categoryId={tenantCategoryId} />
+                      </div>
+                    </div>
                     <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                       ✓ Click "Save Changes" to apply this category
                     </p>
@@ -862,7 +932,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave }: EditIte
             </div>
           </div>
           <p className="text-xs text-neutral-500 mt-2">
-            Assign a category to organize your products. Categories with Google IDs will sync to Google Shopping.
+            Assign a Google Product Category for Google Shopping sync. Categories help organize your products and ensure proper placement on Google.
           </p>
         </div>
 

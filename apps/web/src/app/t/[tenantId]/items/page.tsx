@@ -1,5 +1,6 @@
 import SetTenantId from "@/components/client/SetTenantId";
 import ItemsPageClient from "@/components/items/ItemsPageClient";
+import CartButton from "@/components/inventory/CartButton";
 
 export default async function TenantScopedItemsPage({
   params,
@@ -12,6 +13,7 @@ export default async function TenantScopedItemsPage({
     <>
       {tenantId ? <SetTenantId tenantId={tenantId} /> : null}
       <ItemsPageClient tenantId={tenantId} />
+      <CartButton tenantId={tenantId} />
     </>
   );
 }

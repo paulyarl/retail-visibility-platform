@@ -48,18 +48,142 @@ export abstract class UniversalSingleton {
   protected cacheMisses: number = 0;
   protected apiCalls: number = 0;
 
+  // Emergency cache busting mode
+  private static emergencyBustMode: boolean = false;
+  private static emergencyBustReason: string = '';
+  private static readonly STORAGE_KEY = 'emergency_bust_mode';
+
+  /**
+   * Enable/disable emergency cache busting mode
+   * When enabled, all cache operations are bypassed and fresh data is always fetched
+   */
+  static setEmergencyBustMode(enabled: boolean, reason: string = ''): void {
+    this.emergencyBustMode = enabled;
+    this.emergencyBustReason = reason;
+    
+    // Persist to localStorage so it survives page refreshes
+    if (typeof window !== 'undefined') {
+      if (enabled) {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify({ enabled, reason }));
+        console.warn(`🚨 [UniversalSingleton] EMERGENCY CACHE BUST MODE ENABLED: ${reason}`);
+        console.warn('🚨 All cache operations will be bypassed until disabled');
+      } else {
+        localStorage.removeItem(this.STORAGE_KEY);
+        console.log(`✅ [UniversalSingleton] Emergency cache bust mode disabled: ${reason}`);
+      }
+    }
+  }
+
+  /**
+   * Check if emergency bust mode is enabled
+   */
+  static isEmergencyBustMode(): boolean {
+    // Check localStorage on first access to persist across refreshes
+    if (typeof window !== 'undefined' && !this.emergencyBustMode) {
+      const stored = localStorage.getItem(this.STORAGE_KEY);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          this.emergencyBustMode = parsed.enabled;
+          this.emergencyBustReason = parsed.reason || '';
+          if (this.emergencyBustMode) {
+            console.log(`🚨 [UniversalSingleton] Emergency bust mode restored from storage: ${this.emergencyBustReason}`);
+          }
+        } catch (error) {
+          console.warn('[UniversalSingleton] Failed to parse emergency bust mode from storage:', error);
+          localStorage.removeItem(this.STORAGE_KEY);
+        }
+      }
+    }
+    
+    return this.emergencyBustMode;
+  }
+
+  /**
+   * Get emergency bust mode status
+   */
+  static getEmergencyBustStatus(): { enabled: boolean; reason: string } {
+    return {
+      enabled: this.emergencyBustMode,
+      reason: this.emergencyBustReason
+    };
+  }
+
+  /**
+   * Emergency bust mode controls for global access
+   * These can be called from browser console for quick debugging
+   */
+  static emergencyBust(reason: string = 'Manual emergency bust'): void {
+    this.setEmergencyBustMode(true, reason);
+  }
+
+  static emergencyBustDisable(reason: string = 'Emergency resolved'): void {
+    this.setEmergencyBustMode(false, reason);
+  }
+
+  static emergencyBustStatus(): void {
+    const status = this.getEmergencyBustStatus();
+    console.log(`🚨 Emergency Bust Mode Status: ${status.enabled ? 'ENABLED' : 'DISABLED'}`);
+    if (status.enabled) {
+      console.log(`🚨 Reason: ${status.reason}`);
+    }
+  }
+
+  // Attach to window for global access (only in browser)
+  static attachToWindow(): void {
+    if (typeof window !== 'undefined') {
+      // Only attach if not already present to avoid overwriting
+      if (!(window as any).emergencyBust) {
+        (window as any).emergencyBust = (reason: string) => {
+          console.log(`🚨 Enabling emergency bust mode: ${reason}`);
+          this.setEmergencyBustMode(true, reason);
+        };
+        
+        (window as any).emergencyBustDisable = (reason: string) => {
+          console.log(`✅ Disabling emergency bust mode: ${reason}`);
+          this.setEmergencyBustMode(false, reason);
+        };
+        
+        (window as any).emergencyBustStatus = () => {
+          const status = this.getEmergencyBustStatus();
+          console.log(`🚨 Emergency Bust Mode Status: ${status.enabled ? 'ENABLED' : 'DISABLED'}`);
+          if (status.enabled) {
+            console.log(`🚨 Reason: ${status.reason}`);
+          }
+          return status;
+        };
+        
+        console.log('🔧 Emergency bust controls attached to window:');
+        console.log('  - window.emergencyBust("reason") - Enable emergency mode');
+        console.log('  - window.emergencyBustDisable("reason") - Disable emergency mode');
+        console.log('  - window.emergencyBustStatus() - Check status');
+      }
+    }
+  }
+
   // Singleton identifier
   protected readonly singletonKey: string;
 
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     this.singletonKey = singletonKey;
     this.cacheManager = new CacheManager(cacheOptions);
+    
+    // Initialize emergency bust mode from storage
+    UniversalSingleton.isEmergencyBustMode();
   }
 
   /**
    * Get data from cache with automatic hit/miss tracking
    */
   protected async getFromCache<T>(key: string, options?: AutoUserCacheOptions): Promise<T | null> {
+    // Emergency bust mode bypasses all cache operations
+    if (UniversalSingleton.emergencyBustMode) {
+      console.log(`🚨 [${this.constructor.name}] Emergency bust mode: bypassing cache for ${key}`);
+      this.cacheMisses++;
+      this.logCacheMiss(key);
+      return null;
+    }
+
     try {
       const cached = await this.cacheManager.get(key, options);
       if (cached) {
@@ -80,6 +204,12 @@ export abstract class UniversalSingleton {
    * Set data in cache with error handling
    */
   protected async setCache<T>(key: string, data: T, options?: AutoUserCacheOptions): Promise<void> {
+    // Emergency bust mode bypasses all cache operations
+    if (UniversalSingleton.emergencyBustMode) {
+      console.log(`🚨 [${this.constructor.name}] Emergency bust mode: skipping cache set for ${key}`);
+      return;
+    }
+
     try {
       await this.cacheManager.set(key, data, options);
       this.logCacheSet(key);
@@ -157,7 +287,7 @@ export abstract class UniversalSingleton {
   }
 
   /**
-   * Enhanced makeApiRequest method with caching (from ApiSingletonBase)
+   * Enhanced makeApiRequest method with caching and authentication
    */
   protected async makeApiRequest<T>(
     url: string,
@@ -175,12 +305,13 @@ export abstract class UniversalSingleton {
     this.logApiCall(url);
     
     try {
-      const response = await fetch(`${apiUrl}${url}`, {
+      // Import apiRequest dynamically to avoid circular dependencies
+      const { apiRequest } = await import('@/lib/api');
+      
+      const response = await apiRequest(`${apiUrl}${url}`, {
         ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
+        skipCache: true, // We handle caching ourselves
+        skipAuthRedirect: false, // Allow auth redirects
       });
 
       if (!response.ok) {
@@ -299,6 +430,80 @@ export abstract class UniversalSingleton {
    */
   public getCacheManager(): CacheManager {
     return this.cacheManager;
+  }
+
+  /**
+   * Validate cached data and clear if stale or invalid
+   * This is useful when API endpoints change or data structures evolve
+   */
+  protected async validateAndClearCache<T>(
+    cacheKey: string,
+    validator: (data: any) => boolean,
+    options?: AutoUserCacheOptions
+  ): Promise<T | null> {
+    // Emergency bust mode bypasses all cache operations
+    if (UniversalSingleton.emergencyBustMode) {
+      console.log(`🚨 [${this.constructor.name}] Emergency bust mode: bypassing cache validation for ${cacheKey}`);
+      return null;
+    }
+
+    try {
+      // Try to get from persistent cache first
+      const cached = await this.cacheManager.get(cacheKey, options);
+      if (cached) {
+        // Validate the cached data structure
+        if (validator(cached)) {
+          this.logCacheHit(cacheKey);
+          return cached as T;
+        } else {
+          // Clear invalid/stale cache data
+          console.warn(`[${this.constructor.name}] Invalid cache data detected, clearing: ${cacheKey}`);
+          await this.cacheManager.remove(cacheKey);
+          this.logCacheClear(cacheKey);
+        }
+      }
+    } catch (error) {
+      console.warn(`[${this.constructor.name}] Cache validation failed for ${cacheKey}:`, error);
+      // Clear potentially corrupted cache
+      try {
+        await this.cacheManager.remove(cacheKey);
+      } catch (clearError) {
+        console.warn(`[${this.constructor.name}] Failed to clear cache ${cacheKey}:`, clearError);
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Check if cached data is from an old version and needs refresh
+   * Useful for detecting when API responses have changed structure
+   */
+  protected async isCacheVersionStale(
+    cacheKey: string,
+    expectedStructure: string[],
+    options?: AutoUserCacheOptions
+  ): Promise<boolean> {
+    try {
+      const cached = await this.cacheManager.get(cacheKey, options);
+      if (!cached) return true; // No cache means stale
+      
+      // Check if cached data has expected structure
+      const hasExpectedStructure = expectedStructure.every(prop => {
+        return cached && typeof cached === 'object' && prop in cached && (cached as any)[prop] !== undefined;
+      });
+      
+      if (!hasExpectedStructure) {
+        console.log(`[${this.constructor.name}] Cache structure mismatch detected for ${cacheKey}`);
+        await this.cacheManager.remove(cacheKey);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.warn(`[${this.constructor.name}] Cache version check failed for ${cacheKey}:`, error);
+      return true; // Assume stale on error
+    }
   }
 }
 

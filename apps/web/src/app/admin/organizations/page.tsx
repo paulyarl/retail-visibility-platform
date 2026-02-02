@@ -3,30 +3,11 @@
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Modal, ModalFooter, Input, Select } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api } from '@/lib/api';
-
+import { useTenantOrganizations } from '@/hooks/useTenantOrganizations';
+import { type Organization } from '@/lib/singletons/TenantOrganizationsSingleton';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
-
-interface Organization {
-  id: string;
-  name: string;
-  maxLocations: number;
-  maxTotalSKUs: number;
-  subscriptionTier: string;
-  subscriptionStatus: string;
-  tenants: Array<{
-    id: string;
-    name: string;
-    _count: { items: number };
-  }>;
-  stats: {
-    totalLocations: number;
-    totalSKUs: number;
-    utilizationPercent: number;
-  };
-}
 
 const ITEMS_PER_PAGE = 10;
 
@@ -53,12 +34,26 @@ const ORGANIZATION_TIER_LIMITS = {
 } as const;
 
 export default function AdminOrganizationsPage() {
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Use singleton for all data management
+  const {
+    organizations,
+    availableTenants,
+    loading,
+    error,
+    processing,
+    createOrganization,
+    updateOrganization,
+    addTenantToOrganization,
+    removeTenantFromOrganization,
+    refresh,
+    refreshTenants,
+    clearError,
+  } = useTenantOrganizations('admin', { autoInitialize: true });
+
+  // Local UI state (maintained exactly as before)
   const [currentPage, setCurrentPage] = useState(1);
   const [showManageModal, setShowManageModal] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
-  const [availableTenants, setAvailableTenants] = useState<Array<{id: string; name: string}>>([]);
   const [selectedTenantId, setSelectedTenantId] = useState('');
   
   // Create organization state
@@ -67,7 +62,6 @@ export default function AdminOrganizationsPage() {
   const [newOrgTier, setNewOrgTier] = useState('chain_starter');
   const [newOrgMaxLocations, setNewOrgMaxLocations] = useState('5');
   const [newOrgMaxSKUs, setNewOrgMaxSKUs] = useState('2500');
-  const [creating, setCreating] = useState(false);
 
   // Edit organization tier state
   const [showEditTierModal, setShowEditTierModal] = useState(false);
@@ -77,49 +71,6 @@ export default function AdminOrganizationsPage() {
   const [editMaxLocations, setEditMaxLocations] = useState('5');
   const [editMaxSKUs, setEditMaxSKUs] = useState('2500');
   const [editReason, setEditReason] = useState('');
-  const [updating, setUpdating] = useState(false);
-
-  useEffect(() => {
-    loadOrganizations();
-    loadAvailableTenants();
-  }, []);
-
-  const loadOrganizations = async () => {
-    try {
-      const res = await api.get('/api/organizations');
-      const data = await res.json();
-      // Transform snake_case API response to camelCase for frontend
-      const transformed = (Array.isArray(data) ? data : []).map((org: any) => ({
-        id: org.id,
-        name: org.name,
-        maxLocations: org.max_locations ?? org.maxLocations ?? 5,
-        maxTotalSKUs: org.max_total_skus ?? org.maxTotalSKUs ?? 2500,
-        subscriptionTier: org.subscription_tier ?? org.subscriptionTier ?? 'chain_starter',
-        subscriptionStatus: org.subscription_status ?? org.subscriptionStatus ?? 'active',
-        tenants: (org.tenants || []).map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          _count: { items: t._count?.inventory_items ?? t._count?.items ?? 0 },
-        })),
-        stats: org.stats || { totalLocations: 0, totalSKUs: 0, utilizationPercent: 0 },
-      }));
-      setOrganizations(transformed);
-    } catch (error) {
-      console.error('Failed to load organizations:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadAvailableTenants = async () => {
-    try {
-      const res = await api.get('/api/tenants');
-      const data = await res.json();
-      setAvailableTenants(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Failed to load tenants:', error);
-    }
-  };
 
   const openManageModal = (org: Organization) => {
     setSelectedOrg(org);
@@ -130,36 +81,28 @@ export default function AdminOrganizationsPage() {
     if (!selectedTenantId) return;
     
     try {
-      const res = await api.post(`/api/organizations/${orgId}/tenants`, {
-        tenantId: selectedTenantId
-      });
-      
-      if (res.ok) {
-        await loadOrganizations();
-        await loadAvailableTenants();
-        setSelectedTenantId('');
-        // Update selected org
-        const updated = organizations.find(o => o.id === orgId);
-        if (updated) setSelectedOrg(updated);
-      }
+      await addTenantToOrganization(orgId, selectedTenantId);
+      await refreshTenants();
+      setSelectedTenantId('');
+      // Update selected org with refreshed data
+      const updated = organizations.find(o => o.id === orgId);
+      if (updated) setSelectedOrg(updated);
     } catch (error) {
       console.error('Failed to add tenant:', error);
+      alert('Failed to add tenant. Please try again.');
     }
   };
 
   const handleRemoveTenant = async (orgId: string, tenantId: string) => {
     try {
-      const res = await api.delete(`/api/organizations/${orgId}/tenants/${tenantId}`);
-      
-      if (res.ok) {
-        await loadOrganizations();
-        await loadAvailableTenants();
-        // Update selected org
-        const updated = organizations.find(o => o.id === orgId);
-        if (updated) setSelectedOrg(updated);
-      }
+      await removeTenantFromOrganization(orgId, tenantId);
+      await refreshTenants();
+      // Update selected org with refreshed data
+      const updated = organizations.find(o => o.id === orgId);
+      if (updated) setSelectedOrg(updated);
     } catch (error) {
       console.error('Failed to remove tenant:', error);
+      alert('Failed to remove tenant. Please try again.');
     }
   };
 
@@ -179,31 +122,23 @@ export default function AdminOrganizationsPage() {
       return;
     }
 
-    setUpdating(true);
     try {
-      const res = await api.put(`/api/organizations/${editingOrg.id}`, {
-        subscriptionTier: editTier,
-        subscriptionStatus: editStatus,
-        maxLocations: parseInt(editMaxLocations) || 5,
-        maxTotalSKUs: parseInt(editMaxSKUs) || 2500,
-        reason: editReason.trim(),
+      await updateOrganization(editingOrg.id, {
+        subscription_tier: editTier,
+        subscription_status: editStatus,
+        max_locations: parseInt(editMaxLocations) || 5,
       });
-
-      if (res.ok) {
-        await loadOrganizations();
-        setShowEditTierModal(false);
-        setEditingOrg(null);
-        setEditReason('');
-        alert('Organization tier updated successfully!');
-      } else {
-        const error = await res.json();
-        alert(`Failed to update organization: ${error.error || 'Unknown error'}`);
-      }
+      setShowEditTierModal(false);
+      setEditingOrg(null);
+      setEditReason('');
+      alert('Organization tier updated successfully!');
     } catch (error) {
       console.error('Failed to update organization:', error);
-      alert('Failed to update organization. Please try again.');
-    } finally {
-      setUpdating(false);
+      if (error instanceof Error && error.message.includes('Failed to update organization:')) {
+        alert(error.message);
+      } else {
+        alert('Failed to update organization. Please try again.');
+      }
     }
   };
 
@@ -213,34 +148,26 @@ export default function AdminOrganizationsPage() {
       return;
     }
 
-    setCreating(true);
     try {
-      const res = await api.post('/api/organizations', {
+      await createOrganization({
         name: newOrgName.trim(),
-        subscriptionTier: newOrgTier,
-        maxLocations: parseInt(newOrgMaxLocations) || 10,
-        maxTotalSKUs: parseInt(newOrgMaxSKUs) || 50000,
-        subscriptionStatus: 'active',
+        subscription_tier: newOrgTier,
+        max_locations: parseInt(newOrgMaxLocations) || 10,
       });
-
-      if (res.ok) {
-        await loadOrganizations();
-        setShowCreateModal(false);
-        // Reset form
-        setNewOrgName('');
-        setNewOrgTier('chain_starter');
-        setNewOrgMaxLocations('10');
-        setNewOrgMaxSKUs('50000');
-        alert('Organization created successfully!');
-      } else {
-        const error = await res.json();
-        alert(`Failed to create organization: ${error.error || 'Unknown error'}`);
-      }
+      setShowCreateModal(false);
+      // Reset form
+      setNewOrgName('');
+      setNewOrgTier('chain_starter');
+      setNewOrgMaxLocations('10');
+      setNewOrgMaxSKUs('50000');
+      alert('Organization created successfully!');
     } catch (error) {
       console.error('Failed to create organization:', error);
-      alert('Failed to create organization. Please try again.');
-    } finally {
-      setCreating(false);
+      if (error instanceof Error && error.message.includes('Failed to create organization:')) {
+        alert(error.message);
+      } else {
+        alert('Failed to create organization. Please try again.');
+      }
     }
   };
 
@@ -500,7 +427,7 @@ export default function AdminOrganizationsPage() {
       <Modal
         isOpen={showCreateModal}
         onClose={() => {
-          if (!creating) {
+          if (!processing) {
             setShowCreateModal(false);
             setNewOrgName('');
             setNewOrgTier('chain_starter');
@@ -519,7 +446,7 @@ export default function AdminOrganizationsPage() {
               value={newOrgName}
               onChange={(e) => setNewOrgName(e.target.value)}
               placeholder="e.g., Acme Restaurant Chain"
-              disabled={creating}
+              disabled={processing}
             />
           </div>
 
@@ -537,7 +464,7 @@ export default function AdminOrganizationsPage() {
                 setNewOrgMaxLocations(limits.maxLocations.toString());
                 setNewOrgMaxSKUs(limits.maxTotalSKUs.toString());
               }}
-              disabled={creating}
+              disabled={processing}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="chain_starter">
@@ -561,7 +488,7 @@ export default function AdminOrganizationsPage() {
               value={newOrgMaxLocations}
               onChange={(e) => setNewOrgMaxLocations(e.target.value)}
               placeholder="5"
-              disabled={creating}
+              disabled={processing}
               min="1"
             />
             <p className="text-xs text-neutral-500 mt-1">
@@ -578,7 +505,7 @@ export default function AdminOrganizationsPage() {
               value={newOrgMaxSKUs}
               onChange={(e) => setNewOrgMaxSKUs(e.target.value)}
               placeholder="2500"
-              disabled={creating}
+              disabled={processing}
               min="1"
             />
             <p className="text-xs text-neutral-500 mt-1">
@@ -604,16 +531,16 @@ export default function AdminOrganizationsPage() {
               setNewOrgMaxLocations('5');
               setNewOrgMaxSKUs('2500');
             }}
-            disabled={creating}
+            disabled={processing}
           >
             Cancel
           </Button>
           <Button
             variant="primary"
             onClick={handleCreateOrganization}
-            disabled={creating || !newOrgName.trim()}
+            disabled={processing || !newOrgName.trim()}
           >
-            {creating ? 'Creating...' : 'Create Organization'}
+            {processing ? 'Creating...' : 'Create Organization'}
           </Button>
         </ModalFooter>
       </Modal>
@@ -622,7 +549,7 @@ export default function AdminOrganizationsPage() {
       <Modal
         isOpen={showEditTierModal}
         onClose={() => {
-          if (!updating) {
+          if (!processing) {
             setShowEditTierModal(false);
             setEditingOrg(null);
             setEditReason('');
@@ -659,7 +586,7 @@ export default function AdminOrganizationsPage() {
                     setEditMaxSKUs(limits.maxTotalSKUs.toString());
                   }
                 }}
-                disabled={updating}
+                disabled={processing}
                 className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="chain_starter">
@@ -681,7 +608,7 @@ export default function AdminOrganizationsPage() {
               <select
                 value={editStatus}
                 onChange={(e) => setEditStatus(e.target.value)}
-                disabled={updating}
+                disabled={processing}
                 className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="trial">Trial</option>
@@ -700,7 +627,7 @@ export default function AdminOrganizationsPage() {
                 type="number"
                 value={editMaxSKUs}
                 onChange={(e) => setEditMaxSKUs(e.target.value)}
-                disabled={updating}
+                disabled={processing}
                 min="1"
               />
               <p className="text-xs text-neutral-500 mt-1">
@@ -717,7 +644,7 @@ export default function AdminOrganizationsPage() {
                 onChange={(e) => setEditReason(e.target.value)}
                 placeholder="e.g., Customer upgraded to Chain Professional via sales call"
                 rows={3}
-                disabled={updating}
+                disabled={processing}
                 className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
@@ -731,16 +658,16 @@ export default function AdminOrganizationsPage() {
               setEditingOrg(null);
               setEditReason('');
             }}
-            disabled={updating}
+            disabled={processing}
           >
             Cancel
           </Button>
           <Button
             variant="primary"
             onClick={handleUpdateOrganizationTier}
-            disabled={updating || !editReason.trim()}
+            disabled={processing || !editReason.trim()}
           >
-            {updating ? 'Updating...' : 'Update Tier'}
+            {processing ? 'Updating...' : 'Update Tier'}
           </Button>
         </ModalFooter>
       </Modal>

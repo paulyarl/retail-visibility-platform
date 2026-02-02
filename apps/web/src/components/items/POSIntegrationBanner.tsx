@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui';
 import { X } from 'lucide-react';
-import { api } from '@/lib/api';
+import { getIntegrationsSingleton } from '@/lib/singletons/IntegrationsSingleton';
 
 interface POSIntegrationBannerProps {
   tenantId: string;
@@ -34,17 +34,12 @@ export default function POSIntegrationBanner({
     const checkPOSConnection = async () => {
       setLoading(true);
       try {
-        const response = await api.get(`/api/tenants/${tenantId}/integrations/clover`);
-        if (response.ok) {
-          const data = await response.json();
-          setHasPOS(data.connected || false);
-        } else if (response.status === 404) {
-          // API not implemented yet, assume no POS connection
-          console.warn('[POSIntegrationBanner] Clover integration API not available');
-          setHasPOS(false);
-        }
+        // Use singleton for cached integration status (5-min TTL)
+        const singleton = getIntegrationsSingleton(tenantId);
+        const cloverIntegration = await singleton.fetchCloverIntegration();
+        setHasPOS(cloverIntegration?.connected || false);
       } catch (error) {
-        console.error('[POSIntegrationBanner] Failed to check POS connection:', error);
+        console.error('Failed to check POS connection:', error);
       } finally {
         setLoading(false);
       }

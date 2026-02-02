@@ -272,6 +272,7 @@ export default function LastViewed({
                 return (
                 <SmartProductCard
                   key={`product-${productData.productId}-${index}`}
+                  tenantId={productData.tenantId}
                   product={{
                     id: productData.productId,
                     sku: productData.productSku || productData.productId,

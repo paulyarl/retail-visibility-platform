@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalogSidebar';
 import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSingleton';
 import { FeaturedProduct } from '@/providers/data/FeaturedProductsSingleton';
 import StorefrontViewTracker from '@/components/tracking/StorefrontViewTracker';
@@ -11,15 +10,15 @@ import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import StorefrontMap from '@/components/storefront/StorefrontMap';
 import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
 import FeaturedProductsSection from '@/components/storefront/FeaturedProductsSection';
+import SmartProductCard from '@/components/products/SmartProductCard';
+import FeaturedBucketSimple from '@/components/storefront/FeaturedBucketSimple';
+import StorefrontActions from '@/components/storefront/StorefrontActions';
 import Image from 'next/image';
 import Link from 'next/link';
 
 interface StorefrontClientWrapperProps {
   tenantId: string;
   tenant: any;
-  products: any[];
-  total: number;
-  limit: number;
   platformSettings: any;
   mapLocation: any;
   hasBranding: boolean;
@@ -29,11 +28,8 @@ interface StorefrontClientWrapperProps {
   productCategories: any[];
   storeCategories: any[];
   uncategorizedCount: number;
-  currentCategory: any;
   paymentGateways: any[];
   businessName: string;
-  currentPage: number;
-  totalPages: number;
   search?: string;
   category?: string;
   featured?: string;
@@ -42,7 +38,6 @@ interface StorefrontClientWrapperProps {
   apiBaseUrl: string;
   directoryPublished: boolean;
   tenantSlug: string;
-  primaryStoreCategory: any;
   primaryGBPCategory: any;
   secondaryGBPCategories: any[];
   tier: string;
@@ -54,9 +49,6 @@ interface StorefrontClientWrapperProps {
 export default function StorefrontClientWrapper({
   tenantId,
   tenant,
-  products,
-  total,
-  limit,
   platformSettings,
   mapLocation,
   hasBranding,
@@ -66,11 +58,8 @@ export default function StorefrontClientWrapper({
   productCategories,
   storeCategories,
   uncategorizedCount,
-  currentCategory,
   paymentGateways,
   businessName,
-  currentPage,
-  totalPages,
   search,
   category,
   featured,
@@ -79,7 +68,6 @@ export default function StorefrontClientWrapper({
   apiBaseUrl,
   directoryPublished,
   tenantSlug,
-  primaryStoreCategory,
   primaryGBPCategory,
   secondaryGBPCategories,
   tier,
@@ -102,25 +90,55 @@ export default function StorefrontClientWrapper({
   useEffect(() => {
     const loadFeaturedCounts = async () => {
       try {
-        const data = await featuredProductsSingleton.getAllFeaturedProducts(tenantId, 20);
+        let data = await featuredProductsSingleton.getAllFeaturedProducts(tenantId, 20);
+        
+        // Validate cache: if data is empty, force a fresh fetch
+        if (data && data.totalCount === 0 && (!data.buckets || data.buckets.length === 0)) {
+          console.warn('[StorefrontClientWrapper] Detected empty cached data, forcing fresh fetch');
+          // Clear cache and fetch fresh data
+          await featuredProductsSingleton.clearCache();
+          data = await featuredProductsSingleton.getAllFeaturedProducts(tenantId, 20);
+        }
+        
         if (data) {
           console.log('Featured data response:', data);
           console.log('Buckets:', data.buckets);
           
-          setFeaturedData(data);
+          // Debug each bucket
+          data.buckets?.forEach((bucket: any) => {
+            console.log(`Bucket ${bucket.bucketType}:`, {
+              totalCount: bucket.totalCount,
+              productsCount: bucket.products?.length || 0,
+              products: bucket.products?.slice(0, 2).map((p: any) => ({ id: p.id, name: p.name }))
+            });
+          });
           
-          // Extract counts from buckets
-          const getBucketCount = (bucketType: string) => {
-            const bucket = data.buckets?.find((b: any) => b.bucketType === bucketType);
-            return bucket?.totalCount || 0;
+          // Transform bucket data into the expected format
+          const transformedData = {
+            totalCount: data.totalCount,
+            staffPick: data.buckets?.find((b: any) => b.bucketType === 'staff_pick')?.products || [],
+            seasonal: data.buckets?.find((b: any) => b.bucketType === 'seasonal')?.products || [],
+            sale: data.buckets?.find((b: any) => b.bucketType === 'sale')?.products || [],
+            newArrival: data.buckets?.find((b: any) => b.bucketType === 'new_arrival')?.products || [],
+            storeSelection: data.buckets?.find((b: any) => b.bucketType === 'store_selection')?.products || [],
+            bucketCounts: {
+              staff_pick: data.buckets?.find((b: any) => b.bucketType === 'staff_pick')?.totalCount || 0,
+              seasonal: data.buckets?.find((b: any) => b.bucketType === 'seasonal')?.totalCount || 0,
+              sale: data.buckets?.find((b: any) => b.bucketType === 'sale')?.totalCount || 0,
+              new_arrival: data.buckets?.find((b: any) => b.bucketType === 'new_arrival')?.totalCount || 0,
+              store_selection: data.buckets?.find((b: any) => b.bucketType === 'store_selection')?.totalCount || 0,
+            }
           };
           
+          setFeaturedData(transformedData);
+          
+          // Set featured counts
           setFeaturedCounts({
-            staffPick: getBucketCount('staff_pick'),
-            seasonal: getBucketCount('seasonal'),
-            sale: getBucketCount('sale'),
-            newArrival: getBucketCount('new_arrival'),
-            storeSelection: getBucketCount('store_selection'),
+            staffPick: transformedData.bucketCounts.staff_pick,
+            seasonal: transformedData.bucketCounts.seasonal,
+            sale: transformedData.bucketCounts.sale,
+            newArrival: transformedData.bucketCounts.new_arrival,
+            storeSelection: transformedData.bucketCounts.store_selection,
           });
         }
       } catch (err) {
@@ -202,6 +220,13 @@ export default function StorefrontClientWrapper({
                 <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">
                   {businessName}
                 </h1>
+                
+                {/* Storefront Actions */}
+                <StorefrontActions 
+                  tenantId={tenantId}
+                  businessName={businessName}
+                  currentUrl={typeof window !== 'undefined' ? window.location.href : ''}
+                />
                 
                 {/* Layout Toggle Button */}
                 <button
@@ -416,12 +441,14 @@ export default function StorefrontClientWrapper({
               {/* Staff Picks Bucket */}
               {featuredData.staffPick.length > 0 && (
                 <div id="staff_pick-section">
-                  <FeaturedBucket
+                  <FeaturedBucketSimple
                     title="⭐ Staff Picks"
                     description="Our team's favorite picks"
                     products={featuredData.staffPick}
                     totalCount={featuredData.bucketCounts.staff_pick}
                     bucketType="staff_pick"
+                    tenantId={tenantId}
+                    showLayoutSelector={true}
                   />
                 </div>
               )}
@@ -429,12 +456,14 @@ export default function StorefrontClientWrapper({
               {/* New Arrivals Bucket */}
               {featuredData.newArrival.length > 0 && (
                 <div id="new_arrival-section">
-                  <FeaturedBucket
+                  <FeaturedBucketSimple
                     title="✨ New Arrivals"
                     description="Fresh additions to our collection"
                     products={featuredData.newArrival}
                     totalCount={featuredData.bucketCounts.new_arrival}
                     bucketType="new_arrival"
+                    tenantId={tenantId}
+                    showLayoutSelector={false}
                   />
                 </div>
               )}
@@ -442,12 +471,14 @@ export default function StorefrontClientWrapper({
               {/* Sale Bucket */}
               {featuredData.sale.length > 0 && (
                 <div id="sale-section">
-                  <FeaturedBucket
+                  <FeaturedBucketSimple
                     title="💰 Sale"
                     description="Great deals on selected items"
                     products={featuredData.sale}
                     totalCount={featuredData.bucketCounts.sale}
                     bucketType="sale"
+                    tenantId={tenantId}
+                    showLayoutSelector={false}
                   />
                 </div>
               )}
@@ -455,12 +486,14 @@ export default function StorefrontClientWrapper({
               {/* Seasonal Bucket */}
               {featuredData.seasonal.length > 0 && (
                 <div id="seasonal-section">
-                  <FeaturedBucket
+                  <FeaturedBucketSimple
                     title="🍂 Seasonal"
                     description="Perfect for the current season"
                     products={featuredData.seasonal}
                     totalCount={featuredData.bucketCounts.seasonal}
                     bucketType="seasonal"
+                    tenantId={tenantId}
+                    showLayoutSelector={false}
                   />
                 </div>
               )}
@@ -468,12 +501,14 @@ export default function StorefrontClientWrapper({
               {/* Store Selection Bucket */}
               {featuredData.storeSelection.length > 0 && (
                 <div id="store_selection-section">
-                  <FeaturedBucket
+                  <FeaturedBucketSimple
                     title="🏪 Store Selection"
                     description="Curated by our store experts"
                     products={featuredData.storeSelection}
                     totalCount={featuredData.bucketCounts.store_selection}
                     bucketType="store_selection"
+                    tenantId={tenantId}
+                    showLayoutSelector={false}
                   />
                 </div>
               )}
@@ -485,118 +520,26 @@ export default function StorefrontClientWrapper({
               <div className="relative px-8 py-12 text-center">
                 <div className="max-w-3xl mx-auto">
                   <h3 className="text-2xl font-bold text-primary-900 dark:text-primary-100 mb-3">
-                    Discover More Amazing Products
+                    Discover Our Complete Collection
                   </h3>
                   <p className="text-primary-700 dark:text-primary-300 text-lg mb-6">
-                    Explore our complete collection of {featuredData.totalCount > 0 ? `${featuredData.totalCount}+ ` : ''}products
+                    Browse our entire catalog of {totalAllProducts > 0 ? `${totalAllProducts}+ ` : ''}products with advanced search and filtering
                   </p>
+                  <Link
+                    href={`/shops/${tenantId}`}
+                    className="inline-flex items-center px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors shadow-lg hover:shadow-xl"
+                  >
+                    Browse Full Catalog
+                    <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </Link>
                 </div>
               </div>
             </div>
           </div>
         </div>
       )}
-
-      {/* Main Catalog Area - Conditional Width */}
-      <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
-        <div className="flex">
-          {/* Collapsible Sidebar Catalog Layout */}
-          <div className="w-80 shrink-0">
-            <CollapsibleCatalogSidebar
-              tenantId={tenantId}
-              categories={productCategories}
-              totalProducts={totalAllProducts}
-              productsLength={products.length}
-              totalPages={totalPages}
-              currentPage={currentPage}
-              search={search}
-              currentCategory={currentCategory}
-              featured={featured}
-              view={view}
-              featuredCounts={featuredCounts}
-            />
-          </div>
-
-          {/* Main Content - Full Width */}
-          <div className="flex-1">
-            <div id="catalog-banner" className="transition-all duration-300">
-              {/* Current Context Header */}
-              <div className="mb-6">
-                <h2 className="text-2xl font-semibold text-neutral-900 dark:text-white">
-                  {featured ? getFeaturedTypeName(featured) : (currentCategory ? currentCategory.name : 'All Products')} ({total})
-                </h2>
-                {(search || currentCategory || featured) && (
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-                    {featured && !search && !currentCategory && `Showing ${getFeaturedTypeName(featured).toLowerCase()}`}
-                    {currentCategory && !search && !featured && `Showing all ${currentCategory.name.toLowerCase()} products`}
-                    {search && !currentCategory && !featured && `Results for "${search}"`}
-                    {search && currentCategory && !featured && `Results for "${search}" in ${currentCategory.name}`}
-                    {search && featured && !currentCategory && `Results for "${search}" in ${getFeaturedTypeName(featured)}`}
-                  </p>
-                )}
-              </div>
-
-              {/* Enhanced Product Display */}
-              <div className="space-y-8">
-                <EnhancedProductDisplay
-                  products={products}
-                  tenantId={tenantId}
-                  tenantName={businessName}
-                  tenantLogo={tenant.metadata?.logo_url}
-                  useSingletonData={true}
-                  showFeaturedBadges={true}
-                />
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 mt-8">
-                  {currentPage > 1 && (
-                    <button
-                      className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
-                    >
-                      ← Previous
-                    </button>
-                  )}
-
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-
-                    return (
-                      <button
-                        key={pageNum}
-                        className={`px-4 py-2 rounded-lg transition-colors ${pageNum === currentPage
-                          ? 'bg-primary-600 text-white'
-                          : 'border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700'
-                          }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-
-                  {currentPage < totalPages && (
-                    <button
-                      className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
-                    >
-                      Next →
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Client-side storefront tracking */}
       <StorefrontViewTracker tenantId={tenantId} categoriesViewed={productCategories.map((c: any) => c.name)} />
@@ -662,8 +605,8 @@ export default function StorefrontClientWrapper({
                 slug: tenantSlug,
                 metadata: tenant.metadata
               }}
-              primaryCategory={primaryStoreCategory?.name}
-              productCount={total}
+              primaryCategory={primaryGBPCategory?.name}
+              productCount={totalAllProducts}
             />
           </div>
 
@@ -861,6 +804,43 @@ function FeaturedProductCard({ product }: { product: FeaturedProduct }) {
           </p>
         )}
 
+        {/* Description (trimmed) */}
+        {product.description && (
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2 line-clamp-1">
+            {product.description}
+          </p>
+        )}
+
+        {/* Category and Condition */}
+        <div className="flex items-center gap-2 mb-2">
+          {product.categoryName && (
+            <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">
+              🏷️ {product.categoryName}
+            </span>
+          )}
+          {product.condition && (
+            <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded">
+              ✅ {product.condition.replace('_', ' ')}
+            </span>
+          )}
+        </div>
+
+        {/* Variant Indicator */}
+        {product.hasVariants && (
+          <div className="mb-2">
+            <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">
+              🔄 Multiple Variants
+            </span>
+          </div>
+        )}
+
+        {/* SKU */}
+        {product.sku && (
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-2">
+            📦 SKU: {product.sku}
+          </p>
+        )}
+
         {/* Price */}
         <div className="flex items-center gap-2 mb-3">
           <span className="text-lg font-semibold text-neutral-900 dark:text-white">
@@ -887,6 +867,11 @@ function FeaturedProductCard({ product }: { product: FeaturedProduct }) {
           ) : (
             <span className="text-red-600 dark:text-red-400">
               ✗ Out of Stock
+            </span>
+          )}
+          {product.availability && (
+            <span className="text-neutral-600 dark:text-neutral-400">
+              • {product.availability.replace('_', ' ')}
             </span>
           )}
         </div>

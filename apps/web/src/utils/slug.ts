@@ -1,11 +1,34 @@
 /**
- * Centralized slug utilities for consistent URL generation across the platform
- * This ensures all pages use the same slugification logic
+ * ============================================================================
+ * FRONTEND SLUG UTILITIES
+ * ============================================================================
+ * 
+ * These utilities are for FRONTEND URL generation and navigation only.
+ * 
+ * For TENANT/BUSINESS SLUGS, use the backend API:
+ * - POST /api/slugs/patterns - Get all available slug patterns
+ * - POST /api/slugs/generate-with-pattern - Generate specific pattern
+ * - POST /api/slugs/slugify - Simple slugification via API
+ * 
+ * The backend SlugSingletonService provides:
+ * - Geographic disambiguation
+ * - Uniqueness guarantees
+ * - Database persistence
+ * - Caching
+ * 
+ * These frontend utilities are for:
+ * - Category URL generation (getCategoryUrl)
+ * - Store type URL generation (getStoreTypeUrl)
+ * - Slug comparison (slugsMatch)
+ * - Simple frontend display slugs (unslugify)
+ * ============================================================================
  */
 
 /**
- * Convert text to URL-friendly slug
- * Handles special characters, multiple spaces, and edge cases
+ * Convert text to URL-friendly slug (FRONTEND ONLY)
+ * 
+ * ⚠️ WARNING: For tenant/business slugs, use POST /api/slugs/slugify instead!
+ * This function is only for frontend URL generation (categories, store types).
  * 
  * Examples:
  * - "Electronics store" → "electronics-store"
@@ -14,7 +37,7 @@
  * - "  Multiple   Spaces  " → "multiple-spaces"
  * 
  * @param text - The text to convert to slug
- * @returns URL-friendly slug
+ * @returns URL-friendly slug (frontend use only)
  */
 export function slugify(text: string): string {
   return text

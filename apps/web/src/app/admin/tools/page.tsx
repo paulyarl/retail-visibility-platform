@@ -192,9 +192,8 @@ export default function AdminToolsPage() {
     );
   };
 
-  const renderCollapsibleSection = (title: string, sectionId: string, icon: React.ReactNode, children: React.ReactNode, badge?: string) => {
+  const renderCollapsibleSection = (title: string, sectionId: string, IconComponent: React.ComponentType<any>, children: React.ReactNode, badge?: string) => {
     const isExpanded = expandedSections.includes(sectionId);
-    const Icon = icon as any;
     
     return (
       <div className="mb-6">
@@ -204,7 +203,7 @@ export default function AdminToolsPage() {
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <Icon className="w-5 h-5 text-white" />
+              <IconComponent className="w-5 h-5 text-white" />
             </div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
               {title}
@@ -253,7 +252,7 @@ export default function AdminToolsPage() {
         {renderCollapsibleSection(
           "🔒 Security & Platform Control",
           "security-platform",
-          <Shield className="w-6 h-6" />,
+          Shield,
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {dashboards.filter(d => d.id === 'security-dashboard' || d.id === 'platform-settings').map((dashboard) => {
               const Icon = dashboard.icon;
@@ -306,7 +305,7 @@ export default function AdminToolsPage() {
         {renderCollapsibleSection(
           "📊 Analytics Dashboards",
           "dashboards",
-          <Activity className="w-6 h-6" />,
+          Activity,
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {dashboards.filter(d => d.id !== 'security-dashboard' && d.id !== 'platform-settings').map((dashboard) => {
               const Icon = dashboard.icon;
@@ -358,7 +357,7 @@ export default function AdminToolsPage() {
         {renderCollapsibleSection(
           "📁 Directory Management",
           "directory",
-          <Package className="w-6 h-6" />,
+          Package,
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {directories.map((directory) => {
               const Icon = directory.icon;
@@ -401,7 +400,7 @@ export default function AdminToolsPage() {
         {renderCollapsibleSection(
           "🛠️ Admin Tools",
           "tools",
-          <Settings className="w-6 h-6" />,
+          Settings,
           <div className="space-y-6">
             {categories.map((category) => {
               const categoryTools = tools.filter((tool) => tool.category === category.id);

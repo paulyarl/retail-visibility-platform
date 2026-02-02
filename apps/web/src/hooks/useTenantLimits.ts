@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Hook for managing tenant (location) creation limits
  */

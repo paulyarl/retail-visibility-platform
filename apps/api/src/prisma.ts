@@ -53,7 +53,10 @@ async function withRetry<T>(
         error.message?.includes("Can't reach database server") ||
         error.message?.includes('Connection refused') ||
         error.message?.includes('ECONNREFUSED') ||
-        error.message?.includes('connection pool');
+        error.message?.includes('connection pool') ||
+        error.message?.includes('forcibly closed by the remote host') ||
+        error.message?.includes('ConnectionReset') ||
+        error.message?.includes('An existing connection was forcibly closed');
       
       if (isConnectionError && attempt < maxRetries) {
         // Exponential backoff: 200ms, 400ms, 800ms, 1600ms, 3200ms
@@ -125,4 +128,42 @@ export async function checkDatabaseConnection(): Promise<boolean> {
     console.error('[Database Health] Connection check failed:', error);
     return false;
   }
+}
+
+// Connection validation and recovery
+export async function validateAndRecoverConnection(): Promise<boolean> {
+  try {
+    // Test connection with a simple query
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch (error: any) {
+    console.warn('[Database Recovery] Connection validation failed, attempting recovery:', error.message);
+    
+    // If connection is broken, disconnect and reconnect
+    try {
+      await basePrisma.$disconnect();
+      console.log('[Database Recovery] Disconnected from database');
+      
+      // Wait a moment before reconnecting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Test reconnection
+      await prisma.$queryRaw`SELECT 1`;
+      console.log('[Database Recovery] Successfully reconnected to database');
+      return true;
+    } catch (reconnectError) {
+      console.error('[Database Recovery] Reconnection failed:', reconnectError);
+      return false;
+    }
+  }
+}
+
+// Periodic connection validation (run every 5 minutes in development)
+if (process.env.NODE_ENV === 'development') {
+  setInterval(async () => {
+    const isHealthy = await validateAndRecoverConnection();
+    if (!isHealthy) {
+      console.warn('[Database Health] Periodic check failed - connection may be unstable');
+    }
+  }, 5 * 60 * 1000); // 5 minutes
 }

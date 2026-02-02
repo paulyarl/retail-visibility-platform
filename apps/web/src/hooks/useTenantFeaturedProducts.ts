@@ -32,6 +32,7 @@ interface UseTenantFeaturedProductsReturn extends FeaturedProductsState {
   setSelectedType: (typeId: string) => void;
   setSearchQuery: (query: string) => void;
   setAvailablePage: (page: number) => void;
+  setOutOfStockPage: (page: number) => void;
   setEditingExpiration: (productId: string | null, date?: string) => void;
   forceRefresh: () => Promise<void>;
   
@@ -42,6 +43,9 @@ interface UseTenantFeaturedProductsReturn extends FeaturedProductsState {
   filteredAvailable: FeaturedProduct[];
   isOutOfStock: (product: FeaturedProduct) => boolean;
   
+  // Singleton access for advanced operations
+  singleton: ReturnType<typeof getTenantFeaturedProductsSingleton>;
+  
   // Pre-calculated data for each type
   featuredProductsByType: Record<string, FeaturedProduct[]>;
   activeFeaturedByType: Record<string, FeaturedProduct[]>;
@@ -50,6 +54,7 @@ interface UseTenantFeaturedProductsReturn extends FeaturedProductsState {
   paginatedInStock: FeaturedProduct[];
   paginatedOutOfStock: FeaturedProduct[];
   totalPages: number;
+  outOfStockTotalPages: number;
   totalAvailableProducts: number;
 }
 
@@ -132,46 +137,58 @@ export function useTenantFeaturedProducts(
 
   // Pagination logic - simplified for better separation
   const itemsPerPage = 12;
+  const outOfStockItemsPerPage = 3; // Smaller page size for out-of-stock to enable pagination
 
   const inStockProducts = useMemo(() => {
     const inStock = filteredAvailable.filter(product => !singleton.isOutOfStock(product));
-    console.log('useTenantFeaturedProducts: In-stock filtering', {
+    /* console.log('useTenantFeaturedProducts: In-stock filtering', {
       totalAvailable: filteredAvailable.length,
       inStockCount: inStock.length,
       outOfStockCount: filteredAvailable.length - inStock.length,
       sampleOutOfStock: filteredAvailable.filter(product => singleton.isOutOfStock(product)).slice(0, 2).map(p => ({ id: p.id, name: p.name, stock: p.stock, availability: p.availability }))
-    });
+    }); */
     return inStock;
   }, [filteredAvailable]);
   
   const outOfStockProducts = useMemo(() => {
-    const outOfStock = filteredAvailable.filter(product => singleton.isOutOfStock(product));
-    console.log('useTenantFeaturedProducts: Out-of-stock filtering', {
-      totalAvailable: filteredAvailable.length,
-      outOfStockCount: outOfStock.length,
-      sampleOutOfStock: outOfStock.slice(0, 2).map(p => ({ id: p.id, name: p.name, stock: p.stock, availability: p.availability }))
-    });
-    return outOfStock;
-  }, [filteredAvailable]);
+    // Access out-of-stock products through the state
+    return state.outOfStockProducts || [];
+  }, [state.outOfStockProducts]);
+
+  /* console.log('useTenantFeaturedProducts: Out-of-stock products from singleton', {
+    totalAvailable: filteredAvailable.length,
+    outOfStockCount: outOfStockProducts.length,
+    sampleOutOfStock: outOfStockProducts.slice(0, 2).map(p => ({ id: p.id, name: p.name, stock: p.stock, availability: p.availability }))
+  }); */
 
   const paginatedInStock = useMemo(() => {
-    // Show all in-stock products (no pagination for now to ensure visibility)
-    return inStockProducts;
-  }, [inStockProducts]);
+    // Apply pagination to in-stock products
+    const startIndex = (state.availablePage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return inStockProducts.slice(startIndex, endIndex);
+  }, [inStockProducts, state.availablePage]);
 
   const paginatedOutOfStock = useMemo(() => {
-    // Show all out-of-stock products (no pagination for now to ensure visibility)
-    return outOfStockProducts;
-  }, [outOfStockProducts]);
+    // Apply pagination to out-of-stock products with smaller page size
+    const startIndex = (state.outOfStockPage - 1) * outOfStockItemsPerPage;
+    const endIndex = startIndex + outOfStockItemsPerPage;
+    return outOfStockProducts.slice(startIndex, endIndex);
+  }, [outOfStockProducts, state.outOfStockPage]);
 
   const totalPages = useMemo(() => {
-    const totalProducts = inStockProducts.length + outOfStockProducts.length;
-    return Math.ceil(totalProducts / itemsPerPage);
-  }, [inStockProducts, outOfStockProducts]);
+    // Only paginate in-stock products
+    return Math.ceil(inStockProducts.length / itemsPerPage);
+  }, [inStockProducts]);
+
+  const outOfStockTotalPages = useMemo(() => {
+    // Calculate pages for out-of-stock products with smaller page size
+    return Math.ceil(outOfStockProducts.length / outOfStockItemsPerPage);
+  }, [outOfStockProducts]);
 
   const totalAvailableProducts = useMemo(() => {
-    return inStockProducts.length + outOfStockProducts.length;
-  }, [inStockProducts, outOfStockProducts]);
+    // Only count in-stock products for pagination
+    return inStockProducts.length;
+  }, [inStockProducts]);
 
   // Action callbacks
   const featureProduct = useCallback((productId: string) => {
@@ -200,11 +217,15 @@ export function useTenantFeaturedProducts(
 
   const setAvailablePage = useCallback((page: number) => {
     singleton.setAvailablePage(page);
-  }, [singleton]);
+  }, []);
+
+  const setOutOfStockPage = useCallback((page: number) => {
+    singleton.setOutOfStockPage(page);
+  }, []);
 
   const setEditingExpiration = useCallback((productId: string | null, date?: string) => {
     singleton.setEditingExpiration(productId, date);
-  }, [singleton]);
+  }, []);
 
   const forceRefresh = useCallback(() => {
     return Promise.all([
@@ -272,6 +293,7 @@ export function useTenantFeaturedProducts(
     paginatedInStock,
     paginatedOutOfStock,
     totalPages,
+    outOfStockTotalPages,
     totalAvailableProducts,
     
     // Actions
@@ -282,8 +304,12 @@ export function useTenantFeaturedProducts(
     setSelectedType,
     setSearchQuery,
     setAvailablePage,
+    setOutOfStockPage,
     setEditingExpiration,
     forceRefresh,
+    
+    // Singleton access for advanced operations
+    singleton,
     
     // Helpers
     isOutOfStock

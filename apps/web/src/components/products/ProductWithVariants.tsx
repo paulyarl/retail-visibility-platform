@@ -2,8 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import VariantSelector, { ProductVariant } from './VariantSelector';
+import VariantAttributeDisplay, { VariantComparisonGrid } from './VariantAttributeDisplay';
 import { AddToCartButton } from './AddToCartButton';
-import { PriceDisplay } from './PriceDisplay';
+import { SalePrice } from './SalePrice';
+import { FeaturedTypeBadges } from './FeaturedTypeBadges';
+import { Badge } from '@/components/ui/Badge';
+import { getFeaturedTypeDisplay, FeaturedType } from '@/types/product-display';
+import { useVariantsSingleton } from '@/lib/singletons/VariantsSingleton';
 
 interface ProductWithVariantsProps {
   product: {
@@ -14,11 +19,13 @@ interface ProductWithVariantsProps {
     salePriceCents?: number;
     stock: number;
     imageUrl?: string;
-    tenantId: string;
-    payment_gateway_type?: string | null;
-    payment_gateway_id?: string | null;
+    description?: string;
     has_variants?: boolean;
+    featuredType?: string;
+    featuredPriority?: number;
+    isFeaturedActive?: boolean;
   };
+  tenantId: string;
   tenantName: string;
   tenantLogo?: string;
   defaultGatewayType?: string;
@@ -29,6 +36,7 @@ interface ProductWithVariantsProps {
 
 export default function ProductWithVariants({
   product,
+  tenantId,
   tenantName,
   tenantLogo,
   defaultGatewayType,
@@ -41,6 +49,10 @@ export default function ProductWithVariants({
   const [loading, setLoading] = useState(false);
   const [currentImage, setCurrentImage] = useState<string | undefined>(product.imageUrl);
   const [variantPhotos, setVariantPhotos] = useState<Record<string, string[]>>({});
+  const [variantFeaturedTypes, setVariantFeaturedTypes] = useState<Record<string, any>>({});
+
+  // Initialize VariantsSingleton
+  const { actions: variantsActions } = useVariantsSingleton(tenantId);
 
   // Fetch variants if product has them
   useEffect(() => {
@@ -49,12 +61,15 @@ export default function ProductWithVariants({
     const fetchVariants = async () => {
       setLoading(true);
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${apiUrl}/api/items/${product.id}/variants`);
+        const result = await variantsActions.fetchItemVariants(product.id);
         
-        if (response.ok) {
-          const data = await response.json();
-          setVariants(data.variants || []);
+        if (result.success && result.variants) {
+          setVariants(result.variants);
+          
+          // Fetch featured types for each variant
+          if (result.variants.length > 0) {
+            await fetchVariantFeaturedTypes(result.variants);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch variants:', error);
@@ -65,6 +80,26 @@ export default function ProductWithVariants({
 
     fetchVariants();
   }, [product.id, product.has_variants]);
+
+  // Fetch featured types for variants
+  const fetchVariantFeaturedTypes = async (variants: ProductVariant[]) => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const featuredTypesMap: Record<string, any> = {};
+      
+      for (const variant of variants) {
+        const response = await fetch(`${apiUrl}/api/featured-products/item/${variant.id}`);
+        if (response.ok) {
+          const featuredData = await response.json();
+          featuredTypesMap[variant.id] = featuredData.featuredTypes || [];
+        }
+      }
+      
+      setVariantFeaturedTypes(featuredTypesMap);
+    } catch (error) {
+      console.error('Failed to fetch variant featured types:', error);
+    }
+  };
 
   // Fetch photos for all variants
   useEffect(() => {
@@ -138,38 +173,109 @@ export default function ProductWithVariants({
   const effectiveStock = selectedVariant?.stock ?? product.stock;
   const effectiveSku = selectedVariant?.sku || product.sku;
 
+  // Get effective featured type (variant takes precedence over parent)
+  const getEffectiveFeaturedType = () => {
+    if (selectedVariant?.id && variantFeaturedTypes[selectedVariant.id]) {
+      return variantFeaturedTypes[selectedVariant.id];
+    }
+    if (product.featuredType) {
+      return getFeaturedTypeDisplay(product.featuredType as FeaturedType);
+    }
+    return [];
+  };
+
+  const effectiveFeaturedTypes = getEffectiveFeaturedType();
+
+  // Check if product/variant is on sale
+  const isOnSale = !!(effectiveSalePrice && effectiveSalePrice < effectivePrice);
+
   return (
-    <div className={className}>
+    <div className={`space-y-6 ${className}`}>
       {/* Optional Image Display */}
       {showImage && currentImage && (
-        <div className="mb-4">
+        <div className="relative">
           <img
             src={currentImage}
             alt={selectedVariant?.variant_name || product.name}
             className="w-full h-auto rounded-lg"
           />
+          {isOnSale && (
+            <div className="absolute top-4 left-4">
+              <Badge variant="error" className="text-sm font-bold">
+                SALE
+              </Badge>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Price Display */}
-      <div className="mb-4">
-        <PriceDisplay
-          priceCents={effectivePrice}
-          salePriceCents={effectiveSalePrice}
-          variant="large"
-        />
-        {effectiveStock !== undefined && (
-          <p className="text-sm text-gray-600 mt-1">
-            {effectiveStock > 0 ? `${effectiveStock} in stock` : 'Out of stock'}
-          </p>
+      {/* Product Name and Featured Types */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          {product.name}
+        </h1>
+        {effectiveFeaturedTypes.length > 0 && (
+          <div className="mb-3">
+            <FeaturedTypeBadges 
+              featuredTypes={effectiveFeaturedTypes}
+              maxVisible={3}
+              size="sm"
+            />
+          </div>
         )}
+      </div>
+
+      {/* Price Display with Smart Sale Tagging */}
+      <div className="space-y-2">
+        <SalePrice 
+          product={{
+            price: {
+              cents: effectivePrice,
+              currency: 'USD',
+              formatted: `$${(effectivePrice / 100).toFixed(2)}`
+            },
+            salePrice: effectiveSalePrice ? {
+              cents: effectiveSalePrice,
+              currency: 'USD',
+              formatted: `$${(effectiveSalePrice / 100).toFixed(2)}`
+            } : undefined
+          }}
+          variant="detail"
+          showOriginalPrice={true}
+          showDiscountPercentage={true}
+          showDiscountAmount={true}
+        />
+        
+        {/* Stock Status */}
+        <div className="flex items-center gap-2">
+          {effectiveStock !== undefined && (
+            <Badge variant={effectiveStock > 0 ? 'success' : 'error'}>
+              {effectiveStock > 0 ? `${effectiveStock} in stock` : 'Out of stock'}
+            </Badge>
+          )}
+          
+          {/* SKU */}
+          <span className="text-sm text-gray-500">
+            SKU: {effectiveSku}
+          </span>
+          
+          {/* Variant Name */}
+          {selectedVariant?.variant_name && (
+            <Badge variant="default" className="text-xs">
+              {selectedVariant.variant_name}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Variant Selector */}
       {product.has_variants && variants.length > 0 && (
-        <div className="mb-4">
+        <div className="border-t pt-6">
+          <h3 className="text-lg font-semibold mb-4">Select Options</h3>
           {loading ? (
-            <div className="text-sm text-gray-500">Loading options...</div>
+            <div className="text-center py-4">
+              <div className="text-sm text-gray-500">Loading options...</div>
+            </div>
           ) : (
             <VariantSelector
               variants={variants}
@@ -180,21 +286,48 @@ export default function ProductWithVariants({
         </div>
       )}
 
+      {/* Variant Comparison (when variants exist) */}
+      {product.has_variants && variants.length > 1 && (
+        <div className="border-t pt-6">
+          <h3 className="text-lg font-semibold mb-4">Available Variants</h3>
+          <VariantComparisonGrid
+            variants={variants}
+            onVariantSelect={setSelectedVariant}
+            selectedVariantId={selectedVariant?.id}
+          />
+          
+          {variants.length > 6 && (
+            <p className="text-sm text-gray-500 text-center mt-4">
+              Showing {Math.min(6, variants.length)} of {variants.length} variants. Select options above to see all.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Add to Cart Button */}
-      <AddToCartButton
-        product={{
-          ...product,
-          sku: effectiveSku,
-          priceCents: effectivePrice,
-          salePriceCents: effectiveSalePrice,
-          stock: effectiveStock,
-        }}
-        variant={selectedVariant}
-        tenantName={tenantName}
-        tenantLogo={tenantLogo}
-        defaultGatewayType={defaultGatewayType}
-        className="w-full"
-      />
+      <div className="border-t pt-6">
+        <AddToCartButton
+          product={{
+            ...product,
+            sku: effectiveSku,
+            priceCents: effectivePrice,
+            salePriceCents: effectiveSalePrice,
+            stock: effectiveStock,
+            tenantId,
+          }}
+          variant={selectedVariant}
+          tenantName={tenantName}
+          tenantLogo={tenantLogo}
+          defaultGatewayType={defaultGatewayType}
+          className="w-full"
+        />
+        
+        {effectiveStock <= 0 && (
+          <p className="text-sm text-red-600 text-center mt-2">
+            This item is currently out of stock
+          </p>
+        )}
+      </div>
     </div>
   );
 }

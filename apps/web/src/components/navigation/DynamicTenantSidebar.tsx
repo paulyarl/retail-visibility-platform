@@ -6,12 +6,14 @@ import { apiRequest } from '@/lib/api';
 
 interface DynamicTenantSidebarProps {
   tenantId: string;
+  slug?: string;
   children: React.ReactNode;
 }
 
 interface DirectoryListing {
   id: string;
   tenantId: string;
+  slug?: string;
   isPublished: boolean;
   businessProfile?: {
     slug?: string;
@@ -22,7 +24,7 @@ interface DirectoryListing {
  * Dynamic tenant sidebar that conditionally shows directory link based on published status
  * Now includes fixed header with tenant branding
  */
-export default function DynamicTenantSidebar({ tenantId, children }: DynamicTenantSidebarProps) {
+export default function DynamicTenantSidebar({ tenantId, slug, children }: DynamicTenantSidebarProps) {
   const [listing, setListing] = useState<DirectoryListing | null>(null);
   const [loading, setLoading] = useState(true);
   const [nav, setNav] = useState<any[]>([]);
@@ -37,6 +39,7 @@ export default function DynamicTenantSidebar({ tenantId, children }: DynamicTena
           setListing({
             id: data.listing?.id || tenantId,
             tenantId: tenantId,
+            slug: slug || data.listing?.slug,
             isPublished: true,
             businessProfile: {
               slug: data.listing?.slug,
@@ -46,6 +49,7 @@ export default function DynamicTenantSidebar({ tenantId, children }: DynamicTena
           setListing({
             id: tenantId,
             tenantId: tenantId,
+            slug: slug,
             isPublished: false,
           });
         }
@@ -54,6 +58,7 @@ export default function DynamicTenantSidebar({ tenantId, children }: DynamicTena
         setListing({
           id: tenantId,
           tenantId: tenantId,
+          slug: slug,
           isPublished: false,
         });
       } finally {
@@ -93,11 +98,12 @@ export default function DynamicTenantSidebar({ tenantId, children }: DynamicTena
         label: 'Inventory', 
         href: `/t/${tenantId}/items`,
         children: [
-          { label: 'Items', href: `/t/${tenantId}/items` },
+          { label: 'Product Manager', href: `/t/${tenantId}/items` },
+          { label: 'Product Wizard', href: `/t/${tenantId}/items/create` },
           { label: 'Barcode Scan', href: `/t/${tenantId}/scan` },
           { label: 'Quick Start', href: `/t/${tenantId}/quick-start` },
           { label: 'Categories', href: `/t/${tenantId}/categories` },
-          { label: 'Storefront', href: `/tenant/${tenantId}` },
+          { label: 'Storefront', href: `/shops/${tenantId}` },
         ]
       },
       { 
@@ -178,6 +184,32 @@ export default function DynamicTenantSidebar({ tenantId, children }: DynamicTena
       ]
     };
 
+    // Add Shops section
+    const shopsSection = {
+      label: 'Shops',
+      href: `/t/${tenantId}/dashboard/shops/manage`,
+      children: [
+        { label: 'Manage My Shops', href: `/t/${tenantId}/dashboard/shops/manage` },
+        { label: 'My Catalog', href: `/t/${tenantId}/catalog` },
+        { 
+          label: 'Shops Public', 
+          href: `/shops`,
+          children: [
+            { label: 'My Shop with Tenant ID ', href: `/shops/${tenantId}` },
+            { label: 'My Shop with Slug ', href: `/shops/${slug}` },
+            { label: 'Shops Directory', href: `/shops` },
+          ]
+        },
+      ]
+    };
+
+   /*   children: [
+          { label: 'Shops', href: `/shops` },
+          { label: 'My Shop', href: `/shops/${tenantId}` },          
+          { label: 'Manage My Shop', href: `/t/${tenantId}/dashboard/shops/manage` },
+        ] */
+
+    baseNav.splice(2, 0, shopsSection);
     baseNav.splice(3, 0, directorySection);
     baseNav.splice(4, 0, integrationsSection);
     // Move Settings to be more prominent (after Inventory, before Onboarding)

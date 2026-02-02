@@ -93,6 +93,11 @@ export interface FeaturedProduct {
   hasDescription?: boolean;
   hasBrand?: boolean;
   hasPrice?: boolean;
+  // Additional fields from API response
+  categoryName?: string;
+  condition?: string;
+  ratingAvg?: number;
+  ratingCount?: number;
 }
 
 export class FeaturedProductsSingleton extends UniversalSingleton {
@@ -101,6 +106,10 @@ export class FeaturedProductsSingleton extends UniversalSingleton {
 
   private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     super(singletonKey, cacheOptions);
+    this.productSingleton = null;
+    
+    // Attach emergency bust controls to window for debugging
+    FeaturedProductsSingleton.attachToWindow();
   }
 
   static getInstance(options?: { encrypt?: boolean; userId?: string }): FeaturedProductsSingleton {
@@ -115,22 +124,79 @@ export class FeaturedProductsSingleton extends UniversalSingleton {
     this.productSingleton = productSingleton;
   }
 
+  // Force clear stale cache for specific cases
+  private async forceClearStaleCache(cacheKey: string, options?: AutoUserCacheOptions): Promise<void> {
+    try {
+      // Check if we have stale cache data
+      const cached = await this.cacheManager.get(cacheKey, options);
+      if (cached && typeof cached === 'object' && 'lastUpdated' in cached) {
+        const cacheTime = new Date((cached as any).lastUpdated).getTime();
+        const apiFixTime = new Date('2026-01-24T11:45:00.000Z').getTime(); // When we fixed the API
+        
+        // If cache is from before the API fix, clear it aggressively
+        if (cacheTime < apiFixTime) {
+          console.log(`[FeaturedProductsSingleton] Force clearing stale cache from ${(cached as any).lastUpdated}`);
+          
+          // Clear from all cache layers
+          await this.cacheManager.remove(cacheKey);
+          this.cache.delete(cacheKey); // Clear memory cache too
+          
+          // Also clear from IndexedDB directly if possible
+          try {
+            await this.cacheManager.clear();
+          } catch (clearError) {
+            console.warn('[FeaturedProductsSingleton] Failed to clear all cache:', clearError);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[FeaturedProductsSingleton] Error in forceClearStaleCache:', error);
+    }
+  }
+
   // Get featured products with universal product data integration
   async getAllFeaturedProducts(tenantId: string, limit: number = 20, options?: AutoUserCacheOptions): Promise<FeaturedProductsData> {
     const cacheKey = `featured-products-${tenantId}-${limit}`;
     
-    // Try to get from cache first
-    const cached = await this.getFromCache(cacheKey, options);
-    if (cached) {
-      try {
-        // Validate cached data structure
-        const cachedData = cached as any;
-        if (cachedData && typeof cachedData === 'object' && 'totalCount' in cachedData && 'buckets' in cachedData) {
-          return cachedData as FeaturedProductsData;
+    // Force clear stale cache for this specific case
+    await this.forceClearStaleCache(cacheKey, options);
+    
+    // Try to get from cache with validation
+    const cached = await this.validateAndClearCache<FeaturedProductsData>(cacheKey, (data) => {
+      // Validator function to check if data has the expected structure
+      if (!data || typeof data !== 'object') return false;
+      
+      // Check basic structure
+      if (!('totalCount' in data && 'buckets' in data && 'lastUpdated' in data)) return false;
+      
+      // Check if this is old cached data (before API fix)
+      // Old data: empty buckets from failed API calls
+      // New data: should have products if totalCount > 0
+      if (data.totalCount === 0 && data.buckets.length === 0) {
+        // This might be old stale data, check the timestamp
+        const cacheTime = new Date(data.lastUpdated).getTime();
+        const apiFixTime = new Date('2026-01-24T11:45:00.000Z').getTime(); // When we fixed the API
+        
+        if (cacheTime < apiFixTime) {
+          console.log(`[FeaturedProductsSingleton] Detected stale cache from ${data.lastUpdated}, clearing...`);
+          return false; // Clear old cache
         }
-      } catch (error) {
-        console.warn('[FeaturedProductsSingleton] Invalid cache data, continuing with fresh fetch');
       }
+      
+      // Check if buckets have the new structure with products and bucketName
+      if (data.buckets.length > 0) {
+        const firstBucket = data.buckets[0];
+        if (!('products' in firstBucket && 'bucketName' in firstBucket)) {
+          console.log(`[FeaturedProductsSingleton] Detected old bucket structure, clearing cache...`);
+          return false; // Clear old format cache
+        }
+      }
+      
+      return true;
+    }, options);
+    
+    if (cached) {
+      return cached;
     }
 
     // Default empty result
@@ -142,7 +208,7 @@ export class FeaturedProductsSingleton extends UniversalSingleton {
 
     try {
       // Fetch featured assignments
-      const response = await fetch(`/api/featured-products/public?tenantId=${tenantId}&limit=${limit}`);
+      const response = await fetch(`/api/public/products/featured?tenantId=${tenantId}&limit=${limit}`);
       
       if (!response.ok) {
         console.warn('API response not ok, returning empty result');
@@ -153,6 +219,110 @@ export class FeaturedProductsSingleton extends UniversalSingleton {
 
       const featuredAssignments = await response.json();
       
+      // Transform the new API response to the expected format
+      if (featuredAssignments && featuredAssignments.products) {
+        // New API format: { success: true, products: [...] }
+        const products = featuredAssignments.products || [];
+        
+        // Group products by featuredType
+        const productsByType = products.reduce((acc: Record<string, any[]>, product: any) => {
+          const type = product.featuredType || 'store_selection';
+          if (!acc[type]) acc[type] = [];
+          
+          // Transform API response to FeaturedProduct format
+          const transformedProduct = {
+            id: product.id,
+            tenantId: product.tenant?.id || product.tenant_id,
+            sku: product.sku,
+            name: product.name,
+            title: product.title,
+            description: product.description ? product.description.substring(0, 30) + (product.description.length > 30 ? '...' : '') : '',
+            marketingDescription: product.marketingDescription,
+            priceCents: product.price ? Math.round(product.price * 100) : null,
+            salePriceCents: product.salePriceCents || product.salePriceCents || null,
+            stock: product.stock,
+            imageUrl: product.imageUrl,
+            imageGallery: product.imageGallery,
+            brand: product.brand,
+            manufacturer: product.manufacturer || null,
+            condition: product.condition,
+            gtin: product.gtin || null,
+            mpn: product.mpn || null,
+            availability: product.availability,
+            itemStatus: product.itemStatus,
+            visibility: product.visibility,
+            hasVariants: product.hasVariants || product.hasVariants || false,
+            variantId: product.variantId || null,
+            variantName: product.variantName || null,
+            variantAttributes: product.variantAttributes || null,
+            featuredType: product.featuredType,
+            featuredPriority: product.featuredPriority,
+            featuredAt: product.featuredAt,
+            featuredUntil: product.featuredUntil,
+            isFeatured: product.isFeatured,
+            isActivelyFeatured: product.isActivelyFeatured,
+            categoryId: product.categoryId,
+            categorySlug: product.categorySlug,
+            categoryName: product.categoryName,
+            googleCategoryId: product.googleCategoryId,
+            metadata: product.metadata || {},
+            createdAt: product.createdAt,
+            updatedAt: product.updatedAt,
+            tenant: product.tenant
+          };
+          
+          acc[type].push(transformedProduct);
+          return acc;
+        }, {} as Record<string, any[]>);
+        
+        // Create buckets for each featured type with proper categorization
+        const result: FeaturedProductsData = {
+          totalCount: products.length,
+          buckets: [
+            { 
+              bucketType: 'staff_pick', 
+              bucketName: 'Staff Picks', 
+              products: productsByType.staff_pick || [],
+              count: productsByType.staff_pick?.length || 0,
+              totalCount: productsByType.staff_pick?.length || 0
+            },
+            { 
+              bucketType: 'seasonal', 
+              bucketName: 'Seasonal Specials', 
+              products: productsByType.seasonal || [],
+              count: productsByType.seasonal?.length || 0,
+              totalCount: productsByType.seasonal?.length || 0
+            },
+            { 
+              bucketType: 'sale', 
+              bucketName: 'Sale Items', 
+              products: productsByType.sale || [],
+              count: productsByType.sale?.length || 0,
+              totalCount: productsByType.sale?.length || 0
+            },
+            { 
+              bucketType: 'new_arrival', 
+              bucketName: 'New Arrivals', 
+              products: productsByType.new_arrival || [],
+              count: productsByType.new_arrival?.length || 0,
+              totalCount: productsByType.new_arrival?.length || 0
+            },
+            { 
+              bucketType: 'store_selection', 
+              bucketName: 'Store Selection', 
+              products: productsByType.store_selection || [],
+              count: productsByType.store_selection?.length || 0,
+              totalCount: productsByType.store_selection?.length || 0
+            }
+          ],
+          lastUpdated: new Date().toISOString()
+        };
+        
+        // Cache the result
+        await this.setCache(cacheKey, result, options); // 5 minutes
+        return result;
+      }
+      
       // Return empty result if no data
       if (!featuredAssignments || !featuredAssignments.buckets) {
         // Cache the empty result to avoid repeated requests
@@ -160,7 +330,7 @@ export class FeaturedProductsSingleton extends UniversalSingleton {
         return defaultResult;
       }
 
-      // For now, return the default result (can be enhanced later with real data processing)
+      // Handle old format (backward compatibility)
       const result: FeaturedProductsData = {
         totalCount: featuredAssignments.totalCount || 0,
         buckets: featuredAssignments.buckets || [],
@@ -216,7 +386,7 @@ export class FeaturedProductsSingleton extends UniversalSingleton {
 
     try {
       // Fetch featured assignments
-      const response = await fetch(`/api/featured-products/public?tenantId=${tenantId}&limit=${limit}`);
+      const response = await fetch(`/api/public/products/featured?tenantId=${tenantId}&limit=${limit}`);
       
       if (!response.ok) {
         console.warn('API response not ok, returning empty result');
@@ -226,11 +396,117 @@ export class FeaturedProductsSingleton extends UniversalSingleton {
 
       const featuredAssignments = await response.json();
       
+      // Transform the new API response to the expected format
+      if (featuredAssignments && featuredAssignments.products) {
+        // New API format: { success: true, products: [...] }
+        const products = featuredAssignments.products || [];
+        
+        // Group products by featuredType
+        const productsByType = products.reduce((acc: Record<string, any[]>, product: any) => {
+          const type = product.featuredType || 'store_selection';
+          if (!acc[type]) acc[type] = [];
+          
+          // Transform API response to FeaturedProduct format
+          const transformedProduct = {
+            id: product.id,
+            tenantId: product.tenant?.id || product.tenant_id,
+            sku: product.sku,
+            name: product.name,
+            title: product.title,
+            description: product.description ? product.description.substring(0, 30) + (product.description.length > 30 ? '...' : '') : '',
+            marketingDescription: product.marketingDescription,
+            priceCents: product.price ? Math.round(product.price * 100) : null,
+            salePriceCents: product.salePriceCents || product.salePriceCents || null,
+            stock: product.stock,
+            imageUrl: product.imageUrl,
+            imageGallery: product.imageGallery,
+            brand: product.brand,
+            manufacturer: product.manufacturer || null,
+            condition: product.condition,
+            gtin: product.gtin || null,
+            mpn: product.mpn || null,
+            availability: product.availability,
+            itemStatus: product.itemStatus,
+            visibility: product.visibility,
+            hasVariants: product.hasVariants || product.hasVariants || false,
+            variantId: product.variantId || null,
+            variantName: product.variantName || null,
+            variantAttributes: product.variantAttributes || null,
+            featuredType: product.featuredType,
+            featuredPriority: product.featuredPriority,
+            featuredAt: product.featuredAt,
+            featuredUntil: product.featuredUntil,
+            isFeatured: product.isFeatured,
+            isActivelyFeatured: product.isActivelyFeatured,
+            categoryId: product.categoryId,
+            categorySlug: product.categorySlug,
+            categoryName: product.categoryName,
+            googleCategoryId: product.googleCategoryId,
+            metadata: product.metadata || {},
+            createdAt: product.createdAt,
+            updatedAt: product.updatedAt,
+            tenant: product.tenant
+          };
+          
+          acc[type].push(transformedProduct);
+          return acc;
+        }, {} as Record<string, any[]>);
+        
+        // Create buckets for each featured type with proper categorization
+        const result: FeaturedProductsData = {
+          totalCount: products.length,
+          buckets: [
+            { 
+              bucketType: 'staff_pick', 
+              bucketName: 'Staff Picks', 
+              products: productsByType.staff_pick || [],
+              count: productsByType.staff_pick?.length || 0,
+              totalCount: productsByType.staff_pick?.length || 0
+            },
+            { 
+              bucketType: 'seasonal', 
+              bucketName: 'Seasonal Specials', 
+              products: productsByType.seasonal || [],
+              count: productsByType.seasonal?.length || 0,
+              totalCount: productsByType.seasonal?.length || 0
+            },
+            { 
+              bucketType: 'sale', 
+              bucketName: 'Sale Items', 
+              products: productsByType.sale || [],
+              count: productsByType.sale?.length || 0,
+              totalCount: productsByType.sale?.length || 0
+            },
+            { 
+              bucketType: 'new_arrival', 
+              bucketName: 'New Arrivals', 
+              products: productsByType.new_arrival || [],
+              count: productsByType.new_arrival?.length || 0,
+              totalCount: productsByType.new_arrival?.length || 0
+            },
+            { 
+              bucketType: 'store_selection', 
+              bucketName: 'Store Selection', 
+              products: productsByType.store_selection || [],
+              count: productsByType.store_selection?.length || 0,
+              totalCount: productsByType.store_selection?.length || 0
+            }
+          ],
+          lastUpdated: new Date().toISOString()
+        };
+        
+        // Cache with auth-aware encryption
+        await set(cacheKey, result, { ttl: 5 * 60 * 1000, ...options });
+        return result;
+      }
+      
+      // Return empty result if no data
       if (!featuredAssignments || !featuredAssignments.buckets) {
         await set(cacheKey, defaultResult, { ttl: 60 * 1000, ...options });
         return defaultResult;
       }
 
+      // Handle old format (backward compatibility)
       const result: FeaturedProductsData = {
         totalCount: featuredAssignments.totalCount || 0,
         buckets: featuredAssignments.buckets || [],
@@ -344,6 +620,11 @@ export class FeaturedProductsSingleton extends UniversalSingleton {
   clearTenantFeaturedProducts() {
     this.clearCache();
   }
+}
+
+// Initialize emergency bust controls immediately when module loads
+if (typeof window !== 'undefined') {
+  FeaturedProductsSingleton.attachToWindow();
 }
 
 // Export singleton instance

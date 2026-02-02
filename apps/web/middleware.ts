@@ -197,6 +197,71 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  // Redirect /shops/t/[tenantId] to /shops/[slug] for SEO-friendly URLs
+  const shopsTenantMatch = pathname.match(/^\/shops\/t\/([^\/]+)(.*)$/);
+  if (shopsTenantMatch) {
+    const tenantId = shopsTenantMatch[1];
+    const remainingPath = shopsTenantMatch[2] || '';
+    
+    // Try to get the slug for this tenant
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.visibleshelf.com';
+      const slugRes = await fetch(`${apiBaseUrl}/api/directory/resolve-slug/${tenantId}`);
+      
+      if (slugRes.ok) {
+        const slugData = await slugRes.json();
+        if (slugData.success && slugData.tenantId && slugData.tenantId !== tenantId) {
+          // If we got a different tenantId back, it means the input was a slug
+          // This case shouldn't happen but we handle it gracefully
+          const destUrl = new URL(`/shops/${tenantId}${remainingPath}`, req.url);
+          const res = NextResponse.redirect(destUrl, { status: 301 });
+          const tcx = JSON.stringify({ tenant_id: tenantId, aud: 'user' });
+          setCookie(res, 'tcx', tcx);
+          return res;
+        }
+        
+        // Try to get the actual slug from directory
+        const directoryRes = await fetch(`${apiBaseUrl}/api/directory/tenant/${tenantId}`);
+        if (directoryRes.ok) {
+          const directoryData = await directoryRes.json();
+          if (directoryData.listing?.slug) {
+            const slug = directoryData.listing.slug;
+            const destUrl = new URL(`/shops/${slug}${remainingPath}`, req.url);
+            
+            // Preserve query params
+            const sourceUrl = new URL(req.url);
+            sourceUrl.searchParams.forEach((value, key) => {
+              destUrl.searchParams.set(key, value);
+            });
+
+            console.log(`[Middleware] Shops tenant redirect: ${pathname} → ${destUrl.toString()}`);
+            
+            const res = NextResponse.redirect(destUrl, { status: 301 });
+            const tcx = JSON.stringify({ tenant_id: tenantId, aud: 'user' });
+            setCookie(res, 'tcx', tcx);
+            return res;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[Middleware] Error resolving shops tenant redirect:', error);
+    }
+    
+    // Fallback: redirect to /shops/[tenantId]
+    const destUrl = new URL(`/shops/${tenantId}${remainingPath}`, req.url);
+    const sourceUrl = new URL(req.url);
+    sourceUrl.searchParams.forEach((value, key) => {
+      destUrl.searchParams.set(key, value);
+    });
+
+    console.log(`[Middleware] Shops tenant fallback redirect: ${pathname} → ${destUrl.toString()}`);
+    
+    const res = NextResponse.redirect(destUrl, { status: 301 });
+    const tcx = JSON.stringify({ tenant_id: tenantId, aud: 'user' });
+    setCookie(res, 'tcx', tcx);
+    return res;
+  }
+
   // When already under /t/{tenantId}/..., issue tcx cookie if missing
   const tMatch = pathname.match(/^\/t\/([^\/]+)\//);
   if (tMatch) {

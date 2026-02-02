@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react';
 import { itemsDataService, Item, CreateItemData } from '@/services/itemsDataService';
+import ItemUpdateService from '@/lib/singletons/ItemUpdateService';
+import PhotoSingleton from '@/lib/singletons/PhotoSingleton';
 
 interface UseItemsActionsOptions {
   tenantId: string;
@@ -81,13 +83,19 @@ export function useItemsActions({
     setUpdateError(null);
 
     try {
-      const item = await itemsDataService.updateItem(itemId, data);
+      // Use ItemUpdateService for automatic cache invalidation
+      const itemUpdateService = ItemUpdateService.getInstance(tenantId);
+      const result = await itemUpdateService.updateItem(itemId, data as any);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update item');
+      }
       
       if (onSuccess) {
         onSuccess();
       }
       
-      return item;
+      return result.item as Item;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update item';
       setUpdateError(errorMessage);
@@ -95,14 +103,20 @@ export function useItemsActions({
     } finally {
       setUpdating(false);
     }
-  }, [onSuccess]);
+  }, [tenantId, onSuccess]);
 
   const deleteItem = useCallback(async (itemId: string): Promise<void> => {
     setDeleting(true);
     setDeleteError(null);
 
     try {
-      await itemsDataService.deleteItem(itemId);
+      // Use ItemUpdateService for automatic cache invalidation
+      const itemUpdateService = ItemUpdateService.getInstance(tenantId);
+      const result = await itemUpdateService.deleteItem(itemId);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to delete item');
+      }
       
       if (onSuccess) {
         onSuccess();
@@ -114,14 +128,23 @@ export function useItemsActions({
     } finally {
       setDeleting(false);
     }
-  }, [onSuccess]);
+  }, [tenantId, onSuccess]);
 
   const uploadPhotos = useCallback(async (itemId: string, files: File[]): Promise<string[]> => {
     setUploading(true);
     setUploadError(null);
 
     try {
-      const urls = await itemsDataService.uploadPhotos(itemId, files);
+      // Use PhotoSingleton for automatic cache invalidation
+      const photoSingleton = PhotoSingleton.getInstance(tenantId);
+      const urls: string[] = [];
+      
+      for (const file of files) {
+        const result = await photoSingleton.uploadItemPhoto(itemId, file, files.indexOf(file) === 0);
+        if (result.success && result.photo) {
+          urls.push(result.photo.url);
+        }
+      }
       
       if (onSuccess) {
         onSuccess();
@@ -135,7 +158,7 @@ export function useItemsActions({
     } finally {
       setUploading(false);
     }
-  }, [onSuccess]);
+  }, [tenantId, onSuccess]);
 
   const isProcessing = creating || updating || deleting || uploading;
 

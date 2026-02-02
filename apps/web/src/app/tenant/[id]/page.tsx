@@ -31,6 +31,10 @@ import LastViewed from '@/components/directory/LastViewed';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
 import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
 import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalogSidebar';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
+import { storefrontService } from '@/services/StorefrontSingletonService';
+import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
 
 export const dynamic = 'force-dynamic';
@@ -99,194 +103,88 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
   try {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
-    // Fetch tenant basic info
-    const tenantRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}`, {
-      cache: 'no-store',
-    });
-
-    if (!tenantRes.ok) {
+    // Use singleton service for cached tenant information
+    const tenantInfo = await tenantInfoService.getCompleteTenantInfo(tenantId);
+    
+    if (!tenantInfo.tenant) {
       return null;
     }
 
-    const tenant: Tenant & { access?: { storefront: boolean } } = await tenantRes.json();
+    const { tenant, businessProfile, businessHours: rawBusinessHours, paymentGateways } = tenantInfo;
 
-    // Fetch payment gateways (once for the entire storefront)
-    let paymentGateways: any[] = [];
-    try {
-      const paymentRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/payment-gateways`, {
-        cache: 'no-store',
-      });
-      if (paymentRes.ok) {
-        const paymentData = await paymentRes.json();
-        if (paymentData.success && paymentData.gateways) {
-          paymentGateways = paymentData.gateways.filter((g: any) => g.is_active);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to fetch payment gateways:', e);
+    // Merge business profile into tenant metadata
+    if (businessProfile) {
+      tenant.metadata = {
+        ...tenant.metadata,
+        ...businessProfile.metadata, // Preserve GBP categories and other metadata from profile
+        businessName: businessProfile.business_name,
+        phone: businessProfile.phone_number,
+        email: businessProfile.email,
+        website: businessProfile.website,
+        address: businessProfile.address_line1
+          ? `${businessProfile.address_line1}${businessProfile.address_line2 ? ', ' + businessProfile.address_line2 : ''}, ${businessProfile.city}, ${businessProfile.state} ${businessProfile.postal_code}`
+          : undefined,
+        logo_url: businessProfile.logo_url,
+        business_description: businessProfile.business_description,
+        social_links: businessProfile.social_links,
+      };
     }
 
-    
-    // Fetch business profile
-    let hasHours = false;
-    let businessHours: any = null;
-    try {
-      const profileRes = await fetch(`${apiBaseUrl}/public/tenant/${tenantId}/profile`, {
-        cache: 'no-store',
-      });
-      if (profileRes.ok) {
-        const businessProfile = await profileRes.json();
-        tenant.metadata = {
-          ...tenant.metadata,
-          ...businessProfile.metadata, // Preserve GBP categories and other metadata from profile
-          businessName: businessProfile.business_name,
-          phone: businessProfile.phone_number,
-          email: businessProfile.email,
-          website: businessProfile.website,
-          address: businessProfile.address_line1
-            ? `${businessProfile.address_line1}${businessProfile.address_line2 ? ', ' + businessProfile.address_line2 : ''}, ${businessProfile.city}, ${businessProfile.state} ${businessProfile.postal_code}`
-            : undefined,
-          logo_url: businessProfile.logo_url,
-          business_description: businessProfile.business_description,
-          social_links: businessProfile.social_links,
-        };
-        // Detect hours presence for branding evaluation
-        const hours = (businessProfile as any)?.hours;
-        businessHours = hours ?? null;
-        if (hours) {
-          if (Array.isArray(hours)) {
-            hasHours = hours.length > 0;
-          } else if (typeof hours === 'object') {
-            hasHours = Object.keys(hours).length > 0;
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Failed to fetch business profile:', e);
-    }
-
-    // Fetch raw business hours data for proper display
-    let rawBusinessHours: any = null;
-    try {
-      const hoursRes = await fetch(`${apiBaseUrl}/api/tenant/${tenantId}/business-hours`, {
-        cache: 'no-store',
-      });
-      if (hoursRes.ok) {
-        const hoursData = await hoursRes.json();
-        if (hoursData.success && hoursData.data) {
-          const { periods, timezone } = hoursData.data;
-          const hours: any = { timezone };
-
-          // Convert periods to day-based format for BusinessHoursDisplay
-          periods.forEach((period: any) => {
-            // Convert API day format (MONDAY) to title case (Monday) for storefront display
-            const dayMap: Record<string, string> = {
-              'MONDAY': 'Monday',
-              'TUESDAY': 'Tuesday',
-              'WEDNESDAY': 'Wednesday',
-              'THURSDAY': 'Thursday',
-              'FRIDAY': 'Friday',
-              'SATURDAY': 'Saturday',
-              'SUNDAY': 'Sunday'
-            };
-            const titleCaseDay = dayMap[period.day] || period.day;
-            if (titleCaseDay && !hours[titleCaseDay]) {
-              hours[titleCaseDay] = {
-                open: period.open,
-                close: period.close
-              };
-            }
-          });
-
-          // Include periods array for BusinessHoursDisplay to handle multiple periods
-          if (periods.length > 0) {
-            hours.periods = periods;
-          }
-
-          // Fetch and include special hours for status computation
-          try {
-            const specialRes = await fetch(`${apiBaseUrl}/api/tenant/${tenantId}/business-hours/special`, {
-              cache: 'no-store',
-            });
-            if (specialRes.ok) {
-              const specialData = await specialRes.json();
-              if (specialData.success && specialData.data?.overrides) {
-                hours.special = specialData.data.overrides.map((override: any) => ({
-                  date: override.date,
-                  open: override.open,
-                  close: override.close,
-                  isClosed: override.isClosed,
-                  note: override.note
-                }));
-              }
-            }
-          } catch (e) {
-            console.error('Failed to fetch special hours:', e);
-          }
-
-          rawBusinessHours = hours;
-        }
-      }
-    } catch (e) {
-      console.error('Failed to fetch raw business hours:', e);
-    }
+    const hasLogo = !!tenant.metadata?.logo_url;
+    const hasBranding = hasLogo || !!rawBusinessHours;
+    const storeStatus = rawBusinessHours ? computeStoreStatus(rawBusinessHours) : null;
 
     // Fetch map location using utility
     const mapLocation = await getTenantMapLocation(tenantId);
 
-    // Fetch categories with counts - using storefront categories API
+    // Fetch categories with counts using singleton service
     let categories: Category[] = [];
     let productCategories: Category[] = [];
     let storeCategories: Category[] = [];
     let uncategorizedCount = 0;
     try {
-      // Get product counts per category from storefront categories API
-      const storefrontCategoriesRes = await fetch(`${apiBaseUrl}/api/storefront/${tenantId}/categories`, {
-        cache: 'no-store',
-      });
-      if (storefrontCategoriesRes.ok) {
-        const storefrontData = await storefrontCategoriesRes.json();
-        const storefrontCategories = storefrontData.categories || [];
-        uncategorizedCount = storefrontData.uncategorizedCount || 0;
+      // Get product counts per category from storefront singleton service
+      const storefrontData = await storefrontService.getStorefrontCategories(tenantId);
+      const storefrontCategories = storefrontData.categories || [];
+      uncategorizedCount = storefrontData.uncategorizedCount || 0;
 
-        // Convert storefront categories to the expected format
-        categories = storefrontCategories.map((cat: any) => ({
-          id: cat.id,
-          name: cat.name,
-          slug: cat.slug,
-          count: cat.count,
-          googleCategoryId: cat.googleCategoryId,
-          category_type: 'platform', // All storefront categories are platform categories
-        }));
+      // Convert storefront categories to the expected format
+      categories = storefrontCategories.map((cat: any) => ({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        count: cat.count,
+        googleCategoryId: cat.googleCategoryId,
+        category_type: 'platform', // All storefront categories are platform categories
+      }));
 
-        // All categories are product categories for storefront
-        productCategories = categories;
-        storeCategories = [];
-      }
+      // All categories are product categories for storefront
+      productCategories = categories;
+      storeCategories = [];
     } catch (e) {
       console.error('Failed to fetch categories:', e);
     }
 
-    // Fetch products for this tenant with optional search, category, and featured filter
-    // Using materialized view for 10-30x faster category filtering!
+    // Fetch products using singleton service
     const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
     const categoryParam = category ? `&category=${encodeURIComponent(category)}` : '';
-    const featuredParam = featured ? `&featured=${encodeURIComponent(featured)}` : '';
     
-    let productsRes;
+    let productsData;
     if (featured) {
       // Use the featured products API when filtering by featured type
-      productsRes = await fetch(`${apiBaseUrl}/api/storefront/${tenantId}/featured-products?limit=${limit}${searchParam}`, {
-        cache: 'no-store',
+      productsData = await storefrontService.getFeaturedProducts(tenantId, {
+        limit,
+        search
       });
     } else {
       // Use regular products API for general browsing
-      productsRes = await fetch(`${apiBaseUrl}/api/storefront/${tenantId}/products?page=${page}&limit=${limit}${searchParam}${categoryParam}`, {
-        cache: 'no-store',
+      productsData = await storefrontService.getStorefrontProducts(tenantId, {
+        page,
+        limit,
+        search,
+        category
       });
     }
-
-    const productsData = productsRes.ok ? await productsRes.json() : { items: [], pagination: { totalItems: 0 } };
     // Handle both old (array) and new (paginated object) response formats
     const rawProducts = productsData.items
       ? (Array.isArray(productsData.items) ? productsData.items : [])
@@ -303,25 +201,16 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     }));
 
     const total = featured 
-      ? productsData.count || products.length // Featured API uses count field
-      : productsData.pagination?.totalItems || productsData.total || products.length;
+      ? ('count' in productsData ? productsData.count : 0) || products.length // Featured API uses count field
+      : ('pagination' in productsData ? productsData.pagination?.totalItems : ('total' in productsData ? productsData.total : 0)) || products.length;
 
-    // Fetch platform settings for footer
-    let platformSettings: PlatformSettings = {};
+    // Fetch platform settings for footer using singleton service
+    let platformSettings: any = {};
     try {
-      const settingsRes = await fetch(`${apiBaseUrl}/platform-settings`, {
-        cache: 'no-store',
-      });
-      if (settingsRes.ok) {
-        platformSettings = await settingsRes.json();
-      }
+      platformSettings = await platformSettingsService.getPlatformSettings();
     } catch (e) {
       console.error('Failed to fetch platform settings:', e);
     }
-
-    const hasLogo = !!tenant.metadata?.logo_url;
-    const hasBranding = hasLogo || hasHours;
-    const storeStatus = rawBusinessHours ? computeStoreStatus(rawBusinessHours) : null;
 
     // Find current category name if filtering
     const currentCategory = category ? categories.find((c: Category) => c.slug === category) : null;
@@ -406,27 +295,25 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   // API base URL for additional calls
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
-  // Fetch directory publish status and actual slug
+  // Fetch directory publish status and actual slug using singleton services
   let directoryPublished = false;
-  let tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
+  let tenantSlug: string;
+  
   try {
-    // Use tenant ID to lookup directory listing (more reliable than generated slug)
-    // Note: id already includes 'tid-' prefix, no need to add 't-'
-    const directoryRes = await fetch(`${apiBaseUrl}/api/directory/${id}`, {
-      cache: 'no-store',
-    });
-    if (directoryRes.ok) {
-      const directoryData = await directoryRes.json();
-      // If the directory page exists, the store is published
-      directoryPublished = true;
-      // Use the actual slug from the directory listing
-      if (directoryData.listing?.slug) {
-        tenantSlug = directoryData.listing.slug;
-      }
-    }
+    // Use tenant directory service to get the actual slug from the API
+    const apiSlug = await tenantDirectoryService.getTenantSlug(id);
+    
+    // Check if directory listing exists to determine publish status
+    const directoryData = await storefrontService.getDirectoryListing(id);
+    directoryPublished = !!directoryData;
+    
+    // Use API slug if available, otherwise generate from business name or use tenant ID
+    tenantSlug = apiSlug || businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
   } catch (e) {
     // Directory page doesn't exist or error - store is not published
     directoryPublished = false;
+    // Fallback to generated slug
+    tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
   }
 
   // Find primary store category for header badge
@@ -436,16 +323,10 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   const primaryGBPCategory = tenant.metadata?.gbp_categories?.primary || tenant.metadata?.gbpCategories?.primary;
   const secondaryGBPCategories = tenant.metadata?.gbp_categories?.secondary || tenant.metadata?.gbpCategories?.secondary || [];
 
-  // Fetch total product count for "All Products" (always unfiltered)
+  // Fetch total product count for "All Products" using singleton service
   let totalAllProducts = 0;
   try {
-    const totalProductsRes = await fetch(`${apiBaseUrl}/api/storefront/${id}/products?page=1&limit=1`, {
-      cache: 'no-store',
-    });
-    if (totalProductsRes.ok) {
-      const totalData = await totalProductsRes.json();
-      totalAllProducts = totalData.pagination?.totalItems || 0;
-    }
+    totalAllProducts = await storefrontService.getTotalProductCount(id);
   } catch (e) {
     console.error('Failed to fetch total product count:', e);
     // Fallback to current total if available
@@ -539,9 +420,6 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
       <StorefrontClientWrapper 
         tenantId={id}
         tenant={tenant}
-        products={products}
-        total={total}
-        limit={limit}
         platformSettings={platformSettings}
         mapLocation={mapLocation}
         hasBranding={hasBranding}
@@ -551,11 +429,8 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
         productCategories={productCategories}
         storeCategories={storeCategories}
         uncategorizedCount={uncategorizedCount}
-        currentCategory={currentCategory}
         paymentGateways={paymentGateways}
         businessName={businessName}
-        currentPage={currentPage}
-        totalPages={totalPages}
         search={search}
         category={category}
         featured={featured}
@@ -564,7 +439,6 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
         apiBaseUrl={apiBaseUrl}
         directoryPublished={directoryPublished}
         tenantSlug={tenantSlug}
-        primaryStoreCategory={primaryStoreCategory}
         primaryGBPCategory={primaryGBPCategory}
         secondaryGBPCategories={secondaryGBPCategories}
         tier={tier}

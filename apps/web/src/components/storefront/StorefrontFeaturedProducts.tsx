@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Package, Calendar, DollarSign, Star, Tag } from 'lucide-react';
+import { Package, Calendar, DollarSign, Star, Tag, Grid, List } from 'lucide-react';
 import Link from 'next/link';
 import SmartProductCard from '@/components/products/SmartProductCard';
+import { Button } from '@/components/ui/Button';
 
 interface FeaturedProduct {
   id: string;
@@ -23,6 +24,9 @@ interface FeaturedProduct {
   has_variants?: boolean;
   hasActivePaymentGateway?: boolean;
   paymentGatewayType?: string;
+  isFeatured?: boolean;
+  featuredTypes?: string[];
+  featuredType?: string;
 }
 
 interface FeaturedSectionProps {
@@ -44,7 +48,8 @@ const featuredTypeConfig = {
     bgColor: 'bg-amber-50',
     borderColor: 'border-amber-200',
     textColor: 'text-amber-700',
-    buttonColor: 'bg-amber-600 hover:bg-amber-700'
+    buttonColor: 'bg-amber-600 hover:bg-amber-700',
+    badgeColor: 'bg-amber-100 text-amber-800 border-amber-200'
   },
   new_arrival: {
     title: 'New Arrivals',
@@ -54,7 +59,8 @@ const featuredTypeConfig = {
     bgColor: 'bg-green-50',
     borderColor: 'border-green-200',
     textColor: 'text-green-700',
-    buttonColor: 'bg-green-600 hover:bg-green-700'
+    buttonColor: 'bg-green-600 hover:bg-green-700',
+    badgeColor: 'bg-green-100 text-green-800 border-green-200'
   },
   seasonal: {
     title: 'Seasonal Specials',
@@ -64,7 +70,8 @@ const featuredTypeConfig = {
     bgColor: 'bg-orange-50',
     borderColor: 'border-orange-200',
     textColor: 'text-orange-700',
-    buttonColor: 'bg-orange-600 hover:bg-orange-700'
+    buttonColor: 'bg-orange-600 hover:bg-orange-700',
+    badgeColor: 'bg-orange-100 text-orange-800 border-orange-200'
   },
   sale: {
     title: 'Sale Items',
@@ -74,7 +81,8 @@ const featuredTypeConfig = {
     bgColor: 'bg-red-50',
     borderColor: 'border-red-200',
     textColor: 'text-red-700',
-    buttonColor: 'bg-red-600 hover:bg-red-700'
+    buttonColor: 'bg-red-600 hover:bg-red-700',
+    badgeColor: 'bg-red-100 text-red-800 border-red-200'
   },
   staff_pick: {
     title: 'Staff Picks',
@@ -84,77 +92,55 @@ const featuredTypeConfig = {
     bgColor: 'bg-purple-50',
     borderColor: 'border-purple-200',
     textColor: 'text-purple-700',
-    buttonColor: 'bg-purple-600 hover:bg-purple-700'
+    buttonColor: 'bg-purple-600 hover:bg-purple-700',
+    badgeColor: 'bg-purple-100 text-purple-800 border-purple-200'
   }
 };
 
-function FeaturedSection({ tenantId, type, title, description, icon, color, maxProducts = 8 }: FeaturedSectionProps) {
-  const [products, setProducts] = useState<FeaturedProduct[]>([]);
-  const [loading, setLoading] = useState(true);
-  const config = featuredTypeConfig[type];
+// Helper function to render featured type badges
+function FeaturedTypeBadges({ featuredTypes }: { featuredTypes?: string[] }) {
+  if (!featuredTypes || featuredTypes.length === 0) {
+    return null;
+  }
 
-  useEffect(() => {
-    let abortController = new AbortController();
-    let isMounted = true;
-
-    const fetchFeaturedProducts = async () => {
-      try {
-        // Use the public storefront featured products API (no auth required)
-        const response = await fetch(`/api/storefront/${tenantId}/featured-products?limit=${maxProducts}`, {
-          signal: abortController.signal,
-        });
-        const data = await response.json();
+  return (
+    <div className="flex flex-wrap gap-1 mt-2">
+      {featuredTypes.map((type) => {
+        const config = featuredTypeConfig[type as keyof typeof featuredTypeConfig];
+        if (!config) return null;
         
-        if (response.ok && isMounted) {
-          // The API returns items array, filter by featured type
-          const typeProducts = data.items?.filter((product: any) => product.featuredType === type) || [];
-          console.log(`FeaturedSection ${type}: Found ${typeProducts.length} products`);
-          
-          // Transform the data to match the expected format
-          const transformedProducts = typeProducts.map((product: any) => ({
-            id: product.id,
-            sku: product.sku,
-            name: product.name,
-            title: product.title,
-            description: product.description,
-            price: product.price || 0,
-            priceCents: product.priceCents,
-            salePriceCents: product.salePriceCents,
-            currency: 'USD',
-            stock: product.stock || 0,
-            imageUrl: product.imageUrl,
-            brand: product.brand,
-            availability: product.availability,
-            tenantCategory: product.tenantCategory,
-            has_variants: product.has_variants,
-            hasActivePaymentGateway: false,
-            paymentGatewayType: null,
-            // Add multi-type support
-            featuredTypes: [type], // This product is featured for this type
-            featuredType: type, // Backward compatibility
-            isFeatured: true
-          }));
-          
-          setProducts(transformedProducts);
-        }
-      } catch (error: unknown) {
-        if (error instanceof Error && error.name !== 'AbortError' && isMounted) {
-          console.error('Error fetching featured products:', error);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
+        return (
+          <span
+            key={type}
+            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${config.badgeColor}`}
+          >
+            {config.icon}
+            <span className="ml-1">{config.title}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
-    fetchFeaturedProducts();
+interface FeaturedSectionWithProductsProps {
+  tenantId: string;
+  type: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  color: string;
+  products: FeaturedProduct[];
+  loading: boolean;
+  maxProducts?: number;
+}
 
-    return () => {
-      isMounted = false;
-      abortController.abort();
-    };
-  }, [tenantId, type]);
+function FeaturedSection({ tenantId, type, title, description, icon, color, products, loading, maxProducts = 8 }: FeaturedSectionWithProductsProps) {
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const config = featuredTypeConfig[type];
+  
+  // Filter products by type (already done at parent level, but keep for safety)
+  const typeProducts = products.filter(p => p.featuredType === type).slice(0, maxProducts);
 
   if (loading) {
     return (
@@ -175,7 +161,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, maxP
     );
   }
 
-  if (products.length === 0) {
+  if (typeProducts.length === 0) {
     return null; // Don't show empty sections
   }
 
@@ -193,57 +179,116 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, maxP
               <p className="text-gray-600 mt-1">{description}</p>
             </div>
           </div>
-          <Link
-            href={`/tenant/${tenantId}?view=grid&featured=${type}&products_only=true`}
-            className={`px-4 py-2 rounded-lg text-white font-medium ${config.buttonColor} transition-colors`}
-          >
-            View All
-          </Link>
+          <div className="flex items-center space-x-3">
+            {/* Grid/List Toggle */}
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="px-3 py-1.5"
+              >
+                <Grid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="px-3 py-1.5"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
+            <Link
+              href={`/tenant/${tenantId}?view=grid&featured=${type}&products_only=true`}
+              className={`px-4 py-2 rounded-lg text-white font-medium ${config.buttonColor} transition-colors`}
+            >
+              View All
+            </Link>
+          </div>
         </div>
 
-        {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {products.map((product) => (
-            <SmartProductCard
-              key={product.id}
-              product={{
-                id: product.id,
-                sku: product.sku || product.id,
-                name: product.name,
-                title: product.title || product.name,
-                brand: product.brand || '',
-                description: product.description || '',
-                priceCents: product.priceCents,
-                salePriceCents: product.salePriceCents,
-                stock: product.stock || 0,
-                imageUrl: product.imageUrl,
-                tenantId: tenantId,
-                availability: (product.availability as any) || 'in_stock',
-                tenantCategory: product.tenantCategory,
-                has_variants: product.has_variants || false,
-                has_active_payment_gateway: product.hasActivePaymentGateway,
-                payment_gateway_type: product.paymentGatewayType,
-                featuredType: type, // Pass the featured type
-              }}
-              variant="featured"
-              showCategory={true}
-              showDescription={true}
-            />
-          ))}
-        </div>
+        {/* Products Display */}
+        {viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {products.map((product) => (
+              <SmartProductCard
+                key={product.id}
+                tenantId={tenantId}
+                product={{
+                  id: product.id,
+                  sku: product.sku || product.id,
+                  name: product.name,
+                  title: product.title,
+                  brand: product.brand,
+                  description: product.description,
+                  priceCents: product.priceCents,
+                  stock: product.stock,
+                  imageUrl: product.imageUrl,
+                  tenantId: tenantId,
+                  availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
+                  has_active_payment_gateway: product.hasActivePaymentGateway,
+                  payment_gateway_type: product.paymentGatewayType,
+                  tenantCategory: product.tenantCategory,
+                  isFeatured: product.isFeatured,
+                  metadata: {
+                    featuredTypes: product.featuredTypes
+                  }
+                }}
+                variant="featured"
+                showCategory={true}
+                showDescription={false}
+                className="h-full"
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {products.map((product) => (
+              <SmartProductCard
+                key={product.id}
+                tenantId={tenantId}
+                product={{
+                  id: product.id,
+                  sku: product.sku || product.id,
+                  name: product.name,
+                  title: product.title,
+                  brand: product.brand,
+                  description: product.description,
+                  priceCents: product.priceCents,
+                  stock: product.stock,
+                  imageUrl: product.imageUrl,
+                  tenantId: tenantId,
+                  availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
+                  has_active_payment_gateway: product.hasActivePaymentGateway,
+                  payment_gateway_type: product.paymentGatewayType,
+                  tenantCategory: product.tenantCategory,
+                  isFeatured: product.isFeatured,
+                  metadata: {
+                    featuredTypes: product.featuredTypes
+                  }
+                }}
+                variant="list"
+                showCategory={true}
+                showDescription={true}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
 export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: string }) {
-  const [activeSections, setActiveSections] = useState<string[]>([]);
+  const [allProducts, setAllProducts] = useState<FeaturedProduct[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let abortController = new AbortController();
     let isMounted = true;
 
-    const checkActiveSections = async () => {
+    const fetchAllProducts = async () => {
       try {
         // Single API call to get all featured products
         const response = await fetch(`/api/storefront/${tenantId}/featured-products?limit=50`, {
@@ -252,32 +297,44 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
         const data = await response.json();
         
         if (response.ok && data.items && isMounted) {
-          // Debug: Log what types we have
-          console.log('Featured products data:', data.items.map((item: any) => item.featuredType));
+          // Transform the data to match the expected format
+          const transformedProducts = data.items.map((product: any) => ({
+            id: product.id,
+            sku: product.sku,
+            name: product.name,
+            title: product.title,
+            description: product.description,
+            price: product.price || 0,
+            priceCents: product.priceCents,
+            salePriceCents: product.salePriceCents,
+            currency: product.currency || 'USD',
+            stock: product.stock || 0,
+            imageUrl: product.imageUrl,
+            brand: product.brand,
+            availability: product.availability,
+            tenantCategory: product.tenantCategory,
+            has_variants: product.hasVariants,
+            hasActivePaymentGateway: product.hasActivePaymentGateway || false,
+            paymentGatewayType: product.defaultGatewayType || null,
+            featuredTypes: product.featuredTypes || [product.featuredType],
+            featuredType: product.featuredType,
+            isFeatured: true
+          }));
           
-          // Check which types have products (include store_selection)
-          const types: Array<'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick'> = ['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick'];
-          const active: string[] = [];
-          
-          for (const type of types) {
-            const hasProducts = data.items.some((product: any) => product.featuredType === type);
-            console.log(`Type ${type}: ${hasProducts ? 'HAS' : 'NO'} products`);
-            if (hasProducts) {
-              active.push(type);
-            }
-          }
-          
-          console.log('Active sections:', active);
-          setActiveSections(active);
+          setAllProducts(transformedProducts);
         }
       } catch (error: unknown) {
         if (error instanceof Error && error.name !== 'AbortError' && isMounted) {
-          console.error('Error checking active sections:', error);
+          console.error('Error fetching featured products:', error);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
         }
       }
     };
 
-    checkActiveSections();
+    fetchAllProducts();
 
     return () => {
       isMounted = false;
@@ -285,41 +342,68 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
     };
   }, [tenantId]);
 
-  if (activeSections.length === 0) {
+  if (loading || allProducts.length === 0) {
     return null;
   }
 
+  // Filter products by type for each section
+  const productsByType = {
+    new_arrival: allProducts.filter(p => p.featuredType === 'new_arrival'),
+    seasonal: allProducts.filter(p => p.featuredType === 'seasonal'),
+    sale: allProducts.filter(p => p.featuredType === 'sale'),
+    staff_pick: allProducts.filter(p => p.featuredType === 'staff_pick'),
+    store_selection: allProducts.filter(p => p.featuredType === 'store_selection')
+  };
+
   return (
     <div className="space-y-0">
-      {activeSections.includes('new_arrival') && (
+      {productsByType.new_arrival.length > 0 && (
         <FeaturedSection
           tenantId={tenantId}
           type="new_arrival"
           {...featuredTypeConfig.new_arrival}
+          products={productsByType.new_arrival}
+          loading={false}
           maxProducts={8}
         />
       )}
-      {activeSections.includes('seasonal') && (
+      {productsByType.seasonal.length > 0 && (
         <FeaturedSection
           tenantId={tenantId}
           type="seasonal"
           {...featuredTypeConfig.seasonal}
+          products={productsByType.seasonal}
+          loading={false}
           maxProducts={8}
         />
       )}
-      {activeSections.includes('sale') && (
+      {productsByType.sale.length > 0 && (
         <FeaturedSection
           tenantId={tenantId}
           type="sale"
           {...featuredTypeConfig.sale}
+          products={productsByType.sale}
+          loading={false}
           maxProducts={8}
         />
       )}
-      {activeSections.includes('staff_pick') && (
+      {productsByType.staff_pick.length > 0 && (
         <FeaturedSection
           tenantId={tenantId}
           type="staff_pick"
           {...featuredTypeConfig.staff_pick}
+          products={productsByType.staff_pick}
+          loading={false}
+          maxProducts={8}
+        />
+      )}
+      {productsByType.store_selection.length > 0 && (
+        <FeaturedSection
+          tenantId={tenantId}
+          type="store_selection"
+          {...featuredTypeConfig.store_selection}
+          products={productsByType.store_selection}
+          loading={false}
           maxProducts={8}
         />
       )}

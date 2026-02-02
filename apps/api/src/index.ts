@@ -1483,6 +1483,16 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
     if (profileData.business_name) {
       console.log('[POST /tenant/profile] Updating tenant name to:', profileData.business_name);
       await prisma.tenants.update({ where: { id: tenant_id }, data: { name: profileData.business_name } });
+      
+      // Auto-regenerate slug when business name changes
+      try {
+        const slugSingletonService = (await import('./services/SlugSingletonService')).default;
+        await slugSingletonService.regenerateSlugFromBusinessName(tenant_id, false);
+        console.log('[POST /tenant/profile] Slug regenerated from new business name');
+      } catch (slugError) {
+        console.warn('[POST /tenant/profile] Failed to regenerate slug:', slugError);
+        // Don't fail the entire request if slug regeneration fails
+      }
     }
 
     console.log('[POST /tenant/profile] Success, returning result:', (result as any)[0] || result);
@@ -2581,6 +2591,7 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
           image_url: true,
           brand: true,
           category_path: true,
+          directory_category_id: true,
           item_status: true,
           availability: true,
           has_variants: true,
@@ -2632,7 +2643,12 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
           license_type: true
         }
       }).then(items => {
-        return items;
+        // Add inventory_item_id field for frontend compatibility
+        // For inventory items, inventory_item_id = id (the item's own ID)
+        return items.map(item => ({
+          ...item,
+          inventory_item_id: item.id // CRITICAL: Frontend expects this field
+        }));
       }),
 
       // Stats query
@@ -2882,6 +2898,16 @@ app.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
     // Update tenant name if business_name changed
     if (delta.business_name && typeof delta.business_name === 'string' && delta.business_name.trim()) {
       await prisma.tenants.update({ where: { id: tenant_id }, data: { name: delta.business_name } });
+      
+      // Auto-regenerate slug when business name changes
+      try {
+        const slugSingletonService = (await import('./services/SlugSingletonService')).default;
+        await slugSingletonService.regenerateSlugFromBusinessName(tenant_id, false);
+        console.log('[PATCH /tenant/profile] Slug regenerated from new business name');
+      } catch (slugError) {
+        console.warn('[PATCH /tenant/profile] Failed to regenerate slug:', slugError);
+        // Don't fail the entire request if slug regeneration fails
+      }
     }
 
     // Handle logo_url clearing from tenant metadata
@@ -4201,6 +4227,60 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   res.json(transformed);
 });
 
+// GET /api/items/:id/photos - Fetch all photos for an item ordered by position
+app.get("/api/items/:id/photos", authenticateToken, async (req, res) => {
+  try {
+    const itemId = req.params.id;
+    
+    // Verify item exists
+    const item = await prisma.inventory_items.findUnique({
+      where: { id: itemId },
+      select: { id: true, tenant_id: true }
+    });
+    
+    if (!item) {
+      return res.status(404).json({ error: "item_not_found" });
+    }
+    
+    // Fetch photos ordered by position
+    const photos = await prisma.photo_assets.findMany({
+      where: { 
+        inventoryItemId: itemId,
+        variant_id: null // Only item-level photos, not variant photos
+      },
+      orderBy: { position: 'asc' },
+      select: {
+        id: true,
+        inventoryItemId: true,
+        variant_id: true,
+        url: true,
+        publicUrl: true,
+        position: true,
+        alt: true,
+        caption: true,
+        createdAt: true
+      }
+    });
+    
+    // Transform to match frontend Photo interface
+    const transformedPhotos = photos.map(photo => ({
+      id: photo.id,
+      itemId: photo.inventoryItemId,
+      variantId: photo.variant_id,
+      url: photo.url || photo.publicUrl,
+      position: photo.position,
+      alt: photo.alt,
+      caption: photo.caption,
+      createdAt: photo.createdAt.toISOString()
+    }));
+    
+    res.json({ photos: transformedPhotos });
+  } catch (error) {
+    console.error('[GET /api/items/:id/photos] Error:', error);
+    res.status(500).json({ error: "failed_to_fetch_photos" });
+  }
+});
+
 const conditionSchema = z.enum(['new', 'brand_new', 'refurbished', 'used']).transform((v) => (v === 'new' ? 'brand_new' : v));
 
 const baseItemSchema = z.object({
@@ -5500,6 +5580,11 @@ import directoryTenantRoutes from './routes/directory-tenant';
 app.use('/api/directory/tenant', directoryTenantRoutes);
 console.log('✅ Directory tenant routes mounted at /api/directory/tenant');
 
+/* ------------------------------ slug generation (PLATFORM STANDARD) ------------------------------ */
+import slugGenerationRoutes from './routes/slug-generation';
+app.use('/api/slugs', slugGenerationRoutes);
+console.log('✅ Slug generation routes mounted at /api/slugs (Platform Standard - SlugSingletonService)');
+
 /* ------------------------------ directory map ------------------------------ */
 import directoryMapRoutes from './routes/directory-map';
 app.use('/api/directory', directoryMapRoutes);
@@ -5811,6 +5896,76 @@ import featuredProductsRoutes from './routes/featured-products';
 app.use('/api', featuredProductsRoutes);
 console.log('✅ Multi-type featured products routes mounted at /api');
 
+/* ------------------------------ SMART SALE TAGGING SYSTEM ------------------------------ */
+import smartSaleTaggingRoutes from './routes/smart-sale-tagging';
+app.use('/api/smart-sale-tagging', smartSaleTaggingRoutes);
+console.log('✅ Smart sale tagging routes mounted at /api/smart-sale-tagging (Automatic sale featured type tagging)');
+
+/* ------------------------------ VARIANT BULK OPERATIONS ------------------------------ */
+import variantBulkOperationsRoutes from './routes/variant-bulk-operations';
+app.use('/api/variants', variantBulkOperationsRoutes);
+console.log('✅ Variant bulk operations routes mounted at /api/variants (Bulk featured type, pricing, stock, activation)');
+
+/* ------------------------------ VARIANT FEATURED TYPES ------------------------------ */
+import variantFeaturedTypesRoutes from './routes/variant-featured-types';
+app.use('/api/featured-products', variantFeaturedTypesRoutes);
+console.log('✅ Variant featured types routes mounted at /api/featured-products (Individual variant featured type support)');
+
+/* ------------------------------ VARIANT-AWARE PRODUCTS ------------------------------ */
+import variantAwareProductsRoutes from './routes/variant-aware-products';
+app.use('/api/products', variantAwareProductsRoutes);
+console.log('✅ Variant-aware products routes mounted at /api/products (Enhanced variant relationship support)');
+
+/* ------------------------------ VARIANTS SINGLETON (NEW) ------------------------------ */
+import variantsSingletonRoutes from './routes/variants-singleton';
+app.use('/api/variants-singleton', variantsSingletonRoutes);
+console.log('✅ Variants singleton routes mounted at /api/variants-singleton (UniversalSingleton pattern)');
+
+/* ------------------------------ VARIANT-AWARE PRODUCTS SINGLETON (NEW) ------------------------------ */
+import variantAwareProductsSingletonRoutes from './routes/variant-aware-products-singleton';
+app.use('/api/products-singleton', variantAwareProductsSingletonRoutes);
+console.log('✅ Variant-aware products singleton routes mounted at /api/products-singleton (Materialized views + UniversalSingleton)');
+
+/* ------------------------------ VARIANT BULK OPERATIONS SINGLETON (NEW) ------------------------------ */
+import variantBulkOperationsSingletonRoutes from './routes/variant-bulk-operations-singleton';
+app.use('/api/variants-singleton', variantBulkOperationsSingletonRoutes);
+console.log('✅ Variant bulk operations singleton routes mounted at /api/variants-singleton (UniversalSingleton pattern)');
+
+/* ------------------------------ PHASE 6 ADVANCED FEATURES ------------------------------ */
+import shopsFeaturedRoutes from './routes/shops-featured';
+app.use('/api/shops-featured', shopsFeaturedRoutes);
+console.log('✅ Shops featured routes mounted at /api/shops-featured');
+
+/* ------------------------------ SHOPS DISCOVERY SYSTEM ------------------------------ */
+import shopsRoutes from './routes/shops';
+app.use('/api/shops', shopsRoutes);
+console.log('✅ Shops discovery routes mounted at /api/shops');
+
+import cartRoutes from './routes/cart';
+app.use('/api/cart', cartRoutes);
+console.log('✅ Cart service routes mounted at /api/cart');
+
+import tiersRoutes from './routes/tiers';
+app.use('/api/tiers', tiersRoutes);
+console.log('✅ Tier middleware routes mounted at /api/tiers');
+
+import brandingRoutes from './routes/branding';
+app.use('/api/branding', brandingRoutes);
+console.log('✅ Branding routes mounted at /api/branding');
+
+import testSlugRoutes from './routes/test-slugs';
+app.use('/api/test', testSlugRoutes);
+console.log('✅ Test slug routes mounted at /api/test');
+
+import publishingRoutes from './routes/publishing';
+app.use('/api/publishing', publishingRoutes);
+console.log('✅ Publishing routes mounted at /api/publishing');
+
+/* ------------------------------ TENANT AUTO ID SYSTEM ------------------------------ */
+import tenantAutoIdRoutes from './routes/tenant-auto-id';
+app.use('/api/tenant-auto-id', tenantAutoIdRoutes);
+console.log('✅ Tenant Auto ID routes mounted at /api/tenant-auto-id');
+
 /* ------------------------------ platform settings ------------------------------ */
 app.use('/api', platformSettingsRoutes);
 console.log('✅ Platform settings routes mounted at /api');
@@ -5845,8 +6000,8 @@ import usersRoutes from './routes/users-singleton';
 app.use('/api/users-singleton', authenticateToken, usersRoutes);
 console.log('✅ Users routes mounted at /api/users-singleton (UniversalSingleton)');
 
-import tiersRoutes from './routes/tiers-singleton';
-app.use('/api/tiers-singleton', authenticateToken, tiersRoutes);
+import tiersSingletonRoutes from './routes/tiers-singleton';
+app.use('/api/tiers-singleton', authenticateToken, tiersSingletonRoutes);
 console.log('✅ Tiers routes mounted at /api/tiers-singleton (UniversalSingleton)');
 
 console.log('🚀 UniversalSingleton System Phase 3 fully integrated and ready for production!');
@@ -5858,6 +6013,10 @@ console.log('✅ Inventory routes mounted at /api/inventory-singleton (Universal
 import categoriesRoutes from './routes/categories-singleton';
 app.use('/api/categories-singleton', authenticateToken, categoriesRoutes);
 console.log('✅ Categories routes mounted at /api/categories-singleton (UniversalSingleton)');
+
+import shopManagementRoutes from './routes/shop-management';
+app.use('/api/shop-management', authenticateToken, shopManagementRoutes);
+console.log('✅ Shop Management routes mounted at /api/shop-management (Real Database Service)');
 
 console.log('🚀 UniversalSingleton System Phase 4 fully integrated and ready for production!');
 
@@ -6148,6 +6307,11 @@ import storeReviewsRoutes from './routes/store-reviews';
 app.use('/api/stores', storeReviewsRoutes);
 app.use('/api', storeReviewsRoutes); // Mount at /api for helpful votes endpoint
 console.log('✅ Store reviews routes mounted at /api/stores and /api');
+
+/* ------------------------------ product queue ------------------------------ */
+import queueRoutes from './routes/queue-routes';
+app.use('/api/queue', queueRoutes);
+console.log('✅ Product queue routes mounted at /api/queue');
 
 // Sentry error handler must be after all routes but before other error handlers
 if (sentryEnabled) {

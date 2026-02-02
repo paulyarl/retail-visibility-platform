@@ -186,9 +186,9 @@ export default function FeaturedProductsSection({ tenantId }: FeaturedProductsSe
   
   return (
     <div className="featured-products-section">
-      {featuredData?.products.map((product: PublicProduct) => (
+      {featuredData?.products.map((product: PublicProduct, index) => (
         <UniversalProductCard
-          key={product.id}
+          key={`${product.id}-${product.sku}-${index}`}
           product={product}
           featuredBadge={getFeaturedBadge(product.featuredType)}
         />

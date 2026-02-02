@@ -1,4 +1,5 @@
 import { prisma } from '../prisma';
+import { triggerRevalidate } from '../utils/revalidate';
 
 export interface FeaturedProduct {
   id: string;
@@ -183,6 +184,13 @@ export class FeaturedProductsService {
         is_active: featuredProduct.is_active
       });
 
+      // Trigger storefront revalidation
+      triggerRevalidate(tenantId, [
+        `/t/${tenantId}`,
+        `/directory/t/${tenantId}`,
+        `/api/public/products/featured?tenantId=${tenantId}`
+      ]).catch(() => {});
+
       return featuredProduct as FeaturedProduct;
     } catch (error) {
       console.error('Error in addFeaturedType:', error);
@@ -234,6 +242,13 @@ export class FeaturedProductsService {
       });
       
       console.log(`[FeaturedProductsService] Verification: ${remainingCount} ${featuredType} products remaining for tenant ${existingFeatured.tenant_id}`);
+      
+      // Trigger storefront revalidation
+      triggerRevalidate(existingFeatured.tenant_id, [
+        `/t/${existingFeatured.tenant_id}`,
+        `/directory/t/${existingFeatured.tenant_id}`,
+        `/api/public/products/featured?tenantId=${existingFeatured.tenant_id}`
+      ]).catch(() => {});
       
       return result.count > 0;
     } catch (error) {

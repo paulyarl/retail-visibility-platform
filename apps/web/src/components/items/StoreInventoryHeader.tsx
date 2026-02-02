@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { apiRequest } from '@/lib/api';
+import TenantSettingsSingleton from '@/lib/singletons/TenantSettingsSingleton';
 import TenantSKUPrefix from './TenantSKUPrefix';
 import { Button, Badge } from '@/components/ui';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
@@ -45,31 +46,20 @@ export default function StoreInventoryHeader({
   const hasStorefront = canAccess('storefront', 'canView');
   const storefrontBadge = getFeatureBadgeWithPermission('storefront', 'canView', 'view storefront');
 
-  // Fetch tenant information for branding
+  // Fetch tenant information for branding using TenantSettingsSingleton (15-min cache)
   useEffect(() => {
     const fetchTenantInfo = async () => {
       try {
-        // Fetch tenant basic info
-        const tenantRes = await apiRequest(`/api/tenants/${tenantId}`);
-        if (tenantRes.ok) {
-          const tenantData = await tenantRes.json();
-          
-          // Fetch business profile for logo
-          let logoUrl = null;
-          try {
-            const profileRes = await apiRequest(`/api/tenant/profile?tenant_id=${tenantId}`);
-            if (profileRes.ok) {
-              const profileData = await profileRes.json();
-              logoUrl = profileData.logo_url;
-            }
-          } catch (profileError) {
-            console.error('Failed to fetch business profile:', profileError);
-          }
-          
+        const singleton = TenantSettingsSingleton.getInstance(tenantId);
+        
+        // Fetch both info and profile via singleton (cached)
+        const { info, profile } = await singleton.fetchAllSettings();
+        
+        if (info) {
           setTenantInfo({
-            name: tenantData.name,
-            logo: logoUrl, // Use logo from business profile
-            subdomain: tenantData.subdomain,
+            name: info.name,
+            logo: profile?.logo_url || undefined,
+            subdomain: info.slug,
           });
         }
       } catch (error) {

@@ -32,17 +32,25 @@ export default function VariantSelector({
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
+  // Sort variants by sort_order first, then by variant_name
+  const sortedVariants = [...variants].sort((a, b) => {
+    if (a.sort_order !== b.sort_order) {
+      return (a.sort_order || 0) - (b.sort_order || 0);
+    }
+    return a.variant_name.localeCompare(b.variant_name);
+  });
+
   // Get all unique attribute types from variants
   const attributeTypes = Array.from(
     new Set(
-      variants.flatMap(v => Object.keys(v.attributes))
+      sortedVariants.flatMap(v => Object.keys(v.attributes))
     )
   ).sort();
 
   // Get available values for each attribute type
   const getAttributeValues = (attributeType: string): string[] => {
     const values = new Set<string>();
-    variants.forEach(variant => {
+    sortedVariants.forEach(variant => {
       if (variant.is_active && variant.attributes[attributeType]) {
         values.add(variant.attributes[attributeType]);
       }
@@ -54,7 +62,7 @@ export default function VariantSelector({
   const isAttributeValueAvailable = (attributeType: string, value: string): boolean => {
     const testSelection = { ...selectedAttributes, [attributeType]: value };
     
-    return variants.some(variant => {
+    return sortedVariants.some(variant => {
       if (!variant.is_active || variant.stock <= 0) return false;
       
       return Object.entries(testSelection).every(([key, val]) => {
@@ -69,7 +77,7 @@ export default function VariantSelector({
     setSelectedAttributes(newSelection);
 
     // Find matching variant
-    const matchingVariant = variants.find(variant => {
+    const matchingVariant = sortedVariants.find(variant => {
       if (!variant.is_active) return false;
       
       return Object.entries(newSelection).every(([key, val]) => {
@@ -84,13 +92,13 @@ export default function VariantSelector({
   // Initialize with selected variant if provided
   useEffect(() => {
     if (selectedVariantId) {
-      const variant = variants.find(v => v.id === selectedVariantId);
+      const variant = sortedVariants.find(v => v.id === selectedVariantId);
       if (variant) {
         setSelectedAttributes(variant.attributes);
         setSelectedVariant(variant);
       }
     }
-  }, [selectedVariantId, variants]);
+  }, [selectedVariantId, sortedVariants]);
 
   if (variants.length === 0 || attributeTypes.length === 0) {
     return null;
@@ -147,31 +155,120 @@ export default function VariantSelector({
       {/* Selected variant info */}
       {selectedVariant && (
         <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
               <p className="text-sm font-medium text-green-900">
                 {selectedVariant.variant_name}
               </p>
               <p className="text-xs text-green-700 mt-1">
                 SKU: {selectedVariant.sku}
               </p>
+              {/* Variant attributes */}
+              <div className="mt-2 flex flex-wrap gap-1">
+                {Object.entries(selectedVariant.attributes).map(([key, value]) => (
+                  <span key={key} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                    {key}: {value}
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-lg font-bold text-green-900">
-                ${((selectedVariant.sale_price_cents || selectedVariant.price_cents) / 100).toFixed(2)}
-              </p>
-              {selectedVariant.sale_price_cents && (
-                <p className="text-xs text-green-700 line-through">
-                  ${(selectedVariant.price_cents / 100).toFixed(2)}
+            <div className="text-right ml-4">
+              {/* Price display */}
+              <div className="mb-2">
+                <p className="text-lg font-bold text-green-900">
+                  ${((selectedVariant.sale_price_cents || selectedVariant.price_cents) / 100).toFixed(2)}
                 </p>
-              )}
-              <p className="text-xs text-green-700 mt-1">
+                {selectedVariant.sale_price_cents && (
+                  <p className="text-xs text-green-700 line-through">
+                    ${(selectedVariant.price_cents / 100).toFixed(2)}
+                  </p>
+                )}
+                {selectedVariant.sale_price_cents && (
+                  <p className="text-xs text-green-600">
+                    {Math.round(((selectedVariant.price_cents - selectedVariant.sale_price_cents) / selectedVariant.price_cents) * 100)}% OFF
+                  </p>
+                )}
+              </div>
+              
+              {/* Stock status */}
+              <p className={`text-xs font-medium ${
+                selectedVariant.stock > 0 ? 'text-green-700' : 'text-red-700'
+              }`}>
                 {selectedVariant.stock > 0 
                   ? `${selectedVariant.stock} in stock`
                   : 'Out of stock'
                 }
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Variant comparison grid */}
+      {!selectedVariant && variants.length > 1 && (
+        <div className="mt-4">
+          <p className="text-sm font-medium text-gray-700 mb-3">All Available Options:</p>
+          <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
+            {variants
+              .filter(v => v.is_active)
+              .map((variant) => {
+                const hasSale = !!(variant.sale_price_cents && variant.sale_price_cents < variant.price_cents);
+                const discountPercent = hasSale 
+                  ? Math.round(((variant.price_cents - variant.sale_price_cents!) / variant.price_cents) * 100)
+                  : 0;
+                
+                return (
+                  <div 
+                    key={variant.id}
+                    className="border rounded-lg p-3 hover:border-gray-300 cursor-pointer transition-colors"
+                    onClick={() => {
+                      // Auto-select all attributes for this variant
+                      Object.entries(variant.attributes).forEach(([key, value]) => {
+                        handleAttributeSelect(key, value);
+                      });
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">
+                          {variant.variant_name}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-gray-500">{variant.sku}</span>
+                          {hasSale && (
+                            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded font-medium">
+                              {discountPercent}% OFF
+                            </span>
+                          )}
+                        </div>
+                        {/* Attributes */}
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {Object.entries(variant.attributes).map(([key, value]) => (
+                            <span key={key} className="text-xs bg-gray-100 text-gray-600 px-1 py-0.5 rounded">
+                              {value}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="text-right ml-4">
+                        <p className="text-sm font-bold text-gray-900">
+                          ${((variant.sale_price_cents || variant.price_cents) / 100).toFixed(2)}
+                        </p>
+                        {variant.sale_price_cents && (
+                          <p className="text-xs text-gray-500 line-through">
+                            ${(variant.price_cents / 100).toFixed(2)}
+                          </p>
+                        )}
+                        <p className={`text-xs font-medium ${
+                          variant.stock > 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {variant.stock > 0 ? `${variant.stock}` : 'Out'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}

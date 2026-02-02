@@ -19,4 +19,5 @@ export { AdvancedSearchableSelect, type SelectOption } from './AdvancedSearchabl
 export { ThemeToggle } from './ThemeToggle';
 export { Label } from './Label';
 export { Textarea } from './Textarea';
+export { Progress } from './Progress';
 export { useToast } from './use-toast';

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/use-toast';
-import { api } from '@/lib/api';
+import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import { Zap, Shield, TrendingUp, Settings, Loader2, BarChart3 } from 'lucide-react';
 import RateLimitTrends from './RateLimitTrends';
 import SecurityAlerts from './SecurityAlerts';
@@ -35,38 +35,95 @@ export default function PlatformSettings() {
   const [rateLimitConfigs, setRateLimitConfigs] = useState<PlatformSettingsData['rateLimitConfigurations']>([]); // Use proper type
   const { toast: toastFunction } = useToast();
 
+  // Default rate limit configurations for different route types
+  const getDefaultRateLimitConfigs = () => {
+    return [
+      {
+        id: 'default-api',
+        route_type: 'api',
+        max_requests: 1000,
+        window_minutes: 1,
+        enabled: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'default-auth',
+        route_type: 'auth',
+        max_requests: 10,
+        window_minutes: 1,
+        enabled: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'default-search',
+        route_type: 'search',
+        max_requests: 100,
+        window_minutes: 1,
+        enabled: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'default-upload',
+        route_type: 'upload',
+        max_requests: 20,
+        window_minutes: 1,
+        enabled: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'default-admin',
+        route_type: 'admin',
+        max_requests: 50,
+        window_minutes: 5,
+        enabled: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    ];
+  };
+
   useEffect(() => {
     loadSettings();
   }, []);
 
   // Update rateLimitConfigs when settings are loaded (but not on every settings change)
   useEffect(() => {
-    if (settings?.rateLimitConfigurations && rateLimitConfigs?.length === 0) {
-      setRateLimitConfigs(settings.rateLimitConfigurations);
+    if (settings?.rateLimitConfigurations) {
+      if (rateLimitConfigs?.length === 0) {
+        setRateLimitConfigs(settings.rateLimitConfigurations);
+      }
+    } else if (rateLimitConfigs?.length === 0) {
+      // Initialize with defaults if no configurations exist
+      setRateLimitConfigs(getDefaultRateLimitConfigs());
     }
   }, [settings?.rateLimitConfigurations, rateLimitConfigs?.length]); // Add rateLimitConfigs.length dependency
 
   const loadSettings = async () => {
     try {
-      const response = await api.get('/api/admin/platform-settings'); // Restore original path
-      if (response.ok) {
-        const data = await response.json();
-        setSettings(data);
-      } else {
-        // Default settings if API fails
-        setSettings({
-          rateLimitingEnabled: true,
-          updatedAt: new Date().toISOString(),
-          updatedBy: 'system'
-        });
-      }
+      // Use singleton service for cached platform settings
+      const settingsData = await platformSettingsService.getPlatformSettings();
+      
+      // Map the platform settings to the expected format for this component
+      const mappedSettings: PlatformSettingsData = {
+        rateLimitingEnabled: settingsData.features?.rateLimitingEnabled || false,
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'system',
+        rateLimitConfigurations: settingsData.features?.rateLimitConfigurations || getDefaultRateLimitConfigs()
+      };
+      
+      setSettings(mappedSettings);
     } catch (error) {
       console.error('Failed to load platform settings:', error);
       // Default settings on error
       setSettings({
         rateLimitingEnabled: true,
         updatedAt: new Date().toISOString(),
-        updatedBy: 'system'
+        updatedBy: 'system',
+        rateLimitConfigurations: getDefaultRateLimitConfigs()
       });
     } finally {
       setLoading(false);
@@ -88,19 +145,19 @@ export default function PlatformSettings() {
       }
 
       const payload = {
-        rateLimitingEnabled: settings?.rateLimitingEnabled || false,
-        rateLimitConfigurations: rateLimitConfigs,
-        ...updates, // Merge with any updates passed in
+        features: {
+          rateLimitingEnabled: settings?.rateLimitingEnabled || false,
+          rateLimitConfigurations: rateLimitConfigs,
+        }
       };
 
-      const response = await api.put('/api/admin/platform-settings', {
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) {
-        const updatedSettings = await response.json();
-        setSettings(updatedSettings); // Update with server response
+      // Use singleton service to update settings
+      const updatedSettings = await platformSettingsService.updatePlatformSettings(payload);
+      
+      if (updatedSettings) {
         toastFunction('Settings saved successfully', { variant: 'success' });
+        // Refresh settings to get the latest data
+        loadSettings();
       } else {
         throw new Error('Failed to save settings');
       }
@@ -129,11 +186,14 @@ export default function PlatformSettings() {
     const descriptions = {
       auth: 'Authentication routes (/api/auth)',
       admin: 'Admin routes (/api/admin)',
+      api: 'API routes (/api/*)',
+      search: 'Search endpoints (/api/search)',
+      upload: 'File upload routes (/api/upload)',
       strict: 'Sensitive API routes',
       standard: 'Regular API routes',
       exempt: 'Public browsing routes (directory, items, storefront)'
     };
-    return descriptions[routeType as keyof typeof descriptions] || routeType;
+    return descriptions[routeType as keyof typeof descriptions] || `${routeType} routes`;
   };
 
   if (loading) {

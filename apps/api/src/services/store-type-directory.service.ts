@@ -1,5 +1,6 @@
 import { getDirectPool } from '../utils/db-pool';
-import { slugify } from '../utils/slug';
+import tenantSingletonService from './TenantSingletonService';
+import slugSingletonService from './SlugSingletonService';
 
 // TypeScript interfaces for store type data
 interface StoreTypeDetails {
@@ -128,35 +129,43 @@ class StoreTypeDirectoryService {
       }
 
       // Transform to expected format
-      return result.rows.map(row => ({
-        id: row.gbp_category_id,
-        name: row.gbp_category_name,
-        displayName: row.gbp_category_display_name,
-        slug: slugify(row.gbp_category_name),
-        storeCount: parseInt(row.store_count) || 0,
-        primaryStoreCount: parseInt(row.primary_store_count) || 0,
-        secondaryStoreCount: parseInt(row.secondary_store_count) || 0,
-        totalProducts: parseInt(row.total_products) || 0,
-        avgRating: parseFloat(row.avg_rating) || 0,
-        uniqueLocations: parseInt(row.unique_locations) || 0,
-        cities: row.cities || [],
-        states: row.states || [],
-        featuredStoreCount: parseInt(row.featured_store_count) || 0,
-        syncedStoreCount: parseInt(row.synced_store_count) || 0,
-        firstStoreAdded: row.first_store_added,
-        lastStoreUpdated: row.last_store_updated,
-        // Compatibility fields (snake_case)
-        store_count: parseInt(row.store_count) || 0,
-        primary_store_count: parseInt(row.primary_store_count) || 0,
-        secondary_store_count: parseInt(row.secondary_store_count) || 0,
-        total_products: parseInt(row.total_products) || 0,
-        avg_rating: parseFloat(row.avg_rating) || 0,
-        unique_locations: parseInt(row.unique_locations) || 0,
-        featured_store_count: parseInt(row.featured_store_count) || 0,
-        synced_store_count: parseInt(row.synced_store_count) || 0,
-        first_store_added: row.first_store_added,
-        last_store_updated: row.last_store_updated,
-      }));
+      return result.rows.map(row => {
+        // Generate slug from category display name (store types are category-based, not tenant-based)
+        const slug = row.gbp_category_display_name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        
+        return {
+          id: row.gbp_category_id,
+          name: row.gbp_category_name,
+          displayName: row.gbp_category_display_name,
+          slug: slug, // Generated from category name
+          storeCount: parseInt(row.store_count) || 0,
+          primaryStoreCount: parseInt(row.primary_store_count) || 0,
+          secondaryStoreCount: parseInt(row.secondary_store_count) || 0,
+          totalProducts: parseInt(row.total_products) || 0,
+          avgRating: parseFloat(row.avg_rating) || 0,
+          uniqueLocations: parseInt(row.unique_locations) || 0,
+          cities: row.cities || [],
+          states: row.states || [],
+          featuredStoreCount: parseInt(row.featured_store_count) || 0,
+          syncedStoreCount: parseInt(row.synced_store_count) || 0,
+          firstStoreAdded: row.first_store_added,
+          lastStoreUpdated: row.last_store_updated,
+          // Compatibility fields (snake_case)
+          store_count: parseInt(row.store_count) || 0,
+          primary_store_count: parseInt(row.primary_store_count) || 0,
+          secondary_store_count: parseInt(row.secondary_store_count) || 0,
+          total_products: parseInt(row.total_products) || 0,
+          avg_rating: parseFloat(row.avg_rating) || 0,
+          unique_locations: parseInt(row.unique_locations) || 0,
+          featured_store_count: parseInt(row.featured_store_count) || 0,
+          synced_store_count: parseInt(row.synced_store_count) || 0,
+          first_store_added: row.first_store_added,
+          last_store_updated: row.last_store_updated,
+        };
+      });
     } catch (error) {
       console.error('[StoreTypeService] Error fetching store types:', error);
       return [];
@@ -195,7 +204,7 @@ class StoreTypeDirectoryService {
       id: category.id,
       name: category.name,
       displayName: category.displayName,
-      slug: slugify(category.name),
+      slug: slugSingletonService.slugify(category.name),
       storeCount: 0,
       primaryStoreCount: 0,
       secondaryStoreCount: 0,
@@ -324,7 +333,7 @@ class StoreTypeDirectoryService {
         tenantId: store.tenant_id,
         name: store.business_name,
         businessName: store.business_name,
-        slug: store.slug || slugify(store.business_name), // Generate slug if null
+        slug: store.slug || slugSingletonService.slugify(store.business_name), // Generate slug if null
         address: store.address,
         city: store.city,
         state: store.state,

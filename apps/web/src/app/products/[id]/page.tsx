@@ -13,6 +13,7 @@ import { PoweredByFooter } from '@/components/PoweredByFooter';
 import ProductBusinessInfoCollapsible from '@/components/products/ProductBusinessInfoCollapsible';
 import ProductReviewsSection from '@/components/products/ProductReviewsSection';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
+import StorefrontActions from '@/components/storefront/StorefrontActions';
 
 // Force dynamic rendering for product pages
 export const dynamic = 'force-dynamic';
@@ -380,6 +381,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       {/* Navigation Buttons (for authenticated users) */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
         <ProductNavigation tenantId={product.tenantId} directorySlug={directorySlug} />
+        
+        {/* Storefront Actions */}
+        <div className="flex justify-end mt-4">
+          <StorefrontActions 
+            tenantId={product.tenantId}
+            businessName={businessName}
+            currentUrl={typeof window !== 'undefined' ? window.location.href : ''}
+            showBackButton={true}
+          />
+        </div>
         
         {/* Alert for non-public products (only shown to authenticated users) */}
         {!isPubliclyAccessible && (

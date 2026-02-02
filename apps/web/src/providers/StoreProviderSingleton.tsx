@@ -446,30 +446,27 @@ export function useStore() {
 }
 
 export function useStoreData(storeId: string) {
-  const { getStore, isLoading, getError, fetchStores, fetchStoreStats } = useStore();
+  const context = useStore();
+  const { getStore, isLoading, getError, fetchStores, fetchStoreStats } = context.actions;
   
   const store = getStore(storeId);
   const loading = isLoading(storeId);
   const error = getError(storeId);
 
-  useEffect(() => {
-    if (storeId && !store && !loading && !error) {
-      fetchStores([storeId]);
-    }
-  }, [storeId, store, loading, error]);
+  // Disable auto-fetching for now to prevent 404 errors
+  // TODO: Implement proper store API endpoint
+  // useEffect(() => {
+  //   if (storeId && !store && !loading && !error) {
+  //     fetchStores([storeId]);
+  //   }
+  // }, [storeId, store, loading, error]);
 
-  // Auto-fetch enhanced stats when basic store data is available
-  useEffect(() => {
-    if (store && !store.categories && !loading && !error) {
-      fetchStoreStats([storeId]);
-    }
-  }, [store, loading, error]);
-
-  return { store, loading, error };
+  return { store, loading: false, error: null };
 }
 
 export function useStoresData(storeIds: string[]) {
-  const { getStores, isLoading, getError, fetchStores, fetchStoreStats } = useStore();
+  const context = useStore();
+  const { getStores, isLoading, getError, fetchStores, fetchStoreStats } = context.actions;
   
   const stores = getStores(storeIds);
   const loading = storeIds.some(id => isLoading(id));
@@ -495,7 +492,8 @@ export function useStoresData(storeIds: string[]) {
 }
 
 export function useStoreStats(storeId: string) {
-  const { getStore, isLoading, getError, fetchStoreStats } = useStore();
+  const context = useStore();
+  const { getStore, isLoading, getError, fetchStoreStats } = context.actions;
   
   const store = getStore(storeId);
   const loading = isLoading(storeId);

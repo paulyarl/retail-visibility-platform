@@ -192,8 +192,8 @@ function FeaturedProductsSection() {
   
   return (
     <div className="grid grid-cols-4 gap-4">
-      {products.map(product => (
-        <ProductCard key={product.id} product={product} />
+      {products.map((product, index) => (
+        <ProductCard key={`${product.id}-${product.sku}-${index}`} product={product} />
       ))}
     </div>
   );

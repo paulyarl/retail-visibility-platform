@@ -7,6 +7,7 @@ import TenantContextProvider from '@/components/tenant/TenantContextProvider';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { getTenantContext } from '@/lib/tenantContext';
 import RememberTenantRoute from '@/components/client/RememberTenantRoute';
+import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
 
 export default async function TenantPageLayout({ children, params }: { children: React.ReactNode; params: Promise<{ tenantId: string }> | { tenantId: string } }) {
   const cookieStore = await cookies();
@@ -28,7 +29,6 @@ export default async function TenantPageLayout({ children, params }: { children:
   // Resolve server tenant context (from tcx cookie or headers)
   const tenantCtx = await getTenantContext();
 
-  const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
   let tenantList: Array<{ id: string; name: string }> = [];
   
   // Skip server-side tenant membership check for now since token might not be available
@@ -73,6 +73,9 @@ export default async function TenantPageLayout({ children, params }: { children:
   //   // Logo fetch failed, continue without it
   // }
 
+  // Fetch tenant slug for the DynamicTenantSidebar using cached singleton service
+  const tenantSlug = await tenantDirectoryService.getTenantSlug(tenantId);
+
   // Feature flags (server-side) for gating nav items/variants
   const ffTenantUrls = isFeatureEnabled('FF_TENANT_URLS', tenantId);
   const ffAppShellNav = isFeatureEnabled('FF_APP_SHELL_NAV', tenantId);
@@ -83,7 +86,7 @@ export default async function TenantPageLayout({ children, params }: { children:
       <RememberTenantRoute tenantId={tenantId} />
       <ProtectedRoute>
         <TenantContextProvider value={{ tenantId: tenantCtx.tenantId ?? tenantId, tenantSlug: tenantCtx.tenantSlug, aud: tenantCtx.aud }}>
-          <DynamicTenantSidebar tenantId={tenantId}>
+          <DynamicTenantSidebar tenantId={tenantId} slug={tenantSlug}>
             {children}
           </DynamicTenantSidebar>
         </TenantContextProvider>

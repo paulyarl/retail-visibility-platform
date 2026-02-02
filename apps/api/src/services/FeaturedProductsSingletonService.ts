@@ -17,6 +17,8 @@ export interface FeaturedProduct {
   expiresAt?: Date;
   autoUnfeature: boolean;
   isActive: boolean;
+  tenantName?: string;
+  tenantLogoUrl?: string;
 }
 
 export interface FeaturedProductFilter {
@@ -290,24 +292,65 @@ class FeaturedProductsSingletonService extends UniversalSingleton {
         orderBy.featured_at = 'desc';
       }
 
-      const featuredProducts = await prisma.featured_products.findMany({
-        where,
-        orderBy,
-        take: filters.limit,
-        skip: filters.offset,
-        include: {
-          inventory_items: {
-            select: {
-              id: true,
-              title: true,
-              sku: true,
-              image_url: true
-            }
-          }
-        }
-      });
+      // Use mv_global_discovery for all cases since it has complete data including logos
+      let query = `
+        SELECT 
+          inventory_item_id as id,
+          inventory_item_id,
+          product_name,
+          product_title,
+          sku,
+          image_url,
+          brand,
+          current_price_cents,
+          sale_price_cents,
+          stock,
+          tenant_id,
+          tenant_name,
+          tenant_logo_url,
+          featured_type,
+          featured_priority,
+          featured_at
+        FROM mv_global_discovery
+        WHERE featured_is_active = true
+      `;
+      
+      let queryParams: any[] = [];
+      
+      // Add featured type filter if specified
+      if (filters.featuredType) {
+        query += ` AND featured_type = $${queryParams.length + 1}`;
+        queryParams.push(filters.featuredType);
+      }
+      
+      // Add tenant filter if specified
+      if (filters.tenantId) {
+        query += ` AND tenant_id = $${queryParams.length + 1}`;
+        queryParams.push(filters.tenantId);
+      }
+      
+      // Add ordering
+      if (filters.sortBy === 'priority') {
+        query += ` ORDER BY featured_priority DESC`;
+      } else {
+        query += ` ORDER BY featured_at DESC`;
+      }
+      
+      // Add limit and offset
+      if (filters.limit) {
+        query += ` LIMIT $${queryParams.length + 1}`;
+        queryParams.push(filters.limit);
+      }
+      if (filters.offset) {
+        query += ` OFFSET $${queryParams.length + 1}`;
+        queryParams.push(filters.offset);
+      }
+      
+      const { getDirectPool } = await import('../utils/db-pool');
+      const pool = getDirectPool();
+      const featuredProducts = await pool.query(query, queryParams);
 
-      const mappedProducts = featuredProducts.map(fp => this.mapPrismaFeaturedProduct(fp));
+      const mappedProducts = featuredProducts.rows.map(fp => this.mapPrismaFeaturedProduct(fp));
       await this.setCache(cacheKey, mappedProducts);
       
       return mappedProducts;
@@ -429,17 +472,20 @@ class FeaturedProductsSingletonService extends UniversalSingleton {
   /**
    * Map Prisma featured product to FeaturedProduct interface
    */
-  private mapPrismaFeaturedProduct(prismaFeaturedProduct: any): FeaturedProduct {
+  private mapPrismaFeaturedProduct(mvProduct: any): FeaturedProduct {
     return {
-      id: prismaFeaturedProduct.id,
-      inventoryItemId: prismaFeaturedProduct.inventory_item_id,
-      tenantId: prismaFeaturedProduct.tenant_id,
-      featuredType: prismaFeaturedProduct.featured_type,
-      priority: prismaFeaturedProduct.featured_priority,
-      featuredAt: prismaFeaturedProduct.featured_at,
-      expiresAt: prismaFeaturedProduct.featured_expires_at,
-      autoUnfeature: prismaFeaturedProduct.auto_unfeature,
-      isActive: prismaFeaturedProduct.is_active
+      id: mvProduct.id,
+      inventoryItemId: mvProduct.inventory_item_id,
+      tenantId: mvProduct.tenant_id,
+      featuredType: mvProduct.featured_type,
+      priority: mvProduct.featured_priority,
+      featuredAt: mvProduct.featured_at,
+      expiresAt: undefined, // MVs don't have expires_at field
+      autoUnfeature: false, // MVs don't have auto_unfeature field
+      isActive: true, // MVs only return active products
+      // Add tenant information for display
+      tenantName: mvProduct.tenant_name,
+      tenantLogoUrl: mvProduct.tenant_logo_url
     };
   }
 

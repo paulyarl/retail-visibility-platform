@@ -21,7 +21,7 @@ import PropagateItemModal from "@/components/items/PropagateItemModal";
 import QuickStartEmptyState from "@/components/items/QuickStartEmptyState";
 import ItemsGuide from "@/components/items/ItemsGuide";
 import { Item } from "@/services/itemsDataService";
-import { apiRequest } from "@/lib/api";
+import { useCategorySingleton } from '@/providers/data/CategorySingleton';
 
 interface ItemsPageClientProps {
   tenantId: string;
@@ -142,20 +142,23 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   const [allTenantCategories, setAllTenantCategories] = useState<Array<{id: string, name: string}>>([]);
   
   // Fetch ALL tenant categories once (not affected by filters)
+  // Use CategorySingleton for automatic caching (15-min TTL)
+  const { actions: categoryActions } = useCategorySingleton();
+  
   // Also build from items as fallback
   const categoriesFromItems = useRef<Map<string, string>>(new Map());
   
   useEffect(() => {
     const fetchAllCategories = async () => {
       try {
-        const response = await apiRequest(`/api/tenant/${tenantId}/categories`);
-        if (response.ok) {
-          const data = await response.json();
-          const categories = data.data || data.categories || data || [];
-          if (categories.length > 0) {
-            setAllTenantCategories(categories.map((c: any) => ({ id: c.id, name: c.name })).sort((a: any, b: any) => a.name.localeCompare(b.name)));
-            return;
-          }
+        // Use singleton for automatic caching
+        const { categories } = await categoryActions.fetchCategories({
+          includeChildren: true,
+          includeProductCount: false
+        });
+        if (categories.length > 0) {
+          setAllTenantCategories(categories.map((c: any) => ({ id: c.id, name: c.name })).sort((a: any, b: any) => a.name.localeCompare(b.name)));
+          return;
         }
       } catch (error) {
         console.error('[ItemsPageClient] Failed to fetch categories:', error);
@@ -1082,6 +1085,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
           }
         }}
         onClose={closeEditModal}
+        onItemUpdated={refresh}
       />
 
       {showQRModal && qrItem && (

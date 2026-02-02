@@ -9,6 +9,43 @@ import { getCategoryCounts } from '../utils/category-counts';
 const router = Router();
 
 /**
+ * GET /api/directory/resolve-slug/:slug
+ * Resolve a slug to a tenantId
+ * Used by storefront to handle both slug and tenantId URLs
+ */
+router.get('/resolve-slug/:slug', async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+    
+    // If it starts with 'tid-', it's already a tenantId
+    if (slug.startsWith('tid-')) {
+      return res.json({ success: true, tenantId: slug });
+    }
+    
+    // Query by slug
+    const query = `
+      SELECT tenant_id 
+      FROM directory_listings_list 
+      WHERE slug = $1 AND is_published = true
+      LIMIT 1
+    `;
+    
+    const result = await getDirectPool().query(query, [slug]);
+    
+    if (!result.rows || result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'slug_not_found' });
+    }
+    
+    const tenantId = result.rows[0].tenant_id;
+    return res.json({ success: true, tenantId });
+    
+  } catch (error) {
+    console.error('[DIRECTORY] Error resolving slug:', error);
+    return res.status(500).json({ success: false, error: 'internal_error' });
+  }
+});
+
+/**
  * GET /api/directory/:slug/related
  * Enhanced related stores with 3-category support and fallback
  */

@@ -6,6 +6,7 @@ import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput,
 import { z } from 'zod';
 import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
 import { api } from '@/lib/api';
+import SlugPatternSelector from '@/components/shops/SlugPatternSelector';
 
 interface EditBusinessProfileModalProps {
   isOpen: boolean;
@@ -403,6 +404,48 @@ export default function EditBusinessProfileModal({
             required
           />
 
+          {/* City and State - moved before slug selector */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="City"
+              placeholder="e.g., New York"
+              value={formData.city || ''}
+              onChange={(e) => handleChange('city', e.target.value)}
+              onBlur={() => handleBlur('city')}
+              error={errors.city}
+              required
+            />
+            
+            <Input
+              label="State / Province"
+              placeholder="e.g., NY"
+              value={formData.state || ''}
+              onChange={(e) => handleChange('state', e.target.value)}
+              onBlur={() => handleBlur('state')}
+              error={errors.state}
+            />
+          </div>
+
+          {/* Info box explaining why location helps */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              💡 <strong>Tip:</strong> Adding your city and state helps generate better URL options that are easier to find in search results.
+            </p>
+          </div>
+
+          {/* Slug Pattern Selector */}
+          <SlugPatternSelector
+            businessName={formData.business_name || ''}
+            location={{
+              city: formData.city,
+              state: formData.state,
+              country: formData.country_code,
+            }}
+            tenantId={typeof window !== 'undefined' ? localStorage.getItem('tenantId') || undefined : undefined}
+            selectedSlug={(formData as any).slug || ''}
+            onSlugSelect={(slug) => handleChange('slug' as any, slug)}
+          />
+
           {/* Address Line 1 */}
           <Input
             label="Address Line 1"
@@ -424,37 +467,16 @@ export default function EditBusinessProfileModal({
             error={errors.address_line2}
           />
 
-          {/* City, State, Postal Code */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input
-              label="City"
-              placeholder="e.g., New York"
-              value={formData.city || ''}
-              onChange={(e) => handleChange('city', e.target.value)}
-              onBlur={() => handleBlur('city')}
-              error={errors.city}
-              required
-            />
-            
-            <Input
-              label="State / Province"
-              placeholder="e.g., NY"
-              value={formData.state || ''}
-              onChange={(e) => handleChange('state', e.target.value)}
-              onBlur={() => handleBlur('state')}
-              error={errors.state}
-            />
-            
-            <Input
-              label="Postal Code"
-              placeholder="e.g., 10001"
-              value={formData.postal_code || ''}
-              onChange={(e) => handleChange('postal_code', e.target.value)}
-              onBlur={() => handleBlur('postal_code')}
-              error={errors.postal_code}
-              required
-            />
-          </div>
+          {/* Postal Code */}
+          <Input
+            label="Postal Code"
+            placeholder="e.g., 10001"
+            value={formData.postal_code || ''}
+            onChange={(e) => handleChange('postal_code', e.target.value)}
+            onBlur={() => handleBlur('postal_code')}
+            error={errors.postal_code}
+            required
+          />
 
           {/* Country */}
           <Select

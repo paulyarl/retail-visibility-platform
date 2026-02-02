@@ -28,10 +28,8 @@ import {
 import { generateCloverCatId, generateCloverIntegrationId, generateCloverItemId, generateCloverItemMappingsId, generateCloverOauthChangeLogId, generateCloverSyncLogId } from '../../lib/id-generator';
  
 
-// Helper to create slug from category name
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
+// Import platform standard slug service
+import slugSingletonService from '../../services/SlugSingletonService';
 
 const router = Router();
 
@@ -112,7 +110,7 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
     const uniqueCategories = [...new Set(demoItems.map(item => item.category))];
     
     for (const categoryName of uniqueCategories) {
-      const slug = slugify(categoryName);
+      const slug = slugSingletonService.slugify(categoryName);
       
       // Check if category already exists for this tenant
       let existingCategory = await prisma.directory_category.findFirst({
@@ -883,7 +881,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
         }
         
         // Find or create the category for this tenant (same as demo startup)
-        const slug = slugify(categoryName);
+        const slug = slugSingletonService.slugify(categoryName);
         let existingCategory = await prisma.directory_category.findFirst({
           where: {
             tenantId: tenantId,
@@ -1115,7 +1113,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
       case 'new_category':
         // Create new category from Clover
         const newCatData = event.changes[0].newValue;
-        const newCatSlug = slugify(newCatData.name);
+        const newCatSlug = slugSingletonService.slugify(newCatData.name);
         
         // Check if category already exists
         let newCategory = await prisma.directory_category.findFirst({
@@ -1176,7 +1174,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
             where: { id: catToRename.id },
             data: {
               name: newCatName,
-              slug: slugify(newCatName),
+              slug: slugSingletonService.slugify(newCatName),
               updatedAt: new Date()
             }
           });
@@ -1244,7 +1242,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
               id: generateCloverCatId(),
               tenantId,
               name: toCatName,
-              slug: slugify(toCatName),
+              slug: slugSingletonService.slugify(toCatName),
               isActive: true,
               updatedAt: new Date()
             }

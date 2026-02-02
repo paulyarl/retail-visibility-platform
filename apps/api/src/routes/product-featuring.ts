@@ -63,12 +63,14 @@ router.get('/tenants/:tenantId/products/featured', authenticateToken, requireInv
     // Filter by stock and combine data
     const inStockFeaturedProducts = featuredProducts
       .filter(fp => {
+        if (!fp.inventoryItemId) return false;
         const inventoryItem = inventoryMap.get(fp.inventoryItemId);
         return inventoryItem && inventoryItem.stock > 0 && 
                inventoryItem.item_status === 'active' && 
                inventoryItem.visibility === 'public';
       })
       .map(fp => {
+        if (!fp.inventoryItemId) throw new Error('Inventory item ID is required');
         const inventoryItem = inventoryMap.get(fp.inventoryItemId);
         if (!inventoryItem) throw new Error('Inventory item not found');
         
@@ -76,6 +78,7 @@ router.get('/tenants/:tenantId/products/featured', authenticateToken, requireInv
           ...fp,
           // Add inventory item fields to match expected format
           id: inventoryItem.id,
+          inventory_item_id: fp.inventoryItemId, // CRITICAL: Junction table key for featured product operations
           sku: inventoryItem.sku,
           name: inventoryItem.name,
           title: inventoryItem.title,
@@ -668,6 +671,7 @@ router.get('/tenants/:tenantId/products/featured/inactive', authenticateToken, r
     // Transform the data - only include actually paused products
     const transformedProducts = pausedProducts.map(fp => ({
       ...fp.inventory_items,
+      inventory_item_id: fp.inventory_item_id, // CRITICAL: Junction table key for featured product operations
       featured_type: fp.featured_type,
       featured_priority: fp.featured_priority,
       featured_at: fp.featured_at,

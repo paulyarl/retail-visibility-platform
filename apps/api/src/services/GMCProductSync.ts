@@ -456,7 +456,7 @@ export async function batchSyncProducts(
 
     // Process batch results
     for (const entry of entries) {
-      const item = items[entry.batchId - 1];
+      const item = items[(entry as any).batchId - 1];
       if (!item) continue;
 
       if (entry.errors) {

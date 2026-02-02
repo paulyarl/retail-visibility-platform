@@ -227,6 +227,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
           {products.map((product: Product) => (
             <SmartProductCard
               key={product.id}
+              tenantId={tenantId}
               product={{
                 id: product.id,
                 sku: product.sku,
@@ -484,6 +485,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                 </Link>
                 {/* Self-Aware Purchase UI */}
                 <SmartProductCard
+                  tenantId={tenantId}
                   product={{
                     id: productsWithPhotos[currentProductIndex].id,
                     sku: productsWithPhotos[currentProductIndex].sku,
@@ -520,6 +522,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
           {products.map((product: Product) => (
             <SmartProductCard
               key={product.id}
+              tenantId={tenantId}
               product={{
                 id: product.id,
                 sku: product.sku,

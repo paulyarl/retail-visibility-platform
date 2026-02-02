@@ -108,6 +108,25 @@ export function UniversalProductCard({
               <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
                 {product.name}
               </h3>
+              {/* SKU */}
+              {product.sku && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  SKU: {product.sku}
+                </p>
+              )}
+              {/* Category and Condition */}
+              <div className="flex items-center gap-1 mt-1">
+                {product.categoryName && (
+                  <span className="inline-flex items-center px-1 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs rounded">
+                    {product.categoryName}
+                  </span>
+                )}
+                {product.condition && (
+                  <span className="inline-flex items-center px-1 py-0.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-xs rounded">
+                    {product.condition.replace('_', ' ')}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center justify-between mt-1">
                 <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
                   ${product.formattedPrice}
@@ -118,12 +137,12 @@ export function UniversalProductCard({
                   </span>
                 )}
               </div>
-              {showStoreInfo && store && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {store.name}
-                </p>
-              )}
             </div>
+            {showStoreInfo && store && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {store.name}
+              </p>
+            )}
           </div>
         </Link>
       </div>
@@ -221,11 +240,53 @@ export function UniversalProductCard({
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{product.brand}</p>
         )}
 
+        {/* SKU */}
+        {product.sku && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            SKU: {product.sku}
+          </p>
+        )}
+
+        {/* Category and Condition */}
+        <div className="flex items-center gap-2 mb-3">
+          {product.categoryName && (
+            <span className="inline-flex items-center px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs rounded">
+              🏷️ {product.categoryName}
+            </span>
+          )}
+          {product.condition && (
+            <span className="inline-flex items-center px-2 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-xs rounded">
+              ✅ {product.condition.replace('_', ' ')}
+            </span>
+          )}
+        </div>
+
         {/* Description */}
         {product.description && (
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
             {product.description}
           </p>
+        )}
+
+        {/* Availability Status */}
+        {(product.availability || product.stock !== undefined) && (
+          <div className="mb-3">
+            {product.availability === 'out_of_stock' && (
+              <span className="inline-flex items-center px-2 py-1 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs rounded">
+                Out of Stock
+              </span>
+            )}
+            {product.availability === 'preorder' && (
+              <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs rounded">
+                Pre-order
+              </span>
+            )}
+            {product.availability === 'in_stock' && product.stock !== undefined && (
+              <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs rounded">
+                In Stock ({product.stock} available)
+              </span>
+            )}
+          </div>
         )}
 
         {/* Price */}
@@ -246,15 +307,6 @@ export function UniversalProductCard({
             </span>
           )}
         </div>
-
-        {/* Category */}
-        {product.category && (
-          <div className="mb-3">
-            <span className="inline-flex items-center px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs rounded-full">
-              {product.category.name}
-            </span>
-          </div>
-        )}
 
         {/* Store Info */}
         {showStoreInfo && store && (

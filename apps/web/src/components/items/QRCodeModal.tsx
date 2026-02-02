@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui';
 import { QRCodeGenerator } from './QRCodeGenerator';
-import { api } from '@/lib/api';
+import { getTenantInfoSingleton } from '@/lib/singletons/TenantInfoSingleton';
 
 interface QRCodeModalProps {
   isOpen: boolean;
@@ -18,7 +18,7 @@ export function QRCodeModal(props: QRCodeModalProps) {
   
   const actualTenantId = tenantId || 'tid-ej2um44f';
   
-  // Fetch tier data directly using public endpoint (no auth required)
+  // Fetch tier and logo using singleton (10-min cache)
   const [tierId, setTierId] = useState<string | null>(null);
   const [tierLoading, setTierLoading] = useState(true);
   const [tenantLogo, setTenantLogo] = useState<string | null>(null);
@@ -28,29 +28,19 @@ export function QRCodeModal(props: QRCodeModalProps) {
       try {
         setTierLoading(true);
         
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const singleton = getTenantInfoSingleton(actualTenantId);
         
-        // Use public tier endpoint (no auth required for storefront)
-        const tierResponse = await api.get(`${apiUrl}/api/tenants/${actualTenantId}/tier/public`);
-        if (tierResponse.ok) {
-          const tierData = await tierResponse.json();
-          const effectiveTierId = tierData.effective?.id || tierData.tier;
+        // Fetch tier and profile via singleton (cached)
+        const { tier, profile } = await singleton.fetchAll();
+        
+        if (tier) {
+          const effectiveTierId = tier.effective?.id || tier.id;
           setTierId(effectiveTierId);
           
-          // Fetch logo if professional or above
+          // Set logo if professional or above
           if (effectiveTierId === 'enterprise' || effectiveTierId === 'organization' || effectiveTierId === 'chain_enterprise' || effectiveTierId === 'professional' || effectiveTierId === 'chain_professional') {
-            try {
-              const profileResponse = await api.get(`${apiUrl}/api/tenants/${actualTenantId}/profile`);
-              if (profileResponse.ok) {
-                const profile = await profileResponse.json();
-                setTenantLogo(profile.logo_url || null);
-              }
-            } catch (error) {
-              console.warn('Failed to fetch tenant logo:', error);
-            }
+            setTenantLogo(profile?.logo_url || null);
           }
-        } else {
-          console.error('[QRCodeModal] Error fetching tier:', tierResponse.status);
         }
       } catch (error) {
         console.error('[QRCodeModal] Error fetching tier:', error);

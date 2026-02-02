@@ -165,16 +165,26 @@ router.post('/:cartId/items', requireAuth, async (req: Request, res: Response) =
       product_sku,
       product_image_url,
       unit_price_cents,
+      list_price_cents,
       quantity = 1,
       inventory_item_id,
     } = req.body;
 
-    // Validation
+    // Validation with sale pricing support
     if (!product_id || !product_name || !product_sku || unit_price_cents === undefined) {
       return res.status(400).json({
         success: false,
         error: 'missing_required_fields',
         message: 'product_id, product_name, product_sku, and unit_price_cents are required',
+      });
+    }
+
+    // Validate sale pricing logic
+    if (list_price_cents && list_price_cents > 0 && list_price_cents < unit_price_cents) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_pricing_logic',
+        message: 'list_price_cents must be greater than or equal to unit_price_cents',
       });
     }
 
@@ -213,24 +223,12 @@ router.post('/:cartId/items', requireAuth, async (req: Request, res: Response) =
       );
     } else {
       // Add new item
-      const itemId = `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       result = await pool.query(
-        `INSERT INTO shopping_cart_items (
-          id, cart_id, inventory_item_id, product_id, product_name, 
-          product_sku, product_image_url, unit_price_cents, quantity
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING *`,
-        [
-          itemId,
-          cartId,
-          inventory_item_id || null,
-          product_id,
-          product_name,
-          product_sku,
-          product_image_url || null,
-          unit_price_cents,
-          quantity,
-        ]
+        `INSERT INTO shopping_cart_items 
+         (cart_id, product_id, quantity, created_at, updated_at)
+         VALUES ($1, $2, $3, NOW(), NOW())
+         RETURNING *`,
+        [cartId, product_id, quantity]
       );
     }
 

@@ -68,14 +68,14 @@ export default function FeaturedProductsSection({
     const loadFeaturedProducts = async () => {
       try {
         // Get featured products from public API
-        const response = await fetch(`/api/featured-products/public?tenantId=${tenantId}${showType ? `&type=${showType}` : ''}`);
+        const response = await fetch(`/api/public/products/featured?tenantId=${tenantId}${showType ? `&type=${showType}` : ''}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch featured products');
         }
         
         const data = await response.json();
-        setFeaturedProducts(data.featuredProducts || []);
+        setFeaturedProducts(data.products || []);
       } catch (err) {
         console.error('Failed to load featured products:', err);
         setFeaturedProducts([]);

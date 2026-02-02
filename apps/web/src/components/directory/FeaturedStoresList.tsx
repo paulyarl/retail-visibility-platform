@@ -345,7 +345,11 @@ export default function FeaturedStoresList({
         ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' 
         : 'grid-cols-1'
     }`}>
-      {stores.map((store) => renderStoreCard(store))}
+      {stores.map((store) => (
+        <div key={store.id || store.tenantId}>
+          {renderStoreCard(store)}
+        </div>
+      ))}
     </div>
   );
 

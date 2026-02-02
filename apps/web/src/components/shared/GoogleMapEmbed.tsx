@@ -29,8 +29,8 @@ export default function GoogleMapEmbed({
   useEffect(() => {
     setIsClient(true);
     const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    console.log('[GoogleMapEmbed] API Key available:', !!key, 'Length:', key?.length);
-    console.log('[GoogleMapEmbed] Address:', address);
+/*     console.log('[GoogleMapEmbed] API Key available:', !!key, 'Length:', key?.length);
+    console.log('[GoogleMapEmbed] Address:', address); */
     setApiKey(key);
   }, [address]);
 
@@ -64,7 +64,7 @@ export default function GoogleMapEmbed({
 
   const embedUrl = `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(address)}`;
   const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-
+/* 
   console.log('[GoogleMapEmbed] Full details:', {
     hasApiKey: !!apiKey,
     apiKeyPrefix: apiKey?.substring(0, 10),
@@ -72,7 +72,7 @@ export default function GoogleMapEmbed({
     encodedAddress: encodeURIComponent(address),
     embedUrlLength: embedUrl.length,
     embedUrlStart: embedUrl.substring(0, 80)
-  });
+  }); */
 
   if (mapError) {
     return (

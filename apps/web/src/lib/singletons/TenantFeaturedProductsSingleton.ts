@@ -67,6 +67,7 @@ export interface FeaturedProductsState {
   // Data
   featuredProducts: Record<string, FeaturedProduct[]>;
   availableProducts: FeaturedProduct[];
+  outOfStockProducts: FeaturedProduct[]; // Add out-of-stock products
   inactiveProducts: FeaturedProduct[];
   featuredLimits: Record<string, number>;
   featuredTypes: FeaturedType[];
@@ -78,6 +79,7 @@ export interface FeaturedProductsState {
   selectedType: string;
   currentType: FeaturedType | null;
   availablePage: number;
+  outOfStockPage: number;
   editingExpiration: string | null;
   expirationDate: string;
   togglingActive: boolean;
@@ -85,11 +87,16 @@ export interface FeaturedProductsState {
   
   // Setters
   setAvailablePage: (page: number) => void;
+  setOutOfStockPage: (page: number) => void;
   setAvailableProducts: (products: FeaturedProduct[]) => void;
+  setOutOfStockProducts: (products: FeaturedProduct[]) => void; // Add this
   setInactiveProducts: (products: FeaturedProduct[]) => void;
   setEditingExpiration: (productId: string | null, date?: string) => void;
   setSelectedType: (typeId: string) => void;
   setSearchQuery: (query: string) => void;
+  
+  // Getters
+  getOutOfStockProducts: () => FeaturedProduct[]; // Add this
 }
 
 class TenantFeaturedProductsSingleton {
@@ -178,6 +185,7 @@ class TenantFeaturedProductsSingleton {
     return {
       featuredProducts: {},
       availableProducts: [],
+      outOfStockProducts: [], // Add this
       inactiveProducts: [], // Add this
       featuredLimits: {},
       featuredTypes: [...this.defaultFeaturedTypes],
@@ -187,38 +195,46 @@ class TenantFeaturedProductsSingleton {
       selectedType: 'store_selection',
       currentType: null,
       availablePage: 1,
+      outOfStockPage: 1,
       editingExpiration: null,
       expirationDate: '',
       togglingActive: false,
       forceUpdate: 0,
       // Add setter methods
       setAvailablePage: (page: number) => this.setState({ availablePage: page }),
+      setOutOfStockPage: (page: number) => this.setState({ outOfStockPage: page }),
       setAvailableProducts: (products: FeaturedProduct[]) => this.setState({ availableProducts: products }),
+      setOutOfStockProducts: (products: FeaturedProduct[]) => this.setState({ outOfStockProducts: products }), // Add this
       setInactiveProducts: (products: FeaturedProduct[]) => this.setState({ inactiveProducts: products }),
       setEditingExpiration: (productId: string | null, date?: string) => this.setState({ editingExpiration: productId, expirationDate: date || '' }),
       setSelectedType: (typeId: string) => this.setSelectedType(typeId),
-      setSearchQuery: (query: string) => this.setSearchQuery(query)
+      setSearchQuery: (query: string) => this.setSearchQuery(query),
+      
+      // Add getter methods
+      getOutOfStockProducts: () => this.state.outOfStockProducts || [] // Add this
     };
   }
 
   // State management
   private setState(updates: Partial<FeaturedProductsState>) {
-    console.log('TenantFeaturedProductsSingleton: setState called with:', updates);
+    /* console.log('TenantFeaturedProductsSingleton: setState called with:', updates);
     console.log('TenantFeaturedProductsSingleton: Current state before update:', {
       featuredProductsKeys: Object.keys(this.state.featuredProducts || {}),
       featuredProductsCount: Object.values(this.state.featuredProducts || {}).reduce((sum, arr) => sum + arr.length, 0),
       availableProductsCount: this.state.availableProducts?.length || 0,
+      outOfStockProductsCount: this.state.outOfStockProducts?.length || 0,
       inactiveProductsCount: this.state.inactiveProducts?.length || 0
-    });
+    }); */
     
     this.state = { ...this.state, ...updates };
     
-    console.log('TenantFeaturedProductsSingleton: State after update:', {
+    /* console.log('TenantFeaturedProductsSingleton: State after update:', {
       featuredProductsKeys: Object.keys(this.state.featuredProducts || {}),
       featuredProductsCount: Object.values(this.state.featuredProducts || {}).reduce((sum, arr) => sum + arr.length, 0),
       availableProductsCount: this.state.availableProducts?.length || 0,
+      outOfStockProductsCount: this.state.outOfStockProducts?.length || 0,
       inactiveProductsCount: this.state.inactiveProducts?.length || 0
-    });
+    }); */
     
     this.notifyListeners();
   }
@@ -264,11 +280,11 @@ class TenantFeaturedProductsSingleton {
     if (!this.productSingleton) return;
 
     try {
-      console.log('TenantFeaturedProductsSingleton: syncWithProductProvider called');
+      // console.log('TenantFeaturedProductsSingleton: syncWithProductProvider called');
       
       // Get all universal products for this tenant from ProductSingleton
       const universalProducts = await this.productSingleton.getProductsByTenant?.(this.tenantId) || {};
-      console.log('TenantFeaturedProductsSingleton: Universal products count:', Object.keys(universalProducts).length);
+      // console.log('TenantFeaturedProductsSingleton: Universal products count:', Object.keys(universalProducts).length);
       
       // Combine featured assignments with product data
       const combinedFeaturedProducts: Record<string, FeaturedProduct[]> = {};
@@ -321,7 +337,7 @@ class TenantFeaturedProductsSingleton {
             featuredTypes: []
           }));
 
-        console.log('TenantFeaturedProductsSingleton: syncWithProductProvider updating state with valid data');
+        // console.log('TenantFeaturedProductsSingleton: syncWithProductProvider updating state with valid data');
         this.setState({
           featuredProducts: combinedFeaturedProducts,
           availableProducts
@@ -344,7 +360,8 @@ class TenantFeaturedProductsSingleton {
         this.fetchFeaturedProducts(),
         this.fetchTierLimits(),
         this.fetchInactiveProducts(),
-        this.fetchAvailableProducts() // Add this to load available products
+        this.fetchAvailableProducts(), // Load available products for featuring
+        this.fetchOutOfStockProducts() // Load out-of-stock products for management
       ]);
       if (this.productSingleton) {
         await this.syncWithProductProvider();
@@ -392,31 +409,31 @@ class TenantFeaturedProductsSingleton {
 
   async fetchFeaturedProducts() {
     try {
-      console.log('TenantFeaturedProductsSingleton: Fetching featured products...');
+      // console.log('TenantFeaturedProductsSingleton: Fetching featured products...');
       const response = await apiRequest(`/api/featured-products/management?tenantId=${this.tenantId}&_t=${Date.now()}`);
       const data = await response.json();
       
-      console.log('TenantFeaturedProductsSingleton: Raw API response:', data);
+      // console.log('TenantFeaturedProductsSingleton: Raw API response:', data);
       
       if (data && typeof data === 'object') {
         // Check if the data has actual products (not empty)
         const hasProducts = Object.keys(data).some(key => Array.isArray(data[key]) && data[key].length > 0);
         
         if (hasProducts) {
-          console.log('TenantFeaturedProductsSingleton: Featured products fetched successfully', Object.keys(data).length);
-          console.log('TenantFeaturedProductsSingleton: Featured products data structure:', {
+          // console.log('TenantFeaturedProductsSingleton: Featured products fetched successfully', Object.keys(data).length);
+          /* console.log('TenantFeaturedProductsSingleton: Featured products data structure:', {
             keys: Object.keys(data),
             storeSelectionCount: data.store_selection?.length || 0,
             newArrivalCount: data.new_arrival?.length || 0,
             seasonalCount: data.seasonal?.length || 0,
             saleCount: data.sale?.length || 0,
             staffPickCount: data.staff_pick?.length || 0
-          });
+          }); */
           this.setState({ featuredProducts: data });
           
           // CRITICAL: Set isLoading to false after successful fetch
           this.setState({ isLoading: false });
-          console.log('TenantFeaturedProductsSingleton: Loading state set to false');
+          // console.log('TenantFeaturedProductsSingleton: Loading state set to false');
         } else {
           console.log('TenantFeaturedProductsSingleton: Empty featured products data received, not updating state');
           // Don't update state with empty data
@@ -433,16 +450,16 @@ class TenantFeaturedProductsSingleton {
 
   async fetchInactiveProducts() {
     try {
-      console.log('TenantFeaturedProductsSingleton: Fetching inactive products...');
+      // console.log('TenantFeaturedProductsSingleton: Fetching inactive products...');
       const response = await apiRequest(`/api/tenants/${this.tenantId}/products/featured/inactive`);
       if (response.ok) {
         const data = await response.json();
-        console.log('TenantFeaturedProductsSingleton: Raw inactive products response:', data);
+        // console.log('TenantFeaturedProductsSingleton: Raw inactive products response:', data);
         let inactiveProducts = (data.products || []) as FeaturedProduct[];
         
         // Enrich inactive products with missing data from available products
         if (inactiveProducts.length > 0 && this.state.availableProducts.length > 0) {
-          console.log('TenantFeaturedProductsSingleton: Enriching inactive products with available products data...');
+          // console.log('TenantFeaturedProductsSingleton: Enriching inactive products with available products data...');
           
           inactiveProducts = inactiveProducts.map(inactiveProduct => {
             // Find matching product in available products by name or SKU
@@ -452,11 +469,11 @@ class TenantFeaturedProductsSingleton {
             );
             
             if (matchingAvailable) {
-              console.log('TenantFeaturedProductsSingleton: Found match for inactive product:', {
+              /* console.log('TenantFeaturedProductsSingleton: Found match for inactive product:', {
                 inactiveProductName: inactiveProduct.name,
                 availableProductName: matchingAvailable.name,
                 inventory_item_id: matchingAvailable.inventory_item_id
-              });
+              }); */
               
               // Merge the data, prioritizing available products data for missing fields
               return {
@@ -476,13 +493,13 @@ class TenantFeaturedProductsSingleton {
         }
         
         // Debug the first product to see its structure
-        if (inactiveProducts.length > 0) {
+        /* if (inactiveProducts.length > 0) {
           console.log('TenantFeaturedProductsSingleton: Sample inactive product structure:', inactiveProducts[0]);
           console.log('TenantFeaturedProductsSingleton: Product ID fields:', {
             id: inactiveProducts[0].id,
             inventory_item_id: inactiveProducts[0].inventory_item_id
           });
-        }
+        } */
         
         const uniqueInactiveProducts = Array.from(
           new Map(inactiveProducts.map((product: FeaturedProduct) => [product.id, product])).values()
@@ -490,9 +507,9 @@ class TenantFeaturedProductsSingleton {
         
         // Add inactive products to state
         this.setState({ inactiveProducts: uniqueInactiveProducts });
-        console.log('TenantFeaturedProductsSingleton: Inactive products fetched successfully', uniqueInactiveProducts.length);
+        //console.log('TenantFeaturedProductsSingleton: Inactive products fetched successfully', uniqueInactiveProducts.length);
       } else {
-        console.log('TenantFeaturedProductsSingleton: No inactive products data received');
+        //console.log('TenantFeaturedProductsSingleton: No inactive products data received');
         this.setState({ inactiveProducts: [] });
       }
     } catch (error) {
@@ -504,42 +521,93 @@ class TenantFeaturedProductsSingleton {
   async fetchAvailableProducts() {
     // Fallback to direct API call (like the original page)
     try {
-      console.log('TenantFeaturedProductsSingleton: Fetching available products...');
+      //console.log('TenantFeaturedProductsSingleton: Fetching available products...');
       const response = await apiRequest(`/api/tenants/${this.tenantId}/items?limit=100`);
       if (response.ok) {
         const data = await response.json();
-        console.log('TenantFeaturedProductsSingleton: Raw available products response:', data);
+        //console.log('TenantFeaturedProductsSingleton: Raw available products response:', data);
         
         // Process available products (same as original page)
         const allProducts = data.items || [];
         const featuredProductIds = this.currentFeatured.map((p: FeaturedProduct) => p.inventory_item_id);
-        console.log('TenantFeaturedProductsSingleton: Featured product IDs to filter out:', featuredProductIds);
+        //console.log('TenantFeaturedProductsSingleton: Featured product IDs to filter out:', featuredProductIds);
         
         const available = allProducts.filter((p: any) => 
           !featuredProductIds.includes(p.id) && 
           p.item_status === 'active' && 
           p.visibility === 'public' &&
-          p.stock > 0 // Must have stock
+          p.stock > 0 // Only show in-stock products for featuring
         );
         
-        console.log('TenantFeaturedProductsSingleton: Available products after filtering:', {
+        /* console.log('TenantFeaturedProductsSingleton: Available products after filtering:', {
           totalProducts: allProducts.length,
           featuredCount: featuredProductIds.length,
           availableCount: available.length,
           sampleAvailable: available.slice(0, 3)
-        });
+        }); */
+        
+        // DEBUG: Log the first product's structure
+        /* if (available.length > 0) {
+          console.log('=== PRODUCT STRUCTURE FROM API ===');
+          console.log('First product:', available[0]);
+          console.log('Product keys:', Object.keys(available[0]));
+          console.log('ID field:', available[0].id);
+          console.log('inventory_item_id field:', available[0].inventory_item_id);
+          console.log('=== END PRODUCT STRUCTURE ===');
+        } */
         
         // Use the state's setAvailableProducts method
         this.state.setAvailableProducts(available);
       }
     } catch (error) {
-      console.error('Error fetching available products:', error);
+      //console.error('Error fetching available products:', error);
       this.state.setAvailableProducts([]);
+    }
+  }
+
+  async fetchOutOfStockProducts() {
+    // Fetch out-of-stock products for management visibility
+    try {
+      //console.log('TenantFeaturedProductsSingleton: Fetching out-of-stock products...');
+      const response = await apiRequest(`/api/tenants/${this.tenantId}/items?limit=100`);
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Process out-of-stock products
+        const allProducts = data.items || [];
+        const featuredProductIds = this.currentFeatured.map((p: FeaturedProduct) => p.inventory_item_id);
+        
+        const outOfStock = allProducts.filter((p: any) => 
+          !featuredProductIds.includes(p.id) && 
+          p.item_status === 'active' && 
+          p.visibility === 'public' &&
+          p.stock === 0 // Only show out-of-stock products
+        );
+        
+        console.log('TenantFeaturedProductsSingleton: Out-of-stock products after filtering:', {
+          totalProducts: allProducts.length,
+          featuredCount: featuredProductIds.length,
+          outOfStockCount: outOfStock.length,
+          sampleOutOfStock: outOfStock.slice(0, 3)
+        });
+        
+        // Use the state's setOutOfStockProducts method
+        this.state.setOutOfStockProducts(outOfStock);
+      }
+    } catch (error) {
+      console.error('Error fetching out-of-stock products:', error);
+      this.state.setOutOfStockProducts([]);
     }
   }
 
   // Action methods
   async featureProduct(productId: string) {
+    //console.log('[TenantFeaturedProductsSingleton] featureProduct called with productId:', productId);
+    if (!productId) {
+      //console.error('[TenantFeaturedProductsSingleton] productId is undefined in featureProduct');
+      throw new Error('Product ID is required for featuring');
+    }
+    
     this.setState({ processing: true });
     
     try {
@@ -569,8 +637,7 @@ class TenantFeaturedProductsSingleton {
           this.productSingleton.invalidateCache(productId);
         }
 
-        // Trigger storefront revalidation
-        await this.triggerStorefrontRevalidation();
+        // Note: Backend handles storefront revalidation automatically
       } else {
         const error = await response.json();
         throw new Error(error.message || 'Failed to feature product');
@@ -605,8 +672,7 @@ class TenantFeaturedProductsSingleton {
           this.productSingleton.invalidateCache(productId);
         }
 
-        // Trigger storefront revalidation
-        await this.triggerStorefrontRevalidation();
+        // Note: Backend handles storefront revalidation automatically
       } else {
         throw new Error('Failed to unfeature product');
       }
@@ -622,11 +688,12 @@ class TenantFeaturedProductsSingleton {
     this.setState({ togglingActive: true });
     
     try {
-      // For inactive products, the API expects the 'id' field, not 'inventory_item_id'
-      // For active products, we use 'inventory_item_id'
-      const apiProductId = productId;
+      console.log('[toggleProductActive] Called with:', { productId, isActive, tenantId: this.tenantId });
       
-      const response = await apiRequest(`/api/tenants/${this.tenantId}/products/${apiProductId}/feature/active`, {
+      const url = `/api/tenants/${this.tenantId}/products/${productId}/feature/active`;
+      console.log('[toggleProductActive] API URL:', url);
+      
+      const response = await apiRequest(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -634,16 +701,23 @@ class TenantFeaturedProductsSingleton {
         })
       });
 
+      console.log('[toggleProductActive] Response status:', response.status);
+      
       if (response.ok) {
+        const data = await response.json();
+        console.log('[toggleProductActive] Success:', data);
+        
         await Promise.all([
           this.fetchFeaturedProducts(),
           this.fetchInactiveProducts()
         ]);
       } else {
-        throw new Error('Failed to update product status');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('[toggleProductActive] API error:', errorData);
+        throw new Error(errorData.error || 'Failed to update product status');
       }
     } catch (error) {
-      console.error('Error toggling product active status:', error);
+      console.error('[toggleProductActive] Error:', error);
       throw error;
     } finally {
       this.setState({ togglingActive: false });
@@ -654,11 +728,11 @@ class TenantFeaturedProductsSingleton {
     this.setState({ processing: true });
     
     try {
-      console.log('TenantFeaturedProductsSingleton: Updating product expiration:', {
+      /* console.log('TenantFeaturedProductsSingleton: Updating product expiration:', {
         productId,
         expirationDate,
         selectedType: this.state.selectedType
-      });
+      }); */
       
       const response = await apiRequest(`/api/items/${productId}/featured-types/${this.state.selectedType}`, {
         method: 'PATCH',
@@ -670,7 +744,7 @@ class TenantFeaturedProductsSingleton {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('TenantFeaturedProductsSingleton: Expiration update successful:', result);
+        //console.log('TenantFeaturedProductsSingleton: Expiration update successful:', result);
         
         // Refresh featured products to get updated data
         await this.fetchFeaturedProducts();
@@ -686,26 +760,7 @@ class TenantFeaturedProductsSingleton {
     }
   }
 
-  // Trigger storefront revalidation when featured products change
-  private async triggerStorefrontRevalidation() {
-    try {
-      // Revalidate storefront pages that display featured products
-      await fetch('/api/revalidate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paths: [
-            `/t/${this.tenantId}`,
-            `/directory/t/${this.tenantId}`,
-            `/api/featured-products/public?tenantId=${this.tenantId}`
-          ]
-        })
-      });
-    } catch (error) {
-      console.warn('Failed to trigger storefront revalidation:', error);
-    }
-  }
-
+  
   // UI State setters
   setSelectedType(typeId: string) {
     this.setState({ 
@@ -726,6 +781,10 @@ class TenantFeaturedProductsSingleton {
 
   setAvailablePage(page: number) {
     this.setState({ availablePage: page });
+  }
+
+  setOutOfStockPage(page: number) {
+    this.setState({ outOfStockPage: page });
   }
 
   setEditingExpiration(productId: string | null, date: string = '') {

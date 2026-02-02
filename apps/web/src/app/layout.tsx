@@ -6,6 +6,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { PlatformSettingsProvider } from "@/contexts/PlatformSettingsContext";
 import { AuthProvider as CustomAuthProvider } from "@/contexts/AuthContext";
 import { CartWidgetProvider } from "@/contexts/CartWidgetContext";
+import { ProductLayoutProvider } from "@/contexts/ProductLayoutContext";
 import DynamicFavicon from "@/components/DynamicFavicon";
 import { QueryClientWrapper } from "@/components/QueryClientWrapper";
 import { GlobalAlertProvider } from "@/components/ui/GlobalAlertProvider";
@@ -47,14 +48,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PlatformSettingsProvider>
             <CustomAuthProvider>
               <CartWidgetProvider>
-                <GlobalAlertProvider>
-                  <UniversalProvider>
-                    <ErrorBoundary>
-                      {children}
-                    </ErrorBoundary>
-                    <FloatingCartWidget />
-                  </UniversalProvider>
-                </GlobalAlertProvider>
+                <ProductLayoutProvider>
+                  <GlobalAlertProvider>
+                    <UniversalProvider>
+                      <ErrorBoundary>
+                        {children}
+                      </ErrorBoundary>
+                      <FloatingCartWidget />
+                    </UniversalProvider>
+                  </GlobalAlertProvider>
+                </ProductLayoutProvider>
               </CartWidgetProvider>
             </CustomAuthProvider>
           </PlatformSettingsProvider>

@@ -76,6 +76,7 @@ export function ProductRecommendations({ productId, tenantId }: ProductRecommend
         {recommendations.map((product) => (
           <SmartProductCard
             key={product.id}
+            tenantId={product.tenantId}
             product={{
               id: product.id,
               sku: product.id,

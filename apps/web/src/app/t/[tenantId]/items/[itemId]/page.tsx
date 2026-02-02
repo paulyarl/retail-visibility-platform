@@ -1,8 +1,11 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useProductSingleton } from '@/providers/data/ProductSingleton';
+import { useCategorySingleton } from '@/providers/data/CategorySingleton';
+import PhotoSingleton from '@/lib/singletons/PhotoSingleton';
+import ItemUpdateService from '@/lib/singletons/ItemUpdateService';
 import { Card, CardContent, Badge, Button, Modal, ModalFooter } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import SyncStatusIndicator from '@/components/items/SyncStatusIndicator';
@@ -14,10 +17,10 @@ import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import ProductCategoryContext from '@/components/products/ProductCategoryContext';
 
 interface ItemDetailPageProps {
-  params: Promise<{
+  params: {
     tenantId: string;
     itemId: string;
-  }>;
+  };
 }
 
 interface EnrichedItem extends ItemType {
@@ -67,10 +70,9 @@ interface Photo {
   id: string;
   url: string;
   position: number;
-  alt?: string;
-  caption?: string;
+  alt?: string | null;
+  caption?: string | null;
 }
-
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -78,9 +80,8 @@ export const runtime = 'edge';
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
-
 export default function ItemDetailPage({ params }: ItemDetailPageProps) {
-  const { tenantId, itemId } = use(params);
+  const { tenantId, itemId } = useParams() as { tenantId: string; itemId: string };
   const router = useRouter();
   const [item, setItem] = useState<EnrichedItem | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -93,6 +94,9 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const [categories, setCategories] = useState<any[]>([]);
   const [totalProducts, setTotalProducts] = useState(0);
 
+  const { actions: productActions } = useProductSingleton();
+  const { actions: categoryActions } = useCategorySingleton();
+
   useEffect(() => {
     loadItemData();
     loadCategoryData();
@@ -100,10 +104,15 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
   const handleSaveItem = async (updatedItem: ItemType) => {
     try {
-      const response = await api.put(`/api/items/${itemId}`, updatedItem);
-      if (!response.ok) throw new Error('Failed to update item');
+      // Update item via ItemUpdateService with automatic cache invalidation
+      const itemUpdateService = ItemUpdateService.getInstance(tenantId);
+      const result = await itemUpdateService.updateItem(itemId, updatedItem);
       
-      // Reload item data to show updated values
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update item');
+      }
+      
+      // Reload data to reflect changes (cache will be fresh after invalidation)
       await loadItemData();
     } catch (err) {
       console.error('Error updating item:', err);
@@ -116,10 +125,20 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       setLoading(true);
       setError(null);
 
-      // Fetch item details
-      const itemRes = await api.get(`/api/items/${itemId}`);
-      if (!itemRes.ok) throw new Error('Failed to load item');
-      const itemData = await itemRes.json();
+      // Fetch item details via API to get full tenant-specific data
+      const response = await fetch(`/api/items/${itemId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch item: ${response.status}`);
+      }
+      
+      const itemData = await response.json();
+      if (!itemData) throw new Error('Failed to load item');
       
       // Extract enriched fields from metadata if present
       const metadata = itemData.metadata || {};
@@ -134,7 +153,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       }
       if (metadata.specifications && typeof metadata.specifications === 'object') {
         enrichedFields.specifications = {
-          ...(itemData.specifications || {}),
+          ...((itemData as any).specifications || {}),
           ...metadata.specifications
         };
       }
@@ -247,28 +266,71 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       }
       
       // Normalize the item data to match frontend expectations
-      const normalizedItem = {
+      // Database uses snake_case, frontend expects camelCase
+      const normalizedItem: EnrichedItem = {
         ...itemData,
         ...enrichedFields,
-        status: itemData.itemStatus || itemData.item_status || itemData.status || 'active',
-        condition: itemData.condition === 'brand_new' ? 'new' : itemData.condition,
-        tenantCategory: itemData.tenantCategory,
-        tenantCategoryId: itemData.tenantCategoryId || itemData.directory_category_id,
+        // Ensure proper field mapping for critical fields
+        status: (itemData as any).item_status || (itemData as any).status || 'draft',
+        visibility: (itemData as any).visibility || 'private',
+        price: (itemData as any).price_cents ? (itemData as any).price_cents / 100 : ((itemData as any).price || 0),
+        stock: (itemData as any).stock || 0,
+        itemStatus: (itemData as any).item_status || (itemData as any).status || 'draft',
+        condition: (itemData as any).condition || 'new',
+        tenantCategory: (itemData as any).tenantCategory || null,
+        tenantCategoryId: (itemData as any).tenant_category_id || (itemData as any).directory_category_id,
+        imageUrl: (itemData as any).image_url || (itemData as any).imageUrl,
       };
       
       console.log('[ItemDetailPage] Loaded item:', {
         id: normalizedItem.id,
         status: normalizedItem.status,
+        visibility: normalizedItem.visibility,
+        price: normalizedItem.price,
+        stock: normalizedItem.stock,
+        itemStatus: normalizedItem.itemStatus,
         tenantCategory: normalizedItem.tenantCategory,
         tenantCategoryId: normalizedItem.tenantCategoryId,
+        originalData: {
+          item_status: (itemData as any).item_status,
+          visibility: (itemData as any).visibility,
+          price_cents: (itemData as any).price_cents,
+          stock: (itemData as any).stock,
+          tenant_category_id: (itemData as any).tenant_category_id,
+          image_url: (itemData as any).image_url,
+        },
+        fullOriginalData: itemData,
       });
       setItem(normalizedItem);
 
-      // Fetch photos
-      const photosRes = await api.get(`/api/items/${itemId}/photos`);
-      if (photosRes.ok) {
-        const photosData = await photosRes.json();
-        setPhotos(Array.isArray(photosData) ? photosData : []);
+      // Fetch photos via PhotoSingleton
+      try {
+        const photoSingleton = PhotoSingleton.getInstance(tenantId);
+        const itemPhotos = await photoSingleton.fetchItemPhotos(itemId);
+        setPhotos(itemPhotos);
+      } catch (photoError) {
+        console.warn('Failed to load photos via singleton, trying direct fetch:', photoError);
+        
+        // Fallback to direct fetch if singleton fails
+        try {
+          const photoResponse = await fetch(`/api/items/${itemId}/photos`, {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+          });
+          
+          if (photoResponse.ok) {
+            const photoData = await photoResponse.json();
+            setPhotos(photoData.photos || []);
+          } else {
+            console.warn('Photo fetch failed, using empty array:', photoResponse.status);
+            setPhotos([]);
+          }
+        } catch (fallbackError) {
+          console.error('Both singleton and direct photo fetch failed:', fallbackError);
+          setPhotos([]);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load item');
@@ -279,18 +341,15 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
 
   const loadCategoryData = async () => {
     try {
-      // Fetch categories for this tenant
-      const categoriesRes = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/storefront/${tenantId}/categories`);
-      if (categoriesRes.ok) {
-        const categoriesData = await categoriesRes.json();
-        setCategories(categoriesData.categories || []);
-        
-        // Calculate total products
-        const total = categoriesData.categories.reduce((sum: number, cat: any) => sum + cat.count, 0) + (categoriesData.uncategorizedCount || 0);
-        setTotalProducts(total);
-      }
-    } catch (err) {
-      console.error('Failed to load category data:', err);
+      // Fetch categories via singleton (cached)
+      const { categories: fetchedCategories } = await categoryActions.fetchCategories({
+        includeChildren: true,
+        includeProductCount: false
+      });
+      setCategories(fetchedCategories);
+    } catch (error) {
+      console.warn('Failed to load categories via singleton, using empty array:', error);
+      setCategories([]);
     }
   };
 
@@ -839,22 +898,59 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   Quick Actions
                 </h2>
                 <div className="flex flex-col gap-2">
-                  <Button
-                    variant="primary"
-                    onClick={() => window.open(`/products/${item.id}`, '_blank')}
-                    className="w-full"
-                    disabled={item.status !== 'active' || item.visibility !== 'public'}
-                    title={
-                      item.status !== 'active' || item.visibility !== 'public'
-                        ? 'Item must be active and public to view public page'
-                        : 'View public page'
-                    }
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                    View Public Page
-                  </Button>
+                  {/* Debug info - remove in production */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <div className="text-xs text-gray-500 mb-2 p-2 bg-gray-100 rounded">
+                        Debug: status="{item.status}" visibility="{item.visibility}"
+                      </div>
+                    )}
+                    
+                    <Button
+                      variant="primary"
+                      onClick={() => window.open(`/products/${item.id}`, '_blank')}
+                      className="w-full"
+                      disabled={item.status !== 'active' || item.visibility !== 'public'}
+                      title={
+                        item.status !== 'active' || item.visibility !== 'public'
+                          ? `Cannot view public page. Current status: "${item.status}", visibility: "${item.visibility}". Item must be active and public.`
+                          : 'View public page'
+                      }
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      View Public Page
+                      {item.status !== 'active' || item.visibility !== 'public' && (
+                        <span className="ml-2 text-xs">
+                          (Status: {item.status || 'unknown'}, Visibility: {item.visibility || 'unknown'})
+                        </span>
+                      )}
+                    </Button>
+                    
+                    {/* Quick fix button if item is not active/public */}
+                    {(item.status !== 'active' || item.visibility !== 'public') && (
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            await handleSaveItem({
+                              ...item,
+                              status: 'active',
+                              visibility: 'public'
+                            });
+                          } catch (err) {
+                            console.error('Failed to update item:', err);
+                          }
+                        }}
+                        className="w-full"
+                        title="Make item active and public to enable public page"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Make Active & Public
+                      </Button>
+                    )}
                   <Button
                     variant="ghost"
                     onClick={() => router.push(`/t/${tenantId}/scan?mode=enrich&itemId=${item.id}&sku=${encodeURIComponent(item.sku)}`)}
@@ -912,6 +1008,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           updatedAt: item.updatedAt,
         } : null}
         onSave={handleSaveItem}
+        onItemUpdated={loadItemData}
       />
 
       {/* Photo Gallery Modal */}

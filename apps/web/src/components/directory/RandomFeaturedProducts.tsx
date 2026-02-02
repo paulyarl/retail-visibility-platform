@@ -190,6 +190,7 @@ export default function RandomFeaturedProducts() {
             {products.map((product: PublicProduct, index: number) => (
               <SmartProductCard
                 key={`${product.id}-${product.tenantId}-${index}`}
+                tenantId={product.tenantId}
                 product={{
                   id: product.id,
                   sku: product.sku,
@@ -242,6 +243,7 @@ export default function RandomFeaturedProducts() {
             {products.map((product: PublicProduct, index: number) => (
               <SmartProductCard
                 key={`${product.id}-${product.tenantId}-${index}`}
+                tenantId={product.tenantId}
                 product={{
                   id: product.id,
                   sku: product.sku,

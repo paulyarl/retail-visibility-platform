@@ -16,6 +16,7 @@ import { useItemsActions } from '@/hooks/useItemsActions';
 import { useItemsForm } from '@/hooks/useItemsForm';
 import { useItemsViewMode } from '@/hooks/useItemsViewMode';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import { StockUpdateService } from '@/services/stockUpdateService';
 
 // Components
 import ItemsHeader from './ItemsHeader';
@@ -266,11 +267,30 @@ export default function ItemsClient({
       await updateItem(itemId, updateData);
 
       closeCategoryModal();
-      refresh(); // Refresh the items list
     } catch (error) {
       console.error('[ItemsClient] Category assignment failed:', error);
-      // Show error to user
-      alert(error instanceof Error ? error.message : 'Failed to assign category');
+    }
+  };
+
+  const handleStockUpdate = async (itemId: string, newStock: number) => {
+    try {
+      console.log('[ItemsClient] Updating stock for item:', itemId, 'to:', newStock);
+      
+      // Use the StockUpdateService middleware
+      await StockUpdateService.updateStock(itemId, newStock, {
+        tenantId: initialTenantId,
+        onSuccess: (updatedStock) => {
+          console.log('[ItemsClient] Stock update successful:', updatedStock);
+          // Refresh the items data to show updated stock
+          refresh();
+        },
+        onError: (error) => {
+          console.error('[ItemsClient] Stock update failed:', error);
+        }
+      });
+    } catch (error) {
+      console.error('[ItemsClient] Stock update error:', error);
+      throw error;
     }
   };
 
@@ -502,6 +522,7 @@ export default function ItemsClient({
                     onPropagate={canPropagate ? openPropagateModal : undefined}
                     onVisibilityToggle={handleVisibilityToggle}
                     onStatusToggle={handleStatusToggle}
+                    onStockUpdate={handleStockUpdate}
                     tenantId={initialTenantId}
                   />
                 ) : (
@@ -515,6 +536,7 @@ export default function ItemsClient({
                     onPropagate={canPropagate ? openPropagateModal : undefined}
                     onVisibilityToggle={handleVisibilityToggle}
                     onStatusToggle={handleStatusToggle}
+                    onStockUpdate={handleStockUpdate}
                     tenantId={initialTenantId}
                   />
                 )}

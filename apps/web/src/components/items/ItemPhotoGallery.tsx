@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { Button, Input } from "@/components/ui";
 import { api } from "@/lib/api";
 import { uploadImage, ImageUploadPresets } from "@/lib/image-upload";
+import PhotoSingleton from "@/lib/singletons/PhotoSingleton";
+import { useVariantsSingleton } from "@/lib/singletons/VariantsSingleton";
 
 type Photo = {
   id: string;
@@ -54,12 +56,15 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [variantsLoading, setVariantsLoading] = useState(false);
 
+  // Initialize VariantsSingleton
+  const { actions: variantsActions } = useVariantsSingleton(tenantId);
+
   const loadPhotos = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`/api/items/${item.id}/photos`);
-      const data = await res.json();
-      const photoAssets = Array.isArray(data) ? data : [];
+      // Use PhotoSingleton for cached photo fetching
+      const photoSingleton = PhotoSingleton.getInstance(tenantId);
+      const photoAssets = await photoSingleton.fetchItemPhotos(item.id);
       
       // If no photos in photo_assets but item has imageUrl, show it as a legacy photo
       if (photoAssets.length === 0 && item.imageUrl) {
@@ -87,10 +92,9 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
     const loadVariants = async () => {
       try {
         setVariantsLoading(true);
-        const res = await api.get(`/api/items/${item.id}/variants`);
-        if (res.ok) {
-          const data = await res.json();
-          setVariants(data.variants || []);
+        const result = await variantsActions.fetchItemVariants(item.id);
+        if (result.success && result.variants) {
+          setVariants(result.variants);
         }
       } catch (e) {
         console.error("Failed to load variants:", e);
@@ -100,7 +104,7 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
     };
 
     loadVariants();
-  }, [item.id, item.has_variants]);
+  }, [item.id, item.has_variants, variantsActions]);
 
   useEffect(() => {
     loadPhotos();

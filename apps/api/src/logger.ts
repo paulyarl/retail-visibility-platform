@@ -5,8 +5,8 @@
  */
 import type { Request, Response, NextFunction } from "express";
 import type { RequestCtx } from "./context";
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Log levels with severity
 export enum LogLevel {

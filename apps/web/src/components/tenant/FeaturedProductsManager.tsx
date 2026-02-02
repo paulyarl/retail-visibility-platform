@@ -16,6 +16,8 @@ import {
 import { apiRequest } from '@/lib/api';
 import Image from 'next/image';
 import { Tooltip } from "@/components/ui/Tooltip";
+import QuickStockEditor from '@/components/shared/QuickStockEditor';
+import { StockUpdateService } from '@/services/stockUpdateService';
 
 // Import existing ProductSingleton for universal product integration
 import { useProduct } from '@/providers/ProductProvider';
@@ -172,6 +174,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
     selectedType,
     searchQuery,
     availablePage,
+    outOfStockPage,
     processing,
     togglingActive,
     currentFeatured,
@@ -185,15 +188,19 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
     activeFeaturedByType,
     inactiveProducts,
     totalPages,
+    outOfStockTotalPages,
     totalAvailableProducts,
     setSelectedType,
     setSearchQuery,
     setAvailablePage,
+    setOutOfStockPage,
     setEditingExpiration: setSingletonEditingExpiration,
     featureProduct,
     unfeatureProduct,
     toggleProductActive,
-    updateProductExpiration
+    updateProductExpiration,
+    forceRefresh,
+    singleton // Get singleton instance for MV refresh
   } = useTenantFeaturedProducts(tenantId, productProvider);
 
   // Get current type info
@@ -204,6 +211,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
     selectedType,
     currentFeaturedCount: currentFeatured?.length || 0,
     activeFeaturedCount: activeFeatured?.length || 0,
+    expiredFeaturedCount: expiredFeatured?.length || 0,
     featuredProductsKeys: Object.keys(featuredProductsByType || {}),
     featuredTypesCount: featuredTypes.length,
     inactiveProductsCount: inactiveProducts?.length || 0,
@@ -213,8 +221,22 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
     sampleCurrentFeatured: currentFeatured?.slice(0, 2).map(p => ({ 
       id: p.id, 
       name: p.name, 
-      is_active: p.is_active,
-      inventory_item_id: p.inventory_item_id 
+      stock: p.stock, 
+      availability: p.availability,
+      featured_expires_at: p.featured_expires_at,
+      is_active: p.is_active
+    })),
+    sampleInStock: paginatedInStock?.slice(0, 2).map(p => ({ 
+      id: p.id, 
+      name: p.name, 
+      stock: p.stock, 
+      availability: p.availability 
+    })),
+    sampleOutOfStock: paginatedOutOfStock?.slice(0, 2).map(p => ({ 
+      id: p.id, 
+      name: p.name, 
+      stock: p.stock, 
+      availability: p.availability 
     })),
     sampleFeaturedProductsByType: Object.keys(featuredProductsByType || {}).reduce((acc, key) => {
       acc[key] = featuredProductsByType[key]?.length || 0;
@@ -272,15 +294,41 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
     return typeId ? featuredTypes.find(t => t.id === typeId) : null;
   };
 
-  // Filter paused products by selected type
+  // Filter paused products by selected type (show all paused products for now)
   const filteredInactiveProducts = useMemo(() => {
     if (!inactiveProducts || inactiveProducts.length === 0) return [];
     
-    return inactiveProducts.filter(product => {
-      const productType = getPausedProductType(product);
-      return productType === selectedType;
-    });
-  }, [inactiveProducts, selectedType]);
+    // Show all paused products regardless of selected type
+    return inactiveProducts;
+  }, [inactiveProducts]);
+
+  // Stock update handler for out-of-stock products
+  const handleStockUpdate = async (itemId: string, newStock: number) => {
+    try {
+      console.log('[FeaturedProductsManager] Updating stock for item:', itemId, 'to:', newStock);
+      
+      // Use the StockUpdateService middleware with singleton refresh
+      await StockUpdateService.updateStock(itemId, newStock, {
+        tenantId,
+        onSuccess: (updatedStock: number) => {
+          console.log('[FeaturedProductsManager] Stock update successful:', updatedStock);
+          // Refresh data to show updated stock and move products between sections
+          forceRefresh();
+        },
+        onError: (error: Error) => {
+          console.error('[FeaturedProductsManager] Stock update failed:', error);
+        },
+        singletonRefresh: async () => {
+          // Trigger singleton refresh for MV cache invalidation
+          console.log('[FeaturedProductsManager] Triggering singleton refresh for MV cache');
+          await singleton.forceRefresh();
+        }
+      });
+    } catch (error) {
+      console.error('[FeaturedProductsManager] Stock update error:', error);
+      throw error;
+    }
+  };
 
   // Error handling
   const handleError = async (action: () => Promise<void>, errorMessage: string) => {
@@ -317,7 +365,13 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
   };
 
   const handleStartEditExpiration = (product: any) => {
-    setEditingExpiration(product.inventory_item_id);
+    // Featured products use inventory_item_id, active products use id
+    const productId = product.inventory_item_id || product.id;
+    if (!productId) {
+      console.error('Missing product ID for expiration edit:', product);
+      return;
+    }
+    setEditingExpiration(productId);
     // Default to 30 days from now, or existing date
     const defaultDate = new Date();
     defaultDate.setDate(defaultDate.getDate() + 30);
@@ -339,10 +393,11 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
       // Find all types where this product is featured and pause it in each
       const pausePromises = featuredTypes.map(async (type) => {
         const typeProducts = featuredProductsByType[type.id] || [];
-        const productInType = typeProducts.find(p => p.inventory_item_id === product.inventory_item_id);
+        const productId = product.inventory_item_id || product.id;
+        const productInType = typeProducts.find(p => (p.inventory_item_id || p.id) === productId);
         
         if (productInType && productInType.is_active !== false) {
-          return toggleProductActive(product.inventory_item_id, false);
+          return toggleProductActive(productId, false);
         }
         return Promise.resolve();
       });
@@ -356,20 +411,84 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
       return;
     }
 
+    // Debug: Log the product object to see what fields it has
+    console.log('=== FEATURE ALL TYPES DEBUG ===');
+    console.log('Product object for featuring:', product);
+    console.log('Product keys:', Object.keys(product));
+    console.log('Product ID fields:', {
+      id: product.id,
+      inventory_item_id: product.inventory_item_id,
+      inventoryItemId: product.inventoryItemId
+    });
+    console.log('=== END DEBUG ===');
+
     await handleError(async () => {
-      // Feature the product in all types
+      // Feature the product in all types (respecting tier limits)
       const featurePromises = featuredTypes.map(async (type) => {
-        // Check if product is already featured in this type
+        // Check if this type has hit its tier limit
         const typeProducts = featuredProductsByType[type.id] || [];
-        const alreadyFeatured = typeProducts.find(p => p.inventory_item_id === product.inventory_item_id);
+        const currentCount = typeProducts.length;
+        const maxProducts = type.maxProducts;
         
-        if (!alreadyFeatured) {
-          return featureProduct(product.inventory_item_id);
+        // Skip if tier limit is reached
+        if (currentCount >= maxProducts) {
+          console.log(`Skipping ${type.name} - tier limit reached (${currentCount}/${maxProducts})`);
+          return Promise.resolve();
         }
-        return Promise.resolve();
+        
+        // For available products, use product.id
+        // For featured products, use inventory_item_id
+        const productId = product.id || product.inventory_item_id || product.inventoryItemId;
+        
+        console.log('Attempting to feature product with ID:', productId, 'from product:', product);
+        
+        if (!productId) {
+          console.error('Product ID fields are all undefined:', {
+            id: product.id,
+            inventory_item_id: product.inventory_item_id,
+            inventoryItemId: product.inventoryItemId,
+            productKeys: Object.keys(product)
+          });
+          throw new Error('Product ID is undefined - cannot feature product');
+        }
+        
+        console.log(`Featuring product with ID: ${productId} as type: ${type.name} (${currentCount}/${maxProducts})`);
+        
+        // Call the API directly for each type instead of using the singleton
+        const defaultExpiration = new Date();
+        defaultExpiration.setDate(defaultExpiration.getDate() + 30);
+        
+        const response = await apiRequest(`/api/items/${productId}/featured-types`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenantId: tenantId,
+            featured_type: type.id,
+            featured_priority: 50,
+            featured_expires_at: defaultExpiration.toISOString(),
+            auto_unfeature: true
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to feature product in ${type.name}`);
+        }
+        
+        return response;
       });
 
-      await Promise.all(featurePromises);
+      const results = await Promise.all(featurePromises);
+      
+      // Count successful operations
+      const successfulTypes = results.filter(r => r && r.ok).length;
+      const skippedTypes = featuredTypes.length - successfulTypes;
+      
+      if (skippedTypes > 0) {
+        console.log(`Featured product in ${successfulTypes} types, skipped ${skippedTypes} due to tier limits`);
+      }
+      
+      // Refresh the data to show the newly featured products
+      await forceRefresh();
     }, 'Failed to feature product across all types');
   };
 
@@ -504,8 +623,23 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                 </div>
                 <div className="flex gap-2 mt-3">
                   <button
-                    onClick={() => handleError(() => toggleProductActive(product.inventory_item_id, product.is_active === false), 'Failed to toggle product status')}
-                    disabled={togglingActive}
+                    onClick={() => {
+                      console.log('=== PAUSE BUTTON CLICKED ===');
+                      console.log('Product object:', product);
+                      console.log('Product keys:', Object.keys(product));
+                      console.log('product.id:', product.id);
+                      console.log('product.inventory_item_id:', product.inventory_item_id);
+                      console.log('product.is_active:', product.is_active);
+                      console.log('=== END DEBUG ===');
+                      
+                      // Featured products MUST use inventory_item_id (the junction table key)
+                      if (!product.inventory_item_id) {
+                        console.error('Missing inventory_item_id for featured product:', product);
+                        return;
+                      }
+                      handleError(() => toggleProductActive(product.inventory_item_id, product.is_active === false), 'Failed to toggle product status');
+                    }}
+                    disabled={togglingActive || !product.inventory_item_id}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                       (product.is_active !== false && product.is_active !== undefined) ? 'bg-green-600' : 'bg-orange-500'
                     } ${togglingActive ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
@@ -526,7 +660,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                   </button>
                   
                   {/* Expiration Setting */}
-                  {editingExpiration === product.inventory_item_id ? (
+                  {editingExpiration === (product.inventory_item_id || product.id) ? (
                     <div className="flex gap-1 items-center">
                       <input
                         type="date"
@@ -535,7 +669,10 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                         className="px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                       />
                       <button
-                        onClick={() => handleSetExpiration(product.inventory_item_id)}
+                        onClick={() => {
+                          const productId = product.inventory_item_id || product.id;
+                          if (productId) handleSetExpiration(productId);
+                        }}
                         disabled={processing}
                         className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50"
                       >
@@ -572,8 +709,15 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                   </Tooltip>
                   
                   <button
-                    onClick={() => handleError(() => unfeatureProduct(product.inventory_item_id), 'Failed to unfeature product')}
-                    disabled={processing}
+                    onClick={() => {
+                      // Featured products MUST use inventory_item_id
+                      if (!product.inventory_item_id) {
+                        console.error('Missing inventory_item_id for featured product:', product);
+                        return;
+                      }
+                      handleError(() => unfeatureProduct(product.inventory_item_id), 'Failed to remove from featured');
+                    }}
+                    disabled={processing || !product.inventory_item_id}
                     className="flex-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
                   >
                     Remove from Featured
@@ -586,7 +730,13 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
       )}
 
       {/* Expired/Inactive Products */}
-      {expiredFeatured.length > 0 && (
+      {(() => {
+        console.log('[FeaturedProductsManager] Expired products check:', { 
+          expiredFeaturedCount: expiredFeatured?.length || 0,
+          expiredFeaturedSample: expiredFeatured?.slice(0, 2).map(p => ({ id: p.id, name: p.name, is_active: p.is_active }))
+        });
+        return expiredFeatured.length > 0;
+      })() && (
         <div className="bg-white rounded-lg border border-amber-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
@@ -630,15 +780,29 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                 </div>
                 <div className="flex gap-2 mt-3">
                   <button
-                    onClick={() => handleError(() => toggleProductActive(product.inventory_item_id, true), 'Failed to reactivate product')}
-                    disabled={togglingActive}
+                    onClick={() => {
+                      // Expired featured products MUST use inventory_item_id
+                      if (!product.inventory_item_id) {
+                        console.error('Missing inventory_item_id for expired product:', product);
+                        return;
+                      }
+                      handleError(() => toggleProductActive(product.inventory_item_id, true), 'Failed to reactivate product');
+                    }}
+                    disabled={togglingActive || !product.inventory_item_id}
                     className="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
                   >
                     Reactivate
                   </button>
                   <button
-                    onClick={() => handleError(() => unfeatureProduct(product.inventory_item_id), 'Failed to remove product')}
-                    disabled={processing}
+                    onClick={() => {
+                      // Expired featured products MUST use inventory_item_id
+                      if (!product.inventory_item_id) {
+                        console.error('Missing inventory_item_id for expired product:', product);
+                        return;
+                      }
+                      handleError(() => unfeatureProduct(product.inventory_item_id), 'Failed to remove product');
+                    }}
+                    disabled={processing || !product.inventory_item_id}
                     className="flex-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
                   >
                     Remove
@@ -651,7 +815,15 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
       )}
 
       {/* Inactive Products - Paused Only */}
-      {filteredInactiveProducts.length > 0 && (
+      {(() => {
+        console.log('[FeaturedProductsManager] Inactive products check:', { 
+          inactiveProductsCount: inactiveProducts?.length || 0,
+          filteredInactiveCount: filteredInactiveProducts?.length || 0,
+          selectedType,
+          inactiveSample: inactiveProducts?.slice(0, 2).map(p => ({ id: p.id, name: p.name, is_active: p.is_active, featured_type: p.featured_type }))
+        });
+        return filteredInactiveProducts.length > 0;
+      })() && (
         <div className="bg-gradient-to-r from-orange-50 to-amber-100 border-2 border-orange-200 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -729,8 +901,15 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                 {/* Resume Button */}
                 <div className="flex items-center justify-center">
                   <button
-                    onClick={() => handleError(() => toggleProductActive(product.id || product.inventory_item_id, true), 'Failed to resume featuring')}
-                    disabled={togglingActive}
+                    onClick={() => {
+                      // Paused featured products MUST use inventory_item_id
+                      if (!product.inventory_item_id) {
+                        console.error('Missing inventory_item_id for paused product:', product);
+                        return;
+                      }
+                      handleError(() => toggleProductActive(product.inventory_item_id, true), 'Failed to resume featuring');
+                    }}
+                    disabled={togglingActive || !product.inventory_item_id}
                     className="w-full px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
                   >
                     <Play className="w-4 h-4" />
@@ -771,6 +950,13 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
               <Check className="w-5 h-5 text-green-600" />
               In Stock ({paginatedInStock.length} of {totalAvailableProducts})
             </h3>
+            {paginatedInStock.length > 0 && console.log('PRODUCT STRUCTURE DEBUG:', {
+              firstProduct: paginatedInStock[0],
+              productKeys: Object.keys(paginatedInStock[0]),
+              idField: paginatedInStock[0].id,
+              inventory_item_id: paginatedInStock[0].inventory_item_id,
+              inventoryItemId: paginatedInStock[0].inventory_item_id
+            })}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
               {paginatedInStock.map((product, index) => (
                 <div key={`product-${product.id || 'unknown'}-${index}`} className="border border-gray-200 rounded-lg p-4">
@@ -812,8 +998,21 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                     </Tooltip>
                     
                     <button
-                      onClick={() => handleError(() => featureProduct(product.inventory_item_id), 'Failed to feature product')}
-                      disabled={processing}
+                      onClick={() => {
+                        console.log('=== BUTTON CLICK DEBUG ===');
+                        console.log('Feature button clicked - product object:', product);
+                        console.log('Product keys:', Object.keys(product));
+                        console.log('Product ID:', product.id);
+                        console.log('=== END BUTTON CLICK DEBUG ===');
+                        
+                        if (!product.id) {
+                          console.error('Product ID is undefined, cannot feature product');
+                          return;
+                        }
+                        
+                        handleError(() => featureProduct(product.id!), 'Failed to feature product');
+                      }}
+                      disabled={processing || !product.id}
                       className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
                     >
                       Add to {currentType?.name}
@@ -825,20 +1024,55 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
           </>
         )}
 
-        {/* Out-of-Stock Products - Dedicated Section */}
+        {/* Pagination Controls for In-Stock Products Only */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+            <div className="text-sm text-gray-700">
+              Showing {((availablePage - 1) * 12) + 1} to {Math.min(availablePage * 12, totalAvailableProducts)} of {totalAvailableProducts} in-stock products
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setAvailablePage(Math.max(1, availablePage - 1))}
+                disabled={availablePage === 1}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-gray-700">
+                Page {availablePage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setAvailablePage(Math.min(totalPages, availablePage + 1))}
+                disabled={availablePage === totalPages}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
+        {paginatedInStock.length === 0 && (
+          <div className="text-center py-12 text-gray-500">
+            {searchQuery ? 'No in-stock products found matching your search.' : 'No in-stock products available.'}
+          </div>
+        )}
+      </div>
+
+      {/* Out-of-Stock Products - Separate Section */}
       {paginatedOutOfStock.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 mt-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-red-600" />
-              Out-of-Stock Products ({paginatedOutOfStock.length} of {totalAvailableProducts})
+              Out-of-Stock Products ({singleton.getState().outOfStockProducts?.length || 0})
             </h2>
             <div className="text-sm text-red-600">
               These products cannot be featured until restocked
             </div>
           </div>
 
-          <div className="bg-red-100 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="bg-red-100 border border-red-300 rounded-lg p-3 mb-4">
             <div className="flex items-center gap-2 text-red-800">
               <AlertCircle className="w-5 h-5" />
               <p className="font-medium">
@@ -875,27 +1109,55 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                       </div>
                     )}
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-medium text-gray-900 text-sm">{product.name}</h3>
-                    <p className="text-xs text-gray-500">{product.sku}</p>
-                    <div className="mt-1">
-                      {getStockStatus(product)}
-                    </div>
-                    <p className="text-xs text-red-600 font-medium mt-1">
+                </div>
+
+                {/* Product Info - Match inventory card layout */}
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="font-semibold text-gray-900 line-clamp-2">
+                      {product.name}
+                    </h4>
+                    {/* Out of Stock Badge */}
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500 text-white text-xs font-bold rounded-full">
+                      <X className="w-3 h-3" />
+                      OUT OF STOCK
+                    </span>
+                  </div>
+
+                  <div className="text-sm text-gray-600">
+                    SKU: {product.sku}
+                  </div>
+
+                  {/* Stock Editor - Aligned with inventory card */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-lg font-bold text-gray-900">
                       ${((product.price_cents || 0) / 100).toFixed(2)}
-                    </p>
+                    </div>
+                    {product.id && typeof product.stock === 'number' && (
+                      <QuickStockEditor
+                        itemId={product.id}
+                        itemName={product.name || 'Unknown Product'}
+                        currentStock={product.stock}
+                        tenantId={tenantId}
+                        onUpdate={handleStockUpdate}
+                        compact={true}
+                        showStatus={false}
+                      />
+                    )}
                   </div>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-2 mt-3">
-                  <Tooltip content="Edit product to update stock quantity and availability">
+                <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
+                  <Tooltip content="Edit product details">
                     <a
-                      href={`/t/${tenantId}/items/${product.inventory_item_id}`}
+                      href={`/t/${tenantId}/items/${product.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="flex-1 px-3 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 flex items-center justify-center gap-1"
                     >
                       <Edit className="w-3 h-3" />
-                      Manage Stock
+                      Manage
                     </a>
                   </Tooltip>
                   
@@ -913,26 +1175,26 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
             ))}
           </div>
 
-          {/* Pagination for Out-of-Stock */}
-          {totalPages > 1 && (
+          {/* Out-of-Stock Pagination Controls */}
+          {outOfStockTotalPages > 1 && (
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-red-200">
               <div className="text-sm text-gray-700">
-                Showing {paginatedOutOfStock.length} out-of-stock products
+                Showing {((outOfStockPage - 1) * 3) + 1} to {Math.min(outOfStockPage * 3, singleton.getState().outOfStockProducts?.length || 0)} of {singleton.getState().outOfStockProducts?.length || 0} out-of-stock products
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setAvailablePage(Math.max(1, availablePage - 1))}
-                  disabled={availablePage === 1}
+                  onClick={() => setOutOfStockPage(Math.max(1, outOfStockPage - 1))}
+                  disabled={outOfStockPage === 1}
                   className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
                 >
                   Previous
                 </button>
                 <span className="text-sm text-gray-700">
-                  Page {availablePage} of {totalPages}
+                  Page {outOfStockPage} of {outOfStockTotalPages}
                 </span>
                 <button
-                  onClick={() => setAvailablePage(Math.min(totalPages, availablePage + 1))}
-                  disabled={availablePage === totalPages}
+                  onClick={() => setOutOfStockPage(Math.min(outOfStockTotalPages, outOfStockPage + 1))}
+                  disabled={outOfStockPage === outOfStockTotalPages}
                   className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
                 >
                   Next
@@ -943,40 +1205,12 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
         </div>
       )}
 
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
-            <div className="text-sm text-gray-700">
-              Showing {paginatedInStock.length + paginatedOutOfStock.length} products ({paginatedInStock.length} in stock, {paginatedOutOfStock.length} out of stock) of {totalAvailableProducts} total
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setAvailablePage(Math.max(1, availablePage - 1))}
-                disabled={availablePage === 1}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <span className="text-sm text-gray-700">
-                Page {availablePage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setAvailablePage(Math.min(totalPages, availablePage + 1))}
-                disabled={availablePage === totalPages}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
-
-        {paginatedInStock.length === 0 && paginatedOutOfStock.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
-            {searchQuery ? 'No products found matching your search.' : 'No available products.'}
-          </div>
-        )}
-      </div>
+      {/* No Products Message */}
+      {paginatedInStock.length === 0 && paginatedOutOfStock.length === 0 && (
+        <div className="text-center py-12 text-gray-500">
+          {searchQuery ? 'No products found matching your search.' : 'No available products.'}
+        </div>
+      )}
     </div>
   );
 }

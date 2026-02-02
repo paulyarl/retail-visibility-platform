@@ -8,6 +8,8 @@ import ProductWithVariants from './ProductWithVariants';
 import { AddToCartButton } from './AddToCartButton';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { Star, Sparkles, Calendar, Tag, Award } from 'lucide-react';
+import { VariantBadge, PriceRangeDisplay } from '@/components/variants';
+import type { PriceRange, AvailableAttributes } from '@/types/variants';
 
 // Helper functions for storefront featured type badges
 const getStorefrontBadgeStyle = (typeId: string): string => {
@@ -147,10 +149,15 @@ interface ProductData {
     name: string;
     slug: string;
   };
+  // Computed variant fields from backend
+  variant_count?: number;
+  price_range?: PriceRange;
+  available_attributes?: AvailableAttributes;
 }
 
 interface SmartProductCardProps {
   product: ProductData;
+  tenantId: string;
   tenantName?: string;
   tenantLogo?: string;
   tenantCity?: string;
@@ -167,6 +174,7 @@ interface SmartProductCardProps {
 
 export default function SmartProductCard({
   product,
+  tenantId,
   tenantName,
   tenantLogo,
   tenantCity,
@@ -357,12 +365,26 @@ export default function SmartProductCard({
             )}
 
             <div className="flex items-center justify-between mb-4">
-              <PriceDisplay
-                priceCents={product.priceCents}
-                salePriceCents={product.salePriceCents}
-                variant="large"
-                showSavingsBadge={true}
-              />
+              {product.has_variants && product.price_range ? (
+                <div>
+                  <PriceRangeDisplay 
+                    priceRange={product.price_range} 
+                    size="lg"
+                  />
+                  <VariantBadge 
+                    variantCount={product.variant_count || 0} 
+                    size="sm"
+                    className="mt-1"
+                  />
+                </div>
+              ) : (
+                <PriceDisplay
+                  priceCents={product.priceCents}
+                  salePriceCents={product.salePriceCents}
+                  variant="large"
+                  showSavingsBadge={true}
+                />
+              )}
               <div className="text-right">
                 {product.sku && (
                   <p className="text-xs text-neutral-500 dark:text-neutral-400">
@@ -387,6 +409,7 @@ export default function SmartProductCard({
                 {product.has_variants ? (
                   <ProductWithVariants
                     product={product}
+                    tenantId={tenantId}
                     tenantName={tenantName || ''}
                     tenantLogo={tenantLogo}
                     defaultGatewayType={effectiveGatewayType}
@@ -476,15 +499,29 @@ export default function SmartProductCard({
             )}
             
             <div className="flex items-center gap-1 mt-0.5">
-              <PriceDisplay
-                priceCents={product.priceCents}
-                salePriceCents={product.salePriceCents}
-                variant="compact"
-              />
-              {product.salePriceCents && (
+              {product.has_variants && product.price_range ? (
+                <PriceRangeDisplay 
+                  priceRange={product.price_range} 
+                  size="sm"
+                />
+              ) : (
+                <PriceDisplay
+                  priceCents={product.priceCents}
+                  salePriceCents={product.salePriceCents}
+                  variant="compact"
+                />
+              )}
+              {product.salePriceCents && !product.has_variants && (
                 <span className="text-xs bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 px-1.5 py-0.5 rounded">
                   Sale
                 </span>
+              )}
+              {product.has_variants && product.variant_count && (
+                <VariantBadge 
+                  variantCount={product.variant_count} 
+                  size="sm"
+                  showIcon={false}
+                />
               )}
             </div>
             
@@ -654,12 +691,26 @@ export default function SmartProductCard({
                 </Link>
               </div>
               <div className="ml-4">
-                <PriceDisplay
-                  priceCents={product.priceCents}
-                  salePriceCents={product.salePriceCents}
-                  variant="default"
-                  showSavingsBadge={true}
-                />
+                {product.has_variants && product.price_range ? (
+                  <div className="text-right">
+                    <PriceRangeDisplay 
+                      priceRange={product.price_range} 
+                      size="default"
+                    />
+                    <VariantBadge 
+                      variantCount={product.variant_count || 0} 
+                      size="sm"
+                      className="mt-1 inline-block"
+                    />
+                  </div>
+                ) : (
+                  <PriceDisplay
+                    priceCents={product.priceCents}
+                    salePriceCents={product.salePriceCents}
+                    variant="default"
+                    showSavingsBadge={true}
+                  />
+                )}
               </div>
             </div>
             {showDescription && product.description && (
@@ -685,6 +736,7 @@ export default function SmartProductCard({
               product.has_variants ? (
                 <ProductWithVariants
                   product={product}
+                  tenantId={tenantId}
                   tenantName={tenantName || ''}
                   tenantLogo={tenantLogo}
                   defaultGatewayType={effectiveGatewayType}
@@ -761,12 +813,28 @@ export default function SmartProductCard({
           </p>
         )}
         <div className="flex items-center justify-between mb-3">
-          <PriceDisplay
-            priceCents={product.priceCents}
-            salePriceCents={product.salePriceCents}
-            variant="default"
-            showSavingsBadge={true}
-          />
+          <div className="flex-1">
+            {product.has_variants && product.price_range ? (
+              <>
+                <PriceRangeDisplay 
+                  priceRange={product.price_range} 
+                  size="default"
+                />
+                <VariantBadge 
+                  variantCount={product.variant_count || 0} 
+                  size="sm"
+                  className="mt-1"
+                />
+              </>
+            ) : (
+              <PriceDisplay
+                priceCents={product.priceCents}
+                salePriceCents={product.salePriceCents}
+                variant="default"
+                showSavingsBadge={true}
+              />
+            )}
+          </div>
           <div className="text-right">
             <p className="text-xs text-neutral-500">
               SKU: {product.sku}
@@ -787,6 +855,7 @@ export default function SmartProductCard({
             product.has_variants ? (
               <ProductWithVariants
                 product={product}
+                tenantId={tenantId}
                 tenantName={tenantName || ''}
                 tenantLogo={tenantLogo}
                 defaultGatewayType={effectiveGatewayType}

@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
     disableOptimizedLoading: true,
   },
 
+  // Configure Turbopack root directory to silence warning
+  turbopack: {
+    root: path.resolve(__dirname, '../..'),
+  },
+
   // Force all pages to be dynamic - remove static generation entirely
   generateBuildId: async () => {
     return 'build-' + Date.now()
@@ -29,7 +34,7 @@ const nextConfig: NextConfig = {
   compress: false,
 
   // Suppress noisy Sentry/OpenTelemetry warnings in development
-  webpack: (config, { isServer }) => {
+  webpack: (config: any, { isServer }: { isServer: boolean }) => {
     if (!isServer) {
       // Suppress client-side warnings
       config.infrastructureLogging = {

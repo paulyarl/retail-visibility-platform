@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import rateLimitSingletonService from '@/services/RateLimitSingletonService';
 
-// Import shared platform settings (this will be available at runtime)
-// Note: This import might not work in middleware due to Next.js constraints
-// In production, we'd use a database/cache approach
 // Rate limiting configuration
 const WINDOW_MS = 60 * 1000; // 1 minute
 
@@ -22,68 +20,15 @@ const STRICT_PATHS = [
 // In-memory store for rate limiting (in production, use Redis)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
-// Cache for rate limit configurations (updated periodically)
-let rateLimitConfigs: Array<{
-  route_type: string;
-  max_requests: number;
-  window_minutes: number;
-  enabled: boolean;
-}> = [];
-let configsLastUpdated = 0;
-const CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-// Get platform settings (reads from database, falls back to environment)
+// Get platform settings (cached via singleton service)
 async function getPlatformSettings(): Promise<{ rateLimitingEnabled: boolean }> {
-  try {
-    // Try to get from database first (same endpoint as configurations)
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/api/admin/platform-settings`);
-    if (response.ok) {
-      const data = await response.json();
-      return {
-        rateLimitingEnabled: data.rateLimitingEnabled ?? true
-      };
-    }
-  } catch (error) {
-    console.log('Failed to fetch platform settings from database, using environment fallback');
-  }
-  
-  // Fallback to environment variable for backward compatibility
-  return {
-    rateLimitingEnabled: process.env.RATE_LIMITING_ENABLED !== 'false',
-  };
+  const enabled = await rateLimitSingletonService.isRateLimitingEnabled();
+  return { rateLimitingEnabled: enabled };
 }
 
-// Fetch rate limit configurations from database
+// Fetch rate limit configurations (cached via singleton service)
 async function getRateLimitConfigurations() {
-  const now = Date.now();
-  if (rateLimitConfigs.length === 0 || now - configsLastUpdated > CONFIG_CACHE_TTL) {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/api/admin/platform-settings`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.rateLimitConfigurations) {
-          rateLimitConfigs = data.rateLimitConfigurations.map((config: any) => ({
-            route_type: config.route_type,
-            max_requests: config.max_requests,
-            window_minutes: config.window_minutes,
-            enabled: config.enabled
-          }));
-          configsLastUpdated = now;
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch rate limit configurations:', error);
-      // Fall back to default configurations
-      rateLimitConfigs = [
-        { route_type: 'auth', max_requests: 20, window_minutes: 1, enabled: true },
-        { route_type: 'admin', max_requests: 20, window_minutes: 1, enabled: true },
-        { route_type: 'strict', max_requests: 20, window_minutes: 1, enabled: true },
-        { route_type: 'standard', max_requests: 100, window_minutes: 1, enabled: true },
-        { route_type: 'exempt', max_requests: 1000, window_minutes: 1, enabled: false }
-      ];
-    }
-  }
-  return rateLimitConfigs;
+  return await rateLimitSingletonService.getRateLimitConfigurations();
 }
 
 // Clean up expired entries
@@ -194,34 +139,17 @@ export async function applyRateLimit(request: NextRequest): Promise<NextResponse
   }
 
   if (clientData.count >= maxRequests) {
-    // Rate limit exceeded - store warning data for trend analysis
-    try {
-      // Store warning in database (fire and forget - don't block the response)
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      
-      // Make server-to-server call without authentication headers
-      // Rate limiting warnings are internal system data, don't require user auth
-      fetch(`${apiUrl}/api/rate-limit-warnings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Note: No Authorization header - this is an internal system call
-          'X-Internal-Request': 'rate-limit-middleware', // Identify source
-        },
-        body: JSON.stringify({
-          clientId,
-          pathname,
-          requestCount: clientData.count,
-          maxRequests,
-          windowMs: windowMs / 1000, // Convert back to seconds for storage
-          ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
-          userAgent: request.headers.get('user-agent'),
-          blocked: false // Will be set to true for blocked requests
-        })
-      }).catch(err => console.error('Failed to store rate limit warning:', err));
-    } catch (error) {
-      console.error('Error preparing rate limit warning data:', error);
-    }
+    // Rate limit exceeded - store warning data for trend analysis (fire and forget)
+    rateLimitSingletonService.logRateLimitWarning({
+      clientId,
+      pathname,
+      requestCount: clientData.count,
+      maxRequests,
+      windowMs: windowMs / 1000, // Convert back to seconds for storage
+      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
+      userAgent: request.headers.get('user-agent'),
+      blocked: false // Will be set to true for blocked requests
+    });
 
     console.warn('🔥 RATE LIMIT WARNING:', {
       clientId,
@@ -244,34 +172,17 @@ export async function applyRateLimit(request: NextRequest): Promise<NextResponse
       return null;
     }
 
-    // For other routes that hit limits, block and log
-    try {
-      // Store blocked warning in database
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      
-      // Make server-to-server call without authentication headers
-      // Rate limiting warnings are internal system data, don't require user auth
-      fetch(`${apiUrl}/api/rate-limit-warnings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Note: No Authorization header - this is an internal system call
-          'X-Internal-Request': 'rate-limit-middleware', // Identify source
-        },
-        body: JSON.stringify({
-          clientId,
-          pathname,
-          requestCount: clientData.count,
-          maxRequests,
-          windowMs: windowMs / 1000,
-          ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
-          userAgent: request.headers.get('user-agent'),
-          blocked: true
-        })
-      }).catch(err => console.error('Failed to store blocked rate limit warning:', err));
-    } catch (error) {
-      console.error('Error preparing blocked rate limit warning data:', error);
-    }
+    // For other routes that hit limits, block and log (fire and forget)
+    rateLimitSingletonService.logRateLimitWarning({
+      clientId,
+      pathname,
+      requestCount: clientData.count,
+      maxRequests,
+      windowMs: windowMs / 1000,
+      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
+      userAgent: request.headers.get('user-agent'),
+      blocked: true
+    });
 
     // Return 429 response
     const resetTime = new Date(clientData.resetTime);

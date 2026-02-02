@@ -7,6 +7,7 @@ import { mountAdminRoutes } from './mounts/admin-routes';
 import { mountIntegrationRoutes } from './mounts/integration-routes';
 import { mountDirectoryRoutes } from './mounts/directory-routes';
 import { mountDashboardRoutes } from './mounts/dashboard-routes';
+import performanceApi from './performance-api';
 
 /**
  * Mount minimal routes (always enabled)
@@ -64,6 +65,14 @@ export function mountAllRoutes(app: Express) {
     mountDirectoryRoutes(app);
   } catch (error) {
     console.error('❌ Error mounting directory routes:', error);
+  }
+  
+  try {
+    // Performance monitoring and optimization routes
+    app.use('/api/admin/performance', performanceApi);
+    console.log('✅ Performance routes mounted');
+  } catch (error) {
+    console.error('❌ Error mounting performance routes:', error);
   }
   
   console.log('✅ ALL routes mounted - full functionality enabled');

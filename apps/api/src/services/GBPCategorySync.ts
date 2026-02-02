@@ -10,6 +10,7 @@
 
 import { Pool, PoolClient } from 'pg';
 import { getDirectPool } from '../utils/db-pool';
+import slugSingletonService from './SlugSingletonService';
 
 interface GBPCategory {
   id: string;
@@ -144,7 +145,8 @@ export class GBPCategorySyncService {
       RETURNING id
     `;
 
-    const slug = this.generateSlug(tenant.business_name, tenantId);
+    // Use SlugSingletonService for consistent slug generation
+    const slug = await slugSingletonService.getOrCreateSlug(tenantId);
 
     const insertResult = await db.query(insertQuery, [
       tenantId,
@@ -330,20 +332,7 @@ export class GBPCategorySyncService {
     await this.pool.query(query, [gbpCategoryIds]);
   }
 
-  /**
-   * Generate a URL-friendly slug from business name
-   */
-  private generateSlug(businessName: string, tenantId: string): string {
-    const baseSlug = businessName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-
-    // Add tenant ID suffix to ensure uniqueness
-    const suffix = tenantId.split('-').pop() || '';
-    return `${baseSlug}-${suffix}`;
-  }
-
+  
   /**
    * Refresh materialized views
    * Should be called after bulk sync operations

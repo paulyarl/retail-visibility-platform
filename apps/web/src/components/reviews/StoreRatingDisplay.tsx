@@ -4,33 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Star, ThumbsUp, User, MapPin, Shield } from 'lucide-react';
 import ReviewForm from './ReviewForm';
 import { useAuth } from '@/contexts/AuthContext';
-
-interface ReviewSummary {
-  rating_avg: number;
-  rating_count: number;
-  rating_1_count: number;
-  rating_2_count: number;
-  rating_3_count: number;
-  rating_4_count: number;
-  rating_5_count: number;
-  verified_purchase_count: number;
-  last_review_at: string | null;
-}
-
-interface Review {
-  id: string;
-  rating: number;
-  review_text: string | null;
-  helpful_count: number;
-  verified_purchase: boolean;
-  created_at: string;
-  updated_at: string;
-  user_id: string;
-  first_name: string | null;
-  last_name: string | null;
-  email: string;
-  user_vote?: boolean | null;
-}
+import { reviewsService, type ReviewSummary, type Review } from '@/services/ReviewsSingletonService';
 
 interface StoreRatingDisplayProps {
   tenantId: string;
@@ -54,9 +28,6 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
   const [showReviewForm, setShowReviewForm] = useState(false);
   
   console.log('[StoreRatingDisplay] RENDER - showReviewForm:', showReviewForm, 'isAuthenticated:', isAuthenticated);
-  
-  // Use API base URL for server-side API calls
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
   useEffect(() => {
     console.log('[StoreRatingDisplay] showReviewForm changed to:', showReviewForm);
@@ -74,25 +45,8 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
 
   const fetchRatingSummary = async () => {
     try {
-      const response = await fetch(`${apiBaseUrl}/api/stores/${tenantId}/reviews/summary`);
-      if (response.ok) {
-        const data = await response.json();
-        // Convert numeric strings to numbers (PostgreSQL returns numeric as strings)
-        const summaryData = data.data;
-        if (summaryData) {
-          setSummary({
-            ...summaryData,
-            rating_avg: parseFloat(summaryData.rating_avg) || 0,
-            rating_count: parseInt(summaryData.rating_count) || 0,
-            rating_1_count: parseInt(summaryData.rating_1_count) || 0,
-            rating_2_count: parseInt(summaryData.rating_2_count) || 0,
-            rating_3_count: parseInt(summaryData.rating_3_count) || 0,
-            rating_4_count: parseInt(summaryData.rating_4_count) || 0,
-            rating_5_count: parseInt(summaryData.rating_5_count) || 0,
-            verified_purchase_count: parseInt(summaryData.verified_purchase_count) || 0,
-          });
-        }
-      }
+      const summary = await reviewsService.getRatingSummary(tenantId);
+      setSummary(summary);
     } catch (error) {
       console.error('Error fetching rating summary:', error);
     } finally {
@@ -102,11 +56,8 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
 
   const fetchReviews = async () => {
     try {
-      const response = await fetch(`${apiBaseUrl}/api/stores/${tenantId}/reviews?limit=10`);
-      if (response.ok) {
-        const data = await response.json();
-        setReviews(data.data.reviews);
-      }
+      const reviews = await reviewsService.getReviews(tenantId, 10);
+      setReviews(reviews);
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
@@ -114,18 +65,8 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
 
   const fetchUserReview = async () => {
     try {
-      const token = getAccessToken();
-      if (!token) return;
-      
-      const response = await fetch(`${apiBaseUrl}/api/stores/${tenantId}/reviews/user`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUserReview(data.data);
-      }
+      const userReview = await reviewsService.getUserReview(tenantId);
+      setUserReview(userReview);
     } catch (error) {
       console.error('Error fetching user review:', error);
     }
@@ -133,24 +74,17 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
 
   const handleHelpfulVote = async (reviewId: string, isHelpful: boolean) => {
     try {
-      const token = getAccessToken();
-      if (!token) return;
-
-      const response = await fetch(`${apiBaseUrl}/api/reviews/${reviewId}/helpful`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ isHelpful })
-      });
-
-      if (response.ok) {
+      const success = await reviewsService.submitHelpfulVote(reviewId, isHelpful);
+      
+      if (success) {
         // Refresh reviews to update vote counts
         fetchReviews();
+        if (isAuthenticated) {
+          fetchUserReview();
+        }
       }
     } catch (error) {
-      console.error('Error voting on review:', error);
+      console.error('Error submitting helpful vote:', error);
     }
   };
 

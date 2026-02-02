@@ -8,7 +8,7 @@
 
 import { Router, Request, Response } from 'express';
 import { getDirectPool } from '../utils/db-pool';
-import { slugify } from '../utils/slug';
+import tenantSingletonService from '../services/TenantSingletonService';
 
 const router = Router();
 
@@ -199,41 +199,34 @@ router.get('/search', async (req: Request, res: Response) => {
     const totalPages = Math.ceil(total / limitNum);
 
     // Transform to camelCase for frontend - simplified since we only have primary_category
-    const listings = listingsResult.rows.map((row: any) => ({
-      id: row.id,
-      tenantId: row.tenant_id,
-      businessName: row.business_name,
-      slug: row.slug || slugify(row.business_name), // Generate slug if null
-      address: row.address,
-      city: row.city,
-      state: row.state,
-      zipCode: row.zip_code,
-      phone: row.phone,
-      email: row.email,
-      website: row.website,
-      latitude: row.latitude,
-      longitude: row.longitude,
-      primaryCategory: row.gbp_primary_category_name, // GBP store type (primary category)
-      gbpPrimaryCategoryName: row.gbp_primary_category_name, // Alias for compatibility
-      category: {
-        name: row.category_name,
-        slug: row.category_slug,
-        google_category_id: row.google_category_id,
-        icon: row.category_icon,
-        isPrimary: row.is_primary,
-      },
-      logoUrl: row.logo_url,
-      description: row.description,
-      ratingAvg: row.rating_avg || 0,
-      ratingCount: row.rating_count || 0,
-      productCount: row.product_count || 0,
-      isFeatured: row.is_featured || false,
-      subscriptionTier: row.subscription_tier || 'trial',
-      useCustomWebsite: row.use_custom_website || false,
-      businessHours: row.business_hours,
-      directoryPublished: row.directory_published || false, // Add directory publish status
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+    const listings = await Promise.all(listingsResult.rows.map(async (row: any) => {
+      const slug = row.slug || await tenantSingletonService.getTenantSlug(row.tenant_id);
+      return {
+        id: row.id,
+        tenantId: row.tenant_id,
+        businessName: row.business_name,
+        slug: slug, // Use centralized slug
+        address: row.address,
+        city: row.city,
+        state: row.state,
+        zipCode: row.zip_code,
+        phone: row.phone,
+        email: row.email,
+        website: row.website,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        primaryCategory: row.gbp_primary_category_name, // GBP store type (primary category)
+        ratingAvg: row.rating_avg || 0,
+        ratingCount: row.rating_count || 0,
+        productCount: row.product_count || 0,
+        isFeatured: row.is_featured || false,
+        subscriptionTier: row.subscription_tier || 'trial',
+        useCustomWebsite: row.use_custom_website || false,
+        businessHours: row.business_hours,
+        directoryPublished: row.directory_published || false, // Add directory publish status
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
     }));
 
     return res.json({
@@ -524,39 +517,42 @@ router.get('/categories/:idOrSlug', async (req: Request, res: Response) => {
     const totalPages = Math.ceil(total / limitNum);
 
     // Transform stores to camelCase
-    const stores = storesResult.rows.map((row: any) => ({
-      id: row.id,
-      tenantId: row.tenant_id,
-      businessName: row.business_name,
-      slug: row.slug || slugify(row.business_name),
-      address: row.address,
-      city: row.city,
-      state: row.state,
-      zipCode: row.zip_code,
-      phone: row.phone,
-      email: row.email,
-      website: row.website,
-      latitude: row.latitude,
-      longitude: row.longitude,
-      category: {
-        name: row.category_name,
-        slug: row.category_slug,
-        google_category_id: row.google_category_id,
-        icon: row.category_icon,
-        isPrimary: row.is_primary,
-      },
-      logoUrl: row.logo_url,
-      description: row.description,
-      ratingAvg: row.rating_avg || 0,
-      ratingCount: row.rating_count || 0,
-      productCount: row.product_count || 0,
-      isFeatured: row.is_featured || false,
-      subscriptionTier: row.subscription_tier || 'trial',
-      useCustomWebsite: row.use_custom_website || false,
-      businessHours: row.business_hours,
-      directoryPublished: row.directory_published || false, // Add directory publish status
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+    const stores = await Promise.all(storesResult.rows.map(async (row: any) => {
+      const slug = row.slug || await tenantSingletonService.getTenantSlug(row.tenant_id);
+      return {
+        id: row.id,
+        tenantId: row.tenant_id,
+        businessName: row.business_name,
+        slug: slug,
+        address: row.address,
+        city: row.city,
+        state: row.state,
+        zipCode: row.zip_code,
+        phone: row.phone,
+        email: row.email,
+        website: row.website,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        category: {
+          name: row.category_name,
+          slug: row.category_slug,
+          google_category_id: row.google_category_id,
+          icon: row.category_icon,
+          isPrimary: row.is_primary,
+        },
+        logoUrl: row.logo_url,
+        description: row.description,
+        ratingAvg: row.rating_avg || 0,
+        ratingCount: row.rating_count || 0,
+        productCount: row.product_count || 0,
+        isFeatured: row.is_featured || false,
+        subscriptionTier: row.subscription_tier || 'trial',
+        useCustomWebsite: row.use_custom_website || false,
+        businessHours: row.business_hours,
+        directoryPublished: row.directory_published || false,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
     }));
 
     return res.json({

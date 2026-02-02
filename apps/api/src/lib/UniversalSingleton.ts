@@ -677,6 +677,9 @@ abstract class UniversalSingleton {
   // ====================
   // CACHING METHODS
   // ====================
+  protected async getCache<T>(key: string): Promise<T | null> {
+    return this.getFromCache(key) as T;
+  }
   protected async getFromCache<T>(key: string): Promise<T | null> {
     if (!this.options.enableCache) {
       return null;
@@ -717,6 +720,9 @@ abstract class UniversalSingleton {
   /**
    * Set data in cache (both memory and persistent)
    */
+  protected async setToCache<T>(key: string, data: T, options?: { ttl?: number }): Promise<void> {
+       await this.setCache(key,data,options);
+    }
   protected async setCache<T>(key: string, data: T, options?: { ttl?: number }): Promise<void> {
     if (!this.options.enableCache) {
       return;
@@ -776,11 +782,12 @@ abstract class UniversalSingleton {
     const now = Date.now();
     const expiredKeys: string[] = [];
 
-    for (const [key, value] of this.memoryCache) {
+    // Use Array.from() for better compatibility with older TypeScript targets
+    Array.from(this.memoryCache.entries()).forEach(([key, value]) => {
       if (value.expires < now) {
         expiredKeys.push(key);
       }
-    }
+    });
 
     for (const key of expiredKeys) {
       this.memoryCache.delete(key);
@@ -865,6 +872,134 @@ abstract class UniversalSingleton {
     }
     
     throw lastError!;
+  }
+
+  // ====================
+  // TENANT AUTO ID FUNCTIONALITY
+  // ====================
+
+  /**
+   * Generate a 4-character alphanumeric auto ID from tenant ID
+   * Uses the same algorithm as the SKU generator for consistency
+   */
+  public generateTenantAutoId(tenantId: string): string {
+    if (!tenantId) return 'UNKN';
+    
+    // Use a simple hash to create consistent 4-char key from tenant ID
+    let hash = 0;
+    for (let i = 0; i < tenantId.length; i++) {
+      hash = ((hash << 5) - hash) + tenantId.charCodeAt(i);
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    // Convert hash to 4-character alphanumeric key
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed ambiguous chars (0, O, 1, I)
+    let tempHash = Math.abs(hash);
+    let key = '';
+    for (let i = 0; i < 4; i++) {
+      key += chars[tempHash % chars.length];
+      tempHash = Math.floor(tempHash / chars.length);
+    }
+    
+    return key;
+  }
+
+  /**
+   * Get cached tenant auto ID for performance
+   */
+  public getCachedTenantAutoId(tenantId: string): string {
+    const cacheKey = `tenant_auto_id:${tenantId}`;
+    
+    // Check memory cache first
+    if (this.memoryCache.has(cacheKey)) {
+      const cached = this.memoryCache.get(cacheKey);
+      if (cached && Date.now() < cached.expires) {
+        this.metrics.cacheHits++;
+        return cached.data;
+      }
+      this.memoryCache.delete(cacheKey);
+    }
+    
+    // Generate and cache new auto ID
+    const autoId = this.generateTenantAutoId(tenantId);
+    const defaultTTL = this.options.defaultTTL || 300; // Default to 5 minutes
+    const expires = Date.now() + (defaultTTL * 1000);
+    
+    this.memoryCache.set(cacheKey, { data: autoId, expires });
+    this.metrics.cacheMisses++;
+    
+    return autoId;
+  }
+
+  /**
+   * Get all possible identifiers for a tenant (tenantId, slug, autoId)
+   */
+  public getTenantIdentifiers(tenantId: string, slug?: string): {
+    tenantId: string;
+    slug?: string;
+    autoId: string;
+  } {
+    return {
+      tenantId,
+      slug,
+      autoId: this.getCachedTenantAutoId(tenantId)
+    };
+  }
+
+  /**
+   * Validate if an identifier is a tenant auto ID
+   */
+  protected isTenantAutoId(identifier: string): boolean {
+    const pattern = /^[A-Z0-9]{4}$/;
+    return pattern.test(identifier);
+  }
+
+  /**
+   * Resolve tenant by any identifier (tenantId, slug, or autoId)
+   * This will be useful for shop URL routing
+   */
+  public async resolveTenantByIdentifier(identifier: string): Promise<{
+    tenantId?: string;
+    slug?: string;
+    autoId?: string;
+    found: boolean;
+  }> {
+    // Try to resolve as tenantId first
+    try {
+      // This would need to be implemented based on your tenant lookup logic
+      // For now, we'll return the identifier as a potential tenantId
+      if (identifier.startsWith('tid-')) {
+        return {
+          tenantId: identifier,
+          autoId: this.getCachedTenantAutoId(identifier),
+          found: true
+        };
+      }
+    } catch (error) {
+      // Tenant lookup failed
+    }
+    
+    // Try to resolve as autoId
+    if (this.isTenantAutoId(identifier)) {
+      // This would need reverse lookup - for now return as autoId
+      return {
+        autoId: identifier,
+        found: false // Would need reverse lookup
+      };
+    }
+    
+    // Try to resolve as slug
+    try {
+      // This would need slug lookup logic
+      return {
+        slug: identifier,
+        found: false // Would need slug lookup
+      };
+    } catch (error) {
+      // Slug lookup failed
+    }
+    
+    return { found: false };
   }
 
   // ====================

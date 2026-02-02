@@ -400,7 +400,7 @@ export interface TrackingData {
   entityId: string;
   entityName?: string;
   context?: any;
-  pageType: 'directory_detail' | 'product_page' | 'storefront' | 'directory_home' | 'search_results';
+  pageType: 'directory_detail' | 'product_page' | 'storefront' | 'directory_home' | 'search_results' | 'shop' | 'shop_directory' | 'shop_detail' | 'catalog';
   durationSeconds?: number;
 }
 
@@ -537,18 +537,41 @@ async function getUserLocationServer(): Promise<{
   state: string;
 } | null> {
   try {
-    // For server-side, we can use IP-based location
-    const response = await fetch('https://ipapi.co/json/');
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    const response = await fetch('https://ipapi.co/json/', {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'RVP-Platform/1.0'
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`IP location service responded with ${response.status}`);
+    }
+    
     const data = await response.json();
     
+    // Validate the response has the expected fields
+    if (!data.latitude || !data.longitude) {
+      throw new Error('Invalid location data received');
+    }
+    
     return {
-      latitude: data.latitude || 0,
-      longitude: data.longitude || 0,
+      latitude: data.latitude,
+      longitude: data.longitude,
       city: data.city || 'Unknown',
       state: data.region || 'Unknown'
     };
   } catch (error) {
-    console.warn('IP location failed, using default');
+    // Only log in development to reduce noise in production
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('IP location failed, using default:', error instanceof Error ? error.message : 'Unknown error');
+    }
     return null;
   }
 }
@@ -652,17 +675,41 @@ async function getUserLocationClient(): Promise<{
   
   // Fallback to IP-based location
   try {
-    const response = await fetch('https://ipapi.co/json/');
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    const response = await fetch('https://ipapi.co/json/', {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'RVP-Platform/1.0'
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`IP location service responded with ${response.status}`);
+    }
+    
     const data = await response.json();
     
+    // Validate the response has the expected fields
+    if (!data.latitude || !data.longitude) {
+      throw new Error('Invalid location data received');
+    }
+    
     return {
-      latitude: data.latitude || 0,
-      longitude: data.longitude || 0,
+      latitude: data.latitude,
+      longitude: data.longitude,
       city: data.city || 'Unknown',
       state: data.region || 'Unknown'
     };
   } catch (error) {
-    console.warn('IP location failed, using default');
+    // Only log in development to reduce noise in production
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('IP location failed, using default:', error instanceof Error ? error.message : 'Unknown error');
+    }
     return null;
   }
 }

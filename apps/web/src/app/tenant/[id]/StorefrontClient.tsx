@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { UnifiedStoreCard } from '@/components/directory/UnifiedStoreCard';
-import { api } from '@/lib/api';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 
 // Force edge runtime to prevent prerendering issues
@@ -19,14 +19,8 @@ export function StorefrontRecommendations({ tenantId }: { tenantId: string }) {
   useEffect(() => {
     const fetchRecommendations = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await api.get(`${apiUrl}/api/recommendations/for-storefront/${tenantId}`);
-        const data = await response.json();
-        // API returns nested structure: { recommendations: [{ type, title, recommendations: [...stores] }] }
-        // Flatten to get the actual store recommendations
-        const allStores = (data.recommendations || []).flatMap(
-          (group: any) => group.recommendations || []
-        );
+        // Use singleton service for cached recommendations
+        const allStores = await recommendationsService.getStorefrontRecommendations(tenantId);
         setRecommendations(allStores);
       } catch (error) {
         console.error('Error fetching storefront recommendations:', error);
