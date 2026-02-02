@@ -6386,7 +6386,7 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 // Catch-all route handler for debugging unmatched routes
-app.use('*', (req, res) => {
+app.use((req, res) => {
   console.log(`[CATCH-ALL] Unmatched route: ${req.method} ${req.path}`, {
     query: req.query,
     userAgent: req.get('User-Agent'),
