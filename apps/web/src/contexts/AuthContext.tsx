@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!forceRefresh) {
       const cached = getCachedUser();
       if (cached) {
-        console.log('[AuthContext] Using cached user data (avoiding API call)');
+       // console.log('[AuthContext] Using cached user data (avoiding API call)');
         setUser(cached.user);
         setCurrentTenantId(cached.tenantId);
         setIsLoading(false);

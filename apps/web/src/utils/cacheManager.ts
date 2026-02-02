@@ -328,13 +328,13 @@ class CacheManager {
     // Store in IndexedDB if available
     if (this.indexedDBSupported) {
       await this.setToIndexedDB(key, entry);
-      console.log('[CacheManager] Stored in IndexedDB:', key, { encrypted: encrypt, userId: userId ? '***' : 'none' });
+     // console.log('[CacheManager] Stored in IndexedDB:', key, { encrypted: encrypt, userId: userId ? '***' : 'none' });
     }
     
     // Fallback to localStorage
     if (this.localStorageSupported) {
       this.setToLocalStorage(key, entry);
-      console.log('[CacheManager] Stored in localStorage:', key, { encrypted: encrypt, userId: userId ? '***' : 'none' });
+    //  console.log('[CacheManager] Stored in localStorage:', key, { encrypted: encrypt, userId: userId ? '***' : 'none' });
     }
   }
 

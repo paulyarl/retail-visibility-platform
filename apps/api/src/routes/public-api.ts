@@ -1271,6 +1271,25 @@ router.get('/shops/discover/:bucketType', async (req, res) => {
   const startTime = Date.now();
   try {
     const { bucketType } = req.params;
+    console.log(`[PUBLIC API] Shops discovery request:`, {
+      method: req.method,
+      url: req.url,
+      bucketType,
+      query: req.query,
+      userAgent: req.get('User-Agent'),
+      referer: req.get('Referer')
+    });
+
+    // Validate bucketType
+    const validBucketTypes = ['random', 'trending', 'new', 'sale', 'seasonal', 'staff', 'selection'];
+    if (!validBucketTypes.includes(bucketType)) {
+      console.error(`[PUBLIC API] Invalid bucketType: ${bucketType}`);
+      return res.status(400).json({
+        success: false,
+        error: `Invalid bucketType: ${bucketType}. Valid types: ${validBucketTypes.join(', ')}`
+      });
+    }
+    
     const {
       scope = 'shop',
       tenantId,
@@ -1676,6 +1695,14 @@ router.get('/shops/featured/trending', async (req, res) => {
   const startTime = Date.now();
   try {
     const { tenantId, limit = 12, shopScope = 'global' } = req.query;
+    
+    console.log(`[PUBLIC API] Shops trending request:`, {
+      method: req.method,
+      url: req.url,
+      query: req.query,
+      userAgent: req.get('User-Agent'),
+      referer: req.get('Referer')
+    });
     
     const shopsService = (await import('../services/ShopsFeaturedService')).default;
     const service = shopsService.getInstance();

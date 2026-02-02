@@ -322,6 +322,19 @@ const healthRoutes = (req: any, res: any) => {
 app.use('/health', healthRoutes);
 app.use('/api/health', healthRoutes);
 
+// Request logging middleware for debugging
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/public')) {
+    console.log(`[API REQUEST] ${req.method} ${req.path}`, {
+      query: req.query,
+      userAgent: req.get('User-Agent'),
+      referer: req.get('Referer'),
+      timestamp: new Date().toISOString()
+    });
+  }
+  next();
+});
+
 // PUBLIC API ROUTES - Singleton System
 import publicApiRoutes from './routes/public-api';
 app.use('/api/public', publicApiRoutes);
@@ -4227,8 +4240,8 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   res.json(transformed);
 });
 
-// GET /api/items/:id/photos - Fetch all photos for an item ordered by position
-app.get("/api/items/:id/photos", authenticateToken, async (req, res) => {
+// GET /api/items/:id/photos - Fetch all photos for an item ordered by position (PUBLIC)
+app.get("/api/items/:id/photos", async (req, res) => {
   try {
     const itemId = req.params.id;
     
@@ -6371,6 +6384,32 @@ if (process.env.NODE_ENV !== "test") {
     process.exit(1);
   }
 }
+
+// Catch-all route handler for debugging unmatched routes
+app.use('*', (req, res) => {
+  console.log(`[CATCH-ALL] Unmatched route: ${req.method} ${req.path}`, {
+    query: req.query,
+    userAgent: req.get('User-Agent'),
+    referer: req.get('Referer'),
+    timestamp: new Date().toISOString()
+  });
+  
+  res.status(404).json({
+    error: 'Route not found',
+    path: req.path,
+    method: req.method,
+    availableRoutes: [
+      '/api/public/shops/discover/:bucketType',
+      '/api/public/shops/featured/trending',
+      '/api/public/shops/featured/random',
+      '/api/public/shops/featured/new',
+      '/api/public/shops/featured/sale',
+      '/api/public/shops/featured/seasonal',
+      '/api/public/shops/featured/staff',
+      '/api/public/shops/featured/selection'
+    ]
+  });
+});
 
 // Export the Express app for Vercel compatibility
 export default app;

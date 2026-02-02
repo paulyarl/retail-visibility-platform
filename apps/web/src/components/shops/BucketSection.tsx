@@ -373,7 +373,7 @@ export function ProductBucket({
                           obj[key] = product[key];
                           return obj;
                         }, {});
-                        console.log('[BucketSection] Discover Something New Bucket Debug:', {
+                       /*  console.log('[BucketSection] Discover Something New Bucket Debug:', {
                           productId: product.inventoryItemId || product.inventory_item_id,
                           productName: product.productName || product.product_name,
                           tenantId: product.tenantId || product.tenant_id,
@@ -391,7 +391,7 @@ export function ProductBucket({
                           hasInventoryItemId: !!product.inventoryItemId,
                           hasInventory_item_id: !!product.inventory_item_id,
                           hasId: !!product.id
-                        });
+                        }); */
                       }
                       return logoUrl;
                     })() ? (

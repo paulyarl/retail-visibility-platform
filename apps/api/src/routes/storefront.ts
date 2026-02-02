@@ -60,7 +60,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     const whereClause = conditions.join(' AND ');
     
     // Debug logging
-    console.log(`[Storefront API] Query params:`, {
+    /* console.log(`[Storefront API] Query params:`, {
       tenantId,
       category,
       search,
@@ -70,7 +70,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
       conditions,
       whereClause,
       params
-    });
+    }); */
     
     // Query storefront_products MV for individual products (includes payment gateway info)
     const query = `
@@ -141,14 +141,14 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     const totalCount = parseInt(countResult.rows[0]?.count || '0');
     
     // Debug logging for results
-    console.log(`[Storefront API] Results:`, {
+    /* console.log(`[Storefront API] Results:`, {
       totalCount,
       itemsReturned: itemsResult.rows.length,
       pageNum,
       limitNum,
       skip,
       expectedRange: `${skip + 1}-${Math.min(skip + limitNum, totalCount)}`
-    });
+    }); */
     
     // Fetch featured types for the returned products
     const productIds = itemsResult.rows.map((item: any) => item.id);

@@ -95,11 +95,11 @@ class ProductCache extends UniversalSingleton {
     // Check if request is already pending (deduplication)
     const pending = this.pendingRequests.get(inventoryItemId);
     if (pending) {
-      console.log(`[ProductCache] Request pending for ${inventoryItemId}, waiting...`);
+     // console.log(`[ProductCache] Request pending for ${inventoryItemId}, waiting...`);
       return pending;
     }
 
-    console.log(`[ProductCache] Fetching product ${inventoryItemId}`);
+    // console.log(`[ProductCache] Fetching product ${inventoryItemId}`);
 
     // Create and store the pending request
     const requestPromise = this.fetchProduct(inventoryItemId)
@@ -258,7 +258,7 @@ export function useShopsFeaturedBuckets(options: {
       
       // Log cache stats before fetching
       const cacheStatsBefore = productCache.getCacheStats();
-      console.log('[SHOPS BUCKETS] Cache stats before fetch:', cacheStatsBefore);
+      //console.log('[SHOPS BUCKETS] Cache stats before fetch:', cacheStatsBefore);
       
       // Build query parameters
       const queryParams = new URLSearchParams();
@@ -345,7 +345,7 @@ export function useShopsFeaturedBuckets(options: {
           );
           
           // Debug specifically for random endpoint
-          if (endpoint.name === 'random' && invalidProducts.length > 0) {
+          /* if (endpoint.name === 'random' && invalidProducts.length > 0) {
             console.warn(`[SHOPS BUCKETS] ${endpoint.name} - Invalid inventoryItemId debug:`, {
               totalProducts: featuredProducts.length,
               invalidProducts: invalidProducts.length,
@@ -357,7 +357,7 @@ export function useShopsFeaturedBuckets(options: {
                 productName: p.productName || p.product_name
               }))
             });
-          }
+          } */
           
           if (invalidProducts.length > 0) {
             console.warn(`[SHOPS BUCKETS] Found ${invalidProducts.length} products with invalid inventoryItemId:`, invalidProducts);
@@ -384,7 +384,7 @@ export function useShopsFeaturedBuckets(options: {
                 const productData = await productCache.getProduct(inventoryItemId);
                 
                 // Debug for ALL buckets to compare working vs non-working
-                if (inventoryItemId && (inventoryItemId.includes('sid-xbjcqzwj') || inventoryItemId.includes('sid-071div8t'))) {
+               /*  if (inventoryItemId && (inventoryItemId.includes('sid-xbjcqzwj') || inventoryItemId.includes('sid-071div8t'))) {
                   console.log(`[SHOPS BUCKETS] ${endpoint.name} - Merge Debug:`, {
                     inventoryItemId,
                     featuredProductLogo: featuredProduct.tenantLogoUrl || featuredProduct.tenant_logo_url,
@@ -395,7 +395,7 @@ export function useShopsFeaturedBuckets(options: {
                     hasFeaturedProductLogo: !!(featuredProduct.tenantLogoUrl || featuredProduct.tenant_logo_url),
                     hasCacheProductLogo: !!(productData.tenantLogoUrl || productData.tenant_logo_url)
                   });
-                }
+                } */
                 
                 return {
                   ...productData,
@@ -446,15 +446,15 @@ export function useShopsFeaturedBuckets(options: {
         bucketCount: results.length
       });
       
-      console.log('[SHOPS BUCKETS] Successfully fetched buckets', {
+      /* console.log('[SHOPS BUCKETS] Successfully fetched buckets', {
         bucketCount: results.length,
         totalResponseTime: Date.now() - startTime,
         cacheHitRate: `${((cacheHits / results.length) * 100).toFixed(1)}%`
-      });
+      }); */
       
       // Log cache stats after fetching
       const cacheStatsAfter = productCache.getCacheStats();
-      console.log('[SHOPS BUCKETS] Cache stats after fetch:', cacheStatsAfter);
+      // console.log('[SHOPS BUCKETS] Cache stats after fetch:', cacheStatsAfter);
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch buckets';
@@ -473,7 +473,7 @@ export function useShopsFeaturedBuckets(options: {
 
   const clearCache = useCallback(() => {
     productCache.clearAllCache();
-    console.log('[SHOPS BUCKETS] Cache cleared by user');
+    // console.log('[SHOPS BUCKETS] Cache cleared by user');
   }, [productCache]);
 
   const getCacheStats = useCallback(() => {
