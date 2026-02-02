@@ -12,6 +12,7 @@ import { QueryClientWrapper } from "@/components/QueryClientWrapper";
 import { GlobalAlertProvider } from "@/components/ui/GlobalAlertProvider";
 import { FloatingCartWidget } from "@/components/cart/FloatingCartWidget";
 import { UniversalProvider } from "@/providers/UniversalProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,22 +46,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         suppressHydrationWarning
       >
         <QueryClientWrapper>
-          <PlatformSettingsProvider>
-            <CustomAuthProvider>
-              <CartWidgetProvider>
-                <ProductLayoutProvider>
-                  <GlobalAlertProvider>
-                    <UniversalProvider>
-                      <ErrorBoundary>
-                        {children}
-                      </ErrorBoundary>
-                      <FloatingCartWidget />
-                    </UniversalProvider>
-                  </GlobalAlertProvider>
-                </ProductLayoutProvider>
-              </CartWidgetProvider>
-            </CustomAuthProvider>
-          </PlatformSettingsProvider>
+          <ThemeProvider>
+            <PlatformSettingsProvider>
+              <CustomAuthProvider>
+                <CartWidgetProvider>
+                  <ProductLayoutProvider>
+                    <GlobalAlertProvider>
+                      <UniversalProvider>
+                        <ErrorBoundary>
+                          {children}
+                        </ErrorBoundary>
+                        <FloatingCartWidget />
+                      </UniversalProvider>
+                    </GlobalAlertProvider>
+                  </ProductLayoutProvider>
+                </CartWidgetProvider>
+              </CustomAuthProvider>
+            </PlatformSettingsProvider>
+          </ThemeProvider>
         </QueryClientWrapper>
         {/* <Analytics /> */}
       </body>

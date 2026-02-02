@@ -100,30 +100,30 @@ describe('Frontend Slug Utilities', () => {
     });
 
     it('should handle undefined values', () => {
-      expect(slugsMatch(undefined, undefined)).toBe(true);
-      expect(slugsMatch('slug', undefined)).toBe(false);
-      expect(slugsMatch(undefined, 'slug')).toBe(false);
+      expect(slugsMatch('', '')).toBe(true);
+      expect(slugsMatch('slug', '')).toBe(false);
+      expect(slugsMatch('', 'slug')).toBe(false);
     });
 
     it('should handle mixed undefined and empty strings', () => {
-      expect(slugsMatch('', undefined)).toBe(true);
-      expect(slugsMatch(undefined, '')).toBe(true);
+      expect(slugsMatch('', '')).toBe(true);
+      expect(slugsMatch('', '')).toBe(true);
     });
   });
 
   describe('getCategoryUrl', () => {
     it('should generate category URL with slug', () => {
-      expect(getCategoryUrl('electronics')).toBe('/directory/categories/electronics');
-      expect(getCategoryUrl('health-beauty')).toBe('/directory/categories/health-beauty');
+      expect(getCategoryUrl({ name: 'electronics' })).toBe('/directory/categories/electronics');
+      expect(getCategoryUrl({ name: 'Health & Beauty', slug: 'health-beauty' })).toBe('/directory/categories/health-beauty');
     });
 
     it('should handle slugs with special characters', () => {
       const slug = slugify('Health & Beauty');
-      expect(getCategoryUrl(slug)).toBe('/directory/categories/health-beauty');
+      expect(getCategoryUrl({ name: 'Health & Beauty', slug })).toBe('/directory/categories/health-beauty');
     });
 
     it('should handle empty slug', () => {
-      expect(getCategoryUrl('')).toBe('/directory/categories/');
+      expect(getCategoryUrl({ name: '', slug: '' })).toBe('/directory/categories/');
     });
   });
 

@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { Star, Package, Search, Filter, Grid, List, ChevronDown, ShoppingCart, Heart, Share2, Truck, Shield, Sparkles } from 'lucide-react';
 import { useProductLayout, layoutVariantDescriptions } from '@/contexts/ProductLayoutContext';
 import StorefrontActions from '@/components/storefront/StorefrontActions';
+import { Button } from '@mantine/core';
 
 interface CatalogProduct {
   id: string;

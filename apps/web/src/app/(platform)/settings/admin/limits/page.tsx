@@ -5,7 +5,8 @@ import { Building2, TrendingUp, AlertTriangle, Info, Edit2, Save, X, Settings, A
 import { apiRequest } from '@/lib/api';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Button, Input, Badge } from '@/components/ui';
+import { Button } from '@mantine/core';
+import { Input, Badge } from '@/components/ui';
 
 interface Tier {
   id: string;

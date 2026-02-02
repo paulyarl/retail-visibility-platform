@@ -1,5 +1,6 @@
 import { Item } from '@/services/itemsDataService';
 import EnhancedProductCard from './EnhancedProductCard';
+import { Button } from '@mantine/core';
 
 interface ItemsGridProps {
   items: Item[];

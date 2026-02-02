@@ -1,4 +1,5 @@
-import { Button, Badge } from '@/components/ui';
+import { Button } from '@mantine/core';
+import { Badge } from '@/components/ui';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { useState, useEffect } from 'react';
 import { apiRequest } from '@/lib/api';

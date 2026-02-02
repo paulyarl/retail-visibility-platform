@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CreditCard, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { CartSummary } from '@/lib/cart/cartManager';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 
 interface MultiCartCheckoutProps {

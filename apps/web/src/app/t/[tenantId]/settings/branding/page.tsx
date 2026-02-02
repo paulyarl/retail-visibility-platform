@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Alert, Spinner } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Input, Label, Alert, Spinner } from '@/components/ui';
+import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
 import Image from 'next/image';

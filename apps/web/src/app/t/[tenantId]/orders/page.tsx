@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { Button } from '@mantine/core';
 import OrdersClient from './OrdersClient';
 
 export const metadata: Metadata = {

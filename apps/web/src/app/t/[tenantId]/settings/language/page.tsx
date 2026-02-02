@@ -1,4 +1,5 @@
 import LanguageSettingsPage from '@/app/(platform)/settings/language/page';
+import { Button } from '@mantine/core';
 import SetTenantId from '@/components/client/SetTenantId';
 
 export default async function TenantScopedLanguageSettings({ params }: { params: Promise<{ tenantId: string }> }) {

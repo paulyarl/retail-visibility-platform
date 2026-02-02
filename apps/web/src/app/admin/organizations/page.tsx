@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Modal, ModalFooter, Input, Select } from '@/components/ui';
+import { Card, Badge, Modal, ModalFooter, Input, Select } from '@/components/ui';
+import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { useTenantOrganizations } from '@/hooks/useTenantOrganizations';
 import { type Organization } from '@/lib/singletons/TenantOrganizationsSingleton';
@@ -213,25 +214,23 @@ export default function AdminOrganizationsPage() {
         </div>
 
         {organizations.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center py-12">
-                <p className="text-neutral-500">No organizations found</p>
-                <p className="text-sm text-neutral-400 mt-2">
-                  Use the test script to create demo organizations
-                </p>
-              </div>
-            </CardContent>
+          <Card className="p-6 rounded-lg">
+            <div className="text-center py-12">
+              <p className="text-neutral-500">No organizations found</p>
+              <p className="text-sm text-neutral-400 mt-2">
+                Use the test script to create demo organizations
+              </p>
+            </div>
           </Card>
         ) : (
           organizations
             .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
             .map((org) => (
-            <Card key={org.id}>
-              <CardHeader>
+            <Card key={org.id} className="p-6 rounded-lg">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>{org.name}</CardTitle>
+                    <h3 className="text-lg font-semibold">{org.name}</h3>
                     <p className="text-sm text-neutral-700 mt-1 font-medium">ID: {org.id}</p>
                   </div>
                   <div className="flex gap-2">
@@ -241,8 +240,6 @@ export default function AdminOrganizationsPage() {
                     </Badge>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   <div className="bg-neutral-50 p-4 rounded-lg">
                     <div className="text-sm font-semibold text-neutral-700">Locations</div>
@@ -302,7 +299,7 @@ export default function AdminOrganizationsPage() {
                     Edit Tier
                   </Button>
                 </div>
-              </CardContent>
+              </div>
             </Card>
           ))
         )}
@@ -409,7 +406,7 @@ export default function AdminOrganizationsPage() {
             </div>
           </div>
         )}
-        <ModalFooter>
+        <div className="flex gap-3 justify-end p-4 border-t border-neutral-200">
           <Button
             variant="ghost"
             onClick={() => {
@@ -420,7 +417,7 @@ export default function AdminOrganizationsPage() {
           >
             Close
           </Button>
-        </ModalFooter>
+        </div>
       </Modal>
 
       {/* Create Organization Modal */}
@@ -521,7 +518,7 @@ export default function AdminOrganizationsPage() {
           </div>
         </div>
 
-        <ModalFooter>
+        <div className="flex gap-3 justify-end p-4 border-t border-neutral-200">
           <Button
             variant="ghost"
             onClick={() => {
@@ -542,7 +539,7 @@ export default function AdminOrganizationsPage() {
           >
             {processing ? 'Creating...' : 'Create Organization'}
           </Button>
-        </ModalFooter>
+        </div>
       </Modal>
 
       {/* Edit Organization Tier Modal */}
@@ -650,7 +647,7 @@ export default function AdminOrganizationsPage() {
             </div>
           </div>
         )}
-        <ModalFooter>
+        <div className="flex gap-3 justify-end p-4 border-t border-neutral-200">
           <Button
             variant="ghost"
             onClick={() => {
@@ -669,7 +666,7 @@ export default function AdminOrganizationsPage() {
           >
             {processing ? 'Updating...' : 'Update Tier'}
           </Button>
-        </ModalFooter>
+        </div>
       </Modal>
     </div>
   );

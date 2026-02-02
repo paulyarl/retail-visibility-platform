@@ -26,7 +26,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Checkbox } from '@/components/ui/Checkbox';

@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { AnimatedCard, Input, Button, Alert } from '@/components/ui';
+import { AnimatedCard, Input, Alert } from '@/components/ui';
+import { Button } from '@mantine/core';
 import { motion } from 'framer-motion';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import Image from 'next/image';

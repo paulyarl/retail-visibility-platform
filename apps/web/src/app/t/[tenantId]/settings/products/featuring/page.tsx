@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { apiRequest } from '@/lib/api';
 import Image from 'next/image';
+import { Button } from '@mantine/core';
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useTenantFeaturedProducts } from '@/hooks/useTenantFeaturedProducts';
 import { FeaturedProduct, FeaturedType } from '@/lib/singletons/TenantFeaturedProductsSingleton';

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Card, Badge } from '@/components/ui';
+import { Button, Card } from '@mantine/core';
+import { Badge } from '@/components/ui';
 import { motion } from 'framer-motion';
 
 

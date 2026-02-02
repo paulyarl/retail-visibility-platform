@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { MapPin, Truck, Package, Clock, DollarSign } from 'lucide-react';
 
 export type FulfillmentMethod = 'pickup' | 'delivery' | 'shipping';

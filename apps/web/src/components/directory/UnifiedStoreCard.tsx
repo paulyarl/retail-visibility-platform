@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/Badge';
-import { Card, CardContent } from '@/components/ui/Card';
-import { MapPin, Star, Package, ExternalLink } from 'lucide-react';
+import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
+import { MapPin, Star, Package, ExternalLink, Heart, Phone, Store } from 'lucide-react';
 import { computeStoreStatus } from '@/lib/hours-utils';
 
 import { useStoreStatus } from "@/hooks/useStoreStatus";
@@ -128,9 +128,8 @@ export function UnifiedStoreCard({
   if (viewMode === 'list') {
     return (
       <Link href={linkHref} className={`block ${className}`}>
-        <Card className="hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700">
-          <CardContent className="p-4 dark:bg-gray-800">
-            <div className="flex items-center space-x-4">
+        <Card withBorder padding="md" radius="md" className="hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700">
+          <div className="flex items-center space-x-4">
               {/* Logo - conditionally shown */}
               {showLogo && (
                 <div className="flex-shrink-0">
@@ -230,9 +229,9 @@ export function UnifiedStoreCard({
                           </span>
                         )}
                         {listing.reason && (
-                          <Badge variant="default" className="text-xs bg-green-50 dark:bg-green-900/20 text-green-600 border-green-200">
+                          <MantineBadge variant="default" className="text-xs bg-green-50 dark:bg-green-900/20 text-green-600 border-green-200">
                             {listing.reason}
-                          </Badge>
+                          </MantineBadge>
                         )}
                       </div>
 
@@ -249,113 +248,193 @@ export function UnifiedStoreCard({
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </Link>
-    );
-  }
+          </Card>
+        </Link>
+      );
+    }
 
   // Grid view
   return (
     <Link href={linkHref} className={`block ${className}`}>
-      <Card className="h-full hover:shadow-lg transition-all duration-200 group dark:bg-gray-800 dark:border-gray-700">
-        <CardContent className="p-6 dark:bg-gray-800">
-          {/* Header with logo and featured badge */}
-          <div className="flex items-start justify-between mb-4">
-            {/* Logo - conditionally shown */}
-            {showLogo && (
-              <div className="flex-shrink-0">
-                {listing.logoUrl ? (
-                  <Image
-                    src={listing.logoUrl}
-                    alt={listing.businessName}
-                    width={64}
-                    height={64}
-                    className="rounded-lg object-cover"
-                  />
-                ) : (
-                  <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                    <Package className="w-8 h-8 text-gray-400" />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {listing.isFeatured && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg">
-                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-                FEATURED
-              </span>
-            )}
-          </div>
-
-          {/* Business name */}
-          <h3 className="text-lg font-semibold text-gray-900 dark:!text-white mb-2 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-            {listing.businessName}
-          </h3>
-
-          {/* Category */}
-          <div className="mb-3">
-            <Badge variant="info" className="text-xs">
-              {formattedCategory}
-            </Badge>
-          </div>
-
-          {/* Rating */}
-          {ratingAvg > 0 && (
-            <div className="flex items-center mb-3">
-              <Star className="w-4 h-4 fill-current text-yellow-400 mr-1" />
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                {ratingAvg.toFixed(1)}
-              </span>
-              {ratingCount > 0 && (
-                <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">
-                  ({ratingCount})
-                </span>
+      <Card withBorder radius="md" p="md" className="h-full hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700">
+        {/* Logo Section */}
+        {showLogo && (
+          <Card.Section>
+            <div className="h-32 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center relative overflow-hidden">
+              {listing.logoUrl ? (
+                <Image
+                  src={listing.logoUrl}
+                  alt={listing.businessName}
+                  width={80}
+                  height={80}
+                  className="rounded-lg object-cover shadow-lg"
+                />
+              ) : (
+                <div className="w-20 h-20 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center shadow-lg">
+                  <Store className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+                </div>
               )}
-            </div>
-          )}
-
-          {/* Address */}
-          <div className="flex items-start mb-3">
-            <MapPin className="w-4 h-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
-              {formattedAddress || 'Address not available'}
-            </p>
-          </div>
-
-          {/* Footer with reason badge and business hours status */}
-          <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
-            <div className="flex items-center gap-2">
-              {listing.reason && (
-                <Badge variant="default" className="text-xs bg-green-50 dark:bg-green-900/20 text-green-600 border-green-200 dark:border-green-800">
-                  {listing.reason}
-                </Badge>
-              )}
-              {listing.productCount !== undefined && listing.productCount > 0 && (
-                <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                  <Package className="w-4 h-4 mr-1" />
-                  <span>{listing.productCount} products</span>
+              {isFeatured && (
+                <div className="absolute top-3 right-3">
+                  <MantineBadge variant="default" className="bg-yellow-100 text-yellow-800 border-yellow-200 text-xs">
+                    ⭐ Featured
+                  </MantineBadge>
                 </div>
               )}
             </div>
+          </Card.Section>
+        )}
 
-            {hoursStatus && (
-              <div 
-                className={`w-2 h-2 rounded-full ${
-                  hoursStatus.status === 'open' ? 'bg-green-500' :
-                  hoursStatus.status === 'closed' ? 'bg-red-500' :
-                  hoursStatus.status === 'opening-soon' ? 'bg-blue-500' :
-                  hoursStatus.status === 'closing-soon' ? 'bg-yellow-500' :
-                  'bg-gray-500' // fallback
-                }`}
-                title={hoursStatus.label}
-              />
+        {/* Title and Basic Info - Enhanced */}
+        <Card.Section className="p-4">
+          <Group justify="space-between" mb="xs" align="start">
+            <div className="flex-1">
+              <Text 
+                fw={600} 
+                size="lg" 
+                lineClamp={1} 
+                className="text-gray-900 dark:text-white hover:text-blue-600 transition-colors"
+              >
+                {listing.businessName}
+              </Text>
+              <Group gap={4} mt={1}>
+                <MapPin size={14} className="text-gray-500" />
+                <Text size="sm" c="dimmed" lineClamp={1}>
+                  {formattedAddress || 'Location not available'}
+                </Text>
+              </Group>
+            </div>
+            {!showLogo && isFeatured && (
+              <MantineBadge 
+                color="yellow"
+                variant="light"
+                size="xs"
+                className="shrink-0"
+              >
+                ⭐ Featured
+              </MantineBadge>
             )}
-          </div>
-        </CardContent>
+          </Group>
+
+          {/* Rating Display */}
+          {ratingAvg > 0 && (
+            <Group gap={6} mt={2}>
+              <Group gap={2}>
+                {[...Array(5)].map((_, i) => (
+                  <Star 
+                    key={i} 
+                    size={14} 
+                    className={i < Math.floor(ratingAvg) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+                  />
+                ))}
+              </Group>
+              <Text size="sm" fw={500} c="dimmed">
+                {ratingAvg.toFixed(1)}
+                {ratingCount && (
+                  <Text size="xs" c="dimmed" span>
+                    ({ratingCount})
+                  </Text>
+                )}
+              </Text>
+            </Group>
+          )}
+        </Card.Section>
+
+        {/* Features Section - Enhanced Badge Card Pattern */}
+        <Card.Section mb="md">
+          <Text mb="xs" size="sm" fw={500} c="dimmed">
+            Store Highlights
+          </Text>
+          <Group gap={6} wrap="nowrap">
+            {/* Category Badge - Primary */}
+            <MantineBadge 
+              color="blue"
+              variant="light"
+              size="xs"
+            >
+              🏷️ {formattedCategory}
+            </MantineBadge>
+
+            {/* Rating Badge - Highlight */}
+            {ratingAvg >= 4.5 && (
+              <MantineBadge 
+                color="yellow"
+                variant="light"
+                size="xs"
+              >
+                ⭐ {ratingAvg.toFixed(1)} Rated
+              </MantineBadge>
+            )}
+
+            {/* Products Badge - Info */}
+            {totalProducts > 10 && (
+              <MantineBadge 
+                color="purple"
+                variant="light"
+                size="xs"
+              >
+                📦 {totalProducts}+ Items
+              </MantineBadge>
+            )}
+
+            {/* Recommendation Badge - Special */}
+            {listing.reason && (
+              <MantineBadge 
+                color="green"
+                variant="light"
+                size="xs"
+              >
+                💡 {listing.reason}
+              </MantineBadge>
+            )}
+
+            {/* Hours Badge - Status */}
+            {hoursStatus?.status === 'open' && (
+              <MantineBadge 
+                color="teal"
+                variant="light"
+                size="xs"
+                className="animate-pulse"
+              >
+                🟢 Open Now
+              </MantineBadge>
+            )}
+          </Group>
+        </Card.Section>
+
+        {/* Enhanced Action Buttons */}
+        <Card.Section className="pt-3">
+          <Group gap={8}>
+            <Button 
+              radius="md" 
+              size="sm" 
+              variant="filled" 
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium"
+            >
+              Visit Store
+            </Button>
+            <ActionIcon 
+              variant="outline" 
+              radius="md" 
+              size={36} 
+              className="border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+              aria-label="Save to favorites"
+            >
+              <Heart size={16} className="text-gray-600 hover:text-red-500 transition-colors" />
+            </ActionIcon>
+            {listing.businessHours && (
+              <ActionIcon 
+                variant="outline" 
+                radius="md" 
+                size={36} 
+                className="border-gray-300 hover:border-green-500 hover:bg-green-50 transition-colors"
+                aria-label="Call store"
+              >
+                <Phone size={16} className="text-gray-600 hover:text-green-600 transition-colors" />
+              </ActionIcon>
+            )}
+          </Group>
+        </Card.Section>
       </Card>
     </Link>
   );

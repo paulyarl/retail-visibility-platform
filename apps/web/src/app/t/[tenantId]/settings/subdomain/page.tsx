@@ -1,4 +1,5 @@
 import SubdomainSettings from '@/components/tenant/SubdomainSettings';
+import { Button } from '@mantine/core';
 import SetTenantId from '@/components/client/SetTenantId';
 
 export default async function SubdomainSettingsPage({ params }: { params: Promise<{ tenantId: string }> }) {

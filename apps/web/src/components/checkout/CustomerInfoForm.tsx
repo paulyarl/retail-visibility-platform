@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import {
   Form,
   FormControl,

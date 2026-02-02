@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Rocket, Package, Sparkles, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { ContextBadges } from '@/components/ContextBadges';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
-import { Badge } from '@/components/ui';
+import { Button } from '@mantine/core';
 import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
 import { api } from '@/lib/api';
 

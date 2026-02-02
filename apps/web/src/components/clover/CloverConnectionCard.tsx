@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Package, ExternalLink, Settings, RefreshCw, CheckCircle2, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { CloverStatusBadge, CloverStatus } from './CloverStatusBadge';
 import { CloverDemoModeToggle } from './CloverDemoModeToggle';
 import { cn } from '@/lib/utils';

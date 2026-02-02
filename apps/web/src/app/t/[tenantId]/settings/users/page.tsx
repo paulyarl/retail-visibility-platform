@@ -7,6 +7,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
+import { Button } from '@mantine/core';
 import { Spinner } from '@/components/ui';
 
 interface TenantUser {

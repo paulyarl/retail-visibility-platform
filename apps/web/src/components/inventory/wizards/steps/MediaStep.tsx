@@ -33,7 +33,7 @@ import {
 import PhotoSingleton from '@/lib/singletons/PhotoSingleton';
 import VariantPhotoUploadModal from '../VariantPhotoUploadModal';
 
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Switch } from '@/components/ui/Switch';

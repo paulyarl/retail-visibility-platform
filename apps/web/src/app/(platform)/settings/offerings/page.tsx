@@ -1,6 +1,8 @@
 'use client';
 
-import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui';
+import { Card } from '@mantine/core';
+import { Button } from '@mantine/core';
+import { Badge } from '@/components/ui/Badge';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { MANAGED_SERVICES, type ServiceLevel } from '@/lib/managed-services';
 import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
@@ -458,181 +460,178 @@ export default function OfferingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Starter */}
             <Card className="border-2 border-neutral-200">
-              <CardHeader>
+              <div className="p-6">
                 <div className="flex items-center justify-between mb-2">
-                  <CardTitle>Starter</CardTitle>
+                  <h3 className="text-lg font-bold">Starter</h3>
                   <Badge variant="default" className="bg-blue-100 text-blue-800">$29/mo</Badge>
                 </div>
                 <p className="text-sm text-neutral-600">Core visibility and storefront</p>
-              </CardHeader>
-              <CardContent>
+              </div>
+              <div className="p-6 pt-0">
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span><strong>Up to 3 locations</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span><strong>Up to 500 SKUs per location</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Public storefront with catalog & search</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Directory listing</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Google Shopping feeds & Merchant Center sync</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Basic barcode scanner + manual entry</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Basic product enrichment</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>QR codes & basic analytics</span>
                   </li>
                 </ul>
-              </CardContent>
+                <div className="mt-4 pt-4 border-t border-neutral-300">
+                  <p className="text-xs font-semibold text-neutral-900">Your complete online presence, out of the box.</p>
+                </div>
+              </div>
             </Card>
 
             {/* Professional */}
-            <Card className="border-2 border-primary-500 shadow-lg relative">
+            <Card className="border-2 border-primary-500 shadow-lg relative" withBorder padding="lg" radius="md">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                 <Badge variant="success" className="bg-green-500 text-white">POPULAR</Badge>
               </div>
-              <CardHeader>
+              <div className="space-y-4">
                 <div className="flex items-center justify-between mb-2">
-                  <CardTitle>Professional</CardTitle>
+                  <h3 className="text-lg font-semibold">Professional</h3>
                   <Badge variant="default" className="bg-purple-100 text-purple-800">$99/mo</Badge>
                 </div>
                 <p className="text-sm text-neutral-600">Connected & growing retailers (POS + intelligence)</p>
-              </CardHeader>
-              <CardContent>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span><strong>Up to 10 locations</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span><strong>Up to 5,000 SKUs per location</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
-                    <span>Quick Start Wizard (500 products in seconds)</span>
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    <span>Quick Start Wizard (500 products in seconds)</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>SKU scanning + inventory intelligence</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Full Google Business Profile & Shopping suite</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Clover + Square POS integration</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Advanced analytics & bulk operations</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>CSV import/export & higher enrichment quotas</span>
                   </li>
                 </ul>
-              </CardContent>
+              </div>
             </Card>
 
             {/* Enterprise */}
-            <Card className="border-2 border-neutral-200">
-              <CardHeader>
+            <Card className="border-2 border-neutral-200" withBorder padding="lg" radius="md">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between mb-2">
-                  <CardTitle>Enterprise</CardTitle>
+                  <h3 className="text-lg font-semibold">Enterprise</h3>
                   <Badge variant="default" className="bg-amber-100 text-amber-800">$499/mo</Badge>
                 </div>
                 <p className="text-sm text-neutral-600">Full connector + AI automation</p>
-              </CardHeader>
-              <CardContent>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span><strong>Up to 25 locations</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span><strong>10,000+ SKUs per location</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>API access & custom integrations</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Advanced chain management with hero-location testing</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>White-label storefront & custom branding</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>AI-assisted product enrichment & copy</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Dedicated account manager & SLA-backed support</span>
                   </li>
                 </ul>
-              </CardContent>
+              </div>
             </Card>
 
             {/* Organization */}
-            <Card className="border-2 border-emerald-300">
-              <CardHeader>
+            <Card className="border-2 border-emerald-300" withBorder padding="lg" radius="md">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between mb-2">
-                  <CardTitle>Organization</CardTitle>
+                  <h3 className="text-lg font-semibold">Organization</h3>
                   <Badge variant="default" className="bg-emerald-100 text-emerald-800">Custom</Badge>
                 </div>
                 <p className="text-sm text-neutral-600">For chains & franchises (25+ locations)</p>
-              </CardHeader>
-              <CardContent>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span><strong>Unlimited locations</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Unlimited SKUs (within technical limits)</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Full chain management & multi-type propagation</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Hero location & brand asset distribution</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Org-level analytics and billing</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5"></span>
+                    <span className="text-green-500 mt-0.5">✓</span>
                     <span>Custom contracts & pricing</span>
                   </li>
                 </ul>
-              </CardContent>
+              </div>
             </Card>
           </div>
         </section>
@@ -697,18 +696,16 @@ export default function OfferingsPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {Object.values(CHAIN_TIERS).map((tier) => (
-              <Card key={tier.name} className="border-2 border-neutral-200">
-                <CardHeader>
+              <Card key={tier.name} className="border-2 border-neutral-200" withBorder padding="lg" radius="md">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between mb-2">
-                    <CardTitle>{tier.name}</CardTitle>
+                    <h3 className="text-lg font-semibold">{tier.name}</h3>
                     <Badge variant="default" className={tier.color}>{tier.price}</Badge>
                   </div>
                   <p className="text-sm text-neutral-600">
                     {tier.maxLocations === Infinity ? 'Unlimited' : tier.maxLocations} locations • 
                     {tier.maxTotalSKUs === Infinity ? ' Unlimited' : ` ${tier.maxTotalSKUs.toLocaleString()}`} SKUs
                   </p>
-                </CardHeader>
-                <CardContent>
                   <ul className="space-y-2 text-sm">
                     {tier.features.map((feature, idx) => (
                       <li key={idx} className="flex items-start gap-2">
@@ -717,7 +714,7 @@ export default function OfferingsPage() {
                       </li>
                     ))}
                   </ul>
-                </CardContent>
+                </div>
               </Card>
             ))}
           </div>
@@ -736,25 +733,25 @@ export default function OfferingsPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {Object.values(MANAGED_SERVICES).filter(s => s.id !== 'self_service').map((service) => (
-              <Card key={service.id} className={`border-2 ${service.popular ? 'border-primary-500 shadow-lg' : 'border-neutral-200'}`}>
+              <Card key={service.id} className={`border-2 ${service.popular ? 'border-primary-500 shadow-lg' : 'border-neutral-200'}`} withBorder padding="lg" radius="md">
                 {service.popular && (
                   <div className="bg-primary-500 text-white text-center py-1 text-xs font-semibold">
                     MOST POPULAR
                   </div>
                 )}
-                <CardHeader>
-                  <CardTitle className="text-lg">{service.name}</CardTitle>
-                  <p className="text-xs text-neutral-600">{service.tagline}</p>
-                  <div className="mt-2">
-                    {service.monthlyFee > 0 && (
-                      <div className="text-2xl font-bold text-neutral-900">${service.monthlyFee}/mo</div>
-                    )}
-                    {service.skuSetupCost > 0 && (
-                      <div className="text-sm text-neutral-600">${service.skuSetupCost}/SKU setup</div>
-                    )}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">{service.name}</h3>
+                    <p className="text-xs text-neutral-600">{service.tagline}</p>
+                    <div className="mt-2">
+                      {service.monthlyFee > 0 && (
+                        <div className="text-2xl font-bold text-neutral-900">${service.monthlyFee}/mo</div>
+                      )}
+                      {service.skuSetupCost > 0 && (
+                        <div className="text-sm text-neutral-600">${service.skuSetupCost}/SKU setup</div>
+                      )}
+                    </div>
                   </div>
-                </CardHeader>
-                <CardContent>
                   <ul className="space-y-1.5 text-xs">
                     {service.features.map((feature, idx) => (
                       <li key={idx} className="flex items-start gap-1.5">
@@ -763,7 +760,7 @@ export default function OfferingsPage() {
                       </li>
                     ))}
                   </ul>
-                </CardContent>
+                </div>
               </Card>
             ))}
           </div>
@@ -781,94 +778,76 @@ export default function OfferingsPage() {
           <p className="text-neutral-600 mb-6">All the tools to drive foot traffic and dominate local search</p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-3xl mb-3">🏪</div>
-                <h3 className="font-semibold text-neutral-900 mb-2">Complete Online Storefront</h3>
-                <p className="text-sm text-neutral-600">
-                  Professional product catalog with search, mobile-responsive design, and automatic SEO. No website developer needed—just add products and go live!
-                </p>
-              </CardContent>
+            <Card withBorder padding="lg" radius="md">
+              <div className="text-3xl mb-3">🏪</div>
+              <h3 className="font-semibold text-neutral-900 mb-2">Complete Online Storefront</h3>
+              <p className="text-sm text-neutral-600">
+                Professional product catalog with search, mobile-responsive design, and automatic SEO. No website developer needed—just add products and go live!
+              </p>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-3xl mb-3">🗺️</div>
-                <h3 className="font-semibold text-neutral-900 mb-2">Interactive Store Maps</h3>
-                <p className="text-sm text-neutral-600">
-                  Embedded Google Maps with "Get Directions" button. Privacy mode option to show neighborhood instead of exact location. Drive foot traffic to your store!
-                </p>
-              </CardContent>
+            <Card withBorder padding="lg" radius="md">
+              <div className="text-3xl mb-3">🗺️</div>
+              <h3 className="font-semibold text-neutral-900 mb-2">Interactive Store Maps</h3>
+              <p className="text-sm text-neutral-600">
+                Embedded Google Maps with "Get Directions" button. Privacy mode option to show neighborhood instead of exact location. Drive foot traffic to your store!
+              </p>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-3xl mb-3">🔍</div>
-                <h3 className="font-semibold text-neutral-900 mb-2">Google Business Profile Integration</h3>
-                <p className="text-sm text-neutral-600">
-                  Connect with your Google Business Profile. Display your business info consistently across Google Search and Maps. (Full sync with hours and posts coming soon!)
-                </p>
-              </CardContent>
+            <Card withBorder padding="lg" radius="md">
+              <div className="text-3xl mb-3">🔍</div>
+              <h3 className="font-semibold text-neutral-900 mb-2">Google Business Profile Integration</h3>
+              <p className="text-sm text-neutral-600">
+                Connect with your Google Business Profile. Display your business info consistently across Google Search and Maps. (Full sync with hours and posts coming soon!)
+              </p>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-3xl mb-3">🛍️</div>
-                <h3 className="font-semibold text-neutral-900 mb-2">Google Shopping Integration</h3>
-                <p className="text-sm text-neutral-600">
-                  Automatic product feed generation and Google Merchant Center integration. Get your products in front of millions of shoppers searching on Google.
-                </p>
-              </CardContent>
+            <Card withBorder padding="lg" radius="md">
+              <div className="text-3xl mb-3">🛍️</div>
+              <h3 className="font-semibold text-neutral-900 mb-2">Google Shopping Integration</h3>
+              <p className="text-sm text-neutral-600">
+                Automatic product feed generation and Google Merchant Center integration. Get your products in front of millions of shoppers searching on Google.
+              </p>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-3xl mb-3">📱</div>
-                <h3 className="font-semibold text-neutral-900 mb-2">QR Code Marketing</h3>
-                <p className="text-sm text-neutral-600">
-                  Generate high-resolution QR codes for in-store marketing. Print on flyers, business cards, and store windows. Bridge print to digital seamlessly!
-                </p>
-              </CardContent>
+            <Card withBorder padding="lg" radius="md">
+              <div className="text-3xl mb-3">📱</div>
+              <h3 className="font-semibold text-neutral-900 mb-2">QR Code Marketing</h3>
+              <p className="text-sm text-neutral-600">
+                Generate high-resolution QR codes for in-store marketing. Print on flyers, business cards, and store windows. Bridge print to digital seamlessly!
+              </p>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-3xl mb-3">🔎</div>
-                <h3 className="font-semibold text-neutral-900 mb-2">Product Search</h3>
-                <p className="text-sm text-neutral-600">
-                  Powerful search functionality on your storefront. Customers can instantly find products by name, brand, SKU, or description. Fast database-level search!
-                </p>
-              </CardContent>
+            <Card withBorder padding="lg" radius="md">
+              <div className="text-3xl mb-3">🔎</div>
+              <h3 className="font-semibold text-neutral-900 mb-2">Product Search</h3>
+              <p className="text-sm text-neutral-600">
+                Powerful search functionality on your storefront. Customers can instantly find products by name, brand, SKU, or description. Fast database-level search!
+              </p>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-3xl mb-3">🌐</div>
-                <h3 className="font-semibold text-neutral-900 mb-2">SEO-Optimized Pages</h3>
-                <p className="text-sm text-neutral-600">
-                  Professional product pages with NAP consistency, structured data, and mobile-responsive design. Rank higher in local search results automatically.
-                </p>
-              </CardContent>
+            <Card withBorder padding="lg" radius="md">
+              <div className="text-3xl mb-3">🌐</div>
+              <h3 className="font-semibold text-neutral-900 mb-2">SEO-Optimized Pages</h3>
+              <p className="text-sm text-neutral-600">
+                Professional product pages with NAP consistency, structured data, and mobile-responsive design. Rank higher in local search results automatically.
+              </p>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-3xl mb-3">📊</div>
-                <h3 className="font-semibold text-neutral-900 mb-2">Performance Analytics</h3>
-                <p className="text-sm text-neutral-600">
-                  Track impressions, clicks, and sales. Understand what products perform best and optimize your inventory accordingly. Data-driven decisions!
-                </p>
-              </CardContent>
+            <Card withBorder padding="lg" radius="md">
+              <div className="text-3xl mb-3">📊</div>
+              <h3 className="font-semibold text-neutral-900 mb-2">Performance Analytics</h3>
+              <p className="text-sm text-neutral-600">
+                Track impressions, clicks, and sales. Understand what products perform best and optimize your inventory accordingly. Data-driven decisions!
+              </p>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-3xl mb-3">🏢</div>
-                <h3 className="font-semibold text-neutral-900 mb-2">Multi-Location Support</h3>
-                <p className="text-sm text-neutral-600">
-                  Manage multiple locations with centralized billing, shared SKU pools, and consistent branding. Perfect for chains and franchises with massive savings!
-                </p>
-              </CardContent>
+            <Card withBorder padding="lg" radius="md">
+              <div className="text-3xl mb-3">🏢</div>
+              <h3 className="font-semibold text-neutral-900 mb-2">Multi-Location Support</h3>
+              <p className="text-sm text-neutral-600">
+                Manage multiple locations with centralized billing, shared SKU pools, and consistent branding. Perfect for chains and franchises with massive savings!
+              </p>
             </Card>
           </div>
         </section>

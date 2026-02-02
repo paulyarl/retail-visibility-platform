@@ -1,4 +1,5 @@
-import { Card, CardContent, Badge, Button } from '@/components/ui';
+import { Card, CardContent, Badge } from '@/components/ui';
+import { Button } from '@mantine/core';
 import { DbTier } from '../types';
 
 interface BillingFiltersProps {

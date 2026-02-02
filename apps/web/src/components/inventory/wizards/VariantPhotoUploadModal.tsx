@@ -9,7 +9,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { Upload, Trash2, Image as ImageIcon, X, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Modal, ModalFooter } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Alert, AlertDescription } from '@/components/ui/Alert';

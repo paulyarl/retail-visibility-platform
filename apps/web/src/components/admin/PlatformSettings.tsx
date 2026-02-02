@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/Switch';
 import { Label } from '@/components/ui/Label';
 import { Input } from '@/components/ui/Input';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/use-toast';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';

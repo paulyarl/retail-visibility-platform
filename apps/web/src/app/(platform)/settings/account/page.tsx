@@ -2,7 +2,10 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Pagination } from '@/components/ui';
+import { Card } from '@mantine/core';
+import { Button } from '@mantine/core';
+import { Badge } from '@/components/ui/Badge';
+import { Pagination } from '@/components/ui/Pagination';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { Shield, User, Building2, Crown, Navigation, ArrowRight } from 'lucide-react';
 import TenantLimitBadge from '@/components/tenant/TenantLimitBadge';
@@ -132,11 +135,11 @@ export default function AccountPage() {
           description="Your account information and privileges"
           icon={Icons.Settings}
         />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Card>
-            <CardContent className="py-12 text-center">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+          <Card withBorder padding="lg" radius="md">
+            <div className="py-12 text-center">
               <p className="text-neutral-600 dark:text-neutral-400">Loading account information...</p>
-            </CardContent>
+            </div>
           </Card>
         </div>
       </div>
@@ -258,12 +261,8 @@ export default function AccountPage() {
         <SubscriptionStatusGuide />
 
         {/* User Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>User Information</CardTitle>
-            <CardDescription>Your basic account details</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-4">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                 <User className="w-8 h-8 text-white" />
@@ -296,21 +295,19 @@ export default function AccountPage() {
                 <p className="text-xs font-mono text-gray-600 dark:text-gray-400">{user.id}</p>
               </div>
             </div>
-          </CardContent>
+          </div>
         </Card>
 
         {/* Navigation Preferences */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
               <Navigation className="w-5 h-5" />
-              Navigation Preferences
-            </CardTitle>
-            <CardDescription>
-              Choose how tenant switching behaves for you across all tenants
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Navigation Preferences</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Choose how tenant switching behaves for you across all tenants</p>
+              </div>
+            </div>
             <div className="space-y-3">
               <div className="flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
                    onClick={() => saveNavigationPreference('last-visited')}>
@@ -368,16 +365,12 @@ export default function AccountPage() {
                 <span>Saving preference...</span>
               </div>
             )}
-          </CardContent>
+          </div>
         </Card>
 
         {/* Platform Role & Privileges */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Platform Role & Privileges</CardTitle>
-            <CardDescription>Your access level and permissions on the platform</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-6">
             {/* Platform Role */}
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Platform Role</p>
@@ -406,18 +399,25 @@ export default function AccountPage() {
                 ))}
               </ul>
             </div>
-          </CardContent>
+          </div>
         </Card>
 
         {/* Location Capacity */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Location Capacity</CardTitle>
-            <CardDescription>Your location creation limits based on your role and subscription tier</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  Location Capacity
+                </p>
+                <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
+                  Your location creation limits based on your role and subscription tier
+                </p>
+              </div>
+            </div>
             <TenantLimitBadge variant="full" showUpgrade={true} />
-          </CardContent>
+          </div>
         </Card>
 
         {/* SKU Usage & Current Plan */}
@@ -425,19 +425,17 @@ export default function AccountPage() {
 
         {/* Tenant Access */}
         {user.tenants && user.tenants.length > 0 && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
+          <Card withBorder padding="lg" radius="md">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
                 <div>
-                  <CardTitle>Tenant Access</CardTitle>
-                  <CardDescription>Stores and locations you have access to</CardDescription>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Tenant Access</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Stores and locations you have access to</p>
                 </div>
                 <Badge variant="info">
                   {user.tenants.length} {user.tenants.length === 1 ? 'Location' : 'Locations'}
                 </Badge>
               </div>
-            </CardHeader>
-            <CardContent>
               <div className="space-y-3">
                 {paginatedTenants.map((tenant) => {
                   const tenantDetails = getTenantDetails(tenant.id);
@@ -490,17 +488,24 @@ export default function AccountPage() {
                   />
                 </div>
               )}
-            </CardContent>
+            </div>
           </Card>
         )}
 
         {/* Account Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Account Status</CardTitle>
-            <CardDescription>Your account health and activity</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-3 w-3 rounded-full bg-green-500"></div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                  Account Status
+                </p>
+                <p className="text-xs text-green-800 dark:text-green-200 mt-1">
+                  Your account health and activity
+                </p>
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -521,7 +526,7 @@ export default function AccountPage() {
                 </div>
               </div>
             </div>
-          </CardContent>
+          </div>
         </Card>
       </div>
     </div>

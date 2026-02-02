@@ -1,12 +1,13 @@
 'use client';
 
-import Link from 'next/link';
-import { Button, Badge } from '@/components/ui';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
+import { Button } from '@mantine/core';
+import { Badge } from '@/components/ui';
+import FeaturesShowcase from '@/components/FeaturesShowcase';
 import PublicFooter from '@/components/PublicFooter';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import Image from 'next/image';
-import FeaturesShowcase from '@/components/FeaturesShowcase';
 import ChainPropagationCallout from '@/components/ChainPropagationCallout';
 
 // Force edge runtime to prevent prerendering issues

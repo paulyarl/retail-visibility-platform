@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge } from '@/components/ui';
+import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { Shield, User, Building2, Crown, Navigation, ArrowRight } from 'lucide-react';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';

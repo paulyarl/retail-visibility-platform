@@ -6,7 +6,7 @@ import { api, API_BASE_URL } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { isPlatformUser, isTenantOwnerOrAdmin, getTenantRole } from '@/lib/auth/access-control';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 // import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'; // TODO: Tabs component has incompatible API

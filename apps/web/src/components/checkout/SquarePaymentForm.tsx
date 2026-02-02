@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Loader2, CreditCard, Lock } from 'lucide-react';
 

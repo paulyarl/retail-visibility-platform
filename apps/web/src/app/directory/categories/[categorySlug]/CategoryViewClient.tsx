@@ -8,6 +8,7 @@ import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
 import { DirectoryGrid } from '@/components/directory/DirectoryGrid';
 import { DirectoryList } from '@/components/directory/DirectoryList';
 import { Pagination } from '@/components/ui';
+import { Button } from '@mantine/core';
 import { useSearchParams } from 'next/navigation';
 import { slugsMatch } from '@/utils/slug';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';

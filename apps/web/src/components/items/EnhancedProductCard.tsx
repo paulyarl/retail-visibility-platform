@@ -13,7 +13,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, Badge, Button, Tooltip } from '@/components/ui';
+import { Card, CardContent, Badge, Tooltip } from '@/components/ui';
+import { Button } from '@mantine/core';
 import { 
   Edit3, 
   Trash2, 

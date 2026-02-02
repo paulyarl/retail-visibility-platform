@@ -11,6 +11,7 @@
  */
 
 import { Metadata } from 'next';
+import { Button } from '@mantine/core';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 

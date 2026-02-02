@@ -2,6 +2,7 @@
 
 import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Button } from '@mantine/core';
 import { Spinner } from '@/components/ui';
 
 // Force edge runtime to prevent prerendering issues

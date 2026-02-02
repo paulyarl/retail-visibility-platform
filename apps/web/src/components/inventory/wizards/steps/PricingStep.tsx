@@ -26,7 +26,7 @@ import {
 
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 // import { Slider } from '@/components/ui/Slider'; // Slider component not available
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -761,7 +761,7 @@ export default function PricingStep({ data, errors, onChange, variants = [], ten
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">Setup Payment Gateways</h2>
               <Button
-                variant="ghost"
+                variant="subtle"
                 size="sm"
                 onClick={() => setShowSetupModal(false)}
               >

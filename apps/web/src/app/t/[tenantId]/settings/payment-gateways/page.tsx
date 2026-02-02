@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Input } from '@/components/ui/Input';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { CreditCard, Lock, AlertCircle, CheckCircle, Trash2, ShoppingBag, Package } from 'lucide-react';

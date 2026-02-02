@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { ShoppingCart, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
 import ProductQueue from './ProductQueue';
 

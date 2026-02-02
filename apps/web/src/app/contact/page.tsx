@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Alert } from '@/components/ui';
+import { Input, Alert } from '@/components/ui';
+import { Card, Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { motion } from 'framer-motion';
 
@@ -60,12 +61,8 @@ export default function ContactPage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <Card>
-              <CardHeader>
-                <CardTitle>Get in Touch</CardTitle>
-                <CardDescription>We're here to help</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <Card withBorder padding="lg" radius="md">
+              <div className="space-y-4">
                 {/* Email */}
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
@@ -110,7 +107,7 @@ export default function ContactPage() {
                     </p>
                   </div>
                 </div>
-              </CardContent>
+              </div>
             </Card>
           </motion.div>
 
@@ -120,12 +117,16 @@ export default function ContactPage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
           >
-            <Card>
-              <CardHeader>
-                <CardTitle>Send us a Message</CardTitle>
-                <CardDescription>Fill out the form below</CardDescription>
-              </CardHeader>
-              <CardContent>
+            <Card withBorder padding="lg" radius="md">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                  <div className="flex-1">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Send us a Message</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Fill out the form below</p>
+                  </div>
+                </div>
+                </div>
                 {success && (
                   <Alert variant="success" title="Message Sent!" className="mb-4">
                     We've received your message and will get back to you soon.
@@ -182,7 +183,6 @@ export default function ContactPage() {
                     {submitting ? 'Sending...' : 'Send Message'}
                   </Button>
                 </form>
-              </CardContent>
             </Card>
           </motion.div>
         </div>

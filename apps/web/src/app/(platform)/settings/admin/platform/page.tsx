@@ -1,3 +1,4 @@
+import { Button } from '@mantine/core';
 import PlatformSettings from '@/components/admin/PlatformSettings';
 
 // Force edge runtime to prevent prerendering issues

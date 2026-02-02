@@ -1,4 +1,5 @@
-import { Badge, Button, Card, CardContent, Tooltip } from '@/components/ui';
+import { Badge, Card, CardContent, Tooltip } from '@/components/ui';
+import { Button } from '@mantine/core';
 import { Item } from '@/services/itemsDataService';
 import { Copy } from 'lucide-react';
 import SyncStatusIndicator from './SyncStatusIndicator';

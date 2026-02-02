@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Spinner } from '@/components/ui';
+import { Button } from '@mantine/core';
 import { motion } from 'framer-motion';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';

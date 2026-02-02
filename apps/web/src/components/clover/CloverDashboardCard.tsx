@@ -1,7 +1,7 @@
 'use client';
 
 import { Package, ExternalLink, RefreshCw, Settings, Clock } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { CloverStatusBadge, CloverStatus } from './CloverStatusBadge';
 import { cn } from '@/lib/utils';
 

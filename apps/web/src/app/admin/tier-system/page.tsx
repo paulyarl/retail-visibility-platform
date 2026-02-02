@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Alert, Spinner, Input, Modal } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner, Input, Modal } from '@/components/ui';
+import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
 import { Edit2, Save, X, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';

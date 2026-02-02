@@ -19,7 +19,7 @@ import {
   Pause,
   RotateCcw
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Separator } from '@/components/ui/Separator';

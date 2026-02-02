@@ -6,6 +6,7 @@ import Link from 'next/link';
 import GBPCategoryCard from '@/components/settings/GBPCategoryCard';
 import PageHeader from '@/components/PageHeader';
 import { api } from '@/lib/api';
+import { Button } from '@mantine/core';
 import { Spinner } from '@/components/ui';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';

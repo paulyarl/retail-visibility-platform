@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { Button } from '@mantine/core';
 import { useParams } from 'next/navigation';
 import { Star, TrendingUp, Eye, MousePointer, Calendar, DollarSign, Check, X } from 'lucide-react';
 import { api } from '@/lib/api';

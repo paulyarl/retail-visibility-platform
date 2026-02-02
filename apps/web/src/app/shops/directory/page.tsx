@@ -18,7 +18,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card } from '@mantine/core';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
@@ -177,11 +177,14 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
       )}
 
       {/* Search and Filters */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Search & Filter Shops</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Card withBorder padding="lg" radius="md" className="mb-8">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Search & Filter Shops</h3>
+            </div>
+          </div>
           <div className="space-y-4">
             {/* Search Bar */}
             <ShopSearch
@@ -290,7 +293,7 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
               </div>
             )}
           </div>
-        </CardContent>
+        </div>
       </Card>
 
       {/* Results Header */}
@@ -391,10 +394,9 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
         </div>
       )}
 
-      {/* Empty State */}
       {!isLoading && shops && shops.length === 0 && (
-        <Card>
-          <CardContent className="text-center py-12">
+        <Card withBorder padding="lg" radius="md">
+          <div className="text-center py-12">
             <div className="text-6xl mb-4">🏪</div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               No shops found
@@ -409,7 +411,7 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
                 Clear Filters
               </Button>
             )}
-          </CardContent>
+          </div>
         </Card>
       )}
 

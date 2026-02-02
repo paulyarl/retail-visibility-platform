@@ -1,4 +1,4 @@
-import { Badge } from '@/components/ui';
+import { Badge, Button } from '@mantine/core';
 import { Tenant, DbTier } from '../types';
 
 interface TenantCardProps {

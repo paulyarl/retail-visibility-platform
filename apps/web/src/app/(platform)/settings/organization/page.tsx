@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Badge, Button, Spinner } from '@/components/ui';
+import { Card } from '@mantine/core';
+import { Button } from '@mantine/core';
+import { Badge } from '@/components/ui/Badge';
+import { Spinner } from '@/components/ui/Spinner';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
@@ -293,19 +296,17 @@ export default function OrganizationPage() {
             label: 'Back to Settings'
           }}
         />
-        <Card className="mt-6">
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <p className="text-red-600">{error || 'No organization data available'}</p>
-              <Button
-                variant="primary"
-                onClick={() => window.location.href = '/settings'}
-                className="mt-4"
-              >
-                Return to Settings
-              </Button>
-            </div>
-          </CardContent>
+        <Card withBorder padding="lg" radius="md">
+          <div className="py-12 text-center">
+            <p className="text-red-600">{error || 'No organization data available'}</p>
+            <Button
+              variant="primary"
+              onClick={() => window.location.href = '/settings'}
+              className="mt-4"
+            >
+              Return to Settings
+            </Button>
+          </div>
         </Card>
       </div>
     );
@@ -339,77 +340,78 @@ export default function OrganizationPage() {
 
       <div className="mt-6 space-y-6">
         {/* 1. HERO LOCATION BANNER - Prominent Leader Status */}
-        <Card className="border-2 border-amber-400 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50">
-          <CardContent className="py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                {/* Crown Icon */}
-                <div className="p-3 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-xl shadow-lg">
-                  <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                </div>
-                
-                {/* Hero Info */}
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="warning" className="text-xs font-bold">
-                      👑 HERO LOCATION
-                    </Badge>
-                    <Badge variant="default" className="text-xs">
-                      Master Catalog
-                    </Badge>
-                  </div>
-                  {heroLocation ? (
-                    <>
-                      <h2 className="text-2xl font-bold text-neutral-900">
-                        {heroLocation.tenantName}
-                      </h2>
-                      <p className="text-sm text-neutral-600">
-                        {heroLocation.skuCount.toLocaleString()} products • Source for chain-wide distribution
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <h2 className="text-xl font-semibold text-neutral-700">
-                        No Hero Location Set
-                      </h2>
-                      <p className="text-sm text-neutral-600">
-                        Select your master catalog location to enable bulk sync
-                      </p>
-                    </>
-                  )}
-                </div>
+        <Card className="border-2 border-amber-400 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50" withBorder padding="lg" radius="md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {/* Crown Icon */}
+              <div className="p-3 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-xl shadow-lg">
+                <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
               </div>
               
-              {/* Change Hero Button */}
-              <Button 
-                variant="primary"
-                size="lg"
-                onClick={() => setShowHeroModal(true)}
-                className="flex items-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                {heroLocation ? 'Change Hero' : 'Set Hero Location'}
-              </Button>
+              {/* Hero Info */}
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant="warning" className="text-xs font-bold">
+                    👑 HERO LOCATION
+                  </Badge>
+                  <Badge variant="default" className="text-xs">
+                    Master Catalog
+                  </Badge>
+                </div>
+                {heroLocation ? (
+                  <>
+                    <h2 className="text-2xl font-bold text-neutral-900">
+                      {heroLocation.tenantName}
+                    </h2>
+                    <p className="text-sm text-neutral-600">
+                      {heroLocation.skuCount.toLocaleString()} products • Source for chain-wide distribution
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-xl font-semibold text-neutral-700">
+                      No Hero Location Set
+                    </h2>
+                    <p className="text-sm text-neutral-600">
+                      Select your master catalog location to enable bulk sync
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
-          </CardContent>
+            
+            {/* Change Hero Button */}
+            <Button 
+              variant="primary"
+              size="lg"
+              onClick={() => setShowHeroModal(true)}
+              className="flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              {heroLocation ? 'Change Hero' : 'Set Hero Location'}
+            </Button>
+          </div>
         </Card>
 
         {/* Hero Selection Modal */}
         {showHeroModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowHeroModal(false)}>
             <div className="w-full max-w-lg m-4" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Select Hero Location</CardTitle>
-                  <p className="text-sm text-neutral-600 mt-2">
-                    Choose the location with the most complete product catalog to use as your master source.
-                  </p>
-                </CardHeader>
-                <CardContent>
+              <Card withBorder padding="lg" radius="md">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-3 w-3 rounded-full bg-amber-500"></div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Select Hero Location</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Choose the location with the most complete product catalog to use as your master source.
+                      </p>
+                    </div>
+                  </div>
                   <div className="space-y-3">
                     {orgData.locationBreakdown.map((location) => (
                       <button
@@ -449,7 +451,7 @@ export default function OrganizationPage() {
                       Cancel
                     </Button>
                   </div>
-                </CardContent>
+                </div>
               </Card>
             </div>
           </div>
@@ -459,9 +461,8 @@ export default function OrganizationPage() {
         <SubscriptionUsageBadge variant="card" showUpgradeLink={true} />
 
         {/* 3. QUICK ACTIONS - Primary CTAs */}
-        <Card>
-          <CardContent className="py-6">
-            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
+        <Card withBorder padding="lg" radius="md">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
               <Button 
                 variant="primary" 
                 size="lg"
@@ -516,8 +517,7 @@ export default function OrganizationPage() {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </Card>
 
         {/* 4. PROPAGATION CONTROL PANEL - Admin Only */}
         <ProtectedCard
@@ -525,8 +525,8 @@ export default function OrganizationPage() {
           accessOptions={AccessPresets.CHAIN_PROPAGATION}
           hideWhenDenied={true}
         >
-          <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
-            <CardHeader>
+          <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50" withBorder padding="lg" radius="md">
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg">
@@ -535,16 +535,15 @@ export default function OrganizationPage() {
                     </svg>
                   </div>
                   <div>
-                    <CardTitle className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
                       Propagation Control Panel
                       <Badge variant="warning" className="text-xs">Admin Only</Badge>
-                    </CardTitle>
+                    </h3>
                     <p className="text-sm text-neutral-600 mt-1">Advanced tools for managing product distribution</p>
                   </div>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
+              <div className="space-y-4">
               {/* Group 1: Product & Catalog Management */}
               <div className="mb-6">
                 <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide mb-3">
@@ -857,16 +856,19 @@ export default function OrganizationPage() {
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div></Card>
         </ProtectedCard>
 
         {/* 5. LOCATION BREAKDOWN - Detailed view */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Location Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Location Breakdown</h3>
+              </div>
+            </div>
             {orgData.locationBreakdown.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-neutral-500">No locations in this organization</p>
@@ -975,38 +977,35 @@ export default function OrganizationPage() {
                 )}
               </>
             )}
-          </CardContent>
-        </Card>
+          </div></Card>
 
         {/* 5. QUICK START GUIDE - Collapsible */}
-        <Card className="border-primary-200 bg-gradient-to-br from-primary-50 to-white">
-          <CardHeader>
-            <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowQuickStart(!showQuickStart)}>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary-600 rounded-lg">
-                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <CardTitle>Chain Management Quick Start</CardTitle>
-                  <p className="text-sm text-neutral-600 mt-1">Get your chain up and running in minutes</p>
-                </div>
+        <Card className="border-primary-200 bg-gradient-to-br from-primary-50 to-white" withBorder padding="lg" radius="md">
+          <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowQuickStart(!showQuickStart)}>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary-600 rounded-lg">
+                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
               </div>
-              <svg 
-                className={`w-5 h-5 text-neutral-500 transition-transform ${
-                  showQuickStart ? 'rotate-180' : ''
-                }`}
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              <div>
+                <h3 className="text-lg font-semibold">Chain Management Quick Start</h3>
+                <p className="text-sm text-neutral-600 mt-1">Get your chain up and running in minutes</p>
+              </div>
             </div>
-          </CardHeader>
+            <svg 
+              className={`w-5 h-5 text-neutral-500 transition-transform ${
+                showQuickStart ? 'rotate-180' : ''
+              }`}
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
           {showQuickStart && (
-            <CardContent>
+            <div className="mt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Left Column - Quick Start */}
                 <div>
@@ -1103,37 +1102,36 @@ export default function OrganizationPage() {
                 </div>
               </div>
             </div>
-          </CardContent>
-          )}
+          ){'}'}
+        </div>
+)}
         </Card>
 
         {/* 6. DETAILED SYNC GUIDE - Collapsible */}
-        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200">
-          <CardHeader>
-            <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowQuickStart(!showQuickStart)}>
-              <div className="flex items-center gap-3">
-                <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <CardTitle>What Can Be Propagated?</CardTitle>
-                  <p className="text-sm text-blue-800 mt-1">Complete guide to chain-wide propagation</p>
-                </div>
-              </div>
-              <svg 
-                className={`w-5 h-5 text-blue-600 transition-transform ${
-                  showQuickStart ? 'rotate-180' : ''
-                }`}
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200" withBorder padding="lg" radius="md">
+          <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowQuickStart(!showQuickStart)}>
+            <div className="flex items-center gap-3">
+              <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
+              <div>
+                <h3 className="text-lg font-semibold">What Can Be Propagated?</h3>
+                <p className="text-sm text-blue-800 mt-1">Complete guide to chain-wide propagation</p>
+              </div>
             </div>
-          </CardHeader>
+            <svg 
+              className={`w-5 h-5 text-blue-600 transition-transform ${
+                showQuickStart ? 'rotate-180' : ''
+              }`}
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
           {showQuickStart && (
-            <CardContent>
+            <div className="mt-6">
               <div className="flex items-start gap-3 mb-4">
                 <svg className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1274,45 +1272,43 @@ export default function OrganizationPage() {
                   <li>4. Provides detailed summary of created/skipped items</li>
                 </ol>
               </div>
-            </CardContent>
+            </div>
           )}
         </Card>
 
         {/* Warning Messages */}
         {orgData.status.overall !== 'ok' && (
-          <Card className="border-yellow-200 bg-yellow-50">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <svg className="w-6 h-6 text-yellow-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div>
-                  <h4 className="font-semibold text-yellow-900 mb-2">Action Required</h4>
-                  <ul className="text-sm text-yellow-800 space-y-1">
-                    {orgData.status.skus === 'at_limit' && (
-                      <li>• You've reached your SKU limit. Upgrade your plan or remove items to add more.</li>
-                    )}
-                    {orgData.status.skus === 'warning' && (
-                      <li>• You're approaching your SKU limit ({skuPercentage.toFixed(0)}% used).</li>
-                    )}
-                    {orgData.status.locations === 'at_limit' && (
-                      <li>• You've reached your location limit. Upgrade to add more locations.</li>
-                    )}
-                    {orgData.status.locations === 'warning' && (
-                      <li>• You're approaching your location limit ({locationPercentage.toFixed(0)}% used).</li>
-                    )}
-                  </ul>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => window.location.href = '/settings/subscription'}
-                    className="mt-4" style={{ color: '#ffffff' }}
-                  >
-                    Upgrade Plan
-                  </Button>
-                </div>
+          <Card className="border-yellow-200 bg-yellow-50" withBorder padding="lg" radius="md">
+            <div className="flex items-start gap-3">
+              <svg className="w-6 h-6 text-yellow-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div>
+                <h4 className="font-semibold text-yellow-900 mb-2">Action Required</h4>
+                <ul className="text-sm text-yellow-800 space-y-1">
+                  {orgData.status.skus === 'at_limit' && (
+                    <li>• You've reached your SKU limit. Upgrade your plan or remove items to add more.</li>
+                  )}
+                  {orgData.status.skus === 'warning' && (
+                    <li>• You're approaching your SKU limit ({skuPercentage.toFixed(0)}% used).</li>
+                  )}
+                  {orgData.status.locations === 'at_limit' && (
+                    <li>• You've reached your location limit. Upgrade to add more locations.</li>
+                  )}
+                  {orgData.status.locations === 'warning' && (
+                    <li>• You're approaching your location limit ({locationPercentage.toFixed(0)}% used).</li>
+                  )}
+                </ul>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => window.location.href = '/settings/subscription'}
+                  className="mt-4" style={{ color: '#ffffff' }}
+                >
+                  Upgrade Plan
+                </Button>
               </div>
-            </CardContent>
+            </div>
           </Card>
         )}
       </div>

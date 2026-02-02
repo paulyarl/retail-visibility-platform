@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Package, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Label } from '@/components/ui/Label';
 import { cn } from '@/lib/utils';
 

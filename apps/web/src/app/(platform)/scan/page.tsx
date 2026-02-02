@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge } from '@/components/ui';
+import { Card } from '@mantine/core';
+import { Button } from '@mantine/core';
+import { Badge } from '@/components/ui/Badge';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
 import { Flags } from '@/lib/flags';
@@ -132,14 +134,15 @@ export default function ScanPage() {
         )}
 
         {/* Start New Session */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Start New Scanning Session</CardTitle>
-            <CardDescription>
-              Choose your scanning method and begin adding products
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+              <div className="flex-1">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Start New Scanning Session</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Choose your scanning method and begin adding products</p>
+              </div>
+            </div>
             <div className="space-y-4">
               {/* Device Selection */}
               <div>
@@ -238,17 +241,20 @@ export default function ScanPage() {
                   {creating ? 'Starting...' : 'Start Scanning'}
                 </Button>
               </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </Card>
 
         {/* Recent Sessions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Sessions</CardTitle>
-            <CardDescription>View and manage your scanning sessions</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Sessions</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">View and manage your scanning sessions</p>
+              </div>
+            </div>
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
@@ -295,7 +301,7 @@ export default function ScanPage() {
                 ))}
               </div>
             )}
-          </CardContent>
+          </div>
         </Card>
       </div>
     </div>

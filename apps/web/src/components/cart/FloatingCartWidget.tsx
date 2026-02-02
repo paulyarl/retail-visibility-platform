@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { useCartWidget } from '@/contexts/CartWidgetContext';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { ShoppingCart, X, Store, ArrowRight, ChevronDown, ChevronUp, Minimize2, Maximize2 } from 'lucide-react';
 
 export function FloatingCartWidget() {

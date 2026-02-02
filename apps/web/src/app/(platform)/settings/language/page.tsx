@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui';
+import { Card } from '@mantine/core';
+import { Button } from '@mantine/core';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import PageHeader, { Icons } from '@/components/PageHeader';
 
@@ -114,12 +115,15 @@ export default function LanguageSettingsPage() {
 
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           {/* Language Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Display Language</CardTitle>
-              <CardDescription>Select your preferred language for the interface</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Card withBorder padding="lg" radius="md">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Display Language</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Select your preferred language for the interface</p>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {LANGUAGES.map((language) => (
                   <button
@@ -172,16 +176,19 @@ export default function LanguageSettingsPage() {
                   </div>
                 </div>
               </div>
-            </CardContent>
+            </div>
           </Card>
 
           {/* Region Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Data Center Region</CardTitle>
-              <CardDescription>Select your preferred data center location</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Card withBorder padding="lg" radius="md">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Data Center Region</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Select your preferred data center location</p>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {REGIONS.map((region) => (
                   <button
@@ -231,15 +238,18 @@ export default function LanguageSettingsPage() {
                   </div>
                 </div>
               </div>
-            </CardContent>
+            </div>
           </Card>
 
           {/* Info Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>About Translations</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Card withBorder padding="lg" radius="md">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">About Translations</h3>
+                </div>
+              </div>
               <div className="space-y-3 text-sm text-neutral-700">
                 <p>
                   The platform interface will be displayed in your selected language. This includes menus, buttons, labels, and messages.
@@ -256,7 +266,7 @@ export default function LanguageSettingsPage() {
                   </div>
                 </div>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </div>
       </div>

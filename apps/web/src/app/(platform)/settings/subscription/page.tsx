@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Badge, Button } from '@/components/ui';
+import { Card, Badge } from '@mantine/core';
+import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { TIER_LIMITS, type SubscriptionTier, getTierInfo } from '@/lib/tiers';
 import { isTrialStatus, getTrialEndLabel } from '@/lib/trial';
@@ -93,8 +94,8 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
           {/* Platform User Info */}
-          <Card className="border-2 border-purple-500 bg-purple-50">
-            <CardHeader>
+          <Card withBorder padding="lg" radius="md" className="border-2 border-purple-500 bg-purple-50">
+            <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
                   {(user.role as string) === 'PLATFORM_ADMIN' && <span className="text-white text-xl">👑</span>}
@@ -102,18 +103,16 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                   {(user.role as string) === 'PLATFORM_VIEWER' && <span className="text-white text-xl">👁️</span>}
                 </div>
                 <div className="flex-1">
-                  <CardTitle className="text-purple-900">
+                  <h3 className="text-lg font-semibold text-purple-900">
                     {(user.role as string) === 'PLATFORM_ADMIN' && '👑 Platform Administrator'}
                     {(user.role as string) === 'PLATFORM_SUPPORT' && '🛠️ Platform Support'}
                     {(user.role as string) === 'PLATFORM_VIEWER' && '👁️ Platform Viewer'}
-                  </CardTitle>
+                  </h3>
                   <p className="text-sm text-purple-800 mt-1">
                     You have platform-level access. You don't have a personal subscription.
                   </p>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
               <div className="bg-white rounded-lg p-4 border border-purple-200">
                 <h4 className="font-semibold text-purple-900 mb-2">Your Access:</h4>
                 <ul className="space-y-2 text-sm text-purple-800">
@@ -159,7 +158,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                   )}
                 </ul>
               </div>
-            </CardContent>
+            </div>
           </Card>
 
           {/* Available Tiers Catalog */}
@@ -177,14 +176,14 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
               {(['starter', 'professional', 'enterprise', 'organization'] as SubscriptionTier[]).map((tier) => {
                 const info = TIER_LIMITS[tier];
                 return (
-                  <Card key={tier} className="border-2 border-neutral-200">
-                    <CardHeader>
-                      <CardTitle className="text-lg">{info.name}</CardTitle>
-                      <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-neutral-600 mb-4">{info.description}</p>
-                      <div className="space-y-2 mb-4">
+                  <Card key={tier} className="border-2 border-neutral-200" withBorder padding="lg" radius="md">
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-lg font-semibold">{info.name}</h3>
+                        <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
+                      </div>
+                      <p className="text-sm text-neutral-600">{info.description}</p>
+                      <div className="space-y-2">
                         <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
                           <span className="font-semibold text-orange-900">SKUs:</span>{' '}
                           <span className="text-orange-700 font-medium">
@@ -200,7 +199,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                           </li>
                         ))}
                       </ul>
-                    </CardContent>
+                    </div>
                   </Card>
                 );
               })}
@@ -212,13 +211,13 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
               {(['chain_starter', 'chain_professional', 'chain_enterprise'] as ChainTier[]).map((tier) => {
                 const info = CHAIN_TIERS[tier];
                 return (
-                  <Card key={tier} className="border-2 border-neutral-200">
-                    <CardHeader>
-                      <CardTitle className="text-lg">{info.name}</CardTitle>
-                      <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2 mb-4">
+                  <Card key={tier} className="border-2 border-neutral-200" withBorder padding="lg" radius="md">
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-lg font-semibold">{info.name}</h3>
+                        <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
+                      </div>
+                      <div className="space-y-2">
                         <div className="text-sm bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
                           <span className="font-semibold text-amber-900">Locations:</span>{' '}
                           <span className="text-amber-700 font-medium">
@@ -240,7 +239,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                           </li>
                         ))}
                       </ul>
-                    </CardContent>
+                    </div>
                   </Card>
                 );
               })}
@@ -255,15 +254,13 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   if (!tenant) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>No Subscription Found</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-neutral-700 mb-4">
+        <Card className="max-w-md" withBorder padding="lg" radius="md">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">No Subscription Found</h3>
+            <p className="text-neutral-700">
               You don't have an active subscription. Please select a store or contact support.
             </p>
-          </CardContent>
+          </div>
         </Card>
       </div>
     );
@@ -387,8 +384,8 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
         {/* Current Plan */}
         {/* SKU Overage Alert */}
         {skuLimit !== Infinity && usagePercent > 100 && (
-          <Card className="border-2 border-red-500 bg-red-50">
-            <CardHeader>
+          <Card className="border-2 border-red-500 bg-red-50" withBorder padding="lg" radius="md">
+            <div className="space-y-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
                   <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -396,15 +393,13 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <CardTitle className="text-red-900">⚠️ SKU Limit Exceeded</CardTitle>
+                  <h3 className="text-lg font-semibold text-red-900">⚠️ SKU Limit Exceeded</h3>
                   <p className="text-sm text-red-800 mt-1">
                     You are currently using <strong>{skuUsage.toLocaleString()} SKUs</strong>, which exceeds your plan limit of <strong>{skuLimit.toLocaleString()} SKUs</strong>.
                   </p>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-red-100 rounded-lg p-4 border border-red-300 mb-4">
+              <div className="bg-red-100 rounded-lg p-4 border border-red-300">
                 <h4 className="font-semibold text-red-900 mb-2 flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -465,14 +460,14 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                   </Button>
                 </div>
               </div>
-            </CardContent>
+            </div>
           </Card>
         )}
 
         {/* Near Limit Warning */}
         {skuLimit !== Infinity && usagePercent >= 90 && usagePercent <= 100 && (
-          <Card className="border-2 border-amber-500 bg-amber-50">
-            <CardHeader>
+          <Card className="border-2 border-amber-500 bg-amber-50" withBorder padding="lg" radius="md">
+            <div className="space-y-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center">
                   <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -480,122 +475,117 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <CardTitle className="text-amber-900">⚠️ Approaching SKU Limit</CardTitle>
+                  <h3 className="text-amber-900">⚠️ Approaching SKU Limit</h3>
                   <p className="text-sm text-amber-800 mt-1">
                     You're using <strong>{usagePercent}%</strong> of your SKU limit ({skuUsage.toLocaleString()} / {skuLimit.toLocaleString()} SKUs). Consider upgrading soon to avoid hitting your limit.
                   </p>
                 </div>
               </div>
-            </CardHeader>
+            </div>
           </Card>
         )}
 
-        <Card className="border-2 border-primary-500">
-          <CardHeader>
+        <Card className="border-2 border-primary-500" withBorder padding="lg" radius="md">
+          <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <CardTitle>Current Plan</CardTitle>
+              <h3>Current Plan</h3>
               <Badge variant="default" className={tierInfo.color}>
                 {tierInfo.name}
               </Badge>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {/* Pricing */}
-              <div>
-                <div className="text-3xl font-bold text-neutral-900">{tierInfo.price}</div>
-                <p className="text-neutral-600 mt-1">
-                  {isChainTier 
-                    ? `${(tierInfo as any).maxLocations === Infinity ? 'Unlimited' : (tierInfo as any).maxLocations} locations, ${(tierInfo as any).maxTotalSKUs === Infinity ? 'unlimited' : (tierInfo as any).maxTotalSKUs.toLocaleString()} SKUs`
-                    : (tierInfo as any).description
-                  }
-                </p>
-              </div>
 
-              {/* SKU Usage */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-neutral-700">SKU Usage</span>
-                  <span className="text-sm text-neutral-600">
-                    {skuUsage.toLocaleString()} / {skuLimit === Infinity ? '∞' : skuLimit.toLocaleString()}
-                  </span>
-                </div>
-                {skuLimit !== Infinity && (
-                  <div className="w-full bg-neutral-200 rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full transition-all ${
-                        usagePercent >= 90 ? 'bg-red-500' : 
-                        usagePercent >= 70 ? 'bg-amber-500' : 
-                        'bg-green-500'
-                      }`}
-                      style={{ width: `${Math.min(usagePercent, 100)}%` }}
-                    />
-                  </div>
-                )}
-              </div>
+            {/* Pricing */}
+            <div>
+              <div className="text-3xl font-bold text-neutral-900">{tierInfo.price}</div>
+              <p className="text-neutral-600 mt-1">
+                {isChainTier 
+                  ? `${(tierInfo as any).maxLocations === Infinity ? 'Unlimited' : (tierInfo as any).maxLocations} locations, ${(tierInfo as any).maxTotalSKUs === Infinity ? 'unlimited' : (tierInfo as any).maxTotalSKUs.toLocaleString()} SKUs`
+                  : (tierInfo as any).description
+                }
+              </p>
+            </div>
 
-              {/* Features */}
-              <div>
-                <h3 className="text-sm font-semibold text-neutral-900 mb-3">Your Plan Includes:</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {tierInfo.features.map((feature, idx) => (
-                    <div key={idx} className="flex items-start gap-2">
-                      <span className="text-green-500 mt-0.5">✓</span>
-                      <span className="text-sm text-neutral-700">{feature}</span>
-                    </div>
-                  ))}
-                </div>
+            {/* SKU Usage */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-neutral-700">SKU Usage</span>
+                <span className="text-sm text-neutral-600">
+                  {skuUsage.toLocaleString()} / {skuLimit === Infinity ? '∞' : skuLimit.toLocaleString()}
+                </span>
               </div>
-
-              {/* Status */}
-              <div className="pt-4 border-t border-neutral-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-neutral-600">Status</span>
-                  <Badge variant={tenant.subscriptionStatus === 'active' ? 'success' : 'default'}>
-                    {tenant.subscriptionStatus || 'Active'}
-                  </Badge>
+              {skuLimit !== Infinity && (
+                <div className="w-full bg-neutral-200 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all ${
+                      usagePercent >= 90 ? 'bg-red-500' : 
+                      usagePercent >= 70 ? 'bg-amber-500' : 
+                      'bg-green-500'
+                    }`}
+                    style={{ width: `${Math.min(usagePercent, 100)}%` }}
+                  />
                 </div>
-                
-                {/* Trial Expiration */}
-                {isTrialStatus(tenant.subscriptionStatus) && tenant.trialEndsAt && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-neutral-600">Trial Ends</span>
-                    <span className="text-sm font-medium text-neutral-900">
-                      {getTrialEndLabel(tenant.trialEndsAt) ?? ''}
-                    </span>
+              )}
+            </div>
+
+            {/* Features */}
+            <div>
+              <h3 className="text-sm font-semibold text-neutral-900 mb-3">Your Plan Includes:</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {tierInfo.features.map((feature, idx) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    <span className="text-sm text-neutral-700">{feature}</span>
                   </div>
-                )}
-                
-                {/* Subscription Expiration */}
-                {tenant.subscriptionStatus === 'active' && tenant.subscriptionEndsAt && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-neutral-600">Renews On</span>
-                    <span className="text-sm font-medium text-neutral-900">
-                      {new Date(tenant.subscriptionEndsAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </span>
-                  </div>
-                )}
+                ))}
               </div>
             </div>
-          </CardContent>
+
+            {/* Status */}
+            <div className="pt-4 border-t border-neutral-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-neutral-600">Status</span>
+                <Badge variant={tenant.subscriptionStatus === 'active' ? 'success' : 'default'}>
+                  {tenant.subscriptionStatus || 'Active'}
+                </Badge>
+              </div>
+              
+              {/* Trial Expiration */}
+              {isTrialStatus(tenant.subscriptionStatus) && tenant.trialEndsAt && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-600">Trial Ends</span>
+                  <span className="text-sm font-medium text-neutral-900">
+                    {getTrialEndLabel(tenant.trialEndsAt) ?? ''}
+                  </span>
+                </div>
+              )}
+              
+              {/* Subscription Expiration */}
+              {tenant.subscriptionStatus === 'active' && tenant.subscriptionEndsAt && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-600">Renews On</span>
+                  <span className="text-sm font-medium text-neutral-900">
+                    {new Date(tenant.subscriptionEndsAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
         </Card>
 
         {/* Pending Requests */}
         {pendingRequests.length > 0 && (
-          <Card className="border-2 border-amber-500 bg-amber-50">
-            <CardHeader>
+          <Card className="border-2 border-amber-500 bg-amber-50" withBorder padding="lg" radius="md">
+            <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <CardTitle className="text-amber-900">Pending Subscription Change Requests</CardTitle>
+                <h3 className="text-amber-900">Pending Subscription Change Requests</h3>
               </div>
-            </CardHeader>
-            <CardContent>
               <div className="space-y-3">
                 {pendingRequests.map((request: PendingRequest) => {
                   const requestedTierInfo = getTierInfo(request.requestedTier as any);
@@ -642,20 +632,20 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                   );
                 })}
               </div>
-            </CardContent>
+            </div>
           </Card>
         )}
 
         {/* Subscription History */}
         {requestHistory.length > 0 && (
-          <Card>
-            <CardHeader>
+          <Card withBorder padding="lg" radius="md">
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <svg className="w-5 h-5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <CardTitle>Subscription History</CardTitle>
+                  <h3>Subscription History</h3>
                 </div>
                 <Button
                   variant="ghost"
@@ -665,102 +655,102 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                   {showHistory ? 'Hide' : 'Show'} ({requestHistory.length})
                 </Button>
               </div>
-            </CardHeader>
-            {showHistory && (
-              <CardContent>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                  <p className="text-sm text-blue-900">
-                    <span className="font-semibold">💡 Transparency Note:</span> This history shows all your subscription changes. 
-                    If you're wondering why certain features are no longer available, check here to see when your plan changed and why.
-                  </p>
-                </div>
-                <div className="space-y-3">
-                  {requestHistory.map((request: PendingRequest) => {
-                    const fromTierInfo = getTierInfo(request.currentTier as any);
-                    const toTierInfo = getTierInfo(request.requestedTier as any);
-                    const isApproved = request.status === 'complete';
-                    const isDenied = request.status === 'denied';
-                    
-                    // Determine if upgrade or downgrade
-                    const tierOrder = ['starter', 'professional', 'enterprise'];
-                    const chainTierOrder = ['chain_starter', 'chain_professional', 'chain_enterprise'];
-                    const isChain = (request.currentTier as string).startsWith('chain_');
-                    const order = isChain ? chainTierOrder : tierOrder;
-                    const fromIndex = order.indexOf(request.currentTier as string);
-                    const toIndex = order.indexOf(request.requestedTier as string);
-                    const isUpgrade = toIndex > fromIndex;
-                    
-                    return (
-                      <div 
-                        key={request.id} 
-                        className={`p-4 rounded-lg border-2 ${
-                          isApproved && isUpgrade ? 'bg-green-50 border-green-200' : 
-                          isApproved && !isUpgrade ? 'bg-red-50 border-red-200' :
-                          isDenied ? 'bg-red-50 border-red-200' : 
-                          'bg-neutral-50 border-neutral-200'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="font-semibold text-neutral-900">
-                                {fromTierInfo.name}
-                              </span>
-                              <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                              </svg>
-                              <span className="font-semibold text-neutral-900">
-                                {toTierInfo.name}
-                              </span>
+              {showHistory && (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-900">
+                      <span className="font-semibold">💡 Transparency Note:</span> This history shows all your subscription changes. 
+                      If you're wondering why certain features are no longer available, check here to see when your plan changed and why.
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    {requestHistory.map((request: PendingRequest) => {
+                      const fromTierInfo = getTierInfo(request.currentTier as any);
+                      const toTierInfo = getTierInfo(request.requestedTier as any);
+                      const isApproved = request.status === 'complete';
+                      const isDenied = request.status === 'denied';
+                      
+                      // Determine if upgrade or downgrade
+                      const tierOrder = ['starter', 'professional', 'enterprise'];
+                      const chainTierOrder = ['chain_starter', 'chain_professional', 'chain_enterprise'];
+                      const isChain = (request.currentTier as string).startsWith('chain_');
+                      const order = isChain ? chainTierOrder : tierOrder;
+                      const fromIndex = order.indexOf(request.currentTier as string);
+                      const toIndex = order.indexOf(request.requestedTier as string);
+                      const isUpgrade = toIndex > fromIndex;
+                      
+                      return (
+                        <div 
+                          key={request.id} 
+                          className={`p-4 rounded-lg border-2 ${
+                            isApproved && isUpgrade ? 'bg-green-50 border-green-200' : 
+                            isApproved && !isUpgrade ? 'bg-red-50 border-red-200' :
+                            isDenied ? 'bg-red-50 border-red-200' : 
+                            'bg-neutral-50 border-neutral-200'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="font-semibold text-neutral-900">
+                                  {fromTierInfo.name}
+                                </span>
+                                <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                </svg>
+                                <span className="font-semibold text-neutral-900">
+                                  {toTierInfo.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 text-sm text-neutral-600">
+                                <span>
+                                  Requested: {new Date(request.created_at).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric'
+                                  })}
+                                </span>
+                                {request.processed_at && (
+                                  <>
+                                    <span>•</span>
+                                    <span>
+                                      {isApproved ? 'Approved' : 'Denied'}: {new Date(request.processed_at).toLocaleDateString('en-US', {
+                                        year: 'numeric',
+                                        month: 'short',
+                                        day: 'numeric'
+                                      })}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-3 text-sm text-neutral-600">
-                              <span>
-                                Requested: {new Date(request.created_at).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric'
-                                })}
-                              </span>
-                              {request.processed_at && (
-                                <>
-                                  <span>•</span>
-                                  <span>
-                                    {isApproved ? 'Approved' : 'Denied'}: {new Date(request.processed_at).toLocaleDateString('en-US', {
-                                      year: 'numeric',
-                                      month: 'short',
-                                      day: 'numeric'
-                                    })}
-                                  </span>
-                                </>
-                              )}
-                            </div>
+                            <Badge className={
+                              isApproved && isUpgrade ? 'bg-green-100 text-green-800' : 
+                              isApproved && !isUpgrade ? 'bg-red-100 text-red-800' :
+                              isDenied ? 'bg-red-100 text-red-800' : 
+                              'bg-neutral-100 text-neutral-800'
+                            }>
+                              {isApproved ? (isUpgrade ? '↑ Upgraded' : '↓ Downgraded') : isDenied ? '✗ Denied' : request.status}
+                            </Badge>
                           </div>
-                          <Badge className={
-                            isApproved && isUpgrade ? 'bg-green-100 text-green-800' : 
-                            isApproved && !isUpgrade ? 'bg-red-100 text-red-800' :
-                            isDenied ? 'bg-red-100 text-red-800' : 
-                            'bg-neutral-100 text-neutral-800'
-                          }>
-                            {isApproved ? (isUpgrade ? '↑ Upgraded' : '↓ Downgraded') : isDenied ? '✗ Denied' : request.status}
-                          </Badge>
+                          {request.adminNotes && (
+                            <div className={`mt-2 p-2 rounded border ${
+                              isApproved && isUpgrade ? 'bg-green-100 border-green-300' : 
+                              isApproved && !isUpgrade ? 'bg-red-100 border-red-300' :
+                              isDenied ? 'bg-red-100 border-red-300' : 
+                              'bg-neutral-100 border-neutral-300'
+                            }`}>
+                              <p className="text-xs font-medium text-neutral-900 mb-1">Admin Notes:</p>
+                              <p className="text-sm text-neutral-700">{request.adminNotes}</p>
+                            </div>
+                          )}
                         </div>
-                        {request.adminNotes && (
-                          <div className={`mt-2 p-2 rounded border ${
-                            isApproved && isUpgrade ? 'bg-green-100 border-green-300' : 
-                            isApproved && !isUpgrade ? 'bg-red-100 border-red-300' :
-                            isDenied ? 'bg-red-100 border-red-300' : 
-                            'bg-neutral-100 border-neutral-300'
-                          }`}>
-                            <p className="text-xs font-medium text-neutral-900 mb-1">Admin Notes:</p>
-                            <p className="text-sm text-neutral-700">{request.adminNotes}</p>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </CardContent>
-            )}
+              )}
+            </div>
           </Card>
         )}
 
@@ -781,21 +771,19 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
               return (
                 <Card 
                   key={tier}
-                  className={`${isCurrent ? 'border-2 border-primary-500 opacity-60' : 'border-2 border-neutral-200 hover:border-primary-300 transition-colors'}`}
+                  className={`${isCurrent ? 'border-2 border-primary-500 opacity-60 p-6 rounded-lg' : 'border-2 border-neutral-200 hover:border-primary-300 transition-colors p-6 rounded-lg'}`}
                 >
-                  <CardHeader>
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between mb-2">
-                      <CardTitle className="text-lg">{info.name}</CardTitle>
+                      <h3 className="text-lg">{info.name}</h3>
                       {isCurrent && (
                         <Badge variant="default" className="bg-primary-500 text-white">Current</Badge>
                       )}
                     </div>
                     <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-neutral-600 mb-4">{info.description}</p>
+                    <p className="text-sm text-neutral-600">{info.description}</p>
                     
-                    <div className="space-y-2 mb-4">
+                    <div className="space-y-2">
                       <div className="text-sm bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
                         <span className="font-semibold text-amber-900">Locations:</span>{' '}
                         <span className="text-amber-700 font-medium">
@@ -810,7 +798,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                       </div>
                     </div>
 
-                    <ul className="space-y-1.5 text-xs mb-4">
+                    <ul className="space-y-1.5 text-xs">
                       {info.features.slice(0, 4).map((feature, idx) => (
                         <li key={idx} className="flex items-start gap-1.5">
                           <span className="text-green-500 mt-0.5">✓</span>
@@ -827,7 +815,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                     >
                       {isCurrent ? 'Current Plan' : 'Request Change'}
                     </Button>
-                  </CardContent>
+                  </div>
                 </Card>
               );
             })}
@@ -846,19 +834,17 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
               return (
                 <Card 
                   key={tier}
-                  className={`${isCurrent ? 'border-2 border-primary-500 opacity-60' : 'border-2 border-neutral-200 hover:border-primary-300 transition-colors'}`}
+                  className={`${isCurrent ? 'border-2 border-primary-500 opacity-60 p-6 rounded-lg' : 'border-2 border-neutral-200 hover:border-primary-300 transition-colors p-6 rounded-lg'}`}
                 >
-                  <CardHeader>
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between mb-2">
-                      <CardTitle className="text-lg">{info.name}</CardTitle>
+                      <h3 className="text-lg">{info.name}</h3>
                       {isCurrent && (
                         <Badge variant="default" className="bg-primary-500 text-white">Current</Badge>
                       )}
                     </div>
                     <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 mb-4">
+                    <div className="space-y-2">
                       <div className="text-sm bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
                         <span className="font-semibold text-amber-900">Locations:</span>{' '}
                         <span className="text-amber-700 font-medium">
@@ -873,7 +859,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                       </div>
                     </div>
 
-                    <ul className="space-y-1.5 text-xs mb-4">
+                    <ul className="space-y-1.5 text-xs">
                       {info.features.slice(0, 4).map((feature, idx) => (
                         <li key={idx} className="flex items-start gap-1.5">
                           <span className="text-green-500 mt-0.5">✓</span>
@@ -890,7 +876,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                     >
                       {isCurrent ? 'Current Plan' : 'Request Change'}
                     </Button>
-                  </CardContent>
+                  </div>
                 </Card>
               );
             })}
@@ -898,25 +884,23 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
         </div>
 
         {/* View All Offerings */}
-        <Card className="bg-gradient-to-r from-primary-50 to-primary-100 border-primary-200">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-neutral-900 mb-2">
-                  Explore All Platform Offerings
-                </h3>
-                <p className="text-neutral-700">
-                  View all subscription tiers, chain pricing, and managed services options
-                </p>
-              </div>
-              <Button
-                variant="primary"
-                onClick={() => window.location.href = '/settings/offerings'}
-              >
-                View All Offerings
-              </Button>
+        <Card className="bg-gradient-to-r from-primary-50 to-primary-100 border-primary-200 p-6 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+                Explore All Platform Offerings
+              </h3>
+              <p className="text-neutral-700">
+                View all subscription tiers, chain pricing, and managed services options
+              </p>
             </div>
-          </CardContent>
+            <Button
+              variant="primary"
+              onClick={() => window.location.href = '/settings/offerings'}
+            >
+              View All Offerings
+            </Button>
+          </div>
         </Card>
 
       </div>
@@ -924,11 +908,9 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
       {/* Change Confirmation Modal */}
       {showChangeModal && selectedTier && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="max-w-md w-full">
-            <CardHeader>
-              <CardTitle>Confirm Subscription Change</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Card className="max-w-md w-full p-6 rounded-lg">
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Confirm Subscription Change</h3>
               <div className="space-y-4">
                 <p className="text-neutral-700">
                   You are requesting to change your subscription from:
@@ -969,7 +951,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                   </Button>
                 </div>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </div>
       )}

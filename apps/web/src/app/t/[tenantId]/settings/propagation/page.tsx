@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, Badge, AnimatedCard, Spinner } from '@/components/ui';
+import { Button } from '@mantine/core';
 import { motion } from 'framer-motion';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api, API_BASE_URL } from '@/lib/api';

@@ -15,6 +15,7 @@ import LastViewed from '@/components/directory/LastViewed'; // NEW: LastViewed c
 import RandomFeaturedProducts from '@/components/directory/RandomFeaturedProducts'; // NEW: Random featured products
 import FeaturedStoresList from '@/components/directory/FeaturedStoresList'; // NEW: Featured stores list
 import DirectoryPopularTags from '@/components/directory/DirectoryPopularTags'; // NEW: Popular tags
+import { Button } from '@mantine/core';
 import { Pagination } from '@/components/ui';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
@@ -698,7 +699,7 @@ export default function DirectoryClient() {
               currentPage={currentPage}
               totalItems={totalItems}
               pageSize={pageSize}
-              onPageChange={(page) => {
+              onPageChange={(page: number) => {
                 const params = new URLSearchParams(searchParams.toString());
                 params.set('page', page.toString());
                 window.location.href = `/directory?${params.toString()}`;

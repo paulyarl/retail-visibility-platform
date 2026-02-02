@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Modal, ModalFooter, Input, Pagination } from '@/components/ui';
+import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
+import { Modal, ModalFooter, Input, Pagination, Spinner } from '@/components/ui';
+import { Tag, Globe, Edit, Trash2 } from 'lucide-react';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { QuickStartCategoryModal } from '@/components/quick-start';
 import { CategoryEditModal, type CategoryFormData } from '@/components/categories';
-
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -453,11 +454,14 @@ export default function AdminCategoriesPage() {
       />
 
       <div className="mt-6 space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Sync Product Categories to Google Business Profile</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sync Product Categories to Google Business Profile</h3>
+              </div>
+            </div>
             {/* Scope Selection */}
             <div className="mb-4 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
               <label className="block text-sm font-semibold text-neutral-700 mb-2">Scope</label>
@@ -599,13 +603,13 @@ export default function AdminCategoriesPage() {
 
             <div className="mt-4 flex items-center gap-3">
               {lastJobId && (
-                <Badge variant="success">jobId: {lastJobId}</Badge>
+                <MantineBadge variant="success">jobId: {lastJobId}</MantineBadge>
               )}
               {lastResult?.error && (
-                <Badge variant="error">error</Badge>
+                <MantineBadge variant="error">error</MantineBadge>
               )}
               {polling && (
-                <Badge variant="info">updating…</Badge>
+                <MantineBadge variant="info">updating…</MantineBadge>
               )}
             </div>
             {lastSummary && (
@@ -627,7 +631,7 @@ export default function AdminCategoriesPage() {
                 )}
               </div>
             )}
-          </CardContent>
+          </div>
         </Card>
 
         <div className="flex items-center justify-between">
@@ -651,10 +655,10 @@ export default function AdminCategoriesPage() {
         </div>
 
         {/* Categories List */}
-        <Card>
-          <CardHeader>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <CardTitle>All Categories</CardTitle>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">All Categories</h3>
               <div className="w-64">
                 <Input
                   placeholder="Search categories..."
@@ -663,8 +667,6 @@ export default function AdminCategoriesPage() {
                 />
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
             {categories.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-neutral-500">No categories yet</p>
@@ -681,43 +683,115 @@ export default function AdminCategoriesPage() {
               </div>
             ) : (
               <>
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {paginatedCategories.map((category) => (
-                  <div
-                    key={category.id}
-                    className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="inline-block px-3 py-1 bg-primary-100 dark:bg-primary-900/30 rounded-lg mb-1">
-                        <h3 className="font-bold text-primary-900 dark:text-primary-100">{category.name}</h3>
-                      </div>
-                      <p className="text-sm text-neutral-600 dark:text-neutral-400">ID: {category.id}</p>
-                      {(category.googleCategoryId || category.google_category_id) && (
-                        <div className="mt-1">
-                          <GoogleCategoryPath googleCategoryId={category.googleCategoryId || category.google_category_id || ''} />
+                    <Card key={category.id} withBorder radius="md" className="hover:shadow-lg transition-all duration-200 group">
+                      {/* Icon Section - Enhanced */}
+                      <Card.Section className="relative">
+                        <div className="h-24 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 dark:from-blue-600 dark:via-indigo-600 dark:to-purple-700 flex items-center justify-center rounded-t-md group-hover:from-blue-600 group-hover:via-indigo-600 group-hover:to-purple-700 transition-all duration-200">
+                          <Tag className="w-12 h-12 text-white opacity-90" />
+                          {(category.googleCategoryId || category.google_category_id) && (
+                            <div className="absolute top-3 right-3">
+                              <MantineBadge 
+                                color="blue"
+                                variant="light"
+                                size="xs"
+                              >
+                                Google
+                              </MantineBadge>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => openEditModal(category)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openDeleteModal(category)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                      </Card.Section>
+
+                      {/* Title and Status - Enhanced */}
+                      <Card.Section className="p-4">
+                        <Group justify="space-between" mb="xs" align="start">
+                          <div className="flex-1">
+                            <Text 
+                              fw={600} 
+                              size="lg" 
+                              lineClamp={1} 
+                              className="text-gray-900 dark:text-white group-hover:text-blue-600 transition-colors"
+                            >
+                              {category.name}
+                            </Text>
+                            <Text size="xs" c="dimmed" mt={1}>
+                              ID: {category.id.slice(0, 8)}...
+                            </Text>
+                          </div>
+                        </Group>
+
+                        {category.description && (
+                          <Text size="sm" c="dimmed" lineClamp={2} mb="md" className="min-h-[2.5rem]">
+                            {category.description}
+                          </Text>
+                        )}
+                      </Card.Section>
+
+                      {/* Features Section - Enhanced */}
+                      <Card.Section className="px-4 pb-3">
+                        <Group gap={4} wrap="wrap">
+                          {/* Platform Badge */}
+                          <MantineBadge 
+                            color="blue"
+                            variant="light"
+                            size="xs"
+                          >
+                            🏢 Platform
+                          </MantineBadge>
+                          
+                          {/* Google Badge */}
+                          {(category.googleCategoryId || category.google_category_id) && (
+                            <MantineBadge 
+                              color="green"
+                              variant="light"
+                              size="xs"
+                            >
+                              🌍 GBP Ready
+                            </MantineBadge>
+                          )}
+                          
+                          {/* SEO Badge */}
+                          {category.slug && (
+                            <MantineBadge 
+                              color="purple"
+                              variant="light"
+                              size="xs"
+                            >
+                              🔗 SEO URL
+                            </MantineBadge>
+                          )}
+                        </Group>
+                      </Card.Section>
+
+                      {/* Action Buttons - Enhanced */}
+                      <Card.Section className="px-4 pb-4">
+                        <Group gap={6}>
+                          <Button
+                            size="sm"
+                            variant="light"
+                            leftSection={<Edit size={14} />}
+                            onClick={() => openEditModal(category)}
+                            className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 font-medium"
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="light"
+                            color="red"
+                            leftSection={<Trash2 size={14} />}
+                            onClick={() => openDeleteModal(category)}
+                            className="bg-red-50 hover:bg-red-100 text-red-700 border-red-200 font-medium"
+                          >
+                            Delete
+                          </Button>
+                        </Group>
+                      </Card.Section>
+                    </Card>
+                  ))}
+                </div>
               
               {totalPages > 1 && (
                 <div className="mt-6">
@@ -732,15 +806,18 @@ export default function AdminCategoriesPage() {
               )}
             </>
             )}
-          </CardContent>
+          </div>
         </Card>
 
         {/* Admin Guide */}
-        <Card>
-          <CardHeader>
-            <CardTitle>📚 Platform Admin Guide: Product Categories</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">📚 Platform Admin Guide: Product Categories</h3>
+              </div>
+            </div>
             <div className="space-y-4 text-sm">
               {/* What are Product Categories */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -813,7 +890,7 @@ export default function AdminCategoriesPage() {
                 </div>
               </div>
             </div>
-          </CardContent>
+          </div>
         </Card>
       </div>
 
@@ -858,7 +935,7 @@ export default function AdminCategoriesPage() {
             </p>
           </div>
         )}
-        <ModalFooter>
+        <div className="flex gap-3 justify-end p-4 border-t border-neutral-200">
           <Button
             variant="ghost"
             onClick={() => {
@@ -874,7 +951,7 @@ export default function AdminCategoriesPage() {
           >
             Delete Category
           </Button>
-        </ModalFooter>
+        </div>
       </Modal>
     </div>
   );

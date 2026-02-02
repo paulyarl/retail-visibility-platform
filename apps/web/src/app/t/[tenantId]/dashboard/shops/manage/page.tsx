@@ -6,7 +6,7 @@ import { shopsService, type Shop } from '@/services/ShopsService';
 import RealShopService, { type ShopData as RealShop, type ShopAnalytics as ShopAnalyticsType } from '@/services/RealShopService';
 import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { 

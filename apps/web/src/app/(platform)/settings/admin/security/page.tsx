@@ -4,6 +4,7 @@
  */
 
 import { SecurityDashboard } from '@/components/security/monitoring/SecurityDashboard';
+import { Button } from '@mantine/core';
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';

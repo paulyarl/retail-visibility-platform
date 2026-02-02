@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/useTranslation";
 import Link from "next/link";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Alert, Spinner, Modal, ModalFooter, Button } from "@/components/ui";
+import { Card, Group, Switch, Text, Progress, Avatar, Badge as MantineBadge, ActionIcon, SimpleGrid, UnstyledButton, Button } from '@mantine/core';
+import { Card as LegacyCard, Badge, Alert, Modal, ModalFooter, Spinner, CardContent } from "@/components/ui";
+import { IconUpload, IconUsers, IconPackage, IconChartBar, IconBuildingStore, IconShoppingCart, IconPhoto, IconSettings } from '@tabler/icons-react';
 import BusinessProfileCard from "@/components/settings/BusinessProfileCard";
 import GBPCategoryCard from "@/components/settings/GBPCategoryCard";
 import MapCardSettings from "@/components/tenant/MapCardSettings";
@@ -427,12 +429,15 @@ export default function TenantSettingsPage() {
           {/* Right Column - Secondary Content */}
           <div className="space-y-6">
             {/* Tenant Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Tenant Information</CardTitle>
-            <CardDescription>Basic information about your tenant</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <LegacyCard className="p-6 rounded-lg">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Tenant Information</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Basic information about your tenant</p>
+              </div>
+            </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between py-3 border-b border-neutral-200 dark:border-neutral-700">
                 <div>
@@ -450,20 +455,20 @@ export default function TenantSettingsPage() {
                 <p className="text-sm font-medium text-neutral-900 dark:text-white">{tenant.name}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </LegacyCard>
 
         {/* Organization Assignment - Different UI for ADMIN vs OWNER */}
-        <Card>
-          <CardHeader>
+        <LegacyCard className="p-6 rounded-lg">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Organization / Chain Assignment</CardTitle>
-                <CardDescription>
+                <h3 className="text-lg font-semibold">Organization / Chain Assignment</h3>
+                <p className="text-sm text-neutral-600">
                   {user && isPlatformAdmin(user)
                     ? 'Assign this tenant to a chain organization (Admin Only)' 
                     : 'Request to join a chain organization'}
-                </CardDescription>
+                </p>
               </div>
               {user && isPlatformAdmin(user) && !editingOrg && (
                 <button
@@ -482,8 +487,6 @@ export default function TenantSettingsPage() {
                 </Button>
               )}
             </div>
-          </CardHeader>
-          <CardContent>
             <div className="space-y-4">
               {/* Current Organization Status */}
               <div className="flex items-center justify-between py-3">
@@ -641,8 +644,8 @@ export default function TenantSettingsPage() {
                 </Alert>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </LegacyCard>
 
         {/* Request Modal (for OWNER) */}
         {showRequestModal && (
@@ -766,12 +769,12 @@ export default function TenantSettingsPage() {
         )}
 
         {/* Regional Settings */}
-        <Card>
-          <CardHeader>
+        <LegacyCard className="p-6 rounded-lg">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Regional Settings</CardTitle>
-                <CardDescription>Location and localization preferences</CardDescription>
+                <h3 className="text-lg font-semibold">Regional Settings</h3>
+                <p className="text-sm text-neutral-600">Location and localization preferences</p>
               </div>
               {!editingRegional && (
                 <button
@@ -782,8 +785,6 @@ export default function TenantSettingsPage() {
                 </button>
               )}
             </div>
-          </CardHeader>
-          <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between py-3 border-b border-neutral-200 dark:border-neutral-700">
                 <div>
@@ -904,16 +905,16 @@ export default function TenantSettingsPage() {
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </LegacyCard>
 
         {/* Compliance */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Compliance & Privacy</CardTitle>
-            <CardDescription>Data policy and compliance settings</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <LegacyCard className="p-6 rounded-lg">
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold">Compliance & Privacy</h3>
+              <p className="text-sm text-neutral-600">Data policy and compliance settings</p>
+            </div>
             <div className="flex items-center justify-between py-3">
               <div>
                 <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t('settings.tenant.dataPolicy', 'Data Policy Accepted')}</p>
@@ -937,8 +938,8 @@ export default function TenantSettingsPage() {
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </LegacyCard>
 
           </div>
         </div>
@@ -972,13 +973,212 @@ export default function TenantSettingsPage() {
           />
         )}
 
+        {/* Tenant Utilization Task Card - Phase 3 Enhancement */}
+        <Card withBorder padding="lg" radius="md" className="hover:shadow-lg transition-shadow">
+          <Group justify="space-between" mb="md">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <IconChartBar className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <Text fw={600} size="lg">Tenant Utilization</Text>
+                <Text size="sm" c="dimmed">Platform usage overview</Text>
+              </div>
+            </div>
+            <MantineBadge color="blue" variant="light">
+              Active
+            </MantineBadge>
+          </Group>
+
+          <Text size="sm" c="dimmed" mb="md">
+            Current month activity and resource utilization
+          </Text>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="text-center">
+              <Text size="xl" fw={700} c="blue">
+                {25}
+              </Text>
+              <Text size="xs" c="dimmed">Products</Text>
+            </div>
+            <div className="text-center">
+              <Text size="xl" fw={700} c="green">
+                {Math.round(25 / 50 * 100)}%
+              </Text>
+              <Text size="xs" c="dimmed">Utilization</Text>
+            </div>
+            <div className="text-center">
+              <Text size="xl" fw={700} c="orange">
+                {50 - 25}
+              </Text>
+              <Text size="xs" c="dimmed">Available</Text>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="mb-6">
+            <Group justify="space-between" mb={2}>
+              <Text size="sm" fw={500}>SKU Capacity</Text>
+              <Text size="sm" c="dimmed">
+                {25} / 50
+              </Text>
+            </Group>
+            <Progress 
+              value={Math.min(25 / 50 * 100, 100)} 
+              color={25 > 40 ? 'red' : 25 > 25 ? 'orange' : 'blue'}
+              aria-label="SKU capacity utilization"
+            />
+          </div>
+
+          {/* Team Members */}
+          <Group justify="space-between">
+            <div>
+              <Text size="sm" c="dimmed">Team members</Text>
+              <Group gap="sm" mt={2}>
+                <Avatar size="sm" radius="xl" color="blue">
+                  JD
+                </Avatar>
+                <Avatar size="sm" radius="xl" color="green">
+                  AS
+                </Avatar>
+                <Avatar size="sm" radius="xl" color="orange">
+                  MK
+                </Avatar>
+                <Avatar size="sm" radius="xl">
+                  +2
+                </Avatar>
+              </Group>
+            </div>
+            <ActionIcon variant="light" size="lg" radius="md" color="blue" aria-label="Manage team">
+              <IconUsers size={18} />
+            </ActionIcon>
+          </Group>
+        </Card>
+
+        {/* Notification Settings Switches Card - Phase 3 Enhancement */}
+        <Card padding="xl" radius="md" className="hover:shadow-lg transition-shadow">
+          <Text fz="lg" fw={500} mb="xs">
+            Configure Notifications
+          </Text>
+          <Text fz="xs" c="dimmed" mt={3} mb="xl">
+            Choose what notifications you want to receive
+          </Text>
+          
+          <div className="space-y-4">
+            <Group justify="space-between" wrap="nowrap" gap="xl">
+              <div>
+                <Text>Product Updates</Text>
+                <Text size="xs" c="dimmed">
+                  Notifications when products are added or modified
+                </Text>
+              </div>
+              <Switch
+                onLabel="ON"
+                offLabel="OFF"
+                size="lg"
+                defaultChecked
+                aria-label="Product updates notifications"
+              />
+            </Group>
+            
+            <Group justify="space-between" wrap="nowrap" gap="xl">
+              <div>
+                <Text>Order Alerts</Text>
+                <Text size="xs" c="dimmed">
+                  Real-time notifications for new orders and status changes
+                </Text>
+              </div>
+              <Switch
+                onLabel="ON"
+                offLabel="OFF"
+                size="lg"
+                defaultChecked
+                aria-label="Order alerts notifications"
+              />
+            </Group>
+            
+            <Group justify="space-between" wrap="nowrap" gap="xl">
+              <div>
+                <Text>Inventory Warnings</Text>
+                <Text size="xs" c="dimmed">
+                  Low stock alerts and inventory management notifications
+                </Text>
+              </div>
+              <Switch
+                onLabel="ON"
+                offLabel="OFF"
+                size="lg"
+                defaultChecked={false}
+                aria-label="Inventory warnings notifications"
+              />
+            </Group>
+            
+            <Group justify="space-between" wrap="nowrap" gap="xl">
+              <div>
+                <Text>Marketing Updates</Text>
+                <Text size="xs" c="dimmed">
+                Weekly digest with marketing insights and recommendations
+                </Text>
+              </div>
+              <Switch
+                onLabel="ON"
+                offLabel="OFF"
+                size="lg"
+                defaultChecked={false}
+                aria-label="Marketing updates notifications"
+              />
+            </Group>
+          </div>
+        </Card>
+
+        {/* Services Actions Grid Card - Phase 3 Enhancement */}
+        <Card padding="lg" radius="md" className="hover:shadow-lg transition-shadow">
+          <Group justify="space-between" mb="md">
+            <Text fw={600} size="lg">Quick Actions</Text>
+            <Text size="sm" c="dimmed">Manage your store</Text>
+          </Group>
+          
+          <SimpleGrid cols={3} mt="md">
+            <UnstyledButton className="p-4 rounded-lg hover:bg-blue-50 transition-colors group">
+              <IconBuildingStore className="w-8 h-8 text-blue-600 group-hover:text-blue-700 mb-2" stroke={1.5} />
+              <Text size="xs" className="text-center">Store Settings</Text>
+            </UnstyledButton>
+            
+            <UnstyledButton className="p-4 rounded-lg hover:bg-green-50 transition-colors group">
+              <IconShoppingCart className="w-8 h-8 text-green-600 group-hover:text-green-700 mb-2" stroke={1.5} />
+              <Text size="xs" className="text-center">Products</Text>
+            </UnstyledButton>
+            
+            <UnstyledButton className="p-4 rounded-lg hover:bg-purple-50 transition-colors group">
+              <IconPhoto className="w-8 h-8 text-purple-600 group-hover:text-purple-700 mb-2" stroke={1.5} />
+              <Text size="xs" className="text-center">Photos</Text>
+            </UnstyledButton>
+            
+            <UnstyledButton className="p-4 rounded-lg hover:bg-orange-50 transition-colors group">
+              <IconPackage className="w-8 h-8 text-orange-600 group-hover:text-orange-700 mb-2" stroke={1.5} />
+              <Text size="xs" className="text-center">Inventory</Text>
+            </UnstyledButton>
+            
+            <UnstyledButton className="p-4 rounded-lg hover:bg-red-50 transition-colors group">
+              <IconChartBar className="w-8 h-8 text-red-600 group-hover:text-red-700 mb-2" stroke={1.5} />
+              <Text size="xs" className="text-center">Analytics</Text>
+            </UnstyledButton>
+            
+            <UnstyledButton className="p-4 rounded-lg hover:bg-gray-50 transition-colors group">
+              <IconSettings className="w-8 h-8 text-gray-600 group-hover:text-gray-700 mb-2" stroke={1.5} />
+              <Text size="xs" className="text-center">More</Text>
+            </UnstyledButton>
+          </SimpleGrid>
+        </Card>
+
         {/* Help Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Need Help?</CardTitle>
-            <CardDescription>Resources and support</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <LegacyCard className="p-6 rounded-lg">
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold">Need Help?</h3>
+              <p className="text-sm text-neutral-600">Resources and support</p>
+            </div>
             <div className="space-y-3">
               <a href="#" className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-50 transition-colors">
                 <svg className="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -999,8 +1199,8 @@ export default function TenantSettingsPage() {
                 </div>
               </a>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </LegacyCard>
       </div>
     </div>
   );

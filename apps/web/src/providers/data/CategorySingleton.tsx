@@ -58,7 +58,9 @@ type CategoryAction =
 // ====================
 
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+
+// Helper function to get dynamic API base URL
+const getApiBaseUrl = () => process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
 // ====================
 // REDUCER
@@ -181,7 +183,7 @@ export const CategoryProvider: React.FC<CategoryProviderProps> = ({ children }) 
       if (includeProductCount) params.append('includeProductCount', 'true');
 
       const response = await fetch(
-        `${API_BASE_URL}/api/directory/categories?${params}`,
+        `${getApiBaseUrl()}/api/directory/categories?${params}`,
         {
           headers: {
             'Content-Type': 'application/json',

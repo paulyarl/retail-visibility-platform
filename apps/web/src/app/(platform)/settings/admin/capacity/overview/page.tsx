@@ -2,6 +2,7 @@
 
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui';
+import { Button } from '@mantine/core';
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';

@@ -4,7 +4,8 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isFeatureEnabled } from "@/lib/featureFlags";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, AnimatedCard } from "@/components/ui";
+import { Card, Button } from '@mantine/core';
+import { Badge, AnimatedCard } from "@/components/ui";
 import { useCountUp } from "@/hooks/useCountUp";
 import { usePlatformComplete } from "@/hooks/dashboard/usePlatformComplete";
 import { motion } from "framer-motion";
@@ -784,158 +785,178 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
           {isAuthenticated ? (
             <>
             <AnimatedCard delay={0.4} hover={false}>
-              <CardHeader>
-                <CardTitle className="text-lg sm:text-xl">Quick Actions</CardTitle>
-                <CardDescription className="text-sm">Get started with common tasks</CardDescription>
-              </CardHeader>
-            <CardContent className="space-y-2 sm:space-y-3">
-              {selectedTenantId && (
-                <Link href={`/tenant/${selectedTenantId}`} className="block" target="_blank">
-                  <Button variant="primary" className="w-full justify-start" size="md">
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                  <div className="flex-1">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Quick Actions</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Get started with common tasks</p>
+                  </div>
+                </div>
+                <div className="space-y-2 sm:space-y-3">
+                {selectedTenantId && (
+                  <Link href={`/tenant/${selectedTenantId}`} className="block" target="_blank">
+                    <Button variant="primary" className="w-full justify-start" size="md">
+                      <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      </svg>
+                      View Your Storefront
+                    </Button>
+                  </Link>
+                )}
+                <Link href={scopedLinks.tenants} className="block">
+                  <Button variant="secondary" className="w-full justify-start" size="md">
                     <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
-                    View Your Storefront
+                    Manage Locations
                   </Button>
                 </Link>
-              )}
-              <Link href={scopedLinks.tenants} className="block">
-                <Button variant="secondary" className="w-full justify-start" size="md">
-                  <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                  Manage Locations
-                </Button>
-              </Link>
-              <Link href={scopedLinks.items} className="block">
-                <Button variant="secondary" className="w-full justify-start" size="md">
-                  <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                  View Inventory
-                </Button>
-              </Link>
-              <Link href={scopedLinks.createItem} className="block">
-                <Button variant="secondary" className="w-full justify-start" size="md">
-                  <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add New Product
-                </Button>
-              </Link>
-            </CardContent>
+                <Link href={scopedLinks.items} className="block">
+                  <Button variant="secondary" className="w-full justify-start" size="md">
+                    <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    View Inventory
+                  </Button>
+                </Link>
+                <Link href={scopedLinks.createItem} className="block">
+                  <Button variant="secondary" className="w-full justify-start" size="md">
+                    <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add New Product
+                  </Button>
+                </Link>
+              </div>
+            </div>
           </AnimatedCard>
 
           <AnimatedCard delay={0.5} hover={false}>
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Getting Started</CardTitle>
-              <CardDescription className="text-sm">Set up your Visible Shelf</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 sm:space-y-4">
-              <Link href={selectedTenantId ? `/t/${selectedTenantId}/onboarding` : "/tenants"} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
-                <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:scale-110 transition-transform">
-                  1
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                <div className="flex-1">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Getting Started</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Set up your Visible Shelf</p>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Complete Business Profile</p>
-                  <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Set up your store identity and details</p>
-                </div>
-              </Link>
-              <Link href={scopedLinks.createItem} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
-                <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
-                  2
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Add inventory items</p>
-                  <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Upload products with photos</p>
-                </div>
-              </Link>
-              <Link href={scopedLinks.settingsTenant} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
-                <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
-                  3
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Connect to Google</p>
-                  <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Sync with Google Merchant Center</p>
-                </div>
-              </Link>
-            </CardContent>
+              </div>
+              <div className="space-y-3 sm:space-y-4">
+                <Link href={selectedTenantId ? `/t/${selectedTenantId}/onboarding` : "/tenants"} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                  <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:scale-110 transition-transform">
+                    1
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Complete Business Profile</p>
+                    <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Set up your store identity and details</p>
+                  </div>
+                </Link>
+                <Link href={scopedLinks.createItem} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                  <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
+                    2
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Add inventory items</p>
+                    <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Upload products with photos</p>
+                  </div>
+                </Link>
+                <Link href={scopedLinks.settingsTenant} className="flex items-start gap-3 p-3 sm:p-4 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer group">
+                  <div className="h-7 w-7 sm:h-6 sm:w-6 rounded-full bg-neutral-300 text-neutral-600 flex items-center justify-center text-sm font-medium flex-shrink-0 group-hover:bg-primary-600 group-hover:text-white group-hover:scale-110 transition-all">
+                    3
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-neutral-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base">Connect to Google</p>
+                    <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Sync with Google Merchant Center</p>
+                  </div>
+                </Link>
+              </div>
+            </div>
           </AnimatedCard>
           </>
           ) : (
             // Visitor Quick Actions
             <>
               <AnimatedCard delay={0.4} hover={false}>
-                <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Why Choose Us?</CardTitle>
-                  <CardDescription className="text-sm">Everything you need to succeed online</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 sm:space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
-                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-neutral-900 text-sm sm:text-base">Instant Google Visibility</p>
-                      <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Get your products on Google Shopping automatically</p>
+                <div className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-3 w-3 rounded-full bg-purple-500"></div>
+                    <div className="flex-1">
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Why Choose Us?</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Everything you need to succeed online</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
-                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                      </svg>
+                  <div className="space-y-3 sm:space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Instant Google Visibility</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Get your products on Google Shopping automatically</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-neutral-900 text-sm sm:text-base">Beautiful Storefront</p>
-                      <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Professional online store, no coding required</p>
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Beautiful Storefront</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Professional online store, no coding required</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-info flex items-center justify-center flex-shrink-0">
+                        <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-neutral-900 text-sm sm:text-base">Easy Management</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Update inventory from one simple dashboard</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-info flex items-center justify-center flex-shrink-0">
-                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-neutral-900 text-sm sm:text-base">Easy Management</p>
-                      <p className="text-xs sm:text-sm text-neutral-600 mt-0.5">Update inventory from one simple dashboard</p>
-                    </div>
-                  </div>
-                </CardContent>
+                </div>
               </AnimatedCard>
 
               <AnimatedCard delay={0.5} hover={false}>
-                <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Get Started Today</CardTitle>
-                  <CardDescription className="text-sm">Join retailers already using our platform</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 sm:space-y-4">
-                  <Link href="/register" className="block">
-                    <Button variant="primary" className="w-full justify-start" size="md">
-                      <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                      </svg>
-                      Create Free Account
-                    </Button>
-                  </Link>
-                  <Link href="/login" className="block">
-                    <Button variant="secondary" className="w-full justify-start" size="md">
-                      <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                      </svg>
-                      Sign In
-                    </Button>
-                  </Link>
-                  <div className="pt-3 sm:pt-4 border-t border-neutral-200">
-                    <p className="text-xs sm:text-sm text-neutral-600 mb-2">Questions?</p>
-                    <Link href="/contact" className="text-xs sm:text-sm text-primary-600 hover:underline">
-                      Contact our team →
-                    </Link>
+                <div className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-3 w-3 rounded-full bg-blue-500"></div>
+                    <div className="flex-1">
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Get Started Today</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Join retailers already using our platform</p>
+                    </div>
                   </div>
-                </CardContent>
+                  <div className="space-y-3 sm:space-y-4">
+                    <Link href="/register" className="block">
+                      <Button variant="primary" className="w-full justify-start" size="md">
+                        <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                        Create Free Account
+                      </Button>
+                    </Link>
+                    <Link href="/login" className="block">
+                      <Button variant="secondary" className="w-full justify-start" size="md">
+                        <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                        </svg>
+                        Sign In
+                      </Button>
+                    </Link>
+                    <div className="pt-3 sm:pt-4 border-t border-neutral-200">
+                      <p className="text-xs sm:text-sm text-neutral-600 mb-2">Questions?</p>
+                      <Link href="/contact" className="text-xs sm:text-sm text-primary-600 hover:underline">
+                        Contact our team →
+                      </Link>
+                    </div>
+                  </div>
+                </div>
               </AnimatedCard>
             </>
           )}
@@ -1036,13 +1057,11 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
             {/* Storefront Status */}
             <AnimatedCard delay={0.6} hover={false}>
-              <CardHeader>
+              <div className="p-6">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle className="text-base sm:text-lg flex-1 min-w-0">Your Storefront</CardTitle>
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex-1 min-w-0">Your Storefront</h3>
                   <Badge variant="success" className="flex-shrink-0">Live</Badge>
                 </div>
-              </CardHeader>
-              <CardContent>
                 <div className="space-y-3 sm:space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 sm:h-12 sm:w-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -1063,15 +1082,13 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     </Link>
                   )}
                 </div>
-              </CardContent>
+              </div>
             </AnimatedCard>
 
             {/* Google Integration Status */}
             <AnimatedCard delay={0.7} hover={false}>
-              <CardHeader>
-                <CardTitle className="text-base sm:text-lg">Google Integration</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <div className="p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">Google Integration</h3>
                 <div className="space-y-3 sm:space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 sm:h-12 sm:w-12 bg-success rounded-lg flex items-center justify-center flex-shrink-0">
@@ -1090,15 +1107,13 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     </Button>
                   </Link>
                 </div>
-              </CardContent>
+              </div>
             </AnimatedCard>
 
             {/* Actionable Insights */}
             <AnimatedCard delay={0.8} hover={false}>
-              <CardHeader>
-                <CardTitle className="text-base sm:text-lg">Action Items</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <div className="p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">Action Items</h3>
                 <div className="space-y-2 sm:space-y-3">
                   {stats.syncIssues > 0 && (
                     <div className="flex items-start gap-2 p-3 bg-warning-50 rounded-lg">
@@ -1106,7 +1121,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-neutral-900">{stats.syncIssues} items need Google sync</p>
+                        <p className="text-xs sm:text-sm font-medium text-neutral-900">{stats.syncIssues} items need sync</p>
                         <Link href={scopedLinks.items} className="text-xs text-primary-600 hover:underline block mt-1">
                           Review sync status →
                         </Link>
@@ -1135,7 +1150,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     </div>
                   )}
                 </div>
-              </CardContent>
+              </div>
             </AnimatedCard>
           </div>
         )}

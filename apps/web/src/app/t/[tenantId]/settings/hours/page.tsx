@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, use } from "react";
+import { Button } from '@mantine/core';
 import HoursEditor from "@/components/hours/HoursEditor";
 import SpecialHoursCalendar from "@/components/hours/SpecialHoursCalendar";
 import SyncStateBadge from "@/components/hours/SyncStateBadge";

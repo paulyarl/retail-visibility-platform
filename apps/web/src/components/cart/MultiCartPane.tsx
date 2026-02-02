@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { ShoppingCart, Store, ArrowRight, Eye } from 'lucide-react';
 
 export function MultiCartPane() {

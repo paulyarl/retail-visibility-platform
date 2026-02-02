@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge } from '@/components/ui';
+import { Card } from '@mantine/core';
+import { Badge } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { api } from '@/lib/api';
 import { Flags } from '@/lib/flags';
 import { ContextBadges } from '@/components/ContextBadges';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { TierGate } from '@/components/tier/TierGate';
+import { Button } from '@mantine/core';
 
 interface ScanSession {
   id: string;
@@ -199,14 +201,14 @@ export default function TenantScanPage() {
         )}
 
         {/* Start New Session */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Start New Scanning Session</CardTitle>
-            <CardDescription>
-              Choose your scanning method and begin adding products
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Card className="p-6 rounded-lg">
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold">Start New Scanning Session</h3>
+              <p className="text-sm text-neutral-600 mt-1">
+                Choose your scanning method and begin adding products
+              </p>
+            </div>
             <div className="space-y-4">
               {/* Device Selection */}
               <div>
@@ -335,7 +337,7 @@ export default function TenantScanPage() {
                 </Button>
               </div>
             </div>
-          </CardContent>
+          </div>
         </Card>
 
         {/* Best Practices Warning */}
@@ -365,17 +367,17 @@ export default function TenantScanPage() {
         )}
 
         {/* Recent Sessions */}
-        <Card>
-          <CardHeader>
+        <Card className="p-6 rounded-lg">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Recent Sessions</CardTitle>
-                <CardDescription>
+                <h3 className="text-lg font-semibold">Recent Sessions</h3>
+                <p className="text-sm text-neutral-600 mt-1">
                   {sessions.length > 0 
                     ? `Showing ${Math.min((currentPage - 1) * sessionsPerPage + 1, sessions.length)}-${Math.min(currentPage * sessionsPerPage, sessions.length)} of ${sessions.length} sessions`
                     : 'View and manage your scanning sessions'
                   }
-                </CardDescription>
+                </p>
               </div>
               <button
                 onClick={loadSessions}
@@ -388,33 +390,32 @@ export default function TenantScanPage() {
                 Refresh
               </button>
             </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-              </div>
-            ) : sessions.length === 0 ? (
-              <div className="text-center py-12">
-                <svg className="w-16 h-16 mx-auto text-neutral-400 dark:text-neutral-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="text-neutral-600 dark:text-neutral-400">No scanning sessions yet</p>
-                <p className="text-sm text-neutral-500 dark:text-neutral-500 mt-1">
-                  Start a new session to begin scanning products
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-3">
-                  {sessions
-                    .slice((currentPage - 1) * sessionsPerPage, currentPage * sessionsPerPage)
-                    .map((session) => (
-                    <div
-                      key={session.id}
-                      className="flex items-center justify-between p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors"
-                    >
-                      <div 
+            <div>
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                </div>
+              ) : sessions.length === 0 ? (
+                <div className="text-center py-12">
+                  <svg className="w-16 h-16 mx-auto text-neutral-400 dark:text-neutral-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-neutral-600 dark:text-neutral-400">No scanning sessions yet</p>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-500 mt-1">
+                    Start a new session to begin scanning products
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    {sessions
+                      .slice((currentPage - 1) * sessionsPerPage, currentPage * sessionsPerPage)
+                      .map((session) => (
+                      <div
+                        key={session.id}
+                        className="flex items-center justify-between p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors"
+                      >
+                        <div 
                         className="flex-1 cursor-pointer"
                         onClick={() => router.push(`/t/${tenantId}/scan/${session.id}`)}
                       >
@@ -491,7 +492,8 @@ export default function TenantScanPage() {
                 )}
               </>
             )}
-          </CardContent>
+            </div>
+          </div>
         </Card>
       </div>
     </div>

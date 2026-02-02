@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Printer, Download, Mail, Phone, MapPin, Store, CheckCircle2, Package } from 'lucide-react';
 import QRCode from 'qrcode';

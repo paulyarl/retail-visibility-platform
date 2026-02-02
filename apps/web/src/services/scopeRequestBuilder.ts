@@ -41,10 +41,12 @@ export interface ValidationResult {
 }
 
 export class ScopeRequestBuilder {
-  private apiBaseUrl: string;
+  private get apiBaseUrl(): string {
+    return process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  }
 
   constructor(apiBaseUrl?: string) {
-    this.apiBaseUrl = apiBaseUrl || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+    // For backward compatibility, but we'll use the getter for dynamic resolution
   }
 
   /**

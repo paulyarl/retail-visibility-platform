@@ -1,6 +1,7 @@
 'use client';
 
-import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui';
+import { Card } from '@mantine/core';
+import { Badge } from '@/components/ui';
 import PageHeader from '@/components/PageHeader';
 import Link from 'next/link';
 import { useAdminDirectoryListings } from '@/hooks/admin/useAdminDirectoryListings';
@@ -40,8 +41,8 @@ export default function AdminFeaturedDirectoryPage() {
           ))}
         </div>
       ) : listings.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
+        <Card className="p-6 rounded-lg">
+          <div className="py-12 text-center">
             <svg
               className="mx-auto h-12 w-12 text-gray-400"
               fill="none"
@@ -61,14 +62,13 @@ export default function AdminFeaturedDirectoryPage() {
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Featured listings will appear here when tenants upgrade to eligible tiers.
             </p>
-          </CardContent>
+          </div>
         </Card>
       ) : (
         <div className="space-y-4">
           {listings.map((listing) => (
-            <Card key={listing.id}>
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between">
+            <Card key={listing.id} className="p-4 rounded-lg">
+              <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -104,7 +104,6 @@ export default function AdminFeaturedDirectoryPage() {
                     </Link>
                   </div>
                 </div>
-              </CardContent>
             </Card>
           ))}
         </div>

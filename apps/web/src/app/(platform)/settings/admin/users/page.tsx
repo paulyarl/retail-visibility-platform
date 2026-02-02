@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Users, UserPlus, Key, Trash2, Shield, User as UserIcon, Search, Filter, Edit, Building2, Mail, Power, UserCheck, ChevronDown, ChevronRight, Eye, EyeOff, Save, X } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
+import { Card } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui';
+import { Button } from '@mantine/core';
 import CreateUserModal from '@/components/admin/CreateUserModal';
 import ResetPasswordModal from '@/components/admin/ResetPasswordModal';
 import EditUserModal from '@/components/admin/EditUserModal';
@@ -397,35 +397,35 @@ export default function PlatformUserMaintenancePage() {
 
       {/* User Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total Users</CardDescription>
-            <CardTitle className="text-2xl">{users.length}</CardTitle>
-          </CardHeader>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{users.length}</p>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Active Users</CardDescription>
-            <CardTitle className="text-2xl text-green-600">{users.filter(u => u.is_active).length}</CardTitle>
-          </CardHeader>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Active Users</p>
+            <p className="text-2xl font-bold text-green-600">{users.filter(u => u.is_active).length}</p>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Pending Users</CardDescription>
-            <CardTitle className="text-2xl text-yellow-600">{users.filter(u => !u.email_verified).length}</CardTitle>
-          </CardHeader>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Pending Users</p>
+            <p className="text-2xl font-bold text-yellow-600">{users.filter(u => !u.email_verified).length}</p>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Admin Users</CardDescription>
-            <CardTitle className="text-2xl text-purple-600">{users.filter(u => ['PLATFORM_ADMIN', 'ADMIN'].includes(u.role)).length}</CardTitle>
-          </CardHeader>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Admin Users</p>
+            <p className="text-2xl font-bold text-purple-600">{users.filter(u => ['PLATFORM_ADMIN', 'ADMIN'].includes(u.role)).length}</p>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Inactive Users</CardDescription>
-            <CardTitle className="text-2xl text-red-600">{users.filter(u => !u.is_active).length}</CardTitle>
-          </CardHeader>
+        <Card withBorder padding="lg" radius="md">
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Inactive Users</p>
+            <p className="text-2xl font-bold text-red-600">{users.filter(u => !u.is_active).length}</p>
+          </div>
         </Card>
       </div>
       

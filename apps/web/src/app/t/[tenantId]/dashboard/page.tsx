@@ -1,4 +1,5 @@
 import TenantDashboard from "@/components/dashboard/TenantDashboard";
+import { Button } from '@mantine/core';
 import SetTenantId from "@/components/client/SetTenantId";
 
 export default async function TenantScopedDashboard({ params }: { params: Promise<{ tenantId: string }> }) {

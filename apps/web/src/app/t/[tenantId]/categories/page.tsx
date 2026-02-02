@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { api, API_BASE_URL } from '@/lib/api'
+import { Button } from '@mantine/core';
 import { Pagination } from '@/components/ui'
 import { ContextBadges } from '@/components/ContextBadges'
 import { QuickStartCategoryModal } from '@/components/quick-start'
