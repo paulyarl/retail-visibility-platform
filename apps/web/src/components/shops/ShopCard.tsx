@@ -298,97 +298,102 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
 
   // Default variant
   return (
-    <TrackingLink href={shopUrls.canonicalUrl} className="block">
-      <Card className={cn('hover:shadow-lg transition-shadow duration-200', className)}>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {showTrendingBadge && (
-                <Badge variant="default" className="bg-red-500 text-white">
-                  #{trendingRank}
-                </Badge>
-              )}
-              <Badge variant="default" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold text-xs px-3 py-1">
-                {shop.primary_category || shop.category}
+    <Card className={cn('hover:shadow-lg transition-shadow duration-200', className)}>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {showTrendingBadge && (
+              <Badge variant="default" className="bg-red-500 text-white">
+                #{trendingRank}
               </Badge>
-              {shop.isVerified && (
-                <CheckCircle className="w-4 h-4 text-green-500" />
-              )}
+            )}
+            <Badge variant="default" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold text-xs px-3 py-1">
+              {shop.primary_category || shop.category}
+            </Badge>
+            {shop.isVerified && (
+              <CheckCircle className="w-4 h-4 text-green-500" />
+            )}
+          </div>
+          {shop.isActive && (
+            <Badge variant="success" className="text-green-600">
+              Active
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="p-4">
+        {/* Shop Image */}
+        <div className="relative h-40 mb-4">
+          {!imageError && shop.imageUrl ? (
+            <Image
+              src={shop.imageUrl}
+              alt={shop.name}
+              fill
+              className="object-cover rounded-lg"
+              sizes="(max-width: 300px) 100vw"
+              onError={handleImageError}
+            />
+          ) : (
+            <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
+              <span className="text-3xl text-gray-400">🏪</span>
             </div>
-            {shop.isActive && (
-              <Badge variant="success" className="text-green-600">
-                Active
+          )}
+        </div>
+
+        {/* Shop Info */}
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 truncate">
+              {shop.name}
+            </h3>
+            <p className="text-gray-600 line-clamp-2">
+              {shop.description}
+            </p>
+          </div>
+
+          {/* Rating and Reviews */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center">
+              <Star className="w-4 h-4 text-yellow-400 fill-current" />
+              <span className="font-medium text-gray-900">
+                {formatRating(shop.rating)}
+              </span>
+            </div>
+            <span className="text-sm text-gray-500">
+              ({shop.reviewCount} reviews)
+            </span>
+          </div>
+
+          {/* Location */}
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <MapPin className="w-4 h-4" />
+            <span>{shop.location}</span>
+          </div>
+
+          {/* Stats */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-600">
+              {formatProductCount(shop.productCount)} products
+            </span>
+            {shop.rating >= 4.5 && (
+              <Badge variant="success" className="text-xs">
+                Top Rated
               </Badge>
             )}
           </div>
-        </CardHeader>
-        <CardContent className="p-4">
-          {/* Shop Image */}
-          <div className="relative h-40 mb-4">
-            {!imageError && shop.imageUrl ? (
-              <Image
-                src={shop.imageUrl}
-                alt={shop.name}
-                fill
-                className="object-cover rounded-lg"
-                sizes="(max-width: 300px) 100vw"
-                onError={handleImageError}
-              />
-            ) : (
-              <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
-                <span className="text-3xl text-gray-400">🏪</span>
-              </div>
-            )}
-          </div>
+        </div>
+      </CardContent>
 
-          {/* Shop Info */}
-          <div className="space-y-3">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 truncate">
-                {shop.name}
-              </h3>
-              <p className="text-gray-600 line-clamp-2">
-                {shop.description}
-              </p>
-            </div>
-
-            {/* Rating and Reviews */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center">
-                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                <span className="font-medium text-gray-900">
-                  {formatRating(shop.rating)}
-                </span>
-              </div>
-              <span className="text-sm text-gray-500">
-                ({shop.reviewCount} reviews)
-              </span>
-            </div>
-
-            {/* Location */}
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <MapPin className="w-4 h-4" />
-              <span>{shop.location}</span>
-            </div>
-
-            {/* Stats */}
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">
-                {formatProductCount(shop.productCount)} products
-              </span>
-              {shop.rating >= 4.5 && (
-                <Badge variant="success" className="text-xs">
-                  Top Rated
-                </Badge>
-              )}
-            </div>
-          </div>
-        </CardContent>
-
-        {/* URLs */}
-        {showUrls && (
-          <CardFooter className="pt-2">
-            <div className="flex flex-wrap gap-2 text-xs">
+      {/* URLs */}
+      <CardFooter className="pt-2">
+        <div className="flex flex-wrap gap-2 w-full">
+          <TrackingLink href={shopUrls.canonicalUrl}>
+            <Button className="flex-1">
+              Visit Shop
+            </Button>
+          </TrackingLink>
+          {showUrls && (
+            <>
               {shopUrls.slugUrl && (
                 <Link href={shopUrls.slugUrl}>
                   <Button variant="outline" size="sm">
@@ -409,10 +414,10 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
                   Short
                 </Button>
               </Link>
-            </div>
-          </CardFooter>
-        )}
-      </Card>
-    </TrackingLink>
+            </>
+          )}
+        </div>
+      </CardFooter>
+    </Card>
   );
 }
