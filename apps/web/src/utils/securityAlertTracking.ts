@@ -13,6 +13,8 @@
  * - Performance monitoring
  */
 
+import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+
 interface SecurityAlertEvent {
   type: 'rate_limit_exceeded' | 'auth_failure' | 'suspicious_activity' | 'security_incident';
   severity: 'info' | 'warning' | 'critical';
@@ -277,27 +279,54 @@ class SecurityAlertTrackingCache {
    */
   private async sendEventsByType(type: string, events: SecurityAlertEvent[], apiUrl: string): Promise<void> {
     try {
-      const response = await fetch(`${apiUrl}/api/security/telemetry/${type}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Security-Telemetry': 'true'
-        },
-        body: JSON.stringify({
-          events,
-          batchMetadata: {
-            batchSize: events.length,
-            priorityBreakdown: this.getPriorityBreakdown(events),
-            clientTimestamp: Date.now(),
-            clientVersion: '1.0.0',
-            eventType: type
-          }
-        })
-      });
+      // Create a temporary singleton for this request
+      class SecurityTelemetrySingleton extends UniversalSingleton {
+        private static instance: SecurityTelemetrySingleton;
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        private constructor() {
+          super('security-telemetry', { encrypt: false });
+        }
+
+        public static getInstance(): SecurityTelemetrySingleton {
+          if (!SecurityTelemetrySingleton.instance) {
+            SecurityTelemetrySingleton.instance = new SecurityTelemetrySingleton();
+          }
+          return SecurityTelemetrySingleton.instance;
+        }
+
+        async sendTelemetry(type: string, payload: any): Promise<any> {
+          const response = await this.makeApiRequest<any>(
+            `/api/security/telemetry/${type}`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Security-Telemetry': 'true'
+              },
+              body: JSON.stringify(payload)
+            }
+          );
+          
+          if (!response.success) {
+            throw new Error(`Failed to send telemetry: ${response.error || 'Unknown error'}`);
+          }
+          
+          return response.data;
+        }
       }
+
+      const telemetrySingleton = SecurityTelemetrySingleton.getInstance();
+      
+      const response = await telemetrySingleton.sendTelemetry(type, {
+        events,
+        batchMetadata: {
+          batchSize: events.length,
+          priorityBreakdown: this.getPriorityBreakdown(events),
+          clientTimestamp: Date.now(),
+          clientVersion: '1.0.0',
+          eventType: type
+        }
+      });
 
       console.log(`[SecurityAlertTracking] Successfully sent ${events.length} ${type} events`);
     } catch (error) {

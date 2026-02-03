@@ -3,6 +3,42 @@
  * Calculates store-level statistics from storefront_category_counts materialized view
  */
 
+import { UniversalSingleton, SingletonCacheOptions } from '@/providers/base/UniversalSingleton';
+
+// Store Stats Singleton Class
+class StoreStatsSingleton extends UniversalSingleton {
+  private static instance: StoreStatsSingleton;
+
+  private constructor() {
+    super('store-stats', { encrypt: false });
+    this.cacheTTL = 5 * 60 * 1000; // 5 minutes
+  }
+
+  public static getInstance(): StoreStatsSingleton {
+    if (!StoreStatsSingleton.instance) {
+      StoreStatsSingleton.instance = new StoreStatsSingleton();
+    }
+    return StoreStatsSingleton.instance;
+  }
+
+  // Method to fetch store stats for a tenant
+  async fetchStoreStats(tenantId: string): Promise<any> {
+    // Add cache-busting timestamp to force fresh data
+    const timestamp = Date.now();
+    const response = await this.makeApiRequest<any>(
+      `/api/storefront/${tenantId}/storefront/categories-stats?t=${timestamp}`,
+      { cache: 'no-store' }, // Disable caching
+      `store-stats:${tenantId}`
+    );
+    
+    if (!response.success) {
+      throw new Error(`Failed to fetch store stats: ${response.error || 'Unknown error'}`);
+    }
+    
+    return response.data;
+  }
+}
+
 export interface StoreStats {
   totalProducts: number;
   totalInStock: number;
@@ -147,18 +183,8 @@ export async function fetchStoreStats(tenantId: string): Promise<StoreStats> {
   console.log('Store Stats Cache MISS for', tenantId);
   
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-    // Add cache-busting timestamp to force fresh data
-    const timestamp = Date.now();
-    const response = await fetch(`${apiUrl}/api/storefront/${tenantId}/storefront/categories-stats?t=${timestamp}`, {
-      cache: 'no-store', // Disable caching
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch store stats: ${response.status}`);
-    }
-    
-    const data = await response.json();
+    const apiSingleton = StoreStatsSingleton.getInstance();
+    const data = await apiSingleton.fetchStoreStats(tenantId);
     
     // Use the pre-calculated storeStats from API, but transform categories for EnhancedStoreCard
     const categories = data.categories?.map((cat: any) => ({

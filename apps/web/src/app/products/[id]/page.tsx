@@ -8,6 +8,7 @@ import { ProductRecommendations } from '@/components/products/ProductRecommendat
 import LastViewed from '@/components/directory/LastViewed';
 import { computeStoreStatus } from '@/lib/hours-utils';
 import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
+import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
 import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import ProductBusinessInfoCollapsible from '@/components/products/ProductBusinessInfoCollapsible';
@@ -140,21 +141,76 @@ interface Tenant {
   };
 }
 
+// Product Data API Singleton
+class ProductDataSingleton extends UniversalSingleton {
+  private static instance: ProductDataSingleton;
+
+  private constructor() {
+    super('product-data', { encrypt: false });
+  }
+
+  public static getInstance(): ProductDataSingleton {
+    if (!ProductDataSingleton.instance) {
+      ProductDataSingleton.instance = new ProductDataSingleton();
+    }
+    return ProductDataSingleton.instance;
+  }
+
+  async fetchProduct(id: string): Promise<any> {
+    try {
+      const response = await this.makeApiRequest<any>(
+        `/items/${id}`,
+        { 
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      
+      return response;
+    } catch (error) {
+      throw new Error(`Failed to fetch product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async fetchTenantProfile(tenantId: string): Promise<any> {
+    try {
+      const response = await this.makeApiRequest<any>(
+        `/public/tenant/${tenantId}/profile`,
+        { 
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      
+      return response;
+    } catch (error) {
+      throw new Error(`Failed to fetch tenant profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async fetchDirectoryEntry(tenantSlug: string): Promise<any> {
+    const response = await this.makeApiRequest<any>(
+      `/api/directory/${tenantSlug}`,
+      { 
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+    
+    if (!response.success) {
+      throw new Error(`Failed to fetch directory entry: ${response.error || 'Unknown error'}`);
+    }
+    
+    return response.data;
+  }
+}
+
 async function getProduct(id: string): Promise<{ product: Product; tenant: Tenant; storeStatus?: any; directorySlug?: string } | null> {
   try {
-    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
+    const productDataSingleton = ProductDataSingleton.getInstance();
     
     // Fetch product
-    const productRes = await fetch(`${apiBaseUrl}/items/${id}`, {
-      cache: 'no-store',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    if (!productRes.ok) {
-      return null;
-    }
-
-    const productData = await productRes.json();
+    const productData = await productDataSingleton.fetchProduct(id);
     
     // Extract enriched fields from metadata if present
     const metadata = productData.metadata || {};
@@ -186,9 +242,7 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
     };
 
     // Fetch tenant info and business profile using public endpoint
-    const profileRes = await fetch(`${apiBaseUrl}/public/tenant/${product.tenantId}/profile`, {
-      cache: 'no-store',
-    });
+    const profileData = await productDataSingleton.fetchTenantProfile(product.tenantId);
 
     // Payment gateway status is already included in the product data from the MV
     const tenant: Tenant = { 
@@ -200,8 +254,8 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
     let businessName;
 
     let storeStatus = null;
-    if (profileRes.ok) {
-      const profile = await profileRes.json();
+    if (profileData) {
+      const profile = profileData;
       // Extract business name from profile
       tenant.name = profile.business_name || 'Store';
       // Merge business profile data into tenant metadata
@@ -226,13 +280,9 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
   let directoryPublished = false;
   const tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   try {
-    const directoryRes = await fetch(`${apiBaseUrl}/api/directory/${tenantSlug}`, {
-      cache: 'no-store',
-    });
-    if (directoryRes.ok) {
-      // If the directory page exists, the store is published
-      directoryPublished = true;
-    }
+    await productDataSingleton.fetchDirectoryEntry(tenantSlug);
+    // If the directory page exists, the store is published
+    directoryPublished = true;
   } catch (e) {
     // Directory page doesn't exist or error - store is not published
     directoryPublished = false;
@@ -262,24 +312,56 @@ type Photo = {
   position: number;
 };
 
+// Product Photos API Singleton
+class ProductPhotosSingleton extends UniversalSingleton {
+  private static instance: ProductPhotosSingleton;
+
+  private constructor() {
+    super('product-photos', { encrypt: false });
+  }
+
+  public static getInstance(): ProductPhotosSingleton {
+    if (!ProductPhotosSingleton.instance) {
+      ProductPhotosSingleton.instance = new ProductPhotosSingleton();
+    }
+    return ProductPhotosSingleton.instance;
+  }
+
+  async fetchProductPhotos(id: string): Promise<Photo[]> {
+    try {
+      const data = await this.makeApiRequest<any>(
+        `/api/items/${id}/photos`,
+        { 
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      
+      if (!Array.isArray(data)) return [];
+      
+      // Expecting array of { url, position, alt, caption } objects
+      const sorted = (data as Array<{ url?: string; position?: number; alt?: string | null; caption?: string | null }>)
+        .filter((p) => typeof p?.url === 'string' && (p.url as string).length > 0)
+        .sort((a, b) => ((a?.position ?? 0) - (b?.position ?? 0)));
+      return sorted.map((p) => ({
+        url: p.url as string,
+        alt: p.alt,
+        caption: p.caption,
+        position: p.position ?? 0,
+      }));
+    } catch (error) {
+      console.warn(`Failed to fetch product photos: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return [];
+    }
+  }
+}
+
 async function getProductPhotos(id: string): Promise<Photo[]> {
   try {
-    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${apiBaseUrl}/api/items/${id}/photos`, { cache: 'no-store' });
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!Array.isArray(data)) return [];
-    // Expecting array of { url, position, alt, caption } objects
-    const sorted = (data as Array<{ url?: string; position?: number; alt?: string | null; caption?: string | null }>)
-      .filter((p) => typeof p?.url === 'string' && (p.url as string).length > 0)
-      .sort((a, b) => ((a?.position ?? 0) - (b?.position ?? 0)));
-    return sorted.map((p) => ({
-      url: p.url as string,
-      alt: p.alt,
-      caption: p.caption,
-      position: p.position ?? 0,
-    }));
-  } catch (_e) {
+    const photosSingleton = ProductPhotosSingleton.getInstance();
+    return await photosSingleton.fetchProductPhotos(id);
+  } catch (error) {
+    console.warn('Error fetching product photos:', error);
     return [];
   }
 }

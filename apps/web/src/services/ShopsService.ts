@@ -3,6 +3,40 @@
  * Handles all shop-related API calls and data management
  */
 
+import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+
+// Shops API Singleton Class
+class ShopsAPISingleton extends UniversalSingleton {
+  private static instance: ShopsAPISingleton;
+
+  private constructor() {
+    super('shops-service', { encrypt: false });
+  }
+
+  public static getInstance(): ShopsAPISingleton {
+    if (!ShopsAPISingleton.instance) {
+      ShopsAPISingleton.instance = new ShopsAPISingleton();
+    }
+    return ShopsAPISingleton.instance;
+  }
+
+  async makeShopsApiRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string
+  ): Promise<{ success: boolean; data?: T; error?: string; status?: number }> {
+    try {
+      const response = await this.makeApiRequest<T>(url, options, cacheKey);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error', status: error instanceof Error && 'status' in error ? (error as any).status : undefined };
+    }
+  }
+}
+
+// Export the ShopsAPISingleton class
+export { ShopsAPISingleton };
+
 export interface Shop {
   id: string;
   tenantId: string;
@@ -123,20 +157,25 @@ class ShopsService {
     if (cached) return cached;
 
     try {
-      const response = await fetch(`/api/shops/resolve?identifier=${encodeURIComponent(identifier)}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const apiSingleton = ShopsAPISingleton.getInstance();
+      const response = await apiSingleton.makeShopsApiRequest<Shop>(
+        `/api/shops/resolve?identifier=${encodeURIComponent(identifier)}`,
+        {},
+        cacheKey
+      );
 
-      if (!response.ok) {
+      if (!response.success) {
         if (response.status === 404) {
           return null;
         }
-        throw new Error(`Failed to resolve shop: ${response.statusText}`);
+        throw new Error(`Failed to resolve shop: ${response.error || 'Unknown error'}`);
       }
 
-      const shop = await response.json();
+      const shop = response.data;
+      if (!shop) {
+        console.warn('Shop data is undefined');
+        return null;
+      }
       this.setCache(cacheKey, shop);
       return shop;
     } catch (error) {
@@ -154,6 +193,7 @@ class ShopsService {
     if (cached) return cached;
 
     try {
+      const apiSingleton = ShopsAPISingleton.getInstance();
       const params = new URLSearchParams({
         tenantId,
         page: filters.page.toString(),
@@ -163,17 +203,17 @@ class ShopsService {
         ...(filters.sort && filters.sort !== 'default' && { sort: filters.sort }),
       });
 
-      const response = await fetch(`/api/products?${params}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await apiSingleton.makeShopsApiRequest<any>(
+        `/api/products?${params}`,
+        {},
+        `shop-products:${tenantId}:${JSON.stringify(filters)}`
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch products: ${response.statusText}`);
+      if (!response.success) {
+        throw new Error(`Failed to fetch products: ${response.error || 'Unknown error'}`);
       }
 
-      const data = await response.json();
+      const data = response.data;
       const result: ShopProductsResponse = {
         products: data.products || [],
         total: data.total || 0,
@@ -203,6 +243,7 @@ class ShopsService {
     if (cached) return cached;
 
     try {
+      const apiSingleton = ShopsAPISingleton.getInstance();
       const params = new URLSearchParams({
         tenantId,
         page: page.toString(),
@@ -211,17 +252,17 @@ class ShopsService {
         sort: sortBy,
       });
 
-      const response = await fetch(`/api/shops/${tenantId}/reviews?${params}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await apiSingleton.makeShopsApiRequest<any>(
+        `/api/shops/${tenantId}/reviews?${params}`,
+        {},
+        cacheKey
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch reviews: ${response.statusText}`);
+      if (!response.success) {
+        throw new Error(`Failed to fetch reviews: ${response.error || 'Unknown error'}`);
       }
 
-      const data = await response.json();
+      const data = response.data;
       const result: ShopReviewsResponse = {
         reviews: data.reviews || [],
         total: data.total || 0,
@@ -240,15 +281,15 @@ class ShopsService {
    */
   async followShop(tenantId: string, follow: boolean): Promise<boolean> {
     try {
-      const response = await fetch(`/api/shops/${tenantId}/follow`, {
-        method: follow ? 'POST' : 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const apiSingleton = ShopsAPISingleton.getInstance();
+      const response = await apiSingleton.makeShopsApiRequest<any>(
+        `/api/shops/${tenantId}/follow`,
+        { method: follow ? 'POST' : 'DELETE' },
+        `follow-shop:${tenantId}`
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to ${follow ? 'follow' : 'unfollow'} shop: ${response.statusText}`);
+      if (!response.success) {
+        throw new Error(`Failed to ${follow ? 'follow' : 'unfollow'} shop: ${response.error || 'Unknown error'}`);
       }
 
       // Clear relevant cache entries
@@ -267,15 +308,15 @@ class ShopsService {
    */
   async markReviewHelpful(reviewId: string): Promise<boolean> {
     try {
-      const response = await fetch(`/api/reviews/${reviewId}/helpful`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const apiSingleton = ShopsAPISingleton.getInstance();
+      const response = await apiSingleton.makeShopsApiRequest<any>(
+        `/api/reviews/${reviewId}/helpful`,
+        { method: 'POST' },
+        `helpful-review:${reviewId}`
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to mark review as helpful: ${response.statusText}`);
+      if (!response.success) {
+        throw new Error(`Failed to mark review as helpful: ${response.error || 'Unknown error'}`);
       }
 
       // Clear review cache entries
@@ -297,22 +338,23 @@ class ShopsService {
     if (cached) return cached;
 
     try {
+      const apiSingleton = ShopsAPISingleton.getInstance();
       const params = new URLSearchParams({
         limit: limit.toString(),
         ...(region && { region }),
       });
 
-      const response = await fetch(`/api/shops/trending?${params}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await apiSingleton.makeShopsApiRequest<any>(
+        `/api/shops/trending?${params}`,
+        {},
+        cacheKey
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch trending shops: ${response.statusText}`);
+      if (!response.success) {
+        throw new Error(`Failed to fetch trending shops: ${response.error || 'Unknown error'}`);
       }
 
-      const shops = await response.json();
+      const shops = response.data;
       this.setCache(cacheKey, shops);
       return shops;
     } catch (error) {
@@ -330,22 +372,23 @@ class ShopsService {
     if (cached) return cached;
 
     try {
+      const apiSingleton = ShopsAPISingleton.getInstance();
       const params = new URLSearchParams({
         q: query,
         limit: limit.toString(),
       });
 
-      const response = await fetch(`/api/shops/search?${params}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await apiSingleton.makeShopsApiRequest<any>(
+        `/api/shops/search?${params}`,
+        {},
+        cacheKey
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to search shops: ${response.statusText}`);
+      if (!response.success) {
+        throw new Error(`Failed to search shops: ${response.error || 'Unknown error'}`);
       }
 
-      const shops = await response.json();
+      const shops = response.data;
       this.setCache(cacheKey, shops);
       return shops;
     } catch (error) {
@@ -377,17 +420,18 @@ class ShopsService {
     if (cached) return cached;
 
     try {
-      const response = await fetch(`/api/shops/${tenantId}/stats`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const apiSingleton = ShopsAPISingleton.getInstance();
+      const response = await apiSingleton.makeShopsApiRequest<any>(
+        `/api/shops/${tenantId}/stats`,
+        {},
+        cacheKey
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch shop stats: ${response.statusText}`);
+      if (!response.success) {
+        throw new Error(`Failed to fetch shop stats: ${response.error || 'Unknown error'}`);
       }
 
-      const stats = await response.json();
+      const stats = response.data;
       this.setCache(cacheKey, stats);
       return stats;
     } catch (error) {
@@ -432,22 +476,23 @@ class ShopsService {
     if (cached) return cached;
 
     try {
+      const apiSingleton = ShopsAPISingleton.getInstance();
       const queryParams = new URLSearchParams({
         limit: (params?.limit || 100).toString(),
         minProducts: (params?.minProducts || 1).toString(),
       });
 
-      const response = await fetch(`/api/public/shops/categories?${queryParams}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await apiSingleton.makeShopsApiRequest<any>(
+        `/api/public/shops/categories?${queryParams}`,
+        {},
+        cacheKey
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch categories: ${response.statusText}`);
+      if (!response.success) {
+        throw new Error(`Failed to fetch categories: ${response.error || 'Unknown error'}`);
       }
 
-      const data = await response.json();
+      const data = response.data;
       const rawCategories = data.success && data.data ? data.data : [];
       
       // Map to include all required CategoryAggregation fields
@@ -497,27 +542,30 @@ class ShopsService {
     if (cached) return cached;
 
     try {
+      const apiSingleton = ShopsAPISingleton.getInstance();
       // Only access localStorage in browser environment
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      const response = await fetch('/api/slugs/patterns', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
-        },
-        body: JSON.stringify({
-          businessName: params.businessName,
-          location: params.location || {},
+      
+      const response = await apiSingleton.makeShopsApiRequest<any>(
+        '/api/slugs/patterns',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` }),
+          },
+          body: JSON.stringify({
+            businessName: params.businessName,
+            location: params.location || {},
           tenantId: params.tenantId,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch slug patterns: ${response.statusText}`);
+      if (!response.success) {
+        throw new Error(`Failed to fetch slug patterns: ${response.error || 'Unknown error'}`);
       }
 
-      const data = await response.json();
-      const patterns = data.patterns || [];
+      const patterns = response.data?.patterns || [];
       
       this.setCache(cacheKey, patterns);
       return patterns;

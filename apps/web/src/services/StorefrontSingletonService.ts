@@ -44,7 +44,7 @@ class StorefrontSingletonService {
   private constructor() {
     // Initialize UniversalSingletonClient with platform defaults
     this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
+      baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000',
       enableCache: true,
       defaultTTL: 5 * 60 * 1000, // 5 minutes for storefront data
       enableLogging: true,
@@ -162,7 +162,13 @@ class StorefrontSingletonService {
       
       const result = await this.client.makeRequest<any>(endpoint);
       
-      return result.data || { items: [] };
+      // Return the raw API response mapped to expected format
+      // Cast to any since the response structure varies by endpoint
+      const response = result as any;
+      return {
+        items: response?.items || [],
+        count: response?.totalCount || response?.count
+      };
     } catch (error) {
       console.error('[StorefrontSingleton] Failed to get featured products:', error);
       return { items: [] };

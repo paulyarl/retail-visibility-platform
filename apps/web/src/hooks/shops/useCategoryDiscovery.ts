@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { ProductAPISingleton } from './useShopsFeaturedBuckets';
 
 /**
  * Hook for category-based product discovery
@@ -97,27 +99,28 @@ export function useCategoryDiscovery(options: CategoryDiscoveryOptions): Categor
       // Category type
       categoryParams.append('category[categoryType]', categoryType);
       
-      // Fetch products by category
-      const productsResponse = await fetch(
-        `/api/public/shops/discover/${bucketType}?scope=category&${categoryParams.toString()}&limit=${limit}`
+      // Fetch products by category using UniversalSingleton
+      const apiSingleton = ProductAPISingleton.getInstance();
+      const productsData = await apiSingleton.makePublicApiRequest<any>(
+        `/api/public/shops/discover/${bucketType}?scope=category&${categoryParams.toString()}&limit=${limit}`,
+        {},
+        `category-products:${bucketType}`
       );
       
-      if (!productsResponse.ok) {
-        throw new Error(`Failed to fetch category products: ${productsResponse.statusText}`);
+      if (!productsData.success) {
+        throw new Error(`Failed to fetch category products: ${productsData.error || 'Unknown error'}`);
       }
       
-      const productsData = await productsResponse.json();
-      
-      // Fetch trending shops by category
-      const shopsResponse = await fetch(
-        `/api/public/shops/trending?scope=category&${categoryParams.toString()}&limit=12`
+      // Fetch trending shops by category using UniversalSingleton
+      const shopsData = await apiSingleton.makePublicApiRequest<any>(
+        `/api/public/shops/trending?scope=category&${categoryParams.toString()}&limit=12`,
+        {},
+        'category-shops'
       );
       
-      if (!shopsResponse.ok) {
-        throw new Error(`Failed to fetch category shops: ${shopsResponse.statusText}`);
+      if (!shopsData.success) {
+        throw new Error(`Failed to fetch category shops: ${shopsData.error || 'Unknown error'}`);
       }
-      
-      const shopsData = await shopsResponse.json();
       
       setProducts(productsData.data || []);
       setShops(shopsData.data || []);

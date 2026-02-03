@@ -7,6 +7,7 @@
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import ShopProfileClient from './ShopProfileClient';
+import { ShopsAPISingleton } from '@/services/ShopsService';
 
 // Types
 interface Shop {
@@ -45,32 +46,34 @@ interface ShopProfilePageProps {
 // Shop data fetching function
 async function getShopBySlug(identifier: string): Promise<Shop | null> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    // Use ShopsAPISingleton for consistent API communication and caching
+    const apiSingleton = ShopsAPISingleton.getInstance();
+    const response = await apiSingleton.makeShopsApiRequest<any>(`/api/public/shops/${identifier}`, {}, `shop:${identifier}`);
     
-    // First try to fetch by slug
-    let response = await fetch(`${baseUrl}/api/public/shops/${identifier}`, {
-      cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
+    console.log('[DEBUG] Full response:', response);
+    console.log('[DEBUG] Response success:', response.success);
+    console.log('[DEBUG] Response data:', response.data);
+    console.log('[DEBUG] Response data type:', typeof response.data);
+    console.log('[DEBUG] Response data keys:', response.data ? Object.keys(response.data) : 'no data');
+    
+    if (response.success && response.data?.shop) {
+      console.log('[DEBUG] Returning shop from response.data.shop');
+      return response.data.shop;
+    }
+    
     // If slug fetch fails, try by tenant ID
-    if (!response.ok) {
-      response = await fetch(`${baseUrl}/api/public/shops/id/${identifier}`, {
-        cache: 'no-store',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+    if (!response.success || response.status === 404) {
+      console.log('[DEBUG] Trying tenant ID lookup');
+      const idResponse = await apiSingleton.makeShopsApiRequest<any>(`/api/public/shops/id/${identifier}`, {}, `shop:id:${identifier}`);
+      
+      if (idResponse.success && idResponse.data?.shop) {
+        console.log('[DEBUG] Returning shop from idResponse.data.shop');
+        return idResponse.data.shop;
+      }
     }
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const result = await response.json();
-    return result.success ? result.shop : null;
+    
+    console.log('[DEBUG] Returning null');
+    return null;
   } catch (error) {
     console.error('Error fetching shop:', error);
     return null;

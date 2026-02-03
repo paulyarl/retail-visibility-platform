@@ -8,6 +8,7 @@ import { Star, Package, Search, Filter, Grid, List, ChevronDown, ShoppingCart, H
 import { useProductLayout, layoutVariantDescriptions } from '@/contexts/ProductLayoutContext';
 import StorefrontActions from '@/components/storefront/StorefrontActions';
 import { Button } from '@mantine/core';
+import { storefrontService } from '@/services/StorefrontSingletonService';
 
 interface CatalogProduct {
   id: string;

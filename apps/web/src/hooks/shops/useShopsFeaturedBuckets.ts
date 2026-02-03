@@ -3,6 +3,45 @@
 import { useState, useEffect, useCallback } from 'react';
 import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
 
+// Product API Singleton Class
+class ProductAPISingleton extends UniversalSingleton {
+  private static instance: ProductAPISingleton;
+
+  private constructor() {
+    super('product-api', { encrypt: false });
+  }
+
+  public static getInstance(): ProductAPISingleton {
+    if (!ProductAPISingleton.instance) {
+      ProductAPISingleton.instance = new ProductAPISingleton();
+    }
+    return ProductAPISingleton.instance;
+  }
+
+  async fetchProduct(url: string, headers: Record<string, string>): Promise<any> {
+    const response = await this.makeApiRequest<any>(url, { headers });
+    
+    if (!response.success) {
+      throw new Error(`Failed to fetch product: ${response.error || 'Unknown error'}`);
+    }
+    
+    return response.data;
+  }
+
+  async makePublicApiRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string
+  ): Promise<{ success: boolean; data?: T; error?: string }> {
+    try {
+      const response = await this.makeApiRequest<T>(url, options, cacheKey);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+}
+
 /**
  * Product Cache Singleton
  * Extends UniversalSingleton for built-in cache management
@@ -27,7 +66,7 @@ class ProductCache extends UniversalSingleton {
   /**
    * Check if troubleshooting mode is enabled (cache bypass)
    */
-  private static isTroubleshootingMode(): boolean {
+  public static isTroubleshootingMode(): boolean {
     if (typeof window === 'undefined') return false;
     
     // Check localStorage for troubleshooting mode
@@ -139,15 +178,8 @@ class ProductCache extends UniversalSingleton {
       ? `/api/items/${inventoryItemId}?t=${Date.now()}` // Bypass cache with timestamp
       : `/api/items/${inventoryItemId}`; // Use cache
     
-    const response = await fetch(url, {
-      headers
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch product ${inventoryItemId}: ${response.status}`);
-    }
-
-    const product = await response.json();
+    const productApiSingleton = ProductAPISingleton.getInstance();
+    const product = await productApiSingleton.fetchProduct(url, headers);
     return product;
   }
 
@@ -178,6 +210,9 @@ class ProductCache extends UniversalSingleton {
     };
   }
 }
+
+// Export ProductAPISingleton for use in other files
+export { ProductAPISingleton };
 
 /**
  * Hook for fetching shops multi-bucket discovery data
@@ -293,7 +328,7 @@ export function useShopsFeaturedBuckets(options: {
           // If scope type is set but parameters are missing, fall through to default
         }
         
-        // Fallback to legacy shop-scoped URLs
+        // Fallback to legacy shop-scoped URLs (just path, UniversalSingleton will handle full URL)
         return `/api/public/shops/discover/${bucketType}?scope=${shopScope}${tenantId ? `&tenantId=${tenantId}` : ''}&limit=${limit || 12}`;
       };
 
@@ -308,12 +343,12 @@ export function useShopsFeaturedBuckets(options: {
         { name: 'selection', url: buildBucketUrl('selection') }
       ];
 
-      // Add shop-specific endpoints
+      // Add shop-specific endpoints (just paths, UniversalSingleton will handle full URLs)
       const shopEndpoints = [
         { name: 'trendingShops', url: `/api/public/shops/trending?scope=global&limit=12` }
       ];
 
-      // Add user-specific endpoints if userId provided
+      // Add user-specific endpoints if userId provided (just paths, UniversalSingleton will handle full URLs)
       const userEndpoints = userId ? [
         { name: 'recentlyViewed', url: `/api/public/shops/recently-viewed?userId=${userId}` }
       ] : [];
@@ -321,101 +356,79 @@ export function useShopsFeaturedBuckets(options: {
       // Combine all endpoints
       const allEndpoints = [...bucketEndpoints, ...shopEndpoints, ...userEndpoints];
       
+      // Create UniversalSingleton instance for API calls
+      const apiSingleton = ProductAPISingleton.getInstance();
+      
       // Fetch all buckets in parallel
       const fetchPromises = allEndpoints.map(async (endpoint) => {
         try {
-          const response = await fetch(endpoint.url);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch ${endpoint.name}: ${response.statusText}`);
-          }
-          const data = await response.json();
+          // Extract the path from the full URL for makeApiRequest
+          const urlPath = endpoint.url.replace(/https?:\/\/[^\/]+/, '');
+          const data = await apiSingleton.makePublicApiRequest<any>(urlPath, {}, `shops-bucket:${endpoint.name}`);
           
           // Check if the API call was successful
           if (!data.success) {
             throw new Error(`API error for ${endpoint.name}: ${data.error || 'Unknown error'}`);
           }
+
+          // Transform featured product records to match component expectations
+          const featuredProducts = Array.isArray(data.data?.data) ? data.data.data : [];
           
-          // Transform featured product records to actual product data using ProductCache
-          const featuredProducts = data.data || [];
-          
-                    
-          // Debug: Log invalid inventoryItemId values
-          const invalidProducts = featuredProducts.filter(
-            (product: any) => !product.inventoryItemId || product.inventoryItemId === 'undefined' || product.inventoryItemId === null
-          );
-          
-          // Debug specifically for random endpoint
-          /* if (endpoint.name === 'random' && invalidProducts.length > 0) {
-            console.warn(`[SHOPS BUCKETS] ${endpoint.name} - Invalid inventoryItemId debug:`, {
-              totalProducts: featuredProducts.length,
-              invalidProducts: invalidProducts.length,
-              validProducts: featuredProducts.length - invalidProducts.length,
-              sampleInvalid: invalidProducts.slice(0, 2).map((p: any) => ({
-                inventoryItemId: p.inventoryItemId,
-                id: p.id,
-                tenantLogoUrl: p.tenantLogoUrl || p.tenant_logo_url,
-                productName: p.productName || p.product_name
-              }))
-            });
-          } */
-          
-          if (invalidProducts.length > 0) {
-            console.warn(`[SHOPS BUCKETS] Found ${invalidProducts.length} products with invalid inventoryItemId:`, invalidProducts);
-          }
-          
-          // Filter out products with invalid inventoryItemId
-          const validFeaturedProducts = featuredProducts.filter(
-            (product: any) => product.inventoryItemId && product.inventoryItemId !== 'undefined' && product.inventoryItemId !== null
-          );
-          
-          // Create a map to avoid duplicate fetches for the same product
+          // Transform and deduplicate products, accumulating featured types
           const productMap = new Map<string, any>();
-          validFeaturedProducts.forEach((product: any) => {
-            productMap.set(product.inventoryItemId, product);
+          
+          featuredProducts.forEach((product: any) => {
+            const productId = product.inventory_item_id || product.id;
+            
+            if (productMap.has(productId)) {
+              // Product already exists, accumulate featured types
+              const existingProduct = productMap.get(productId);
+              const existingTypes = Array.isArray(existingProduct.featuredTypes) 
+                ? existingProduct.featuredTypes 
+                : [existingProduct.featuredType].filter(Boolean);
+              const newTypes = [product.featured_type || product.featuredType].filter(Boolean);
+              
+              existingProduct.featuredTypes = [...new Set([...existingTypes, ...newTypes])];
+            } else {
+              // New product, transform it
+              const transformedProduct = {
+                id: product.inventory_item_id || product.id,
+                name: product.product_name || product.name,
+                title: product.product_title || product.title,
+                brand: product.brand,
+                description: product.description,
+                priceCents: product.price_cents || product.priceCents,
+                salePriceCents: product.sale_price_cents || product.salePriceCents,
+                stock: product.stock,
+                imageUrl: product.image_url || product.imageUrl,
+                categoryName: product.category_name || product.categoryName,
+                categorySlug: product.category_slug || product.categorySlug,
+                condition: product.condition,
+                availability: product.availability,
+                ratingAvg: product.rating_avg || product.ratingAvg,
+                ratingCount: product.rating_count || product.ratingCount,
+                isFeatured: product.is_featured || product.isFeatured,
+                hasVariants: product.has_variants || product.hasVariants,
+                price: product.price,
+                salePrice: product.sale_price || product.salePrice,
+                currency: product.currency,
+                sku: product.sku,
+                tenantId: product.tenant_id || product.tenantId,
+                tenantName: product.tenant_name || product.tenantName,
+                tenantLogoUrl: product.tenant_logo_url || product.tenantLogoUrl,
+                featuredType: product.featured_type || product.featuredType,
+                featuredTypes: [product.featured_type || product.featuredType].filter(Boolean),
+                priority: product.priority,
+                featuredAt: product.featured_at || product.featuredAt
+              };
+              
+              productMap.set(productId, transformedProduct);
+            }
           });
           
-          // Get ProductCache singleton instance
-          const productCache = ProductCache.getInstance();
+          const transformedProducts = Array.from(productMap.values());
           
-          const transformedProducts = await Promise.all(
-            Array.from(productMap.entries()).map(async ([inventoryItemId, featuredProduct]: [string, any]) => {
-              try {
-                // Use ProductCache to get product data
-                const productData = await productCache.getProduct(inventoryItemId);
-                
-                // Debug for ALL buckets to compare working vs non-working
-               /*  if (inventoryItemId && (inventoryItemId.includes('sid-xbjcqzwj') || inventoryItemId.includes('sid-071div8t'))) {
-                  console.log(`[SHOPS BUCKETS] ${endpoint.name} - Merge Debug:`, {
-                    inventoryItemId,
-                    featuredProductLogo: featuredProduct.tenantLogoUrl || featuredProduct.tenant_logo_url,
-                    cacheProductLogo: productData.tenantLogoUrl || productData.tenant_logo_url,
-                    featuredProductName: featuredProduct.productName || featuredProduct.product_name,
-                    cacheProductName: productData.productName || productData.product_name,
-                    finalLogoUrl: featuredProduct.tenantLogoUrl || productData.tenantLogoUrl || featuredProduct.tenant_logo_url || productData.tenant_logo_url,
-                    hasFeaturedProductLogo: !!(featuredProduct.tenantLogoUrl || featuredProduct.tenant_logo_url),
-                    hasCacheProductLogo: !!(productData.tenantLogoUrl || productData.tenant_logo_url)
-                  });
-                } */
-                
-                return {
-                  ...productData,
-                  // Preserve logo fields from bucket API response
-                  tenantLogoUrl: featuredProduct.tenantLogoUrl || productData.tenantLogoUrl,
-                  tenant_logo_url: featuredProduct.tenant_logo_url || productData.tenant_logo_url,
-                  tenantName: featuredProduct.tenantName || productData.tenantName,
-                  tenant_name: featuredProduct.tenant_name || productData.tenant_name,
-                  featuredType: featuredProduct.featuredType,
-                  priority: featuredProduct.priority,
-                  featuredAt: featuredProduct.featuredAt
-                };
-              } catch (error) {
-                console.error(`Failed to fetch product ${inventoryItemId}:`, error);
-                return null;
-              }
-            })
-          );
-          
-          return { name: endpoint.name, data: transformedProducts.filter(Boolean), metrics: data.metrics };
+          return { name: endpoint.name, data: transformedProducts, metrics: apiSingleton.getMetrics() };
         } catch (err) {
           console.error(`[SHOPS BUCKETS] Error fetching ${endpoint.name}:`, err);
           return { name: endpoint.name, data: [], metrics: null };
@@ -524,35 +537,36 @@ export function useShopsBucket(bucketType: keyof ShopsBucketData, options: {
       queryParams.append('limit', limit.toString());
       
       let url: string;
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
       switch (bucketType) {
         case 'random':
-          url = `/api/public/shops/featured/random?${queryParams.toString()}`;
+          url = `${apiUrl}/api/public/shops/featured/random?${queryParams.toString()}`;
           break;
         case 'trending':
-          url = `/api/public/shops/featured/trending?${queryParams.toString()}`;
+          url = `${apiUrl}/api/public/shops/featured/trending?${queryParams.toString()}`;
           break;
         case 'new':
-          url = `/api/public/shops/featured/new?${queryParams.toString()}`;
+          url = `${apiUrl}/api/public/shops/featured/new?${queryParams.toString()}`;
           break;
         case 'sale':
-          url = `/api/public/shops/featured/sale?${queryParams.toString()}`;
+          url = `${apiUrl}/api/public/shops/featured/sale?${queryParams.toString()}`;
           break;
         case 'seasonal':
-          url = `/api/public/shops/featured/seasonal?${queryParams.toString()}`;
+          url = `${apiUrl}/api/public/shops/featured/seasonal?${queryParams.toString()}`;
           break;
         case 'staff':
-          url = `/api/public/shops/featured/staff?${queryParams.toString()}`;
+          url = `${apiUrl}/api/public/shops/featured/staff?${queryParams.toString()}`;
           break;
         case 'selection':
-          url = `/api/public/shops/featured/selection?${queryParams.toString()}`;
+          url = `${apiUrl}/api/public/shops/featured/selection?${queryParams.toString()}`;
           break;
         case 'trendingShops':
-          url = `/api/public/shops/trending?limit=${limit}`;
+          url = `${apiUrl}/api/public/shops/trending?limit=${limit}`;
           break;
         case 'recentlyViewed':
           // This requires userId, so we'll handle it separately
-          url = `/api/public/shops/recently-viewed?limit=${limit}`;
+          url = `${apiUrl}/api/public/shops/recently-viewed?limit=${limit}`;
           break;
         default:
           throw new Error(`Unknown bucket type: ${bucketType}`);

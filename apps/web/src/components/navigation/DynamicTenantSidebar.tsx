@@ -195,8 +195,9 @@ export default function DynamicTenantSidebar({ tenantId, slug, children }: Dynam
           label: 'Shops Public', 
           href: `/shops`,
           children: [
-            { label: 'My Shop with Tenant ID ', href: `/shops/${tenantId}` },
-            { label: 'My Shop with Slug ', href: `/shops/${slug}` },
+            { label: 'My Storefront', href: `/tenant/${tenantId}` },
+            { label: 'My Shop with Tenant ID', href: `/shops/${tenantId}` },
+            { label: 'My Shop with Slug', href: `/shops/${slug}` },
             { label: 'Shops Directory', href: `/shops` },
           ]
         },

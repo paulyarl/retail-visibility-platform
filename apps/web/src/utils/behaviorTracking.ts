@@ -11,6 +11,46 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { api } from '@/lib/api';
+import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+
+// Behavior Tracking Singleton Class
+class BehaviorTrackingSingleton extends UniversalSingleton {
+  private static instance: BehaviorTrackingSingleton;
+
+  private constructor() {
+    super('behavior-tracking', { encrypt: false });
+  }
+
+  public static getInstance(): BehaviorTrackingSingleton {
+    if (!BehaviorTrackingSingleton.instance) {
+      BehaviorTrackingSingleton.instance = new BehaviorTrackingSingleton();
+    }
+    return BehaviorTrackingSingleton.instance;
+  }
+
+  async trackRecommendation(userId: string, sessionToken: string, trackingData: any, location?: any): Promise<void> {
+    const response = await this.makeApiRequest<any>(
+      `/api/recommendations/track`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          sessionId: sessionToken,
+          ...trackingData,
+          locationLat: location?.latitude,
+          locationLng: location?.longitude,
+          referrer: '', // Server-side can't access referrer easily
+          userAgent: '', // Server-side can't access user agent
+        })
+      }
+    );
+    
+    if (!response.success) {
+      throw new Error(`Failed to track recommendation: ${response.error || 'Unknown error'}`);
+    }
+  }
+}
 
 // Client-side tracking cache
 interface CachedTrackingEvent extends TrackingData {
@@ -427,19 +467,8 @@ export async function trackBehavior(trackingData: TrackingData): Promise<void> {
     // Get user location (server-side)
     const location = await getUserLocationServer();
     
-    await fetch(`${apiUrl}/api/recommendations/track`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId,
-        sessionId: sessionToken,
-        ...trackingData,
-        locationLat: location?.latitude,
-        locationLng: location?.longitude,
-        referrer: '', // Server-side can't access referrer easily
-        userAgent: '', // Server-side can't access user agent
-      })
-    });
+    const trackingSingleton = BehaviorTrackingSingleton.getInstance();
+    await trackingSingleton.trackRecommendation(userId, sessionToken, trackingData, location);
   } catch (error) {
     // Tracking failures should be silent - don't show to users
     console.warn('Silent tracking failure:', error instanceof Error ? error.message : 'Unknown error');

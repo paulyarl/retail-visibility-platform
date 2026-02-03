@@ -5,6 +5,7 @@ import { Package, Calendar, DollarSign, Star, Tag, Grid, List } from 'lucide-rea
 import Link from 'next/link';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { Button } from '@/components/ui/Button';
+import { storefrontService } from '@/services/StorefrontSingletonService';
 
 interface FeaturedProduct {
   id: string;
@@ -285,18 +286,14 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let abortController = new AbortController();
     let isMounted = true;
 
     const fetchAllProducts = async () => {
       try {
-        // Single API call to get all featured products
-        const response = await fetch(`/api/storefront/${tenantId}/featured-products?limit=50`, {
-          signal: abortController.signal,
-        });
-        const data = await response.json();
+        // Use StorefrontSingletonService for backend API call with caching
+        const data = await storefrontService.getFeaturedProducts(tenantId, { limit: 50 });
         
-        if (response.ok && data.items && isMounted) {
+        if (data.items && isMounted) {
           // Transform the data to match the expected format
           const transformedProducts = data.items.map((product: any) => ({
             id: product.id,
@@ -338,7 +335,6 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
 
     return () => {
       isMounted = false;
-      abortController.abort();
     };
   }, [tenantId]);
 

@@ -136,19 +136,21 @@ export interface ProductBucketProps {
   viewAllUrl?: string;
   onProductClick?: (product: any) => void;
   viewMode?: 'grid' | 'list';
+  className?: string;
 }
 
 export function ProductBucket({
   products,
-  loading,
-  error,
+  loading = false,
+  error = null,
   title,
   subtitle,
   maxItems = 8,
+  onProductClick,
+  viewMode = 'grid',
   showViewAll = false,
   viewAllUrl,
-  onProductClick,
-  viewMode = 'grid'
+  className = ''
 }: ProductBucketProps) {
   const displayProducts = products.slice(0, maxItems);
 
@@ -196,41 +198,43 @@ export function ProductBucket({
                 </div>
               )}
               
-              {/* Featured Badge */}
-              {product.featuredType && (
-                <div className="absolute top-2 left-2">
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full shadow-sm flex items-center gap-1 ${
-                    product.featuredType === 'store_selection' 
-                      ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' 
-                      : product.featuredType === 'new_arrival'
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                      : product.featuredType === 'sale'
-                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      : product.featuredType === 'seasonal'
-                      ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-                      : product.featuredType === 'staff_pick'
-                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                      : product.featuredType === 'trending'
-                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                      : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                  }`}>
-                    <span className="text-xs">
-                      {product.featuredType === 'store_selection' && '🏪'}
-                      {product.featuredType === 'new_arrival' && '✨'}
-                      {product.featuredType === 'sale' && '🏷️'}
-                      {product.featuredType === 'seasonal' && '🍂'}
-                      {product.featuredType === 'staff_pick' && '⭐'}
-                      {product.featuredType === 'trending' && '🔥'}
+              {/* Featured Badge - now supports multiple types */}
+              {((product.featuredTypes && product.featuredTypes.length > 0) || product.featuredType) && (
+                <div className="absolute top-2 left-2 flex flex-wrap gap-1 max-w-[calc(100%-1rem)]">
+                  {(product.featuredTypes || [product.featuredType]).filter(Boolean).map((type: string) => (
+                    <span key={type} className={`px-2 py-1 text-xs font-medium rounded-full shadow-sm flex items-center gap-1 ${
+                      type === 'store_selection' 
+                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' 
+                        : type === 'new_arrival'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : type === 'sale'
+                        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        : type === 'seasonal'
+                        ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                        : type === 'staff_pick'
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                        : type === 'trending'
+                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                    }`}>
+                      <span className="text-xs">
+                        {type === 'store_selection' && '🏪'}
+                        {type === 'new_arrival' && '✨'}
+                        {type === 'sale' && '🏷️'}
+                        {type === 'seasonal' && '🍂'}
+                        {type === 'staff_pick' && '⭐'}
+                        {type === 'trending' && '🔥'}
+                      </span>
+                      <span className="text-xs font-medium">
+                        {type === 'store_selection' && 'Store Pick'}
+                        {type === 'new_arrival' && 'New'}
+                        {type === 'sale' && 'Sale'}
+                        {type === 'seasonal' && 'Seasonal'}
+                        {type === 'staff_pick' && 'Staff Pick'}
+                        {type === 'trending' && 'Trending'}
+                      </span>
                     </span>
-                    <span className="text-xs font-medium">
-                      {product.featuredType === 'store_selection' && 'Store Pick'}
-                      {product.featuredType === 'new_arrival' && 'New'}
-                      {product.featuredType === 'sale' && 'Sale'}
-                      {product.featuredType === 'seasonal' && 'Seasonal'}
-                      {product.featuredType === 'staff_pick' && 'Staff Pick'}
-                      {product.featuredType === 'trending' && 'Trending'}
-                    </span>
-                  </span>
+                  ))}
                 </div>
               )}
             </div>
