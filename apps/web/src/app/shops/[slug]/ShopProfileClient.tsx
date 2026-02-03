@@ -46,21 +46,23 @@ interface Shop {
   name: string;
   slug: string;
   business_name?: string;
-  logo_url?: string;
+  imageUrl?: string;
   address?: string;
   city?: string;
   state?: string;
   zip_code?: string;
   phone?: string;
   website?: string;
-  rating_avg?: number;
+  rating?: number;
   rating_count?: number;
-  product_count: number;
+  productCount: number;
   is_published: boolean;
   primary_category?: string;
   created_at: Date;
   tenantName?: string;
   tenantLogoUrl?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface ShopProfileClientProps {
@@ -79,9 +81,9 @@ function ShopProfileHeader({ shop }: { shop: Shop }) {
               {/* Shop Logo */}
               <div className="relative">
                 <div className="h-24 w-24 bg-white rounded-lg shadow-md flex items-center justify-center overflow-hidden">
-                  {shop.logo_url ? (
+                  {shop.imageUrl ? (
                     <img
-                      src={shop.logo_url}
+                      src={shop.imageUrl}
                       alt={shop.name}
                       className="w-full h-full object-cover"
                     />
@@ -112,10 +114,10 @@ function ShopProfileHeader({ shop }: { shop: Shop }) {
                 )}
 
                 <div className="flex items-center space-x-6 text-sm text-gray-600">
-                  {shop.rating_avg && (
+                  {shop.rating && (
                     <div className="flex items-center space-x-1">
                       <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                      <span className="font-medium">{shop.rating_avg.toFixed(1)}</span>
+                      <span className="font-medium">{shop.rating.toFixed(1)}</span>
                       {shop.rating_count && (
                         <span className="text-gray-500">({shop.rating_count} reviews)</span>
                       )}
@@ -124,7 +126,7 @@ function ShopProfileHeader({ shop }: { shop: Shop }) {
                   
                   <div className="flex items-center space-x-1">
                     <Package className="h-4 w-4" />
-                    <span>{shop.product_count} products</span>
+                    <span>{shop.productCount} products</span>
                   </div>
 
                   {shop.primary_category && (
@@ -188,11 +190,13 @@ function ShopProfileHeader({ shop }: { shop: Shop }) {
                             state: shop.state,
                             zip_code: shop.zip_code,
                             zipCode: shop.zip_code,
-                            logo_url: shop.logo_url
+                            logo_url: shop.imageUrl,
+                            latitude: shop.latitude,
+                            longitude: shop.longitude
                           }
                         }}
                         primaryCategory={shop.primary_category}
-                        productCount={shop.product_count}
+                        productCount={shop.productCount}
                       />
                     </div>
                     
@@ -244,14 +248,16 @@ function ShopProfileHeader({ shop }: { shop: Shop }) {
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{shop.product_count}</div>
+                    <div className="text-2xl font-bold text-blue-600">{shop.productCount}</div>
                     <div className="text-sm text-gray-600">Products</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
-                      {shop.rating_avg ? shop.rating_avg.toFixed(1) : 'N/A'}
+                      {shop.rating ? shop.rating.toFixed(1) : 'N/A'}
                     </div>
-                    <div className="text-sm text-gray-600">Rating</div>
+                    <div className="text-sm text-gray-600">
+                      Rating {shop.rating_count ? `(${shop.rating_count} reviews)` : ''}
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -293,7 +299,7 @@ export default function ShopProfileClient({ shop }: ShopProfileClientProps) {
             </div>
             
             <div className="flex items-center space-x-2">
-              <Link href={`/shops/directory?category=${shop.primary_category}`}>
+              <Link href={`/shops/directory${shop.primary_category ? `?category=${encodeURIComponent(shop.primary_category)}` : ''}`}>
                 <Button variant="ghost" size="sm">
                   Similar Shops
                 </Button>
@@ -320,7 +326,7 @@ export default function ShopProfileClient({ shop }: ShopProfileClientProps) {
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Products</h2>
               <p className="text-gray-600">
-                Browse our selection of {shop.product_count} products
+                Browse our selection of {shop.productCount} products
               </p>
             </div>
 

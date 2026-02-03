@@ -953,42 +953,39 @@ router.get('/shops/trending', async (req, res) => {
 });
 
 /**
- * GET /api/public/shops/trending-shops
- * Get trending shops aggregation (Phase 3)
- * NOTE: Must be defined before /:slug to avoid route collision
+ * GET /api/public/shops/:slug
+ * Get single shop by slug (public access)
  */
-router.get('/shops/trending-shops', async (req, res) => {
+router.get('/shops/:slug', async (req, res) => {
   try {
-    const { limit } = req.query;
+    const { slug } = req.params;
     
-    const shopsService = (await import('../services/ShopsFeaturedService')).default;
-    const service = shopsService.getInstance();
+    // Use ShopService singleton
+    const ShopService = (await import('../services/ShopService')).default;
+    const shopService = ShopService.getInstance();
     
-    const shops = await service.getGlobalTrendingShops({
-      limit: limit ? parseInt(limit as string) : undefined
-    }) as any[];
-
-    res.setHeader('Cache-Control', 'public, max-age=900');
-    res.setHeader('X-MV-Source', 'mv_global_discovery_aggregated');
-
+    const shop = await shopService.getShopBySlug(slug);
+    
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        error: 'Shop not found'
+      });
+    }
+    
+    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
+    res.setHeader('X-Service-Source', 'ShopService-Singleton');
+    
     res.json({
       success: true,
-      data: shops,
-      count: shops.length,
-      type: 'trending_shops',
-      metadata: {
-        mvSource: 'mv_global_discovery_aggregated',
-        cacheMaxAge: 900,
-        minimumProducts: 3,
-        qualityMetrics: true
-      }
+      shop
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PUBLIC SHOPS API] Error fetching trending shops:', errorMessage);
+    console.error('[PUBLIC API] Error fetching shop by slug:', errorMessage);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch trending shops',
+      error: 'Failed to fetch shop',
       message: errorMessage
     });
   }

@@ -23,6 +23,13 @@ export interface Shop {
   is_published: boolean;
   primary_category?: string;
   created_at: Date;
+  latitude?: number;
+  longitude?: number;
+  debug?: {
+    raw_primary_category?: any;
+    raw_shop_category?: any;
+    all_fields?: string[];
+  };
 }
 
 export interface ShopCategory {
@@ -89,16 +96,9 @@ class ShopService extends UniversalSingleton {
    * Uses mv_global_discovery for optimized performance
    */
   async getShopBySlug(slug: string): Promise<Shop | null> {
-    const cacheKey = `shop:slug:${slug}`;
-
-    // Check UniversalSingleton cache first
-    const cached = await this.getFromCache<Shop>(cacheKey);
-    if (cached) {
-      this.logInfo(`Cache hit for shop slug: ${slug}`);
-      return cached;
-    }
-
-    this.logInfo(`Cache miss, fetching shop by slug: ${slug}`);
+    const cacheKey = `shop:slug:v7:${slug}`; // New version to force refresh
+    
+    this.logInfo(`Fetching shop by slug: ${slug}`);
 
     try {
       // Use mv_global_discovery for optimized shop data retrieval
@@ -114,13 +114,20 @@ class ShopService extends UniversalSingleton {
           tenant_zip,
           shop_category as primary_category,
           subscription_tier,
+          store_average_rating,
+          store_review_count,
+          tenant_latitude,
+          tenant_longitude,
           COUNT(DISTINCT inventory_item_id) FILTER (WHERE item_status = 'active' AND visibility = 'public') as product_count
         FROM mv_global_discovery
         WHERE tenant_slug = $1
+          AND shop_category IS NOT NULL
         GROUP BY 
           tenant_id, tenant_name, tenant_slug,
           tenant_logo_url, tenant_address, tenant_city, tenant_state,
-          tenant_zip, shop_category, subscription_tier
+          tenant_zip, shop_category, subscription_tier,
+          store_average_rating, store_review_count,
+          tenant_latitude, tenant_longitude
         LIMIT 1
       `;
 
@@ -144,16 +151,18 @@ class ShopService extends UniversalSingleton {
         location: `${row.tenant_city || ''}${row.tenant_city && row.tenant_state ? ', ' : ''}${row.tenant_state || ''}`,
         phone: row.tenant_phone || undefined,
         website: row.tenant_website || undefined,
-        rating: undefined,
-        rating_count: undefined,
+        rating: row.store_average_rating ? parseFloat(row.store_average_rating) : undefined,
+        rating_count: row.store_review_count ? parseInt(row.store_review_count) : undefined,
         productCount: parseInt(row.product_count) || 0,
         is_published: true,
-        primary_category: row.tenant_primary_category || undefined,
+        primary_category: row.primary_category || undefined,
+        latitude: row.tenant_latitude ? parseFloat(row.tenant_latitude) : undefined,
+        longitude: row.tenant_longitude ? parseFloat(row.tenant_longitude) : undefined,
         created_at: new Date()
       };
 
       // Store in UniversalSingleton cache
-      await this.setCache(cacheKey, transformedShop, { ttl: 900 }); // 15 minutes
+    await this.setCache(cacheKey, transformedShop, { ttl: 900 }); // 15 minutes
       
       return transformedShop;
     } catch (error) {
@@ -192,13 +201,19 @@ class ShopService extends UniversalSingleton {
           tenant_zip,
           shop_category as primary_category,
           subscription_tier,
+          store_average_rating,
+          store_review_count,
+          tenant_latitude,
+          tenant_longitude,
           COUNT(DISTINCT inventory_item_id) FILTER (WHERE item_status = 'active' AND visibility = 'public') as product_count
         FROM mv_global_discovery
         WHERE tenant_id = $1
         GROUP BY 
           tenant_id, tenant_name, tenant_slug,
           tenant_logo_url, tenant_address, tenant_city, tenant_state,
-          tenant_zip, shop_category, subscription_tier
+          tenant_zip, shop_category, subscription_tier,
+          store_average_rating, store_review_count,
+          tenant_latitude, tenant_longitude
         LIMIT 1
       `;
 
@@ -222,8 +237,8 @@ class ShopService extends UniversalSingleton {
         location: `${row.tenant_city || ''}${row.tenant_city && row.tenant_state ? ', ' : ''}${row.tenant_state || ''}`,
         phone: undefined,
         website: undefined,
-        rating: undefined,
-        rating_count: undefined,
+        rating: row.store_average_rating ? parseFloat(row.store_average_rating) : undefined,
+        rating_count: row.store_review_count ? parseInt(row.store_review_count) : undefined,
         productCount: parseInt(row.product_count) || 0,
         is_published: true,
         primary_category: row.primary_category || undefined,

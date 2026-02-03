@@ -24,12 +24,14 @@ interface Shop {
   website?: string;
   rating_avg?: number;
   rating_count?: number;
-  product_count: number;
+  productCount: number;
   is_published: boolean;
   primary_category?: string;
   created_at: Date;
   tenantName?: string;
   tenantLogoUrl?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface ShopProfilePageProps {
@@ -44,35 +46,39 @@ interface ShopProfilePageProps {
 }
 
 // Shop data fetching function
-async function getShopBySlug(identifier: string): Promise<Shop | null> {
+export async function getShopBySlug(identifier: string): Promise<Shop | null> {
   try {
     // Use ShopsAPISingleton for consistent API communication and caching
     const apiSingleton = ShopsAPISingleton.getInstance();
     const response = await apiSingleton.makeShopsApiRequest<any>(`/api/public/shops/${identifier}`, {}, `shop:${identifier}`);
     
-    console.log('[DEBUG] Full response:', response);
-    console.log('[DEBUG] Response success:', response.success);
-    console.log('[DEBUG] Response data:', response.data);
-    console.log('[DEBUG] Response data type:', typeof response.data);
-    console.log('[DEBUG] Response data keys:', response.data ? Object.keys(response.data) : 'no data');
-    
-    if (response.success && response.data?.shop) {
-      console.log('[DEBUG] Returning shop from response.data.shop');
-      return response.data.shop;
+    if (response.success) {
+      // The API already returns a properly mapped Shop object
+      if (response.data?.shop) {
+        return response.data.shop as Shop;
+      } else if (response.data?.data) {
+        return response.data.data as Shop;
+      } else if (response.data && typeof response.data === 'object' && response.data.id) {
+        return response.data as Shop;
+      }
     }
     
     // If slug fetch fails, try by tenant ID
     if (!response.success || response.status === 404) {
-      console.log('[DEBUG] Trying tenant ID lookup');
       const idResponse = await apiSingleton.makeShopsApiRequest<any>(`/api/public/shops/id/${identifier}`, {}, `shop:id:${identifier}`);
       
-      if (idResponse.success && idResponse.data?.shop) {
-        console.log('[DEBUG] Returning shop from idResponse.data.shop');
-        return idResponse.data.shop;
+      if (idResponse.success) {
+        // The API already returns a properly mapped Shop object
+        if (idResponse.data?.shop) {
+          return idResponse.data.shop as Shop;
+        } else if (idResponse.data?.data) {
+          return idResponse.data.data as Shop;
+        } else if (idResponse.data && typeof idResponse.data === 'object' && idResponse.data.id) {
+          return idResponse.data as Shop;
+        }
       }
     }
     
-    console.log('[DEBUG] Returning null');
     return null;
   } catch (error) {
     console.error('Error fetching shop:', error);
