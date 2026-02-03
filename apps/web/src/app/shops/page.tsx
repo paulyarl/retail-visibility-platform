@@ -131,7 +131,7 @@ function ShopsPageContent() {
 
   // Extract categories from all products
   useEffect(() => {
-    const allProducts = [
+    const allProductsRaw = [
       ...buckets.trending,
       ...buckets.new,
       ...buckets.sale,
@@ -140,7 +140,17 @@ function ShopsPageContent() {
       ...buckets.selection,
       ...buckets.random
     ];
-    
+
+    // Deduplicate products across all buckets to prevent double-counting
+    const productMap = new Map<string, any>();
+    allProductsRaw.forEach(product => {
+      const productId = product.id || product.inventory_item_id;
+      if (!productMap.has(productId)) {
+        productMap.set(productId, product);
+      }
+    });
+    const allProducts = Array.from(productMap.values());
+
     const categoryMap = new Map<string, number>();
     allProducts.forEach(product => {
       const category = product.categoryName || product.category_name;

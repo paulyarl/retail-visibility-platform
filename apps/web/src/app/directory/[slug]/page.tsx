@@ -392,11 +392,17 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
   }
 
   const listing = consolidatedData.listing;
-  const featuredProducts = consolidatedData.featuredProducts || [];
+  const featuredProductsRaw = consolidatedData.featuredProducts || [];
   const storeTypes = consolidatedData.storeTypes || [];
   const categoryCounts = consolidatedData.categoryCounts || [];
   const recommendations = consolidatedData.recommendations || [];
   const paymentGatewayStatus = consolidatedData.paymentGatewayStatus || { hasActiveGateway: false, defaultGatewayType: null };
+
+  // Deduplicate featured products by ID to prevent React key conflicts
+  const featuredProducts = featuredProductsRaw.filter((product: any, index: number, arr: any[]) => {
+    const productId = product.id || product.inventory_item_id;
+    return arr.findIndex((p: any) => (p.id || p.inventory_item_id) === productId) === index;
+  });
 
   // Debug logging for featured products
   /* console.log('[Directory Page] Featured products data:', {
