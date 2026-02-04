@@ -22,7 +22,8 @@ import { Card } from '@mantine/core';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Layout, LayoutList, Star, Grid3X3 } from 'lucide-react';
+import { Layout, LayoutList, Star, Grid3X3, Store, ShoppingBag, TrendingUp } from 'lucide-react';
+import Link from 'next/link';
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 
 interface ShopDirectoryPageProps {
@@ -158,6 +159,34 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
         pageType="shop_directory"
         category={filters.category || null}
       />
+      
+      {/* Navigation Header */}
+      <div className="bg-white border-b sticky top-0 z-40">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Store className="h-5 w-5 text-blue-600" />
+                <span className="font-semibold text-gray-900">Shop Directory</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link href="/shops">
+                  <Button variant="ghost" size="sm">
+                    <ShoppingBag className="h-4 w-4 mr-2" />
+                    Shops Page
+                  </Button>
+                </Link>
+                <Link href="/shops/trending">
+                  <Button variant="ghost" size="sm">
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    Trending
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       
       {/* Header */}
       <div className="mb-8">

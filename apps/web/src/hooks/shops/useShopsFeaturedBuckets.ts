@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { ShopsAPISingleton } from '@/services/ShopsService';
 
 // Product API Singleton Class
 class ProductAPISingleton extends UniversalSingleton {
@@ -345,7 +346,7 @@ export function useShopsFeaturedBuckets(options: {
 
       // Add shop-specific endpoints (just paths, UniversalSingleton will handle full URLs)
       const shopEndpoints = [
-        { name: 'trendingShops', url: `/api/public/shops/trending?scope=global&limit=12` }
+        { name: 'trendingShops', url: `/api/public/shops/shop/trending?scope=global&limit=12&_t=${Date.now()}` }
       ];
 
       // Add user-specific endpoints if userId provided (just paths, UniversalSingleton will handle full URLs)
@@ -364,20 +365,88 @@ export function useShopsFeaturedBuckets(options: {
         try {
           // Extract the path from the full URL for makeApiRequest
           const urlPath = endpoint.url.replace(/https?:\/\/[^\/]+/, '');
-          const data = await apiSingleton.makePublicApiRequest<any>(urlPath, {}, `shops-bucket:${endpoint.name}`);
+          
+          let data;
+          
+          // Use ShopsAPISingleton for shop endpoints, UniversalSingleton will handle full URLs
+          if (endpoint.name === 'trendingShops') {
+            const timestamp = Date.now(); // Force fresh cache key
+            const shopsApiSingleton = ShopsAPISingleton.getInstance();
+            // Temporarily disable caching for trending shops
+            data = await shopsApiSingleton.makeShopsApiRequest<any>(urlPath, {}, undefined);
+          } else {
+            const apiSingleton = ProductAPISingleton.getInstance();
+            data = await apiSingleton.makePublicApiRequest<any>(urlPath, {}, `shops-bucket:${endpoint.name}`);
+          }
           
           // Check if the API call was successful
           if (!data.success) {
             throw new Error(`API error for ${endpoint.name}: ${data.error || 'Unknown error'}`);
           }
 
-          // Transform featured product records to match component expectations
-          const featuredProducts = Array.isArray(data.data?.data) ? data.data.data : [];
+          // Handle different response structures
+          let responseData;
+          if (endpoint.name === 'trendingShops') {
+            // Shop endpoints return data directly
+            responseData = data.data || [];
+          } else {
+            // Product endpoints return nested data
+            responseData = Array.isArray(data.data?.data) ? data.data.data : [];
+          }
+          
+          if (endpoint.name === 'trendingShops') {
+            // Transform trending products into unique shop data
+            const shopMap = new Map<string, any>();
+            
+            // Extract the actual data array from the response object
+            const productsArray = Array.isArray(responseData) ? responseData : (responseData?.data || []);
+            
+            productsArray.forEach((product: any) => {
+              // The API returns product objects with rich shop data
+              const tenantId = product.tenant_id;
+              
+              if (!shopMap.has(tenantId)) {
+                // Create shop entry from product data
+                const shopData = {
+                  tenantId: product.tenant_id,
+                  name: product.tenant_name,
+                  slug: product.tenant_slug, // Full slug: "baraka-international-market-inc"
+                  autoId: product.tenant_id,
+                  imageUrl: product.tenant_logo_url,
+                  location: `${product.tenant_city || ''}${product.tenant_city && product.tenant_state ? ', ' : ''}${product.tenant_state || ''}`,
+                  productCount: 1, // Will be accumulated
+                  rating: product.store_average_rating?.s || product.average_rating?.s || 4.5,
+                  reviewCount: product.store_review_count?.s || product.review_count?.s || 0,
+                  primary_category: product.shop_category || 'General', // "Grocery Store"
+                  trendingScore: product.trending_score?.s || 0,
+                  urls: {
+                    slugUrl: `/shops/${product.tenant_slug}`,
+                    tenantIdUrl: `/shops/${product.tenant_id}`,
+                    autoIdUrl: `/shops/${product.tenant_id}`,
+                    canonicalUrl: `/shops/${product.tenant_slug}`
+                  }
+                };
+                shopMap.set(tenantId, shopData);
+              } else {
+                // Accumulate product count for existing shop
+                const existingShop = shopMap.get(tenantId);
+                existingShop.productCount += 1;
+              }
+            });
+            
+            const finalShops = Array.from(shopMap.values());
+            
+            return {
+              endpointName: endpoint.name,
+              data: finalShops,
+              success: true
+            };
+          }
           
           // Transform and deduplicate products, accumulating featured types
           const productMap = new Map<string, any>();
           
-          featuredProducts.forEach((product: any) => {
+          responseData.forEach((product: any) => {
             const productId = product.inventory_item_id || product.id;
             
             if (productMap.has(productId)) {
@@ -401,8 +470,8 @@ export function useShopsFeaturedBuckets(options: {
                 salePriceCents: product.sale_price_cents || product.salePriceCents,
                 stock: product.stock,
                 imageUrl: product.image_url || product.imageUrl,
-                categoryName: product.category_name || product.categoryName,
-                categorySlug: product.category_slug || product.categorySlug,
+                categoryName: product.product_category || product.category_name || product.categoryName || 'General',
+                categorySlug: product.product_category_slug || product.category_slug || product.categorySlug || 'general',
                 condition: product.condition,
                 availability: product.availability,
                 ratingAvg: product.rating_avg || product.ratingAvg,
@@ -435,18 +504,36 @@ export function useShopsFeaturedBuckets(options: {
         }
       });
 
-      const results = await Promise.all(fetchPromises);
+      // Process all results
+      const results = await Promise.allSettled(fetchPromises);
+      
+      // Debug: Log the results
+      /* if (process.env.NODE_ENV === 'development') {
+        console.log('[useShopsFeaturedBuckets] API Results:', results);
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            console.log(`[useShopsFeaturedBuckets] ${allEndpoints[index].name} result:`, result.value);
+          } else {
+            console.error(`[useShopsFeaturedBuckets] ${allEndpoints[index].name} error:`, result.reason);
+          }
+        });
+      } */
       
       // Process results
       const newBuckets: Partial<ShopsBucketData> = {};
       let totalResponseTime = 0;
       let cacheHits = 0;
       
-      results.forEach(result => {
-        newBuckets[result.name as keyof ShopsBucketData] = result.data;
-        if (result.metrics) {
-          totalResponseTime += result.metrics.responseTime || 0;
-          if (result.metrics.cacheHit) cacheHits++;
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          const endpointName = result.value.endpointName || result.value.name;
+          const bucketKey = endpointName as keyof ShopsBucketData;
+          newBuckets[bucketKey] = result.value.data;
+          
+          if (result.value.metrics) {
+            totalResponseTime += result.value.metrics.responseTime || 0;
+            if (result.value.metrics.cacheHit) cacheHits++;
+          }
         }
       });
 

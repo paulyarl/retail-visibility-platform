@@ -107,13 +107,13 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
             {/* Shop Image */}
-            <div className="relative w-16 h-16 flex-shrink-0">
+            <div className="relative w-16 h-16 flex-shrink-0 overflow-hidden rounded-lg group">
               {!imageError && shop.imageUrl ? (
                 <Image
                   src={shop.imageUrl}
                   alt={shop.name}
                   fill
-                  className="object-cover rounded-lg"
+                  className="object-cover transition-transform duration-300 group-hover:scale-110"
                   sizes="(max-width: 64px) 100vw"
                   onError={handleImageError}
                 />
@@ -188,13 +188,13 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
         </CardHeader>
         <CardContent className="p-4">
           {/* Shop Image */}
-          <div className="relative h-48 mb-4">
+          <div className="relative h-48 mb-4 overflow-hidden rounded-lg group">
             {!imageError && shop.imageUrl ? (
               <Image
                 src={shop.imageUrl}
                 alt={shop.name}
                 fill
-                className="object-cover rounded-lg"
+                className="object-cover transition-transform duration-300 group-hover:scale-110"
                 sizes="(max-width: 400px) 100vw"
                 onError={handleImageError}
               />
@@ -323,13 +323,13 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
       </CardHeader>
       <CardContent className="p-4">
         {/* Shop Image */}
-        <div className="relative h-40 mb-4">
+        <div className="relative h-40 mb-4 overflow-hidden rounded-lg group">
           {!imageError && shop.imageUrl ? (
             <Image
               src={shop.imageUrl}
               alt={shop.name}
               fill
-              className="object-cover rounded-lg"
+              className="object-cover transition-transform duration-300 group-hover:scale-110"
               sizes="(max-width: 300px) 100vw"
               onError={handleImageError}
             />

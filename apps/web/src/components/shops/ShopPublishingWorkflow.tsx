@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Separator } from '@/components/ui/Separator';
 import { Progress } from '@/components/ui/Progress';
@@ -38,6 +37,7 @@ import {
 } from 'lucide-react';
 import { type Shop } from '@/services/ShopsService';
 import RealShopService from '@/services/RealShopService';
+import { Button } from '@mantine/core';
 
 interface ShopPublishingWorkflowProps {
   shop: Shop;

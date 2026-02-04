@@ -437,8 +437,11 @@ class ShopService extends UniversalSingleton {
         region: undefined
       });
 
+      // Handle the response structure from ShopsFeaturedService
+      const shopsArray = Array.isArray(trendingShops) ? trendingShops : [];
+
       // Transform to match Shop interface
-      const shops: Shop[] = trendingShops.map((shop: any) => ({
+      const shops: Shop[] = shopsArray.map((shop: any) => ({
         id: shop.tenantId,
         name: shop.name,
         slug: shop.slug,
@@ -454,9 +457,9 @@ class ShopService extends UniversalSingleton {
         rating: shop.rating,
         rating_count: shop.rating_count,
         reviewCount: shop.reviewCount,
+        primary_category: shop.primary_category,
         productCount: shop.productCount,
         is_published: shop.is_published,
-        primary_category: shop.primary_category,
         created_at: shop.created_at || new Date()
       }));
 

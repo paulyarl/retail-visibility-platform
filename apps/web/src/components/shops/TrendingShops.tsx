@@ -10,13 +10,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Shop } from '@/types/shop';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+//import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
 import { ChevronLeft, ChevronRight, TrendingUp, Star, MapPin, ExternalLink, Activity, Users, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTrendingShops } from '@/lib/shops/shop-hooks';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import { Button } from '@mantine/core';
 
 interface TrendingShopsProps {
   limit?: number;

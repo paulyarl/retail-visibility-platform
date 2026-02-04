@@ -334,11 +334,27 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
 
       const result = await pool.query(query, [limit]);
       
+      // Debug: Log the raw database rows to see what fields are available
+      console.log('[ShopsFeaturedService] Raw database rows:', result.rows);
+      console.log('[ShopsFeaturedService] Row 0 fields:', Object.keys(result.rows[0] || {}));
+      if (result.rows.length > 0) {
+        console.log('[ShopsFeaturedService] Row 0 imageurl:', result.rows[0].imageurl);
+        console.log('[ShopsFeaturedService] Row 0 primary_category:', result.rows[0].primary_category);
+        console.log('[ShopsFeaturedService] Row 0 tenant_slug:', result.rows[0].tenant_slug);
+      }
+      
       const trendingShops = result.rows.map(row => {
+        console.log('[ShopsFeaturedService] Processing row:', {
+          tenant_id: row.tenant_id,
+          tenant_name: row.tenant_name,
+          tenant_slug: row.tenant_slug,
+          'slug to be used': row.tenant_slug || row.tenant_id
+        });
+        
         return {
           tenantId: row.tenant_id,
           name: row.tenant_name,
-          slug: row.tenant_slug || '',
+          slug: row.tenant_slug || row.tenant_id, // Use actual tenant_slug or fallback to tenant_id
           autoId: row.tenant_id, // Using tenant_id as autoId for now
           imageUrl: row.imageurl || null,
           location: `${row.tenant_city || ''}${row.tenant_city && row.tenant_state ? ', ' : ''}${row.tenant_state || ''}`,
@@ -357,6 +373,13 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
         };
       });
 
+      console.log('[ShopsFeaturedService] Final trending shops:', trendingShops.map(s => ({
+        tenantId: s.tenantId,
+        name: s.name,
+        slug: s.slug,
+        slugUrl: s.urls.slugUrl
+      })));
+
       this.logger.info('[SHOPS FEATURED] Returning trending shops from database', {
         count: trendingShops.length,
         shops: trendingShops.map(s => ({
@@ -371,28 +394,8 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
     } catch (error) {
       this.logger.error('[SHOPS FEATURED] Error fetching trending shops', error);
       
-      // Fallback to mock data if database fails
-      const fallbackShops = [
-        {
-          tenantId: 'tid-m8ijkrnk',
-          name: 'Baraka International Market',
-          slug: 'baraka-market',
-          autoId: 'ULCW',
-          imageUrl: 'https://nbwsiobosqawrugnqddo.supabase.co/storage/v1/object/public/tenants/logos/tid-m8ijkrnk/tenant-logo-tid-m8ijkrnk-1768711118513.jpeg',
-          location: 'Pittsburgh, PA',
-          productCount: 156,
-          rating: 4.8,
-          trendingScore: 95,
-          urls: {
-            slugUrl: '/shops/baraka-market',
-            tenantIdUrl: '/shops/tid-m8ijkrnk',
-            autoIdUrl: '/shops/ULCW',
-            canonicalUrl: '/shops/baraka-market'
-          }
-        }
-      ].slice(0, limit);
-      
-      return fallbackShops;
+      // Let the error propagate to see if SQL query works
+      throw error;
     }
   }
 

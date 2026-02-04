@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ShopCard } from '@/components/shops/ShopCard';
 import { ShopPagination } from '@/components/shops/ShopPagination';
@@ -29,6 +29,7 @@ interface TrendingShop {
   state?: string;
   rating?: number;
   rating_count?: number;
+  reviewCount?: number;
   productCount: number;
   primary_category?: string;
   created_at: string;
@@ -36,7 +37,7 @@ interface TrendingShop {
   weeklyGrowth?: number;
 }
 
-export default function TrendingShopsPage() {
+function TrendingShopsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -52,28 +53,30 @@ export default function TrendingShopsPage() {
   // Track page view
   useEffect(() => {
     trackBehaviorClient({
-      action: 'page_view',
-      pageType: 'trending_shops',
-      metadata: {
+      entityType: 'category',
+      entityId: 'trending-shops-page',
+      context: {
         page,
         limit,
         region
-      }
+      },
+      pageType: 'shop_directory'
     });
   }, [page, limit, region]);
 
   const handleShopClick = (shop: any) => {
     trackBehaviorClient({
-      action: 'shop_click',
-      pageType: 'trending_shops',
-      shopId: shop.id,
-      shopName: shop.name,
-      metadata: {
-        position: shops?.findIndex(s => s.id === shop.id),
+      entityType: 'store',
+      entityId: shop.id,
+      context: {
+        source: 'trending',
+        shop_name: shop.name,
         category: shop.primary_category,
+        position: shops?.findIndex(s => s.id === shop.id),
         rating: shop.rating,
-        reviewCount: shop.reviewCount || shop.rating_count
-      }
+        review_count: shop.reviewCount || shop.rating_count
+      },
+      pageType: 'shop_directory'
     });
   };
 
@@ -120,13 +123,10 @@ export default function TrendingShopsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <ShopViewTracker 
-        pageType="trending_shops"
-        metadata={{
-          page,
-          limit,
-          region,
-          totalShops: shops?.length || 0
-        }}
+        tenantId="trending-page"
+        shopName="Trending Shops"
+        category="trending"
+        pageType="shop_directory"
       />
 
       {/* Header */}
@@ -250,9 +250,11 @@ export default function TrendingShopsPage() {
               <div className="mt-8 flex justify-center">
                 <ShopPagination
                   currentPage={page}
-                  totalItems={shops.length}
-                  itemsPerPage={limit}
+                  totalPages={Math.ceil(shops.length / limit)}
                   onPageChange={handlePageChange}
+                  limit={limit}
+                  onLimitChange={() => {}}
+                  limitOptions={[12, 24, 48]}
                 />
               </div>
             )}
@@ -273,5 +275,17 @@ export default function TrendingShopsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function TrendingShopsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    }>
+      <TrendingShopsPageContent />
+    </Suspense>
   );
 }

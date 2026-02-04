@@ -9,7 +9,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import { Shop } from '@/types/shop';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -31,6 +30,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useShopCategories } from '@/hooks/shops/useShopCategories';
+import { Button } from '@mantine/core';
 
 interface ShopSearchProps {
   onSearch: (query: string, filters?: SearchFilters) => void;

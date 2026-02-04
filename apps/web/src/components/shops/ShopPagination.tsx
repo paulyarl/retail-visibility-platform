@@ -7,9 +7,9 @@
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { cn } from '@/lib/utils';
+import { Button } from '@mantine/core';
 
 interface ShopPaginationProps {
   currentPage: number;

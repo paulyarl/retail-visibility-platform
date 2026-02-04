@@ -3,27 +3,187 @@
 import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 
 // ====================
-// SINGLETON STORE PROVIDER
+// STORE PROVIDER SINGLETON - CLIENT-SIDE IMPLEMENTATION
 // ====================
+
+// Client-side singleton options
+interface ClientSingletonOptions {
+  enableCache?: boolean;
+  defaultTTL?: number;
+  maxCacheSize?: number;
+  enableLogging?: boolean;
+}
+
+// Authentication Context (simplified for client-side)
+interface AuthContext {
+  userId?: string;
+  tenantId?: string;
+  sessionId?: string;
+  roles?: string[];
+  permissions?: string[];
+  token?: string;
+}
+
+// Metrics interface
+interface ClientMetrics {
+  cacheHits: number;
+  cacheMisses: number;
+  cacheHitRate: number;
+  cacheSize: number;
+  apiCalls: number;
+  errors: number;
+  lastUpdated: string;
+}
+
 class StoreProviderSingleton {
   private static instance: StoreProviderSingleton;
   private context: React.Context<any>;
   private ProviderComponent: React.ComponentType<{ children: ReactNode; initialData?: Record<string, any>; cacheTTL?: number }>;
 
-  private constructor() {
+  // Client-side caching
+  private memoryCache: Map<string, { data: any; expires: number }> = new Map();
+  private options: ClientSingletonOptions;
+  private metrics: ClientMetrics;
+
+  // Authentication context
+  private currentAuthContext: AuthContext | null = null;
+
+  constructor(options: ClientSingletonOptions = {}) {
+    this.options = {
+      enableCache: true,
+      defaultTTL: 300, // 5 minutes
+      maxCacheSize: 1000,
+      enableLogging: true,
+      ...options
+    };
+
+    this.metrics = {
+      cacheHits: 0,
+      cacheMisses: 0,
+      cacheHitRate: 0,
+      cacheSize: 0,
+      apiCalls: 0,
+      errors: 0,
+      lastUpdated: new Date().toISOString()
+    };
+
     this.context = createContext<any>(undefined);
     this.ProviderComponent = this.createProviderComponent();
   }
 
   static getInstance(): StoreProviderSingleton {
-    if (!StoreProviderSingleton.instance) {
-      StoreProviderSingleton.instance = new StoreProviderSingleton();
+    if (!(globalThis as any).__storeProviderSingletonInstance) {
+      (globalThis as any).__storeProviderSingletonInstance = new StoreProviderSingleton();
     }
-    return StoreProviderSingleton.instance;
+    return (globalThis as any).__storeProviderSingletonInstance;
+  }
+
+  // Client-side logging
+  private logInfo(message: string, metadata?: any): void {
+    if (this.options.enableLogging) {
+      console.log(`[StoreProvider] INFO: ${message}`, metadata || '');
+    }
+  }
+
+  private logError(message: string, error?: any): void {
+    if (this.options.enableLogging) {
+      console.error(`[StoreProvider] ERROR: ${message}`, error || '');
+    }
+  }
+
+  // Authentication methods
+  setAuthContext(authContext: AuthContext): void {
+    this.currentAuthContext = authContext;
+    this.logInfo('Authentication context set', { userId: authContext.userId, tenantId: authContext.tenantId });
+  }
+
+  getAuthContext(): AuthContext | null {
+    return this.currentAuthContext;
+  }
+
+  // Client-side API request method
+  private async makeAPIRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
+    // Add authentication headers if available
+    const headers = new Headers(options.headers || {});
+
+    if (this.currentAuthContext?.token) {
+      headers.set('Authorization', `Bearer ${this.currentAuthContext.token}`);
+    }
+
+    if (this.currentAuthContext?.tenantId) {
+      headers.set('X-Tenant-ID', this.currentAuthContext.tenantId);
+    }
+
+    const requestOptions: RequestInit = {
+      ...options,
+      headers
+    };
+
+    this.metrics.apiCalls++;
+
+    try {
+      const response = await fetch(url, requestOptions);
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json() as T;
+    } catch (error) {
+      this.metrics.errors++;
+      this.logError('API request error:', error);
+      throw error;
+    }
+  }
+
+  // Cache management
+  private getFromCache<T>(key: string): T | null {
+    if (!this.options.enableCache) return null;
+
+    const cached = this.memoryCache.get(key);
+    if (cached && cached.expires > Date.now()) {
+      this.metrics.cacheHits++;
+      return cached.data as T;
+    }
+
+    this.metrics.cacheMisses++;
+    if (cached) this.memoryCache.delete(key); // Remove expired
+    return null;
+  }
+
+  private setCache<T>(key: string, data: T, ttl?: number): void {
+    if (!this.options.enableCache) return;
+
+    const expires = Date.now() + ((ttl || this.options.defaultTTL!) * 1000);
+    this.memoryCache.set(key, { data, expires });
+    this.metrics.cacheSize = this.memoryCache.size;
+    this.updateMetrics();
+  }
+
+  private clearCache(key?: string): void {
+    if (key) {
+      this.memoryCache.delete(key);
+    } else {
+      this.memoryCache.clear();
+    }
+    this.metrics.cacheSize = this.memoryCache.size;
+    this.updateMetrics();
+  }
+
+  private updateMetrics(): void {
+    const total = this.metrics.cacheHits + this.metrics.cacheMisses;
+    this.metrics.cacheHitRate = total > 0 ? this.metrics.cacheHits / total : 0;
+    this.metrics.lastUpdated = new Date().toISOString();
+  }
+
+  getMetrics(): ClientMetrics {
+    return { ...this.metrics };
   }
 
   private createProviderComponent() {
     const contextRef = this.context; // Capture context reference
+    const singletonRef = this; // Capture singleton reference
+
     return function StoreProviderWrapper({ children, initialData = {}, cacheTTL = 5 * 60 * 1000 }: { children: ReactNode; initialData?: Record<string, any>; cacheTTL?: number }) {
       const [state, dispatch] = useReducer(storeReducer, {
         stores: initialData,
@@ -40,7 +200,7 @@ class StoreProviderSingleton {
         };
       }, []);
 
-      // Basic store fetching
+      // Enhanced store fetching using client-side API methods
       const fetchStores = async (storeIds: string[]) => {
         // Filter out already cached stores
         const uncachedIds = storeIds.filter(id => {
@@ -53,27 +213,23 @@ class StoreProviderSingleton {
         });
 
         if (uncachedIds.length === 0) {
-          console.log('StoreProvider: All stores cached, skipping fetch');
+          singletonRef.logInfo('All stores cached, skipping fetch');
           return;
         }
 
-        console.log(`StoreProvider: Fetching ${uncachedIds.length} stores, ${storeIds.length - uncachedIds.length} cached`);
+        singletonRef.logInfo(`Fetching ${uncachedIds.length} stores, ${storeIds.length - uncachedIds.length} cached`);
         
         dispatch({ type: 'FETCH_START', storeIds: uncachedIds });
 
         try {
           const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-          const response = await fetch(`${apiUrl}/api/stores/batch`, {
+          
+          // Use client-side API request method
+          const data = await singletonRef.makeAPIRequest<{ stores: any[] }>(`${apiUrl}/api/stores/batch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ storeIds: uncachedIds })
           });
-
-          if (!response.ok) {
-            throw new Error(`Failed to fetch stores: ${response.status}`);
-          }
-
-          const data = await response.json();
           
           // Transform API response to UniversalStore format
           const universalStores = data.stores.map((store: any) => ({
@@ -129,7 +285,7 @@ class StoreProviderSingleton {
 
           dispatch({ type: 'FETCH_SUCCESS', stores: universalStores });
         } catch (error) {
-          console.error('StoreProvider: Fetch error:', error);
+          singletonRef.logError('Fetch error:', error);
           uncachedIds.forEach(id => {
             dispatch({ 
               type: 'FETCH_ERROR', 
@@ -140,9 +296,9 @@ class StoreProviderSingleton {
         }
       };
 
-      // Enhanced stats fetching (ratings, categories, etc.)
+      // Enhanced stats fetching using client-side API methods
       const fetchStoreStats = async (storeIds: string[]) => {
-        console.log(`StoreProvider: Fetching enhanced stats for ${storeIds.length} stores`);
+        singletonRef.logInfo(`Fetching enhanced stats for ${storeIds.length} stores`);
         
         // Set loading state
         storeIds.forEach(id => {
@@ -152,13 +308,9 @@ class StoreProviderSingleton {
         try {
           const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
           
-          // Fetch stats for all stores in parallel
+          // Fetch stats for all stores in parallel using client-side API method
           const promises = storeIds.map(async (storeId) => {
-            const response = await fetch(`${apiUrl}/api/storefront/${storeId}/storefront/categories-stats`);
-            if (!response.ok) {
-              throw new Error(`Failed to fetch stats for ${storeId}: ${response.status}`);
-            }
-            const data = await response.json();
+            const data = await singletonRef.makeAPIRequest<any>(`${apiUrl}/api/storefront/${storeId}/storefront/categories-stats`);
             return { storeId, stats: data };
           });
 
@@ -192,7 +344,7 @@ class StoreProviderSingleton {
             }
           });
         } catch (error) {
-          console.error('StoreProvider: Stats fetch error:', error);
+          singletonRef.logError('Stats fetch error:', error);
           storeIds.forEach(id => {
             dispatch({ 
               type: 'FETCH_ERROR', 
@@ -233,6 +385,15 @@ class StoreProviderSingleton {
         return state.errors[storeId];
       };
 
+      // Authentication context methods
+      const setAuthContext = (authContext: AuthContext) => {
+        singletonRef.setAuthContext(authContext);
+      };
+
+      const getAuthContext = () => {
+        return singletonRef.getAuthContext();
+      };
+
       const value = {
         state,
         actions: {
@@ -243,7 +404,12 @@ class StoreProviderSingleton {
           getStore,
           getStores,
           isLoading,
-          getError
+          getError,
+          setAuthContext,
+          getAuthContext,
+          // Expose client-side methods
+          getMetrics: () => singletonRef.getMetrics(),
+          clearAllCache: () => singletonRef.clearCache(),
         }
       };
 
@@ -425,10 +591,17 @@ interface StoreProviderProps {
   children: ReactNode;
   initialData?: Record<string, UniversalStore>;
   cacheTTL?: number;
+  authContext?: AuthContext;
 }
 
-export function StoreProvider({ children, initialData = {}, cacheTTL = 5 * 60 * 1000 }: StoreProviderProps) {
+export function StoreProvider({ children, initialData = {}, cacheTTL = 5 * 60 * 1000, authContext }: StoreProviderProps) {
   const singleton = StoreProviderSingleton.getInstance();
+  
+  // Set authentication context if provided
+  if (authContext) {
+    singleton.setAuthContext(authContext);
+  }
+  
   const ProviderComponent = singleton.getProvider();
   return <ProviderComponent children={children} initialData={initialData} cacheTTL={cacheTTL} />;
 }

@@ -63,22 +63,6 @@ export async function getShopBySlug(identifier: string): Promise<Shop | null> {
       }
     }
     
-    // If slug fetch fails, try by tenant ID
-    if (!response.success || response.status === 404) {
-      const idResponse = await apiSingleton.makeShopsApiRequest<any>(`/api/public/shops/id/${identifier}`, {}, `shop:id:${identifier}`);
-      
-      if (idResponse.success) {
-        // The API already returns a properly mapped Shop object
-        if (idResponse.data?.shop) {
-          return idResponse.data.shop as Shop;
-        } else if (idResponse.data?.data) {
-          return idResponse.data.data as Shop;
-        } else if (idResponse.data && typeof idResponse.data === 'object' && idResponse.data.id) {
-          return idResponse.data as Shop;
-        }
-      }
-    }
-    
     return null;
   } catch (error) {
     console.error('Error fetching shop:', error);

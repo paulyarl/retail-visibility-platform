@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { shopsService, type Shop, type ShopReview } from '@/services/ShopsService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
 import { Separator } from '@/components/ui/Separator';
 import { 

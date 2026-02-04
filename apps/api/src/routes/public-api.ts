@@ -28,10 +28,13 @@ const ProductQuerySchema = z.object({
 
 const FeaturedProductsQuerySchema = z.object({
   limit: z.string().transform(Number).default(5),
-  lat: z.string().transform(Number).optional(),
-  lng: z.string().transform(Number).optional(),
+  lat: z.string().optional(), // Keep as string for service compatibility
+  lng: z.string().optional(), // Keep as string for service compatibility
   radius: z.string().transform(Number).default(50),
-  tenantId: z.string().optional()
+  tenantId: z.string().optional(),
+  category: z.string().optional(),
+  minPrice: z.string().transform(Number).optional(),
+  maxPrice: z.string().transform(Number).optional()
 });
 
 const StoreQuerySchema = z.object({
@@ -50,346 +53,88 @@ const StoreQuerySchema = z.object({
 // ====================
 
 /**
- * GET /api/public/products
- * Get public products with filtering and pagination
+ * GET /api/public/products/:identifier
+ * Get products by tenant identifier (tenant-id, slug, auto-id) - Universal Identifier Pattern
  */
-router.get('/products', async (req, res) => {
+router.get('/products/:identifier', async (req, res) => {
   try {
+    const { identifier } = req.params;
     const query = ProductQuerySchema.parse(req.query);
-    
-    const where = {
-      item_status: 'active' as const,
-      ...(query.category && { category: { slug: query.category } }),
-      ...(query.search && {
-        OR: [
-          { name: { contains: query.search, mode: 'insensitive' as const }, description: { contains: query.search, mode: 'insensitive' as const } }
-        ]
-      })
-    };
 
-    const [products, total] = await Promise.all([
-      prisma.inventory_items.findMany({
-        where,
-        take: query.limit,
-        skip: query.offset,
-        orderBy: { [query.sort]: query.order }
-      }),
-      prisma.inventory_items.count({ where })
-    ]);
+    console.log(`[Public API] Products request for identifier: ${identifier}`);
+
+    // Use ProductService with Universal Identifier support
+    const { ProductService } = await import('../services/ProductService');
+    const productService = ProductService.getInstance();
+
+    const result = await productService.getProductsByTenant(identifier, {
+      limit: query.limit,
+      offset: query.offset,
+      sort: query.sort,
+      order: query.order,
+      search: query.search,
+      category: (query as any).category,
+      minPrice: (query as any).minPrice,
+      maxPrice: (query as any).maxPrice
+    });
+
+    res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache
+    res.setHeader('X-Service-Source', 'ProductService');
 
     res.json({
       success: true,
-      products: products.map(product => ({
-        id: product.id,
-        name: product.name,
-        description: product.description,
-        price: product.price_cents ? product.price_cents / 100 : null,
-        imageUrl: product.image_url || null,
-        tenant: {
-          id: product.tenant_id,
-          name: 'Store Name', // Placeholder since tenant relationship not included
-          slug: 'store-slug'   // Placeholder since tenant relationship not included
-        },
-        availability: 'in_stock', // Default availability
-        createdAt: product.created_at
-      })),
-      pagination: {
-        total,
-        limit: query.limit,
-        offset: query.offset,
-        hasMore: query.offset + query.limit < total
+      ...result,
+      metadata: {
+        identifier,
+        cacheTTL: 5 * 60 * 1000 // 5 minutes
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Products error:', error);
-    res.status(500).json({
+    console.error('[PUBLIC API] Products by identifier error:', error);
+    const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
+    res.status(statusCode).json({
       success: false,
-      error: 'Failed to fetch products'
+      error: error instanceof Error ? error.message : 'Failed to fetch products'
     });
   }
 });
 
 /**
  * GET /api/public/products/featured
- * Get featured products with location awareness
+ * Get featured products with location awareness - Universal Identifier Pattern
  */
 router.get('/products/featured', async (req, res) => {
   try {
     const query = FeaturedProductsQuerySchema.parse(req.query);
-    
-    console.log('[PUBLIC API] Featured products query:', query);
-    
-    // Use mv_global_discovery materialized view for optimized featured products query
-    try {
-      // Use direct pool query like storefront-featured.ts
-      const { getDirectPool } = await import('../utils/db-pool');
-      const pool = getDirectPool();
-      
-      const sqlQuery = `
-        SELECT DISTINCT 
-          mv.*
-        FROM mv_global_discovery mv
-        WHERE mv.tenant_id = $1
-          AND mv.featured_is_active = true
-          AND mv.item_status = 'active'
-          AND mv.visibility = 'public'
-        ORDER BY mv.featured_priority DESC, mv.featured_at DESC
-        LIMIT $2
-      `;
-      
-      const result = await pool.query(sqlQuery, [query.tenantId, query.limit * 3]);
-      
-      const featuredProducts = result.rows;
-      
-      console.log('[PUBLIC API] Raw query successful, products:', featuredProducts.length);
-      
-      // Debug: Log featured type distribution
-      const featuredTypeCounts = featuredProducts.reduce((acc: Record<string, number>, product: any) => {
-        const type = product.featured_type || 'store_selection';
-        acc[type] = (acc[type] || 0) + 1;
-        return acc;
-      }, {});
-      console.log('[PUBLIC API] Featured type distribution:', featuredTypeCounts);
-      
-      // Debug: Check for duplicates
-      const productIds = featuredProducts.map((p: any) => p.id);
-      const uniqueIds = new Set(productIds);
-      console.log('[PUBLIC API] Product count check:', {
-        total: featuredProducts.length,
-        unique: uniqueIds.size,
-        duplicates: featuredProducts.length - uniqueIds.size
-      });
-      
-      // Get tenant information for the products
-      const tenantIds = [...new Set(featuredProducts.map(fp => fp.tenant_id))];
-      const tenants = await prisma.tenants.findMany({
-        where: { id: { in: tenantIds } },
-        select: { id: true, name: true, slug: true }
-      });
 
-      const tenantMap = new Map(tenants.map(t => [t.id, t]));
+    console.log(`[Public API] Featured products request with query:`, query);
 
-      // Randomize selection from featured products (preserve all featured type assignments)
-      const shuffled = featuredProducts.sort(() => Math.random() - 0.5);
-      const selected = shuffled.slice(0, query.limit);
+    // Use FeaturedService with intelligent caching
+    const { FeaturedService } = await import('../services/FeaturedService');
+    const featuredService = FeaturedService.getInstance();
 
-      res.json({
-        success: true,
-        products: selected.map(fp => {
-          const tenant = tenantMap.get(fp.tenant_id);
-          return {
-            // Product Info
-            id: fp.inventory_item_id,
-            name: fp.product_name,
-            title: fp.product_title,
-            description: fp.product_description,
-            marketingDescription: fp.marketing_description,
-            price: fp.current_price_cents ? fp.current_price_cents / 100 : null,
-            priceFormatted: fp.price,
-            priceCents: fp.current_price_cents,
-            listPriceCents: fp.list_price_cents,
-            salePriceCents: fp.sale_price_cents,
-            currency: fp.currency,
-            imageUrl: fp.image_url || null,
-            imageGallery: fp.image_urls,
-            
-            // Product Details
-            sku: fp.sku,
-            brand: fp.brand,
-            manufacturer: fp.manufacturer,
-            condition: fp.condition,
-            gtin: fp.gtin,
-            mpn: fp.mpn,
-            stock: fp.stock,
-            quantity: fp.quantity,
-            availability: fp.availability,
-            itemStatus: fp.item_status,
-            visibility: fp.visibility,
-            
-            // Featured Info
-            featuredType: fp.featured_type,
-            featuredPriority: fp.featured_priority,
-            featuredAt: fp.featured_at,
-            featuredUntil: fp.featured_until,
-            isFeatured: fp.featured_is_active,
-            isActivelyFeatured: fp.is_actively_featured,
-            
-            // Category Info
-            categoryName: fp.product_category,
-            categorySlug: fp.product_category_slug,
-            googleCategoryId: fp.product_google_category_id,
-            
-            // Flags
-            hasImage: fp.has_image,
-            hasGallery: fp.has_gallery,
-            hasDescription: fp.has_description,
-            hasBrand: fp.has_brand,
-            hasPrice: fp.has_price,
-            inStock: fp.in_stock,
-            hasActivePaymentGateway: fp.has_active_payment_gateway,
-            defaultGatewayType: fp.default_gateway_type,
-            
-            // Timestamps
-            createdAt: fp.created_at,
-            updatedAt: fp.updated_at,
-            
-            // Tenant Info
-            tenant: {
-              id: fp.tenant_id,
-              name: fp.tenant_name,
-              slug: fp.tenant_slug || 'store-slug',
-              subscriptionTier: fp.subscription_tier,
-              city: fp.tenant_city,
-              state: fp.tenant_state,
-              address: fp.tenant_address,
-              latitude: fp.tenant_latitude,
-              longitude: fp.tenant_longitude
-            },
-            
-            distance: query.lat && query.lng ? Math.random() * 50 : null // Mock distance
-          };
-        }),
-        location: query.lat && query.lng ? {
-          lat: parseFloat(query.lat as unknown as string),
-          lng: parseFloat(query.lng as unknown as string),
-          radius: query.radius
-        } : null
-      });
-    } catch (rawQueryError) {
-      console.error('[PUBLIC API] Raw query failed, trying fallback:', rawQueryError);
-      
-      // Fallback: Also use mv_global_discovery with direct pool
-      const { getDirectPool } = await import('../utils/db-pool');
-      const pool = getDirectPool();
-      
-      const fallbackQuery = `
-        SELECT DISTINCT 
-          mv.*
-        FROM mv_global_discovery mv
-        WHERE mv.tenant_id = $1
-          AND mv.featured_is_active = true
-          AND mv.item_status = 'active'
-          AND mv.visibility = 'public'
-        ORDER BY mv.featured_priority DESC, mv.featured_at DESC
-        LIMIT $2
-      `;
-      
-      const fallbackResult = await pool.query(fallbackQuery, [query.tenantId, query.limit * 3]);
-      
-      const allFeaturedProducts = fallbackResult.rows;
-      
-      console.log('[PUBLIC API] Fallback query successful, products:', allFeaturedProducts.length);
-      
-      // Debug: Log featured type distribution
-      const featuredTypeCounts = allFeaturedProducts.reduce((acc: Record<string, number>, product: any) => {
-        const type = product.featured_type || 'store_selection';
-        acc[type] = (acc[type] || 0) + 1;
-        return acc;
-      }, {});
-      console.log('[PUBLIC API] Fallback featured type distribution:', featuredTypeCounts);
-      
-      // Debug: Check for duplicates
-      const productIds = allFeaturedProducts.map((p: any) => p.id);
-      const uniqueIds = new Set(productIds);
-      console.log('[PUBLIC API] Fallback product count check:', {
-        total: allFeaturedProducts.length,
-        unique: uniqueIds.size,
-        duplicates: allFeaturedProducts.length - uniqueIds.size
-      });
-      
-      // Get tenant information
-      const tenantIds = [...new Set(allFeaturedProducts.map(fp => fp.tenant_id))];
-      const tenants = await prisma.tenants.findMany({
-        where: { id: { in: tenantIds } },
-        select: { id: true, name: true, slug: true }
-      });
+    const result = await featuredService.getFeaturedProducts({
+      limit: query.limit,
+      tenantId: query.tenantId,
+      lat: query.lat,
+      lng: query.lng,
+      radius: query.radius,
+      category: query.category,
+      minPrice: query.minPrice,
+      maxPrice: query.maxPrice
+    });
 
-      const tenantMap = new Map(tenants.map(t => [t.id, t]));
+    res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache
+    res.setHeader('X-Service-Source', 'FeaturedService');
 
-      // Randomize selection from featured products (preserve all featured type assignments)
-      const shuffled = allFeaturedProducts.sort(() => Math.random() - 0.5);
-      const selected = shuffled.slice(0, query.limit);
-
-      res.json({
-        success: true,
-        products: selected.map(fp => ({
-          // Product Info
-          id: fp.inventory_item_id,
-          name: fp.product_name,
-          title: fp.product_title,
-          description: fp.product_description,
-          marketingDescription: fp.marketing_description,
-          price: fp.current_price_cents ? fp.current_price_cents / 100 : null,
-          priceFormatted: fp.price,
-          priceCents: fp.current_price_cents,
-          listPriceCents: fp.list_price_cents,
-          salePriceCents: fp.sale_price_cents,
-          currency: fp.currency,
-          imageUrl: fp.image_url || null,
-          imageGallery: fp.image_urls,
-          
-          // Product Details
-          sku: fp.sku,
-          brand: fp.brand,
-          manufacturer: fp.manufacturer,
-          condition: fp.condition,
-          gtin: fp.gtin,
-          mpn: fp.mpn,
-          stock: fp.stock,
-          quantity: fp.quantity,
-          availability: fp.availability,
-          itemStatus: fp.item_status,
-          visibility: fp.visibility,
-          
-          // Featured Info
-          featuredType: fp.featured_type,
-          featuredPriority: fp.featured_priority,
-          featuredAt: fp.featured_at,
-          featuredUntil: fp.featured_until,
-          isFeatured: fp.featured_is_active,
-          isActivelyFeatured: fp.is_actively_featured,
-          
-          // Category Info
-          categoryName: fp.product_category,
-          categorySlug: fp.product_category_slug,
-          googleCategoryId: fp.product_google_category_id,
-          
-          // Flags
-          hasImage: fp.has_image,
-          hasGallery: fp.has_gallery,
-          hasDescription: fp.has_description,
-          hasBrand: fp.has_brand,
-          hasPrice: fp.has_price,
-          inStock: fp.in_stock,
-          hasActivePaymentGateway: fp.has_active_payment_gateway,
-          defaultGatewayType: fp.default_gateway_type,
-          
-          // Timestamps
-          createdAt: fp.created_at,
-          updatedAt: fp.updated_at,
-          
-          // Tenant Info
-          tenant: {
-            id: fp.tenant_id,
-            name: fp.tenant_name,
-            slug: fp.tenant_slug || 'store-slug',
-            subscriptionTier: fp.subscription_tier,
-            city: fp.tenant_city,
-            state: fp.tenant_state,
-            address: fp.tenant_address,
-            latitude: fp.tenant_latitude,
-            longitude: fp.tenant_longitude
-          },
-          
-          distance: query.lat && query.lng ? Math.random() * 50 : null // Mock distance
-        })),
-        location: query.lat && query.lng ? {
-          lat: parseFloat(query.lat as unknown as string),
-          lng: parseFloat(query.lng as unknown as string),
-          radius: query.radius
-        } : null
-      });
-    }
+    res.json({
+      success: true,
+      ...result,
+      metadata: {
+        cacheTTL: 5 * 60 * 1000, // 5 minutes
+        cacheStats: featuredService.getCacheStats()
+      }
+    });
   } catch (error) {
     console.error('[PUBLIC API] Featured products error:', error);
     res.status(500).json({
@@ -400,13 +145,13 @@ router.get('/products/featured', async (req, res) => {
 });
 
 /**
- * GET /api/public/products/search
- * Search products with advanced filtering
+ * GET /api/public/products/search/global
+ * Global product search across all tenants
  */
-router.get('/products/search', async (req, res) => {
+router.get('/products/search/global', async (req, res) => {
   try {
     const query = ProductQuerySchema.parse(req.query);
-    
+
     if (!query.search) {
       return res.status(400).json({
         success: false,
@@ -414,41 +159,36 @@ router.get('/products/search', async (req, res) => {
       });
     }
 
-    const where = {
-      item_status: 'active' as const,
-      OR: [
-        { name: { contains: query.search, mode: 'insensitive' as const } },
-        { description: { contains: query.search, mode: 'insensitive' as const } },
-        { sku: { contains: query.search, mode: 'insensitive' as const } }
-      ]
-    };
+    console.log(`[Public API] Global product search: "${query.search}"`);
 
-    const products = await prisma.inventory_items.findMany({
-      where,
-      take: query.limit,
-      skip: query.offset,
-      orderBy: { [query.sort]: query.order }
+    // Use ProductService for global search
+    const { ProductService } = await import('../services/ProductService');
+    const productService = ProductService.getInstance();
+
+    const result = await productService.searchProducts({
+      limit: query.limit,
+      offset: query.offset,
+      sort: query.sort,
+      order: query.order,
+      search: query.search,
+      category: (query as any).category,
+      minPrice: (query as any).minPrice,
+      maxPrice: (query as any).maxPrice
     });
+
+    res.setHeader('Cache-Control', 'public, max-age=180'); // 3 min cache for search
+    res.setHeader('X-Service-Source', 'ProductService');
 
     res.json({
       success: true,
-      query: query.search,
-      products: products.map(product => ({
-        id: product.id,
-        name: product.name,
-        description: product.description,
-        price: product.price_cents ? product.price_cents / 100 : null,
-        imageUrl: product.image_url || null,
-        tenant: {
-          id: product.tenant_id,
-          name: 'Store Name', // Placeholder
-          slug: 'store-slug'   // Placeholder
-        },
-        availability: 'in_stock' // Default
-      }))
+      ...result,
+      metadata: {
+        searchQuery: query.search,
+        cacheTTL: 3 * 60 * 1000 // 3 minutes
+      }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Product search error:', error);
+    console.error('[PUBLIC API] Global product search error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to search products'
@@ -458,57 +198,41 @@ router.get('/products/search', async (req, res) => {
 
 /**
  * GET /api/public/products/:id
- * Get single product by ID
+ * Get single product by ID with full details - Universal Identifier Pattern
  */
 router.get('/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const product = await prisma.inventory_items.findFirst({
-      where: { 
-        id,
-        item_status: 'active' as const
-      },
-      include: {
-        photo_assets: true,
-        tenants: {
-          select: {
-            id: true,
-            name: true,
-            slug: true
-          }
-        }
-      }
-    });
+
+    console.log(`[Public API] Single product request for ID: ${id}`);
+
+    // Use SingleProductService with caching
+    const { SingleProductService } = await import('../services/SingleProductService');
+    const productService = SingleProductService.getInstance();
+
+    const product = await productService.getProductById(id);
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        error: 'Product not found'
+        error: 'Product not found',
+        message: `No product found with ID: ${id}`
       });
     }
 
+    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
+    res.setHeader('X-Service-Source', 'SingleProductService');
+
     res.json({
       success: true,
-      product: {
-        id: product.id,
-        name: product.name,
-        description: product.description,
-        price: product.price_cents ? product.price_cents / 100 : null,
-        sku: product.sku,
-        availability: product.stock > 0 ? 'in_stock' : 'out_of_stock',
-        images: product.photo_assets.map((photo: any) => ({
-          id: photo.id,
-          url: photo.url,
-          isPrimary: photo.is_primary
-        })),
-        tenant: product.tenants,
-        createdAt: product.created_at,
-        updatedAt: product.updated_at
+      product,
+      metadata: {
+        productId: id,
+        cacheTTL: 15 * 60 * 1000 // 15 minutes
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Product by ID error:', error);
+    console.error('[PUBLIC API] Single product error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch product'
@@ -516,118 +240,35 @@ router.get('/products/:id', async (req, res) => {
   }
 });
 
-/**
- * GET /api/public/products/categories
- * Get product categories with counts
- */
-router.get('/products/categories', async (req, res) => {
-  try {
-    const categories = await prisma.platform_categories.findMany({
-      where: { is_active: true },
-      orderBy: { name: 'asc' }
-    });
-
-    // Get product counts separately
-    const categoryIds = categories.map(c => c.id);
-    const productCounts = await prisma.inventory_items.groupBy({
-      by: ['directory_category_id'],
-      where: {
-        directory_category_id: { in: categoryIds },
-        item_status: 'active'
-      },
-      _count: {
-        id: true
-      }
-    });
-
-    const countMap = productCounts.reduce((acc: Record<string, number>, item: any) => {
-      acc[item.directory_category_id] = item._count.id;
-      return acc;
-    }, {} as Record<string, number>);
-
-    res.json({
-      success: true,
-      categories: categories.map(category => ({
-        id: category.id,
-        name: category.name,
-        slug: category.slug,
-        description: category.description,
-        productCount: countMap[category.id] || 0
-      }))
-    });
-  } catch (error) {
-    console.error('[PUBLIC API] Product categories error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch product categories'
-    });
-  }
-});
-
-// ====================
-// PUBLIC STORES ENDPOINTS
-// ====================
-
-/**
- * GET /api/public/stores
- * Get public stores with filtering
- */
 router.get('/stores', async (req, res) => {
   try {
     const query = StoreQuerySchema.parse(req.query);
-    
-    const where = {
-      isActive: true,
-      ...(query.search && {
-        OR: [
-          { name: { contains: query.search, mode: 'insensitive' as const }, description: { contains: query.search, mode: 'insensitive' as const } }
-        ]
-      }),
-      ...(query.city && { city: query.city }),
-      ...(query.state && { state: query.state })
-    };
 
-    const [stores, total] = await Promise.all([
-      prisma.tenants.findMany({
-        where,
-        take: query.limit,
-        skip: query.offset,
-        include: {
-          _count: {
-            select: {
-              inventory_items: {
-                where: { item_status: 'active' as const }
-              }
-            }
-          }
-        }
-      }),
-      prisma.tenants.count({ where })
-    ]);
+    console.log(`[Public API] Stores request with query:`, query);
+
+    // Use StoreService
+    const { StoreService } = await import('../services/StoreService');
+    const storeService = StoreService.getInstance();
+
+    const result = await storeService.getStores({
+      limit: query.limit,
+      offset: query.offset,
+      search: query.search,
+      city: query.city,
+      state: query.state,
+      sort: query.sort,
+      category: query.category,
+      page: query.page
+    });
+
+    res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache
+    res.setHeader('X-Service-Source', 'StoreService');
 
     res.json({
       success: true,
-      stores: stores.map(store => {
-        const metadata = store.metadata as any || {};
-        return {
-          id: store.id,
-          name: store.name,
-          slug: store.slug,
-          description: metadata.description || null,
-          address: metadata.address || null,
-          city: metadata.city || null,
-          state: metadata.state || null,
-          zipCode: metadata.zipCode || null,
-          country: metadata.country || null,
-          productCount: store._count.inventory_items,
-          createdAt: store.created_at
-        };
-      }),
-      pagination: {
-        total,
-        limit: query.limit,
-        offset: query.offset,
-        hasMore: query.offset + query.limit < total
+      ...result,
+      metadata: {
+        cacheTTL: 5 * 60 * 1000 // 5 minutes
       }
     });
   } catch (error) {
@@ -641,12 +282,12 @@ router.get('/stores', async (req, res) => {
 
 /**
  * GET /api/public/stores/search
- * Search stores
+ * Search stores - Universal Identifier Pattern
  */
 router.get('/stores/search', async (req, res) => {
   try {
     const query = StoreQuerySchema.parse(req.query);
-    
+
     if (!query.search) {
       return res.status(400).json({
         success: false,
@@ -654,33 +295,28 @@ router.get('/stores/search', async (req, res) => {
       });
     }
 
-    const stores = await prisma.tenants.findMany({
-      where: {
-        subscription_status: 'active',
-        OR: [
-          { name: { contains: query.search, mode: 'insensitive' } },
-          { metadata: { path: ['description'], string_contains: query.search } },
-          { metadata: { path: ['city'], string_contains: query.search } }
-        ]
-      },
-      take: query.limit,
-      skip: query.offset
+    console.log(`[Public API] Store search: "${query.search}"`);
+
+    // Use StoreService for search
+    const { StoreService } = await import('../services/StoreService');
+    const storeService = StoreService.getInstance();
+
+    const result = await storeService.searchStores({
+      limit: query.limit,
+      offset: query.offset,
+      search: query.search
     });
+
+    res.setHeader('Cache-Control', 'public, max-age=180'); // 3 min cache for search
+    res.setHeader('X-Service-Source', 'StoreService');
 
     res.json({
       success: true,
-      query: query.search,
-      stores: stores.map(store => {
-        const metadata = store.metadata as any || {};
-        return {
-          id: store.id,
-          name: store.name,
-          slug: store.slug,
-          description: metadata.description || null,
-          city: metadata.city || null,
-          state: metadata.state || null
-        };
-      })
+      ...result,
+      metadata: {
+        searchQuery: query.search,
+        cacheTTL: 3 * 60 * 1000 // 3 minutes
+      }
     });
   } catch (error) {
     console.error('[PUBLIC API] Store search error:', error);
@@ -692,116 +328,50 @@ router.get('/stores/search', async (req, res) => {
 });
 
 /**
- * GET /api/public/stores/:slug
- * Get single store by slug
+ * GET /api/public/stores/:identifier
+ * Get single store by any identifier (tenant-id, slug, auto-id) - Universal Identifier Pattern
  */
-router.get('/stores/:slug', async (req, res) => {
+router.get('/stores/:identifier', async (req, res) => {
   try {
-    const { slug } = req.params;
-    
-    const store = await prisma.tenants.findFirst({
-      where: { 
-        slug,
-        subscription_status: 'active'
-      },
-      include: {
-        _count: {
-          select: {
-            inventory_items: {
-              where: { item_status: 'active' as const }
-            }
-          }
-        }
-      }
-    });
+    const { identifier } = req.params;
+
+    console.log(`[Public API] Store lookup request for identifier: ${identifier}`);
+
+    // Use StoreService with Universal Identifier support
+    const { StoreService } = await import('../services/StoreService');
+    const storeService = StoreService.getInstance();
+
+    const store = await storeService.getStoreByIdentifier(identifier);
 
     if (!store) {
       return res.status(404).json({
         success: false,
-        error: 'Store not found'
+        error: 'Store not found',
+        message: `No store found for identifier: ${identifier}`
       });
     }
 
+    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
+    res.setHeader('X-Service-Source', 'StoreService');
+
     res.json({
       success: true,
-      store: {
-        id: store.id,
-        name: store.name,
-        slug: store.slug,
-        description: (store.metadata as any)?.description || null,
-        address: (store.metadata as any)?.address || null,
-        city: (store.metadata as any)?.city || null,
-        state: (store.metadata as any)?.state || null,
-        zipCode: (store.metadata as any)?.zipCode || null,
-        country: (store.metadata as any)?.country || null,
-        productCount: store._count.inventory_items,
-        createdAt: store.created_at
+      store,
+      metadata: {
+        identifier,
+        cacheTTL: 15 * 60 * 1000 // 15 minutes
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Store by slug error:', error);
-    res.status(500).json({
+    console.error('[PUBLIC API] Store by identifier error:', error);
+    const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
+    res.status(statusCode).json({
       success: false,
-      error: 'Failed to fetch store'
+      error: error instanceof Error ? error.message : 'Failed to fetch store'
     });
   }
 });
 
-/**
- * GET /api/public/stores/id/:tenantId
- * Get single store by tenant ID
- */
-router.get('/stores/id/:tenantId', async (req, res) => {
-  try {
-    const { tenantId } = req.params;
-    
-    const store = await prisma.tenants.findFirst({
-      where: { 
-        id: tenantId,
-        subscription_status: 'active'
-      },
-      include: {
-        _count: {
-          select: {
-            inventory_items: {
-              where: { item_status: 'active' as const }
-            }
-          }
-        }
-      }
-    });
-
-    if (!store) {
-      return res.status(404).json({
-        success: false,
-        error: 'Store not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      store: {
-        id: store.id,
-        name: store.name,
-        slug: store.slug,
-        description: (store.metadata as any)?.description || null,
-        address: (store.metadata as any)?.address || null,
-        city: (store.metadata as any)?.city || null,
-        state: (store.metadata as any)?.state || null,
-        zipCode: (store.metadata as any)?.zipCode || null,
-        country: (store.metadata as any)?.country || null,
-        productCount: store._count.inventory_items,
-        createdAt: store.created_at
-      }
-    });
-  } catch (error) {
-    console.error('[PUBLIC API] Store by tenant ID error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch store'
-    });
-  }
-});
 
 // ====================
 // SHOPS ENDPOINTS
@@ -809,97 +379,66 @@ router.get('/stores/id/:tenantId', async (req, res) => {
 
 /**
  * GET /api/public/shops
- * Get public shops with filtering
+ * Get public shops with filtering - Universal Identifier Pattern
  */
 router.get('/shops', async (req, res) => {
   try {
     const query = StoreQuerySchema.parse(req.query);
-    
-    // Build orderBy clause
-    let orderBy: any = { name: 'asc' };
-    if (query.sort === 'rating') {
-      orderBy = { rating_avg: 'desc' };
-    } else if (query.sort === 'newest') {
-      orderBy = { created_at: 'desc' };
-    } else if (query.sort === 'products') {
-      orderBy = { inventory_items: { _count: 'desc' } };
-    }
-    
-    const stores = await prisma.tenants.findMany({
-      where: {
-        subscription_status: 'active',
-        ...(query.search && {
-          OR: [
-            { name: { contains: query.search, mode: 'insensitive' } },
-            { slug: { contains: query.search, mode: 'insensitive' } }
-          ]
-        }),
-        ...(query.category && {
-          metadata: {
-            path: ['primary_category'],
-            equals: query.category
-          }
-        })
-      },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        subscription_tier: true,
-        created_at: true,
-        metadata: true,
-        _count: {
-          select: {
-            inventory_items: {
-              where: { item_status: 'active' as const }
-            }
-          }
-        }
-      },
-      orderBy,
-      take: query.limit,
-      skip: query.page ? (query.page - 1) * query.limit : query.offset
+
+    console.log(`[Public API] Shops request with query:`, query);
+
+    // Use StoreService with Universal Identifier support
+    const { StoreService } = await import('../services/StoreService');
+    const storeService = StoreService.getInstance();
+
+    const result = await storeService.getStores({
+      limit: query.limit,
+      offset: query.offset,
+      search: query.search,
+      city: query.city,
+      state: query.state,
+      sort: query.sort,
+      category: query.category,
+      page: query.page
     });
 
-    const total = await prisma.tenants.count({
-      where: {
-        subscription_status: 'active',
-        ...(query.search && {
-          OR: [
-            { name: { contains: query.search, mode: 'insensitive' } },
-            { slug: { contains: query.search, mode: 'insensitive' } }
-          ]
-        })
-      }
-    });
+    // Transform to match existing response format for backward compatibility
+    const shops = result.stores.map(store => ({
+      id: store.id,
+      name: store.name,
+      slug: store.slug,
+      business_name: store.businessName || store.name,
+      logo_url: store.logoUrl || null,
+      address: store.address || null,
+      city: store.city || null,
+      state: store.state || null,
+      zip_code: store.zipCode || null,
+      phone: store.phone || null,
+      website: store.website || null,
+      rating_avg: undefined, // Not available in current schema
+      rating_count: undefined, // Not available in current schema
+      product_count: store.productCount,
+      is_published: true, // All active tenants are considered published for shops
+      primary_category: store.primaryCategory || null
+    }));
 
-    const currentPage = query.page || Math.floor(query.offset / query.limit) + 1;
+    const currentPage = query.page || Math.floor((query.offset || 0) / (query.limit || 10)) + 1;
+
+    res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache
+    res.setHeader('X-Service-Source', 'StoreService');
 
     res.json({
-      shops: stores.map(store => ({
-        id: store.id,
-        name: store.name,
-        slug: store.slug,
-        business_name: (store.metadata as any)?.businessName || store.name,
-        logo_url: (store.metadata as any)?.logo_url || null,
-        address: (store.metadata as any)?.address || null,
-        city: (store.metadata as any)?.city || null,
-        state: (store.metadata as any)?.state || null,
-        zip_code: (store.metadata as any)?.zipCode || null,
-        phone: (store.metadata as any)?.phone || null,
-        website: (store.metadata as any)?.website || null,
-        rating_avg: undefined, // Not available in current schema
-        rating_count: undefined, // Not available in current schema
-        product_count: (store as any)._count?.inventory_items || 0,
-        is_published: true, // All active tenants are considered published for shops
-        primary_category: (store.metadata as any)?.primary_category || null
-      })),
+      success: true,
+      shops,
       pagination: {
         page: currentPage,
         limit: query.limit,
-        total,
-        totalPages: Math.ceil(total / query.limit),
-        hasMore: currentPage * query.limit < total
+        total: result.pagination.total,
+        totalPages: result.pagination.totalPages,
+        hasMore: result.pagination.hasMore
+      },
+      metadata: {
+        cacheTTL: 5 * 60 * 1000 // 5 minutes
       }
     });
   } catch (error) {
@@ -952,41 +491,355 @@ router.get('/shops/trending', async (req, res) => {
   }
 });
 
+// ====================
+// UNIVERSAL IDENTIFIER ROUTES
+// ====================
+
 /**
- * GET /api/public/shops/:slug
- * Get single shop by slug (public access)
+ * Batch testing route for identifier resolution
  */
-router.get('/shops/:slug', async (req, res) => {
+router.post('/test/batch-resolve', async (req, res) => {
   try {
-    const { slug } = req.params;
+    const { identifiers } = req.body;
     
-    // Use ShopService singleton
+    if (!Array.isArray(identifiers)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid request',
+        message: 'identifiers must be an array'
+      });
+    }
+    
+    const { resolveMultipleIdentifiers } = await import('../middleware/universalIdentifierResolver');
+    const results = await resolveMultipleIdentifiers(identifiers);
+    
+    res.json({
+      success: true,
+      data: results,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error('[Batch Test] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Batch test failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * GET /api/public/shops/:identifier
+ * Get shop by any identifier (tenant-id, slug, auto-id) - public access
+ */
+router.get('/shops/:identifier', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    console.log('[Public API] Shop lookup request for identifier:', identifier);
+    
+    // Use the universal identifier resolver
+    const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
+    const cache = UniversalIdentifierCache.getInstance();
+    const resolvedTenant = await cache.resolveIdentifier(identifier);
+    
+    if (!resolvedTenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Shop not found',
+        message: `No shop found for identifier: ${identifier}`
+      });
+    }
+    
+    // Use ShopService to get shop details
     const ShopService = (await import('../services/ShopService')).default;
     const shopService = ShopService.getInstance();
     
-    const shop = await shopService.getShopBySlug(slug);
+    let shop;
+    
+    // Try different methods based on identifier type
+    switch (resolvedTenant.type) {
+      case 'slug':
+        shop = await shopService.getShopBySlug(identifier);
+        break;
+      case 'tenant_id':
+        shop = await shopService.getShopByTenantId(identifier);
+        break;
+      case 'auto_id':
+        // For auto_id, we need to find the tenant first
+        shop = await shopService.getShopByTenantId(resolvedTenant.id);
+        break;
+    }
     
     if (!shop) {
       return res.status(404).json({
         success: false,
-        error: 'Shop not found'
+        error: 'Shop not found',
+        message: 'Shop details not available for this tenant'
       });
     }
     
     res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
-    res.setHeader('X-Service-Source', 'ShopService-Singleton');
+    res.setHeader('X-Service-Source', 'Universal-Identifier-Cache');
     
     res.json({
       success: true,
-      shop
+      shop,
+      metadata: {
+        tenant: {
+          id: resolvedTenant.id,
+          name: resolvedTenant.name,
+          slug: resolvedTenant.slug,
+          type: resolvedTenant.type
+        },
+        identifierType: resolvedTenant.type
+      }
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[PUBLIC API] Error fetching shop by slug:', errorMessage);
+    console.error('[Public API] Error fetching shop by identifier:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch shop',
-      message: errorMessage
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// ====================
+// PUBLIC TENANT ENDPOINTS (Universal Identifier Pattern)
+// ====================
+
+/**
+ * GET /api/public/tenant/:identifier
+ * Get basic tenant information by any identifier (tenant-id, slug, auto-id)
+ */
+router.get('/tenant/:identifier', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    console.log(`[Public API] Tenant lookup request for identifier: ${identifier}`);
+    
+    // Use the universal identifier resolver
+    const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
+    const cache = UniversalIdentifierCache.getInstance();
+    const resolvedTenant = await cache.resolveIdentifier(identifier);
+    
+    if (!resolvedTenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
+    
+    // Return basic tenant information
+    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
+    res.setHeader('X-Service-Source', 'Universal-Identifier-Cache');
+    
+    res.json({
+      success: true,
+      data: {
+        id: resolvedTenant.id,
+        name: resolvedTenant.name,
+        slug: resolvedTenant.slug,
+        subscriptionStatus: resolvedTenant.subscriptionStatus,
+        metadata: resolvedTenant.metadata,
+        createdAt: new Date().toISOString(), // We don't have created_at in cache
+        updatedAt: new Date().toISOString()
+      },
+      metadata: {
+        tenant: {
+          id: resolvedTenant.id,
+          name: resolvedTenant.name,
+          slug: resolvedTenant.slug,
+          type: resolvedTenant.type
+        },
+        identifierType: resolvedTenant.type
+      }
+    });
+  } catch (error) {
+    console.error('[Public API] Error fetching tenant by identifier:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch tenant',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * GET /api/public/tenant/:identifier/profile
+ * Get tenant profile by any identifier (tenant-id, slug, auto-id)
+ */
+router.get('/tenant/:identifier/profile', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    console.log(`[Public API] Tenant profile request for identifier: ${identifier}`);
+    
+    // Use the universal identifier resolver
+    const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
+    const cache = UniversalIdentifierCache.getInstance();
+    const resolvedTenant = await cache.resolveIdentifier(identifier);
+    
+    if (!resolvedTenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
+    
+    // Use TenantService to get complete profile
+    const { TenantService } = await import('../services/TenantService');
+    const tenantService = TenantService.getInstance();
+    const profile = await tenantService.getTenantProfile(resolvedTenant.id);
+    
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant profile not found',
+        message: 'Unable to retrieve tenant profile'
+      });
+    }
+    
+    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
+    res.setHeader('X-Service-Source', 'Universal-Identifier-Cache');
+    
+    res.json({
+      success: true,
+      data: profile,
+      metadata: {
+        tenant: {
+          id: resolvedTenant.id,
+          name: resolvedTenant.name,
+          slug: resolvedTenant.slug,
+          type: resolvedTenant.type
+        },
+        identifierType: resolvedTenant.type
+      }
+    });
+  } catch (error) {
+    console.error('[Public API] Error fetching tenant profile by identifier:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch tenant profile',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * GET /api/public/tenant/:identifier/business-profile
+ * Get tenant business profile by any identifier (tenant-id, slug, auto-id)
+ */
+router.get('/tenant/:identifier/business-profile', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    console.log(`[Public API] Business profile request for identifier: ${identifier}`);
+    
+    // Use the universal identifier resolver
+    const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
+    const cache = UniversalIdentifierCache.getInstance();
+    const resolvedTenant = await cache.resolveIdentifier(identifier);
+    
+    if (!resolvedTenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
+    
+    // Use TenantService to get business profile
+    const { TenantService } = await import('../services/TenantService');
+    const tenantService = TenantService.getInstance();
+    const profile = await tenantService.getTenantProfile(resolvedTenant.id);
+    
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        error: 'Business profile not found',
+        message: 'Unable to retrieve business profile'
+      });
+    }
+    
+    // Extract business information
+    const businessProfile = {
+      id: profile.id,
+      name: profile.name,
+      slug: profile.slug,
+      businessInfo: profile.businessInfo,
+      metadata: profile.metadata,
+      subscriptionStatus: profile.subscriptionStatus,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt
+    };
+    
+    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
+    res.setHeader('X-Service-Source', 'Universal-Identifier-Cache');
+    
+    res.json({
+      success: true,
+      data: businessProfile,
+      metadata: {
+        tenant: {
+          id: resolvedTenant.id,
+          name: resolvedTenant.name,
+          slug: resolvedTenant.slug,
+          type: resolvedTenant.type
+        },
+        identifierType: resolvedTenant.type
+      }
+    });
+  } catch (error) {
+    console.error('[Public API] Error fetching business profile by identifier:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch business profile',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// ====================
+// LEGACY SHOPS ENDPOINTS (for backward compatibility)
+// ====================
+
+/**
+ * GET /api/public/shops/trending
+ * Get trending shops
+ */
+router.get('/shops/trending', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const limit = parseInt((req.query.limit as string) || '12');
+    
+    // Use unified ShopService with UniversalSingleton caching
+    const { default: ShopService } = await import('../services/ShopService');
+    const shopService = ShopService.getInstance();
+    
+    const shops = await shopService.getTrendingShops({ limit });
+    
+    const responseTime = Date.now() - startTime;
+    
+    res.setHeader('Cache-Control', 'public, max-age=600'); // 10 minutes cache
+    res.setHeader('X-Response-Time', responseTime.toString());
+    res.setHeader('X-Service-Source', 'ShopService');
+    
+    res.json({
+      success: true,
+      data: shops,
+      count: shops.length,
+      metadata: {
+        cacheTTL: 10 * 60 * 1000, // 10 minutes
+        responseTime,
+        limit
+      }
+    });
+  } catch (error) {
+    console.error('[PUBLIC SHOPS API] Error fetching trending shops:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch trending shops';
+    res.status(500).json({
+      success: false,
+      error: errorMessage
     });
   }
 });
@@ -1155,7 +1008,7 @@ router.get('/shops/:slug', async (req, res) => {
     
     // Skip if this is a special route that should be handled elsewhere
     if (slug === 'trending' || slug === 'featured' || slug === 'id') {
-      console.log('[PUBLIC API] Skipping special slug:', slug);
+   //   console.log('[PUBLIC API] Skipping special slug:', slug);
       return res.status(404).json({
         success: false,
         error: 'Not found'
@@ -1169,10 +1022,10 @@ router.get('/shops/:slug', async (req, res) => {
     // Check if this is a tenant ID (starts with 'tid-')
     let shop;
     if (slug.startsWith('tid-')) {
-      console.log('[PUBLIC API] Detected tenant ID, fetching by tenant ID:', slug);
+//      console.log('[PUBLIC API] Detected tenant ID, fetching by tenant ID:', slug);
       shop = await shopService.getShopByTenantId(slug);
     } else {
-      console.log('[PUBLIC API] Fetching by slug:', slug);
+ //     console.log('[PUBLIC API] Fetching by slug:', slug);
       shop = await shopService.getShopBySlug(slug);
     }
 
@@ -1235,58 +1088,19 @@ router.get('/shops/id/:tenantId', async (req, res) => {
 
 /**
  * GET /api/public/shops/discover/:bucketType
- * Universal discovery endpoint with scope-aware routing
- * 
+ * Universal discovery endpoint with scope-aware routing - Universal Identifier Pattern
+ *
  * Query parameters:
  * - scope: 'shop' | 'global' | 'location' | 'category' | 'timezone' (default: 'shop')
  * - tenantId: string (required for shop scope)
  * - limit: number (default: 12)
  * - sortBy: 'priority' | 'featuredAt' | 'expiresAt' | 'relevance' (default: 'priority')
  * - sortOrder: 'asc' | 'desc' (default: 'desc')
- * 
- * Location scope (future):
- * - location[city]: string
- * - location[state]: string
- * - location[zip]: string
- * - location[country]: string
- * - location[radius]: number (miles)
- * 
- * Category scope:
- * - category[productName]: string (product category name)
- * - category[productId]: string (product category ID)
- * - category[googleProductId]: string (Google Product Category ID)
- * - category[shopCategoryName]: string (shop/GBP category name)
- * - category[shopCategoryId]: string (shop/GBP category ID)
- * - category[shopGoogleCategoryId]: string (Google Business Profile Category ID)
- * - category[categoryType]: 'product' | 'shop' | 'both' (default: 'product')
- * 
- * Timezone scope (future):
- * - timezone[timezone]: string
- * - timezone[offset]: number
  */
 router.get('/shops/discover/:bucketType', async (req, res) => {
   const startTime = Date.now();
   try {
     const { bucketType } = req.params;
-    console.log(`[PUBLIC API] Shops discovery request:`, {
-      method: req.method,
-      url: req.url,
-      bucketType,
-      query: req.query,
-      userAgent: req.get('User-Agent'),
-      referer: req.get('Referer')
-    });
-
-    // Validate bucketType
-    const validBucketTypes = ['random', 'trending', 'new', 'sale', 'seasonal', 'staff', 'selection'];
-    if (!validBucketTypes.includes(bucketType)) {
-      console.error(`[PUBLIC API] Invalid bucketType: ${bucketType}`);
-      return res.status(400).json({
-        success: false,
-        error: `Invalid bucketType: ${bucketType}. Valid types: ${validBucketTypes.join(', ')}`
-      });
-    }
-    
     const {
       scope = 'shop',
       tenantId,
@@ -1296,10 +1110,20 @@ router.get('/shops/discover/:bucketType', async (req, res) => {
       ...otherQueryParams
     } = req.query;
 
+    // Validate bucketType
+    const validBucketTypes = ['random', 'trending', 'new', 'sale', 'seasonal', 'staff', 'selection'];
+    if (!validBucketTypes.includes(bucketType as string)) {
+      console.error(`[PUBLIC API] Invalid bucketType: ${bucketType}`);
+      return res.status(400).json({
+        success: false,
+        error: `Invalid bucketType: ${bucketType}. Valid types: ${validBucketTypes.join(', ')}`
+      });
+    }
+
     // Parse nested query parameters for location, category, timezone
-    const location = otherQueryParams['location[city]'] ? {
-      latitude: undefined,
-      longitude: undefined,
+    const location = (otherQueryParams['location[latitude]'] || otherQueryParams['location[city]'] || otherQueryParams['location[state]'] || otherQueryParams['location[zip]']) ? {
+      latitude: otherQueryParams['location[latitude]'] ? parseFloat(otherQueryParams['location[latitude]'] as string) : undefined,
+      longitude: otherQueryParams['location[longitude]'] ? parseFloat(otherQueryParams['location[longitude]'] as string) : undefined,
       city: otherQueryParams['location[city]'] as string,
       state: otherQueryParams['location[state]'] as string,
       zip: otherQueryParams['location[zip]'] as string,
@@ -1308,17 +1132,12 @@ router.get('/shops/discover/:bucketType', async (req, res) => {
     } : undefined;
 
     const category = otherQueryParams['category[productName]'] ? {
-      // Product category parameters
       productName: otherQueryParams['category[productName]'] as string,
       productId: otherQueryParams['category[productId]'] as string,
       googleProductId: otherQueryParams['category[googleProductId]'] as string,
-      
-      // Shop category parameters (GBP-based)
       shopCategoryName: otherQueryParams['category[shopCategoryName]'] as string,
       shopCategoryId: otherQueryParams['category[shopCategoryId]'] as string,
       shopGoogleCategoryId: otherQueryParams['category[shopGoogleCategoryId]'] as string,
-      
-      // Category type - specifies which category to use for filtering
       categoryType: otherQueryParams['category[categoryType]'] as 'product' | 'shop' | 'both'
     } : undefined;
 
@@ -1327,10 +1146,13 @@ router.get('/shops/discover/:bucketType', async (req, res) => {
       offset: otherQueryParams['timezone[offset]'] ? parseInt(otherQueryParams['timezone[offset]'] as string) : undefined
     } : undefined;
 
-    const { ScopeRouter } = await import('../services/ScopeRouter');
-    const scopeRouter = ScopeRouter.getInstance();
+    console.log(`[Public API] Discovery request for bucket: ${bucketType}, scope: ${scope}`);
 
-    const products = await scopeRouter.routeDiscovery(bucketType, {
+    // Use DiscoveryService with intelligent caching
+    const { DiscoveryService } = await import('../services/DiscoveryService');
+    const discoveryService = DiscoveryService.getInstance();
+
+    const result = await discoveryService.routeDiscovery(bucketType as string, {
       scope: scope as 'shop' | 'global' | 'location' | 'category' | 'timezone',
       tenantId: tenantId as string,
       limit: parseInt(limit as string),
@@ -1341,30 +1163,28 @@ router.get('/shops/discover/:bucketType', async (req, res) => {
       timezone
     });
 
-    // Transform snake_case to camelCase for frontend compatibility
-    const transformedProducts = Array.isArray(products) ? products.map((product: any) => ({
-      ...product,
-      inventoryItemId: product.inventory_item_id || product.inventoryItemId,
-      productName: product.product_name || product.productName,
-      imageUrl: product.image_url || product.imageUrl,
-      priceCents: product.current_price_cents || product.priceCents,
-      salePriceCents: product.sale_price_cents || product.salePriceCents,
-      featuredType: product.featured_type || product.featuredType,
-      tenantId: product.tenant_id || product.tenantId,
-      tenantName: product.tenant_name || product.tenantName,
-      tenantLogoUrl: product.tenant_logo_url || product.tenantLogoUrl
-    })) : products;
+    // Add MV-aware cache headers
+    const productsArray = Array.isArray(result.products) ? result.products : [];
+    const mvRefreshedAt = productsArray[0]?.mv_refreshed_at || new Date().toISOString();
+
+    res.setHeader('X-MV-Refreshed-At', mvRefreshedAt);
+    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 minutes
+    res.setHeader('X-MV-Source', 'mv_global_discovery');
+    res.setHeader('X-Service-Source', 'DiscoveryService');
 
     res.json({
       success: true,
-      data: transformedProducts,
-      scope,
-      bucketType,
-      cached: true,
+      data: result.products,
+      scope: result.scope,
+      bucketType: result.bucketType,
+      cached: result.cached,
+      metadata: {
+        cacheTTL: 10 * 60 * 1000, // 10 minutes
+        cacheStats: discoveryService.getCacheStats()
+      },
       metrics: {
-        cacheHit: true,
-        responseTime: Date.now() - startTime,
-        itemCount: Array.isArray(transformedProducts) ? transformedProducts.length : 0
+        ...result.metrics,
+        responseTime: Date.now() - startTime
       }
     });
   } catch (error) {
@@ -1376,11 +1196,6 @@ router.get('/shops/discover/:bucketType', async (req, res) => {
     });
   }
 });
-
-/**
- * GET /api/public/shops/trending
- * Get trending shops with scope-aware routing
- */
 router.get('/shops/trending', async (req, res) => {
   const startTime = Date.now();
   try {
@@ -1963,21 +1778,21 @@ router.get('/shops/recently-viewed', async (req, res) => {
  */
 router.get('/categories', async (req, res) => {
   try {
-    const categories = await prisma.platform_categories.findMany({
-      where: { is_active: true },
-      orderBy: { name: 'asc' }
-    });
+    // Use PlatformCategoryService with UniversalSingleton caching
+    const { PlatformCategoryService } = await import('../services/PlatformCategoryService');
+    const categoryService = PlatformCategoryService.getInstance();
+
+    const categories = await categoryService.getCategories();
+
+    res.setHeader('Cache-Control', 'public, max-age=600'); // 10 min cache
+    res.setHeader('X-Service-Source', 'PlatformCategoryService');
 
     res.json({
       success: true,
-      categories: categories.map(category => ({
-        id: category.id,
-        name: category.name,
-        slug: category.slug,
-        description: category.description,
-        googleCategoryId: category.google_category_id,
-        productCount: 0 // Placeholder since we removed the count
-      }))
+      categories,
+      metadata: {
+        cacheTTL: 10 * 60 * 1000 // 10 minutes
+      }
     });
   } catch (error) {
     console.error('[PUBLIC API] Categories error:', error);
@@ -1994,30 +1809,21 @@ router.get('/categories', async (req, res) => {
  */
 router.get('/categories/tree', async (req, res) => {
   try {
-    const categories = await prisma.platform_categories.findMany({
-      where: { is_active: true },
-      orderBy: { name: 'asc' }
-    });
+    // Use PlatformCategoryService with UniversalSingleton caching
+    const { PlatformCategoryService } = await import('../services/PlatformCategoryService');
+    const categoryService = PlatformCategoryService.getInstance();
 
-    // Build tree structure
-    const buildTree = (categories: any[], parentId: string | null = null): any[] => {
-      return categories
-        .filter(cat => cat.parent_id === parentId)
-        .map(cat => ({
-          id: cat.id,
-          name: cat.name,
-          slug: cat.slug,
-          description: cat.description,
-          iconEmoji: cat.icon_emoji,
-          children: buildTree(categories, cat.id)
-        }));
-    };
+    const categoryTree = await categoryService.getCategoryTree();
 
-    const tree = buildTree(categories);
+    res.setHeader('Cache-Control', 'public, max-age=600'); // 10 min cache
+    res.setHeader('X-Service-Source', 'PlatformCategoryService');
 
     res.json({
       success: true,
-      categories: tree
+      categories: categoryTree,
+      metadata: {
+        cacheTTL: 10 * 60 * 1000 // 10 minutes
+      }
     });
   } catch (error) {
     console.error('[PUBLIC API] Category tree error:', error);
@@ -2090,36 +1896,15 @@ router.get('/categories/:id/products', async (req, res) => {
       });
     }
 
-    const [products, total] = await Promise.all([
-      prisma.inventory_items.findMany({
-        where: {
-          item_status: 'active' as const,
-          directory_category_id: id
-        },
-        take: query.limit,
-        skip: query.offset,
-        orderBy: { [query.sort]: query.order },
-        include: {
-          photo_assets: {
-            where: { position: 0 },
-            take: 1
-          },
-          tenants: {
-            select: {
-              id: true,
-              name: true,
-              slug: true
-            }
-          }
-        }
-      }),
-      prisma.inventory_items.count({
-        where: {
-          item_status: 'active' as const,
-          directory_category_id: id
-        }
-      })
-    ]);
+    const { ProductService } = await import('../services/ProductService');
+    const productService = ProductService.getInstance();
+
+    const productsResponse = await productService.getProductsByCategory(category.id, {
+      limit: query.limit,
+      offset: query.offset,
+      sort: query.sort,
+      order: query.order
+    });
 
     res.json({
       success: true,
@@ -2128,21 +1913,8 @@ router.get('/categories/:id/products', async (req, res) => {
         name: category.name,
         slug: category.slug
       },
-      products: products.map(product => ({
-        id: product.id,
-        name: product.name,
-        description: product.description,
-        price: product.price_cents ? product.price_cents / 100 : null,
-        imageUrl: product.photo_assets[0]?.url || null,
-        tenant: product.tenants,
-        availability: product.availability
-      })),
-      pagination: {
-        total,
-        limit: query.limit,
-        offset: query.offset,
-        hasMore: query.offset + query.limit < total
-      }
+      products: productsResponse.products,
+      pagination: productsResponse.pagination
     });
   } catch (error) {
     console.error('[PUBLIC API] Category products error:', error);

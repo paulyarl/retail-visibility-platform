@@ -25,6 +25,10 @@ import { applyRateLimit } from "./middleware/rate-limit";
 import { securityHeaders, additionalSecurityHeaders } from "./middleware/security-headers";
 import { inputValidationMiddleware } from "./middleware/input-validation";
 
+// Security middleware imports
+import { validateInput, securityLogger } from "./middleware/security";
+import { ssrfProtection, basicRateLimit, blockIotRequests } from "./middleware/ssrf-protection";
+
 // Migration fix applied: ProductCondition enum renamed 'new' to 'brand_new'
 // Force rebuild v3: Railway build cache bypass
 import fs from "fs";
@@ -246,6 +250,13 @@ if (sentryEnabled) {
 app.use(securityHeaders);
 app.use(additionalSecurityHeaders);
 
+// Security middleware - applied early for protection
+app.use(securityLogger); // Log suspicious requests
+app.use(basicRateLimit()); // Rate limiting
+app.use(blockIotRequests); // Block ONVIF/IoT attacks
+app.use(validateInput); // Input validation and sanitization
+app.use(ssrfProtection); // SSRF protection
+
 app.use(cors({
   origin: [/localhost:\d+$/, /\.vercel\.app$/, /vercel\.app$/ ,/www\.visibleshelf\.com$/, /visibleshelf\.com$/, /\.visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.store$/],
   credentials: true,
@@ -303,6 +314,16 @@ app.use("/uploads", express.static(UPLOAD_DIR));
 /* ------------------------------ tenants ------------------------------ */
 import tenantCategoriesRoutes from './routes/tenant-categories';
 
+// Mount universal tenant routes (NEW - Phase 3)
+import universalTenantsRoutes from './routes/universal-tenants';
+app.use('/api', universalTenantsRoutes);
+console.log('✅ Universal tenant routes mounted at /api (Phase 3: Universal Identifier System)');
+
+// Mount cache monitoring routes (NEW - Phase 1)
+import cacheMonitoringRoutes from './routes/cache-monitoring';
+app.use('/api/cache', cacheMonitoringRoutes);
+console.log('✅ Cache monitoring routes mounted at /api/cache (Phase 1: Encrypted Cache System)');
+
 // Health check route
 const healthRoutes = (req: any, res: any) => {
   const alertStatus = getAlertStatus();
@@ -323,7 +344,7 @@ app.use('/health', healthRoutes);
 app.use('/api/health', healthRoutes);
 
 // Request logging middleware for debugging
-app.use((req, res, next) => {
+/* app.use((req, res, next) => {
   if (req.path.startsWith('/api/public')) {
     console.log(`[API REQUEST] ${req.method} ${req.path}`, {
       query: req.query,
@@ -333,7 +354,7 @@ app.use((req, res, next) => {
     });
   }
   next();
-});
+}); */
 
 // PUBLIC API ROUTES - Singleton System
 import publicApiRoutes from './routes/public-api';

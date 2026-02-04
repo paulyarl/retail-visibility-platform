@@ -5,9 +5,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, MapPin, Star, Phone, Globe, Clock, Filter, Grid, List, ChevronDown, Store, ShoppingBag, TrendingUp, Sparkles, Tag, Users, Calendar, ArrowLeft, X } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Container, Grid as MantineGrid, SimpleGrid } from '@mantine/core';
 import StorefrontActions from '@/components/storefront/StorefrontActions';
 import { useShopsFeaturedBuckets } from '@/hooks/shops/useShopsFeaturedBuckets';
 import { BucketSection, ProductBucket, ShopBucket } from '@/components/shops/BucketSection';
+import { TrendingShopsContainer } from '@/components/shops/TrendingShopsContainer';
+import { TrendingProductsContainer } from '@/components/shops/TrendingProductsContainer';
 import ScopeFilterBar from '@/components/shops/ScopeFilterBar';
 import { useScopeUrlState } from '@/hooks/shops/useScopeUrlState';
 import { ScopeParams } from '@/types/scope';
@@ -129,8 +133,24 @@ function ShopsPageContent() {
     router.push(`/shops/${shop.id}`);
   };
 
-  // Extract categories from all products
+  // Extract categories from both shops and products for comprehensive search
   useEffect(() => {
+    const categoryMap = new Map<string, { count: number; type: 'shop' | 'product' }>();
+    
+    // Add shop categories
+    if (shops.length) {
+      shops.forEach(shop => {
+        const category = shop.primary_category || 'General';
+        const existing = categoryMap.get(category);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          categoryMap.set(category, { count: 1, type: 'shop' });
+        }
+      });
+    }
+    
+    // Add product categories from all buckets
     const allProductsRaw = [
       ...buckets.trending,
       ...buckets.new,
@@ -140,8 +160,8 @@ function ShopsPageContent() {
       ...buckets.selection,
       ...buckets.random
     ];
-
-    // Deduplicate products across all buckets to prevent double-counting
+    
+    // Deduplicate products
     const productMap = new Map<string, any>();
     allProductsRaw.forEach(product => {
       const productId = product.id || product.inventory_item_id;
@@ -150,18 +170,68 @@ function ShopsPageContent() {
       }
     });
     const allProducts = Array.from(productMap.values());
-
-    const categoryMap = new Map<string, number>();
+    
+    // Add product categories
     allProducts.forEach(product => {
-      const category = product.categoryName || product.category_name;
+      const category = product.categoryName || product.category_name || product.product_category;
       if (category) {
-        categoryMap.set(category, (categoryMap.get(category) || 0) + 1);
+        const existing = categoryMap.get(category);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          categoryMap.set(category, { count: 1, type: 'product' });
+        }
       }
     });
     
-    const categoryList = Array.from(categoryMap.entries()).map(([name, count]) => ({ name, count }));
+    const categoryList = Array.from(categoryMap.entries()).map(([name, data]) => ({ 
+      name, 
+      count: data.count,
+      type: data.type
+    }));
     setCategories(categoryList.sort((a, b) => a.name.localeCompare(b.name)));
-  }, [buckets]);
+  }, [shops, buckets]);
+
+  // Filter and sort shops
+  const filterAndSortShops = (shopsList: any[]) => {
+    let filtered = [...shopsList];
+    
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(shop => 
+        shop.name?.toLowerCase().includes(query) ||
+        shop.business_name?.toLowerCase().includes(query) ||
+        shop.description?.toLowerCase().includes(query) ||
+        shop.primary_category?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply category filter
+    if (selectedCategory) {
+      filtered = filtered.filter(shop => 
+        shop.primary_category === selectedCategory
+      );
+    }
+    
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return (a.name || '').localeCompare(b.name || '');
+        case 'rating':
+          return (b.rating_avg || 0) - (a.rating_avg || 0);
+        case 'products':
+          return (b.product_count || 0) - (a.product_count || 0);
+        case 'newest':
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        default:
+          return 0;
+      }
+    });
+    
+    return filtered;
+  };
 
   // Filter and sort products
   const filterAndSortProducts = (products: any[]) => {
@@ -174,14 +244,17 @@ function ShopsPageContent() {
         p.name?.toLowerCase().includes(query) ||
         p.brand?.toLowerCase().includes(query) ||
         p.categoryName?.toLowerCase().includes(query) ||
-        p.category_name?.toLowerCase().includes(query)
+        p.category_name?.toLowerCase().includes(query) ||
+        p.product_category?.toLowerCase().includes(query)
       );
     }
     
     // Apply category filter
     if (selectedCategory) {
       filtered = filtered.filter(p => 
-        p.categoryName === selectedCategory || p.category_name === selectedCategory
+        p.categoryName === selectedCategory || 
+        p.category_name === selectedCategory ||
+        p.product_category === selectedCategory
       );
     }
     
@@ -202,6 +275,29 @@ function ShopsPageContent() {
     });
     
     return filtered;
+  };
+
+  // Helper function to get all products from all buckets
+  const getAllProducts = () => {
+    const allProductsRaw = [
+      ...buckets.trending,
+      ...buckets.new,
+      ...buckets.sale,
+      ...buckets.seasonal,
+      ...buckets.staff,
+      ...buckets.selection,
+      ...buckets.random
+    ];
+    
+    // Deduplicate products
+    const productMap = new Map<string, any>();
+    allProductsRaw.forEach(product => {
+      const productId = product.id || product.inventory_item_id;
+      if (!productMap.has(productId)) {
+        productMap.set(productId, product);
+      }
+    });
+    return Array.from(productMap.values());
   };
 
   // Show traditional listing when searching or filtering
@@ -262,6 +358,30 @@ function ShopsPageContent() {
                 businessName="Shops Directory"
                 currentUrl="/shops"
               />
+            </div>
+          </div>
+        </div>
+        
+        {/* Navigation Bar */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="h-5 w-5 text-blue-600" />
+              <span className="font-semibold text-gray-900 dark:text-white">Shops & Products</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href="/shops/directory">
+                <Button variant="ghost" size="sm">
+                  <Store className="h-4 w-4 mr-2" />
+                  Shops Directory
+                </Button>
+              </Link>
+              <Link href="/shops/trending">
+                <Button variant="ghost" size="sm">
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  Trending
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -382,106 +502,106 @@ function ShopsPageContent() {
         </div>
       </div>
 
-      {/* Multi-Bucket Discovery Experience */}
+      {/* Separated Containers with Mantine Grid */}
       {!showTraditionalListing && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Above Fold: High Engagement Buckets */}
-          <div className="space-y-12 mb-16">
-            <ProductBucket
-              products={filterAndSortProducts(buckets.trending)}
-              loading={loading}
-              error={error}
-              title="🔥 Trending Products"
-              subtitle="Hot products gaining traction across all shops"
-              maxItems={8}
-              onProductClick={handleProductClick}
-              viewMode={viewMode}
-            />
+        <Container size="xl" py="md">
+          {/* Trending Section with Shops and Products */}
+          <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="xl" mb="xl">
+            {/* Trending Shops Container */}
+            <div>
+              <TrendingShopsContainer 
+                trendingShops={buckets.trendingShops || []}
+                loading={loading}
+                error={error}
+              />
+            </div>
             
-            <ProductBucket
-              products={filterAndSortProducts(buckets.new)}
-              loading={loading}
-              error={error}
-              title="✨ New Arrivals"
-              subtitle="Fresh products just added to our marketplace"
-              maxItems={8}
-              onProductClick={handleProductClick}
-              viewMode={viewMode}
-            />
-            
-            <ProductBucket
-              products={filterAndSortProducts(buckets.random)}
-              loading={loading}
-              error={error}
-              title="🎲 Discover Something New"
-              subtitle="Randomly selected gems from our curated collection"
-              maxItems={8}
-              onProductClick={handleProductClick}
-              viewMode={viewMode}
-            />
-          </div>
+            {/* Trending Products Container */}
+            <div>
+              <TrendingProductsContainer 
+                trendingProducts={buckets.trending || []}
+                loading={loading}
+                error={error}
+              />
+            </div>
+          </SimpleGrid>
 
-          {/* Mid Page: Conversion Focused */}
-          <div className="space-y-12 mb-16">
-            <ProductBucket
-              products={filterAndSortProducts(buckets.sale)}
-              loading={loading}
-              error={error}
-              title="🏷️ Sale & Deals"
-              subtitle="Limited-time offers and special promotions"
-              maxItems={8}
-              showViewAll={true}
-              viewAllUrl="/shops?filter=sale"
-              onProductClick={handleProductClick}
-              viewMode={viewMode}
-            />
-            
-            <ProductBucket
-              products={filterAndSortProducts(buckets.seasonal)}
-              loading={loading}
-              error={error}
-              title="🍂 Seasonal Picks"
-              subtitle="Perfect products for the current season"
-              maxItems={8}
-              onProductClick={handleProductClick}
-              viewMode={viewMode}
-            />
-            
-            <ProductBucket
-              products={filterAndSortProducts(buckets.staff)}
-              loading={loading}
-              error={error}
-              title="⭐ Staff Picks"
-              subtitle="Hand-picked favorites from our team"
-              maxItems={8}
-              onProductClick={handleProductClick}
-              viewMode={viewMode}
-            />
-          </div>
-
-          {/* Below Fold: Discovery & Exploration */}
+          {/* Other Product Buckets */}
           <div className="space-y-12">
-            <ShopBucket
-              shops={buckets.trendingShops}
-              loading={loading}
-              error={error}
-              title="🔥 Trending Shops"
-              subtitle="Popular shops with high engagement"
-              maxItems={6}
-              showViewAll={true}
-              viewAllUrl="/shops?sort=trending"
-              onShopClick={handleShopClick}
-            />
-            
-            <ProductBucket
-              products={buckets.selection}
-              loading={loading}
-              error={error}
-              title="🏪 Store Selections"
-              subtitle="Curated collections from individual shops"
-              maxItems={8}
-              onProductClick={handleProductClick}
-            />
+            {/* Mid Page: Conversion Focused */}
+            <div className="space-y-12 mb-16">
+              <ProductBucket
+                products={filterAndSortProducts(buckets.new)}
+                loading={loading}
+                error={error}
+                title="✨ New Arrivals"
+                subtitle="Fresh products just added to our marketplace"
+                maxItems={8}
+                onProductClick={handleProductClick}
+                viewMode={viewMode}
+              />
+              
+              <ProductBucket
+                products={filterAndSortProducts(buckets.random)}
+                loading={loading}
+                error={error}
+                title="🎲 Discover Something New"
+                subtitle="Randomly selected gems from our curated collection"
+                maxItems={8}
+                onProductClick={handleProductClick}
+                viewMode={viewMode}
+              />
+            </div>
+
+            <div className="space-y-12 mb-16">
+              <ProductBucket
+                products={filterAndSortProducts(buckets.sale)}
+                loading={loading}
+                error={error}
+                title="🏷️ Sale & Deals"
+                subtitle="Limited-time offers and special promotions"
+                maxItems={8}
+                showViewAll={true}
+                viewAllUrl="/shops?filter=sale"
+                onProductClick={handleProductClick}
+                viewMode={viewMode}
+              />
+              
+              <ProductBucket
+                products={filterAndSortProducts(buckets.seasonal)}
+                loading={loading}
+                error={error}
+                title="🍂 Seasonal Picks"
+                subtitle="Perfect products for the current season"
+                maxItems={8}
+                onProductClick={handleProductClick}
+                viewMode={viewMode}
+              />
+              
+              <ProductBucket
+                products={filterAndSortProducts(buckets.staff)}
+                loading={loading}
+                error={error}
+                title="⭐ Staff Picks"
+                subtitle="Hand-picked favorites from our team"
+                maxItems={8}
+                onProductClick={handleProductClick}
+                viewMode={viewMode}
+              />
+            </div>
+
+            {/* Below Fold: Discovery & Exploration */}
+            <div className="space-y-12">
+              <ProductBucket
+                products={buckets.selection}
+                loading={loading}
+                error={error}
+                title="🏪 Store Selections"
+                subtitle="Curated collections from individual shops"
+                maxItems={8}
+                onProductClick={handleProductClick}
+              />
+            </div>
           </div>
 
           {/* Performance Metrics (Development Only) */}
@@ -507,111 +627,134 @@ function ShopsPageContent() {
               </button>
             </div>
           )}
-        </div>
+        </Container>
       )}
 
-      {/* Traditional Shops Listing (for search/filter) */}
+      {/* Traditional Listing (for search/filter) - Shows both Shops and Products */}
       {showTraditionalListing && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               {searchQuery && `Search Results for "${searchQuery}"`}
-              {selectedCategory && `${selectedCategory} Shops`}
-              {!searchQuery && !selectedCategory && 'All Shops'}
+              {selectedCategory && !searchQuery && `${selectedCategory} Results`}
+              {!searchQuery && !selectedCategory && 'All Results'}
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              {shops.length} shops found
+              {filterAndSortShops(shops).length} shops and {filterAndSortProducts(getAllProducts()).length} products found
             </p>
           </div>
           
-          {shopsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm animate-pulse">
-                  <div className="aspect-square bg-gray-200 dark:bg-gray-700 rounded-t-xl"></div>
-                  <div className="p-4">
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
-                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
-                    <div className="flex gap-2">
-                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded flex-1"></div>
-                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+          {/* Shops Section */}
+          <div className="mb-12">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+              <Store size={20} />
+              Shops ({filterAndSortShops(shops).length})
+            </h3>
+            
+            {shopsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm animate-pulse">
+                    <div className="aspect-square bg-gray-200 dark:bg-gray-700 rounded-t-xl"></div>
+                    <div className="p-4">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+                      <div className="flex gap-2">
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded flex-1"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : shopsError ? (
-            <div className="text-center py-12">
-              <p className="text-red-600 dark:text-red-400 mb-4">Error loading shops: {shopsError}</p>
-              <button onClick={fetchShops} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                Try Again
-              </button>
-            </div>
-          ) : shops.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">🔍</div>
-              <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">No shops found</h3>
-              <p className="text-gray-600 dark:text-gray-400">Try adjusting your search or filters</p>
-            </div>
-          ) : (
-            <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
-              {shops.map((shop, index) => (
-                <div 
-                  key={shop.id} 
-                  className="bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer"
-                  onClick={() => handleShopCardClick(shop, index + 1, 'featured')}
-                >
-                  <div className="relative aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                    {shop.logo_url ? (
-                      <Image
-                        src={shop.logo_url}
-                        alt={shop.name}
-                        width={120}
-                        height={120}
-                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Store size={48} className="text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-2 truncate">{shop.name}</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
-                      {shop.business_description || 'Quality products and great service'}
-                    </p>
-                    <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-3">
-                      <span className="flex items-center gap-1">
-                        <ShoppingBag size={14} />
-                        {shop.product_count} products
-                      </span>
-                      {shop.rating_avg && (
-                        <span className="flex items-center gap-1">
-                          <Star size={14} className="text-yellow-400" />
-                          {shop.rating_avg.toFixed(1)} ({shop.rating_count})
-                        </span>
+                ))}
+              </div>
+            ) : shopsError ? (
+              <div className="text-center py-12">
+                <p className="text-red-600 dark:text-red-400 mb-4">Error loading shops: {shopsError}</p>
+                <button onClick={fetchShops} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                  Try Again
+                </button>
+              </div>
+            ) : filterAndSortShops(shops).length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">🏪</div>
+                <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">No shops found</h3>
+                <p className="text-gray-600 dark:text-gray-400">Try adjusting your search or filters</p>
+              </div>
+            ) : (
+              <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
+                {filterAndSortShops(shops).map((shop, index) => (
+                  <div 
+                    key={shop.id} 
+                    className="bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer"
+                    onClick={() => handleShopCardClick(shop, index + 1, 'search')}
+                  >
+                    <div className="relative aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                      {shop.logo_url ? (
+                        <Image
+                          src={shop.logo_url}
+                          alt={shop.name}
+                          width={120}
+                          height={120}
+                          className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Store size={48} className="text-gray-400" />
+                        </div>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      {shop.city && shop.state && (
+                    <div className="p-4">
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-2 truncate">{shop.name}</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                        {shop.business_description || 'Quality products and great service'}
+                      </p>
+                      <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-3">
                         <span className="flex items-center gap-1">
                           <MapPin size={14} />
-                          {shop.city}, {shop.state}
+                          {shop.city || 'Location'}
                         </span>
-                      )}
-                      {shop.phone && (
-                        <span className="flex items-center gap-1">
-                          <Phone size={14} />
-                          {shop.phone}
-                        </span>
-                      )}
+                        <span>{shop.product_count || 0} products</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <Star size={14} className="text-yellow-500 fill-current" />
+                          <span className="font-medium">{shop.rating_avg?.toFixed(1) || 'N/A'}</span>
+                        </div>
+                        <span className="text-gray-400">({shop.rating_count || 0} reviews)</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Products Section */}
+          <div>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+              <ShoppingBag size={20} />
+              Products ({filterAndSortProducts(getAllProducts()).length})
+            </h3>
+            
+            {filterAndSortProducts(getAllProducts()).length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">📦</div>
+                <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">No products found</h3>
+                <p className="text-gray-600 dark:text-gray-400">Try adjusting your search or filters</p>
+              </div>
+            ) : (
+              <ProductBucket
+                products={filterAndSortProducts(getAllProducts())}
+                loading={loading}
+                error={error}
+                title=""
+                subtitle=""
+                maxItems={undefined}
+                onProductClick={handleProductClick}
+                viewMode={viewMode}
+              />
+            )}
+          </div>
         </div>
       )}
     </div>

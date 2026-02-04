@@ -1,9 +1,9 @@
 'use client';
 
 import { Search, Grid, List } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { Button } from '@mantine/core';
 
 interface LayoutControlsProps {
   viewMode: 'grid' | 'list';

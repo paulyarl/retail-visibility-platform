@@ -2,7 +2,6 @@
 
 import { Shop } from '@/lib/shops/shop-resolver';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Separator } from '@/components/ui/Separator';
 import { 
@@ -17,6 +16,7 @@ import {
   Package
 } from 'lucide-react';
 import Image from 'next/image';
+import { Button } from '@mantine/core';
 
 interface ShopHeaderProps {
   shop: Shop;

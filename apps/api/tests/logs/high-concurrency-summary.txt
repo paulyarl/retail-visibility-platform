@@ -1,40 +1,48 @@
 
-HIGH CONCURRENCY TEST REPORT - 500 USERS
-========================================
+HIGH CONCURRENCY TEST REPORT - 1000 USERS
+==========================================
 Test Configuration:
-  • Concurrent Users: 500
+  • Concurrent Users: 200
   • Requests per User: 10
-  • Total Requests: 5000
-  • Test Duration: 0.05s
+  • Total Requests: 2000
+  • API Base URL: http://localhost:4000
+  • Test Duration: 62.32s
 
 RESULTS:
-  • Successful Requests: 4961
-  • Failed Requests: 39
-  • Success Rate: 99.22%
-  • Requests per Second: 107847.83
+  • Successful Requests: 205
+  • Failed Requests: 1795
+  • Success Rate: 10.25%
+  • Requests per Second: 3.29
 
 PERFORMANCE:
-  • Average Response Time: 13.45ms
-  • Min Response Time: 2ms
-  • Max Response Time: 44ms
-  • 50th Percentile: 12ms
-  • 90th Percentile: 22ms
-  • 95th Percentile: 32ms
-  • 99th Percentile: 38ms
+  • Average Response Time: 7815.39ms
+  • Min Response Time: 3418ms
+  • Max Response Time: 18895ms
+  • 50th Percentile: 7988ms
+  • 90th Percentile: 11027ms
+  • 95th Percentile: 11413ms
+  • 99th Percentile: 11913ms
 
-ASSESSMENT: EXCELLENT
-🎉 OUTSTANDING PERFORMANCE! Your platform handles viral traffic with ease!
+ENDPOINT PERFORMANCE:
+  • categories: 516 requests, 0.00ms avg
+  • discovery-random: 403 requests, 3975.57ms avg
+  • stores: 574 requests, 0.00ms avg
+  • category-tree: 306 requests, 0.00ms avg
+  • products-by-identifier: 201 requests, 0.00ms avg
 
-ERRORS: 39
-  • User 11: User 11 Request 8 failed: Simulated API error
-  • User 13: User 13 Request 5 failed: Simulated API error
-  • User 24: User 24 Request 1 failed: Simulated API error
-  • User 27: User 27 Request 4 failed: Simulated API error
-  • User 47: User 47 Request 9 failed: Simulated API error
-  ... and 34 more errors
+ASSESSMENT: NEEDS_IMPROVEMENT
+❌ PERFORMANCE NEEDS IMPROVEMENT! Not ready for viral traffic.
+
+ERRORS: 1795
+  • User 1: User 1 Request 1 failed: fetch failed
+  • User 1: User 1 Request 4 failed: This operation was aborted
+  • User 1: User 1 Request 5 failed: This operation was aborted
+  • User 1: User 1 Request 6 failed: fetch failed
+  • User 1: User 1 Request 7 failed: fetch failed
 
 RECOMMENDATIONS:
-✅ Ready for massive viral traffic
-✅ Exceptional reliability under load
-✅ Excellent response times
-✅ 95th percentile is excellent
+❌ Significant optimization required
+🔧 Review architecture and scaling
+❌ Response times need improvement
+❌ 95th percentile is too high for viral traffic
+❌ 99th percentile is too high

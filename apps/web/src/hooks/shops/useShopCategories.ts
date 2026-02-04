@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { shopsService } from '@/services/ShopsService';
 
 interface ShopCategory {
   shop_category: string;
@@ -36,7 +37,7 @@ class ShopCategoriesCache extends UniversalSingleton {
   }
 
   /**
-   * Get shop categories data with caching via UniversalSingleton
+   * Get shop categories data with caching via UniversalSingleton and ShopsService
    */
   async getShopCategories(): Promise<ShopCategory[]> {
     const cacheKey = 'shop-categories:all';
@@ -48,10 +49,10 @@ class ShopCategoriesCache extends UniversalSingleton {
       return cached;
     }
 
-    console.log('[ShopCategoriesCache] Fetching shop categories from API');
+    console.log('[ShopCategoriesCache] Fetching shop categories from service');
 
-    // Fetch from API
-    const categories = await this.fetchCategories();
+    // Fetch from service (includes built-in caching)
+    const categories = await shopsService.getShopCategories();
     
     // Store in cache using UniversalSingleton's cache management
     await this.setCache(cacheKey, categories);
@@ -59,24 +60,6 @@ class ShopCategoriesCache extends UniversalSingleton {
     this.setCachedData(cacheKey, categories, this.cacheTTL);
     
     return categories;
-  }
-
-  /**
-   * Fetch shop categories data from API
-   */
-  private async fetchCategories(): Promise<ShopCategory[]> {
-    const response = await fetch('/api/shop-categories');
-    if (!response.ok) {
-      throw new Error(`Failed to fetch categories: ${response.status}`);
-    }
-
-    const result = await response.json();
-    
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to fetch categories');
-    }
-
-    return result.data || [];
   }
 
   /**

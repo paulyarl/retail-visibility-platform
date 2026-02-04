@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { shopsService, type Shop } from '@/services/ShopsService';
-import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { 
   Heart, 
@@ -14,6 +13,7 @@ import {
   ExternalLink,
   Check
 } from 'lucide-react';
+import { Button } from '@mantine/core';
 
 interface ShopActionsProps {
   shop: Shop;

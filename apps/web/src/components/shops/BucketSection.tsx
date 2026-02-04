@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShoppingCart, Star } from 'lucide-react';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
+import { ShopCard } from '@/components/shops/ShopCard';
 
 /**
  * Bucket Section Component - Reusable container for shops discovery buckets
@@ -494,7 +495,38 @@ export function ShopBucket({
   viewAllUrl,
   onShopClick
 }: ShopBucketProps) {
-  const displayShops = shops.slice(0, maxItems);
+  // Debug: Log the raw shops prop
+ /*  if (process.env.NODE_ENV === 'development') {
+    console.log(`[ShopBucket] ${title} - Raw shops prop:`, shops);
+    console.log(`[ShopBucket] ${title} - shops type:`, typeof shops);
+    console.log(`[ShopBucket] ${title} - shops is array:`, Array.isArray(shops));
+    console.log(`[ShopBucket] ${title} - shops keys:`, shops ? Object.keys(shops) : 'shops is null/undefined');
+  } */
+
+  // Add robust type checking
+  let displayShops: any[] = [];
+  
+  if (Array.isArray(shops)) {
+    displayShops = shops.slice(0, maxItems);
+  } else if (shops && typeof shops === 'object') {
+    // If shops is an object, try to find an array property
+    const possibleArrays: [string, any][] = Object.entries(shops).filter(([key, value]) => Array.isArray(value));
+    if (possibleArrays.length > 0) {
+      // console.log(`[ShopBucket] ${title} - Found array properties:`, possibleArrays.map(([key]) => key));
+      displayShops = possibleArrays[0][1].slice(0, maxItems);
+    } else {
+     // console.error(`[ShopBucket] ${title} - shops is object but no array properties found`);
+      displayShops = [];
+    }
+  } else {
+   // console.error(`[ShopBucket] ${title} - shops is not an array or object:`, typeof shops);
+    displayShops = [];
+  }
+
+  // Debug: Log the final displayShops
+ /*  if (process.env.NODE_ENV === 'development') {
+    console.log(`[ShopBucket] ${title} - Final displayShops:`, displayShops);
+  } */
 
   return (
     <BucketSection
@@ -508,54 +540,42 @@ export function ShopBucket({
     >
       <div className="bucket-grid bucket-grid-shops">
         {displayShops.map((shop, index) => (
-          <div 
-            key={shop.id || index} 
-            className="bucket-item shop-item"
-            onClick={() => onShopClick?.(shop)}
-          >
-            <div className="shop-image">
-              {shop.logo_url ? (
-                <img 
-                  src={shop.logo_url} 
-                  alt={shop.name}
-                  loading="lazy"
-                />
-              ) : (
-                <div className="shop-image-placeholder">
-                  <span className="placeholder-icon">🏪</span>
-                </div>
-              )}
-              {shop.trending_score && (
-                <div className="trending-badge">
-                  🔥 Trending
-                </div>
-              )}
-            </div>
-            <div className="shop-info">
-              <h3 className="shop-name">{shop.name}</h3>
-              <p className="shop-description">
-                {shop.business_description || 'Great products and service'}
-              </p>
-              <div className="shop-stats">
-                <span className="product-count">
-                  {shop.product_count || 0} products
-                </span>
-                {shop.rating_avg && (
-                  <span className="rating">
-                    ⭐ {shop.rating_avg.toFixed(1)} ({shop.rating_count})
-                  </span>
-                )}
-              </div>
-              <div className="shop-location">
-                {shop.city && shop.state && (
-                  <span className="location">
-                    📍 {shop.city}, {shop.state}
-                  </span>
-                )}
-              </div>
-            </div>
+          <div key={shop.id || shop.tenantId || index}>
+            <ShopCard
+              shop={{
+                tenantId: shop.id || shop.tenantId,
+                name: shop.name,
+                slug: shop.slug || '',
+                autoId: shop.id || shop.autoId || shop.tenantId,
+                description: shop.business_description || shop.description || shop.business_name || 'Great products and service',
+                location: shop.location || shop.address || `${shop.city || shop.tenant_city || ''}, ${shop.state || shop.tenant_state || ''}`,
+                category: shop.primary_category || 'General',
+                primary_category: shop.primary_category,
+                imageUrl: shop.imageUrl || shop.logo_url,
+                rating: shop.rating || shop.rating_avg || 0,
+                reviewCount: shop.reviewCount || shop.rating_count || 0,
+                productCount: shop.productCount || shop.product_count || 0,
+                isVerified: false,
+                isActive: true,
+                createdAt: shop.created_at ? new Date(shop.created_at).toISOString() : new Date().toISOString(),
+                updatedAt: shop.created_at ? new Date(shop.created_at).toISOString() : new Date().toISOString(),
+                urls: shop.urls || {
+                  slugUrl: `/shops/${shop.slug || shop.id}`,
+                  tenantIdUrl: `/shops/${shop.id}`,
+                  autoIdUrl: `/shops/${shop.id}`,
+                  canonicalUrl: `/shops/${shop.slug || shop.id}`
+                }
+              }}
+              trackingContext={{
+                source: 'featured',
+                position: index + 1,
+                category: shop.primary_category
+              }}
+              showTrendingBadge={!!shop.trendingScore}
+              trendingRank={index + 1}
+            />
           </div>
-          ))}
+        ))}
       </div>
     </BucketSection>
   );

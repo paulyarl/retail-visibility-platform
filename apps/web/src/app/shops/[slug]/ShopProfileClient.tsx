@@ -304,7 +304,7 @@ export default function ShopProfileClient({ shop }: ShopProfileClientProps) {
                   Similar Shops
                 </Button>
               </Link>
-              <Link href="/shops/directory">
+              <Link href="/shops/trending">
                 <Button variant="ghost" size="sm">
                   <TrendingUp className="h-4 w-4 mr-2" />
                   Trending

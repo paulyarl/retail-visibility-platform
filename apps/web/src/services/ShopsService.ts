@@ -330,6 +330,15 @@ class ShopsService {
   }
 
   /**
+   * Manually clear cache (for debugging - call from browser console)
+   */
+  clearCache(): void {
+    console.log('[ShopsService] Manually clearing cache...');
+    this.cache.clear();
+    console.log('[ShopsService] Cache cleared successfully');
+  }
+
+  /**
    * Get trending shops
    */
   async getTrendingShops(limit: number = 10, region?: string): Promise<Shop[]> {
@@ -345,7 +354,7 @@ class ShopsService {
       });
 
       const response = await apiSingleton.makeShopsApiRequest<any>(
-        `/api/shops/trending?${params}`,
+        `/api/public/shops/trending?${params}`,
         {},
         cacheKey
       );
@@ -358,6 +367,7 @@ class ShopsService {
       this.setCache(cacheKey, shops);
       return shops;
     } catch (error) {
+      console.log('Error fetching trending shops:', error);
       console.error('Error fetching trending shops:', error);
       return [];
     }
@@ -444,6 +454,44 @@ class ShopsService {
         averageStock: 0,
         parentProductsWithVariants: 0,
       };
+    }
+  }
+
+  /**
+   * Get shop categories (simple version for dropdowns/filters)
+   * Public endpoint - no authentication required
+   */
+  async getShopCategories(): Promise<Array<{
+    shop_category: string;
+    count?: number;
+  }>> {
+    const cacheKey = 'shop-categories:simple';
+    const cached = this.getFromCache<Array<{
+      shop_category: string;
+      count?: number;
+    }>>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const apiSingleton = ShopsAPISingleton.getInstance();
+
+      const response = await apiSingleton.makeShopsApiRequest<any>(
+        '/api/shop-categories',
+        {},
+        cacheKey
+      );
+
+      if (!response.success) {
+        throw new Error(`Failed to fetch shop categories: ${response.error || 'Unknown error'}`);
+      }
+
+      const categories = response.data?.data || [];
+      
+      this.setCache(cacheKey, categories);
+      return categories;
+    } catch (error) {
+      console.error('Error fetching shop categories:', error);
+      return [];
     }
   }
 
@@ -638,13 +686,6 @@ class ShopsService {
   }
 
   /**
-   * Clear all cache
-   */
-  clearCache(): void {
-    this.cache.clear();
-  }
-
-  /**
    * Get cache size (for debugging)
    */
   getCacheSize(): number {
@@ -654,3 +695,9 @@ class ShopsService {
 
 // Export singleton instance
 export const shopsService = ShopsService.getInstance();
+
+// Add to window for debugging (only in browser)
+if (typeof window !== 'undefined') {
+  (window as any).shopsService = shopsService;
+  (window as any).clearShopsCache = () => shopsService.clearCache();
+}
