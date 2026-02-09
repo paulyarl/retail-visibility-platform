@@ -44,6 +44,10 @@ interface StorefrontClientWrapperProps {
   features: any;
   totalAllProducts: number;
   fullWidthLayout?: boolean;
+  products?: any[]; // Add products prop
+  currentPage?: number;
+  totalPages?: number;
+  totalItems?: number;
 }
 
 export default function StorefrontClientWrapper({
@@ -74,6 +78,10 @@ export default function StorefrontClientWrapper({
   features,
   totalAllProducts,
   fullWidthLayout = false,
+  products = [],
+  currentPage = 1,
+  totalPages = 1,
+  totalItems = 0,
 }: StorefrontClientWrapperProps) {
   const [featuredCounts, setFeaturedCounts] = useState({
     staffPick: 0,
@@ -541,8 +549,43 @@ export default function StorefrontClientWrapper({
         </div>
       )}
 
-      {/* Client-side storefront tracking */}
-      <StorefrontViewTracker tenantId={tenantId} categoriesViewed={productCategories.map((c: any) => c.name)} />
+      {/* Main Product Catalog Section - Only show if not in products_only mode and we have products */}
+      {!isProductsOnly && products.length > 0 && (
+        <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
+          <div className="py-12">
+            {/* Section Header */}
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-2">
+                Our Products
+              </h2>
+              <p className="text-lg text-neutral-600 dark:text-neutral-400">
+                Browse our complete catalog of {totalItems} products
+                {search && ` matching "${search}"`}
+                {category && ` in ${categories.find((c: any) => c.slug === category)?.name || category}`}
+              </p>
+            </div>
+
+            {/* Enhanced Product Display */}
+            <EnhancedProductDisplay
+              products={products}
+              tenantId={tenantId}
+              tenantName={businessName}
+              tenantLogo={tenant.metadata?.logo_url}
+              useSingletonData={true}
+              showFeaturedBadges={true}
+              initialPageSize={12}
+              showPageSizeControl={true}
+            />
+
+            {/* Pagination Info */}
+            {totalPages > 1 && (
+              <div className="mt-8 text-center text-sm text-neutral-600 dark:text-neutral-400">
+                Page {currentPage} of {totalPages} • {totalItems} total products
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Contact Information and Business Hours */}
       <div className="grid grid-cols-1 md:grid-cols-2 md:gap-8 xl:gap-4 2xl:gap-2">

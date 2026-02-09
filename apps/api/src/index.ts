@@ -362,7 +362,7 @@ app.use('/api/public', publicApiRoutes);
 console.log('✅ Public API routes mounted at /api/public (Singleton System)');
 
 // PUBLIC STATUS ENDPOINT - No authentication required for status display
-app.get('/public/tenant/:tenantId/business-hours/status', async (req, res) => {
+app.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res) => {
   const { tenantId } = req.params;
 
   try {
@@ -3641,10 +3641,6 @@ app.get('/api/directory/store-types', async (req, res) => {
   }
 });
 
-import directoryStoreTypesRoutes from './routes/directory-store-types';
-app.use('/api/directory/store-types', directoryStoreTypesRoutes);
-console.log('✅ Directory store types routes mounted at /api/directory/store-types');
-
 // Mount featured stores router BEFORE other directory routes to avoid conflicts
 import directoryFeaturedStoresRoutes from './routes/directory-featured-stores';
 app.use('/api/directory/featured-stores', directoryFeaturedStoresRoutes);
@@ -5609,10 +5605,10 @@ import directoryCategoriesOptimizedRoutes from './routes/directory-categories-op
 app.use('/api/directory/categories-optimized', directoryCategoriesOptimizedRoutes);
 console.log('✅ Directory categories optimized routes mounted (category statistics - 10x faster)');
 
-/* ------------------------------ directory tenant ------------------------------ */
-import directoryTenantRoutes from './routes/directory-tenant';
-app.use('/api/directory/tenant', directoryTenantRoutes);
-console.log('✅ Directory tenant routes mounted at /api/directory/tenant');
+// Mount enhanced directory categories routes BEFORE store-types routes to avoid catch-all conflicts
+import directoryCategoriesEnhancedRoutes from './routes/directory-categories-enhanced';
+app.use('/api/directory', directoryCategoriesEnhancedRoutes);
+console.log('✅ Directory categories enhanced routes mounted at /api/directory');
 
 /* ------------------------------ slug generation (PLATFORM STANDARD) ------------------------------ */
 import slugGenerationRoutes from './routes/slug-generation';
@@ -5628,11 +5624,6 @@ console.log('✅ Directory map routes mounted at /api/directory');
 import directoryRoutes from './routes/directory';
 app.use('/api/directory', directoryRoutes);
 console.log('✅ Directory main routes mounted at /api/directory (includes /:identifier catch-all)');
-
-// Mount enhanced directory categories routes
-import directoryCategoriesEnhancedRoutes from './routes/directory-categories-enhanced';
-app.use('/api/directory', directoryCategoriesEnhancedRoutes);
-console.log('✅ Directory categories enhanced routes mounted at /api/directory');
 
 /* ------------------------------ END PUBLIC ROUTES ------------------------------ */
 
@@ -6242,8 +6233,8 @@ app.use('/api/tenants', paymentGatewaysRoutes);
 console.log('✅ Payment gateway routes mounted at /api/tenants/:tenantId/payment-gateways');
 
 /* ------------------------------ fulfillment settings ------------------------------ */
-app.use(fulfillmentSettingsRoutes);
-console.log('✅ Fulfillment settings routes mounted at /api/tenants/:tenantId/fulfillment-settings');
+app.use('/api', fulfillmentSettingsRoutes);
+console.log('✅ Fulfillment settings routes mounted at /api/tenants/:tenantId/fulfillment-settings and /api/public/tenant/:tenantId/fulfillment-settings');
 
 /* ------------------------------ tenant orders ------------------------------ */
 app.use('/api', tenantOrdersRoutes);

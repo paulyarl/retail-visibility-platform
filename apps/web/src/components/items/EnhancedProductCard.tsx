@@ -222,7 +222,7 @@ export default function EnhancedProductCard({
           {/* Category */}
           {item.tenantCategory && (
             <div className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-700 text-xs font-medium rounded-md border border-blue-200 dark:border-blue-800">
-              <span>{item.tenantCategory.name}</span>
+              <span>{typeof item.tenantCategory === 'string' ? item.tenantCategory : item.tenantCategory?.name || ''}</span>
             </div>
           )}
 

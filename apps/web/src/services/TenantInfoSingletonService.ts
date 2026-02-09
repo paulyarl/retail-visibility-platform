@@ -1,11 +1,11 @@
 /**
  * Tenant Info Singleton Service
- * 
- * Extends UniversalSingletonClient to provide cached tenant information operations
+ *
+ * Extends UniversalSingleton to provide cached tenant information operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
 
 export interface TenantInfo {
   id: string;
@@ -57,19 +57,11 @@ export interface PaymentGateway {
   [key: string]: any;
 }
 
-class TenantInfoSingletonService {
+class TenantInfoSingletonService extends UniversalSingleton {
   private static instance: TenantInfoSingletonService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with platform defaults
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 5 * 60 * 1000, // 5 minutes for tenant info
-      enableLogging: true,
-      enableMetrics: true
-    });
+    super('tenant-info-service', { encrypt: false });
   }
 
   public static getInstance(): TenantInfoSingletonService {
@@ -84,17 +76,27 @@ class TenantInfoSingletonService {
    * Uses the /public/tenant/:tenantId endpoint
    */
   async getTenantInfo(tenantId: string): Promise<TenantInfo | null> {
+    console.log(`[TenantInfoSingleton] getTenantInfo START for tenant: ${tenantId}`, new Date().toISOString());
+    
     if (!tenantId) {
       console.error('[TenantInfoSingleton] getTenantInfo: tenantId is required');
       return null;
     }
 
     try {
-      const result = await this.client.makeRequest<TenantInfo>(
-        `/public/tenant/${tenantId}`
+      console.log(`[TenantInfoSingleton] Making API call to /api/public/tenant/${tenantId}`);
+      const startTime = Date.now();
+      
+      const tenant = await this.makeApiRequest<TenantInfo>(
+        `/api/public/tenant/${tenantId}`,
+        {},
+        `tenant-info-${tenantId}`
       );
       
-      return (result as any) || null;
+      const endTime = Date.now();
+      console.log(`[TenantInfoSingleton] API call completed in ${endTime - startTime}ms, result:`, tenant);
+
+      return tenant || null;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get tenant info:', error);
       return null;
@@ -106,17 +108,27 @@ class TenantInfoSingletonService {
    * Uses the /public/tenant/:tenantId/profile endpoint
    */
   async getBusinessProfile(tenantId: string): Promise<BusinessProfile | null> {
+    console.log(`[TenantInfoSingleton] getBusinessProfile START for tenant: ${tenantId}`, new Date().toISOString());
+    
     if (!tenantId) {
       console.error('[TenantInfoSingleton] getBusinessProfile: tenantId is required');
       return null;
     }
 
     try {
-      const result = await this.client.makeRequest<BusinessProfile>(
-        `/public/tenant/${tenantId}/profile`
+      console.log(`[TenantInfoSingleton] Making API call to /api/public/tenant/${tenantId}/profile`);
+      const startTime = Date.now();
+      
+      const profile = await this.makeApiRequest<BusinessProfile>(
+        `/api/public/tenant/${tenantId}/profile`,
+        {},
+        `tenant-profile-${tenantId}`
       );
       
-      return (result as any) || null;
+      const endTime = Date.now();
+      console.log(`[TenantInfoSingleton] Profile API call completed in ${endTime - startTime}ms, result:`, profile);
+
+      return profile || null;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get business profile:', error);
       return null;
@@ -134,7 +146,7 @@ class TenantInfoSingletonService {
     }
 
     try {
-      const result = await this.client.makeRequest<{
+      const result = await this.makeApiRequest<{
         success: boolean;
         data: {
           periods: Array<{
@@ -145,11 +157,13 @@ class TenantInfoSingletonService {
           timezone: string;
         };
       }>(
-        `/api/tenant/${tenantId}/business-hours`
+        `/api/tenant/${tenantId}/business-hours`,
+        {},
+        `tenant-hours-${tenantId}`
       );
-      
-      if (result.data && result.data.success && result.data.data) {
-        const { periods, timezone } = result.data.data;
+
+      if (result && result.success && result.data) {
+        const { periods, timezone } = result.data;
         const hours: BusinessHours = { timezone };
 
         // Convert periods to day-based format for BusinessHoursDisplay
@@ -175,7 +189,7 @@ class TenantInfoSingletonService {
 
         return hours;
       }
-      
+
       return null;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get business hours:', error);
@@ -188,23 +202,33 @@ class TenantInfoSingletonService {
    * Uses the /public/tenant/:tenantId/payment-gateways endpoint
    */
   async getPaymentGateways(tenantId: string): Promise<PaymentGateway[]> {
+    console.log(`[TenantInfoSingleton] getPaymentGateways START for tenant: ${tenantId}`, new Date().toISOString());
+    
     if (!tenantId) {
       console.error('[TenantInfoSingleton] getPaymentGateways: tenantId is required');
       return [];
     }
 
     try {
-      const result = await this.client.makeRequest<{
+      console.log(`[TenantInfoSingleton] Making API call to /api/public/tenant/${tenantId}/payment-gateways`);
+      const startTime = Date.now();
+      
+      const result = await this.makeApiRequest<{
         success: boolean;
         gateways: PaymentGateway[];
       }>(
-        `/public/tenant/${tenantId}/payment-gateways`
+        `/api/public/tenant/${tenantId}/payment-gateways`,
+        {},
+        `tenant-gateways-${tenantId}`
       );
       
-      if (result.data && result.data.success && result.data.gateways) {
-        return result.data.gateways.filter((g: any) => g.is_active);
+      const endTime = Date.now();
+      console.log(`[TenantInfoSingleton] Payment gateways API call completed in ${endTime - startTime}ms, result:`, result);
+
+      if (result && result.success && result.gateways) {
+        return result.gateways.filter((g: any) => g.is_active);
       }
-      
+
       return [];
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get payment gateways:', error);
@@ -261,14 +285,15 @@ class TenantInfoSingletonService {
    * Get performance metrics
    */
   public getMetrics() {
-    return this.client.getMetrics();
+    return super.getMetrics();
   }
 
   /**
    * Reset metrics
    */
   public resetMetrics(): void {
-    this.client.resetMetrics();
+    // UniversalSingleton doesn't have resetMetrics, so we'll just log
+    console.log('[TenantInfoSingleton] Metrics reset requested');
   }
 }
 

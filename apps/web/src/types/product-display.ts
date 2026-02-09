@@ -42,6 +42,34 @@ export interface ProductDisplay {
   tags?: string[];
   createdAt?: string;
   updatedAt?: string;
+  
+  // Enhanced fields for rich product display
+  averageRating?: number;
+  reviewCount?: number;
+  viewCount?: number;
+  wishlistCount?: number;
+  shareCount?: number;
+  isOnSale?: boolean;
+  discountPercentage?: string;
+  hasGallery?: boolean;
+  videoUrl?: string;
+  imageUrls?: string[];
+  galleryUrls?: string[];
+  thumbnailUrl?: string;
+  featuredImageUrl?: string;
+  marketingDescription?: string;
+  manufacturer?: string;
+  condition?: string;
+  gtin?: string;
+  mpn?: string;
+  specifications?: any;
+  attributes?: any;
+  customFields?: any;
+  searchKeywords?: string[];
+  seoTitle?: string;
+  seoDescription?: string;
+  seoKeywords?: string[];
+  metadata?: any;
 }
 
 // ====================

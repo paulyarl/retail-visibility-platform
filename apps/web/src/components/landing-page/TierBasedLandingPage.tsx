@@ -42,7 +42,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
           // Get tenant profile for logo if professional or above
           if (effectiveTier === 'professional' || effectiveTier === 'enterprise' || effectiveTier === 'organization' || effectiveTier === 'chain_professional' || effectiveTier === 'chain_enterprise') {
             try {
-              const profileResponse = await api.get(`${apiUrl}/public/tenant/${tenantId}/profile`);
+              const profileResponse = await api.get(`${apiUrl}/api/public/tenant/${tenantId}/profile`);
               if (profileResponse.ok) {
                 const profile = await profileResponse.json();
                 setTenantLogo(profile.logo_url || null);
@@ -462,7 +462,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
-                {product.tenantCategory.name}
+                {typeof product.tenantCategory === 'string' ? product.tenantCategory : product.tenantCategory?.name || ''}
               </span>
             </div>
           )}

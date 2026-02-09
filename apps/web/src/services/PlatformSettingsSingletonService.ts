@@ -54,7 +54,7 @@ class PlatformSettingsSingletonService {
   async getPlatformSettings(): Promise<PlatformSettings> {
     try {
       const result = await this.client.makeRequest<PlatformSettings>(
-        '/platform-settings'
+        '/api/platform-settings'
       );
       
       return result.data || {
@@ -86,7 +86,7 @@ class PlatformSettingsSingletonService {
   async updatePlatformSettings(settings: Partial<PlatformSettings>): Promise<PlatformSettings | null> {
     try {
       const result = await this.client.makeRequest<PlatformSettings>(
-        '/platform-settings',
+        '/api/platform-settings',
         {
           method: 'POST',
           body: JSON.stringify(settings)

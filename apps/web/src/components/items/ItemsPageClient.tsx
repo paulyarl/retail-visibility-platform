@@ -175,8 +175,8 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   // Collect categories from items as they load (builds up over time)
   useEffect(() => {
     items.forEach(item => {
-      if (item.tenantCategory?.id && item.tenantCategory?.name) {
-        categoriesFromItems.current.set(item.tenantCategory.id, item.tenantCategory.name);
+      if (item.tenantCategory?.id && (typeof item.tenantCategory === 'object' ? item.tenantCategory.name : item.tenantCategory)) {
+        categoriesFromItems.current.set(item.tenantCategory.id, typeof item.tenantCategory === 'object' ? item.tenantCategory.name : item.tenantCategory);
       }
     });
     // If API didn't return categories, use collected ones

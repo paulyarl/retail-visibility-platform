@@ -289,6 +289,41 @@ SELECT
     0
   )::numeric as review_count,
   
+  -- NEW PRODUCT-SPECIFIC REVIEW AGGREGATIONS (live from store_reviews table)
+  COALESCE(
+    (SELECT AVG(sr.rating) 
+     FROM store_reviews sr 
+     WHERE sr.product_id::text = ii.id::text 
+       AND sr.tenant_id = t.id 
+       AND sr.approval_status = 'approved'::review_status), 
+    0
+  )::numeric as product_rating_live,
+  COALESCE(
+    (SELECT COUNT(sr.id) 
+     FROM store_reviews sr 
+     WHERE sr.product_id::text = ii.id::text 
+       AND sr.tenant_id = t.id 
+       AND sr.approval_status = 'approved'::review_status), 
+    0
+  )::numeric as product_reviews_count_live,
+  COALESCE(
+    (SELECT SUM(sr.helpful_count) 
+     FROM store_reviews sr 
+     WHERE sr.product_id::text = ii.id::text 
+       AND sr.tenant_id = t.id 
+       AND sr.approval_status = 'approved'::review_status), 
+    0
+  )::numeric as product_helpful_count_live,
+  COALESCE(
+    (SELECT COUNT(sr.id) 
+     FROM store_reviews sr 
+     WHERE sr.product_id::text = ii.id::text 
+       AND sr.tenant_id = t.id 
+       AND sr.approval_status = 'approved'::review_status), 
+    0
+  )::numeric as product_reviews_approved_live,
+  -- END NEW FIELDS
+  
   (ii.metadata->>'wishlist_count')::numeric as wishlist_count,
   (ii.metadata->>'share_count')::numeric as share_count,
   

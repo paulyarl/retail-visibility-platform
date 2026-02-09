@@ -190,8 +190,8 @@ export default function DirectoryFilters({ categories, storeTypes = [], location
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">All Categories</option>
-                  {categories.map((cat) => (
-                    <option key={cat.slug} value={cat.slug}>
+                  {categories.map((cat, index) => (
+                    <option key={`${cat.slug}-${index}`} value={cat.slug}>
                       {cat.name} ({cat.count})
                     </option>
                   ))}

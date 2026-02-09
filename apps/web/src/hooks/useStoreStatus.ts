@@ -36,11 +36,11 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
 
       // Use browser cache instead of no-store since we have server-side caching
       //const response = await fetch(`${baseUrl}/public/tenant/${tenantId}/business-hours/status`);
-      const response = await api.get(`${baseUrl}/public/tenant/${tenantId}/business-hours/status`);
+      const response = await api.get(`${baseUrl}/api/public/tenant/${tenantId}/business-hours/status`);
 
       if (!response.ok) {
         // Check if this is a rate limit error and handle it with user-friendly messaging
-        if (memoizedHandleRateLimitError(response, `/public/tenant/${tenantId}/business-hours/status`)) {
+        if (memoizedHandleRateLimitError(response, `/api/public/tenant/${tenantId}/business-hours/status`)) {
           // Rate limit error was handled, don't show generic error
           setError(null);
           setStatus(null);

@@ -103,7 +103,7 @@ export default function OrderReceipt({ cart, onPrint, className = "" }: OrderRec
         const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         
         // Fetch tenant profile
-        const profileResponse = await fetch(`${apiUrl}/public/tenant/${cart.tenantId}/profile`);
+        const profileResponse = await fetch(`${apiUrl}/api/public/tenant/${cart.tenantId}/profile`);
         if (profileResponse.ok) {
           const profile = await profileResponse.json();
           console.log('[OrderReceipt] Fetched tenant profile:', profile);
@@ -147,7 +147,7 @@ export default function OrderReceipt({ cart, onPrint, className = "" }: OrderRec
         }
 
         // Fetch fulfillment settings for pickup ready time
-        const fulfillmentResponse = await fetch(`${apiUrl}/public/tenant/${cart.tenantId}/fulfillment-settings`);
+        const fulfillmentResponse = await fetch(`${apiUrl}/api/public/tenant/${cart.tenantId}/fulfillment-settings`);
         if (fulfillmentResponse.ok) {
           const fulfillmentData = await fulfillmentResponse.json();
           if (fulfillmentData.success && fulfillmentData.settings) {

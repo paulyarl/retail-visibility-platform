@@ -53,8 +53,10 @@ export async function getShopBySlug(identifier: string): Promise<Shop | null> {
     const response = await apiSingleton.makeShopsApiRequest<any>(`/api/public/shops/${identifier}`, {}, `shop:${identifier}`);
     
     if (response.success) {
-      // The API already returns a properly mapped Shop object
-      if (response.data?.shop) {
+      // The API returns the shop directly in the response
+      if (response.shop) {
+        return response.shop as Shop;
+      } else if (response.data?.shop) {
         return response.data.shop as Shop;
       } else if (response.data?.data) {
         return response.data.data as Shop;

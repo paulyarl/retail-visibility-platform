@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useProduct } from '@/providers/ProductProvider';
 import { UniversalProductCard } from '@/components/products/UniversalProductCard';
 import { Star, Sparkles, Calendar, Tag, Award } from 'lucide-react';
+import { storefrontService } from '@/services/StorefrontService';
 
 // Featured type configuration (matches producer)
 const featuredTypeConfig = {
@@ -67,15 +68,21 @@ export default function FeaturedProductsSection({
   useEffect(() => {
     const loadFeaturedProducts = async () => {
       try {
-        // Get featured products from public API
-        const response = await fetch(`/api/public/products/featured?tenantId=${tenantId}${showType ? `&type=${showType}` : ''}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch featured products');
+        // Use StorefrontService instead of direct fetch
+        const response = await storefrontService.getFeaturedProducts(tenantId, {
+          limit: maxProducts,
+          search: undefined // Could add search support later
+        });
+
+        // Filter by featured type if specified
+        let filteredProducts = response.items;
+        if (showType) {
+          filteredProducts = response.items.filter(product =>
+            product.featuredTypes?.includes(showType)
+          );
         }
-        
-        const data = await response.json();
-        setFeaturedProducts(data.products || []);
+
+        setFeaturedProducts(filteredProducts);
       } catch (err) {
         console.error('Failed to load featured products:', err);
         setFeaturedProducts([]);
@@ -85,7 +92,7 @@ export default function FeaturedProductsSection({
     if (tenantId) {
       loadFeaturedProducts();
     }
-  }, [tenantId, showType]);
+  }, [tenantId, showType, maxProducts]);
 
   // Filter active and in-stock products
   const displayProducts = useMemo(() => {

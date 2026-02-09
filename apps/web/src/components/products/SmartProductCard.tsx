@@ -121,14 +121,22 @@ interface ProductData {
   description?: string;
   priceCents: number;
   salePriceCents?: number;
+  listPriceCents?: number;
   stock: number;
+  inventoryQuantity?: number;
   imageUrl?: string;
+  imageUrls?: string[];
+  videoUrl?: string;
+  galleryUrls?: string[];
+  thumbnailUrl?: string;
+  featuredImageUrl?: string;
   tenantId: string;
   payment_gateway_type?: string | null;
   payment_gateway_id?: string | null;
   has_variants?: boolean;
   has_active_payment_gateway?: boolean;
   availability?: 'in_stock' | 'out_of_stock' | 'preorder';
+  itemStatus?: string;
   isFeatured?: boolean;
   featuredType?: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
   featuredTypes?: ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[]; // Support multiple types
@@ -139,6 +147,12 @@ interface ProductData {
   daysUntilExpiration?: number;
   isExpired?: boolean;
   isExpiringSoon?: boolean;
+  autoUnfeature?: boolean;
+  // Enhanced review fields (live aggregations)
+  productRatingLive?: number;
+  productReviewsCountLive?: number;
+  productHelpfulCountLive?: number;
+  productReviewsApprovedLive?: number;
   metadata?: any;
   hasGallery?: boolean;
   hasDescription?: boolean;
@@ -153,6 +167,112 @@ interface ProductData {
   variant_count?: number;
   price_range?: PriceRange;
   available_attributes?: AvailableAttributes;
+  
+  // Enhanced fields from API
+  averageRating?: number;
+  reviewCount?: number;
+  viewCount?: number;
+  uniqueViewers?: number;
+  engagementCount?: number;
+  conversionCount?: number;
+  revenueCents?: number;
+  unitsSold?: number;
+  wishlistCount?: number;
+  shareCount?: number;
+  isOnSale?: boolean;
+  discountPercentage?: string;
+  currency?: string;
+  
+  // Product details
+  manufacturer?: string;
+  condition?: string;
+  gtin?: string;
+  mpn?: string;
+  specifications?: any;
+  attributes?: any;
+  customFields?: any;
+  searchKeywords?: string[];
+  tags?: string[];
+  
+  // SEO
+  seoTitle?: string;
+  seoDescription?: string;
+  seoKeywords?: string[];
+  
+  // Physical properties
+  weight?: number;
+  dimensions?: any;
+  weightUnit?: string;
+  length?: number;
+  width?: number;
+  height?: number;
+  dimensionUnit?: string;
+  
+  // Categories
+  categoryName?: string;
+  categorySlug?: string;
+  productCategory?: string;
+  productCategorySlug?: string;
+  googleCategoryId?: string;
+  productParentCategoryId?: string;
+  
+  // Variants
+  variantId?: string;
+  variantName?: string;
+  variantSku?: string;
+  variantColor?: string;
+  variantSize?: string;
+  variantMaterial?: string;
+  variantStyle?: string;
+  
+  // Product types
+  productType?: string;
+  isDigitalProduct?: boolean;
+  isPhysicalProduct?: boolean;
+  isService?: boolean;
+  isBundle?: boolean;
+  isCustomizable?: boolean;
+  isTrackable?: boolean;
+  
+  // Rich descriptions
+  marketingDescription?: string;
+  
+  // Shop info
+  tenantName?: string;
+  tenantLogoUrl?: string;
+  shopCategory?: string;
+  shopCategoryId?: string;
+  shopGoogleCategoryId?: string;
+  
+  // Location
+  tenantCity?: string;
+  tenantState?: string;
+  tenantCountry?: string;
+  tenantZip?: string;
+  tenantAddress?: string;
+  tenantLatitude?: number;
+  tenantLongitude?: number;
+  timezone?: string;
+  
+  // Business info
+  businessType?: string;
+  businessCategory?: string;
+  businessSize?: string;
+  establishedYear?: number;
+  
+  // Status indicators
+  inStock?: boolean;
+  stockStatus?: string;
+  priceStatus?: string;
+  
+  // Analytics
+  bucketPriority?: number;
+  trendingScore?: number;
+  
+  // Timestamps
+  createdAt?: string;
+  updatedAt?: string;
+  publishedAt?: string;
 }
 
 interface SmartProductCardProps {
@@ -317,7 +437,7 @@ export default function SmartProductCard({
               )}
               {showCategory && product.tenantCategory && (
                 <span className="text-xs px-2.5 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded-full font-medium">
-                  {product.tenantCategory.name}
+                  {typeof product.productCategory === 'string' ? product.productCategory : ''}
                 </span>
               )}
             </div>
@@ -363,6 +483,77 @@ export default function SmartProductCard({
                 {product.description}
               </p>
             )}
+
+            {/* Enhanced Product Info */}
+            <div className="space-y-3 mb-4">
+              {/* Brand and Rating Row */}
+              <div className="flex items-center justify-between">
+                {displayBrand && (
+                  <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400 uppercase tracking-wide">
+                    {displayBrand}
+                  </p>
+                )}
+                
+                {/* Rating - Product-specific data only */}
+                {product.productRatingLive !== undefined && product.productRatingLive !== null && (
+                  <div className="flex items-center gap-1">
+                    <div className="flex items-center">
+                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                      <span className="text-sm text-neutral-600 dark:text-neutral-400 ml-1">
+                        {typeof product.productRatingLive === 'number' 
+                          ? product.productRatingLive.toFixed(1)
+                          : parseFloat(String(product.productRatingLive)).toFixed(1)
+                        }
+                      </span>
+                    </div>
+                    <span className="text-xs text-neutral-500 dark:text-neutral-500">
+                      ({product.productReviewsCountLive || 0})
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Media Indicators */}
+              {(product.hasGallery || product.videoUrl) && (
+                <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+                  {product.hasGallery && (
+                    <span className="flex items-center gap-1">
+                      📷 Gallery
+                    </span>
+                  )}
+                  {product.videoUrl && (
+                    <span className="flex items-center gap-1">
+                      🎥 Video
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Engagement Metrics */}
+              {(product.viewCount || product.wishlistCount) && (
+                <div className="flex items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400">
+                  {product.viewCount && (
+                    <span className="flex items-center gap-1">
+                      👁️ {product.viewCount.toLocaleString()} views
+                    </span>
+                  )}
+                  {product.wishlistCount && (
+                    <span className="flex items-center gap-1">
+                      ❤️ {product.wishlistCount.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Sale Badge */}
+              {product.isOnSale && product.discountPercentage && (
+                <div className="inline-flex">
+                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                    {product.discountPercentage}% OFF
+                  </span>
+                </div>
+              )}
+            </div>
 
             <div className="flex items-center justify-between mb-4">
               {product.has_variants && product.price_range ? (
@@ -470,6 +661,46 @@ export default function SmartProductCard({
               </p>
             )}
             
+            {/* Rating and Engagement for Compact */}
+            <div className="flex items-center justify-between mt-1">
+              {/* Rating - Product-specific data only */}
+              {product.productRatingLive !== undefined && product.productRatingLive !== null && (
+                <div className="flex items-center gap-1">
+                  <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                  <span className="text-xs text-neutral-600 dark:text-neutral-400">
+                    {typeof product.productRatingLive === 'number' 
+                      ? product.productRatingLive.toFixed(1)
+                      : parseFloat(String(product.productRatingLive)).toFixed(1)
+                    }
+                  </span>
+                  {product.productReviewsCountLive && (
+                    <span className="text-xs text-neutral-500">
+                      ({product.productReviewsCountLive})
+                    </span>
+                  )}
+                </div>
+              )}
+              
+              {/* Media Indicators */}
+              {(product.hasGallery || product.videoUrl) && (
+                <div className="flex items-center gap-1 text-xs text-neutral-500">
+                  {product.hasGallery && (
+                    <span>📷</span>
+                  )}
+                  {product.videoUrl && (
+                    <span>🎥</span>
+                  )}
+                </div>
+              )}
+              
+              {/* Engagement */}
+              {product.viewCount && !product.hasGallery && !product.videoUrl && (
+                <span className="text-xs text-neutral-500">
+                  👁️ {product.viewCount > 999 ? `${(product.viewCount / 1000).toFixed(1)}k` : product.viewCount}
+                </span>
+              )}
+            </div>
+            
             {/* Store Information for Directory Context */}
             {tenantName && (
               <div className="flex items-center gap-1 mt-0.5">
@@ -513,7 +744,7 @@ export default function SmartProductCard({
               )}
               {product.salePriceCents && !product.has_variants && (
                 <span className="text-xs bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 px-1.5 py-0.5 rounded">
-                  Sale
+                  {product.discountPercentage ? `${product.discountPercentage}% OFF` : 'Sale'}
                 </span>
               )}
               {product.has_variants && product.variant_count && (
@@ -527,17 +758,17 @@ export default function SmartProductCard({
             
             {/* Category and Stock Status */}
             <div className="flex items-center gap-2 mt-1 text-xs text-neutral-600 dark:text-neutral-400">
-              {showCategory && product.tenantCategory && (
+              {showCategory && product.productCategory && (
                 <span className="flex items-center gap-1">
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                   </svg>
-                  {typeof product.tenantCategory === 'string' ? product.tenantCategory : product.tenantCategory?.name || ''}
+                  {typeof product.productCategory === 'string' ? product.productCategory : ''}
                 </span>
               )}
               {product.stock !== undefined && product.stock !== null && (
                 <>
-                  {showCategory && product.tenantCategory && <span>•</span>}
+                  {showCategory && product.productCategory && <span>•</span>}
                   <span className={`flex items-center gap-1 ${
                     product.stock === 0 
                       ? 'text-red-600 dark:text-red-400' 
@@ -559,7 +790,7 @@ export default function SmartProductCard({
               )}
               {product.has_variants && (
                 <>
-                  {(showCategory && product.tenantCategory) || (product.stock !== undefined && product.stock !== null) ? <span>•</span> : null}
+                  {(showCategory && product.productCategory) || (product.stock !== undefined && product.stock !== null) ? <span>•</span> : null}
                   <span className="text-blue-600 dark:text-blue-400">
                     Multiple options
                   </span>
@@ -647,9 +878,9 @@ export default function SmartProductCard({
                         </span>
                       ));
                     })()}
-                    {showCategory && product.tenantCategory && (
+                    {showCategory && product.productCategory && (
                       <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
-                        {product.tenantCategory.name}
+                        {typeof product.productCategory === 'string' ? product.productCategory :  ''}
                       </span>
                     )}
                   </div>
@@ -796,22 +1027,25 @@ export default function SmartProductCard({
               {displayBrand}
             </p>
           )}
-          {showCategory && product.tenantCategory && (
+          {showCategory && product.productCategory && (
             <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
-              {product.tenantCategory.name}
+              {typeof product.productCategory === 'string' ? product.productCategory : ''}
             </span>
           )}
         </div>
+        
         <Link href={`/products/${product.id}`}>
-          <h3 className="font-semibold text-neutral-900 dark:text-white line-clamp-2 mb-2 hover:text-primary-600 dark:hover:text-primary-400">
+          <h3 className="font-semibold text-lg text-neutral-900 dark:text-white mb-2 hover:text-primary-600 dark:hover:text-primary-400">
             {displayTitle}
           </h3>
         </Link>
+        
         {showDescription && product.description && (
           <p className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-3">
             {product.description}
           </p>
         )}
+        
         <div className="flex items-center justify-between mb-3">
           <div className="flex-1">
             {product.has_variants && product.price_range ? (

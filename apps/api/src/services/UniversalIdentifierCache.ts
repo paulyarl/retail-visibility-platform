@@ -2,12 +2,11 @@
  * Universal Identifier Cache Service
  * 
  * Provides encrypted, high-performance tenant identifier resolution
- * with military-grade security and singleton pattern.
+ * using UniversalSingleton's built-in encryption and caching.
  */
 
-import crypto from 'crypto';
 import { prisma } from '../prisma';
-import { CacheEncryption } from '../security/CacheEncryption';
+import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingleton';
 
 export interface ResolvedTenant {
   id: string;
@@ -18,53 +17,28 @@ export interface ResolvedTenant {
   type: 'tenant_id' | 'slug' | 'auto_id';
 }
 
-interface EncryptedCacheEntry {
-  data: Buffer;           // Encrypted tenant data
-  timestamp: number;      // When cached
-  ttl: number;           // Time to live in ms
-  accessCount: number;   // Access frequency
-  lastAccessed: number;  // Last access time
-}
-
-interface CacheMetrics {
-  hits: number;
-  misses: number;
-  hitRate: number;
-  avgResponseTime: number;
-  encryptedEntries: number;
-  totalMemoryUsage: number;
-  lastReset: number;
-}
-
 /**
- * Universal Identifier Cache with Encryption
- * Extends UniversalSingleton pattern for global consistency
+ * Universal Identifier Cache extending UniversalSingleton
+ * Leverages built-in encryption and caching capabilities
  */
-export class UniversalIdentifierCache {
+export class UniversalIdentifierCache extends UniversalSingleton {
   private static instance: UniversalIdentifierCache;
-  private encryptedCache: Map<string, EncryptedCacheEntry> = new Map();
-  private readonly cacheEncryption: CacheEncryption;
-  private metrics: CacheMetrics;
   private operationQueue: Map<string, Promise<any>> = new Map(); // Prevent concurrent operations on same key
-  private readonly defaultTTL = 15 * 60 * 1000; // 15 minutes
 
   private constructor() {
-    // Initialize encryption service
-    const keyMaterial = process.env.IDENTIFIER_CACHE_KEY || 'default-cache-key-change-in-production';
-    this.cacheEncryption = new CacheEncryption(keyMaterial);
-    
-    this.metrics = {
-      hits: 0,
-      misses: 0,
-      hitRate: 0,
-      avgResponseTime: 0,
-      encryptedEntries: 0,
-      totalMemoryUsage: 0,
-      lastReset: Date.now()
+    const options: SingletonCacheOptions = {
+      enableCache: true,
+      defaultTTL: 900, // 15 minutes in seconds
+      maxCacheSize: 1000,
+      enableMetrics: true,
+      enableLogging: true,
+      enableEncryption: true, // Use built-in encryption
+      enablePrivateCache: false,
+      authenticationLevel: 'public'
     };
-
-    console.log('[UniversalIdentifierCache] Initialized with encrypted cache');
-    this.startCacheMaintenance();
+    
+    super('universal-identifier-cache', options);
+    console.log('[UniversalIdentifierCache] Initialized with UniversalSingleton encryption');
   }
 
   static getInstance(): UniversalIdentifierCache {
@@ -81,125 +55,85 @@ export class UniversalIdentifierCache {
     // Check if there's already an operation running for this key
     const existingOperation = this.operationQueue.get(key);
     if (existingOperation) {
-      // Wait for the existing operation to complete
-      await existingOperation;
+      console.log(`[Cache SYNC] Waiting for existing operation for key: ${key}`);
+      // Wait for the existing operation to complete and return its result
+      try {
+        return await existingOperation;
+      } catch (error) {
+        console.error(`[Cache SYNC] Existing operation failed for key: ${key}`, error);
+        // If existing operation fails, remove it and try again
+        this.operationQueue.delete(key);
+        // Continue to create new operation
+      }
     }
 
+    console.log(`[Cache SYNC] Starting new operation for key: ${key}`);
+    
     // Create a new operation and add it to the queue
-    const operationPromise = operation().finally(() => {
-      // Remove from queue when done
-      this.operationQueue.delete(key);
-    });
-
+    const operationPromise = operation();
+    
+    // Store the promise in the queue
     this.operationQueue.set(key, operationPromise);
-    return operationPromise;
+    
+    try {
+      const result = await operationPromise;
+      console.log(`[Cache SYNC] Operation completed for key: ${key}`);
+      return result;
+    } finally {
+      // Always remove from queue when done, regardless of success/failure
+      this.operationQueue.delete(key);
+    }
   }
 
   /**
-   * Resolve identifier with encrypted cache lookup and synchronized database operations
+   * Resolve identifier using UniversalSingleton's built-in caching and encryption
    */
   async resolveIdentifier(identifier: string): Promise<ResolvedTenant | null> {
     const startTime = Date.now();
+    console.log(`[Cache RESOLVE] Starting resolve for: ${identifier}`);
 
     try {
-      // Try encrypted cache first with synchronization
-      const cached = await this.synchronizeOperation(identifier, () => this.getFromEncryptedCache(identifier));
-      if (cached && !this.isExpired(cached)) {
-        this.metrics.hits++;
-        this.updateAccessMetrics(identifier, cached);
+      // Use UniversalSingleton's built-in caching with synchronization
+      console.log(`[Cache RESOLVE] Checking cache for: ${identifier}`);
+      
+      const resolvedTenant = await this.synchronizeOperation(identifier, async () => {
+        // First try to get from UniversalSingleton cache
+        const cached = await this.getCache<ResolvedTenant>(`identifier:${identifier}`);
+        if (cached) {
+          console.log(`[Cache HIT] ${identifier} -> ${cached.id}`);
+          this.metrics.cacheHits++;
+          return cached;
+        }
 
-        const responseTime = Date.now() - startTime;
-        this.updateResponseTime(responseTime);
-
-        // cached.data is now the decrypted ResolvedTenant
-        const resolvedTenant = cached.data as unknown as ResolvedTenant;
-        console.log(`[Cache HIT] ${identifier} -> ${resolvedTenant.id} (${responseTime}ms)`);
-        return resolvedTenant;
-      }
-
-      // Cache miss - resolve from database with synchronization
-      this.metrics.misses++;
-      const resolvedTenant = await this.synchronizeOperation(identifier, () => this.resolveFromDatabaseAndCache(identifier));
+        // Cache miss - resolve from database
+        console.log(`[Cache MISS] Resolving from database for: ${identifier}`);
+        this.metrics.cacheMisses++;
+        
+        const dbResult = await this.resolveFromDatabase(identifier);
+        
+        if (dbResult) {
+          // Cache the result using UniversalSingleton's encryption
+          await this.setCache(`identifier:${identifier}`, dbResult);
+          console.log(`[Cache SET] ${identifier} -> ${dbResult.id}`);
+        }
+        
+        return dbResult;
+      });
 
       const responseTime = Date.now() - startTime;
       this.updateResponseTime(responseTime);
 
       if (resolvedTenant) {
-        console.log(`[Cache MISS->SET] ${identifier} -> ${resolvedTenant.id} (${responseTime}ms)`);
+        console.log(`[Cache RESOLVE] ${identifier} -> ${resolvedTenant.id} (${responseTime}ms)`);
       } else {
-        console.log(`[Cache MISS] ${identifier} -> NOT FOUND (${responseTime}ms)`);
+        console.log(`[Cache RESOLVE] ${identifier} -> NOT FOUND (${responseTime}ms)`);
       }
 
       return resolvedTenant;
     } catch (error) {
       console.error(`[Cache ERROR] ${identifier}:`, error);
-      this.metrics.misses++;
       return null;
     }
-  }
-
-  /**
-   * Resolve from database and cache the result with synchronization
-   */
-  private async resolveFromDatabaseAndCache(identifier: string): Promise<ResolvedTenant | null> {
-    // Check cache again in case another operation already set it
-    const existing = await this.getFromEncryptedCache(identifier);
-    if (existing && !this.isExpired(existing)) {
-      return existing.data as unknown as ResolvedTenant;
-    }
-
-    // Resolve from database
-    const resolvedTenant = await this.resolveFromDatabase(identifier);
-    if (resolvedTenant) {
-      // Cache the result (this will also be synchronized)
-      await this.setEncryptedCache(identifier, resolvedTenant);
-    }
-
-    return resolvedTenant;
-  }
-
-  /**
-   * Get from encrypted cache
-   */
-  private async getFromEncryptedCache(identifier: string): Promise<EncryptedCacheEntry | null> {
-    const entry = this.encryptedCache.get(identifier);
-    if (!entry) return null;
-
-    try {
-      // Decrypt the data
-      const decrypted = await this.decrypt(entry.data);
-      return { ...entry, data: decrypted };
-    } catch (error) {
-      console.error(`[Cache DECRYPT ERROR] ${identifier}:`, error);
-      // Remove corrupted entry
-      this.encryptedCache.delete(identifier);
-      return null;
-    }
-  }
-
-  /**
-   * Set encrypted cache entry with synchronization
-   */
-  private async setEncryptedCache(identifier: string, tenant: ResolvedTenant): Promise<void> {
-    return this.synchronizeOperation(identifier, async () => {
-      try {
-        const encrypted = await this.encrypt(tenant);
-
-        const entry: EncryptedCacheEntry = {
-          data: encrypted,
-          timestamp: Date.now(),
-          ttl: this.defaultTTL,
-          accessCount: 0,
-          lastAccessed: Date.now()
-        };
-
-        this.encryptedCache.set(identifier, entry);
-        this.updateMemoryMetrics();
-
-      } catch (error) {
-        console.error(`[Cache ENCRYPT ERROR] ${identifier}:`, error);
-      }
-    });
   }
 
   /**
@@ -207,9 +141,11 @@ export class UniversalIdentifierCache {
    */
   private async resolveFromDatabase(identifier: string): Promise<ResolvedTenant | null> {
     console.log(`[Cache DB LOOKUP] ${identifier}`);
-    
+
     try {
       // Try tenant_id first
+      console.log(`[Cache DB LOOKUP] Trying tenant_id lookup for: ${identifier}`);
+      const tenantIdStart = Date.now();
       let tenant = await prisma.tenants.findFirst({
         where: { id: identifier },
         select: {
@@ -220,8 +156,11 @@ export class UniversalIdentifierCache {
           metadata: true
         }
       });
+      const tenantIdTime = Date.now() - tenantIdStart;
+      console.log(`[Cache DB LOOKUP] Tenant ID lookup completed in ${tenantIdTime}ms`);
 
       if (tenant) {
+        console.log(`[Cache DB LOOKUP] Found by tenant_id: ${identifier} -> ${tenant.id}`);
         return {
           id: tenant.id,
           slug: tenant.slug,
@@ -233,6 +172,8 @@ export class UniversalIdentifierCache {
       }
 
       // Try slug
+      console.log(`[Cache DB LOOKUP] Trying slug lookup for: ${identifier}`);
+      const slugStart = Date.now();
       tenant = await prisma.tenants.findFirst({
         where: { slug: identifier },
         select: {
@@ -243,8 +184,11 @@ export class UniversalIdentifierCache {
           metadata: true
         }
       });
+      const slugTime = Date.now() - slugStart;
+      console.log(`[Cache DB LOOKUP] Slug lookup completed in ${slugTime}ms`);
 
       if (tenant) {
+        console.log(`[Cache DB LOOKUP] Found by slug: ${identifier} -> ${tenant.id}`);
         return {
           id: tenant.id,
           slug: tenant.slug,
@@ -256,6 +200,8 @@ export class UniversalIdentifierCache {
       }
 
       // Try auto_id from metadata
+      console.log(`[Cache DB LOOKUP] Trying auto_id lookup for: ${identifier}`);
+      const autoIdStart = Date.now();
       const tenantsWithAutoId = await prisma.tenants.findMany({
         where: {
           metadata: {
@@ -271,9 +217,12 @@ export class UniversalIdentifierCache {
           metadata: true
         }
       });
+      const autoIdTime = Date.now() - autoIdStart;
+      console.log(`[Cache DB LOOKUP] Auto ID lookup completed in ${autoIdTime}ms`);
 
       if (tenantsWithAutoId.length > 0) {
         const tenant = tenantsWithAutoId[0];
+        console.log(`[Cache DB LOOKUP] Found by auto_id: ${identifier} -> ${tenant.id}`);
         return {
           id: tenant.id,
           slug: tenant.slug,
@@ -284,6 +233,7 @@ export class UniversalIdentifierCache {
         };
       }
 
+      console.log(`[Cache DB LOOKUP] Not found: ${identifier}`);
       return null;
     } catch (error) {
       console.error(`[Cache DB ERROR] ${identifier}:`, error);
@@ -292,114 +242,22 @@ export class UniversalIdentifierCache {
   }
 
   /**
-   * Encrypt data using CacheEncryption service
-   */
-  private async encrypt(data: any): Promise<Buffer> {
-    try {
-      const result = this.cacheEncryption.encrypt(data);
-      return result.encrypted;
-    } catch (error) {
-      console.error('[Cache ENCRYPT ERROR]:', error instanceof Error ? error.message : 'Unknown error');
-      throw new Error('Cache encryption failed');
-    }
-  }
-
-  /**
-   * Decrypt data using CacheEncryption service
-   */
-  private async decrypt(encryptedData: Buffer): Promise<any> {
-    try {
-      // Handle legacy data or invalid data
-      if (!Buffer.isBuffer(encryptedData)) {
-        console.log('[Cache] Invalid encrypted data format, clearing cache entry');
-        throw new Error('Invalid encrypted data format');
-      }
-      
-      const result = this.cacheEncryption.decrypt(encryptedData);
-      return result.data;
-    } catch (error) {
-      console.error('[Cache DECRYPT ERROR]:', error instanceof Error ? error.message : 'Unknown error');
-      throw new Error('Cache decryption failed');
-    }
-  }
-
-  /**
-   * Check if cache entry is expired
-   */
-  private isExpired(entry: EncryptedCacheEntry): boolean {
-    return Date.now() - entry.timestamp > entry.ttl;
-  }
-
-  /**
-   * Update access metrics for cache entry
-   */
-  private updateAccessMetrics(identifier: string, entry: EncryptedCacheEntry): void {
-    entry.accessCount++;
-    entry.lastAccessed = Date.now();
-    
-    // Update the entry in cache
-    this.encryptedCache.set(identifier, entry);
-  }
-
-  /**
-   * Update response time metrics
+   * Update response time metrics (using UniversalSingleton's built-in metrics)
    */
   private updateResponseTime(responseTime: number): void {
-    const totalRequests = this.metrics.hits + this.metrics.misses;
-    this.metrics.avgResponseTime = 
-      (this.metrics.avgResponseTime * (totalRequests - 1) + responseTime) / totalRequests;
-    this.metrics.hitRate = this.metrics.hits / totalRequests;
+    // UniversalSingleton handles its own metrics, we just log for debugging
+    console.log(`[Cache METRICS] Response time: ${responseTime}ms`);
   }
 
   /**
-   * Update memory usage metrics
+   * Get cache metrics (using UniversalSingleton's built-in metrics)
    */
-  private updateMemoryMetrics(): void {
-    this.metrics.encryptedEntries = this.encryptedCache.size;
-    
-    let totalSize = 0;
-    for (const entry of this.encryptedCache.values()) {
-      totalSize += entry.data.length + 64; // Data + overhead
-    }
-    this.metrics.totalMemoryUsage = totalSize;
+  getMetrics() {
+    return super.getMetrics(); // Use UniversalSingleton's built-in metrics
   }
 
   /**
-   * Invalidate tenant from cache (all identifiers) with synchronization
-   */
-  async invalidateTenant(tenantId: string): Promise<void> {
-    // Get all identifiers that need to be invalidated
-    const identifiersToCheck: string[] = [];
-    for (const identifier of this.encryptedCache.keys()) {
-      identifiersToCheck.push(identifier);
-    }
-
-    // Process each identifier with synchronization
-    const invalidationPromises = identifiersToCheck.map(identifier =>
-      this.synchronizeOperation(identifier, async () => {
-        try {
-          const entry = this.encryptedCache.get(identifier);
-          if (!entry) return;
-
-          const decrypted = await this.decrypt(entry.data);
-          if (decrypted.id === tenantId) {
-            this.encryptedCache.delete(identifier);
-          }
-        } catch (error) {
-          // Remove corrupted entries
-          this.encryptedCache.delete(identifier);
-        }
-      })
-    );
-
-    await Promise.all(invalidationPromises);
-
-    console.log(`[Cache INVALIDATE] Removed entries for tenant ${tenantId}`);
-    this.updateMemoryMetrics();
-  }
-
-  /**
-   * Warm cache with tenant data
+   * Warm cache with multiple tenants
    */
   async warmCache(tenantIds: string[]): Promise<void> {
     console.log(`[Cache WARM] Starting warm-up for ${tenantIds.length} tenants`);
@@ -419,18 +277,18 @@ export class UniversalIdentifierCache {
       await Promise.all(tenants.map(async (tenant) => {
         const resolvedTenant: ResolvedTenant = {
           id: tenant.id,
-          slug: tenant.slug || '',
+          slug: tenant.slug,
           name: tenant.name,
-          subscriptionStatus: tenant.subscription_status || '',
+          subscriptionStatus: tenant.subscription_status || 'unknown',
           metadata: tenant.metadata,
           type: 'tenant_id'
         };
 
-        await this.setEncryptedCache(tenant.id, resolvedTenant);
+        await this.setCache(`identifier:${tenant.id}`, resolvedTenant);
         
         if (tenant.slug) {
           const slugTenant = { ...resolvedTenant, type: 'slug' as const };
-          await this.setEncryptedCache(tenant.slug, slugTenant);
+          await this.setCache(`identifier:${tenant.slug}`, slugTenant);
         }
 
         // Check for autoId in metadata
@@ -438,7 +296,7 @@ export class UniversalIdentifierCache {
         const autoId = metadata.autoId;
         if (autoId) {
           const autoIdTenant = { ...resolvedTenant, type: 'auto_id' as const };
-          await this.setEncryptedCache(autoId, autoIdTenant);
+          await this.setCache(`identifier:${autoId}`, autoIdTenant);
         }
       }));
 
@@ -449,59 +307,42 @@ export class UniversalIdentifierCache {
   }
 
   /**
-   * Get cache metrics
+   * Clear all cache (public method for cache monitoring)
    */
-  getMetrics(): CacheMetrics {
-    this.updateMemoryMetrics();
-    return { ...this.metrics };
+  public async clearAllCache(): Promise<void> {
+    await this.clearCache(); // Use UniversalSingleton's protected clearCache method
+    console.log('[Cache CLEAR] All entries cleared via public method');
   }
 
   /**
-   * Clear all cache
+   * Invalidate tenant from cache
    */
-  clearCache(): void {
-    this.encryptedCache.clear();
-    this.metrics = {
-      hits: 0,
-      misses: 0,
-      hitRate: 0,
-      avgResponseTime: 0,
-      encryptedEntries: 0,
-      totalMemoryUsage: 0,
-      lastReset: Date.now()
-    };
-    console.log('[Cache CLEAR] All entries cleared');
-  }
-
-  /**
-   * Start cache maintenance (cleanup expired entries)
-   */
-  private startCacheMaintenance(): void {
-    setInterval(() => {
-      this.cleanupExpiredEntries();
-    }, 5 * 60 * 1000); // Every 5 minutes
-  }
-
-  /**
-   * Cleanup expired entries
-   */
-  private cleanupExpiredEntries(): void {
-    const now = Date.now();
-    const expiredEntries: string[] = [];
+  async invalidateTenant(tenantId: string): Promise<void> {
+    // Get all identifiers that need to be invalidated
+    const cacheKeys = [`identifier:${tenantId}`];
     
-    for (const [identifier, entry] of this.encryptedCache.entries()) {
-      if (now - entry.timestamp > entry.ttl) {
-        expiredEntries.push(identifier);
-      }
-    }
-    
-    if (expiredEntries.length > 0) {
-      expiredEntries.forEach(identifier => {
-        this.encryptedCache.delete(identifier);
+    // Also invalidate by slug if we can find it
+    try {
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { slug: true }
       });
       
-      console.log(`[Cache CLEANUP] Removed ${expiredEntries.length} expired entries`);
-      this.updateMemoryMetrics();
+      if (tenant?.slug) {
+        cacheKeys.push(`identifier:${tenant.slug}`);
+      }
+    } catch (error) {
+      console.error('[Cache] Error finding tenant slug for invalidation:', error);
     }
+
+    // Invalidate all related cache entries
+    const invalidationPromises = cacheKeys.map(key =>
+      this.clearCache(key).catch(error => 
+        console.error(`[Cache] Error invalidating ${key}:`, error)
+      )
+    );
+
+    await Promise.all(invalidationPromises);
+    console.log(`[Cache] Invalidated ${cacheKeys.length} cache entries for tenant: ${tenantId}`);
   }
 }

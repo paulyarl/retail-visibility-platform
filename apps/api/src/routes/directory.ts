@@ -369,12 +369,42 @@ router.get('/locations', async (req, res) => {
 });
 
 /**
- * GET /api/directory/tenant/:tenantId
- * Get directory slug by tenant ID
+ * GET /api/directory/tenant/:identifier
+ * Get directory slug by tenant identifier (tenant-id, slug, or auto-id)
  */
-router.get('/tenant/:tenantId', async (req, res) => {
+router.get('/tenant/:identifier', async (req, res) => {
   try {
-    const { tenantId } = req.params;
+    const { identifier } = req.params;
+    console.log(`[Directory] Tenant slug request for identifier: ${identifier}`);
+
+    // Use the universal identifier resolver to get tenant ID
+    const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
+    const cache = UniversalIdentifierCache.getInstance();
+    
+    // Add timeout for identifier resolution to prevent hanging
+    const identifierPromise = cache.resolveIdentifier(identifier);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Identifier resolution timeout')), 10000); // 10 second timeout
+    });
+    
+    let resolvedTenant: any = null;
+    try {
+      resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
+      console.log(`[Directory] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
+    } catch (error) {
+      console.error(`[Directory] Error resolving identifier: ${identifier}`, error);
+      return res.status(404).json({
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
+    
+    if (!resolvedTenant) {
+      return res.status(404).json({
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
 
     // Use direct database connection to avoid Prisma enum validation issues
     const { getDirectPool } = await import('../utils/db-pool');
@@ -388,18 +418,26 @@ router.get('/tenant/:tenantId', async (req, res) => {
       LIMIT 1
     `;
     
-    const result = await pool.query(query, [tenantId]);
+    const result = await pool.query(query, [resolvedTenant.id]);
 
     if (!result.rows || result.rows.length === 0) {
-      return res.status(404).json({ error: 'directory_listing_not_found' });
+      return res.status(404).json({ 
+        error: 'directory_listing_not_found',
+        message: 'No published directory listing found for this tenant'
+      });
     }
 
-    return res.json({ slug: result.rows[0].slug });
+    return res.json({ 
+      slug: result.rows[0].slug,
+      tenantId: resolvedTenant.id,
+      identifierType: resolvedTenant.type
+    });
   } catch (error: any) {
-    console.error('[GET /api/directory/tenant/:tenantId] Error:', error);
+    console.error('[GET /api/directory/tenant/:identifier] Error:', error);
     return res.status(500).json({ error: 'failed_to_get_directory_slug' });
   }
 });
+
 router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params;

@@ -1,167 +1,54 @@
 "use client";
 
-import { useState, useEffect, use } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, use } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Star, Package, Search, Filter, Grid, List, ChevronDown, ShoppingCart, Heart, Share2, Truck, Shield, Sparkles } from 'lucide-react';
 import { useProductLayout, layoutVariantDescriptions } from '@/contexts/ProductLayoutContext';
 import StorefrontActions from '@/components/storefront/StorefrontActions';
 import { Button } from '@mantine/core';
-import { storefrontService } from '@/services/StorefrontSingletonService';
-
-interface CatalogProduct {
-  id: string;
-  sku: string;
-  name: string;
-  title?: string;
-  brand?: string;
-  description?: string;
-  priceCents: number;
-  salePriceCents?: number;
-  stock: number;
-  imageUrl?: string;
-  tenantId: string;
-  categoryName?: string;
-  categorySlug?: string;
-  condition?: string;
-  availability?: 'in_stock' | 'out_of' | 'preorder';
-  ratingAvg?: number;
-  ratingCount?: number;
-  isFeatured?: boolean;
-  featuredTypes?: string[];
-  hasVariants?: boolean;
-  metadata?: Record<string, any>;
-  price?: number;
-  salePrice?: number;
-  currency?: string;
-}
-
-interface CatalogResponse {
-  items: CatalogProduct[];
-  pagination: {
-    page: number;
-    limit: number;
-    totalItems: number;
-    totalPages: number;
-    hasMore: boolean;
-  };
-}
-
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  productCount: number;
-}
+import { useCatalog, type CatalogProduct } from '@/hooks/useCatalog';
 
 export default function CatalogPage({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = use(params);
-  const searchParams = useSearchParams();
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [sortBy, setSortBy] = useState<'featured' | 'newest' | 'price-low' | 'price-high' | 'rating'>('featured');
   const { variant: layoutVariant, setVariant } = useProductLayout();
 
-  // Fetch products
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: '24',
-        ...(selectedCategory && { category: selectedCategory }),
-        ...(searchQuery && { search: searchQuery }),
-        ...(sortBy && { sort: sortBy }),
-      });
-
-      const response = await fetch(`/api/storefront/${tenantId}/products?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch products');
-      
-      const data: CatalogResponse = await response.json();
-      setProducts(data.items);
-      setTotalPages(data.pagination.totalPages);
-      setTotalItems(data.pagination.totalItems);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch categories
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch(`/api/storefront/${tenantId}/categories`);
-      if (!response.ok) throw new Error('Failed to fetch categories');
-      
-      const data = await response.json();
-      setCategories(data.categories || []);
-    } catch (err) {
-      console.error('Failed to fetch categories:', err);
-    }
-  };
-
-  // Initialize from URL params
-  useEffect(() => {
-    const page = searchParams.get('page');
-    const category = searchParams.get('category');
-    const search = searchParams.get('search');
-    
-    const sort = searchParams.get('sort');
-    
-    if (page) setCurrentPage(parseInt(page));
-    if (category) setSelectedCategory(category);
-    if (search) setSearchQuery(search || '');
-    if (sort) setSortBy(sort as any);
-  }, [searchParams]);
-
-  // Fetch data on mount and when filters change
-  useEffect(() => {
-    if (tenantId) {
-      fetchProducts();
-      fetchCategories();
-    }
-  }, [tenantId, currentPage, selectedCategory, searchQuery, sortBy]);
-
-  // Update URL when filters change
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (currentPage > 1) params.set('page', currentPage.toString());
-    if (selectedCategory) params.set('category', selectedCategory);
-    if (searchQuery) params.set('search', searchQuery);
-    if (sortBy !== 'featured') params.set('sort', sortBy);
-    
-    const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
-    window.history.replaceState({}, '', newUrl);
-  }, [currentPage, selectedCategory, searchQuery, sortBy]);
+  // Use the catalog hook for all data and state management
+  const {
+    products,
+    categories,
+    loading,
+    loadingCategories,
+    currentPage,
+    totalPages,
+    totalItems,
+    selectedCategory,
+    searchQuery,
+    sortBy,
+    setPage,
+    setCategory,
+    setSearch,
+    setSort,
+    error,
+    clearError,
+  } = useCatalog({ tenantId });
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentPage(1);
+    setSearch(searchQuery); // This will reset page to 1 automatically
   };
 
   const handleCategoryChange = (category: string) => {
-    setSelectedCategory(category);
-    setCurrentPage(1);
+    setCategory(category); // This will reset page to 1 automatically
   };
 
   const handleSortChange = (sort: string) => {
-    setSortBy(sort as any);
-    setCurrentPage(1);
+    setSort(sort as any); // This will reset page to 1 automatically
   };
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+    setPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -431,7 +318,7 @@ export default function CatalogPage({ params }: { params: Promise<{ tenantId: st
                   type="text"
                   placeholder="Search products..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-neutral-700 dark:text-white"
                 />
               </div>

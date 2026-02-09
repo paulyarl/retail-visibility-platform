@@ -167,6 +167,16 @@ interface ProductCardProps extends ProductDisplay {
   showFeaturedType: boolean;
   showCategory: boolean;
   onClick: () => void;
+  // Enhanced fields
+  averageRating?: number;
+  reviewCount?: number;
+  brand?: string;
+  isOnSale?: boolean;
+  discountPercentage?: string;
+  viewCount?: number;
+  wishlistCount?: number;
+  hasGallery?: boolean;
+  videoUrl?: string;
 }
 
 function ProductCard({
@@ -187,7 +197,16 @@ function ProductCard({
   showSKU,
   showFeaturedType,
   showCategory,
-  onClick
+  onClick,
+  averageRating,
+  reviewCount,
+  brand,
+  isOnSale,
+  discountPercentage,
+  viewCount,
+  wishlistCount,
+  hasGallery,
+  videoUrl
 }: ProductCardProps) {
   return (
     <div className="group hover:shadow-lg transition-shadow duration-200 cursor-pointer border rounded-lg" onClick={onClick}>
@@ -243,6 +262,47 @@ function ProductCard({
             </p>
           )}
 
+          {/* Brand & Rating Row */}
+          <div className="flex items-center justify-between">
+            {/* Brand */}
+            {brand && (
+              <div className="text-sm font-medium text-gray-900">
+                {brand}
+              </div>
+            )}
+            
+            {/* Rating */}
+            {averageRating && reviewCount && (
+              <div className="flex items-center gap-1">
+                <div className="flex items-center">
+                  <span className="text-yellow-500">★</span>
+                  <span className="text-sm text-gray-600 ml-1">
+                    {averageRating.toFixed(1)}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-500">
+                  ({reviewCount})
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Media Indicators */}
+          {(hasGallery || videoUrl) && (
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              {hasGallery && (
+                <span className="flex items-center gap-1">
+                  📷 Gallery
+                </span>
+              )}
+              {videoUrl && (
+                <span className="flex items-center gap-1">
+                  🎥 Video
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Category */}
           {showCategory && (
             <div className="flex items-center gap-2">
@@ -274,6 +334,31 @@ function ProductCard({
             showDiscountPercentage={true}
             showDiscountAmount={false}
           />
+
+          {/* Sale Badge */}
+          {isOnSale && discountPercentage && (
+            <div className="mt-2">
+              <Badge variant="error" className="text-xs">
+                {discountPercentage}% OFF
+              </Badge>
+            </div>
+          )}
+
+          {/* Engagement Metrics */}
+          {(viewCount || wishlistCount) && (
+            <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+              {viewCount && (
+                <span className="flex items-center gap-1">
+                  👁️ {viewCount} views
+                </span>
+              )}
+              {wishlistCount && (
+                <span className="flex items-center gap-1">
+                  ❤️ {wishlistCount}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

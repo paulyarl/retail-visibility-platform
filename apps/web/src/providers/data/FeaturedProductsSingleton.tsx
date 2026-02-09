@@ -13,6 +13,9 @@ import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSing
 // Import existing ProductSingleton for universal product integration
 import { PublicProduct } from '@/providers/data/ProductSingleton';
 
+// Import StorefrontService for API calls
+import { storefrontService } from '@/services/StorefrontService';
+
 // FeaturedType union
 export type FeaturedType = 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
 
@@ -207,22 +210,12 @@ export class FeaturedProductsSingleton extends UniversalSingleton {
     };
 
     try {
-      // Fetch featured assignments
-      const response = await fetch(`/api/public/products/featured?tenantId=${tenantId}&limit=${limit}`);
+      // Fetch featured products using StorefrontService
+      const featuredResponse = await storefrontService.getFeaturedProducts(tenantId, { limit });
       
-      if (!response.ok) {
-        console.warn('API response not ok, returning empty result');
-        // Cache the empty result to avoid repeated failed requests
-        await this.setCache(cacheKey, defaultResult, options); // 30 seconds for errors
-        return defaultResult;
-      }
-
-      const featuredAssignments = await response.json();
-      
-      // Transform the new API response to the expected format
-      if (featuredAssignments && featuredAssignments.products) {
-        // New API format: { success: true, products: [...] }
-        const products = featuredAssignments.products || [];
+      // Transform the StorefrontService response to the expected format
+      if (featuredResponse && featuredResponse.items) {
+        const products = featuredResponse.items || [];
         
         // Group products by featuredType
         const productsByType = products.reduce((acc: Record<string, any[]>, product: any) => {
@@ -232,14 +225,14 @@ export class FeaturedProductsSingleton extends UniversalSingleton {
           // Transform API response to FeaturedProduct format
           const transformedProduct = {
             id: product.id,
-            tenantId: product.tenant?.id || product.tenant_id,
+            tenantId: product.tenantId,
             sku: product.sku,
             name: product.name,
             title: product.title,
             description: product.description ? product.description.substring(0, 30) + (product.description.length > 30 ? '...' : '') : '',
             marketingDescription: product.marketingDescription,
-            priceCents: product.price ? Math.round(product.price * 100) : null,
-            salePriceCents: product.salePriceCents || product.salePriceCents || null,
+            priceCents: product.priceCents,
+            salePriceCents: product.salePriceCents,
             stock: product.stock,
             imageUrl: product.imageUrl,
             imageGallery: product.imageGallery,
@@ -324,23 +317,8 @@ export class FeaturedProductsSingleton extends UniversalSingleton {
       }
       
       // Return empty result if no data
-      if (!featuredAssignments || !featuredAssignments.buckets) {
-        // Cache the empty result to avoid repeated requests
-        await this.setCache(cacheKey, defaultResult, options); // 1 minute for empty data
-        return defaultResult;
-      }
-
-      // Handle old format (backward compatibility)
-      const result: FeaturedProductsData = {
-        totalCount: featuredAssignments.totalCount || 0,
-        buckets: featuredAssignments.buckets || [],
-        lastUpdated: featuredAssignments.lastUpdated || new Date().toISOString()
-      };
-
-      // Cache the result
-      await this.setCache(cacheKey, result, options); // 5 minutes
-
-      return result;
+      await this.setCache(cacheKey, defaultResult, options); // 1 minute for empty data
+      return defaultResult;
     } catch (error) {
       console.error('Error fetching featured products:', error);
       
@@ -385,21 +363,13 @@ export class FeaturedProductsSingleton extends UniversalSingleton {
     };
 
     try {
-      // Fetch featured assignments
-      const response = await fetch(`/api/public/products/featured?tenantId=${tenantId}&limit=${limit}`);
+      // Fetch featured products using StorefrontService
+      const featuredResponse = await storefrontService.getFeaturedProducts(tenantId, { limit });
       
-      if (!response.ok) {
-        console.warn('API response not ok, returning empty result');
-        await set(cacheKey, defaultResult, { ttl: 30 * 1000, ...options });
-        return defaultResult;
-      }
-
-      const featuredAssignments = await response.json();
-      
-      // Transform the new API response to the expected format
-      if (featuredAssignments && featuredAssignments.products) {
+      // Transform the StorefrontService response to the expected format
+      if (featuredResponse && featuredResponse.items) {
         // New API format: { success: true, products: [...] }
-        const products = featuredAssignments.products || [];
+        const products = featuredResponse.items || [];
         
         // Group products by featuredType
         const productsByType = products.reduce((acc: Record<string, any[]>, product: any) => {
@@ -501,22 +471,8 @@ export class FeaturedProductsSingleton extends UniversalSingleton {
       }
       
       // Return empty result if no data
-      if (!featuredAssignments || !featuredAssignments.buckets) {
-        await set(cacheKey, defaultResult, { ttl: 60 * 1000, ...options });
-        return defaultResult;
-      }
-
-      // Handle old format (backward compatibility)
-      const result: FeaturedProductsData = {
-        totalCount: featuredAssignments.totalCount || 0,
-        buckets: featuredAssignments.buckets || [],
-        lastUpdated: featuredAssignments.lastUpdated || new Date().toISOString()
-      };
-
-      // Cache with auth-aware encryption
-      await set(cacheKey, result, { ttl: 5 * 60 * 1000, ...options });
-
-      return result;
+      await set(cacheKey, defaultResult, { ttl: 60 * 1000, ...options });
+      return defaultResult;
     } catch (error) {
       console.error('Error fetching featured products:', error);
       await set(cacheKey, defaultResult, { ttl: 30 * 1000, ...options });

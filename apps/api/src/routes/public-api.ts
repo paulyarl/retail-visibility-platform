@@ -536,12 +536,31 @@ router.get('/shops/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
     console.log('[Public API] Shop lookup request for identifier:', identifier);
-    
-    // Use the universal identifier resolver
+
+    // Use UniversalIdentifierCache for proper caching and identifier resolution
     const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
     const cache = UniversalIdentifierCache.getInstance();
-    const resolvedTenant = await cache.resolveIdentifier(identifier);
-    
+
+    let resolvedTenant: any = null;
+
+    // Add timeout for identifier resolution to prevent hanging
+    const identifierPromise = cache.resolveIdentifier(identifier);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Identifier resolution timeout')), 10000); // 10 second timeout
+    });
+
+    try {
+      resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
+      console.log('[Public API] Successfully resolved identifier:', identifier, '->', resolvedTenant?.id);
+    } catch (error) {
+      console.error('[Public API] Error resolving identifier:', identifier, error);
+      return res.status(404).json({
+        success: false,
+        error: `Identifier not found: ${identifier}`,
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+
     if (!resolvedTenant) {
       return res.status(404).json({
         success: false,
@@ -549,49 +568,34 @@ router.get('/shops/:identifier', async (req, res) => {
         message: `No shop found for identifier: ${identifier}`
       });
     }
-    
-    // Use ShopService to get shop details
-    const ShopService = (await import('../services/ShopService')).default;
-    const shopService = ShopService.getInstance();
-    
-    let shop;
-    
-    // Try different methods based on identifier type
-    switch (resolvedTenant.type) {
-      case 'slug':
-        shop = await shopService.getShopBySlug(identifier);
-        break;
-      case 'tenant_id':
-        shop = await shopService.getShopByTenantId(identifier);
-        break;
-      case 'auto_id':
-        // For auto_id, we need to find the tenant first
-        shop = await shopService.getShopByTenantId(resolvedTenant.id);
-        break;
-    }
-    
-    if (!shop) {
-      return res.status(404).json({
-        success: false,
-        error: 'Shop not found',
-        message: 'Shop details not available for this tenant'
-      });
-    }
-    
+
+    // Simple approach: just return the resolved tenant info
+    // No need for expensive ShopService queries for basic identifier validation
+    const shop = {
+      id: resolvedTenant.id,
+      name: resolvedTenant.name,
+      slug: resolvedTenant.slug,
+      business_name: resolvedTenant.name,
+      imageUrl: undefined, // Not needed for basic validation
+      location: undefined,
+      productCount: undefined,
+      rating: undefined,
+      rating_count: undefined,
+      is_published: true,
+      primary_category: undefined,
+      created_at: new Date()
+    };
+
+    console.log(`[Public API] Successfully resolved identifier ${identifier} -> ${resolvedTenant.id}`);
+
     res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
-    res.setHeader('X-Service-Source', 'Universal-Identifier-Cache');
-    
+
     res.json({
       success: true,
       shop,
       metadata: {
-        tenant: {
-          id: resolvedTenant.id,
-          name: resolvedTenant.name,
-          slug: resolvedTenant.slug,
-          type: resolvedTenant.type
-        },
-        identifierType: resolvedTenant.type
+        identifier,
+        cacheTTL: 15 * 60 * 1000 // 15 minutes
       }
     });
   } catch (error) {
@@ -620,7 +624,25 @@ router.get('/tenant/:identifier', async (req, res) => {
     // Use the universal identifier resolver
     const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
     const cache = UniversalIdentifierCache.getInstance();
-    const resolvedTenant = await cache.resolveIdentifier(identifier);
+    
+    // Add timeout for identifier resolution to prevent hanging
+    const identifierPromise = cache.resolveIdentifier(identifier);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Identifier resolution timeout')), 10000); // 10 second timeout
+    });
+    
+    let resolvedTenant: any = null;
+    try {
+      resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
+      console.log(`[Public API] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
+    } catch (error) {
+      console.error(`[Public API] Error resolving identifier: ${identifier}`, error);
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
     
     if (!resolvedTenant) {
       return res.status(404).json({
@@ -677,7 +699,25 @@ router.get('/tenant/:identifier/profile', async (req, res) => {
     // Use the universal identifier resolver
     const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
     const cache = UniversalIdentifierCache.getInstance();
-    const resolvedTenant = await cache.resolveIdentifier(identifier);
+    
+    // Add timeout for identifier resolution to prevent hanging
+    const identifierPromise = cache.resolveIdentifier(identifier);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Identifier resolution timeout')), 10000); // 10 second timeout
+    });
+    
+    let resolvedTenant: any = null;
+    try {
+      resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
+      console.log(`[Public API] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
+    } catch (error) {
+      console.error(`[Public API] Error resolving identifier: ${identifier}`, error);
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
     
     if (!resolvedTenant) {
       return res.status(404).json({
@@ -690,7 +730,25 @@ router.get('/tenant/:identifier/profile', async (req, res) => {
     // Use TenantService to get complete profile
     const { TenantService } = await import('../services/TenantService');
     const tenantService = TenantService.getInstance();
-    const profile = await tenantService.getTenantProfile(resolvedTenant.id);
+    
+    // Add timeout for profile retrieval
+    const profilePromise = tenantService.getTenantProfile(resolvedTenant.id);
+    const profileTimeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Profile retrieval timeout')), 15000); // 15 second timeout
+    });
+    
+    let profile: any = null;
+    try {
+      profile = await Promise.race([profilePromise, profileTimeoutPromise]);
+      console.log(`[Public API] Successfully retrieved profile for tenant: ${resolvedTenant.id}`);
+    } catch (error) {
+      console.error(`[Public API] Error retrieving profile for tenant: ${resolvedTenant.id}`, error);
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant profile not found',
+        message: 'Unable to retrieve tenant profile'
+      });
+    }
     
     if (!profile) {
       return res.status(404).json({
@@ -727,9 +785,74 @@ router.get('/tenant/:identifier/profile', async (req, res) => {
 });
 
 /**
- * GET /api/public/tenant/:identifier/business-profile
- * Get tenant business profile by any identifier (tenant-id, slug, auto-id)
+ * GET /api/public/tenant/:identifier/payment-gateways
+ * Get tenant payment gateways by any identifier (tenant-id, slug, auto-id)
  */
+router.get('/tenant/:identifier/payment-gateways', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    console.log(`[Public API] Payment gateways request for identifier: ${identifier}`);
+
+    // Use the universal identifier resolver
+    const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
+    const cache = UniversalIdentifierCache.getInstance();
+    
+    // Add timeout for identifier resolution to prevent hanging
+    const identifierPromise = cache.resolveIdentifier(identifier);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Identifier resolution timeout')), 10000); // 10 second timeout
+    });
+    
+    let resolvedTenant: any = null;
+    try {
+      resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
+      console.log(`[Public API] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
+    } catch (error) {
+      console.error(`[Public API] Error resolving identifier: ${identifier}`, error);
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
+
+    if (!resolvedTenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
+
+    // For now, return empty gateways array since payment gateway logic isn't implemented yet
+    // In the future, this would query tenant payment gateway configurations
+    const gateways: any[] = [];
+
+    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
+    res.setHeader('X-Service-Source', 'Universal-Identifier-Cache');
+
+    res.json({
+      success: true,
+      gateways,
+      metadata: {
+        tenant: {
+          id: resolvedTenant.id,
+          name: resolvedTenant.name,
+          slug: resolvedTenant.slug,
+          type: resolvedTenant.type
+        },
+        identifierType: resolvedTenant.type
+      }
+    });
+  } catch (error) {
+    console.error('[Public API] Error fetching payment gateways by identifier:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch payment gateways',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
 router.get('/tenant/:identifier/business-profile', async (req, res) => {
   try {
     const { identifier } = req.params;

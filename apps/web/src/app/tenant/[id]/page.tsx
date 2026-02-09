@@ -54,6 +54,11 @@ interface Product {
   availability: 'in_stock' | 'out_of_stock' | 'preorder';
   payment_gateway_type?: string | null;
   has_active_payment_gateway?: boolean;
+  // product display attributes
+  product_rating?: number;
+  product_review_count?: number;
+  product_helpful_count?: number;
+  product_review_approved?: number;
 }
 
 interface Tenant {
@@ -445,6 +450,10 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
         features={features}
         totalAllProducts={totalAllProducts}
         fullWidthLayout={false} // Default to constrained layout
+        products={products}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={total}
       />
     </ProductSingletonProvider>
   );

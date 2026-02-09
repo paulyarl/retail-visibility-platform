@@ -43,9 +43,10 @@ export const getDirectPool = (): Pool => {
   url.searchParams.delete('sslmode'); // Remove sslmode, we set it via ssl option
   const cleanConnectionString = url.toString();
 
-  // Get connection limits from URL params or use defaults
-  const connectionLimit = parseInt(url.searchParams.get('connection_limit') || '5');
-  const poolTimeout = parseInt(url.searchParams.get('pool_timeout') || '10') * 1000; // Convert to ms
+  // Get connection limits from URL params or use higher defaults for better performance
+  const connectionLimit = parseInt(url.searchParams.get('connection_limit') || '20');
+  const poolTimeout = parseInt(url.searchParams.get('pool_timeout') || '30') * 1000; // Convert to ms
+  const connectionTimeout = parseInt(url.searchParams.get('connection_timeout') || '30') * 1000; // Convert to ms
 
   directPool = new Pool({
     connectionString: cleanConnectionString,
@@ -54,8 +55,10 @@ export const getDirectPool = (): Pool => {
       checkServerIdentity: () => undefined
     } : false,
     max: connectionLimit,
+    min: 2, // Minimum connections to keep alive
     idleTimeoutMillis: poolTimeout,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: connectionTimeout,
+    allowExitOnIdle: true,
   });
 
   return directPool;

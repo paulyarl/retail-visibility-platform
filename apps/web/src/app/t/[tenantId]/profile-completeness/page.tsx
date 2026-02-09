@@ -55,7 +55,7 @@ export default function ProfileCompletenessPage() {
         }
 
         // Fetch profile data from the public endpoint
-        const res = await fetch(`${API_BASE_URL}/public/tenant/${tenantId}/profile`, {
+        const res = await fetch(`${API_BASE_URL}/api/public/tenant/${tenantId}/profile`, {
           headers,
           credentials: 'include',
         })

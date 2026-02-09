@@ -141,7 +141,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                   </p>
                   {product.tenantCategory && (
                     <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
-                      {product.tenantCategory.name}
+                      {typeof product.tenantCategory === 'string' ? product.tenantCategory : product.tenantCategory?.name || ''}
                     </span>
                   )}
                 </div>
@@ -444,7 +444,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
                   </p>
                   {productsWithPhotos[currentProductIndex].tenantCategory && (
                     <span className="text-xs px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
-                      {productsWithPhotos[currentProductIndex].tenantCategory.name}
+                      {typeof productsWithPhotos[currentProductIndex].tenantCategory === 'string' ? productsWithPhotos[currentProductIndex].tenantCategory : productsWithPhotos[currentProductIndex].tenantCategory?.name || ''}
                     </span>
                   )}
                 </div>

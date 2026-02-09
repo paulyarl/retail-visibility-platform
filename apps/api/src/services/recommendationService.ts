@@ -18,6 +18,54 @@ export interface Recommendation {
   city?: string;
   state?: string;
   distance?: number;
+
+  // Rich product data from mv_global_discovery
+  productId?: string;
+  productName?: string;
+  productTitle?: string;
+  productDescription?: string;
+  productPrice?: number;
+  productPriceCents?: number;
+  productSalePrice?: number;
+  productSalePriceCents?: number;
+  productStock?: number;
+  productImageUrl?: string;
+  productBrand?: string;
+  productRatingLive?: number;
+  productReviewsCountLive?: number;
+  productHelpfulCountLive?: number;
+  productReviewsApprovedLive?: number;
+  productAverageRating?: number;
+  productReviewCount?: number;
+  storeAverageRating?: number;
+  storeReviewCount?: number;
+  viewCount?: number;
+  uniqueViewers?: number;
+  engagementCount?: number;
+  conversionCount?: number;
+  revenueCents?: number;
+  unitsSold?: number;
+  wishlistCount?: number;
+  shareCount?: number;
+  trendingScore?: number;
+  priceStatus?: string;
+  stockStatus?: string;
+  hasImage?: boolean;
+  hasGallery?: boolean;
+  hasDescription?: boolean;
+  hasBrand?: boolean;
+  hasPrice?: boolean;
+  inStock?: boolean;
+  hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
+  tenantLogoUrl?: string;
+  tenantCategory?: string;
+  productCategory?: string;
+  productCategorySlug?: string;
+  featuredType?: string;
+  featuredPriority?: number;
+  featuredAt?: string;
+  isFeaturedActive?: boolean;
 }
 
 export interface RecommendationResponse {
@@ -71,16 +119,27 @@ export async function getStoresViewedBySameUsers(
         LIMIT $${params.length + 1}
       )
       SELECT 
-        dcl.tenant_id,
-        dcl.business_name,
-        dcl.slug,
-        dcl.address,
-        dcl.city,
-        dcl.state,
+        DISTINCT mgd.tenant_id,
+        mgd.tenant_name as business_name,
+        mgd.tenant_slug as slug,
+        mgd.tenant_address as address,
+        mgd.tenant_city as city,
+        mgd.tenant_state as state,
+        mgd.average_rating as store_average_rating,
+        mgd.review_count as store_review_count,
+        mgd.view_count,
+        mgd.unique_viewers,
+        mgd.engagement_count,
+        mgd.conversion_count,
+        mgd.revenue_cents,
+        mgd.units_sold,
+        mgd.tenant_logo_url,
+        mgd.tenant_category,
         osv.view_count as score
       FROM other_stores_viewed osv
-      JOIN directory_listings_list dcl ON osv.entity_id::text = dcl.tenant_id::text
-      WHERE dcl.is_published = true
+      JOIN mv_global_discovery mgd ON osv.entity_id::text = mgd.tenant_id::text
+      WHERE mgd.item_status = 'active'
+        AND mgd.visibility = 'public'
     `;
     
     params.push(limit);
@@ -90,8 +149,22 @@ export async function getStoresViewedBySameUsers(
       tenantId: row.tenant_id,
       businessName: row.business_name,
       slug: row.slug,
-      score: row.view_count,
+      score: row.score,
       reason: 'Users who viewed this store also viewed this store',
+
+      // Rich store data from mv_global_discovery
+      storeAverageRating: typeof row.store_average_rating === 'string' ? parseFloat(row.store_average_rating) : row.store_average_rating,
+      storeReviewCount: row.store_review_count,
+      viewCount: row.view_count,
+      uniqueViewers: row.unique_viewers,
+      engagementCount: row.engagement_count,
+      conversionCount: row.conversion_count,
+      revenueCents: row.revenue_cents,
+      unitsSold: row.units_sold,
+      tenantLogoUrl: row.tenant_logo_url,
+      tenantCategory: row.tenant_category,
+
+      // Store location data
       address: row.address,
       city: row.city,
       state: row.state
@@ -218,44 +291,56 @@ export async function getTrendingNearby(
   const pool = getDirectPool();
   
   try {
-    // Use pre-aggregated trending_stores_mv for 7-13x faster queries
+    // Use mv_global_discovery for comprehensive store data
     const query = `
       SELECT 
-        tenant_id,
-        business_name,
-        slug,
-        address,
-        city,
-        state,
-        rating_avg,
-        view_count,
-        unique_viewers,
-        trending_score,
-        3959 * ACOS(
-          COS(RADIANS($1)) * COS(RADIANS(latitude)) * 
-          COS(RADIANS(longitude) - RADIANS($2)) + 
-          SIN(RADIANS($1)) * SIN(RADIANS(latitude))
-        ) as distance
-      FROM trending_stores_mv
-      WHERE 3959 * ACOS(
-          COS(RADIANS($1)) * COS(RADIANS(latitude)) * 
-          COS(RADIANS(longitude) - RADIANS($2)) + 
-          SIN(RADIANS($1)) * SIN(RADIANS(latitude))
-        ) <= $3
-      ORDER BY trending_score DESC, view_count DESC
-      LIMIT $4
+        DISTINCT mgd.tenant_id,
+        mgd.tenant_name as business_name,
+        mgd.tenant_slug as slug,
+        mgd.tenant_address as address,
+        mgd.tenant_city as city,
+        mgd.tenant_state as state,
+        mgd.average_rating as store_average_rating,
+        mgd.review_count as store_review_count,
+        mgd.view_count,
+        mgd.unique_viewers,
+        mgd.engagement_count,
+        mgd.conversion_count,
+        mgd.revenue_cents,
+        mgd.units_sold,
+        mgd.trending_score,
+        mgd.tenant_logo_url,
+        mgd.tenant_category,
+        ${userLat && userLng ? `
+          3959 * ACOS(
+            COS(RADIANS(${userLat})) * COS(RADIANS(mgd.tenant_latitude)) * 
+            COS(RADIANS(mgd.tenant_longitude) - RADIANS(${userLng})) + 
+            SIN(RADIANS(${userLat})) * SIN(RADIANS(mgd.tenant_latitude))
+          ) as distance` : 'NULL as distance'}
+      FROM mv_global_discovery mgd
+      WHERE mgd.item_status = 'active'
+        AND mgd.visibility = 'public'
+        AND mgd.trending_score > 0
+        ${userLat && userLng ? `AND mgd.tenant_latitude IS NOT NULL AND mgd.tenant_longitude IS NOT NULL
+        AND 3959 * ACOS(
+          COS(RADIANS(${userLat})) * COS(RADIANS(mgd.tenant_latitude)) * 
+          COS(RADIANS(mgd.tenant_longitude) - RADIANS(${userLng})) + 
+          SIN(RADIANS(${userLat})) * SIN(RADIANS(mgd.tenant_latitude))
+        ) <= ${radiusMiles}` : ''}
+      ORDER BY mgd.trending_score DESC, mgd.view_count DESC
+      LIMIT ${limit}
     `;
     
-    const result = await pool.query(query, [userLat, userLng, radiusMiles, limit]);
+    const result = await pool.query(query);
     
     const recommendations: Recommendation[] = result.rows.map((row: any) => {
       // Calculate location-weighted rating if user location is available
-      let locationWeightedRating = row.rating_avg || 0;
+      let locationWeightedRating = (typeof row.store_average_rating === 'string' ? parseFloat(row.store_average_rating) : row.store_average_rating) || 0;
       if (userLat && userLng && row.distance !== null) {
         // Apply location bonus: closer stores get rating boost
         const distanceMiles = row.distance;
         const locationBonus = Math.max(0, 1 - (distanceMiles / 50)) * 0.5; // 0 to 0.5 bonus
-        locationWeightedRating = Math.min(5, (row.rating_avg || 0) + locationBonus);
+        locationWeightedRating = Math.min(5, locationWeightedRating + locationBonus);
       }
       
       // Enhanced scoring with location-weighted ratings
@@ -274,11 +359,25 @@ export async function getTrendingNearby(
         businessName: row.business_name,
         slug: row.slug,
         score: finalScore,
-        reason: `Trending nearby - ${row.view_count} views by ${row.unique_viewers} people${row.rating_avg ? ` (${row.rating_avg.toFixed(1)}⭐)` : ''}`,
+        reason: `Trending nearby - ${row.view_count} views by ${row.unique_viewers} people${row.store_average_rating ? ` (${locationWeightedRating.toFixed(1)}⭐)` : ''}`,
+
+        // Rich store data from mv_global_discovery
+        storeAverageRating: typeof row.store_average_rating === 'string' ? parseFloat(row.store_average_rating) : row.store_average_rating,
+        storeReviewCount: row.store_review_count,
+        viewCount: row.view_count,
+        uniqueViewers: row.unique_viewers,
+        engagementCount: row.engagement_count,
+        conversionCount: row.conversion_count,
+        revenueCents: row.revenue_cents,
+        unitsSold: row.units_sold,
+        tenantLogoUrl: row.tenant_logo_url,
+        tenantCategory: row.tenant_category,
+
+        // Store location data
         address: row.address,
         city: row.city,
         state: row.state,
-        distance: Math.round(row.distance * 10) / 10
+        distance: row.distance ? Math.round(row.distance * 10) / 10 : undefined
       };
     });
 
@@ -402,23 +501,64 @@ export async function getProductsViewedBySameUsers(
         ORDER BY view_count DESC, last_viewed DESC
         LIMIT $3
       )
-      SELECT 
-        opv.entity_id as product_id,
-        opv.entity_name as product_name,
-        opv.view_count as score,
-        sp.tenant_id,
-        sp.title,
-        sp.price_cents,
-        sp.image_url,
-        sp.has_active_payment_gateway,
-        sp.default_gateway_type,
-        dcl.business_name as store_name,
-        dcl.slug as store_slug
+      SELECT
+        mgd.inventory_item_id as product_id,
+        mgd.product_name,
+        mgd.product_title,
+        mgd.product_description,
+        mgd.current_price_cents as product_price_cents,
+        mgd.sale_price_cents as product_sale_price_cents,
+        mgd.stock as product_stock,
+        mgd.image_url as product_image_url,
+        mgd.brand as product_brand,
+        mgd.product_rating_live,
+        mgd.product_reviews_count_live,
+        mgd.product_helpful_count_live,
+        mgd.product_reviews_approved_live,
+        mgd.product_average_rating,
+        mgd.product_review_count,
+        mgd.average_rating as store_average_rating,
+        mgd.review_count as store_review_count,
+        mgd.view_count,
+        mgd.unique_viewers,
+        mgd.engagement_count,
+        mgd.conversion_count,
+        mgd.revenue_cents,
+        mgd.units_sold,
+        mgd.wishlist_count,
+        mgd.share_count,
+        mgd.trending_score,
+        mgd.price_status,
+        mgd.stock_status,
+        mgd.has_image,
+        mgd.has_gallery,
+        mgd.has_description,
+        mgd.has_brand,
+        mgd.has_price,
+        mgd.in_stock,
+        mgd.has_active_payment_gateway,
+        mgd.default_gateway_type,
+        mgd.tenant_name,
+        mgd.tenant_logo_url,
+        mgd.shop_category,
+        mgd.product_category,
+        mgd.product_category_slug,
+        mgd.featured_type,
+        mgd.featured_priority,
+        mgd.featured_at,
+        mgd.featured_is_active,
+        mgd.tenant_id,
+        mgd.tenant_name as business_name,
+        mgd.tenant_slug as slug,
+        mgd.tenant_address as address,
+        mgd.tenant_city as city,
+        mgd.tenant_state as state,
+        opv.view_count as score
       FROM other_products_viewed opv
-      JOIN storefront_products sp ON opv.entity_id = sp.id
-      JOIN directory_listings_list dcl ON sp.tenant_id = dcl.tenant_id
-      WHERE dcl.tenant_exists = true
-        AND dcl.is_directory_visible = true
+      JOIN mv_global_discovery mgd ON opv.entity_id::text = mgd.inventory_item_id::text
+      WHERE mgd.item_status = 'active'
+        AND mgd.visibility = 'public'
+        AND mgd.has_active_payment_gateway = true
     `;
     
     const params = userId ? [productId, userId, limit] : [productId, limit];
@@ -426,17 +566,63 @@ export async function getProductsViewedBySameUsers(
     
     const recommendations: Recommendation[] = result.rows.map((row: any) => ({
       tenantId: row.tenant_id,
-      businessName: row.store_name,
-      slug: row.store_slug,
-      score: row.view_count,
+      businessName: row.business_name,
+      slug: row.slug,
+      score: row.score,
       reason: 'Users who viewed this product also viewed this',
-      // Product-specific info
+
+      // Rich product data from mv_global_discovery
       productId: row.product_id,
       productName: row.product_name,
-      productPrice: row.price_cents ? row.price_cents / 100 : undefined,
-      productImage: row.image_url,
+      productTitle: row.product_title,
+      productDescription: row.product_description,
+      productPrice: row.product_price_cents ? row.product_price_cents / 100 : undefined,
+      productPriceCents: row.product_price_cents,
+      productSalePrice: row.product_sale_price_cents ? row.product_sale_price_cents / 100 : undefined,
+      productSalePriceCents: row.product_sale_price_cents,
+      productStock: row.product_stock,
+      productImageUrl: row.product_image_url,
+      productBrand: row.product_brand,
+      productRatingLive: typeof row.product_rating_live === 'string' ? parseFloat(row.product_rating_live) : row.product_rating_live,
+      productReviewsCountLive: row.product_reviews_count_live,
+      productHelpfulCountLive: row.product_helpful_count_live,
+      productReviewsApprovedLive: row.product_reviews_approved_live,
+      productAverageRating: typeof row.product_average_rating === 'string' ? parseFloat(row.product_average_rating) : row.product_average_rating,
+      productReviewCount: row.product_review_count,
+      storeAverageRating: typeof row.store_average_rating === 'string' ? parseFloat(row.store_average_rating) : row.store_average_rating,
+      storeReviewCount: row.store_review_count,
+      viewCount: row.view_count,
+      uniqueViewers: row.unique_viewers,
+      engagementCount: row.engagement_count,
+      conversionCount: row.conversion_count,
+      revenueCents: row.revenue_cents,
+      unitsSold: row.units_sold,
+      wishlistCount: row.wishlist_count,
+      shareCount: row.share_count,
+      trendingScore: typeof row.trending_score === 'string' ? parseFloat(row.trending_score) : row.trending_score,
+      priceStatus: row.price_status,
+      stockStatus: row.stock_status,
+      hasImage: row.has_image,
+      hasGallery: row.has_gallery,
+      hasDescription: row.has_description,
+      hasBrand: row.has_brand,
+      hasPrice: row.has_price,
+      inStock: row.in_stock,
       hasActivePaymentGateway: row.has_active_payment_gateway,
-      defaultGatewayType: row.default_gateway_type
+      defaultGatewayType: row.default_gateway_type,
+      tenantLogoUrl: row.tenant_logo_url,
+      tenantCategory: row.shop_category,
+      productCategory: row.product_category,
+      productCategorySlug: row.product_category_slug,
+      featuredType: row.featured_type,
+      featuredPriority: row.featured_priority,
+      featuredAt: row.featured_at,
+      isFeaturedActive: row.featured_is_active,
+
+      // Store location data
+      address: row.address,
+      city: row.city,
+      state: row.state
     }));
 
     return {

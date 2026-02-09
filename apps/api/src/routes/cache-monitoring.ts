@@ -179,7 +179,7 @@ router.post('/invalidate/:tenantId', async (req, res) => {
 router.post('/clear', async (req, res) => {
   try {
     const cache = UniversalIdentifierCache.getInstance();
-    cache.clearCache();
+    await cache.clearAllCache();
     
     res.json({
       success: true,

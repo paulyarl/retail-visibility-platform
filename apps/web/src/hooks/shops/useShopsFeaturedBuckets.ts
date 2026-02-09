@@ -470,7 +470,7 @@ export function useShopsFeaturedBuckets(options: {
                 salePriceCents: product.sale_price_cents || product.salePriceCents,
                 stock: product.stock,
                 imageUrl: product.image_url || product.imageUrl,
-                categoryName: product.product_category || product.category_name || product.categoryName || 'General',
+                categoryName: product.categoryName || product.product_category || product.category_name || 'General',
                 categorySlug: product.product_category_slug || product.category_slug || product.categorySlug || 'general',
                 condition: product.condition,
                 availability: product.availability,

@@ -90,7 +90,7 @@ class HoursStatusSingleton extends UniversalSingleton {
     
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const url = `${apiUrl}/public/tenant/${tenantId}/business-hours/status`;
+      const url = `${apiUrl}/api/public/tenant/${tenantId}/business-hours/status`;
       
       const response = await this.makePublicRequest<any>(url);
 

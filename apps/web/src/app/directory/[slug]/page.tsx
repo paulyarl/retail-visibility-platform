@@ -93,7 +93,7 @@ async function getBusinessProfile(tenantId: string) {
   const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
   
   try {
-    const res = await fetch(`${apiUrl}/public/tenant/${tenantId}/profile`, {
+    const res = await fetch(`${apiUrl}/api/public/tenant/${tenantId}/profile`, {
       next: { revalidate: 300 }, // Revalidate every 5 minutes
     });
 

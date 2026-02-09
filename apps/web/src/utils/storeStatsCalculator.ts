@@ -31,11 +31,12 @@ class StoreStatsSingleton extends UniversalSingleton {
       `store-stats:${tenantId}`
     );
     
-    if (!response.success) {
-      throw new Error(`Failed to fetch store stats: ${response.error || 'Unknown error'}`);
+    // The API returns data directly, not wrapped in a success object
+    if (!response || response.error) {
+      throw new Error(`Failed to fetch store stats: ${response?.error || 'Unknown error'}`);
     }
     
-    return response.data;
+    return response;
   }
 }
 

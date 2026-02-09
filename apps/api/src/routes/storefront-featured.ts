@@ -18,20 +18,52 @@ const router = Router();
  */
 router.get('/:tenantId/featured-products', async (req: Request, res: Response) => {
   try {
-    const { tenantId } = req.params;
+    const { tenantId: identifier } = req.params;
     const { limit = '20', includeExpired = 'false' } = req.query;
     
-    if (!tenantId) {
+    console.log(`[FeaturedProducts] Request for identifier: ${identifier}`);
+    
+    if (!identifier) {
       return res.status(400).json({ error: 'tenant_required' });
     }
     
+    // Resolve the identifier to actual tenant ID using UniversalIdentifierCache
+    const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
+    const cache = UniversalIdentifierCache.getInstance();
+    
+    // Add timeout for identifier resolution to prevent hanging
+    const identifierPromise = cache.resolveIdentifier(identifier);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Identifier resolution timeout')), 10000); // 10 second timeout
+    });
+    
+    let resolvedTenant: any = null;
+    try {
+      resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
+      console.log(`[FeaturedProducts] Resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
+    } catch (error) {
+      console.error(`[FeaturedProducts] Error resolving identifier: ${identifier}`, error);
+      return res.status(404).json({
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
+    
+    if (!resolvedTenant) {
+      return res.status(404).json({
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
+    
+    const tenantId = resolvedTenant.id; // Use the resolved tenant ID
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
     const showExpired = includeExpired === 'true';
     
     // Single query to get ALL featured products data using mv_global_discovery
-    // Use DISTINCT to ensure each product appears only once per bucket
+    // Remove DISTINCT to handle multiple featured types per product properly
     const query = `
-      SELECT DISTINCT 
+      SELECT 
         mv.*
       FROM mv_global_discovery mv
       WHERE mv.tenant_id = $1
@@ -42,7 +74,7 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
       LIMIT $2
     `;
     
-    const result = await getDirectPool().query(query, [tenantId, limitNum]);
+    const result = await getDirectPool().query(query, [tenantId, limitNum * 2]); // Get more to account for duplicates
     
     // Divide products by featured_type for component props
     const buckets: Record<string, any[]> = {
@@ -53,13 +85,33 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
       store_selection: []
     };
     
-    // Group products by featured_type
+    // Track unique products to avoid duplicates in buckets
+    const seenProducts = new Set<string>();
+    
+    // Group products by featured_type, ensuring each product appears only once per exact combination
     result.rows.forEach(product => {
       const featuredType = product.featured_type;
-      if (buckets[featuredType]) {
+      const productId = product.inventory_item_id;
+      const combinationKey = `${productId}-${featuredType}`;
+      
+      // Only deduplicate if the exact same inventory_id + featured_type combination appears
+      if (buckets[featuredType] && !seenProducts.has(combinationKey)) {
         buckets[featuredType].push(product);
+        seenProducts.add(combinationKey);
       }
     });
+    
+    // Debug logging
+    console.log(`[FeaturedProducts] Raw results: ${result.rows.length}`);
+    console.log(`[FeaturedProducts] Bucket counts:`, Object.fromEntries(
+      Object.entries(buckets).map(([type, products]) => [type, products.length])
+    ));
+    console.log(`[FeaturedProducts] Sample products:`, result.rows.slice(0, 5).map(p => ({
+      id: p.inventory_item_id,
+      name: p.product_name,
+      type: p.featured_type,
+      priority: p.featured_priority
+    })));
     
     // Calculate total count and bucket counts
     const totalCount = result.rows.length;
@@ -193,6 +245,12 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
           unitsSold: product.units_sold,
           averageRating: product.average_rating,
           reviewCount: product.review_count,
+          // NEW LIVE REVIEW AGGREGATIONS
+          productRatingLive: product.product_rating_live,
+          productReviewsCountLive: product.product_reviews_count_live,
+          productHelpfulCountLive: product.product_helpful_count_live,
+          productReviewsApprovedLive: product.product_reviews_approved_live,
+          // END NEW FIELDS
           wishlistCount: product.wishlist_count,
           shareCount: product.share_count,
           bucketPriority: product.bucket_priority,
@@ -396,7 +454,13 @@ router.get('/:tenantId/featured-products/:type', async (req: Request, res: Respo
       revenueCents: product.revenue_cents,
       unitsSold: product.units_sold,
       averageRating: product.average_rating,
-      reviewCount: product.review_count,
+      reviewCount: product.review_count,      
+      // NEW LIVE REVIEW AGGREGATIONS
+      productRatingLive: product.product_rating_live,
+      productReviewsCountLive: product.product_reviews_count_live,
+      productHelpfulCountLive: product.product_helpful_count_live,
+      productReviewsApprovedLive: product.product_reviews_approved_live,
+      //
       wishlistCount: product.wishlist_count,
       shareCount: product.share_count,
       bucketPriority: product.bucket_priority,

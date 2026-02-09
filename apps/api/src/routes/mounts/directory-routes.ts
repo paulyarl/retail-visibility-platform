@@ -28,7 +28,8 @@ export function mountDirectoryRoutes(app: Express) {
   console.log('✅ Directory categories routes mounted (category-based discovery)');
 
   // Directory Store Types routes - NEW for store type browsing (dual category system)
-  app.use('/api/directory', directoryStoreTypesRoutes);
+  // Mount at specific path to avoid conflicts with other directory routes
+  app.use('/api/directory/store-types', directoryStoreTypesRoutes);
   console.log('✅ Directory store types routes mounted (store type discovery)');
 
   // Directory routes - mount AFTER category routes to avoid conflicts

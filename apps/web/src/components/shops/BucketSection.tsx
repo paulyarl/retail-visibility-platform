@@ -263,9 +263,9 @@ export function ProductBucket({
                 )}
                 
                 {/* Category */}
-                {(product.tenantCategory?.name || product.categoryName) && (
+                {(typeof product.tenantCategory === 'string' ? product.tenantCategory : product.tenantCategory?.name || product.categoryName) && (
                   <p className="product-category text-xs text-blue-600 dark:text-blue-400 font-medium">
-                    {product.tenantCategory?.name || product.categoryName}
+                    {typeof product.tenantCategory === 'string' ? product.tenantCategory : product.tenantCategory?.name || product.categoryName}
                   </p>
                 )}
                 

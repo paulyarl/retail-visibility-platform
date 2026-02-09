@@ -24,12 +24,60 @@ class ShopsAPISingleton extends UniversalSingleton {
     url: string,
     options: RequestInit = {},
     cacheKey?: string
-  ): Promise<{ success: boolean; data?: T; error?: string; status?: number }> {
+  ): Promise<T> {
+    return this.makeApiRequest<T>(url, options, cacheKey);
+  }
+
+  /**
+   * Resolve shop identifier with priority order
+   */
+  async getShopByIdentifier(identifier: string): Promise<Shop | null> {
+    const cacheKey = `shop:${identifier}`;
+
     try {
-      const response = await this.makeApiRequest<T>(url, options, cacheKey);
-      return { success: true, data: response };
+      const shop = await this.makeShopsApiRequest<Shop>(
+        `/api/shops/resolve?identifier=${encodeURIComponent(identifier)}`,
+        {},
+        cacheKey
+      );
+
+      return shop;
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error', status: error instanceof Error && 'status' in error ? (error as any).status : undefined };
+      console.error('Error resolving shop identifier:', identifier, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get shop products with filtering and pagination
+   */
+  async getShopProducts(tenantId: string, filters: ShopFilters): Promise<ShopProductsResponse> {
+    try {
+      const params = new URLSearchParams({
+        tenantId,
+        page: filters.page.toString(),
+        limit: filters.limit.toString(),
+        ...(filters.category && { category: filters.category }),
+        ...(filters.search && { search: filters.search }),
+        ...(filters.sort && filters.sort !== 'default' && { sort: filters.sort }),
+      });
+
+      const data = await this.makeShopsApiRequest<any>(
+        `/api/products?${params}`,
+        {},
+        `shop-products:${tenantId}:${JSON.stringify(filters)}`
+      );
+
+      const result: ShopProductsResponse = {
+        products: data.products || [],
+        total: data.total || 0,
+        categories: data.categories || [],
+      };
+
+      return result;
+    } catch (error) {
+      console.error('Error fetching shop products:', error);
+      return { products: [], total: 0, categories: [] };
     }
   }
 }
@@ -134,11 +182,12 @@ export interface ShopReviewsResponse {
 
 class ShopsService {
   private static instance: ShopsService;
-  private cache: Map<string, { data: any; timestamp: number }>;
+  private apiSingleton: ShopsAPISingleton;
+  private cache: Map<string, { data: any; timestamp: number }> = new Map();
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
   private constructor() {
-    this.cache = new Map();
+    this.apiSingleton = ShopsAPISingleton.getInstance();
   }
 
   static getInstance(): ShopsService {
@@ -152,80 +201,14 @@ class ShopsService {
    * Resolve shop identifier with priority order
    */
   async getShopByIdentifier(identifier: string): Promise<Shop | null> {
-    const cacheKey = `shop:${identifier}`;
-    const cached = this.getFromCache<Shop>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const apiSingleton = ShopsAPISingleton.getInstance();
-      const response = await apiSingleton.makeShopsApiRequest<Shop>(
-        `/api/shops/resolve?identifier=${encodeURIComponent(identifier)}`,
-        {},
-        cacheKey
-      );
-
-      if (!response.success) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to resolve shop: ${response.error || 'Unknown error'}`);
-      }
-
-      const shop = response.data;
-      if (!shop) {
-        console.warn('Shop data is undefined');
-        return null;
-      }
-      this.setCache(cacheKey, shop);
-      return shop;
-    } catch (error) {
-      console.error('Error resolving shop identifier:', identifier, error);
-      return null;
-    }
+    return this.apiSingleton.getShopByIdentifier(identifier);
   }
 
   /**
    * Get shop products with filtering and pagination
    */
   async getShopProducts(tenantId: string, filters: ShopFilters): Promise<ShopProductsResponse> {
-    const cacheKey = `products:${tenantId}:${JSON.stringify(filters)}`;
-    const cached = this.getFromCache<ShopProductsResponse>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const apiSingleton = ShopsAPISingleton.getInstance();
-      const params = new URLSearchParams({
-        tenantId,
-        page: filters.page.toString(),
-        limit: filters.limit.toString(),
-        ...(filters.category && { category: filters.category }),
-        ...(filters.search && { search: filters.search }),
-        ...(filters.sort && filters.sort !== 'default' && { sort: filters.sort }),
-      });
-
-      const response = await apiSingleton.makeShopsApiRequest<any>(
-        `/api/products?${params}`,
-        {},
-        `shop-products:${tenantId}:${JSON.stringify(filters)}`
-      );
-
-      if (!response.success) {
-        throw new Error(`Failed to fetch products: ${response.error || 'Unknown error'}`);
-      }
-
-      const data = response.data;
-      const result: ShopProductsResponse = {
-        products: data.products || [],
-        total: data.total || 0,
-        categories: data.categories || [],
-      };
-
-      this.setCache(cacheKey, result);
-      return result;
-    } catch (error) {
-      console.error('Error fetching shop products:', error);
-      return { products: [], total: 0, categories: [] };
-    }
+    return this.apiSingleton.getShopProducts(tenantId, filters);
   }
 
   /**

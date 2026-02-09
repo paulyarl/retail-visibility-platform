@@ -29,33 +29,64 @@ interface LastViewedProduct {
   productName: string;
   productTitle?: string;
   productDescription?: string;
-  productBrand?: string;
-  productSku?: string;
+  productPrice?: number;
   productPriceCents?: number;
-  productImageUrl?: string;
-  productCurrency?: string;
+  productSalePrice?: number;
+  productSalePriceCents?: number;
   productStock?: number;
-  productAvailability?: string;
-  isFeatured?: boolean;
+  productImageUrl?: string;
+  productBrand?: string;
+  productRatingLive?: number;
+  productReviewsCountLive?: number;
+  productHelpfulCountLive?: number;
+  productReviewsApprovedLive?: number;
+  productAverageRating?: number;
+  productReviewCount?: number;
+  storeAverageRating?: number;
+  storeReviewCount?: number;
+  viewCount?: number;
+  uniqueViewers?: number;
+  engagementCount?: number;
+  conversionCount?: number;
+  revenueCents?: number;
+  unitsSold?: number;
+  wishlistCount?: number;
+  shareCount?: number;
+  trendingScore?: number;
+  priceStatus?: string;
+  stockStatus?: string;
+  hasImage?: boolean;
+  hasGallery?: boolean;
+  hasDescription?: boolean;
+  hasBrand?: boolean;
+  hasPrice?: boolean;
+  inStock?: boolean;
+  hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
+  tenantLogoUrl?: string;
+  tenantCategory?: string;
+  productCategory?: string;
+  productCategorySlug?: string;
+  featuredType?: string;
+  featuredPriority?: number;
+  featuredAt?: string;
+  isFeaturedActive?: boolean;
   storeName?: string;
   storeSlug?: string;
   storeLogo?: string;
   tenantId: string;
-  hasActivePaymentGateway?: boolean;
-  defaultGatewayType?: string | null;
-  tenantCategory?: {
-    id: string;
-    name: string;
-    slug: string;
-  };
+  productSku?: string;
+  productCurrency?: string;
+  productAvailability?: string;
+  isFeatured?: boolean;
   lastViewedAt: string;
   pageType?: string;
   context?: string;
   productCount?: number;
   businessName?: string;
   tenantLogo?: string;
-  productPrice?: number;
   productImage?: string;
+  
 }
 
 interface LastViewedItem {
@@ -139,23 +170,63 @@ export default function LastViewed({
                 productName: item.productName,
                 productTitle: item.productTitle,
                 productDescription: item.productDescription,
-                productBrand: item.productBrand,
-                productSku: item.productSku,
                 productPrice: item.productPrice,
                 productPriceCents: item.productPriceCents,
-                productImage: item.productImage,
+                productSalePrice: item.productSalePrice,
+                productSalePriceCents: item.productSalePriceCents,
                 productStock: item.productStock,
-                productAvailability: item.productAvailability,
-                productCurrency: item.productCurrency,
+                productImageUrl: item.productImageUrl,
+                productBrand: item.productBrand,
+                productRatingLive: item.productRatingLive,
+                productReviewsCountLive: item.productReviewsCountLive,
+                productHelpfulCountLive: item.productHelpfulCountLive,
+                productReviewsApprovedLive: item.productReviewsApprovedLive,
+                productAverageRating: item.productAverageRating,
+                productReviewCount: item.productReviewCount,
+                storeAverageRating: item.storeAverageRating,
+                storeReviewCount: item.storeReviewCount,
+                viewCount: item.viewCount,
+                uniqueViewers: item.uniqueViewers,
+                engagementCount: item.engagementCount,
+                conversionCount: item.conversionCount,
+                revenueCents: item.revenueCents,
+                unitsSold: item.unitsSold,
+                wishlistCount: item.wishlistCount,
+                shareCount: item.shareCount,
+                trendingScore: item.trendingScore,
+                priceStatus: item.priceStatus,
+                stockStatus: item.stockStatus,
+                hasImage: item.hasImage,
+                hasGallery: item.hasGallery,
+                hasDescription: item.hasDescription,
+                hasBrand: item.hasBrand,
+                hasPrice: item.hasPrice,
+                inStock: item.inStock,
+                hasActivePaymentGateway: item.hasActivePaymentGateway,
+                defaultGatewayType: item.defaultGatewayType,
+                tenantLogoUrl: item.tenantLogoUrl,
+                tenantCategory: item.tenantCategory,
+                productCategory: item.productCategory,
+                productCategorySlug: item.productCategorySlug,
+                featuredType: item.featuredType,
+                featuredPriority: item.featuredPriority,
+                featuredAt: item.featuredAt,
+                isFeaturedActive: item.isFeaturedActive,
+                storeName: item.businessName,
+                storeSlug: item.slug,
+                storeLogo: item.tenantLogoUrl,
                 tenantId: item.tenantId,
-                businessName: item.businessName,
-                slug: item.slug,
+                productSku: item.productSku,
+                productCurrency: item.currency || "USD",
+                productAvailability: item.availability,
+                isFeatured: item.isFeaturedActive,
+                lastViewedAt: item.lastViewedAt || new Date().toISOString(),
+                pageType: item.pageType,
+                context: item.context,
                 score: item.score,
                 reason: item.reason,
-                hasActivePaymentGateway: item.hasActivePaymentGateway,
-                tenantLogo: item.tenantLogo,
-                tenantCategory: item.tenantCategory,
-                isFeatured: item.isFeatured
+                businessName: item.businessName,
+                tenantLogo: item.tenantLogoUrl
               }
             };
           } else {
@@ -171,9 +242,9 @@ export default function LastViewed({
                 address: item.address,
                 city: item.city,
                 state: item.state,
-                logoUrl: item.logoUrl,
-                ratingAvg: item.ratingAvg,
-                ratingCount: item.ratingCount,
+                logoUrl: item.logoUrl || item.tenantLogoUrl,
+                ratingAvg: item.storeAverageRating,
+                ratingCount: item.storeReviewCount,
                 productCount: item.productCount,
                 isFeatured: item.isFeatured
               }
@@ -281,14 +352,84 @@ export default function LastViewed({
                     brand: productData.productBrand || productData.businessName,
                     description: productData.productDescription,
                     priceCents: productData.productPriceCents || Math.round((productData.productPrice || 0) * 100),
+                    salePriceCents: productData.productSalePriceCents,
                     stock: productData.productStock || 999,
                     imageUrl: productData.productImage || productData.productImageUrl,
                     tenantId: productData.tenantId,
                     availability: (productData.productAvailability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
                     has_active_payment_gateway: productData.hasActivePaymentGateway,
                     payment_gateway_type: productData.defaultGatewayType,
-                    tenantCategory: productData.tenantCategory,
-                    isFeatured: productData.isFeatured
+                    tenantCategory: productData.tenantCategory ? {
+                      id: productData.tenantCategory,
+                      name: productData.tenantCategory,
+                      slug: productData.tenantCategory
+                    } : undefined,
+                    isFeatured: productData.isFeatured,
+                    
+                    // Enhanced fields for rich display
+                    averageRating: typeof productData.productAverageRating === 'string' ? parseFloat(productData.productAverageRating) : productData.productAverageRating,
+                    reviewCount: productData.productReviewCount,
+                    viewCount: productData.viewCount,
+                    wishlistCount: productData.wishlistCount,
+                    shareCount: productData.shareCount,
+                    isOnSale: productData.productSalePriceCents ? true : false,
+                    discountPercentage: productData.productPriceCents && productData.productSalePriceCents ? 
+                      Math.round(((productData.productPriceCents - productData.productSalePriceCents) / productData.productPriceCents) * 100).toString() : "0",
+                    currency: productData.productCurrency || "USD",
+                    
+                    // Media fields
+                    hasGallery: productData.hasGallery,
+                    videoUrl: undefined, // Not available in last viewed data
+                    imageUrls: undefined, // Not available in last viewed data
+                    galleryUrls: undefined, // Not available in last viewed data
+                    thumbnailUrl: undefined, // Not available in last viewed data
+                    featuredImageUrl: undefined, // Not available in last viewed data
+                    
+                    // Product details
+                    manufacturer: undefined, // Not available in last viewed data
+                    condition: undefined, // Not available in last viewed data
+                    gtin: undefined, // Not available in last viewed data
+                    mpn: undefined, // Not available in last viewed data
+                    specifications: undefined, // Not available in last viewed data
+                    attributes: undefined, // Not available in last viewed data
+                    customFields: undefined, // Not available in last viewed data
+                    searchKeywords: undefined, // Not available in last viewed data
+                    seoTitle: undefined, // Not available in last viewed data
+                    seoDescription: undefined, // Not available in last viewed data
+                    seoKeywords: undefined, // Not available in last viewed data
+                    tags: undefined, // Not available in last viewed data
+                    
+                    // NEW LIVE REVIEW AGGREGATIONS
+                    productRatingLive: typeof productData.productRatingLive === 'string' ? parseFloat(productData.productRatingLive) : productData.productRatingLive,
+                    productReviewsCountLive: productData.productReviewsCountLive,
+                    productHelpfulCountLive: productData.productHelpfulCountLive,
+                    productReviewsApprovedLive: productData.productReviewsApprovedLive,
+                    
+                    // Featured data
+                    featuredType: productData.featuredType as 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' | undefined,
+                    featuredPriority: productData.featuredPriority,
+                    featuredAt: productData.featuredAt,
+                    isFeaturedActive: productData.isFeaturedActive,
+                    
+                    // Analytics
+                    uniqueViewers: productData.uniqueViewers,
+                    engagementCount: productData.engagementCount,
+                    conversionCount: productData.conversionCount,
+                    revenueCents: productData.revenueCents,
+                    unitsSold: productData.unitsSold,
+                    trendingScore: typeof productData.trendingScore === 'string' ? parseFloat(productData.trendingScore) : productData.trendingScore,
+                    
+                    // Status fields
+                    priceStatus: productData.priceStatus,
+                    stockStatus: productData.stockStatus,
+                    hasDescription: productData.hasDescription,
+                    hasBrand: productData.hasBrand,
+                    hasPrice: productData.hasPrice,
+                    inStock: productData.inStock,
+                    
+                    // Categories
+                    productCategory: productData.productCategory,
+                    productCategorySlug: productData.productCategorySlug
                   }}
                   tenantName={productData.businessName || productData.storeName}
                   tenantLogo={productData.tenantLogo || productData.storeLogo}

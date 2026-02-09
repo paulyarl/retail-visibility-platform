@@ -51,7 +51,7 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
       const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
       // Fetch fulfillment settings only
-      const fulfillmentRes = await fetch(`${apiUrl}/public/tenant/${tenantId}/fulfillment-settings`);
+      const fulfillmentRes = await fetch(`${apiUrl}/api/public/tenant/${tenantId}/fulfillment-settings`);
       if (fulfillmentRes.ok) {
         const fulfillmentData = await fulfillmentRes.json();
         if (fulfillmentData.success && fulfillmentData.settings) {
@@ -71,7 +71,7 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
       const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
       // Fetch fulfillment settings
-      const fulfillmentRes = await fetch(`${apiUrl}/public/tenant/${tenantId}/fulfillment-settings`);
+      const fulfillmentRes = await fetch(`${apiUrl}/api/public/tenant/${tenantId}/fulfillment-settings`);
       if (fulfillmentRes.ok) {
         const fulfillmentData = await fulfillmentRes.json();
         if (fulfillmentData.success && fulfillmentData.settings) {
@@ -80,7 +80,7 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
       }
 
       // Fetch payment gateways
-      const paymentRes = await fetch(`${apiUrl}/public/tenant/${tenantId}/payment-gateways`);
+      const paymentRes = await fetch(`${apiUrl}/api/public/tenant/${tenantId}/payment-gateways`);
       if (paymentRes.ok) {
         const paymentData = await paymentRes.json();
         if (paymentData.success && paymentData.gateways) {

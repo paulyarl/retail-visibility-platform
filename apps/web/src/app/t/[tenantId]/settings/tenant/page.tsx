@@ -132,7 +132,7 @@ export default function TenantBusinessProfilePage() {
   const loadTenantName = async () => {
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.get(`${apiBaseUrl}/public/tenant/${encodeURIComponent(tenantId)}`);
+      const response = await api.get(`${apiBaseUrl}/api/public/tenant/${encodeURIComponent(tenantId)}`);
       
       if (response.ok) {
         const data = await response.json();
