@@ -9,6 +9,7 @@ import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/use-toast';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
+import { rateLimitSettingsService, type RateLimitConfiguration } from '@/services/RateLimitSettingsSingletonService';
 import { Zap, Shield, TrendingUp, Settings, Loader2, BarChart3 } from 'lucide-react';
 import RateLimitTrends from './RateLimitTrends';
 import SecurityAlerts from './SecurityAlerts';
@@ -17,15 +18,7 @@ interface PlatformSettingsData {
   rateLimitingEnabled: boolean;
   updatedAt: string;
   updatedBy: string;
-  rateLimitConfigurations?: Array<{
-    id: string;
-    route_type: string;
-    max_requests: number;
-    window_minutes: number;
-    enabled: boolean;
-    created_at: string;
-    updated_at: string;
-  }>;
+  rateLimitConfigurations?: RateLimitConfiguration[];
 }
 
 export default function PlatformSettings() {
@@ -104,20 +97,42 @@ export default function PlatformSettings() {
 
   const loadSettings = async () => {
     try {
-      // Use singleton service for cached platform settings
-      const settingsData = await platformSettingsService.getPlatformSettings();
+      // Use rate limit settings service for proper persistence
+      const settingsData = await rateLimitSettingsService.getRateLimitSettings();
       
-      // Map the platform settings to the expected format for this component
-      const mappedSettings: PlatformSettingsData = {
-        rateLimitingEnabled: settingsData.features?.rateLimitingEnabled || false,
-        updatedAt: new Date().toISOString(),
-        updatedBy: 'system',
-        rateLimitConfigurations: settingsData.features?.rateLimitConfigurations || getDefaultRateLimitConfigs()
-      };
-      
-      setSettings(mappedSettings);
+      if (settingsData) {
+        // Map the rate limiting settings to the expected format for this component
+        const mappedSettings: PlatformSettingsData = {
+          rateLimitingEnabled: settingsData.rateLimitingEnabled,
+          updatedAt: settingsData.updatedAt,
+          updatedBy: settingsData.updatedBy,
+          rateLimitConfigurations: settingsData.rateLimitConfigurations?.map((config: any) => ({
+            id: config.id || `${config.route_type}-config`,
+            route_type: config.route_type,
+            max_requests: config.max_requests ?? 1,
+            window_minutes: 1, // Fixed to per minute for now
+            enabled: config.enabled ?? true,
+            created_at: config.created_at,
+            updated_at: config.updated_at
+          })) || []
+        };
+        
+        setSettings(mappedSettings);
+        // Also update rateLimitConfigs to ensure UI reflects saved state
+        setRateLimitConfigs(mappedSettings.rateLimitConfigurations);
+      } else {
+        // Default settings if API fails
+        const defaults = getDefaultRateLimitConfigs();
+        setSettings({
+          rateLimitingEnabled: true,
+          updatedAt: new Date().toISOString(),
+          updatedBy: 'system',
+          rateLimitConfigurations: defaults
+        });
+        setRateLimitConfigs(defaults);
+      }
     } catch (error) {
-      console.error('Failed to load platform settings:', error);
+      console.error('Failed to load rate limiting settings:', error);
       // Default settings on error
       setSettings({
         rateLimitingEnabled: true,
@@ -145,14 +160,17 @@ export default function PlatformSettings() {
       }
 
       const payload = {
-        features: {
-          rateLimitingEnabled: settings?.rateLimitingEnabled || false,
-          rateLimitConfigurations: rateLimitConfigs,
-        }
+        rateLimitingEnabled: settings?.rateLimitingEnabled || false,
+        rateLimitConfigurations: (rateLimitConfigs || []).map(config => ({
+          route_type: config.route_type,
+          max_requests: config.max_requests,
+          window_minutes: 1,
+          enabled: config.enabled
+        }))
       };
 
       // Use singleton service to update settings
-      const updatedSettings = await platformSettingsService.updatePlatformSettings(payload);
+      const updatedSettings = await rateLimitSettingsService.updateRateLimitSettings(payload);
       
       if (updatedSettings) {
         toastFunction('Settings saved successfully', { variant: 'success' });
@@ -301,7 +319,7 @@ export default function PlatformSettings() {
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
                       <Label htmlFor={`max-${config.route_type}`} className="text-sm">
-                        Max Requests:
+                        Requests per minute:
                       </Label>
                       <Input
                         id={`max-${config.route_type}`}
@@ -311,21 +329,6 @@ export default function PlatformSettings() {
                         className="w-20"
                         min="1"
                         max="10000"
-                        disabled={saving || !config.enabled}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor={`window-${config.route_type}`} className="text-sm">
-                        Per Minute:
-                      </Label>
-                      <Input
-                        id={`window-${config.route_type}`}
-                        type="number"
-                        value={config.window_minutes}
-                        onChange={(e) => updateRateLimitConfig(config.route_type, 'window_minutes', parseInt(e.target.value) || 1)}
-                        className="w-16"
-                        min="1"
-                        max="60"
                         disabled={saving || !config.enabled}
                       />
                     </div>

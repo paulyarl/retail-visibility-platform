@@ -89,7 +89,9 @@ router.put('/', async (req: Request, res: Response) => {
       // Update rate limiting configurations
       for (const config of rateLimitConfigurations) {
         await basePrisma.rate_limit_configurations.upsert({
-          where: { route_type: config.route_type },
+          where: { 
+            route_type: config.route_type
+          },
           update: {
             max_requests: config.max_requests,
             window_minutes: config.window_minutes,

@@ -144,6 +144,8 @@ class PlatformSettingsSingletonService {
       const updatedSettings = (result as any)?.data || result;
       
       if (updatedSettings) {
+        // Clear cache to ensure fresh data on next request
+        this.clearCache();
         return updatedSettings;
       }
       
@@ -152,6 +154,14 @@ class PlatformSettingsSingletonService {
       console.error('[PlatformSettingsSingleton] Failed to update platform settings:', error);
       return null;
     }
+  }
+
+  /**
+   * Clear the cache to force fresh data on next request
+   */
+  public clearCache(): void {
+    // Access the private clearCache method of the client
+    (this.client as any).clearCache();
   }
 
   /**

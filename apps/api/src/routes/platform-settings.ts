@@ -85,6 +85,10 @@ router.get('/platform-settings', async (_req, res) => {
       themeBorderRadius: settings.theme_border_radius,
       themeButtonSize: settings.theme_button_size,
       themeSpacing: settings.theme_spacing,
+      // Features
+      features: {
+        rateLimitingEnabled: settings.rate_limiting_enabled ?? true,
+      },
       createdAt: settings.created_at?.toISOString(),
       updatedAt: settings.updated_at?.toISOString(),
     };
@@ -138,6 +142,11 @@ router.post(
       }
       if (parsed.data.themeSpacing !== undefined) {
         updateData.theme_spacing = parsed.data.themeSpacing;
+      }
+
+      // Features mapping - handle features separately since not in schema
+      if (req.body.features?.rateLimitingEnabled !== undefined) {
+        updateData.rate_limiting_enabled = req.body.features.rateLimitingEnabled;
       }
 
       // Handle logo upload (skip if Supabase not configured)
@@ -218,6 +227,10 @@ router.post(
         themeBorderRadius: settings.theme_border_radius,
         themeButtonSize: settings.theme_button_size,
         themeSpacing: settings.theme_spacing,
+        // Features
+        features: {
+          rateLimitingEnabled: settings.rate_limiting_enabled ?? true,
+        },
         createdAt: settings.created_at?.toISOString(),
         updatedAt: settings.updated_at?.toISOString(),
       };
