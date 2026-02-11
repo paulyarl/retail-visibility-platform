@@ -69,12 +69,12 @@ async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
            user.role === 'ADMIN' || 
            user.isPlatformAdmin === true;
   } catch (error) {
-    console.error('[Middleware] Error checking platform admin:', error);
+    console.error('[Proxy] Error checking platform admin:', error);
     return false;
   }
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname, hostname, searchParams } = new URL(req.url);
 
   // Handle subdomain storefront routing
@@ -104,7 +104,7 @@ export async function middleware(req: NextRequest) {
           if (domain === 'localhost') {
             // Rewrite to tenant storefront path (keeps subdomain in URL)
             const destPath = `/t/${tenantId}${pathname}`;
-            console.log(`[Middleware] Subdomain rewrite: ${hostname}${pathname} → ${destPath} (domain: ${domain})`);
+            console.log(`[Proxy] Subdomain rewrite: ${hostname}${pathname} → ${destPath} (domain: ${domain})`);
             
             const url = req.nextUrl.clone();
             url.pathname = destPath;
@@ -126,7 +126,7 @@ export async function middleware(req: NextRequest) {
             destUrl.searchParams.set(key, value);
           });
 
-          console.log(`[Middleware] Subdomain routing: ${hostname}${pathname} → ${destUrl.toString()} (domain: ${domain})`);
+          console.log(`[Proxy] Subdomain routing: ${hostname}${pathname} → ${destUrl.toString()} (domain: ${domain})`);
 
           const res = NextResponse.redirect(destUrl, { status: 302 });
 
@@ -138,7 +138,7 @@ export async function middleware(req: NextRequest) {
         }
       }
     } catch (error) {
-      console.error('[Middleware] Error in subdomain routing:', error);
+      console.error('[Proxy] Error in subdomain routing:', error);
       // Continue with normal routing if subdomain lookup fails
     }
   }
@@ -148,7 +148,7 @@ export async function middleware(req: NextRequest) {
     const isAdmin = await isPlatformAdmin(req);
     
     // Log all admin access attempts
-    console.log('[Middleware] Admin access attempt:', {
+    console.log('[Proxy] Admin access attempt:', {
       path: pathname,
       allowed: isAdmin,
       timestamp: new Date().toISOString(),
@@ -234,7 +234,7 @@ export async function middleware(req: NextRequest) {
               destUrl.searchParams.set(key, value);
             });
 
-            console.log(`[Middleware] Shops tenant redirect: ${pathname} → ${destUrl.toString()}`);
+            console.log(`[Proxy] Shops tenant redirect: ${pathname} → ${destUrl.toString()}`);
             
             const res = NextResponse.redirect(destUrl, { status: 301 });
             const tcx = JSON.stringify({ tenant_id: tenantId, aud: 'user' });
@@ -244,7 +244,7 @@ export async function middleware(req: NextRequest) {
         }
       }
     } catch (error) {
-      console.error('[Middleware] Error resolving shops tenant redirect:', error);
+      console.error('[Proxy] Error resolving shops tenant redirect:', error);
     }
     
     // Fallback: redirect to /shops/[tenantId]
@@ -254,7 +254,7 @@ export async function middleware(req: NextRequest) {
       destUrl.searchParams.set(key, value);
     });
 
-    console.log(`[Middleware] Shops tenant fallback redirect: ${pathname} → ${destUrl.toString()}`);
+    console.log(`[Proxy] Shops tenant fallback redirect: ${pathname} → ${destUrl.toString()}`);
     
     const res = NextResponse.redirect(destUrl, { status: 301 });
     const tcx = JSON.stringify({ tenant_id: tenantId, aud: 'user' });

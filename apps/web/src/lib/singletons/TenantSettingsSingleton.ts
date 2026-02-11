@@ -131,7 +131,7 @@ class TenantSettingsSingleton extends UniversalSingleton {
     
     try {
       const data = await this.makeApiRequest<TenantProfile>(
-        `/api/tenant/${this.tenantId}/profile`,
+        `/api/tenant/profile?tenant_id=${this.tenantId}`,
         { method: 'GET' },
         cacheKey,
         this.CACHE_TTL
@@ -228,7 +228,7 @@ class TenantSettingsSingleton extends UniversalSingleton {
       
       this.apiCalls++;
       const data = await this.makeApiRequest<TenantProfile>(
-        `/api/tenant/${this.tenantId}/profile`,
+        `/api/tenant/profile?tenant_id=${this.tenantId}`,
         {
           method: 'PUT',
           headers: {

@@ -179,168 +179,81 @@ export default function StorefrontClientWrapper({
 
   return (
     <>
-      {/* Page Controls */}
-      <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
-        <div className="py-4 border-b border-neutral-200 dark:border-neutral-700">
+      {/* Simplified Header - Brand Identity and Actions */}
+      <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
-            <div className="text-sm text-neutral-600 dark:text-neutral-400">
-              Page controls and navigation
-            </div>
-            
-            {/* Layout Toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-neutral-600 dark:text-neutral-400">Layout:</span>
-              <button
-                onClick={() => setIsFullWidth(!isFullWidth)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
-                title={isFullWidth ? "Switch to constrained layout" : "Switch to full width layout"}
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  {isFullWidth ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20H5a2 2 0 01-2-2V6a2 2 0 012-2h4m10 0h4a2 2 0 012 2v12a2 2 0 01-2 2h-4M9 4h6v16H9V4z" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                  )}
-                </svg>
-                {isFullWidth ? 'Constrained' : 'Full Width'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Header with Business Name and Logo - AT THE TOP */}
-      <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center gap-6">
-            {tenant.metadata?.logo_url && (
-              <div className="relative w-24 h-24 shrink-0">
-                <Image
-                  src={tenant.metadata.logo_url}
-                  alt={businessName}
-                  fill
-                  className="object-contain rounded-lg"
-                />
+            {/* Brand Identity */}
+            <div className="flex items-center gap-4">
+              {/* Store Logo */}
+              <div className="flex-shrink-0">
+                {tenant.metadata?.logo_url ? (
+                  <div className="relative w-12 h-12">
+                    <Image
+                      src={tenant.metadata.logo_url}
+                      alt={businessName}
+                      fill
+                      className="object-contain rounded-lg shadow-sm"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 flex items-center justify-center shadow-sm">
+                    <svg className="w-6 h-6 text-primary-600 dark:text-primary-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                )}
               </div>
-            )}
-            <div>
-              <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">
-                  {businessName}
+
+              {/* Store Name and Category */}
+              <div>
+                <h1 className="text-xl font-semibold text-neutral-900 dark:text-white">
+                  {businessName || 'Store Name Not Available'}
                 </h1>
-                
-                {/* Storefront Actions */}
-                <StorefrontActions 
-                  tenantId={tenantId}
-                  businessName={businessName}
-                  currentUrl={typeof window !== 'undefined' ? window.location.href : ''}
-                />
-                
-                {/* Layout Toggle Button */}
-                <button
-                  onClick={() => setIsFullWidth(!isFullWidth)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
-                  title={isFullWidth ? "Switch to constrained layout" : "Switch to full width layout"}
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    {isFullWidth ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20H5a2 2 0 01-2-2V6a2 2 0 012-2h4m10 0h4a2 2 0 012 2v12a2 2 0 01-2 2h-4M9 4h6v16H9V4z" />
-                    ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                    )}
-                  </svg>
-                  {isFullWidth ? 'Constrained' : 'Full Width'}
-                </button>
+                {primaryGBPCategory && (
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    {primaryGBPCategory.name}
+                  </p>
+                )}
               </div>
+            </div>
 
-              {/* GBP Categories - Clean badges below store name */}
-              {(primaryGBPCategory || (storeCategories && storeCategories.length > 0)) && (
-                <div className="flex flex-wrap items-center gap-2 mt-3">
-                  {/* Primary GBP Category */}
-                  {primaryGBPCategory && (
-                    <Link
-                      href={`/directory/stores/${primaryGBPCategory.id?.replace('gcid:', '').replace(/_/g, '-') || primaryGBPCategory.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
-                      title={`Browse all ${primaryGBPCategory.name} stores`}
-                    >
-                      <span className="text-base">
-                        {primaryGBPCategory.name === 'Grocery store' && '🏪'}
-                        {primaryGBPCategory.name === 'Electronics store' && '🛍️'}
-                        {primaryGBPCategory.name === 'Shoe store' && '👟'}
-                        {primaryGBPCategory.name === 'Supermarket' && '🛒'}
-                        {primaryGBPCategory.name === 'Clothing store' && '👕'}
-                        {primaryGBPCategory.name === 'Hardware store' && '🔧'}
-                        {primaryGBPCategory.name === 'Restaurant' && '🍽️'}
-                        {primaryGBPCategory.name === 'Pharmacy' && '💊'}
-                        {primaryGBPCategory.name === 'Bookstore' && '📚'}
-                        {primaryGBPCategory.name === 'Pet store' && '🐕'}
-                        {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(primaryGBPCategory.name) && '🏢'}
-                      </span>
-                      <span>{primaryGBPCategory.name}</span>
-                    </Link>
-                  )}
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2">
+              {/* Review Button */}
+              <button className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Reviews">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              </button>
 
-                  {/* Secondary GBP Categories */}
-                  {secondaryGBPCategories && secondaryGBPCategories.length > 0 && secondaryGBPCategories.map((category: any, index: number) => (
-                    <Link
-                      key={category.id || index}
-                      href={`/directory/stores/${category.id?.replace('gcid:', '').replace(/_/g, '-') || category.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                      title={`Browse all ${category.name} stores`}
-                    >
-                      <span className="text-base">
-                        {category.name === 'Grocery store' && '🏪'}
-                        {category.name === 'Electronics store' && '🛍️'}
-                        {category.name === 'Shoe store' && '👟'}
-                        {category.name === 'Supermarket' && '🛒'}
-                        {category.name === 'Clothing store' && '👕'}
-                        {category.name === 'Hardware store' && '🔧'}
-                        {category.name === 'Restaurant' && '🍽️'}
-                        {category.name === 'Pharmacy' && '💊'}
-                        {category.name === 'Bookstore' && '📚'}
-                        {category.name === 'Pet store' && '🐕'}
-                        {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(category.name) && '🏢'}
-                      </span>
-                      <span>{category.name}</span>
-                    </Link>
-                  ))}
+              {/* Cart Button */}
+              <button className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Cart">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </button>
 
-                  {/* Fallback: Show store categories if no GBP categories */}
-                  {!primaryGBPCategory && storeCategories && storeCategories.length > 0 &&
-                    storeCategories
-                      .sort((a: any, b: any) => {
-                        if (a.is_primary && !b.is_primary) return -1;
-                        if (!a.is_primary && b.is_primary) return 1;
-                        return a.name.localeCompare(b.name);
-                      })
-                      .map((category: any) => (
-                        <Link
-                          key={category.id}
-                          href={getCategoryUrl(category, "/directory/stores")}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${category.is_primary
-                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
-                            }`}
-                          title={`Browse all ${category.name} stores`}
-                        >
-                          <span className="text-base">
-                            {category.name === 'Grocery store' && '🏪'}
-                            {category.name === 'Electronics store' && '🛍️'}
-                            {category.name === 'Shoe store' && '👟'}
-                            {category.name === 'Supermarket' && '🛒'}
-                            {category.name === 'Clothing store' && '👕'}
-                            {category.name === 'Hardware store' && '🔧'}
-                            {category.name === 'Restaurant' && '🍽️'}
-                            {category.name === 'Pharmacy' && '💊'}
-                            {category.name === 'Bookstore' && '📚'}
-                            {category.name === 'Pet store' && '🐕'}
-                            {!['Grocery store', 'Electronics store', 'Shoe store', 'Supermarket', 'Clothing store', 'Hardware store', 'Restaurant', 'Pharmacy', 'Bookstore', 'Pet store'].includes(category.name) && '🏢'}
-                          </span>
-                          <span>{category.name}</span>
-                        </Link>
-                      ))}
-                </div>
-              )}
+              {/* Heart/Favorite Button */}
+              <button className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Favorite">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </button>
+
+              {/* Print Button */}
+              <button className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Print">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+              </button>
+
+              {/* Share Button */}
+              <button className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Share">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>

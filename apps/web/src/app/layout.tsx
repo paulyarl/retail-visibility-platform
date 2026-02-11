@@ -12,6 +12,7 @@ import { QueryClientWrapper } from "@/components/QueryClientWrapper";
 import { GlobalAlertProvider } from "@/components/ui/GlobalAlertProvider";
 import { FloatingCartWidget } from "@/components/cart/FloatingCartWidget";
 import { UniversalProvider } from "@/providers/UniversalProvider";
+import { PlatformThemeProvider } from "@/contexts/PlatformThemeProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 const geistSans = Geist({
@@ -47,22 +48,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <QueryClientWrapper>
           <ThemeProvider>
-            <PlatformSettingsProvider>
-              <CustomAuthProvider>
-                <CartWidgetProvider>
-                  <ProductLayoutProvider>
-                    <GlobalAlertProvider>
-                      <UniversalProvider>
-                        <ErrorBoundary>
-                          {children}
-                        </ErrorBoundary>
-                        <FloatingCartWidget />
-                      </UniversalProvider>
-                    </GlobalAlertProvider>
-                  </ProductLayoutProvider>
-                </CartWidgetProvider>
-              </CustomAuthProvider>
-            </PlatformSettingsProvider>
+            <PlatformThemeProvider>
+              <PlatformSettingsProvider>
+                <CustomAuthProvider>
+                  <CartWidgetProvider>
+                    <ProductLayoutProvider>
+                      <GlobalAlertProvider>
+                        <UniversalProvider>
+                          <ErrorBoundary>
+                            {children}
+                          </ErrorBoundary>
+                          <FloatingCartWidget />
+                        </UniversalProvider>
+                      </GlobalAlertProvider>
+                    </ProductLayoutProvider>
+                  </CartWidgetProvider>
+                </CustomAuthProvider>
+              </PlatformSettingsProvider>
+            </PlatformThemeProvider>
           </ThemeProvider>
         </QueryClientWrapper>
         {/* <Analytics /> */}

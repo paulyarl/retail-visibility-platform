@@ -110,7 +110,7 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
         throw new Error('Tenant ID is required');
       }
 
-      console.log('[useTenantComplete] Fetching consolidated tenant data for:', tenantId);
+//      console.log('[useTenantComplete] Fetching consolidated tenant data for:', tenantId);
 
       const response = await api.get(`/api/tenants/${encodeURIComponent(tenantId)}/complete`);
 
@@ -119,11 +119,11 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
       }
 
       const data = await response.json();
-      console.log('[useTenantComplete] Received consolidated data:', {
+     /*  console.log('[useTenantComplete] Received consolidated data:', {
         tenant: data.tenant?.id,
         hasTier: !!data.tier,
         hasUsage: !!data.usage,
-      });
+      }); */
 
       return data;
     },

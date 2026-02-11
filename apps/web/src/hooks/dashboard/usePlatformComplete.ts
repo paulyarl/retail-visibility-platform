@@ -87,7 +87,7 @@ export function usePlatformComplete(): UsePlatformCompleteReturn {
   const { data: dashboardData, isLoading, error, refetch } = useQuery({
     queryKey: ['platform', 'dashboard', 'complete'],
     queryFn: async (): Promise<PlatformDashboardData> => {
-      console.log('[usePlatformComplete] Fetching consolidated platform dashboard data');
+//      console.log('[usePlatformComplete] Fetching consolidated platform dashboard data');
 
       const response = await api.get('/api/platform/dashboard');
 
@@ -96,12 +96,12 @@ export function usePlatformComplete(): UsePlatformCompleteReturn {
       }
 
       const data = await response.json();
-      console.log('[usePlatformComplete] Received consolidated data:', {
+    /*   console.log('[usePlatformComplete] Received consolidated data:', {
         hasStats: !!data.data?.stats,
         hasTopTenants: !!data.data?.topTenants,
         hasActivity: !!data.data?.recentActivity,
         cacheMetrics: data._cache?.metrics
-      });
+      }); */
 
       return data.data;
     },

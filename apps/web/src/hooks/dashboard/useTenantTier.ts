@@ -126,6 +126,9 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
     // Reconstruct tier data from cached format
     const { tenant, tier: tierInfo } = tenantData;
 
+    // Guard against missing tierInfo
+    if (!tierInfo) return null;
+
     let organizationTier: TierInfo | null = null;
     let tenantTier: TierInfo | null = null;
     let isChain = false;

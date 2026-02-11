@@ -64,18 +64,38 @@ export default function TenantBrandingPage() {
         logoUrl = tenantData.metadata?.logo_url || '';
         bannerUrl = tenantData.metadata?.banner_url || '';
       }
+
+      // If no logo in metadata, try to get it from mv_global_discovery
+      if (!logoUrl) {
+        try {
+          const logoResponse = await api.get(`${apiBaseUrl}/api/public/tenant/${encodeURIComponent(tenantId)}/logo`);
+          if (logoResponse.ok) {
+            const logoData = await logoResponse.json();
+            if (logoData.success && logoData.data && logoData.data.length > 0) {
+              logoUrl = logoData.data[0].tenant_logo_url || '';
+              console.log('[Branding] Found logo from mv_global_discovery:', logoUrl);
+            }
+          }
+        } catch (logoErr) {
+          console.warn('Failed to fetch logo from mv_global_discovery:', logoErr);
+        }
+      }
       
       // Fetch profile for business description
       let businessName = tenantName;
       let businessDescription = '';
       
       try {
-        const response = await api.get(`${apiBaseUrl}/api/tenant/profile?tenant_id=${encodeURIComponent(tenantId)}`);
+        const response = await api.get(`${apiBaseUrl}/api/tenant/${encodeURIComponent(tenantId)}/profile`);
         if (response.ok) {
           const data = await response.json();
           // Use tenant name if no business_name is set, otherwise use business_name
-          businessName = data.business_name || tenantName || '';
-          businessDescription = data.business_description || '';
+          businessName = data.data?.profile?.business_name || tenantName || '';
+          businessDescription = data.data?.profile?.business_description || '';
+          
+          // Also check for logo and banner in the profile
+          if (!logoUrl) logoUrl = data.data?.profile?.logo_url || '';
+          if (!bannerUrl) bannerUrl = data.data?.profile?.banner_url || '';
         }
       } catch (profileErr) {
         console.warn('Profile fetch failed, using tenant name:', profileErr);

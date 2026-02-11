@@ -17,6 +17,18 @@ export interface PlatformSettings {
     mode: 'light' | 'dark';
     customColors?: Record<string, string>;
   };
+  // New theme settings fields
+  themePreset?: string;
+  themeColors?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    neutral: string;
+  };
+  themeFontFamily?: string;
+  themeBorderRadius?: string;
+  themeButtonSize?: string;
+  themeSpacing?: number;
   branding?: {
     companyName?: string;
     tagline?: string;
@@ -49,7 +61,7 @@ class PlatformSettingsSingletonService {
 
   /**
    * Get platform settings with caching
-   * Uses the /platform-settings endpoint
+   * Uses the /api/platform-settings endpoint
    */
   async getPlatformSettings(): Promise<PlatformSettings> {
     try {
@@ -57,12 +69,32 @@ class PlatformSettingsSingletonService {
         '/api/platform-settings'
       );
       
-      return result.data || {
+      // The /api/platform-settings endpoint returns data directly, not wrapped in ApiResponse
+      // Check if result itself is the data, not result.data
+      const settings = (result as any)?.data || result;
+      
+      if (settings) {
+        return settings;
+      }
+      
+      // Return default settings if no data
+      return {
         platformName: 'Visible Shelf',
         logoUrl: null,
         faviconUrl: null,
         primaryColor: '#3b82f6',
         secondaryColor: '#8b5cf6',
+        themePreset: 'default',
+        themeColors: {
+          primary: '#0066ff',
+          secondary: '#6fd58a',
+          accent: '#ffdd07',
+          neutral: '#64748b'
+        },
+        themeFontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        themeBorderRadius: 'md',
+        themeButtonSize: 'sm',
+        themeSpacing: 16,
       };
     } catch (error) {
       console.error('[PlatformSettingsSingleton] Failed to get platform settings:', error);
@@ -74,6 +106,17 @@ class PlatformSettingsSingletonService {
         faviconUrl: null,
         primaryColor: '#3b82f6',
         secondaryColor: '#8b5cf6',
+        themePreset: 'default',
+        themeColors: {
+          primary: '#0066ff',
+          secondary: '#6fd58a',
+          accent: '#ffdd07',
+          neutral: '#64748b'
+        },
+        themeFontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        themeBorderRadius: 'md',
+        themeButtonSize: 'sm',
+        themeSpacing: 16,
       };
     }
   }
@@ -89,16 +132,22 @@ class PlatformSettingsSingletonService {
         '/api/platform-settings',
         {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify(settings)
         }
       );
       
-      // Clear cache after update to ensure fresh data on next fetch
-      // Note: Since clearCache is private, the cache will expire naturally based on TTL
+      // The /api/platform-settings endpoint returns data directly, not wrapped in ApiResponse
+      // Check if result itself is the data, not result.data
+      const updatedSettings = (result as any)?.data || result;
       
-      // The API returns the settings directly, not wrapped in a data property
-      // But makeRequest returns ApiResponse<PlatformSettings>, so we need to handle both cases
-      return (result as any)?.data || result || null;
+      if (updatedSettings) {
+        return updatedSettings;
+      }
+      
+      return null;
     } catch (error) {
       console.error('[PlatformSettingsSingleton] Failed to update platform settings:', error);
       return null;

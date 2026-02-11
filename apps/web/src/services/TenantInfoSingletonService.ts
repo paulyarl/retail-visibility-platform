@@ -282,6 +282,41 @@ class TenantInfoSingletonService extends UniversalSingleton {
   }
 
   /**
+   * Get tenant logo URL from mv_global_discovery materialized view
+   * This is used as a fallback when the tenant API doesn't return logo_url
+   */
+  async getTenantLogoFromDiscovery(tenantId: string): Promise<string | null> {
+    console.log(`[TenantInfoSingleton] getTenantLogoFromDiscovery START for tenant: ${tenantId}`, new Date().toISOString());
+    
+    if (!tenantId) {
+      return null;
+    }
+
+    try {
+      // Use the public API to query the materialized view
+      const result = await this.makeApiRequest<{
+        success: boolean;
+        data: Array<{ tenant_logo_url: string }>;
+      }>(
+        `/api/public/tenant/${tenantId}/logo`,
+        {},
+        `tenant-logo-${tenantId}`
+      );
+      
+      if (result && result.success && result.data && result.data.length > 0) {
+        const logoUrl = result.data[0].tenant_logo_url;
+        console.log(`[TenantInfoSingleton] Found logo URL from discovery: ${logoUrl}`);
+        return logoUrl;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[TenantInfoSingleton] Failed to get tenant logo from discovery:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get performance metrics
    */
   public getMetrics() {

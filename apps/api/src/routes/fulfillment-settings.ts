@@ -26,7 +26,7 @@ const fulfillmentSettingsSchema = z.object({
 });
 
 // Get fulfillment settings for a tenant
-router.get('/api/tenants/:tenantId/fulfillment-settings', authenticateToken, async (req, res) => {
+router.get('/:tenantId/fulfillment-settings', authenticateToken, async (req, res) => {
   try {
     const { tenantId } = req.params;
 
@@ -149,8 +149,8 @@ router.get('/public/tenant/:tenantId/fulfillment-settings', async (req, res) => 
   }
 });
 
-// Update fulfillment settings
-router.put('/api/tenants/:tenantId/fulfillment-settings', authenticateToken, async (req, res) => {
+// Update fulfillment settings for a tenant
+router.put('/:tenantId/fulfillment-settings', authenticateToken, async (req, res) => {
   try {
     const { tenantId } = req.params;
     

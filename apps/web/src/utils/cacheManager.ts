@@ -88,7 +88,7 @@ class CacheManager {
         };
       });
 
-      console.log('[CacheManager] IndexedDB initialized successfully');
+//      console.log('[CacheManager] IndexedDB initialized successfully');
     } catch (error) {
       console.warn('[CacheManager] IndexedDB initialization failed, falling back to memory only:', error);
       this.indexedDBSupported = false;

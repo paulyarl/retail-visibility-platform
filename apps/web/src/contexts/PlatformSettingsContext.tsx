@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { brandingSettingsService } from '@/services/BrandingSettingsSingletonService';
 
 interface PlatformSettings {
   platformName: string;
@@ -27,10 +28,21 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/admin/settings/branding');
-      // Always try to parse the response, even if not ok (API returns defaults)
-      const data = await res.json();
-      setSettings(data);
+      // Use the singleton service instead of direct fetch to leverage caching
+      const settings = await brandingSettingsService.getBrandingSettings();
+
+      // Map PlatformSettings to the context's PlatformSettings interface
+      if (settings) {
+        const mappedSettings: PlatformSettings = {
+          platformName: settings.platformName || 'Visible Shelf',
+          platformDescription: 'Manage your retail operations with ease', // Default since not in PlatformSettings
+          logoUrl: settings.logoUrl || null,
+          faviconUrl: settings.faviconUrl || null,
+        };
+        setSettings(mappedSettings);
+      } else {
+        setSettings(null);
+      }
     } catch (err) {
       console.error('Error fetching platform settings:', err);
       // Silently set default values on error (no error state)

@@ -210,11 +210,11 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   // Check URL params for create=true to auto-open create modal
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    console.log('[ItemsPageClient] Checking URL params:', {
+    /* console.log('[ItemsPageClient] Checking URL params:', {
       search: window.location.search,
       createParam: params.get('create'),
       shouldOpenModal: params.get('create') === 'true'
-    });
+    }); */
     if (params.get('create') === 'true') {
       console.log('[ItemsPageClient] Opening create modal...');
       openCreateModal();
@@ -222,10 +222,10 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   }, [openCreateModal]);
 
   // Debug: Monitor modal state changes
-  useEffect(() => {
+ /*  useEffect(() => {
     console.log('[ItemsPageClient] Create modal state changed:', showCreateModal);
   }, [showCreateModal]);
-
+ */
   const hasGlobalEmptyState =
     !loading &&
     !error &&

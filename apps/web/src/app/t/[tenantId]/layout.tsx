@@ -4,7 +4,6 @@ import SetTenantId from "@/components/client/SetTenantId";
 import DynamicTenantSidebar from "@/components/navigation/DynamicTenantSidebar";
 import { isFeatureEnabled } from '@/lib/featureFlags';
 import TenantContextProvider from '@/components/tenant/TenantContextProvider';
-import ProtectedRoute from '@/components/ProtectedRoute';
 import { getTenantContext } from '@/lib/tenantContext';
 import RememberTenantRoute from '@/components/client/RememberTenantRoute';
 import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
@@ -84,13 +83,11 @@ export default async function TenantPageLayout({ children, params }: { children:
     <>
       {/* Persist last visited tenant route for restore-after-login UX */}
       <RememberTenantRoute tenantId={tenantId} />
-      <ProtectedRoute>
-        <TenantContextProvider value={{ tenantId: tenantCtx.tenantId ?? tenantId, tenantSlug: tenantCtx.tenantSlug, aud: tenantCtx.aud }}>
-          <DynamicTenantSidebar tenantId={tenantId} slug={tenantSlug}>
-            {children}
-          </DynamicTenantSidebar>
-        </TenantContextProvider>
-      </ProtectedRoute>
+      <TenantContextProvider value={{ tenantId: tenantCtx.tenantId ?? tenantId, tenantSlug: tenantCtx.tenantSlug, aud: tenantCtx.aud }}>
+        <DynamicTenantSidebar tenantId={tenantId} slug={tenantSlug}>
+          {children}
+        </DynamicTenantSidebar>
+      </TenantContextProvider>
     </>
   );
 }

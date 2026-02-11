@@ -1,54 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { api } from '@/lib/api';
-
-// Consolidated response from /api/items/complete
-interface ItemsCompleteResponse {
-  items: Array<{
-    id: string;
-    sku: string;
-    name: string;
-    description?: string;
-    brand?: string;
-    manufacturer?: string;
-    condition?: 'new' | 'used' | 'refurbished';
-    price: number | null;
-    stock: number;
-    status: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed';
-    visibility: 'public' | 'private';
-    categoryPath?: string[];
-    tenantCategoryId?: string | null;
-    tenantCategory?: {
-      id: string;
-      name: string;
-      slug?: string;
-      googleCategoryId?: string | null;
-    };
-    imageUrl?: string;
-    images?: string[];
-    metadata?: any;
-    createdAt?: string;
-    updatedAt?: string;
-  }>;
-  stats: {
-    total: number;
-    active: number;
-    inactive: number;
-    syncing: number;
-    public: number;
-    private: number;
-    lowStock: number;
-  };
-  pagination: {
-    page: number;
-    limit: number;
-    totalItems: number;
-    totalPages: number;
-    hasMore: boolean;
-  };
-  _timestamp: string;
-}
+import { itemsService, ItemsCompleteResponse, ItemsStats, Item } from '@/services/ItemsSingletonService';
 
 // Keep status and visibility aligned with backend ItemFilters for now
 export type ItemStatusFilter = "all" | "active" | "inactive" | "syncing";
@@ -56,7 +9,7 @@ export type ItemVisibilityFilter = "all" | "public" | "private";
 
 interface UseItemsCompleteOptions {
   tenantId: string;
-  initialItems?: ItemsCompleteResponse['items'];
+  initialItems?: Item[];
   initialPage?: number;
   initialPageSize?: number;
   initialStatus?: ItemStatusFilter;
@@ -67,12 +20,12 @@ interface UseItemsCompleteOptions {
 
 interface UseItemsCompleteResult {
   // Data
-  items: ItemsCompleteResponse['items'];
+  items: Item[];
   loading: boolean;
   error: string | null;
 
   // Storewide stats (not affected by filters/pagination)
-  stats: ItemsCompleteResponse['stats'];
+  stats: ItemsStats;
 
   // Pagination
   page: number;
@@ -145,54 +98,63 @@ export function useItemsComplete(options: UseItemsCompleteOptions): UseItemsComp
     setError(null);
 
     try {
-      // Build query parameters
-      const params = new URLSearchParams({
+      // Build parameters for singleton service
+      const params = {
         tenant_id: tenantId,
-        page: page.toString(),
-        limit: pageSize.toString(),
-      });
+        page: page,
+        limit: pageSize,
+        ...(search.trim() && { q: search.trim() }),
+        ...(status !== "all" && { status }),
+        ...(visibility !== "all" && { visibility }),
+        ...(category && (
+          category === 'assigned' || category === 'unassigned' 
+            ? { categoryFilter: category as 'assigned' | 'unassigned' }
+            : { categoryId: category }
+        )),
+      };
 
-      // Add filters
-      if (search.trim()) params.append('q', search.trim());
-      if (status !== "all") params.append('status', status);
-      if (visibility !== "all") params.append('visibility', visibility);
+      // Use singleton service instead of direct API call
+      const data = await itemsService.getItemsComplete(params);
 
-      // Category filters - now server-side
-      if (category) {
-        if (category === 'assigned' || category === 'unassigned') {
-          params.append('categoryFilter', category);
-        } else {
-          params.append('categoryId', category);
-        }
+      if (data) {
+        setItems(data.items);
+        setStats(data.stats);
+        setTotalItems(data.pagination.totalItems);
+        setTotalPages(data.pagination.totalPages);
+      } else {
+        // Fallback to empty state if service fails
+        setItems([]);
+        setStats({
+          total: 0,
+          active: 0,
+          inactive: 0,
+          syncing: 0,
+          public: 0,
+          private: 0,
+          lowStock: 0
+        });
+        setTotalItems(0);
+        setTotalPages(1);
       }
-
-      console.log('[useItemsComplete] Fetching consolidated items data with params:', Object.fromEntries(params));
-
-      const response = await api.get(`/api/items/complete?${params.toString()}`);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[useItemsComplete] API error:', response.status, errorData);
-        throw new Error(`Failed to fetch items: ${response.status} ${response.statusText}`);
-      }
-
-      const data: ItemsCompleteResponse = await response.json();
-
-      console.log('[useItemsComplete] Received consolidated data:', {
-        itemsCount: data.items.length,
-        totalItems: data.pagination.totalItems,
-        stats: data.stats
-      });
-
-      setItems(data.items);
-      setStats(data.stats);
-      setTotalItems(data.pagination.totalItems);
-      setTotalPages(data.pagination.totalPages);
 
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load items";
       setError(msg);
       console.error("[useItemsComplete] fetchItems failed:", err);
+      
+      // Set fallback state on error
+      setItems([]);
+      setStats({
+        total: 0,
+        active: 0,
+        inactive: 0,
+        syncing: 0,
+        public: 0,
+        private: 0,
+        lowStock: 0
+      });
+      setTotalItems(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }

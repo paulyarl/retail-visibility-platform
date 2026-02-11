@@ -341,7 +341,7 @@ router.get('/:tenantId/categories', async (req: Request, res: Response) => {
       name: row.name,
       slug: row.slug,
       googleCategoryId: row.googleCategoryId,
-      count: row.count,
+      productCount: row.count, // Map count to productCount to match Category interface
       productsWithImages: row.productsWithImages,
       productsWithDescriptions: row.productsWithDescriptions,
       productsWithBrand: row.productsWithBrand,

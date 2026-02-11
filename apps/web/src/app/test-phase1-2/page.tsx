@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Separator } from '@/components/ui/Separator';
+import { tenantLimitsService } from '@/services/TenantLimitsSingletonService';
 
 export default function TestPhase1_2() {
   const [testResults, setTestResults] = useState<Record<string, any>>({});
@@ -39,10 +40,10 @@ export default function TestPhase1_2() {
 
       // Test 3: Tenant Limits
       console.log('Testing Tenant Limits...');
-      const limitsTest = await fetch('/api/tenant-limits/status').then(r => r.json()).catch(() => null);
+      const limitsTest = await tenantLimitsService.getTenantLimitsStatus();
       results.tenantLimits = {
         success: !!limitsTest,
-        hasLimits: !!limitsTest?.current
+        hasLimits: !!limitsTest?.canCreate
       };
 
       // Test 4: Basic API Health

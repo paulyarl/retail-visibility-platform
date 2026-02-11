@@ -90,23 +90,23 @@ export class UniversalIdentifierCache extends UniversalSingleton {
    */
   async resolveIdentifier(identifier: string): Promise<ResolvedTenant | null> {
     const startTime = Date.now();
-    console.log(`[Cache RESOLVE] Starting resolve for: ${identifier}`);
+    //console.log(`[Cache RESOLVE] Starting resolve for: ${identifier}`);
 
     try {
       // Use UniversalSingleton's built-in caching with synchronization
-      console.log(`[Cache RESOLVE] Checking cache for: ${identifier}`);
+      //console.log(`[Cache RESOLVE] Checking cache for: ${identifier}`);
       
       const resolvedTenant = await this.synchronizeOperation(identifier, async () => {
         // First try to get from UniversalSingleton cache
         const cached = await this.getCache<ResolvedTenant>(`identifier:${identifier}`);
         if (cached) {
-          console.log(`[Cache HIT] ${identifier} -> ${cached.id}`);
+          //console.log(`[Cache HIT] ${identifier} -> ${cached.id}`);
           this.metrics.cacheHits++;
           return cached;
         }
 
         // Cache miss - resolve from database
-        console.log(`[Cache MISS] Resolving from database for: ${identifier}`);
+        //console.log(`[Cache MISS] Resolving from database for: ${identifier}`);
         this.metrics.cacheMisses++;
         
         const dbResult = await this.resolveFromDatabase(identifier);
@@ -114,7 +114,7 @@ export class UniversalIdentifierCache extends UniversalSingleton {
         if (dbResult) {
           // Cache the result using UniversalSingleton's encryption
           await this.setCache(`identifier:${identifier}`, dbResult);
-          console.log(`[Cache SET] ${identifier} -> ${dbResult.id}`);
+          //console.log(`[Cache SET] ${identifier} -> ${dbResult.id}`);
         }
         
         return dbResult;
@@ -123,12 +123,12 @@ export class UniversalIdentifierCache extends UniversalSingleton {
       const responseTime = Date.now() - startTime;
       this.updateResponseTime(responseTime);
 
-      if (resolvedTenant) {
+     /*  if (resolvedTenant) {
         console.log(`[Cache RESOLVE] ${identifier} -> ${resolvedTenant.id} (${responseTime}ms)`);
       } else {
         console.log(`[Cache RESOLVE] ${identifier} -> NOT FOUND (${responseTime}ms)`);
       }
-
+ */
       return resolvedTenant;
     } catch (error) {
       console.error(`[Cache ERROR] ${identifier}:`, error);
@@ -140,11 +140,11 @@ export class UniversalIdentifierCache extends UniversalSingleton {
    * Resolve identifier from database
    */
   private async resolveFromDatabase(identifier: string): Promise<ResolvedTenant | null> {
-    console.log(`[Cache DB LOOKUP] ${identifier}`);
+    //console.log(`[Cache DB LOOKUP] ${identifier}`);
 
     try {
       // Try tenant_id first
-      console.log(`[Cache DB LOOKUP] Trying tenant_id lookup for: ${identifier}`);
+      //console.log(`[Cache DB LOOKUP] Trying tenant_id lookup for: ${identifier}`);
       const tenantIdStart = Date.now();
       let tenant = await prisma.tenants.findFirst({
         where: { id: identifier },
@@ -157,10 +157,10 @@ export class UniversalIdentifierCache extends UniversalSingleton {
         }
       });
       const tenantIdTime = Date.now() - tenantIdStart;
-      console.log(`[Cache DB LOOKUP] Tenant ID lookup completed in ${tenantIdTime}ms`);
+      //console.log(`[Cache DB LOOKUP] Tenant ID lookup completed in ${tenantIdTime}ms`);
 
       if (tenant) {
-        console.log(`[Cache DB LOOKUP] Found by tenant_id: ${identifier} -> ${tenant.id}`);
+        //console.log(`[Cache DB LOOKUP] Found by tenant_id: ${identifier} -> ${tenant.id}`);
         return {
           id: tenant.id,
           slug: tenant.slug,
@@ -172,7 +172,7 @@ export class UniversalIdentifierCache extends UniversalSingleton {
       }
 
       // Try slug
-      console.log(`[Cache DB LOOKUP] Trying slug lookup for: ${identifier}`);
+      //console.log(`[Cache DB LOOKUP] Trying slug lookup for: ${identifier}`);
       const slugStart = Date.now();
       tenant = await prisma.tenants.findFirst({
         where: { slug: identifier },
@@ -185,10 +185,10 @@ export class UniversalIdentifierCache extends UniversalSingleton {
         }
       });
       const slugTime = Date.now() - slugStart;
-      console.log(`[Cache DB LOOKUP] Slug lookup completed in ${slugTime}ms`);
+      //console.log(`[Cache DB LOOKUP] Slug lookup completed in ${slugTime}ms`);
 
       if (tenant) {
-        console.log(`[Cache DB LOOKUP] Found by slug: ${identifier} -> ${tenant.id}`);
+        //console.log(`[Cache DB LOOKUP] Found by slug: ${identifier} -> ${tenant.id}`);
         return {
           id: tenant.id,
           slug: tenant.slug,

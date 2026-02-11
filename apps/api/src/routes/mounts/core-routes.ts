@@ -25,6 +25,7 @@ import tenantTierRoutes from '../tenant-tier';
 import paymentGatewaysRoutes from '../payment-gateways';
 import digitalDownloadsRoutes from '../digital-downloads';
 import shopCategoriesRoutes from '../shop-categories';
+import tenantLogoRoutes from '../tenant-logo';
 
 /**
  * Mount core business routes
@@ -69,6 +70,7 @@ export function mountCoreRoutes(app: Express) {
   app.use('/api/taxonomy', taxonomyRoutes);
   app.use('/api/analytics', analyticsRoutes);
   app.use('/api/shop-categories', shopCategoriesRoutes);
+  app.use('/api/public/tenant', tenantLogoRoutes);
 
   console.log('✅ Core business routes mounted');
 }

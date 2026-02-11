@@ -46,7 +46,7 @@ export function useTenantDashboard(tenantId: string | null): UseTenantDashboardR
       return;
     }
 
-    console.log('[useTenantDashboard] Fetching consolidated data for tenantId:', tenantId);
+//    console.log('[useTenantDashboard] Fetching consolidated data for tenantId:', tenantId);
 
     try {
       setLoading(true);

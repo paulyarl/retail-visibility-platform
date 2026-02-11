@@ -115,7 +115,11 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       return null;
     }
 
-    const { tenant, businessProfile, businessHours: rawBusinessHours, paymentGateways } = tenantInfo;
+    const { tenant: tenantResponse, businessProfile: businessProfileResponse, businessHours: rawBusinessHours, paymentGateways } = tenantInfo;
+
+    // Extract actual data from response objects
+    const tenant = (tenantResponse as any)?.data || tenantResponse;
+    const businessProfile = (businessProfileResponse as any)?.data || businessProfileResponse;
 
     // Merge business profile into tenant metadata
     if (businessProfile) {
@@ -129,7 +133,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
         address: businessProfile.address_line1
           ? `${businessProfile.address_line1}${businessProfile.address_line2 ? ', ' + businessProfile.address_line2 : ''}, ${businessProfile.city}, ${businessProfile.state} ${businessProfile.postal_code}`
           : undefined,
-        logo_url: businessProfile.logo_url,
+        logo_url: businessProfile.logo_url || tenant.logo_url || tenant.metadata?.logo_url, // Use business profile, tenant record, or tenant metadata logo
         business_description: businessProfile.business_description,
         social_links: businessProfile.social_links,
       };
@@ -309,13 +313,20 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
     const apiSlug = await tenantDirectoryService.getTenantSlug(id);
     
     // Check if directory listing exists to determine publish status
-    const directoryData = await storefrontService.getDirectoryListing(id);
-    directoryPublished = !!directoryData;
+    try {
+      const directoryData = await storefrontService.getDirectoryListing(id);
+      directoryPublished = !!directoryData;
+    } catch (directoryError) {
+      // Directory API failed - assume not published
+      console.warn('[TenantPage] Directory listing check failed:', directoryError);
+      directoryPublished = false;
+    }
     
     // Use API slug if available, otherwise generate from business name or use tenant ID
     tenantSlug = apiSlug || businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
   } catch (e) {
     // Directory page doesn't exist or error - store is not published
+    console.warn('[TenantPage] Directory service failed:', e);
     directoryPublished = false;
     // Fallback to generated slug
     tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;

@@ -375,7 +375,7 @@ router.get('/locations', async (req, res) => {
 router.get('/tenant/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
-    console.log(`[Directory] Tenant slug request for identifier: ${identifier}`);
+    //console.log(`[Directory] Tenant slug request for identifier: ${identifier}`);
 
     // Use the universal identifier resolver to get tenant ID
     const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
@@ -390,7 +390,7 @@ router.get('/tenant/:identifier', async (req, res) => {
     let resolvedTenant: any = null;
     try {
       resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
-      console.log(`[Directory] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
+      //console.log(`[Directory] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
     } catch (error) {
       console.error(`[Directory] Error resolving identifier: ${identifier}`, error);
       return res.status(404).json({

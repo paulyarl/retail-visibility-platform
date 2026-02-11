@@ -941,6 +941,13 @@ model platform_settings_list {
   created_at            DateTime @default(now()) @db.Timestamptz(6)
   updated_at            DateTime @db.Timestamptz(6)
   rate_limiting_enabled Boolean? @default(true)
+  // Theme settings
+  theme_preset          String?  @default("default")
+  theme_colors          Json?
+  theme_font_family     String?  @default("Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif")
+  theme_border_radius   String?  @default("md")
+  theme_button_size     String?  @default("sm")
+  theme_spacing         Int?     @default(16)
 }
 
 model product_performances {

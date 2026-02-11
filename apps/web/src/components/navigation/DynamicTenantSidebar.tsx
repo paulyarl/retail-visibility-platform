@@ -170,7 +170,7 @@ export default function DynamicTenantSidebar({ tenantId, slug, children }: Dynam
       label: 'Integrations',
       href: `/t/${tenantId}/settings/integrations`,
       children: [
-        { label: 'Google Business Profile', href: `/t/${tenantId}/settings/integrations/google-business` },
+        { label: 'Google Business Profile', href: `/t/${tenantId}/settings/integrations/google` },
         { label: 'Google Merchant Center', href: `/t/${tenantId}/settings/integrations/google-merchant` },
         { label: 'Feed Validation', href: `/t/${tenantId}/feed-validation` },
         { 

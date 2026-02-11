@@ -6,6 +6,8 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { Card, Button, ColorInput, Select, Slider, TextInput, Badge, Switch, Group, Text, Divider, Tabs, TabsList, TabsTab, TabsPanel } from '@mantine/core';
 import { useMantineTheme } from '@mantine/core';
+import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
+import { tenantBrandingSettingsService } from '@/services/TenantBrandingSettingsSingletonService';
 import { CheckCircle, Palette, Type, Layout, Eye, Save, RefreshCw } from 'lucide-react';
 
 // Force edge runtime to prevent prerendering issues
@@ -80,7 +82,6 @@ const RADIUS_OPTIONS = [
 
 export default function ThemeSettingsPage() {
   const router = useRouter();
-  const currentTheme = useMantineTheme();
 
   // Theme state
   const [selectedPreset, setSelectedPreset] = useState('default');
@@ -97,25 +98,104 @@ export default function ThemeSettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Load current theme settings
+  // Detect tenant context based on URL path, not localStorage
+  const [isTenantContext, setIsTenantContext] = useState(false);
+  const [tenantId, setTenantId] = useState<string | null>(null);
+
+  // Detect tenant context based on URL path
   useEffect(() => {
-    loadCurrentTheme();
+    const pathname = window.location.pathname;
+    const tenantMatch = pathname.match(/^\/t\/([^\/]+)\/settings\/appearance/);
+    
+    if (tenantMatch) {
+      const detectedTenantId = tenantMatch[1];
+      setTenantId(detectedTenantId);
+      setIsTenantContext(true);
+    } else {
+      // Platform context - always use platform settings
+      setTenantId(null);
+      setIsTenantContext(false);
+    }
   }, []);
 
-  const loadCurrentTheme = () => {
-    // In a real implementation, this would load from the database
-    // For now, we'll use default values
-    setCustomColors({
-      primary: '#0066ff',
-      secondary: '#6fd58a',
-      accent: '#ffdd07',
-      neutral: '#64748b'
-    });
-    setFontFamily('Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif');
-    setBorderRadius('md');
-    setButtonSize('sm');
-    setSpacing(16);
+  const loadCurrentTheme = async () => {
+    try {
+      let settings;
+
+      if (isTenantContext && tenantId) {
+        // Use tenant branding service for tenant-specific settings
+        settings = await tenantBrandingSettingsService.getTenantBrandingSettings(tenantId);
+
+        if (settings) {
+          // Map tenant branding fields to theme state
+          setSelectedPreset(settings.theme || 'default');
+          setCustomColors({
+            primary: settings.primaryColor || '#0066ff',
+            secondary: settings.secondaryColor || '#6fd58a',
+            accent: settings.accentColor || '#ffdd07',
+            neutral: '#64748b' // Not in tenant branding, use default
+          });
+          setFontFamily('Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'); // Not in tenant branding, use default
+          setBorderRadius('md'); // Not in tenant branding, use default
+          setButtonSize('sm'); // Not in tenant branding, use default
+          setSpacing(16); // Not in tenant branding, use default
+        }
+      } else {
+        // Use platform settings service for platform-wide settings
+        settings = await platformSettingsService.getPlatformSettings();
+
+        if (settings) {
+          // Set theme settings from API
+          setSelectedPreset(settings.themePreset || 'default');
+          setCustomColors(settings.themeColors || {
+            primary: '#0066ff',
+            secondary: '#6fd58a',
+            accent: '#ffdd07',
+            neutral: '#64748b'
+          });
+          setFontFamily(settings.themeFontFamily || 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif');
+          setBorderRadius(settings.themeBorderRadius || 'md');
+          setButtonSize(settings.themeButtonSize || 'sm');
+          setSpacing(settings.themeSpacing || 16);
+        }
+      }
+
+      if (!settings) {
+        console.warn('[Appearance] No settings found, using defaults');
+        // Fallback to defaults if API fails or no data
+        setSelectedPreset('default');
+        setCustomColors({
+          primary: '#0066ff',
+          secondary: '#6fd58a',
+          accent: '#ffdd07',
+          neutral: '#64748b'
+        });
+        setFontFamily('Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif');
+        setBorderRadius('md');
+        setButtonSize('sm');
+        setSpacing(16);
+      }
+    } catch (error) {
+      console.error('Failed to load theme settings:', error);
+      // Fallback to defaults if API fails
+      setSelectedPreset('default');
+      setCustomColors({
+        primary: '#0066ff',
+        secondary: '#6fd58a',
+        accent: '#ffdd07',
+        neutral: '#64748b'
+      });
+      setFontFamily('Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif');
+      setBorderRadius('md');
+      setButtonSize('sm');
+      setSpacing(16);
+    }
   };
+
+  // Load current theme settings when tenant context changes
+  useEffect(() => {
+    loadCurrentTheme();
+  }, [isTenantContext, tenantId]);
 
   const handlePresetSelect = (preset: string) => {
     setSelectedPreset(preset);
@@ -137,29 +217,46 @@ export default function ThemeSettingsPage() {
   const handleSaveTheme = async () => {
     setIsLoading(true);
     try {
-      // In a real implementation, this would save to the database
-      const themeConfig = {
-        colors: customColors,
-        fontFamily,
-        borderRadius,
-        buttonSize,
-        spacing,
-        updatedAt: new Date().toISOString(),
-        updatedBy: 'admin' // In real app, get from auth context
-      };
+      let result;
 
-      console.log('Saving theme configuration:', themeConfig);
+      if (isTenantContext && tenantId) {
+        // Save tenant-specific branding settings
+        const tenantBrandingConfig = {
+          primaryColor: customColors.primary,
+          secondaryColor: customColors.secondary,
+          accentColor: customColors.accent,
+          theme: selectedPreset,
+        };
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+        result = await tenantBrandingSettingsService.updateTenantBrandingSettings(tenantId, tenantBrandingConfig);
+      } else {
+        // Save platform-wide theme settings
+        const themeConfig = {
+          themePreset: selectedPreset,
+          themeColors: customColors,
+          themeFontFamily: fontFamily,
+          themeBorderRadius: borderRadius,
+          themeButtonSize: buttonSize,
+          themeSpacing: spacing,
+        };
 
-      setHasUnsavedChanges(false);
-      // Show success message (would use Mantine notifications in real app)
-      alert('Theme settings saved successfully!');
+        result = await platformSettingsService.updatePlatformSettings(themeConfig);
+      }
+
+      if (result) {
+        setHasUnsavedChanges(false);
+        alert('Theme settings saved successfully!');
+        
+        // Refresh the theme data immediately to ensure persistence
+        // The cache will be invalidated by the update operation
+        loadCurrentTheme();
+      } else {
+        throw new Error('Failed to save theme settings');
+      }
 
     } catch (error) {
       console.error('Failed to save theme:', error);
-      alert('Failed to save theme settings');
+      alert('Failed to save theme settings. Please try again.');
     } finally {
       setIsLoading(false);
     }

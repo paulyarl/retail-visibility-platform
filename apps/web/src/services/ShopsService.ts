@@ -577,6 +577,8 @@ class ShopsService {
       // Only access localStorage in browser environment
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
       
+      console.log('[ShopsService] Fetching slug patterns with params:', params);
+      
       const response = await apiSingleton.makeShopsApiRequest<any>(
         '/api/slugs/patterns',
         {
@@ -588,18 +590,34 @@ class ShopsService {
           body: JSON.stringify({
             businessName: params.businessName,
             location: params.location || {},
-          tenantId: params.tenantId,
-        }),
-      });
+            tenantId: params.tenantId,
+          }),
+        });
 
-      if (!response.success) {
+      console.log('[ShopsService] Slug patterns API response:', response);
+
+      // Handle case where response is not in expected format
+      if (!response || typeof response !== 'object') {
+        console.error('[ShopsService] Invalid API response format:', response);
+        throw new Error('Invalid API response format');
+      }
+
+      // Check if response has success property (expected format)
+      if ('success' in response && !response.success) {
+        console.error('[ShopsService] API response error:', response);
         throw new Error(`Failed to fetch slug patterns: ${response.error || 'Unknown error'}`);
       }
 
-      const patterns = response.data?.patterns || [];
-      
-      this.setCache(cacheKey, patterns);
-      return patterns;
+      // Handle case where API returns patterns directly without success wrapper
+      if ('patterns' in response) {
+        const patterns = response.patterns || [];
+        this.setCache(cacheKey, patterns);
+        return patterns;
+      }
+
+      // If we get here, the response format is unexpected
+      console.error('[ShopsService] Unexpected API response format:', response);
+      throw new Error('Unexpected API response format');
     } catch (error) {
       console.error('Error fetching slug patterns:', error);
       throw error;

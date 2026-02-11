@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Card, TextInput, Badge, Group, Text, Stack } from "@mantine/core";
+import { Button, Card, TextInput, Badge, Group, Text, Stack, useMantineTheme } from "@mantine/core";
 
 /**
  * Mantine Integration Test Component

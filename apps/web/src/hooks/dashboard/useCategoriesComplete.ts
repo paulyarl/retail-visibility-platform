@@ -75,7 +75,7 @@ export function useCategoriesComplete(tenantId: string | null): UseCategoriesCom
         throw new Error('Tenant ID is required');
       }
 
-      console.log('[useCategoriesComplete] Fetching consolidated categories data for:', tenantId);
+//      console.log('[useCategoriesComplete] Fetching consolidated categories data for:', tenantId);
 
       const response = await api.get(`/api/v1/tenants/${encodeURIComponent(tenantId)}/categories/complete`);
 
@@ -84,11 +84,11 @@ export function useCategoriesComplete(tenantId: string | null): UseCategoriesCom
       }
 
       const data = await response.json();
-      console.log('[useCategoriesComplete] Received consolidated data:', {
+     /*  console.log('[useCategoriesComplete] Received consolidated data:', {
         categoriesCount: data.categories?.length,
         alignmentCoverage: data.alignmentStatus?.mappingCoverage,
         hasOrganization: !!data.organization,
-      });
+      }); */
 
       return data;
     },

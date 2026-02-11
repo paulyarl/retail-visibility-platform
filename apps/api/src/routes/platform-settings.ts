@@ -24,6 +24,18 @@ const upload = multer({
 const platform_settings_listSchema = z.object({
   platformName: z.string().optional(),
   platformDescription: z.string().optional(),
+  // Theme settings
+  themePreset: z.string().optional(),
+  themeColors: z.object({
+    primary: z.string(),
+    secondary: z.string(),
+    accent: z.string(),
+    neutral: z.string()
+  }).optional(),
+  themeFontFamily: z.string().optional(),
+  themeBorderRadius: z.string().optional(),
+  themeButtonSize: z.string().optional(),
+  themeSpacing: z.number().optional(),
 });
 
 // GET /platform-settings - Get platform branding settings
@@ -66,6 +78,13 @@ router.get('/platform-settings', async (_req, res) => {
       platformDescription: settings.platform_description,
       logoUrl: settings.logo_url,
       faviconUrl: settings.favicon_url,
+      // Theme settings
+      themePreset: settings.theme_preset,
+      themeColors: settings.theme_colors,
+      themeFontFamily: settings.theme_font_family,
+      themeBorderRadius: settings.theme_border_radius,
+      themeButtonSize: settings.theme_button_size,
+      themeSpacing: settings.theme_spacing,
       createdAt: settings.created_at?.toISOString(),
       updatedAt: settings.updated_at?.toISOString(),
     };
@@ -99,6 +118,26 @@ router.post(
       }
       if (parsed.data.platformDescription !== undefined) {
         updateData.platform_description = parsed.data.platformDescription;
+      }
+
+      // Theme settings mapping
+      if (parsed.data.themePreset !== undefined) {
+        updateData.theme_preset = parsed.data.themePreset;
+      }
+      if (parsed.data.themeColors !== undefined) {
+        updateData.theme_colors = parsed.data.themeColors;
+      }
+      if (parsed.data.themeFontFamily !== undefined) {
+        updateData.theme_font_family = parsed.data.themeFontFamily;
+      }
+      if (parsed.data.themeBorderRadius !== undefined) {
+        updateData.theme_border_radius = parsed.data.themeBorderRadius;
+      }
+      if (parsed.data.themeButtonSize !== undefined) {
+        updateData.theme_button_size = parsed.data.themeButtonSize;
+      }
+      if (parsed.data.themeSpacing !== undefined) {
+        updateData.theme_spacing = parsed.data.themeSpacing;
       }
 
       // Handle logo upload (skip if Supabase not configured)
@@ -172,6 +211,13 @@ router.post(
         platformDescription: settings.platform_description,
         logoUrl: settings.logo_url,
         faviconUrl: settings.favicon_url,
+        // Theme settings
+        themePreset: settings.theme_preset,
+        themeColors: settings.theme_colors,
+        themeFontFamily: settings.theme_font_family,
+        themeBorderRadius: settings.theme_border_radius,
+        themeButtonSize: settings.theme_button_size,
+        themeSpacing: settings.theme_spacing,
         createdAt: settings.created_at?.toISOString(),
         updatedAt: settings.updated_at?.toISOString(),
       };

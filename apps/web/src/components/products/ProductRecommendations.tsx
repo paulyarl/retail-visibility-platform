@@ -66,6 +66,8 @@ export function ProductRecommendations({ productId, tenantId }: ProductRecommend
     return null;
   }
 
+  console.log('[ProductRecommendations] Rendering with', recommendations.length, 'recommendations');
+
   return (
     <div className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8">
       <h2 className="text-2xl font-semibold text-neutral-900 dark:text-white mb-6">
@@ -73,31 +75,34 @@ export function ProductRecommendations({ productId, tenantId }: ProductRecommend
       </h2>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {recommendations.map((product) => (
-          <SmartProductCard
-            key={product.id}
-            tenantId={product.tenantId}
-            product={{
-              id: product.id,
-              sku: product.id,
-              name: product.name,
-              title: product.title,
-              brand: product.brand,
-              priceCents: Math.round(product.price * 100),
-              stock: 999,
-              imageUrl: product.imageUrl,
-              tenantId: product.tenantId,
-              availability: 'in_stock',
-              has_active_payment_gateway: product.has_active_payment_gateway,
-              payment_gateway_type: product.payment_gateway_type,
-            }}
-            tenantName=""
-            variant="compact"
-            showCategory={false}
-            showDescription={false}
-            className="h-full"
-          />
-        ))}
+        {recommendations.map((product) => {
+          console.log('[ProductRecommendations] Mapping product:', product.id, product.title);
+          return (
+            <SmartProductCard
+              key={product.id}
+              tenantId={product.tenantId}
+              product={{
+                id: product.id,
+                sku: product.id,
+                name: product.name,
+                title: product.title,
+                brand: product.brand,
+                priceCents: Math.round(product.price * 100),
+                stock: 999,
+                imageUrl: product.imageUrl,
+                tenantId: product.tenantId,
+                availability: 'in_stock',
+                has_active_payment_gateway: product.has_active_payment_gateway,
+                payment_gateway_type: product.payment_gateway_type,
+              }}
+              tenantName=""
+              variant="compact"
+              showCategory={false}
+              showDescription={false}
+              className="h-full"
+            />
+          );
+        })}
       </div>
 
       {/* Browse More Link */}

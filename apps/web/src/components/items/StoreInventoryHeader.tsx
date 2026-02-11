@@ -63,7 +63,17 @@ export default function StoreInventoryHeader({
           });
         }
       } catch (error) {
-        console.error('Failed to fetch tenant info:', error);
+        // Handle 403 Forbidden and 404 Not Found errors gracefully (permission/endpoint issues)
+        if (error instanceof Error && (error.message.includes('403') || error.message.includes('404'))) {
+          console.warn('[StoreInventoryHeader] Access denied or endpoint not found, using fallback');
+          // Set minimal tenant info from tenantId
+          setTenantInfo({
+            name: `Store ${tenantId}`,
+            subdomain: tenantId,
+          });
+        } else {
+          console.error('Failed to fetch tenant info:', error);
+        }
       } finally {
         setLoading(false);
       }

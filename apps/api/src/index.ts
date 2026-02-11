@@ -6233,6 +6233,7 @@ app.use('/api/tenants', paymentGatewaysRoutes);
 console.log('✅ Payment gateway routes mounted at /api/tenants/:tenantId/payment-gateways');
 
 /* ------------------------------ fulfillment settings ------------------------------ */
+app.use('/api/tenants', fulfillmentSettingsRoutes);
 app.use('/api', fulfillmentSettingsRoutes);
 console.log('✅ Fulfillment settings routes mounted at /api/tenants/:tenantId/fulfillment-settings and /api/public/tenant/:tenantId/fulfillment-settings');
 

@@ -435,7 +435,7 @@ export default function SmartProductCard({
                   {displayBrand}
                 </p>
               )}
-              {showCategory && product.tenantCategory && (
+              {showCategory && product.productCategory && (
                 <span className="text-xs px-2.5 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded-full font-medium">
                   {typeof product.productCategory === 'string' ? product.productCategory : ''}
                 </span>
@@ -736,11 +736,12 @@ export default function SmartProductCard({
                   size="sm"
                 />
               ) : (
-                <PriceDisplay
-                  priceCents={product.priceCents}
-                  salePriceCents={product.salePriceCents}
-                  variant="compact"
-                />
+                // <PriceDisplay
+                //   priceCents={product.priceCents}
+                //   salePriceCents={product.salePriceCents}
+                //   variant="compact"
+                // />
+                <div>Price: ${product.priceCents / 100}</div>
               )}
               {product.salePriceCents && !product.has_variants && (
                 <span className="text-xs bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 px-1.5 py-0.5 rounded">
@@ -798,7 +799,7 @@ export default function SmartProductCard({
               )}
             </div>
             
-            {effectiveCanPurchase && (
+            {effectiveCanPurchase && effectiveGatewayType && (
               <div className="mt-2">
                 {product.has_variants ? (
                   <Link
