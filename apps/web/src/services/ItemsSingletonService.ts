@@ -114,8 +114,8 @@ class ItemsSingletonService {
       
       const result = await this.client.makeRequest<ItemsCompleteResponse>(endpoint);
 
-      // API returns data directly, not wrapped in ApiResponse
-      return result || null;
+      // Extract data from ApiResponse wrapper
+      return result?.data || null;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to get items complete:', error);
       return null;
