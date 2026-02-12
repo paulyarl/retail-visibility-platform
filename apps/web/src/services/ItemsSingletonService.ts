@@ -114,15 +114,16 @@ class ItemsSingletonService {
       
       const result = await this.client.makeRequest<ItemsCompleteResponse>(endpoint);
 
+      const data = result as unknown as ItemsCompleteResponse;
       console.log('[ItemsSingleton] getItemsComplete API response:', {
         endpoint,
-        hasData: !!result,
-        itemsCount: result?.items?.length || 0,
-        totalItems: result?.stats?.total || 0
+        hasData: !!data,
+        itemsCount: data?.items?.length || 0,
+        totalItems: data?.stats?.total || 0
       });
 
       // makeRequest returns data directly, not wrapped in ApiResponse
-      return result;
+      return data;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to get items complete:', error);
       return null;
@@ -137,7 +138,7 @@ class ItemsSingletonService {
       const result = await this.client.makeRequest<Item>(`/api/items/${itemId}`);
 
       // makeRequest returns data directly, not wrapped in ApiResponse
-      return result;
+      return result as unknown as Item;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to get item:', error);
       return null;
@@ -162,7 +163,7 @@ class ItemsSingletonService {
       );
 
       // makeRequest returns data directly, not wrapped in ApiResponse
-      return result;
+      return result as unknown as Item;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to create item:', error);
       return null;
@@ -187,7 +188,7 @@ class ItemsSingletonService {
       );
 
       // makeRequest returns data directly, not wrapped in ApiResponse
-      return result;
+      return result as unknown as Item;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to update item:', error);
       return null;
@@ -207,8 +208,8 @@ class ItemsSingletonService {
         }
       );
 
-      // makeRequest returns ApiResponse<T>, so extract data from response
-      return result?.data?.success || false;
+      // makeRequest returns data directly, not wrapped in ApiResponse
+      return (result as unknown as { success: boolean }).success || false;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to delete item:', error);
       return false;
