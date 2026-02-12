@@ -501,6 +501,20 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800">
+      {console.log('[ItemsPageClient] Render - state:', {
+        tenantId,
+        loading,
+        error,
+        totalItems,
+        hasItems,
+        itemsLength: items.length,
+        page,
+        pageSize,
+        status,
+        visibility,
+        search,
+        category
+      })}
       {/* Enhanced Store Inventory Header */}
       <StoreInventoryHeader
         stats={stats}

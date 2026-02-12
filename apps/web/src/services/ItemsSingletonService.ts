@@ -114,8 +114,15 @@ class ItemsSingletonService {
       
       const result = await this.client.makeRequest<ItemsCompleteResponse>(endpoint);
 
-      // Extract data from ApiResponse wrapper
-      return result?.data || null;
+      console.log('[ItemsSingleton] getItemsComplete API response:', {
+        endpoint,
+        hasData: !!result,
+        itemsCount: result?.items?.length || 0,
+        totalItems: result?.stats?.total || 0
+      });
+
+      // makeRequest returns data directly, not wrapped in ApiResponse
+      return result;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to get items complete:', error);
       return null;
@@ -129,8 +136,8 @@ class ItemsSingletonService {
     try {
       const result = await this.client.makeRequest<Item>(`/api/items/${itemId}`);
 
-      // makeRequest returns ApiResponse<T>, so extract data from response
-      return result?.data || null;
+      // makeRequest returns data directly, not wrapped in ApiResponse
+      return result;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to get item:', error);
       return null;
@@ -154,8 +161,8 @@ class ItemsSingletonService {
         }
       );
 
-      // makeRequest returns ApiResponse<T>, so extract data from response
-      return result?.data || null;
+      // makeRequest returns data directly, not wrapped in ApiResponse
+      return result;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to create item:', error);
       return null;
@@ -179,8 +186,8 @@ class ItemsSingletonService {
         }
       );
 
-      // makeRequest returns ApiResponse<T>, so extract data from response
-      return result?.data || null;
+      // makeRequest returns data directly, not wrapped in ApiResponse
+      return result;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to update item:', error);
       return null;
