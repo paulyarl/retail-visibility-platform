@@ -23,9 +23,13 @@ export interface RecommendationGroup {
 class RecommendationsSingletonService extends PublicApiSingleton {
   private static instance: RecommendationsSingletonService;
 
+  // Different TTL for different recommendation types
+  private readonly PERSONALIZED_TTL = 1 * 60 * 1000; // 1 minute for personalized
+  private readonly STATIC_TTL = 30 * 60 * 1000; // 30 minutes for static
+  private readonly SEMI_STATIC_TTL = 10 * 60 * 1000; // 10 minutes for semi-static
+
   private constructor() {
     super('recommendations-singleton');
-    this.cacheTTL = 10 * 60 * 1000; // 10 minutes for recommendations
   }
 
   public static getInstance(): RecommendationsSingletonService {
@@ -62,7 +66,8 @@ class RecommendationsSingletonService extends PublicApiSingleton {
       }>(
         `/api/recommendations/for-storefront/${tenantId}?${searchParams.toString()}`,
         {},
-        `storefront-recommendations-${tenantId}`
+        `display:storefront-recommendations-${tenantId}`,
+        this.SEMI_STATIC_TTL // 10 minutes for storefront recommendations
       );
       
       // API returns nested structure: { recommendations: [{ type, title, recommendations: [...stores] }] }
@@ -117,7 +122,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
           method: 'POST',
           body: JSON.stringify(batchData)
         },
-        'recommendations-track-batch'
+        null // Don't use cache for tracking requests
       );
     } catch (error) {
       console.warn('[RecommendationsSingleton] Behavior tracking batch failed:', error);
@@ -134,8 +139,8 @@ class RecommendationsSingletonService extends PublicApiSingleton {
       const response = await this.makePublicRequest<any>(
         '/api/recommendations/for-directory',
         {},
-        'directory-recommendations',
-        this.cacheTTL
+        'display:directory-recommendations',
+        this.STATIC_TTL // 30 minutes for general directory recommendations
       );
 
       return response;
@@ -214,8 +219,8 @@ class RecommendationsSingletonService extends PublicApiSingleton {
       const response = await this.makePublicRequest<any>(
         `/api/recommendations/for-directory?storeType=${storeTypeSlug}`,
         {},
-        `store-type-recommendations-${storeTypeSlug}`,
-        this.cacheTTL
+        `display:store-type-recommendations-${storeTypeSlug}`,
+        this.SEMI_STATIC_TTL // 10 minutes for store type recommendations
       );
 
       return response;
@@ -234,8 +239,8 @@ class RecommendationsSingletonService extends PublicApiSingleton {
       const response = await this.makePublicRequest<any>(
         `/api/directory/store-types/${storeTypeSlug}`,
         {},
-        `store-type-details-${storeTypeSlug}`,
-        this.cacheTTL
+        `display:store-type-details-${storeTypeSlug}`,
+        this.SEMI_STATIC_TTL // 10 minutes for store type details
       );
 
       return response;
@@ -298,6 +303,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
     limit?: number;
   }): Promise<any> {
     try {
+      // Must have either userId or sessionId
+      if (!params?.sessionId && !params?.userId) {
+        console.warn('[RecommendationsSingleton] No sessionId or userId provided for getLastViewed');
+        return null;
+      }
+
       const searchParams = new URLSearchParams();
       if (params?.sessionId) searchParams.append('sessionId', params.sessionId);
       if (params?.userId) searchParams.append('userId', params.userId);
@@ -306,8 +317,8 @@ class RecommendationsSingletonService extends PublicApiSingleton {
       const response = await this.makePublicRequest<any>(
         `/api/recommendations/last-viewed?${searchParams.toString()}`,
         {},
-        'last-viewed-recommendations',
-        this.cacheTTL
+        `display:last-viewed-recommendations:${params.sessionId || params.userId || 'anonymous'}`,
+        this.PERSONALIZED_TTL // 1 minute for personalized recommendations
       );
 
       return response;

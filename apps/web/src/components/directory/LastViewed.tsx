@@ -152,7 +152,8 @@ export default function LastViewed({
         }
 
         const data = await recommendationsService.getLastViewed({
-          sessionId,
+          ...(sessionId && { sessionId }),
+          ...(userId && { userId }),
           limit: 8
         });
         
