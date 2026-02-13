@@ -244,6 +244,10 @@ export function sortByPopularity<T extends CategoryMetrics>(
   categories: T[],
   weights?: ScoringWeights
 ): T[] {
+  if (!Array.isArray(categories)) {
+    return [];
+  }
+  
   return [...categories].sort((a, b) => {
     const scoreA = calculatePopularityScore(a, weights).totalScore;
     const scoreB = calculatePopularityScore(b, weights).totalScore;

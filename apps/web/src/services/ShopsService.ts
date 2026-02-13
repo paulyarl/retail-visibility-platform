@@ -398,7 +398,7 @@ class ShopsService extends PublicApiSingleton {
           shop_category: string;
           count?: number;
         }>;
-      }>('/api/shops/categories/simple', {}, 'shop-categories:simple');
+      }>('/api/shops/categories', {}, 'shop-categories');
 
       const categories = response.data || [];
       return categories;

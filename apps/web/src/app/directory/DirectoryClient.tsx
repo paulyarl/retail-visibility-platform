@@ -308,19 +308,17 @@ export default function DirectoryClient() {
         let categories = getCachedData(CACHE_CONFIG.categories.key);
         console.log('[DirectoryClient] Categories cache check:', categories ? 'HIT' : 'MISS');
 
-        if (!categories) {
+        if (!categories || categories.length === 0) {
           // Fetch directory categories
           const categoriesData = await directoryService.getDirectoryCategories();
 
           if (categoriesData) {
-            categories = categoriesData;
+            setCategories(categoriesData);
           } else {
             console.error('Failed to fetch categories from server');
-            categories = [];
+            setCategories([]);
           }
         }
-        
-        setCategories(categories || []);
 
         // Try cache first for store types
         // TEMP: Clear cache to force fresh API call
@@ -490,9 +488,9 @@ export default function DirectoryClient() {
 
       {/* Filters */}
       <DirectoryFilters 
-        categories={categories.map(cat => ({ name: cat.name, slug: cat.slug, count: cat.storeCount }))}
+        categories={Array.isArray(categories) ? categories.map(cat => ({ name: cat.name, slug: cat.slug, count: cat.storeCount })) : []}
         storeTypes={storeTypes}
-        locations={locations.map(loc => ({ city: loc.city, state: loc.state, count: loc.count }))} 
+        locations={Array.isArray(locations) ? locations.map(loc => ({ city: loc.city, state: loc.state, count: loc.count })) : []} 
       />
 
       {/* Random Featured Products */}
@@ -792,7 +790,7 @@ function DirectoryHomeRecommendations() {
         Trending Nearby
       </h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {recommendations.map((rec, index) => (
+        {Array.isArray(recommendations) && recommendations.map((rec, index) => (
           <Link
             key={rec.tenantId}
             href={`/directory/${rec.slug}`}

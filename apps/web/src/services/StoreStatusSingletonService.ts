@@ -37,10 +37,8 @@ class StoreStatusSingletonService extends PublicApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const baseUrl = apiBase || process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-      
       const result = await this.makePublicRequest<StoreStatus>(
-        `${baseUrl}/api/public/tenant/${tenantId}/business-hours/status`,
+        `/api/public/tenant/${tenantId}/business-hours/status`,
         {},
         `store-status-${tenantId}`
       );
