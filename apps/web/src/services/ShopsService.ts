@@ -433,63 +433,6 @@ class ShopsService extends PublicApiSingleton {
   }
 
   /**
-   * Get slug patterns for business name and location
-   * Uses authenticated API request
-   */
-  async getSlugPatterns(params: {
-    businessName: string;
-    location?: {
-      city?: string;
-      state?: string;
-      country?: string;
-    };
-    tenantId?: string;
-  }): Promise<Array<{
-    pattern: string;
-    slug: string;
-    isAvailable: boolean;
-    description: string;
-  }>> {
-    try {
-      const response = await this.makePublicRequest<any>(
-        '/api/shops/slug-patterns',
-        {
-          method: 'POST',
-          body: JSON.stringify(params),
-        },
-        `patterns:${params.businessName}:${params.location?.city || ''}:${params.location?.state || ''}`
-      );
-
-      console.log('[ShopsService] Slug patterns API response:', response);
-
-      // Handle case where response is not in expected format
-      if (!response || typeof response !== 'object') {
-        console.error('[ShopsService] Invalid API response format:', response);
-        throw new Error('Invalid API response format');
-      }
-
-      // Check if response has success property (expected format)
-      if ('success' in response && !response.success) {
-        console.error('[ShopsService] API response error:', response);
-        throw new Error(`Failed to fetch slug patterns: ${response.error || 'Unknown error'}`);
-      }
-
-      // Handle case where API returns patterns directly without success wrapper
-      if ('patterns' in response) {
-        const patterns = response.patterns || [];
-        return patterns;
-      }
-
-      // If we get here, the response format is unexpected
-      console.error('[ShopsService] Unexpected API response format:', response);
-      throw new Error('Unexpected API response format');
-    } catch (error) {
-      console.error('Error fetching slug patterns:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Get shop hours status for public display
    * Public endpoint - no authentication required
    */

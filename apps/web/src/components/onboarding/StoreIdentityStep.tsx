@@ -6,7 +6,7 @@ import { Input, Select, Alert } from '@/components/ui';
 import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput } from '@/lib/validation/businessProfile';
 import { addressParser } from '@/lib/address-parser';
 import { z } from 'zod';
-import SlugPatternSelector from '@/components/shops/SlugPatternSelector';
+import SlugPatternSelector from '@/components/tenants/SlugPatternSelector';
 
 interface StoreIdentityStepProps {
   initialData?: Partial<BusinessProfile>;

@@ -58,3 +58,36 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { limit = 100, minProducts = 1 } = body;
+
+    // Get categories with counts
+    let categories = SHOP_CATEGORIES.map(cat => ({
+      ...cat,
+      count: Math.floor(Math.random() * 50) + 10 // Mock count between 10-60
+    }));
+
+    // Filter by minimum products and apply limit
+    const filteredCategories = categories
+      .filter(cat => cat.count >= minProducts)
+      .slice(0, limit);
+
+    return NextResponse.json({
+      success: true,
+      data: filteredCategories
+    });
+
+  } catch (error) {
+    console.error('[SHOP_CATEGORIES] POST Error:', error);
+    return NextResponse.json(
+      { 
+        error: 'categories_post_failed', 
+        message: 'Failed to process shop categories' 
+      },
+      { status: 500 }
+    );
+  }
+}
