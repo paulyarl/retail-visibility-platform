@@ -296,8 +296,8 @@ export abstract class UniversalSingleton {
     customTTL?: number,
     apiUrl: string = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'
   ): Promise<T> {
-    // Check cache first if cacheKey provided
-    if (cacheKey && this.isCached(cacheKey)) {
+    // Check cache first if cacheKey provided and it's a GET request
+    if (cacheKey && (options.method === 'GET' || !options.method) && this.isCached(cacheKey)) {
       return this.getCachedData(cacheKey);
     }
     
@@ -320,9 +320,15 @@ export abstract class UniversalSingleton {
 
       const data = await response.json();
       
-      // Cache the result if cacheKey provided
-      if (cacheKey) {
+      // For GET requests, cache the result if cacheKey provided
+      if (cacheKey && (options.method === 'GET' || !options.method)) {
         this.setCachedData(cacheKey, data, customTTL);
+      }
+      
+      // For non-GET requests, invalidate the cache if cacheKey provided
+      if (cacheKey && options.method && options.method !== 'GET') {
+        await this.invalidateCache(cacheKey);
+        this.logCacheClear(cacheKey);
       }
       
       this.logApiSuccess(url);

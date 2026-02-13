@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import SmartProductCard from './SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 interface RecommendedProduct {
   id: string;
@@ -34,13 +35,9 @@ export function ProductRecommendations({ productId, tenantId }: ProductRecommend
 
     const fetchRecommendations = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${apiUrl}/api/recommendations/for-product-page/${productId}?limit=6`, {
-          signal: abortController.signal,
-        });
-
-        if (response.ok && isMounted) {
-          const data = await response.json();
+        const data = await recommendationsService.getProductPageRecommendations(productId, 6);
+        
+        if (data && isMounted) {
           setRecommendations(data.recommendations || []);
         }
       } catch (error: unknown) {

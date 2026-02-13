@@ -1,11 +1,11 @@
 /**
- * Middleware to handle source map requests and prevent them from being treated as routes
+ * Proxy to handle source map requests and prevent them from being treated as routes
  */
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Block source map requests from being treated as page routes

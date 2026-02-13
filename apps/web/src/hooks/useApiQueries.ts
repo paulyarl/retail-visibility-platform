@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from '@/lib/api';
+import { apiQueriesService } from '@/services/ApiQueriesSingletonService';
 import { useTenantComplete } from './dashboard/useTenantComplete';
 import { useItemsComplete } from './useItemsComplete';
 
@@ -75,13 +75,8 @@ export function useOrganizationData(organizationId?: string) {
         throw new Error('Organization ID is required');
       }
 
-      const response = await api.get(`/api/organization/billing/counters?organizationId=${organizationId}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch organization data');
-      }
-
-      return response.json();
+      const response = await apiQueriesService.getOrganizationBillingCounters(organizationId);
+      return response;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes - organization data updates moderately frequently
     gcTime: 15 * 60 * 1000, // 15 minutes cache
@@ -134,11 +129,8 @@ export function useTenant(tenantId: string) {
   return useQuery({
     queryKey: ['tenant', tenantId],
     queryFn: async (): Promise<Tenant> => {
-      const response = await api.get(`/api/tenants/${tenantId}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tenant: ${response.status}`);
-      }
-      return response.json();
+      const response = await apiQueriesService.getTenant(tenantId);
+      return response;
     },
     staleTime: 15 * 60 * 1000, // 15 minutes - tenant data is mostly static
     gcTime: 60 * 60 * 1000, // 1 hour cache
@@ -150,11 +142,8 @@ export function useTenantCategories(tenantId: string) {
   return useQuery({
     queryKey: ['tenant', tenantId, 'categories'],
     queryFn: async (): Promise<Category[]> => {
-      const response = await api.get(`/api/tenant/${tenantId}/categories`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tenant categories: ${response.status}`);
-      }
-      return response.json();
+      const response = await apiQueriesService.getTenantCategories(tenantId);
+      return response;
     },
     staleTime: 30 * 60 * 1000, // 30 minutes - categories change infrequently
     gcTime: 60 * 60 * 1000, // 1 hour cache
@@ -209,18 +198,8 @@ export function useUpgradeRequests(tenantId?: string, status?: string) {
     queryFn: async (): Promise<any[]> => {
       if (!tenantId) return [];
 
-      const params = new URLSearchParams();
-      params.set('tenantId', tenantId);
-      if (status) params.set('status', status);
-
-      const response = await api.get(`/api/upgrade-requests?${params.toString()}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch upgrade requests');
-      }
-
-      const data = await response.json();
-      return data.data || [];
+      const response = await apiQueriesService.getUpgradeRequests(tenantId, status);
+      return response;
     },
     staleTime: 2 * 60 * 1000, // 2 minutes - requests update frequently
     gcTime: 10 * 60 * 1000, // 10 minutes cache

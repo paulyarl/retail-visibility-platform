@@ -1,22 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+import { directoryService } from '@/services/DirectorySingletonService';
 
 export async function GET(request: NextRequest) {
   try {
-    // Forward request to backend API
-    const response = await fetch(`${API_BASE_URL}/api/directory/categories`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    // Use DirectorySingletonService for automatic caching and error handling
+    const categories = await directoryService.getDirectoryCategories();
+    
+    if (!categories) {
+      return NextResponse.json(
+        { error: 'Failed to fetch categories' },
+        { status: 500 }
+      );
+    }
 
-    const data = await response.json();
-
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(categories);
   } catch (error) {
-    console.error('[Directory Categories Proxy] Error:', error);
+    console.error('[Directory Categories API] Error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch categories' },
       { status: 500 }

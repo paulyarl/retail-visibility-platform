@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner, Input, Modal } from '@/components/ui';
 import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { Edit2, Save, X, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
 // Force edge runtime to prevent prerendering issues
@@ -82,14 +82,8 @@ export default function TierSystemPage() {
       setLoading(true);
       setError(null);
       
-      const response = await api.get('/api/admin/tier-system/tiers');
-      const data = await response.json();
-      
-      if (response.ok) {
-        setTiers(data.tiers || []);
-      } else {
-        setError(data.error || 'Failed to load tiers');
-      }
+      const tiers = await platformHomeService.getTierSystemTiers();
+      setTiers(tiers || []);
     } catch (err) {
       console.error('Failed to load tiers:', err);
       setError('Failed to load tiers');
@@ -103,16 +97,13 @@ export default function TierSystemPage() {
       setError(null);
       setSuccess(null);
       
-      const response = await api.patch(`/api/admin/tier-system/tiers/${tierId}`, {
-        isActive
-      });
+      const tier = await platformHomeService.updateTierStatus(tierId, isActive);
       
-      if (response.ok) {
+      if (tier) {
         setSuccess(`Tier ${isActive ? 'activated' : 'deactivated'} successfully`);
         loadTiers(); // Reload to show updated state
       } else {
-        const data = await response.json();
-        setError(data.error || 'Failed to update tier');
+        setError('Failed to update tier');
       }
     } catch (err) {
       console.error('Failed to toggle tier:', err);
@@ -137,16 +128,15 @@ export default function TierSystemPage() {
       setSaving(true);
       setError(null);
       
-      const response = await api.put(`/api/admin/tier-system/tiers/${editingData.id}`, editingData);
+      const tier = await platformHomeService.updateTier(editingData.id, editingData);
       
-      if (response.ok) {
+      if (tier) {
         setSuccess('Tier updated successfully');
         setEditingTier(null);
         setEditingData(null);
         loadTiers();
       } else {
-        const data = await response.json();
-        setError(data.error || 'Failed to update tier');
+        setError('Failed to save tier');
       }
     } catch (err) {
       console.error('Failed to save tier:', err);
@@ -251,17 +241,9 @@ export default function TierSystemPage() {
       setSaving(true);
       setError(null);
       
-      const response = await api.patch(`/api/admin/tier-system/tiers/${tierId}/sort-order`, {
-        sortOrder: newSortOrder
-      });
-      
-      if (response.ok) {
-        setSuccess('Sort order updated successfully');
-        loadTiers();
-      } else {
-        const data = await response.json();
-        setError(data.error || 'Failed to update sort order');
-      }
+      await platformHomeService.updateTierSortOrder(tierId, newSortOrder);
+      setSuccess('Sort order updated successfully');
+      loadTiers();
     } catch (err) {
       console.error('Failed to update sort order:', err);
       setError('Failed to update sort order');
@@ -319,14 +301,21 @@ export default function TierSystemPage() {
       }
 
       // Create the tier
-      const response = await api.post('/api/admin/tier-system/tiers', {
-        ...newTier,
-        id: `tier_${newTier.tierKey}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+      const tier = await platformHomeService.createTier({
+        tierKey: newTier.tierKey || '',
+        name: newTier.name || '',
+        displayName: newTier.displayName || '',
+        description: newTier.description || '',
+        priceMonthly: newTier.priceMonthly || 0,
+        maxSkus: newTier.maxSkus ?? null,
+        maxLocations: newTier.maxLocations || 1,
+        tierType: newTier.tierType || 'individual',
+        isActive: newTier.isActive ?? true,
+        sortOrder: newTier.sortOrder || tiers.length + 1,
+        features: newTier.features || []
       });
-
-      if (response.ok) {
+      
+      if (tier) {
         setSuccess('Tier created successfully');
         setShowAddTierModal(false);
         setNewTier({
@@ -344,8 +333,7 @@ export default function TierSystemPage() {
         });
         loadTiers(); // Reload to show new tier
       } else {
-        const data = await response.json();
-        setError(data.error || 'Failed to create tier');
+        setError('Failed to create tier');
       }
     } catch (err) {
       console.error('Failed to create tier:', err);

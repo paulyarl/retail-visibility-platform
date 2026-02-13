@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { safeTransformToCamel, BusinessProfile } from '@/utils/case-transform';
-import { api } from '@/lib/api';
+import { businessProfileService } from '@/services/BusinessProfileSingletonService';
 
 interface UseBusinessProfileOptions {
   transform?: boolean; // Optional transformation
@@ -36,17 +36,9 @@ export const useBusinessProfile = (options: UseBusinessProfileOptions = {}) => {
     setError(null);
     
     try {
-      const response = await api.get(`/api/tenants/${tenantId}/profile`);
-      if (!response.ok) throw new Error('Failed to fetch profile');
+      const rawData = await businessProfileService.getBusinessProfile(tenantId, transform);
       
-      const rawData = await response.json();
-      
-      // Apply transformation if requested
-      const processedData = transform 
-        ? safeTransformToCamel<BusinessProfile>(rawData)
-        : rawData;
-      
-      setData(processedData);
+      setData(rawData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { platformHomeService } from "@/services/PlatformHomeSingletonService";
 import { useAuth } from "@/contexts/AuthContext";
 import { canSwitchToTenant } from "@/lib/auth/access-control";
 import { navigateToTenant } from "@/lib/tenant-navigation";
@@ -56,9 +56,8 @@ export default function TenantSwitcher() {
       const token = localStorage.getItem('access_token');
       if (!token) return;
       try {
-        const res = await api.get("/api/tenants", { skipAuthRedirect: true });
-        if (!res.ok) return;
-        const data: Tenant[] = await res.json();
+        const data = await platformHomeService.getTenants();
+        if (!data) return;
         // Limit to authorized memberships to avoid confusion
         const memberIds = (user?.tenants || []).map(t => t.id);
         const filtered = memberIds.length > 0 ? data.filter(t => memberIds.includes(t.id)) : data;
@@ -143,9 +142,8 @@ export default function TenantSwitcher() {
                 const token = localStorage.getItem('access_token');
                 if (!token) return;
                 try {
-                  const res = await api.get("/api/tenants", { skipAuthRedirect: true });
-                  if (!res.ok) return;
-                  const data: Tenant[] = await res.json();
+                  const data = await platformHomeService.getTenants();
+                  if (!data) return;
                   // Limit to authorized memberships to avoid confusion
                   const memberIds = (user?.tenants || []).map(t => t.id);
                   const filtered = memberIds.length > 0 ? data.filter(t => memberIds.includes(t.id)) : data;

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { productLikesService } from '@/services/ProductLikesSingletonService';
 
 // Simple decryption for client-side caching (matches AuthContext)
 function decrypt(text: string): string {
@@ -48,88 +49,50 @@ export function ProductLikeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const likeProduct = async (productId: string) => {
-    const url = `/api/products/${productId}/like`;
-    console.log('[ProductLikeProvider] Making request to:', url);
+    console.log('[ProductLikeProvider] Liking product:', productId);
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          sessionId
-        }),
-      });
-
-      if (!response.ok) {
+      const result = await productLikesService.likeProduct(productId, userId || undefined, sessionId || undefined);
+      
+      if (!result) {
         throw new Error('Failed to like product');
       }
 
-      const data = await response.json();
-      return {
-        success: true,
-        likes: data.likes,
-        userLiked: data.userLiked
-      };
+      const data = await productLikesService.getProductLikeStatus(productId, userId || undefined, sessionId || undefined);
+      
+      return { success: true, likes: data.likesCount, userLiked: data.userLiked };
     } catch (error) {
       console.error('[ProductLikeProvider] Error liking product:', error);
-      return {
-        success: false,
-        likes: 0,
-        userLiked: false
-      };
+      return { success: false, likes: 0, userLiked: false };
     }
   };
 
   const unlikeProduct = async (productId: string) => {
     try {
-      const response = await fetch(`/api/products/${productId}/like`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          sessionId
-        }),
-      });
-
-      if (!response.ok) {
+      const success = await productLikesService.unlikeProduct(productId, userId || undefined, sessionId || undefined);
+      
+      if (!success) {
         throw new Error('Failed to unlike product');
       }
 
-      const data = await response.json();
+      const data = await productLikesService.getProductLikeStatus(productId, userId || undefined, sessionId || undefined);
+      
       return {
         success: true,
-        likes: data.likes,
+        likes: data.likesCount,
         userLiked: data.userLiked
       };
     } catch (error) {
       console.error('[ProductLikeProvider] Error unliking product:', error);
-      return {
-        success: false,
-        likes: 0,
-        userLiked: true
-      };
+      return { success: false, likes: 0, userLiked: false };
     }
   };
 
   const getLikeStatus = async (productId: string) => {
     try {
-      const params = new URLSearchParams();
-      if (userId) params.append('userId', userId);
-      if (sessionId) params.append('sessionId', sessionId);
-
-      const response = await fetch(`/api/products/${productId}/likes?${params}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to get like status');
-      }
-
-      const data = await response.json();
+      const data = await productLikesService.getProductLikeStatus(productId, userId || undefined, sessionId || undefined);
+      
       return {
-        likes: data.likes,
+        likes: data.likesCount,
         userLiked: data.userLiked
       };
     } catch (error) {

@@ -10,6 +10,7 @@ import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { Star, Sparkles, Calendar, Tag, Award } from 'lucide-react';
 import { VariantBadge, PriceRangeDisplay } from '@/components/variants';
 import type { PriceRange, AvailableAttributes } from '@/types/variants';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 
 // Helper functions for storefront featured type badges
 const getStorefrontBadgeStyle = (typeId: string): string => {
@@ -345,11 +346,9 @@ export default function SmartProductCard({
 
     const checkPurchaseAbility = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${apiUrl}/api/tenants/${product.tenantId}/payment-gateway`);
+        const data = await tenantInfoService.getPaymentGatewayStatus(product.tenantId);
         
-        if (response.ok) {
-          const data = await response.json();
+        if (data) {
           setCanPurchase(data.hasActiveGateway || false);
           setDefaultGatewayType(data.defaultGatewayType || undefined);
         } else {

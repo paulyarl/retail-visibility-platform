@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@mantine/core';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Loader2, CreditCard, Lock } from 'lucide-react';
+import { customerOrderService } from '@/services/CustomerOrderService';
 
 interface SquarePaymentFormProps {
   amount: number;
@@ -119,28 +120,21 @@ function SquarePaymentFormContent({
         const token = result.token;
 
         // Process payment with backend
-        const response = await fetch('/api/checkout/square/process-payment', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            orderId,
-            paymentId,
-            sourceId: token,
-            amount,
-            customerInfo,
-            shippingAddress,
-            cartItems,
-          }),
+        const response = await customerOrderService.processSquarePayment({
+          orderId,
+          paymentId,
+          sourceId: token,
+          amount,
+          customerInfo,
+          shippingAddress,
+          cartItems,
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Payment failed');
+        if (!response) {
+          throw new Error('Payment failed');
         }
 
-        const { payment } = await response.json();
+        const { payment } = response;
         
         // Success - call onSuccess with order number and transaction ID
         onSuccess(orderNumber, payment.id);
@@ -227,61 +221,52 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
     const initializePayment = async () => {
       try {
         // Create order
-        const orderResponse = await fetch('/api/checkout/orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+        const orderResponse = await customerOrderService.createCheckoutOrder({
+          customerInfo: {
+            email: customerInfo.email,
+            firstName: customerInfo.firstName,
+            lastName: customerInfo.lastName,
+            phone: customerInfo.phone,
           },
-          body: JSON.stringify({
-            tenantId: cartItems[0]?.tenantId,
-            customer: {
-              email: customerInfo.email,
-              firstName: customerInfo.firstName,
-              lastName: customerInfo.lastName,
-              phone: customerInfo.phone,
-            },
-            shippingAddress: shippingAddress,
-            items: cartItems.map((item) => ({
-              id: item.inventoryItemId,
-              sku: item.sku,
-              name: item.name,
-              quantity: item.quantity,
-              unit_price_cents: item.unitPrice,
-              list_price_cents: item.listPrice,
-              image_url: item.imageUrl,
-              tenant_id: item.tenantId,
-            })),
-          }),
+          cartItems: cartItems.map((item) => ({
+            id: item.inventoryItemId,
+            sku: item.sku,
+            name: item.name,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            listPrice: item.listPrice,
+            image_url: item.imageUrl,
+            tenant_id: item.tenantId,
+          })),
+          fulfillmentMethod: 'pickup',
+          shippingAddress: shippingAddress,
+          paymentMethod: 'square',
         });
 
-        if (!orderResponse.ok) {
+        if (!orderResponse) {
           throw new Error('Failed to create order');
         }
 
-        const { order } = await orderResponse.json();
+        const { order } = orderResponse;
         setOrderId(order.id);
         setOrderNumber(order.orderNumber);
 
         // Create payment record
-        const paymentResponse = await fetch('/api/checkout/payments/charge', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            orderId: order.id,
-            paymentMethod: {
-              type: 'card',
-            },
-            gatewayType: 'square',
-          }),
+        const paymentResponse = await customerOrderService.createSquareCharge({
+          orderId: order.id,
+          paymentId: order.paymentId,
+          amount,
+          sourceId: '', // Will be set after tokenization
+          customerInfo,
+          shippingAddress,
+          cartItems,
         });
 
-        if (!paymentResponse.ok) {
+        if (!paymentResponse) {
           throw new Error('Failed to create payment record');
         }
 
-        const { payment } = await paymentResponse.json();
+        const { payment } = paymentResponse;
         setPaymentId(payment.id);
         setIsLoading(false);
       } catch (err) {

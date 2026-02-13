@@ -1,115 +1,74 @@
 /**
  * Security API Service
  * Phase 1: Basic Security Features
+ * 
+ * Legacy service - use SecuritySingletonService instead
+ * This file is kept for backward compatibility
  */
 
-import { LoginSession, SecurityAlert, ApiResponse } from '@/types/security';
-import { api } from '@/lib/api';
+import { LoginSession, SecurityAlert } from '@/types/security';
+import { securityService } from './SecuritySingletonService';
 
 /**
  * Get active user sessions
+ * @deprecated Use securityService.getActiveSessions() instead
  */
 export async function getActiveSessions(): Promise<LoginSession[]> {
-  const response = await api.get('/api/auth/sessions');
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch active sessions');
-  }
-
-  const data: ApiResponse<LoginSession[]> = await response.json();
-  
-  // Parse deviceInfo JSON string for each session
-  const parsedSessions = (data.data || []).map((session: any) => ({
-    ...session,
-    deviceInfo: session.deviceInfo ? JSON.parse(session.deviceInfo) : {
-      type: 'Unknown',
-      browser: 'Unknown', 
-      os: 'Unknown'
-    }
-  }));
-  
-  return parsedSessions;
+  return await securityService.getActiveSessions();
 }
 
 /**
  * Revoke a specific session
+ * @deprecated Use securityService.revokeSession() instead
  */
 export async function revokeSession(sessionId: string): Promise<void> {
-  const response = await api.delete(`/api/auth/sessions/${sessionId}`);
-
-  if (!response.ok) {
-    throw new Error('Failed to revoke session');
-  }
+  return await securityService.revokeSession(sessionId);
 }
 
 /**
  * Revoke all sessions except current
+ * @deprecated Use securityService.revokeAllSessions() instead
  */
 export async function revokeAllSessions(): Promise<void> {
-  const response = await api.post('/api/auth/sessions/revoke-all');
-
-  if (!response.ok) {
-    throw new Error('Failed to revoke all sessions');
-  }
+  return await securityService.revokeAllSessions();
 }
 
 /**
  * Get security alerts for the current user
+ * @deprecated Use securityService.getSecurityAlerts() instead
  */
 export async function getSecurityAlerts(): Promise<SecurityAlert[]> {
-  const response = await api.get('/api/security/security-alerts');
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch security alerts');
-  }
-
-  const data: ApiResponse<SecurityAlert[]> = await response.json();
-  return data.data || (data as any).alerts || [];
+  return await securityService.getSecurityAlerts();
 }
 
 /**
  * Mark a security alert as read
+ * @deprecated Use securityService.markAlertAsRead() instead
  */
 export async function markAlertAsRead(alertId: string): Promise<void> {
-  const response = await api.put(`/api/security/security-alerts/${alertId}/read`);
-
-  if (!response.ok) {
-    throw new Error('Failed to mark alert as read');
-  }
+  return await securityService.markAlertAsRead(alertId);
 }
 
 /**
  * Dismiss a security alert
+ * @deprecated Use securityService.dismissAlert() instead
  */
 export async function dismissAlert(alertId: string): Promise<void> {
-  const response = await api.delete(`/api/security/security-alerts/${alertId}`);
-
-  if (!response.ok) {
-    throw new Error('Failed to dismiss alert');
-  }
+  return await securityService.dismissAlert(alertId);
 }
 
 /**
  * Get security alert preferences
+ * @deprecated Use securityService.getAlertPreferences() instead
  */
 export async function getAlertPreferences(): Promise<Record<string, boolean>> {
-  const response = await api.get('/api/security/security-alerts/preferences');
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch alert preferences');
-  }
-
-  const data: ApiResponse<Record<string, boolean>> = await response.json();
-  return data.data || {};
+  return await securityService.getAlertPreferences();
 }
 
 /**
  * Update security alert preferences
+ * @deprecated Use securityService.updateAlertPreferences() instead
  */
 export async function updateAlertPreferences(preferences: Record<string, boolean>): Promise<void> {
-  const response = await api.put('/api/security/security-alerts/preferences', preferences);
-
-  if (!response.ok) {
-    throw new Error('Failed to update alert preferences');
-  }
+  return await securityService.updateAlertPreferences(preferences);
 }

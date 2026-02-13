@@ -18,6 +18,7 @@ import { useItemsForm } from '@/hooks/useItemsForm';
 import { useItemsViewMode } from '@/hooks/useItemsViewMode';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { StockUpdateService } from '@/services/stockUpdateService';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
 // Components
 import ItemsHeader from './ItemsHeader';
@@ -117,12 +118,9 @@ export default function ItemsClient({
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await api.get(`/api/tenants/${initialTenantId}/categories`);
-        if (response.ok) {
-          const data = await response.json();
-          setCategories(data.categories || []);
-          setUncategorizedCount(data.uncategorizedCount || 0);
-        }
+        const data = await platformHomeService.getTenantCategories(initialTenantId);
+        setCategories(data.categories || []);
+        setUncategorizedCount(data.uncategorizedCount || 0);
       } catch (error) {
         console.error('Failed to fetch categories:', error);
       }

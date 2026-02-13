@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
 
 export interface TenantSlugResponse {
   slug: string;
@@ -17,19 +17,43 @@ export interface TenantIdentifiers {
   autoId: string;
 }
 
-class TenantDirectorySingletonService {
+export interface TenantDirectoryListing {
+  id: string;
+  tenantId: string;
+  businessName: string;
+  slug: string;
+  description?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  logo?: string;
+  coverImage?: string;
+  rating?: number;
+  reviewCount?: number;
+  categories?: string[];
+  isVerified?: boolean;
+  isFeatured?: boolean;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+  businessHours?: any;
+  status: 'draft' | 'pending' | 'approved' | 'rejected' | 'published';
+  createdAt: string;
+  updatedAt: string;
+  publishedAt?: string;
+}
+
+class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
   private static instance: TenantDirectorySingletonService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with platform defaults
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 10 * 60 * 1000, // 10 minutes for tenant data (longer than regular API)
-      enableLogging: true,
-      enableMetrics: true
-    });
+    super('tenant-directory-singleton');
+    this.cacheTTL = 10 * 60 * 1000; // 10 minutes for tenant data (longer than regular API)
   }
 
   public static getInstance(): TenantDirectorySingletonService {
@@ -50,11 +74,13 @@ class TenantDirectorySingletonService {
     }
 
     try {
-      const result = await this.client.makeRequest<TenantSlugResponse>(
-        `/api/directory/tenant/${tenantId}`
+      const result = await this.makeAuthenticatedRequest<TenantSlugResponse>(
+        `/api/directory/tenant/${tenantId}`,
+        {},
+        `tenant-slug-${tenantId}`
       );
       
-      return result.data?.slug;
+      return result.slug;
     } catch (error) {
       console.error('[TenantDirectorySingleton] Failed to get tenant slug:', error);
       return undefined;
@@ -118,17 +144,146 @@ class TenantDirectorySingletonService {
   }
 
   /**
-   * Get performance metrics
+   * Get tenant directory listing
+   * Authenticated endpoint for tenant directory management
    */
-  public getMetrics() {
-    return this.client.getMetrics();
+  async getDirectoryListing(tenantId: string): Promise<TenantDirectoryListing | null> {
+    try {
+      if (!tenantId) {
+        console.error('[TenantDirectorySingleton] getDirectoryListing: tenantId is required');
+        return null;
+      }
+
+      const result = await this.makeAuthenticatedRequest<TenantDirectoryListing>(
+        `/api/tenants/${tenantId}/directory/listing`,
+        {},
+        `directory-listing-${tenantId}`
+      );
+      
+      return result;
+    } catch (error) {
+      console.error('[TenantDirectorySingleton] Failed to get directory listing:', error);
+      return null;
+    }
   }
 
   /**
-   * Reset metrics
+   * Create tenant directory listing
+   * Authenticated endpoint for tenant directory creation
    */
-  public resetMetrics(): void {
-    this.client.resetMetrics();
+  async createDirectoryListing(tenantId: string, listingData: Partial<TenantDirectoryListing>): Promise<TenantDirectoryListing | null> {
+    try {
+      if (!tenantId || !listingData) {
+        console.error('[TenantDirectorySingleton] createDirectoryListing: tenantId and listingData are required');
+        return null;
+      }
+
+      const result = await this.makeAuthenticatedRequest<TenantDirectoryListing>(
+        `/api/tenants/${tenantId}/directory/listing`,
+        {
+          method: 'POST',
+          body: JSON.stringify(listingData)
+        },
+        `create-directory-listing-${tenantId}`
+      );
+
+      // Invalidate cache for this tenant's listing
+      this.invalidateCache(`directory-listing-${tenantId}`);
+      
+      return result;
+    } catch (error) {
+      console.error('[TenantDirectorySingleton] Failed to create directory listing:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update tenant directory listing
+   * Authenticated endpoint for tenant directory updates
+   */
+  async updateDirectoryListing(tenantId: string, listingData: Partial<TenantDirectoryListing>): Promise<TenantDirectoryListing | null> {
+    try {
+      if (!tenantId || !listingData) {
+        console.error('[TenantDirectorySingleton] updateDirectoryListing: tenantId and listingData are required');
+        return null;
+      }
+
+      const result = await this.makeAuthenticatedRequest<TenantDirectoryListing>(
+        `/api/tenants/${tenantId}/directory/listing`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(listingData)
+        },
+        `update-directory-listing-${tenantId}`
+      );
+
+      // Invalidate cache for this tenant's listing
+      this.invalidateCache(`directory-listing-${tenantId}`);
+      
+      return result;
+    } catch (error) {
+      console.error('[TenantDirectorySingleton] Failed to update directory listing:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Patch tenant directory listing
+   * Authenticated endpoint for partial updates
+   */
+  async patchDirectoryListing(tenantId: string, listingData: Partial<TenantDirectoryListing>): Promise<TenantDirectoryListing | null> {
+    try {
+      if (!tenantId || !listingData) {
+        console.error('[TenantDirectorySingleton] patchDirectoryListing: tenantId and listingData are required');
+        return null;
+      }
+
+      const result = await this.makeAuthenticatedRequest<TenantDirectoryListing>(
+        `/api/tenants/${tenantId}/directory/listing`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(listingData)
+        },
+        `patch-directory-listing-${tenantId}`
+      );
+
+      // Invalidate cache for this tenant's listing
+      this.invalidateCache(`directory-listing-${tenantId}`);
+      
+      return result;
+    } catch (error) {
+      console.error('[TenantDirectorySingleton] Failed to patch directory listing:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete tenant directory listing
+   * Authenticated endpoint for tenant directory deletion
+   */
+  async deleteDirectoryListing(tenantId: string): Promise<boolean> {
+    try {
+      if (!tenantId) {
+        console.error('[TenantDirectorySingleton] deleteDirectoryListing: tenantId is required');
+        return false;
+      }
+
+      const result = await this.makeAuthenticatedRequest<any>(
+        `/api/tenants/${tenantId}/directory/listing`,
+        {
+          method: 'DELETE'
+        },
+        `delete-directory-listing-${tenantId}`
+      );
+
+      // Invalidate cache for this tenant's listing
+      this.invalidateCache(`directory-listing-${tenantId}`);
+      
+      return !!result;
+    } catch (error) {
+      console.error('[TenantDirectorySingleton] Failed to delete directory listing:', error);
+      return false;
+    }
   }
 }
 

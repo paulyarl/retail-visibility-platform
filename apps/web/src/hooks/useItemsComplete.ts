@@ -116,14 +116,14 @@ export function useItemsComplete(options: UseItemsCompleteOptions): UseItemsComp
       // Use singleton service instead of direct API call
       const data = await itemsService.getItemsComplete(params);
 
-      console.log('[useItemsComplete] fetchItems - service returned:', {
+     /*  console.log('[useItemsComplete] fetchItems - service returned:', {
         tenantId,
         params,
         hasData: !!data,
         itemsCount: data?.items?.length || 0,
         totalItems: data?.stats?.total || 0,
         error: data ? null : 'Service returned null'
-      });
+      }); */
 
       if (data) {
         setItems(data.items);
@@ -131,12 +131,12 @@ export function useItemsComplete(options: UseItemsCompleteOptions): UseItemsComp
         setTotalItems(data.pagination.totalItems);
         setTotalPages(data.pagination.totalPages);
 
-        console.log('[useItemsComplete] fetchItems - state updated:', {
+        /* console.log('[useItemsComplete] fetchItems - state updated:', {
           itemsCount: data.items.length,
           totalItems: data.stats.total,
           currentPage: page,
           totalPages: data.pagination.totalPages
-        });
+        }); */
       } else {
         // Fallback to empty state if service fails
         setItems([]);

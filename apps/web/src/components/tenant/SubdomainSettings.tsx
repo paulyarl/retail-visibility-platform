@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Loader2, CheckCircle, AlertCircle, Info, Eye, Globe, ExternalLink, RefreshCw } from 'lucide-react';
-import { api, API_BASE_URL } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 
 interface SubdomainSettingsProps {
   tenantId: string;
@@ -67,11 +67,8 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
 
   const loadCurrentSubdomain = async () => {
     try {
-      const response = await api.get(`/api/tenants/${tenantId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentSubdomain(data.subdomain || '');
-      }
+      const data = await tenantInfoService.getTenantSubdomain(tenantId);
+      setCurrentSubdomain(data.subdomain || '');
     } catch (error) {
       console.error('Failed to load current subdomain:', error);
     }
@@ -80,12 +77,11 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
   const loadUserSubdomains = async () => {
     try {
       setLoadingSubdomains(true);
-      const response = await api.get(`/api/tenants/my-subdomains?tenantId=${tenantId}`);
-      if (response.ok) {
-        const data = await response.json();
-        // Use API-provided URLs directly - they are dynamically detected based on request host
-        setUserSubdomains(data.subdomains);
-      }
+      const data = await tenantInfoService.getUserSubdomains(tenantId);
+      // Use API-provided URLs directly - they are dynamically detected based on request host
+      setUserSubdomains(data.subdomains || []);
+      setPlatformDomain(data.platformDomain || 'visibleshelf.com');
+      setPlatformUrl(data.platformUrl || 'visibleshelf.com');
     } catch (error) {
       console.error('Failed to load user subdomains:', error);
     } finally {
@@ -101,9 +97,7 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
     setError('');
 
     try {
-      const response = await api.get(`/api/tenants/check-subdomain/${newSubdomain}`);
-      const result = await response.json();
-
+      const result = await tenantInfoService.checkSubdomainAvailability(newSubdomain);
       setCheckResult(result);
     } catch (error) {
       console.error('Failed to check subdomain:', error);
@@ -121,18 +115,12 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
     setSuccess('');
 
     try {
-      const response = await api.put(`/api/tenants/${tenantId}/subdomain`, { subdomain: newSubdomain });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setCurrentSubdomain(newSubdomain);
-        setSuccess('Subdomain updated successfully!');
-        setNewSubdomain('');
-        setCheckResult(null);
-      } else {
-        setError(data.message || 'Failed to update subdomain');
-      }
+      const data = await tenantInfoService.updateTenantSubdomain(tenantId, newSubdomain);
+      
+      setCurrentSubdomain(newSubdomain);
+      setSuccess('Subdomain updated successfully!');
+      setNewSubdomain('');
+      setCheckResult(null);
     } catch (error) {
       console.error('Failed to update subdomain:', error);
       setError('Failed to update subdomain');
@@ -147,18 +135,12 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
     setSuccess('');
 
     try {
-      const response = await api.delete(`/api/tenants/${tenantId}/subdomain`);
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setCurrentSubdomain('');
-        setSuccess('Subdomain removed successfully!');
-        setNewSubdomain('');
-        setCheckResult(null);
-      } else {
-        setError(data.message || 'Failed to remove subdomain');
-      }
+      const data = await tenantInfoService.deleteTenantSubdomain(tenantId);
+      
+      setCurrentSubdomain('');
+      setSuccess('Subdomain removed successfully!');
+      setNewSubdomain('');
+      setCheckResult(null);
     } catch (error) {
       console.error('Failed to remove subdomain:', error);
       setError('Failed to remove subdomain');
@@ -173,21 +155,16 @@ export default function SubdomainSettings({ tenantId }: SubdomainSettingsProps) 
     }
 
     try {
-      const response = await api.delete(`/api/tenants/${targetTenantId}/subdomain`);
-      if (response.ok) {
-        // Refresh the subdomains list
-        await loadUserSubdomains();
-        // If this was the current tenant's subdomain, refresh current subdomain too
-        if (targetTenantId === tenantId) {
-          await loadCurrentSubdomain();
-        }
-        setSuccess('Subdomain removed successfully!');
-      } else {
-        const data = await response.json();
-        setError(data.message || 'Failed to remove subdomain');
+      await tenantInfoService.deleteSubdomainByTenantId(targetTenantId);
+      // Refresh the subdomains list
+      await loadUserSubdomains();
+      // If this was the current tenant's subdomain, refresh current subdomain too
+      if (targetTenantId === tenantId) {
+        await loadCurrentSubdomain();
       }
+      setSuccess('Subdomain removed successfully!');
     } catch (error) {
-      console.error('Failed to delete subdomain:', error);
+      console.error('Failed to remove subdomain:', error);
       setError('Failed to remove subdomain');
     }
   };

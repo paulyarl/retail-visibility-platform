@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Package, Search, Filter, Download, Eye, CheckCircle2, Clock, ShoppingBag, XCircle, Settings, CreditCard } from 'lucide-react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { tenantOrderService } from '@/services/TenantOrderService';
 
 interface OrderItem {
   id: string;
@@ -94,27 +94,33 @@ export default function OrdersClient({ tenantId, searchParams }: OrdersClientPro
         params.append('fulfillmentStatus', statusFilter);
       }
       
-      const response = await api.get(`/api/tenants/${tenantId}/orders?${params}`);
+      const filters: any = {
+        page: currentPage,
+        limit: 10
+      };
       
-      if (!response.ok) throw new Error('Failed to fetch orders');
+      if (statusFilter === 'archived') {
+        filters.archived = 'true';
+      } else if (statusFilter !== 'all') {
+        filters.fulfillmentStatus = statusFilter;
+      }
       
-      const data = await response.json();
+      const data = await tenantOrderService.getOrders(tenantId, filters);
       
-      console.log('[OrdersClient] API Response:', {
-        success: data.success,
-        ordersCount: data.data?.orders?.length,
-        pagination: data.data?.pagination,
-        firstOrder: data.data?.orders?.[0]
+      console.log('[OrdersClient] Service Response:', {
+        ordersCount: data.orders?.length,
+        pagination: data.pagination,
+        firstOrder: data.orders?.[0]
       });
       
-      if (data.success && data.data) {
-        setOrders(data.data.orders || []);
-        setTotalPages(data.data.pagination?.totalPages || 1);
-        setTotalCount(data.data.pagination?.total || 0);
+      if (data.orders) {
+        setOrders(data.orders || []);
+        setTotalPages(data.pagination?.totalPages || 1);
+        setTotalCount(data.pagination?.total || 0);
         console.log('[OrdersClient] State updated:', {
-          ordersCount: data.data.orders?.length,
-          totalPages: data.data.pagination?.totalPages,
-          totalCount: data.data.pagination?.total
+          ordersCount: data.orders?.length,
+          totalPages: data.pagination?.totalPages,
+          totalCount: data.pagination?.total
         });
       }
     } catch (error) {
@@ -189,11 +195,9 @@ export default function OrdersClient({ tenantId, searchParams }: OrdersClientPro
     try {
       setArchiving(orderId);
       
-      const response = await api.put(`/api/tenants/${tenantId}/orders/${orderId}/archive`, {
-        archived: true
-      });
+      const success = await tenantOrderService.archiveOrder(tenantId, orderId, true);
       
-      if (!response.ok) throw new Error('Failed to archive order');
+      if (!success) throw new Error('Failed to archive order');
       
       // Refresh orders list
       await fetchOrders();

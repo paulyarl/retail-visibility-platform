@@ -1,13 +1,4 @@
-import { api } from '@/lib/api';
-
-export interface ScanSession {
-  id: string;
-  tenantId: string;
-  status: 'active' | 'completed' | 'cancelled';
-  itemsScanned: number;
-  createdAt: string;
-  updatedAt: string;
-}
+import { platformHomeService, ScanSession } from '@/services/PlatformHomeSingletonService';
 
 /**
  * Service for handling scan session operations
@@ -19,18 +10,7 @@ export class ScanSessionService {
    */
   async checkActiveSessions(tenantId: string): Promise<ScanSession | null> {
     try {
-      const response = await api.get(
-        `/api/scan/sessions?tenantId=${tenantId}&status=active`
-      );
-
-      if (!response.ok) {
-        // 404 is expected when no active sessions
-        if (response.status === 404) return null;
-        throw new Error('Failed to check scan sessions');
-      }
-
-      const data = await response.json();
-      return Array.isArray(data) && data.length > 0 ? data[0] : null;
+      return await platformHomeService.checkActiveScanSessions(tenantId);
     } catch (error) {
       console.error('[ScanSessionService] Failed to check sessions:', error);
       return null;
@@ -42,16 +22,7 @@ export class ScanSessionService {
    */
   async createSession(tenantId: string): Promise<ScanSession> {
     try {
-      const response = await api.post('/api/scan/sessions', {
-        tenantId,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData?.error || 'Failed to create scan session');
-      }
-
-      return await response.json();
+      return await platformHomeService.createScanSession(tenantId);
     } catch (error) {
       console.error('[ScanSessionService] Failed to create session:', error);
       throw error;
@@ -63,14 +34,7 @@ export class ScanSessionService {
    */
   async endSession(sessionId: string): Promise<void> {
     try {
-      const response = await api.put(`/api/scan/sessions/${sessionId}`, {
-        status: 'completed',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData?.error || 'Failed to end scan session');
-      }
+      await platformHomeService.endScanSession(sessionId);
     } catch (error) {
       console.error('[ScanSessionService] Failed to end session:', error);
       throw error;

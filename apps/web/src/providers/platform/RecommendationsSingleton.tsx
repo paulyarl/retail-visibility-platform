@@ -5,7 +5,7 @@
  * Extends UniversalSingleton for consistent caching and metrics
  */
 
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { PublicApiSingleton } from '../base/UniversalSingleton';
 import { RecentlyViewedItem } from './RecentlyViewedSingleton';
 
 // Recommendations Data Interfaces
@@ -72,15 +72,16 @@ export interface RecommendationFeedback {
  * Recommendations Singleton - Consumer Pattern
  * 
  * Consumes and manages recommendation data for personalization
+ * Uses PublicApiSingleton for public recommendation data
  */
-class RecommendationsSingleton extends UniversalSingleton {
+class RecommendationsSingleton extends PublicApiSingleton {
   private static instance: RecommendationsSingleton;
   private recommendationConfig: RecommendationConfig;
   private feedbackQueue: RecommendationFeedback[] = [];
   private feedbackInterval: NodeJS.Timeout | null = null;
 
-  private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
-    super(singletonKey, cacheOptions);
+  private constructor(singletonKey: string) {
+    super(singletonKey);
     this.recommendationConfig = {
       enableRecommendations: true,
       maxRecommendations: 20,
@@ -148,20 +149,18 @@ class RecommendationsSingleton extends UniversalSingleton {
       if (options.minScore) params.append('minScore', options.minScore.toString());
       if (options.tenantId) params.append('tenantId', options.tenantId);
 
-      const response = await fetch(`/api/recommendations/personalized?${params}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch personalized recommendations');
-      }
-
-      const recommendations = await response.json();
+      const recommendations = await this.makePublicRequest<Recommendation[]>(
+        `/api/recommendations/personalized?${params}`,
+        {},
+        `recommendations-personalized-${userId}-${options.type}-${options.tenantId}`,
+        this.cacheTTL
+      );
       
       // Filter by minimum score
       const filteredRecommendations = recommendations.filter((rec: Recommendation) => 
         rec.score >= (options.minScore || this.recommendationConfig.minScore)
       );
 
-      await this.setCache(cacheKey, filteredRecommendations);
       return filteredRecommendations;
     } catch (error) {
       console.error('Error fetching personalized recommendations:', error);
@@ -194,15 +193,13 @@ class RecommendationsSingleton extends UniversalSingleton {
       if (options.tenantId) params.append('tenantId', options.tenantId);
       if (options.timeRange) params.append('timeRange', options.timeRange.toString());
 
-      const response = await fetch(`/api/recommendations/popular?${params}`);
+      const recommendations = await this.makePublicRequest<Recommendation[]>(
+        `/api/recommendations/popular?${params}`,
+        {},
+        `recommendations-popular-${options.type}-${options.tenantId}`,
+        this.cacheTTL
+      );
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch popular recommendations');
-      }
-
-      const recommendations = await response.json();
-      
-      await this.setCache(cacheKey, recommendations);
       return recommendations;
     } catch (error) {
       console.error('Error fetching popular recommendations:', error);
@@ -237,15 +234,13 @@ class RecommendationsSingleton extends UniversalSingleton {
       if (options.userId) params.append('userId', options.userId);
       if (options.tenantId) params.append('tenantId', options.tenantId);
 
-      const response = await fetch(`/api/recommendations/similar?${params}`);
+      const recommendations = await this.makePublicRequest<Recommendation[]>(
+        `/api/recommendations/similar?${params}`,
+        {},
+        `recommendations-similar-${itemId}-${itemType}-${options.tenantId}`,
+        this.cacheTTL
+      );
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch similar item recommendations');
-      }
-
-      const recommendations = await response.json();
-      
-      await this.setCache(cacheKey, recommendations);
       return recommendations;
     } catch (error) {
       console.error('Error fetching similar item recommendations:', error);
@@ -261,31 +256,21 @@ class RecommendationsSingleton extends UniversalSingleton {
     userId?: string,
     limit: number = 10
   ): Promise<Recommendation[]> {
-    const cacheKey = `recommendations-from-recently-viewed-${userId || 'anonymous'}-${limit}`;
-    
-    const cached = await this.getFromCache<Recommendation[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch('/api/recommendations/from-recently-viewed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recentlyViewed,
-          userId,
-          limit
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch recommendations from recently viewed');
-      }
-
-      const recommendations = await response.json();
+      const recommendations = await this.makePublicRequest<Recommendation[]>(
+        '/api/recommendations/from-recently-viewed',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            recentlyViewed,
+            userId,
+            limit
+          })
+        },
+        `recommendations-recently-viewed-${userId}`,
+        this.cacheTTL
+      );
       
-      await this.setCache(cacheKey, recommendations);
       return recommendations;
     } catch (error) {
       console.error('Error fetching recommendations from recently viewed:', error);
@@ -314,23 +299,20 @@ class RecommendationsSingleton extends UniversalSingleton {
     }
 
     try {
-      const response = await fetch('/api/recommendations/contextual', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          context,
-          userId,
-          limit
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch contextual recommendations');
-      }
-
-      const recommendations = await response.json();
+      const recommendations = await this.makePublicRequest<Recommendation[]>(
+        '/api/recommendations/contextual',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            context,
+            userId,
+            limit
+          })
+        },
+        `recommendations-contextual-${userId}`,
+        this.cacheTTL
+      );
       
-      await this.setCache(cacheKey, recommendations);
       return recommendations;
     } catch (error) {
       console.error('Error fetching contextual recommendations:', error);
@@ -393,15 +375,14 @@ class RecommendationsSingleton extends UniversalSingleton {
    */
   private async sendFeedback(feedback: RecommendationFeedback): Promise<void> {
     try {
-      const response = await fetch('/api/recommendations/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(feedback)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send recommendation feedback');
-      }
+      await this.makePublicRequest<void>(
+        '/api/recommendations/feedback',
+        {
+          method: 'POST',
+          body: JSON.stringify(feedback)
+        },
+        `recommendations-feedback-${feedback.recommendationId}`
+      );
     } catch (error) {
       console.error('Error sending recommendation feedback:', error);
       throw error;
@@ -413,15 +394,14 @@ class RecommendationsSingleton extends UniversalSingleton {
    */
   private async sendFeedbackBatch(feedbacks: RecommendationFeedback[]): Promise<void> {
     try {
-      const response = await fetch('/api/recommendations/feedback/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feedbacks })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send recommendation feedback batch');
-      }
+      await this.makePublicRequest<void>(
+        '/api/recommendations/feedback/batch',
+        {
+          method: 'POST',
+          body: JSON.stringify({ feedbacks })
+        },
+        `recommendations-feedback-batch`
+      );
     } catch (error) {
       console.error('Error sending recommendation feedback batch:', error);
       throw error;
@@ -444,13 +424,12 @@ class RecommendationsSingleton extends UniversalSingleton {
     }
 
     try {
-      const response = await fetch(`/api/recommendations/analytics?days=${days}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch recommendation analytics');
-      }
-
-      const analytics = await response.json();
+      const analytics = await this.makePublicRequest<any>(
+        `/api/recommendations/analytics?days=${days}`,
+        {},
+        `recommendations-analytics-${days}`,
+        this.cacheTTL
+      );
       
       await this.setCache(cacheKey, analytics);
       return analytics;
@@ -505,13 +484,12 @@ class RecommendationsSingleton extends UniversalSingleton {
       if (type) params.append('type', type);
       params.append('days', days.toString());
 
-      const response = await fetch(`/api/recommendations/performance?${params}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch recommendation performance');
-      }
-
-      const performance = await response.json();
+      const performance = await this.makePublicRequest<any>(
+        `/api/recommendations/performance?${params}`,
+        {},
+        `recommendations-performance-${type}-${days}`,
+        this.cacheTTL
+      );
       
       await this.setCache(cacheKey, performance);
       return performance;

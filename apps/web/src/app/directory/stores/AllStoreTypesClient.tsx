@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Store, ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 interface StoreType {
   name: string;
@@ -37,17 +38,9 @@ export default function AllStoreTypesClient() {
       setError(null);
 
       try {
-        const apiBaseUrl =
-          process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${apiBaseUrl}/api/directory/store-types`);
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch store types');
-        }
-
-        const result = await response.json();
+        const result = await recommendationsService.getDirectoryStoreTypes();
         // Handle both response formats: result.storeTypes or result.data.storeTypes
-        setStoreTypes(result.storeTypes || result.data?.storeTypes || []);
+        setStoreTypes(result?.storeTypes || result?.data?.storeTypes || []);
       } catch (err) {
         console.error('Error fetching store types:', err);
         setError('Failed to load store types. Please try again.');

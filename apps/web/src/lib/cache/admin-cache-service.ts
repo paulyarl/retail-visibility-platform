@@ -4,7 +4,7 @@
  * Similar to tenant caching but optimized for admin use cases
  */
 
-import { api } from '@/lib/api';
+import { securityService } from '@/services/SecuritySingletonService';
 import { LocalStorageCache } from './local-storage-cache';
 
 export interface AdminTenantsData {
@@ -165,12 +165,7 @@ export class AdminCacheService {
       }
     }
 
-    const response = await api.get('/api/tenants');
-    if (!response.ok) {
-      throw new Error(`Failed to fetch tenants list: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = await securityService.getAdminTenants();
     const tenantsData: AdminTenantsData = {
       tenants: Array.isArray(data) ? data : [],
       total: Array.isArray(data) ? data.length : 0
@@ -194,13 +189,7 @@ export class AdminCacheService {
       }
     }
 
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-    const response = await api.get(`${apiBaseUrl}/api/admin/sync-stats`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch sync stats: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = await securityService.getAdminSyncStats();
     const syncStats: AdminSyncStats = {
       totalRuns: data.stats?.totalRuns || 0,
       successRate: data.stats?.successRate || 0,
@@ -230,17 +219,7 @@ export class AdminCacheService {
     if (params?.limit) queryParams.set('limit', params.limit.toString());
     if (params?.offset) queryParams.set('offset', params.offset.toString());
 
-    const response = await api.get(`/api/admin/security/sessions?${queryParams}`);
-    if (!response.ok) {
-      // Handle 503 gracefully for security endpoints
-      if (response.status === 503) {
-        console.warn('Security sessions endpoint temporarily unavailable');
-        return { data: [], total: 0 };
-      }
-      throw new Error(`Failed to fetch security sessions: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = await securityService.getAdminSecuritySessions(params);
     const sessionsData: AdminSecuritySessions = {
       data: data.data || [],
       total: data.total || 0
@@ -264,16 +243,10 @@ export class AdminCacheService {
       }
     }
 
-    const response = await api.get('/api/admin/security/sessions/stats');
-    if (!response.ok) {
-      if (response.status === 503) {
-        console.warn('Security stats endpoint temporarily unavailable');
-        return { activeSessions: 0, activeUsers: 0, sessionsLast24h: 0, revokedSessions: 0, deviceBreakdown: [] };
-      }
-      throw new Error(`Failed to fetch security stats: ${response.status}`);
+    const data = await securityService.getAdminSecuritySessionsStats();
+    if (!data) {
+      return { activeSessions: 0, activeUsers: 0, sessionsLast24h: 0, revokedSessions: 0, deviceBreakdown: [] };
     }
-
-    const data = await response.json();
 
     LocalStorageCache.set(cacheKey, data, { ttl: this.SECURITY_CACHE_TTL });
 
@@ -293,12 +266,7 @@ export class AdminCacheService {
       }
     }
 
-    const response = await api.get('/api/admin/security/alerts');
-    if (!response.ok) {
-      throw new Error(`Failed to fetch security alerts: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = await securityService.getAdminSecurityAlerts();
     const alertsData: AdminSecurityAlerts = {
       data: data.data || [],
       total: data.total || 0
@@ -322,12 +290,7 @@ export class AdminCacheService {
       }
     }
 
-    const response = await api.get('/api/admin/security/alerts/stats');
-    if (!response.ok) {
-      throw new Error(`Failed to fetch security alert stats: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = await securityService.getAdminSecurityAlertsStats();
 
     LocalStorageCache.set(cacheKey, data, { ttl: this.SECURITY_CACHE_TTL });
 
@@ -347,16 +310,7 @@ export class AdminCacheService {
       }
     }
 
-    const response = await api.get('/api/admin/security/failed-logins?limit=20');
-    if (!response.ok) {
-      if (response.status === 503) {
-        console.warn('Failed logins endpoint temporarily unavailable');
-        return { data: [] };
-      }
-      throw new Error(`Failed to fetch failed logins: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = await securityService.getAdminFailedLogins();
     const failedLoginsData: AdminFailedLogins = {
       data: data.data || []
     };

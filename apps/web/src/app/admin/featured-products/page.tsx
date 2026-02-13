@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Star, TrendingUp, Store, Package, Eye, ExternalLink, X, Trash2, CheckSquare, Square, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -66,69 +66,63 @@ export default function AdminFeaturedProductsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, productsRes] = await Promise.all([
-        api.get('/api/admin/products/featuring/stats'),
-        api.get(`/api/admin/products/featured?limit=${limit}&offset=${page * limit}`)
+      const [statsData, productsData] = await Promise.all([
+        platformHomeService.getFeaturingStats(),
+        platformHomeService.getFeaturedProducts(limit, page * limit)
       ]);
 
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
+      setStats(statsData);
+      
+      let allProducts = productsData || [];
+        
+      // Extract unique tenants for filter dropdown
+      const tenantsMap = new Map();
+      allProducts.forEach((p: FeaturedProduct) => {
+        if (!tenantsMap.has(p.tenant_id)) {
+          tenantsMap.set(p.tenant_id, { id: p.tenant_id, name: p.tenants.name });
+        }
+      });
+      setUniqueTenants(Array.from(tenantsMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
+      
+      // Apply client-side filters
+      let filteredProducts = allProducts;
+      
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filteredProducts = filteredProducts.filter((p: FeaturedProduct) => 
+          p.name?.toLowerCase().includes(query) ||
+          p.title?.toLowerCase().includes(query) ||
+          p.brand?.toLowerCase().includes(query) ||
+          p.sku?.toLowerCase().includes(query) ||
+          p.tenants.name?.toLowerCase().includes(query)
+        );
       }
-
-      if (productsRes.ok) {
-        const productsData = await productsRes.json();
-        let allProducts = productsData.products || [];
-        
-        // Extract unique tenants for filter dropdown
-        const tenantsMap = new Map();
-        allProducts.forEach((p: FeaturedProduct) => {
-          if (!tenantsMap.has(p.tenant_id)) {
-            tenantsMap.set(p.tenant_id, { id: p.tenant_id, name: p.tenants.name });
-          }
-        });
-        setUniqueTenants(Array.from(tenantsMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
-        
-        // Apply client-side filters
-        let filteredProducts = allProducts;
-        
-        if (searchQuery) {
-          const query = searchQuery.toLowerCase();
-          filteredProducts = filteredProducts.filter((p: FeaturedProduct) => 
-            p.name?.toLowerCase().includes(query) ||
-            p.title?.toLowerCase().includes(query) ||
-            p.brand?.toLowerCase().includes(query) ||
-            p.sku?.toLowerCase().includes(query) ||
-            p.tenants.name?.toLowerCase().includes(query)
-          );
-        }
-        
-        if (tierFilter !== 'all') {
-          filteredProducts = filteredProducts.filter((p: FeaturedProduct) => 
-            p.tenants.subscription_tier === tierFilter
-          );
-        }
-        
-        if (tenantFilter !== 'all') {
-          filteredProducts = filteredProducts.filter((p: FeaturedProduct) => 
-            p.tenant_id === tenantFilter
-          );
-        }
-        
-        if (expirationFilter === 'expiring') {
-          const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-          filteredProducts = filteredProducts.filter((p: FeaturedProduct) => 
-            p.featured_until && new Date(p.featured_until) <= sevenDaysFromNow
-          );
-        } else if (expirationFilter === 'permanent') {
-          filteredProducts = filteredProducts.filter((p: FeaturedProduct) => !p.featured_until);
-        } else if (expirationFilter === 'temporary') {
-          filteredProducts = filteredProducts.filter((p: FeaturedProduct) => p.featured_until);
-        }
-        
-        setProducts(filteredProducts);
-        setTotal(filteredProducts.length);
+      
+      if (tierFilter !== 'all') {
+        filteredProducts = filteredProducts.filter((p: FeaturedProduct) => 
+          p.tenants.subscription_tier === tierFilter
+        );
       }
+      
+      if (tenantFilter !== 'all') {
+        filteredProducts = filteredProducts.filter((p: FeaturedProduct) => 
+          p.tenant_id === tenantFilter
+        );
+      }
+      
+      if (expirationFilter === 'expiring') {
+        const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        filteredProducts = filteredProducts.filter((p: FeaturedProduct) => 
+          p.featured_until && new Date(p.featured_until) <= sevenDaysFromNow
+        );
+      } else if (expirationFilter === 'permanent') {
+        filteredProducts = filteredProducts.filter((p: FeaturedProduct) => !p.featured_until);
+      } else if (expirationFilter === 'temporary') {
+        filteredProducts = filteredProducts.filter((p: FeaturedProduct) => p.featured_until);
+      }
+      
+      setProducts(filteredProducts);
+      setTotal(filteredProducts.length);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -158,14 +152,9 @@ export default function AdminFeaturedProductsPage() {
 
   const handleUnfeature = async (productId: string, tenantId: string) => {
     try {
-      const res = await api.delete(`/api/tenants/${tenantId}/products/${productId}/feature`);
-      if (res.ok) {
-        await fetchData();
-        setConfirmUnfeature(null);
-      } else {
-        const error = await res.json();
-        alert(`Failed to unfeature: ${error.message || 'Unknown error'}`);
-      }
+      await platformHomeService.unfeatureProduct(tenantId, productId);
+      await fetchData();
+      setConfirmUnfeature(null);
     } catch (error) {
       console.error('Error unfeaturing product:', error);
       alert('Failed to unfeature product');
@@ -174,18 +163,9 @@ export default function AdminFeaturedProductsPage() {
 
   const handlePriorityUpdate = async (productId: string, tenantId: string, newPriority: number) => {
     try {
-      const res = await api.patch(`/api/tenants/${tenantId}/products/${productId}/feature/priority`, {
-        priority: newPriority
-      });
-      if (res.ok) {
-        setProducts(prev => prev.map(p => 
-          p.id === productId ? { ...p, featured_priority: newPriority } : p
-        ));
-        setUpdatingPriority(null);
-      } else {
-        const error = await res.json();
-        alert(`Failed to update priority: ${error.message || 'Unknown error'}`);
-      }
+      await platformHomeService.updateProductPriority(tenantId, productId, newPriority);
+      await fetchData();
+      setUpdatingPriority(null);
     } catch (error) {
       console.error('Error updating priority:', error);
       alert('Failed to update priority');
@@ -224,7 +204,7 @@ export default function AdminFeaturedProductsPage() {
       const promises = Array.from(selectedProducts).map(productId => {
         const product = products.find(p => p.id === productId);
         if (!product) return Promise.resolve();
-        return api.delete(`/api/tenants/${product.tenant_id}/products/${productId}/feature`);
+        return platformHomeService.unfeatureProduct(product.tenant_id, productId);
       });
 
       await Promise.all(promises);

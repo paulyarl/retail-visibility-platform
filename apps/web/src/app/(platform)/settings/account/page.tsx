@@ -12,7 +12,7 @@ import TenantLimitBadge from '@/components/tenant/TenantLimitBadge';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 import { useTenantLimits } from '@/hooks/useTenantLimits';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -36,15 +36,12 @@ export default function AccountPage() {
       if (!user?.id) return;
       
       try {
-        const response = await api.get('/user/preferences');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.data?.navigationPreference) {
-            setNavigationPreference(data.data.navigationPreference);
-            // Also update localStorage for immediate use in tenant switcher
-            if (user && user.id) {
-              localStorage.setItem(`user-nav-preference-${user.id}`, data.data.navigationPreference);
-            }
+        const preferences = await platformHomeService.getUserPreferences();
+        if (preferences?.navigationPreference) {
+          setNavigationPreference(preferences.navigationPreference as 'last-visited' | 'current-page');
+          // Also update localStorage for immediate use in tenant switcher
+          if (user && user.id) {
+            localStorage.setItem(`user-nav-preference-${user.id}`, preferences.navigationPreference);
           }
         }
       } catch (error) {
@@ -59,21 +56,16 @@ export default function AccountPage() {
   const saveNavigationPreference = async (preference: 'last-visited' | 'current-page') => {
     setSavingPreference(true);
     try {
-      const response = await api.patch('/user/preferences', {
-        preferences: {
-          navigationPreference: preference
-        }
+      const updatedPreferences = await platformHomeService.updateUserPreferences({
+        navigationPreference: preference
       });
 
-      if (response.ok) {
+      if (updatedPreferences) {
         setNavigationPreference(preference);
         // Also update localStorage for immediate use in tenant switcher
         if (user && user.id) {
           localStorage.setItem(`user-nav-preference-${user.id}`, preference);
         }
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to save preference');
       }
     } catch (error) {
       console.error('Failed to save navigation preference:', error);

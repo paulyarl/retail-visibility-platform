@@ -16,6 +16,7 @@ import dynamic from 'next/dynamic';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import CategoryBrowseTracker from '@/components/tracking/CategoryBrowseTracker';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 // Dynamically import Google Maps to avoid SSR issues
 const DirectoryMapGoogle = dynamic(() => import('@/components/directory/DirectoryMapGoogle'), {
@@ -128,9 +129,8 @@ export default function CategoryViewClient({
         const decodedSlug = decodeURIComponent(categorySlug);
 
         // 1. Fetch category info from directory categories API
-        const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/categories`);
-        if (categoriesRes.ok) {
-          const catData = await categoriesRes.json();
+        const catData = await recommendationsService.getDirectoryCategories();
+        if (catData) {
           // Use centralized slug matching for robust comparison
           const currentCat = catData.categories?.find((c: any) => 
             slugsMatch(c.slug, decodedSlug)
@@ -150,15 +150,11 @@ export default function CategoryViewClient({
         }
 
         // 2. Fetch stores in this category using directory categories API
-        const storesRes = await fetch(
-          `${apiBaseUrl}/api/directory/mv/categories/${decodedSlug}`
-        );
+        const storesData = await recommendationsService.getStoresByCategory(decodedSlug);
 
-        if (!storesRes.ok) {
+        if (!storesData) {
           throw new Error('Failed to fetch stores');
         }
-
-        const storesData = await storesRes.json();
 
         // 3. Transform to DirectoryResponse format (categories API returns stores directly)
         setData({

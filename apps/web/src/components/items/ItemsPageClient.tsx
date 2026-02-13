@@ -483,15 +483,15 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   };
 
   const handleStockUpdate = async (itemId: string, newStock: number) => {
-    console.log('[handleStockUpdate] CALLED with:', { itemId, newStock, type: typeof newStock });
-    console.log('[handleStockUpdate] updateItem function:', typeof updateItem);
+    /* console.log('[handleStockUpdate] CALLED with:', { itemId, newStock, type: typeof newStock });
+    console.log('[handleStockUpdate] updateItem function:', typeof updateItem); */
     try {
       // Ensure stock is a number, not a string
       const stockNumber = typeof newStock === 'string' ? parseInt(newStock) : newStock;
-      console.log(`[ItemsPageClient] Updating stock for item ${itemId} to ${stockNumber} (type: ${typeof stockNumber})`);
+      /* console.log(`[ItemsPageClient] Updating stock for item ${itemId} to ${stockNumber} (type: ${typeof stockNumber})`); */
       const result = await updateItem(itemId, { stock: stockNumber });
-      console.log(`[ItemsPageClient] Stock updated successfully:`, result);
-      console.log(`[ItemsPageClient] Refreshing list...`);
+      /* console.log(`[ItemsPageClient] Stock updated successfully:`, result); */
+      /* console.log(`[ItemsPageClient] Refreshing list...`); */
       // Refresh is called automatically by updateItem's onSuccess callback
     } catch (error) {
       console.error('[ItemsPageClient] Stock update failed:', error);
@@ -499,7 +499,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
     }
   };
 
-  console.log('[ItemsPageClient] Render - state:', {
+  /* console.log('[ItemsPageClient] Render - state:', {
     tenantId,
     loading,
     error,
@@ -513,7 +513,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
     search,
     category
   });
-
+ */
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-800">
       <StoreInventoryHeader

@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Butto
 import PageHeader, { Icons } from '@/components/PageHeader';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
 
 // Force edge runtime to prevent prerendering issues
@@ -58,11 +58,10 @@ export default function TenantUsersPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.get(`/api/tenants/${tenantId}/users`);
-      const data = await res.json();
+      const data = await platformHomeService.getTenantUsers(tenantId);
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to load users');
+      if (!data) {
+        throw new Error('Failed to load users');
       }
 
       setUsers(Array.isArray(data) ? data : []);
@@ -84,15 +83,13 @@ export default function TenantUsersPage() {
       setAdding(true);
       setError(null);
 
-      const res = await api.post(`/api/tenants/${tenantId}/users`, {
+      const data = await platformHomeService.addTenantUser(tenantId, {
         email: addEmail.trim(),
         role: addRole,
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || data.error || 'Failed to add user');
+      if (!data) {
+        throw new Error('Failed to add user');
       }
 
       setSuccess(`User ${addEmail} added successfully`);
@@ -117,14 +114,10 @@ export default function TenantUsersPage() {
       setChangingRole(true);
       setError(null);
 
-      const res = await api.put(`/api/tenants/${tenantId}/users/${selectedUser.id}`, {
-        role: newRole,
-      });
+      const data = await platformHomeService.updateTenantUserRole(tenantId, selectedUser.id, newRole);
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || data.error || 'Failed to change role');
+      if (!data) {
+        throw new Error('Failed to change role');
       }
 
       setSuccess(`Role updated successfully`);
@@ -148,16 +141,11 @@ export default function TenantUsersPage() {
 
     try {
       setError(null);
-      const res = await api.delete(`/api/tenants/${tenantId}/users/${user.id}`);
+      await platformHomeService.removeTenantUser(tenantId, user.id);
 
-      if (res.status === 204 || res.ok) {
-        setSuccess(`User removed successfully`);
-        await loadUsers();
-        setTimeout(() => setSuccess(null), 3000);
-      } else {
-        const data = await res.json();
-        throw new Error(data.message || data.error || 'Failed to remove user');
-      }
+      setSuccess(`User removed successfully`);
+      await loadUsers();
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       console.error('[Tenant Users] Remove error:', err);
       setError(err instanceof Error ? err.message : 'Failed to remove user');

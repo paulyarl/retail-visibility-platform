@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { ExternalLink, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 
 interface OAuthConnectButtonProps {
   tenantId: string;
@@ -34,16 +34,13 @@ export default function OAuthConnectButton({
       setError(null);
 
       // Get authorization URL from backend
-      const response = await api.get(
-        `/api/oauth/${gatewayType}/authorize?tenantId=${tenantId}`
-      );
+      const response = await tenantInfoService.getOAuthAuthorizationUrl(gatewayType, tenantId);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to initiate OAuth flow');
+      if (!response) {
+        throw new Error('Failed to initiate OAuth flow');
       }
 
-      const { authorizationUrl } = await response.json();
+      const { authorizationUrl } = response;
 
       // Redirect to OAuth provider
       window.location.href = authorizationUrl;
@@ -62,18 +59,10 @@ export default function OAuthConnectButton({
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/oauth/${gatewayType}/disconnect`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ tenantId }),
-      });
+      const response = await tenantInfoService.disconnectOAuth(gatewayType, tenantId);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to disconnect');
+      if (!response) {
+        throw new Error('Failed to disconnect');
       }
 
       onConnectionChange();

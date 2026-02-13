@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 
 export async function GET(
   request: NextRequest,
@@ -9,21 +8,13 @@ export async function GET(
   try {
     const { id } = await params;
     
-    // Forward Authorization header
-    const authHeader = request.headers.get('authorization');
-    const headers: HeadersInit = {};
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-
-    const response = await fetch(`${API_BASE_URL}/api/tenants/${id}/payment-gateways`, { headers });
-
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    const gateways = await tenantInfoService.getPaymentGateways(id);
+    
+    return NextResponse.json({ success: true, gateways });
   } catch (error) {
     console.error('[Payment Gateways API] GET error:', error);
     return NextResponse.json(
-      { error: 'proxy_failed' },
+      { error: 'Failed to fetch payment gateways' },
       { status: 500 }
     );
   }
@@ -37,27 +28,33 @@ export async function POST(
     const { id } = await params;
     const body = await request.json();
     
-    // Forward Authorization header
-    const authHeader = request.headers.get('authorization');
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
+    // Route to appropriate method based on gateway type
+    let result;
+    if (body.gateway_type === 'paypal') {
+      result = await tenantInfoService.savePayPalGateway(id, body);
+    } else if (body.gateway_type === 'square') {
+      result = await tenantInfoService.saveSquareGateway(id, body);
+    } else {
+      // For other gateway types, we might need to add a general method
+      // For now, return an error for unsupported gateway types
+      return NextResponse.json(
+        { error: 'Unsupported gateway type' },
+        { status: 400 }
+      );
     }
-
-    const response = await fetch(`${API_BASE_URL}/api/tenants/${id}/payment-gateways`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    
+    if (!result) {
+      return NextResponse.json(
+        { error: 'Failed to save payment gateway' },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json({ success: true, gateway: result });
   } catch (error) {
     console.error('[Payment Gateways API] POST error:', error);
     return NextResponse.json(
-      { error: 'proxy_failed' },
+      { error: 'Failed to save payment gateway' },
       { status: 500 }
     );
   }

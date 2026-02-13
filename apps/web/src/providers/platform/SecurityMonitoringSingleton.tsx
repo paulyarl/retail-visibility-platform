@@ -5,7 +5,7 @@
  * Extends UniversalSingleton for consistent caching and metrics
  */
 
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { AuthenticatedApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
 import { SecurityThreat, SecurityAlert, BlockedIP, SecurityMetrics } from '@/types/security';
 
 // Security Monitoring Data Interfaces
@@ -46,7 +46,7 @@ export interface SecurityMonitoringStats {
  * 
  * Produces security monitoring data and manages threat detection
  */
-class SecurityMonitoringSingleton extends UniversalSingleton {
+class SecurityMonitoringSingleton extends AuthenticatedApiSingleton {
   private static instance: SecurityMonitoringSingleton;
   private monitoringConfig: SecurityMonitoringConfig;
   private eventBuffer: SecurityEvent[] = [];
@@ -307,23 +307,9 @@ class SecurityMonitoringSingleton extends UniversalSingleton {
    * Get monitoring statistics
    */
   async getMonitoringStats(): Promise<SecurityMonitoringStats> {
-    const cacheKey = 'monitoring-stats';
-    
-    const cached = await this.getFromCache<SecurityMonitoringStats>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch('/api/security/monitoring/stats');
+      const stats = await this.makeAuthenticatedRequest<SecurityMonitoringStats>('/api/security/monitoring/stats', {}, 'monitoring-stats');
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch monitoring stats');
-      }
-
-      const stats = await response.json();
-      
-      await this.setCache(cacheKey, stats);
       return stats;
     } catch (error) {
       console.error('Error fetching monitoring stats:', error);
@@ -411,15 +397,10 @@ class SecurityMonitoringSingleton extends UniversalSingleton {
 
   private async sendThreatToAPI(threat: SecurityThreat): Promise<void> {
     try {
-      const response = await fetch('/api/security/threats', {
+      await this.makeAuthenticatedRequest('/api/security/threats', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(threat)
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to send threat to API');
-      }
     } catch (error) {
       console.error('Error sending threat to API:', error);
     }
@@ -427,15 +408,10 @@ class SecurityMonitoringSingleton extends UniversalSingleton {
 
   private async sendAlertToAPI(alert: SecurityAlert): Promise<void> {
     try {
-      const response = await fetch('/api/security/alerts', {
+      await this.makeAuthenticatedRequest('/api/security/alerts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(alert)
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to send alert to API');
-      }
     } catch (error) {
       console.error('Error sending alert to API:', error);
     }
@@ -443,15 +419,10 @@ class SecurityMonitoringSingleton extends UniversalSingleton {
 
   private async sendIPBlockToAPI(blockedIP: BlockedIP): Promise<void> {
     try {
-      const response = await fetch('/api/security/blocked-ips', {
+      await this.makeAuthenticatedRequest('/api/security/blocked-ips', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(blockedIP)
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to send IP block to API');
-      }
     } catch (error) {
       console.error('Error sending IP block to API:', error);
     }

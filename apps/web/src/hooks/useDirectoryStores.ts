@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import cacheManager from '@/utils/cacheManager';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 export interface DirectoryStore {
   id: string;
@@ -161,32 +162,20 @@ export const useDirectoryStores = (
         cacheTTL
       });
       
-      // Use the directory API endpoint
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const params = new URLSearchParams();
-      
-      if (search) params.append('search', search);
-      if (category) params.append('category', category);
-      if (lat && lng) {
-        params.append('lat', lat.toString());
-        params.append('lng', lng.toString());
-      }
-      if (sort) params.append('sort', sort);
-      params.append('page', page.toString());
-      params.append('limit', limit.toString());
-
-      const response = await fetch(`${apiUrl}/api/directory/mv/search?${params}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      // Use the directory API endpoint through singleton service
+      const result = await recommendationsService.searchDirectoryStores({
+        search,
+        category,
+        lat,
+        lng,
+        sort,
+        page,
+        limit
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch directory stores: ${response.status} ${errorText}`);
+      if (!result) {
+        throw new Error('Failed to fetch directory stores: No response from service');
       }
-
-      const result = await response.json();
 
       // Deduplicate listings by tenant_id (MV returns one row per category)
       // Keep the first occurrence of each store

@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api, API_BASE_URL } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { 
   CheckCircle, 
@@ -18,6 +18,7 @@ import {
   Lock,
   Star
 } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/api';
 
 interface SetupStep {
   id: string;
@@ -84,9 +85,7 @@ export default function GoogleIntegrationsPage() {
   async function fetchSetupStatus() {
     try {
       setLoading(true);
-      const res = await api.get(`${API_BASE_URL}/api/feed-jobs/setup-status/${tenantId}`);
-      if (!res.ok) throw new Error('Failed to fetch setup status');
-      const data = await res.json();
+      const data = await platformHomeService.getGoogleFeedJobsSetupStatus(tenantId);
       setSetupStatus(data?.data || null);
       setError(null);
     } catch (err) {
@@ -98,10 +97,8 @@ export default function GoogleIntegrationsPage() {
 
   async function fetchGBPStatus() {
     try {
-      const res = await api.get(`${API_BASE_URL}/api/google/business/status?tenantId=${tenantId}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setGbpStatus(data?.data || null);
+      const data = await platformHomeService.getGoogleGBPStatus(tenantId);
+      setGbpStatus(data);
     } catch (err) {
       console.error('Failed to fetch GBP status:', err);
     }
@@ -111,21 +108,16 @@ export default function GoogleIntegrationsPage() {
     try {
       setLoadingMerchants(true);
       setError(null);
-      const res = await api.get(`${API_BASE_URL}/api/google/oauth/merchants?tenantId=${tenantId}`);
-      if (!res.ok) {
-        const errData = await res.json();
-        // If no OAuth account, redirect to connect flow
-        if (errData.error === 'no_oauth_account' || res.status === 404) {
-          // Redirect to Google OAuth to connect account for Merchant Center
-          window.location.href = `${API_BASE_URL}/api/google/oauth/authorize?tenantId=${tenantId}`;
-          return;
-        }
-        throw new Error(errData.message || 'Failed to fetch merchants');
-      }
-      const data = await res.json();
+      const data = await platformHomeService.getGoogleOAuthMerchants(tenantId);
       setMerchants(data?.data?.merchants || []);
       setShowMerchantSelector(true);
-    } catch (err) {
+    } catch (err: any) {
+      // If no OAuth account, redirect to connect flow
+      if (err?.error === 'no_oauth_account' || err?.status === 404) {
+        // Redirect to Google OAuth to connect account for Merchant Center
+        window.location.href = `/api/google/oauth/authorize?tenantId=${tenantId}`;
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to fetch merchant accounts');
     } finally {
       setLoadingMerchants(false);
@@ -135,15 +127,7 @@ export default function GoogleIntegrationsPage() {
   async function handleLinkMerchant(merchant: MerchantAccount) {
     try {
       setLinkingMerchant(true);
-      const res = await api.post(`${API_BASE_URL}/api/google/oauth/link-merchant`, {
-        tenantId,
-        merchantId: merchant.id,
-        merchantName: merchant.name
-      });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || 'Failed to link merchant');
-      }
+      await platformHomeService.linkGoogleMerchant(tenantId, merchant.id, merchant.name);
       setShowMerchantSelector(false);
       await fetchSetupStatus();
     } catch (err) {
@@ -187,8 +171,7 @@ export default function GoogleIntegrationsPage() {
       return;
     }
     try {
-      const res = await api.post(`${API_BASE_URL}/api/google/oauth/disconnect`, { tenantId });
-      if (!res.ok) throw new Error('Failed to disconnect');
+      await platformHomeService.disconnectGoogleOAuth(tenantId);
       await fetchSetupStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to disconnect');
@@ -200,8 +183,7 @@ export default function GoogleIntegrationsPage() {
       return;
     }
     try {
-      const res = await api.post(`${API_BASE_URL}/api/google/business/disconnect`, { tenantId });
-      if (!res.ok) throw new Error('Failed to disconnect');
+      await platformHomeService.disconnectGoogleGBP(tenantId);
       await fetchGBPStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to disconnect');

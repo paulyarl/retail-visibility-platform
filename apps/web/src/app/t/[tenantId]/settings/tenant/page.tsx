@@ -6,7 +6,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import BusinessProfileCard from '@/components/settings/BusinessProfileCard';
 import GBPLocationCard from '@/components/settings/GBPLocationCard';
 import { BusinessProfile } from '@/lib/validation/businessProfile';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { Spinner } from '@/components/ui';
@@ -108,14 +108,12 @@ export default function TenantBusinessProfilePage() {
 
   const loadProfile = async () => {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.get(`${apiBaseUrl}/api/tenant/profile?tenant_id=${encodeURIComponent(tenantId)}`);
+      const data = await platformHomeService.getTenantProfile(tenantId);
       
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data);
+      if (data) {
+        setProfile(data as BusinessProfile);
         // Merge with onboarding data
-        await mergeProfileData(data);
+        await mergeProfileData(data as BusinessProfile);
       } else {
         // If no profile exists, still try to merge onboarding data
         await mergeProfileData(null);
@@ -131,11 +129,9 @@ export default function TenantBusinessProfilePage() {
 
   const loadTenantName = async () => {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.get(`${apiBaseUrl}/api/public/tenant/${encodeURIComponent(tenantId)}`);
+      const data = await platformHomeService.getTenant(tenantId);
       
-      if (response.ok) {
-        const data = await response.json();
+      if (data) {
         setTenantName(data.name || '');
       }
     } catch (error) {
@@ -145,27 +141,18 @@ export default function TenantBusinessProfilePage() {
 
   const handleUpdate = async (updatedProfile: BusinessProfile) => {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.post(`${apiBaseUrl}/api/tenant/profile`, {
-        tenant_id: tenantId, // Fixed: use tenant_id instead of tenantId
-        ...updatedProfile,
-      });
+      const data = await platformHomeService.updateTenantProfile(tenantId, updatedProfile as any);
       
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data);
-        setMergedProfile(data); // Update merged profile with saved data
+      if (data) {
+        setProfile(data as BusinessProfile);
+        setMergedProfile(data as BusinessProfile); // Update merged profile with saved data
         // Reload the profile data to ensure we have the latest from server
         loadProfile();
       } else {
-        console.error('Failed to update profile:', response.statusText);
-        // Still update local state for UI feedback, but it will be overwritten when loadProfile() completes
-        setProfile(updatedProfile);
-        setMergedProfile(updatedProfile);
+        console.error('Failed to update profile: No response data');
       }
     } catch (error) {
       console.error('Failed to update profile:', error);
-      // Update local state for UI feedback even if API call fails
       setProfile(updatedProfile);
       setMergedProfile(updatedProfile);
     }

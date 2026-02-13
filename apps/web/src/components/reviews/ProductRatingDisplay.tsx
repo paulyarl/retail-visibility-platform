@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 //import { Star, MessageSquare, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import ReviewForm from '@/components/reviews/ReviewForm';
-import { api } from '@/lib/api';
+import { productReviewsService } from '@/services/ProductReviewsSingletonService';
 import { MessageSquare, Star, User } from 'lucide-react';
 
 interface ProductRatingDisplayProps {
@@ -55,6 +55,7 @@ export default function ProductRatingDisplay({ productId, tenantId, showWriteRev
   const [userReview, setUserReview] = useState<UserReview | null>(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch product reviews and summary
@@ -63,45 +64,58 @@ export default function ProductRatingDisplay({ productId, tenantId, showWriteRev
       setLoading(true);
 
       // Fetch summary
-      const summaryResponse = await api.get(`/api/stores/${tenantId}/products/${productId}/reviews/summary`);
-      if (summaryResponse.ok) {
-        const summaryData = await summaryResponse.json();
-        if (summaryData.success) {
-          // Parse string values to numbers
-          const parsedSummary = {
-            ...summaryData.data,
-            rating_avg: parseFloat(summaryData.data.rating_avg) || 0,
-            rating_count: parseInt(summaryData.data.rating_count) || 0,
-            rating_1_count: parseInt(summaryData.data.rating_1_count) || 0,
-            rating_2_count: parseInt(summaryData.data.rating_2_count) || 0,
-            rating_3_count: parseInt(summaryData.data.rating_3_count) || 0,
-            rating_4_count: parseInt(summaryData.data.rating_4_count) || 0,
-            rating_5_count: parseInt(summaryData.data.rating_5_count) || 0,
-            helpful_count_total: parseInt(summaryData.data.helpful_count_total) || 0,
-            verified_purchase_count: parseInt(summaryData.data.verified_purchase_count) || 0
-          };
-          setSummary(parsedSummary);
-        }
+      const summaryData = await productReviewsService.getProductReviewSummary(tenantId, productId);
+      if (summaryData) {
+        // Convert to component interface
+        const ratingSummary: RatingSummary = {
+          rating_avg: summaryData.rating_avg,
+          rating_count: summaryData.rating_count,
+          rating_1_count: 0,
+          rating_2_count: 0,
+          rating_3_count: 0,
+          rating_4_count: 0,
+          rating_5_count: 0,
+          verified_purchase_count: 0
+        };
+        setSummary(ratingSummary);
       }
 
       // Fetch reviews
-      const reviewsResponse = await api.get(`/api/stores/${tenantId}/products/${productId}/reviews?limit=5`);
-      if (reviewsResponse.ok) {
-        const reviewsData = await reviewsResponse.json();
-        if (reviewsData.success) {
-          setReviews(reviewsData.data.reviews);
-        }
+      const reviewsData = await productReviewsService.getProductReviews(tenantId, productId, { limit: 5 });
+      if (reviewsData) {
+        // Convert to component interface
+        const convertedReviews: Review[] = reviewsData.map(review => ({
+          id: review.id,
+          rating: review.rating,
+          review_text: review.content,
+          helpful_count: review.helpful,
+          verified_purchase: review.verified || false,
+          created_at: review.createdAt,
+          updated_at: review.updatedAt,
+          user_id: review.userId,
+          session_id: null,
+          first_name: review.user?.name ? review.user.name.split(' ')[0] : null,
+          last_name: review.user?.name ? review.user.name.split(' ').slice(1).join(' ') : null,
+          email: review.user?.email || null
+        }));
+        setReviews(convertedReviews);
       }
 
       // Fetch user's review if authenticated
       if (isAuthenticated) {
         try {
-          const userReviewResponse = await api.get(`/api/stores/${tenantId}/products/${productId}/reviews/user`);
-          if (userReviewResponse.ok) {
-            const userReviewData = await userReviewResponse.json();
-            if (userReviewData.success && userReviewData.data) {
-              setUserReview(userReviewData.data);
-            }
+          const userReviewData = await productReviewsService.getUserProductReview(tenantId, productId);
+          if (userReviewData) {
+            // Convert to component interface
+            const userReview: UserReview = {
+              id: userReviewData.id,
+              rating: userReviewData.rating,
+              review_text: userReviewData.content,
+              verified_purchase: userReviewData.verified || false,
+              created_at: userReviewData.createdAt,
+              updated_at: userReviewData.updatedAt
+            };
+            setUserReview(userReview);
           }
         } catch (userReviewError) {
           // User hasn't reviewed this product yet, that's ok
@@ -140,44 +154,31 @@ export default function ProductRatingDisplay({ productId, tenantId, showWriteRev
         ? `/api/stores/${tenantId}/products/${productId}/reviews`
         : `/api/stores/${tenantId}/products/${productId}/reviews/anonymous`;
 
-      console.log('Submitting review to:', endpoint, mappedData, 'isUpdate:', isUpdate);
+      console.log('Submitting review:', mappedData, 'isUpdate:', isUpdate);
       
-      let response;
-      if (isUpdate && isAuthenticated) {
-        // Use PUT for updates
-        response = await api.put(endpoint, mappedData);
-      } else {
-        // Use POST for new reviews
-        response = await api.post(endpoint, mappedData);
-      }
+      const reviewData = {
+        rating: formData.rating,
+        title: formData.title || '',
+        content: formData.content,
+        userId: user?.id
+      };
+      
+      const response = await productReviewsService.createOrUpdateProductReview(tenantId, productId, reviewData);
 
-      console.log('Review submission response:', response.status, response.statusText);
+      console.log('Review submission response:', response);
 
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log('Review submission success:', responseData);
-        if (responseData.success) {
-          setShowReviewForm(false);
-          // Refresh reviews
-          await fetchReviews();
-        } else {
-          throw new Error(responseData.error || 'Failed to submit review');
-        }
+      if (response) {
+        setShowReviewForm(false);
+        // Refresh reviews
+        await fetchReviews();
       } else {
-        // Try to get error details from response
-        let errorDetails = 'Failed to submit review';
-        try {
-          const errorData = await response.json();
-          console.error('Review submission error response:', errorData);
-          errorDetails = errorData.error || errorData.message || errorDetails;
-        } catch (parseError) {
-          console.error('Could not parse error response:', parseError);
-        }
-        throw new Error(errorDetails);
+        throw new Error('Failed to submit review');
       }
     } catch (err) {
       console.error('Error submitting review:', err);
-      throw err;
+      setError('Failed to submit review. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 

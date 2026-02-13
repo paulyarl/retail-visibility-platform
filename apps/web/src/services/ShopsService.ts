@@ -3,10 +3,11 @@
  * Handles all shop-related API calls and data management
  */
 
-import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { UniversalSingleton, PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { CategoryAggregation } from '@/types/scope';
 
 // Shops API Singleton Class
-class ShopsAPISingleton extends UniversalSingleton {
+class ShopsAPISingleton extends PublicApiSingleton {
   private static instance: ShopsAPISingleton;
 
   private constructor() {
@@ -25,7 +26,7 @@ class ShopsAPISingleton extends UniversalSingleton {
     options: RequestInit = {},
     cacheKey?: string
   ): Promise<T> {
-    return this.makeApiRequest<T>(url, options, cacheKey);
+    return this.makePublicRequest<T>(url, options, cacheKey);
   }
 
   /**
@@ -180,13 +181,13 @@ export interface ShopReviewsResponse {
   total: number;
 }
 
-class ShopsService {
+class ShopsService extends PublicApiSingleton {
   private static instance: ShopsService;
   private apiSingleton: ShopsAPISingleton;
-  private cache: Map<string, { data: any; timestamp: number }> = new Map();
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
   private constructor() {
+    super('shops-service-main');
     this.apiSingleton = ShopsAPISingleton.getInstance();
   }
 
@@ -221,10 +222,6 @@ class ShopsService {
     filter: 'all' | '5' | '4' | '3' | '2' | '1' = 'all',
     sortBy: 'recent' | 'helpful' | 'rating-high' | 'rating-low' = 'recent'
   ): Promise<ShopReviewsResponse> {
-    const cacheKey = `reviews:${tenantId}:${page}:${limit}:${filter}:${sortBy}`;
-    const cached = this.getFromCache<ShopReviewsResponse>(cacheKey);
-    if (cached) return cached;
-
     try {
       const apiSingleton = ShopsAPISingleton.getInstance();
       const params = new URLSearchParams({
@@ -238,20 +235,15 @@ class ShopsService {
       const response = await apiSingleton.makeShopsApiRequest<any>(
         `/api/shops/${tenantId}/reviews?${params}`,
         {},
-        cacheKey
+        `reviews:${tenantId}:${page}:${limit}:${filter}:${sortBy}`
       );
 
-      if (!response.success) {
-        throw new Error(`Failed to fetch reviews: ${response.error || 'Unknown error'}`);
-      }
-
-      const data = response.data;
+      const data = response;
       const result: ShopReviewsResponse = {
         reviews: data.reviews || [],
         total: data.total || 0,
       };
 
-      this.setCache(cacheKey, result);
       return result;
     } catch (error) {
       console.error('Error fetching shop reviews:', error);
@@ -271,14 +263,7 @@ class ShopsService {
         `follow-shop:${tenantId}`
       );
 
-      if (!response.success) {
-        throw new Error(`Failed to ${follow ? 'follow' : 'unfollow'} shop: ${response.error || 'Unknown error'}`);
-      }
-
-      // Clear relevant cache entries
-      this.clearCachePattern(`shop:${tenantId}`);
-      this.clearCachePattern(`shop:*`);
-
+      // Cache invalidation handled automatically by makePublicRequest
       return true;
     } catch (error) {
       console.error('Error following/unfollowing shop:', error);
@@ -302,9 +287,7 @@ class ShopsService {
         throw new Error(`Failed to mark review as helpful: ${response.error || 'Unknown error'}`);
       }
 
-      // Clear review cache entries
-      this.clearCachePattern('reviews:*');
-
+      // Cache invalidation handled automatically by makePublicRequest
       return true;
     } catch (error) {
       console.error('Error marking review as helpful:', error);
@@ -312,23 +295,11 @@ class ShopsService {
     }
   }
 
-  /**
-   * Manually clear cache (for debugging - call from browser console)
-   */
-  clearCache(): void {
-    console.log('[ShopsService] Manually clearing cache...');
-    this.cache.clear();
-    console.log('[ShopsService] Cache cleared successfully');
-  }
-
+  
   /**
    * Get trending shops
    */
   async getTrendingShops(limit: number = 10, region?: string): Promise<Shop[]> {
-    const cacheKey = `trending:${limit}:${region || 'all'}`;
-    const cached = this.getFromCache<Shop[]>(cacheKey);
-    if (cached) return cached;
-
     try {
       const apiSingleton = ShopsAPISingleton.getInstance();
       const params = new URLSearchParams({
@@ -336,18 +307,12 @@ class ShopsService {
         ...(region && { region }),
       });
 
-      const response = await apiSingleton.makeShopsApiRequest<any>(
+      const shops = await apiSingleton.makeShopsApiRequest<Shop[]>(
         `/api/public/shops/trending?${params}`,
         {},
-        cacheKey
+        `trending:${limit}:${region || 'all'}`
       );
 
-      if (!response.success) {
-        throw new Error(`Failed to fetch trending shops: ${response.error || 'Unknown error'}`);
-      }
-
-      const shops = response.data;
-      this.setCache(cacheKey, shops);
       return shops;
     } catch (error) {
       console.log('Error fetching trending shops:', error);
@@ -360,30 +325,16 @@ class ShopsService {
    * Search shops
    */
   async searchShops(query: string, limit: number = 20): Promise<Shop[]> {
-    const cacheKey = `search:${query}:${limit}`;
-    const cached = this.getFromCache<Shop[]>(cacheKey);
-    if (cached) return cached;
-
     try {
-      const apiSingleton = ShopsAPISingleton.getInstance();
-      const params = new URLSearchParams({
-        q: query,
-        limit: limit.toString(),
-      });
+      const response = await this.makePublicRequest<{
+        success: boolean;
+        data: Shop[];
+      }>('/api/shops/search', {
+        method: 'POST',
+        body: JSON.stringify({ query, limit }),
+      }, `search:${query}:${limit}`);
 
-      const response = await apiSingleton.makeShopsApiRequest<any>(
-        `/api/shops/search?${params}`,
-        {},
-        cacheKey
-      );
-
-      if (!response.success) {
-        throw new Error(`Failed to search shops: ${response.error || 'Unknown error'}`);
-      }
-
-      const shops = response.data;
-      this.setCache(cacheKey, shops);
-      return shops;
+      return response.data || [];
     } catch (error) {
       console.error('Error searching shops:', error);
       return [];
@@ -401,32 +352,24 @@ class ShopsService {
     averageStock: number;
     parentProductsWithVariants: number;
   }> {
-    const cacheKey = `stats:${tenantId}`;
-    const cached = this.getFromCache<{
-      totalVariants: number;
-      activeVariants: number;
-      variantsOnSale: number;
-      averagePrice: number;
-      averageStock: number;
-      parentProductsWithVariants: number;
-    }>(cacheKey);
-    if (cached) return cached;
-
     try {
-      const apiSingleton = ShopsAPISingleton.getInstance();
-      const response = await apiSingleton.makeShopsApiRequest<any>(
-        `/api/shops/${tenantId}/stats`,
-        {},
-        cacheKey
-      );
+      const response = await this.makePublicRequest<{
+        totalVariants: number;
+        activeVariants: number;
+        variantsOnSale: number;
+        averagePrice: number;
+        averageStock: number;
+        parentProductsWithVariants: number;
+      }>(`/api/shops/${tenantId}/stats`, {}, `stats:${tenantId}`);
 
-      if (!response.success) {
-        throw new Error(`Failed to fetch shop stats: ${response.error || 'Unknown error'}`);
-      }
-
-      const stats = response.data;
-      this.setCache(cacheKey, stats);
-      return stats;
+      return response || {
+        totalVariants: 0,
+        activeVariants: 0,
+        variantsOnSale: 0,
+        averagePrice: 0,
+        averageStock: 0,
+        parentProductsWithVariants: 0,
+      };
     } catch (error) {
       console.error('Error fetching shop stats:', error);
       return {
@@ -448,29 +391,16 @@ class ShopsService {
     shop_category: string;
     count?: number;
   }>> {
-    const cacheKey = 'shop-categories:simple';
-    const cached = this.getFromCache<Array<{
-      shop_category: string;
-      count?: number;
-    }>>(cacheKey);
-    if (cached) return cached;
-
     try {
-      const apiSingleton = ShopsAPISingleton.getInstance();
+      const response = await this.makePublicRequest<{
+        success: boolean;
+        data?: Array<{
+          shop_category: string;
+          count?: number;
+        }>;
+      }>('/api/shops/categories/simple', {}, 'shop-categories:simple');
 
-      const response = await apiSingleton.makeShopsApiRequest<any>(
-        '/api/shop-categories',
-        {},
-        cacheKey
-      );
-
-      if (!response.success) {
-        throw new Error(`Failed to fetch shop categories: ${response.error || 'Unknown error'}`);
-      }
-
-      const categories = response.data?.data || [];
-      
-      this.setCache(cacheKey, categories);
+      const categories = response.data || [];
       return categories;
     } catch (error) {
       console.error('Error fetching shop categories:', error);
@@ -485,60 +415,17 @@ class ShopsService {
   async getCategories(params?: {
     limit?: number;
     minProducts?: number;
-  }): Promise<Array<{
-    category_type: 'product' | 'shop';
-    category_name: string;
-    category_slug: string;
-    product_count: number;
-    shop_count: number;
-    avg_trending_score: number;
-    products_in_stock: number;
-  }>> {
-    const cacheKey = `categories:${params?.limit || 100}:${params?.minProducts || 1}`;
-    const cached = this.getFromCache<Array<{
-      category_type: 'product' | 'shop';
-      category_name: string;
-      category_slug: string;
-      product_count: number;
-      shop_count: number;
-      avg_trending_score: number;
-      products_in_stock: number;
-    }>>(cacheKey);
-    if (cached) return cached;
-
+  }): Promise<CategoryAggregation[]> {
     try {
-      const apiSingleton = ShopsAPISingleton.getInstance();
-      const queryParams = new URLSearchParams({
-        limit: (params?.limit || 100).toString(),
-        minProducts: (params?.minProducts || 1).toString(),
-      });
+      const response = await this.makePublicRequest<{
+        success: boolean;
+        data?: CategoryAggregation[];
+      }>('/api/shops/categories', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      }, `categories:${params?.limit || 100}:${params?.minProducts || 1}`);
 
-      const response = await apiSingleton.makeShopsApiRequest<any>(
-        `/api/public/shops/categories?${queryParams}`,
-        {},
-        cacheKey
-      );
-
-      if (!response.success) {
-        throw new Error(`Failed to fetch categories: ${response.error || 'Unknown error'}`);
-      }
-
-      const data = response.data;
-      const rawCategories = data.success && data.data ? data.data : [];
-      
-      // Map to include all required CategoryAggregation fields
-      const categories = rawCategories.map((cat: any) => ({
-        category_type: cat.category_type as 'product' | 'shop',
-        category_name: cat.category_name,
-        category_slug: cat.category_slug,
-        product_count: cat.product_count || 0,
-        shop_count: cat.shop_count || 0,
-        avg_trending_score: cat.avg_trending_score || 0,
-        products_in_stock: cat.products_in_stock || 0,
-      }));
-      
-      this.setCache(cacheKey, categories);
-      return categories;
+      return response.data || [];
     } catch (error) {
       console.error('Error fetching categories:', error);
       return [];
@@ -563,36 +450,15 @@ class ShopsService {
     isAvailable: boolean;
     description: string;
   }>> {
-    const cacheKey = `patterns:${params.businessName}:${params.location?.city || ''}:${params.location?.state || ''}`;
-    const cached = this.getFromCache<Array<{
-      pattern: string;
-      slug: string;
-      isAvailable: boolean;
-      description: string;
-    }>>(cacheKey);
-    if (cached) return cached;
-
     try {
-      const apiSingleton = ShopsAPISingleton.getInstance();
-      // Only access localStorage in browser environment
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
-      console.log('[ShopsService] Fetching slug patterns with params:', params);
-      
-      const response = await apiSingleton.makeShopsApiRequest<any>(
-        '/api/slugs/patterns',
+      const response = await this.makePublicRequest<any>(
+        '/api/shops/slug-patterns',
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token && { 'Authorization': `Bearer ${token}` }),
-          },
-          body: JSON.stringify({
-            businessName: params.businessName,
-            location: params.location || {},
-            tenantId: params.tenantId,
-          }),
-        });
+          body: JSON.stringify(params),
+        },
+        `patterns:${params.businessName}:${params.location?.city || ''}:${params.location?.state || ''}`
+      );
 
       console.log('[ShopsService] Slug patterns API response:', response);
 
@@ -611,7 +477,6 @@ class ShopsService {
       // Handle case where API returns patterns directly without success wrapper
       if ('patterns' in response) {
         const patterns = response.patterns || [];
-        this.setCache(cacheKey, patterns);
         return patterns;
       }
 
@@ -621,6 +486,53 @@ class ShopsService {
     } catch (error) {
       console.error('Error fetching slug patterns:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get shop hours status for public display
+   * Public endpoint - no authentication required
+   */
+  async getShopHoursStatus(tenantId: string): Promise<{
+    isOpen: boolean;
+    hours?: {
+      monday?: string;
+      tuesday?: string;
+      wednesday?: string;
+      thursday?: string;
+      friday?: string;
+      saturday?: string;
+      sunday?: string;
+    };
+    timezone?: string;
+    nextOpenTime?: string;
+    nextCloseTime?: string;
+  }> {
+    try {
+      const response = await this.makePublicRequest<{
+        isOpen: boolean;
+        hours?: {
+          monday?: string;
+          tuesday?: string;
+          wednesday?: string;
+          thursday?: string;
+          friday?: string;
+          saturday?: string;
+          sunday?: string;
+        };
+        timezone?: string;
+        nextOpenTime?: string;
+        nextCloseTime?: string;
+      }>(`/api/shops/${tenantId}/hours-status`, {}, `hours-status-${tenantId}`);
+
+      return response || {
+        isOpen: false,
+      };
+    } catch (error) {
+      console.error('Error fetching shop hours status:', error);
+      return {
+        isOpen: false,
+      };
     }
   }
 
@@ -661,37 +573,6 @@ class ShopsService {
     return urls;
   }
 
-  // Cache management methods
-  private getFromCache<T>(key: string): T | null {
-    const cached = this.cache.get(key);
-    if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
-      return cached.data as T;
-    }
-    return null;
-  }
-
-  private setCache<T>(key: string, data: T): void {
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now(),
-    });
-  }
-
-  private clearCachePattern(pattern: string): void {
-    const regex = new RegExp(pattern.replace(/\*/g, '.*'));
-    for (const key of this.cache.keys()) {
-      if (regex.test(key)) {
-        this.cache.delete(key);
-      }
-    }
-  }
-
-  /**
-   * Get cache size (for debugging)
-   */
-  getCacheSize(): number {
-    return this.cache.size;
-  }
 }
 
 // Export singleton instance
@@ -700,5 +581,4 @@ export const shopsService = ShopsService.getInstance();
 // Add to window for debugging (only in browser)
 if (typeof window !== 'undefined') {
   (window as any).shopsService = shopsService;
-  (window as any).clearShopsCache = () => shopsService.clearCache();
 }

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { navigateToTenant } from '@/lib/tenant-navigation'
-import { api } from '@/lib/api'
+import { tenantInfoService } from '@/services/TenantInfoSingletonService'
 
 export type TenantOption = { id: string; name: string }
 
@@ -33,14 +33,11 @@ export default function TenantSwitcher({ currentTenantId, tenants }: { currentTe
       
       // Try server first
       try {
-        const response = await api.get('/user/preferences');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.data?.navigationPreference) {
-            setNavigationPreference(data.data.navigationPreference);
-            localStorage.setItem(`user-nav-preference-${user.id}`, data.data.navigationPreference);
-            return;
-          }
+        const data = await tenantInfoService.getUserPreferences();
+        if (data.data?.navigationPreference) {
+          setNavigationPreference(data.data.navigationPreference);
+          localStorage.setItem(`user-nav-preference-${user.id}`, data.data.navigationPreference);
+          return;
         }
       } catch (error) {
         console.warn('Failed to load preference from server, using localStorage:', error);

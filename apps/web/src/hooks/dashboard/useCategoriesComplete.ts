@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
 // Consolidated response from /api/v1/tenants/:tenantId/categories/complete
 interface CategoriesCompleteResponse {
@@ -77,13 +77,7 @@ export function useCategoriesComplete(tenantId: string | null): UseCategoriesCom
 
 //      console.log('[useCategoriesComplete] Fetching consolidated categories data for:', tenantId);
 
-      const response = await api.get(`/api/v1/tenants/${encodeURIComponent(tenantId)}/categories/complete`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch complete categories data: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await platformHomeService.getCategoriesComplete(tenantId);
      /*  console.log('[useCategoriesComplete] Received consolidated data:', {
         categoriesCount: data.categories?.length,
         alignmentCoverage: data.alignmentStatus?.mappingCoverage,

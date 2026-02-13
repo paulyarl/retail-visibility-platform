@@ -13,7 +13,7 @@ import SquarePaymentForm from '@/components/checkout/SquarePaymentForm';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ArrowLeft, ShoppingCart, Store, CreditCard, Wallet } from 'lucide-react';
-import { api } from '@/lib/api';
+import { customerOrderService } from '@/services/CustomerOrderService';
 import { getCart, clearCart } from '@/lib/cart/cartManager';
 
 type CheckoutStep = 'review' | 'fulfillment' | 'shipping' | 'payment';
@@ -63,17 +63,10 @@ function CheckoutPageContent() {
       
       try {
         console.log('[Checkout] Fetching payment gateways for tenant:', tenantId);
-        // Use direct fetch for public checkout - no auth required
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/tenants/${tenantId}/payment-gateways/public`);
+        // Use CustomerOrderService for public checkout - no auth required
+        const gateways = await customerOrderService.getPaymentGateways(tenantId);
         
-        if (!response.ok) {
-          console.error('[Checkout] Failed to fetch payment gateways:', response.status);
-          return;
-        }
-        
-        const data = await response.json();
-        console.log('[Checkout] Payment gateways data:', data);
-        const gateways = data.gateways || [];
+        console.log('[Checkout] Payment gateways data:', gateways);
         
         // Extract active gateway types
         const activeTypes = gateways

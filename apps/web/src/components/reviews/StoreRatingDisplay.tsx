@@ -97,53 +97,25 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
     sessionId?: string;
   }) => {
     try {
-      const token = getAccessToken();
-      
-      // Use different endpoints based on authentication status
-      const endpoint = token 
-        ? `/api/stores/${tenantId}/reviews` 
-        : `/api/stores/${tenantId}/reviews/anonymous`;
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          rating: reviewData.rating,
-          reviewText: reviewData.content,
-          locationLat: null,
-          locationLng: null,
-          // For anonymous reviews
-          ...(reviewData.sessionId && {
-            sessionId: reviewData.sessionId,
-            userName: reviewData.userName,
-            userEmail: reviewData.userEmail,
-          })
-        })
+      const response = await reviewsService.submitReview(tenantId, {
+        rating: reviewData.rating,
+        content: reviewData.content,
+        locationLat: null,
+        locationLng: null,
+        sessionId: reviewData.sessionId,
+        userName: reviewData.userName,
+        userEmail: reviewData.userEmail
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to submit review');
+      
+      if (response) {
+        // Refresh reviews
+        await fetchReviews();
+        setShowReviewForm(false);
+      } else {
+        throw new Error('Failed to submit review');
       }
-
-      // Refresh data
-      fetchRatingSummary();
-      fetchReviews();
-      if (isAuthenticated) {
-        fetchUserReview();
-      }
-      setShowReviewForm(false);
     } catch (error) {
       console.error('Error submitting review:', error);
-      throw error;
     }
   };
 

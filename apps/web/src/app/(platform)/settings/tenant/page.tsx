@@ -13,7 +13,7 @@ import SwisPreviewSettings from "@/components/tenant/SwisPreviewSettings";
 import GoogleConnectCard from "@/components/google/GoogleConnectCard";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import PageHeader, { Icons } from "@/components/PageHeader";
-import { api } from "@/lib/api";
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useAuth } from "@/contexts/AuthContext";
 import { getAdminEmail } from "@/lib/admin-emails";
 import { isPlatformAdmin } from "@/lib/auth/access-control";
@@ -86,8 +86,7 @@ export default function TenantSettingsPage() {
   useEffect(() => {
     const loadTenant = async () => {
       try {
-        const res = await api.get("/api/tenants");
-        const tenants: Tenant[] = await res.json();
+        const tenants = await platformHomeService.getTenants();
         
         if (!tenants || tenants.length === 0) {
           setError("No tenants found. Please create a tenant first.");
@@ -123,9 +122,8 @@ export default function TenantSettingsPage() {
 
     const loadOrganizations = async () => {
       try {
-        const res = await api.get("/api/organizations");
-        const data = await res.json();
-        setOrganizations(Array.isArray(data) ? data : []);
+        const organizations = await platformHomeService.getOrganizations();
+        setOrganizations(organizations || []);
       } catch (e) {
         console.error("Failed to load organizations:", e);
       }
@@ -133,10 +131,9 @@ export default function TenantSettingsPage() {
 
     const loadPendingRequest = async (tenantId: string) => {
       try {
-        const res = await api.get(`/api/organization-requests?tenantId=${tenantId}&status=pending`);
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setPendingRequest(data[0]);
+        const pendingRequest = await platformHomeService.getPendingUpgradeRequest(tenantId);
+        if (pendingRequest) {
+          setPendingRequest(pendingRequest);
         }
       } catch (e) {
         console.error("Failed to load pending request:", e);
@@ -159,28 +156,26 @@ export default function TenantSettingsPage() {
       if (!tenant?.id) return;
       setProfileLoading(true);
       try {
-        const res = await api.get(`/api/tenant/profile?tenant_id=${encodeURIComponent(tenant.id)}`);
-        if (res.ok) {
-          const data = await res.json();
+        const data = await platformHomeService.getTenantProfile(tenant.id);
+        if (data) {
           // Normalize potential camelCase payload from API to our BusinessProfile shape
           const normalized: BusinessProfile = {
             tenant_id: tenant.id,
-            business_name: data.business_name ?? data.businessName ?? tenant.name,
-            address_line1: data.address_line1 ?? data.addressLine1 ?? '',
-            address_line2: data.address_line2 ?? data.addressLine2 ?? '',
+            business_name: data.businessName ?? tenant.name,
+            address_line1: data.addressLine1 ?? '',
+            address_line2: data.addressLine2 ?? '',
             city: data.city ?? '',
             state: data.state ?? '',
-            postal_code: data.postal_code ?? data.postalCode ?? '',
-            country_code: data.country_code ?? data.countryCode ?? 'US',
-            phone_number: data.phone_number ?? data.phoneNumber ?? '',
+            postal_code: data.postalCode ?? '',
+            country_code: data.countryCode ?? 'US',
+            phone_number: data.phone ?? '',
             email: data.email ?? '',
             website: data.website ?? '',
-            contact_person: data.contact_person ?? data.contactPerson ?? '',
-            logo_url: data.logo_url ?? data.logoUrl ?? (tenant.metadata as any)?.logo_url ?? '',
-            business_description: data.business_description ?? '',
-            hours: data.hours ?? undefined,
-            social_links: data.social_links ?? undefined,
-            seo_tags: data.seo_tags ?? undefined,
+            contact_person: data.contactPerson ?? '',
+            logo_url: data.logoUrl ?? (tenant.metadata as any)?.logo_url ?? '',
+            business_description: data.description ?? '',
+            social_links: data.socialLinks ?? undefined,
+            seo_tags: data.seoTags ?? undefined,
             latitude: data.latitude,
             longitude: data.longitude,
             // Map settings
@@ -211,8 +206,7 @@ export default function TenantSettingsPage() {
                 normalized.longitude = coords.longitude;
                 
                 // Save coordinates to database
-                await api.patch('/api/tenant/profile', {
-                  tenant_id: tenant.id,
+                await platformHomeService.updateTenantProfile(tenant.id, {
                   latitude: coords.latitude,
                   longitude: coords.longitude,
                 });
@@ -327,15 +321,13 @@ export default function TenantSettingsPage() {
                 onUpdate={async (updated) => {
                   try {
                     console.log('[TenantSettings] Updating profile with:', updated);
-                    const response = await api.patch('/api/tenant/profile', {
+                    const saved = await platformHomeService.updateTenantProfile(tenant.id, {
                       tenant_id: tenant.id,
                       ...updated,
-                    });
-                    if (!response.ok) {
-                      const e = await response.json();
-                      throw new Error(e?.error || 'Failed to update business profile');
+                    } as any);
+                    if (!saved) {
+                      throw new Error('Failed to update business profile');
                     }
-                    const saved = await response.json();
                     const next: BusinessProfile = {
                       tenant_id: tenant.id,
                       business_name: (saved.businessName ?? updated.business_name) as any,
@@ -345,11 +337,10 @@ export default function TenantSettingsPage() {
                       state: saved.state ?? updated.state,
                       postal_code: saved.postalCode ?? updated.postal_code,
                       country_code: saved.countryCode ?? updated.country_code,
-                      phone_number: saved.phoneNumber ?? updated.phone_number,
+                      phone_number: saved.phone ?? updated.phone_number,
                       email: saved.email ?? updated.email,
                       website: saved.website ?? updated.website,
-                      contact_person: saved.contactPerson ?? updated.contact_person,
-                      logo_url: saved.logoUrl ?? saved.logo_url ?? updated.logo_url ?? '',
+                      logo_url: saved.logoUrl ?? updated.logo_url,
                       latitude: saved.latitude ?? updated.latitude,
                       longitude: saved.longitude ?? updated.longitude,
                     } as any;
@@ -403,14 +394,13 @@ export default function TenantSettingsPage() {
                 privacyMode={(profile as any).map_privacy_mode ?? 'precise'}
                 onSave={async (settings) => {
                   try {
-                    const response = await api.patch('/api/tenant/profile', {
+                    const saved = await platformHomeService.updateTenantProfile(tenant.id, {
                       tenant_id: tenant.id,
                       display_map: settings.displayMap,
                       map_privacy_mode: settings.privacyMode,
-                    });
-                    if (!response.ok) {
-                      const e = await response.json();
-                      throw new Error(e?.error || 'Failed to update map settings');
+                    } as any);
+                    if (!saved) {
+                      throw new Error('Failed to update map settings');
                     }
                     setProfile(prev => prev ? ({
                       ...prev,
@@ -535,18 +525,13 @@ export default function TenantSettingsPage() {
                       setSavingOrg(true);
                       try {
                         if (selectedOrgId) {
-                          const response = await api.post(`/api/organizations/${selectedOrgId}/tenants`, {
-                            tenantId: tenant.id
-                          });
-                          if (!response.ok) throw new Error('Failed to assign to organization');
+                          await platformHomeService.assignTenantToOrganization(selectedOrgId, tenant.id);
                         } else if (tenant.organization) {
-                          const response = await api.delete(`/api/organizations/${tenant.organization.id}/tenants/${tenant.id}`);
-                          if (!response.ok) throw new Error('Failed to remove from organization');
+                          await platformHomeService.removeTenantFromOrganization(tenant.organization.id, tenant.id);
                         }
                         
-                        const res = await api.get("/api/tenants");
-                        const tenants: Tenant[] = await res.json();
-                        const updated = tenants.find((t) => t.id === tenant.id);
+                        const tenants = await platformHomeService.getTenants();
+                        const updated = tenants?.find((t) => t.id === tenant.id);
                         if (updated) setTenant(updated);
                         
                         setEditingOrg(false);
@@ -592,11 +577,10 @@ export default function TenantSettingsPage() {
                             className="mt-2"
                             onClick={async () => {
                               try {
-                                const res = await api.patch(`/api/organization-requests/${pendingRequest.id}`, {
+                                const updated = await platformHomeService.updatePendingRequest(pendingRequest.id, {
                                   costAgreed: true
                                 });
-                                if (res.ok) {
-                                  const updated = await res.json();
+                                if (updated) {
                                   setPendingRequest(updated);
                                 }
                               } catch (err) {
@@ -618,7 +602,7 @@ export default function TenantSettingsPage() {
                       onClick={async () => {
                         if (confirm('Are you sure you want to cancel this request?')) {
                           try {
-                            await api.delete(`/api/organization-requests/${pendingRequest.id}`);
+                            await platformHomeService.deletePendingRequest(pendingRequest.id);
                             setPendingRequest(null);
                           } catch (err) {
                             console.error('Failed to cancel request:', err);
@@ -719,41 +703,21 @@ export default function TenantSettingsPage() {
                   }
                   
                   try {
-                    const res = await api.post('/api/organization-requests', {
+                    const newRequest = await platformHomeService.createOrganizationRequest({
                       tenantId: tenant.id,
                       organizationId: selectedOrgId,
-                      requestedBy: user?.id,
+                      requestedBy: user?.id || '',
                       notes: requestNotes,
                       requestType: 'join'
                     });
                     
-                    if (res.ok) {
-                      const newRequest = await res.json();
+                    if (newRequest) {
                       setPendingRequest(newRequest);
                       setShowRequestModal(false);
                       setSelectedOrgId('');
                       setRequestNotes('');
-                      
-                      // Open email client with pre-filled content for admin notification
-                      const adminEmail = getAdminEmail('organization_requests');
-                      const orgName = organizations.find(o => o.id === selectedOrgId)?.name || 'Organization';
-                      const subject = encodeURIComponent(`Organization Request - ${tenant.name} → ${orgName}`);
-                      const body = encodeURIComponent(
-                        `Hello,\n\n` +
-                        `A new organization request has been submitted:\n\n` +
-                        `Tenant: ${tenant.name}\n` +
-                        `Organization: ${orgName}\n` +
-                        `Requested by: ${user?.email || user?.id}\n` +
-                        `Notes: ${requestNotes || 'None'}\n\n` +
-                        `Please review this request in the admin dashboard:\n` +
-                        `${window.location.origin}/settings/admin/organization-requests\n\n` +
-                        `Best regards,\n` +
-                        `${tenant.name}`
-                      );
-                      window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
                     } else {
-                      const error = await res.json();
-                      alert(error.error || 'Failed to submit request');
+                      alert('Failed to submit request');
                     }
                   } catch (err) {
                     console.error('Failed to submit request:', err);
@@ -872,11 +836,11 @@ export default function TenantSettingsPage() {
                     onClick={async () => {
                       setSavingRegional(true);
                       try {
-                        const response = await api.put(`/api/tenants/${tenant.id}`, regionalSettings);
-                        if (!response.ok) throw new Error('Failed to update');
-                        const updated = await response.json();
-                        setTenant(updated);
-                        setEditingRegional(false);
+                        const updated = await platformHomeService.updateTenant(tenant.id, regionalSettings);
+                        if (updated) {
+                          setTenant(updated);
+                          setEditingRegional(false);
+                        }
                       } catch (err) {
                         console.error('Failed to update regional settings:', err);
                         alert('Failed to save changes');

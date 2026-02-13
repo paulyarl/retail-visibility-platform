@@ -6,17 +6,24 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { tenantLimitsService } from '@/services/TenantLimitsSingletonService';
 
 export interface TenantLimitStatus {
   current: number;
-  limit: number | 'unlimited';
-  remaining: number | 'unlimited';
+  limit: any;
+  remaining: any;
   tier: string;
+  status: string;
   tierDisplayName: string;
   canCreate: boolean;
-  upgradeMessage: string | null;
-  upgradeToTier: string | null;
+  upgradeMessage?: string;
+  upgradeToTier?: string;
+  tenant?: Array<{
+    id: string;
+    name: string;
+    tier: string;
+    status: string;
+  }>;
   tenants?: Array<{
     id: string;
     name: string;
@@ -38,13 +45,13 @@ export function useTenantLimits() {
   const { data: status, isLoading: loading, error, refetch } = useQuery({
     queryKey: ['tenant-limits', 'status'],
     queryFn: async (): Promise<TenantLimitStatus> => {
-      const response = await api.get('/api/tenant-limits/status');
+      const response = await tenantLimitsService.getTenantLimitsStatus();
 
-      if (!response.ok) {
+      if (!response) {
         throw new Error('Failed to fetch tenant limit status');
       }
 
-      return response.json();
+      return response;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes - limits change infrequently
     gcTime: 15 * 60 * 1000, // 15 minutes cache
@@ -87,7 +94,14 @@ export function useTierInfo() {
       setLoading(true);
       setError(null);
 
-      const response = await api.get('/api/tenant-limits/tiers');
+      // Note: This endpoint doesn't exist in the singleton service yet
+      // For now, we'll keep the direct API call but should be migrated later
+      const response = await fetch('/api/tenant-limits/tiers', {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
 
       if (!response.ok) {
         throw new Error('Failed to fetch tier information');

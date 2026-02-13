@@ -5,7 +5,7 @@
  * Extends UniversalSingleton for consistent caching and metrics
  */
 
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { AuthenticatedApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
 import { LoginSession, SecurityAlert, SecurityMetrics, SecurityThreat, BlockedIP } from '@/types/security';
 
 // Security Dashboard Data Interfaces
@@ -31,7 +31,7 @@ export interface SecurityDashboardFilters {
  * Consumes security data from various sources and provides
  * unified access for dashboard components
  */
-class SecurityDashboardSingleton extends UniversalSingleton {
+class SecurityDashboardSingleton extends AuthenticatedApiSingleton {
   private static instance: SecurityDashboardSingleton;
 
   private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
@@ -108,13 +108,7 @@ class SecurityDashboardSingleton extends UniversalSingleton {
     }
 
     try {
-      const response = await fetch('/api/auth/sessions');
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch active sessions');
-      }
-
-      const data = await response.json();
+      const data = await this.makeAuthenticatedRequest<{ data: LoginSession[] }>('/api/auth/sessions', {}, 'active_sessions_raw');
       const sessions = data.data || [];
 
       // Parse deviceInfo JSON string for each session
@@ -144,24 +138,9 @@ class SecurityDashboardSingleton extends UniversalSingleton {
    * Get security metrics
    */
   async getSecurityMetrics(hours: number = 24): Promise<SecurityMetrics> {
-    const cacheKey = `security-metrics-${hours}`;
-    
-    const cached = await this.getFromCache<SecurityMetrics>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/security/metrics?hours=${hours}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch security metrics');
-      }
+      const metrics = await this.makeAuthenticatedRequest<SecurityMetrics>(`/api/security/metrics?hours=${hours}`, {}, `security-metrics-${hours}`);
 
-      const result = await response.json();
-      const metrics = result as unknown as SecurityMetrics;
-
-      await this.setCache(cacheKey, metrics);
       return metrics;
     } catch (error) {
       console.error('Error fetching security metrics:', error);
@@ -191,13 +170,6 @@ class SecurityDashboardSingleton extends UniversalSingleton {
     threatStatus: 'active' | 'resolved' | 'all' = 'active',
     hours: number = 24
   ): Promise<SecurityThreat[]> {
-    const cacheKey = `recent-threats-${threatStatus}-${hours}`;
-    
-    const cached = await this.getFromCache<SecurityThreat[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
       const params = new URLSearchParams({
         limit: '50',
@@ -206,16 +178,9 @@ class SecurityDashboardSingleton extends UniversalSingleton {
         page: '1'
       });
 
-      const response = await fetch(`/api/security/threats?${params}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch security threats');
-      }
-
-      const result = await response.json();
+      const result = await this.makeAuthenticatedRequest<{ threats: SecurityThreat[] }>(`/api/security/threats?${params}`, {}, `recent-threats-${threatStatus}-${hours}`);
       const threats = result.threats || [];
 
-      await this.setCache(cacheKey, threats);
       return threats;
     } catch (error) {
       console.error('Error fetching security threats:', error);
@@ -227,24 +192,10 @@ class SecurityDashboardSingleton extends UniversalSingleton {
    * Get blocked IPs
    */
   async getBlockedIPs(hours: number = 24): Promise<BlockedIP[]> {
-    const cacheKey = `blocked-ips-${hours}`;
-    
-    const cached = await this.getFromCache<BlockedIP[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/security/blocked-ips?hours=${hours}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch blocked IPs');
-      }
-
-      const result = await response.json();
+      const result = await this.makeAuthenticatedRequest<{ data: BlockedIP[] }>(`/api/security/blocked-ips?hours=${hours}`, {}, `blocked-ips-${hours}`);
       const blockedIPs = result.data || [];
 
-      await this.setCache(cacheKey, blockedIPs);
       return blockedIPs;
     } catch (error) {
       console.error('Error fetching blocked IPs:', error);
@@ -259,29 +210,15 @@ class SecurityDashboardSingleton extends UniversalSingleton {
     alertLevel: 'low' | 'medium' | 'high' | 'critical' | 'all' = 'all',
     hours: number = 24
   ): Promise<SecurityAlert[]> {
-    const cacheKey = `security-alerts-${alertLevel}-${hours}`;
-    
-    const cached = await this.getFromCache<SecurityAlert[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
       const params = new URLSearchParams({
         hours: hours.toString(),
         level: alertLevel === 'all' ? '' : alertLevel
       });
 
-      const response = await fetch(`/api/security/alerts?${params}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch security alerts');
-      }
-
-      const result = await response.json();
+      const result = await this.makeAuthenticatedRequest<{ data: SecurityAlert[] }>(`/api/security/alerts?${params}`, {}, `security-alerts-${alertLevel}-${hours}`);
       const alerts = result.data || [];
 
-      await this.setCache(cacheKey, alerts);
       return alerts;
     } catch (error) {
       console.error('Error fetching security alerts:', error);
@@ -298,13 +235,9 @@ class SecurityDashboardSingleton extends UniversalSingleton {
    */
   async revokeSession(sessionId: string): Promise<void> {
     try {
-      const response = await fetch(`/api/auth/sessions/${sessionId}`, {
+      await this.makeAuthenticatedRequest(`/api/auth/sessions/${sessionId}`, {
         method: 'DELETE'
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to revoke session');
-      }
 
       // Clear cache to refresh data
       await this.clearCache();
@@ -319,13 +252,9 @@ class SecurityDashboardSingleton extends UniversalSingleton {
    */
   async revokeAllSessions(): Promise<void> {
     try {
-      const response = await fetch('/api/auth/sessions/revoke-all', {
+      await this.makeAuthenticatedRequest('/api/auth/sessions/revoke-all', {
         method: 'POST'
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to revoke all sessions');
-      }
 
       // Clear cache to refresh data
       await this.clearCache();
@@ -368,27 +297,13 @@ class SecurityDashboardSingleton extends UniversalSingleton {
     score: number;
     issues: string[];
   }> {
-    const cacheKey = 'security-health-status';
-    
-    const cached = await this.getFromCache<{
-      status: 'healthy' | 'warning' | 'critical';
-      score: number;
-      issues: string[];
-    }>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch('/api/security/health');
+      const healthStatus = await this.makeAuthenticatedRequest<{
+        status: 'healthy' | 'warning' | 'critical';
+        score: number;
+        issues: string[];
+      }>('/api/security/health', {}, 'security-health-status');
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch security health status');
-      }
-
-      const healthStatus = await response.json();
-      
-      await this.setCache(cacheKey, healthStatus);
       return healthStatus;
     } catch (error) {
       console.error('Error fetching security health status:', error);

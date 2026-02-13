@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 interface DirectoryTenantPageProps {
   params: {
@@ -8,17 +9,8 @@ interface DirectoryTenantPageProps {
 
 async function getTenantSlug(tenantId: string): Promise<string | null> {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${apiUrl}/api/directory/tenant/${tenantId}`, {
-      cache: 'no-store',
-    });
-
-    if (!res.ok) {
-      return null;
-    }
-
-    const data = await res.json();
-    return data.slug || null;
+    const data = await recommendationsService.getTenantDirectorySlug(tenantId);
+    return data?.slug || null;
   } catch (error) {
     console.error('Error fetching tenant directory slug:', error);
     return null;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { Tenant, DbTier } from '../types';
 
 interface UseBillingDataResult {
@@ -27,30 +27,22 @@ export function useBillingData(): UseBillingDataResult {
       try {
         console.log('[useBillingData] Loading tenants...');
         setLoading(true);
-        const res = await api.get('/api/tenants');
-        if (res.ok) {
-          const data = await res.json();
-          // API returns array directly, not { tenants: [...] }
-          const tenantsArray = Array.isArray(data) ? data : (data.tenants || []);
-          
-          // Transform snake_case fields to camelCase for frontend compatibility
-          const transformedTenants = tenantsArray.map((tenant: any) => ({
-            id: tenant.id,
-            name: tenant.name,
-            subscriptionTier: tenant.subscriptionTier,
-            organization: tenant.organization ? {
-              id: tenant.organization.id,
-              name: tenant.organization.name,
-            } : null,
-            metadata: tenant.metadata,
-          }));
-          
-          console.log('[useBillingData] Tenants loaded:', transformedTenants.length);
-          setTenants(transformedTenants);
-        } else {
-          console.error('[useBillingData] Failed to load tenants:', res.status);
-          setError('Failed to load tenants');
-        }
+        const tenantsArray = await platformHomeService.getTenants();
+        
+        // Transform snake_case fields to camelCase for frontend compatibility
+        const transformedTenants = tenantsArray?.map((tenant: any) => ({
+          id: tenant.id,
+          name: tenant.name,
+          subscriptionTier: tenant.subscriptionTier,
+          organization: tenant.organization ? {
+            id: tenant.organization.id,
+            name: tenant.organization.name,
+          } : null,
+          metadata: tenant.metadata,
+        })) || [];
+        
+        console.log('[useBillingData] Tenants loaded:', transformedTenants.length);
+        setTenants(transformedTenants);
       } catch (e) {
         console.error('[useBillingData] Error loading tenants:', e);
         setError('Failed to load tenants');
@@ -67,15 +59,9 @@ export function useBillingData(): UseBillingDataResult {
       try {
         console.log('[useBillingData] Loading tiers...');
         setTiersLoading(true);
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await api.get(`${apiBaseUrl}/api/admin/tier-system/tiers`);
-        if (res.ok) {
-          const data = await res.json();
-          console.log('[useBillingData] Tiers loaded:', data.tiers?.length || 0);
-          setTiers(data.tiers || []);
-        } else {
-          console.error('[useBillingData] Failed to load tiers:', res.status);
-        }
+        const data = await platformHomeService.getAdminTiers();
+        console.log('[useBillingData] Tiers loaded:', data?.length || 0);
+        setTiers(data || []);
       } catch (e) {
         console.error('[useBillingData] Error loading tiers:', e);
       } finally {

@@ -8,7 +8,7 @@ import { TIER_LIMITS, type SubscriptionTier, getTierInfo } from '@/lib/tiers';
 import { isTrialStatus, getTrialEndLabel } from '@/lib/trial';
 import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
 import { getAllAdminEmails } from '@/lib/admin-emails';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { isPlatformUser, isPlatformAdmin, type UserData } from '@/lib/auth/access-control';
 import { useAuth } from '@/contexts/AuthContext';
 import { ContextBadges } from '@/components/ContextBadges';
@@ -288,26 +288,23 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
       const requestedTierInfo = getTierInfo(selectedTier!);
       
       // Check for existing active requests
-      const checkResponse = await api.get(`/api/upgrade-requests?tenantId=${tenant.id}&status=new,pending`);
-      if (checkResponse.ok) {
-        const existingRequests = await checkResponse.json();
-        if (existingRequests.data && existingRequests.data.length > 0) {
-          alert('You already have a pending subscription change request. Please wait for it to be processed before submitting a new one.');
-          setShowChangeModal(false);
-          return;
-        }
+      const existingRequests = await platformHomeService.getUpgradeRequests(tenant.id, 'new,pending');
+      if (existingRequests && existingRequests.length > 0) {
+        alert('You already have a pending subscription change request. Please wait for it to be processed before submitting a new one.');
+        setShowChangeModal(false);
+        return;
       }
       
       // Create upgrade request in database (queue)
-      const response = await api.post('/api/upgrade-requests', {
+      const newRequest = await platformHomeService.createUpgradeRequest({
         tenantId: tenant.id,
         business_name: metadata?.businessName || tenant.name,
         currentTier: tenant.subscriptionTier || 'starter',
-        requestedTier: selectedTier,
+        requestedTier: selectedTier!,
         notes: `Subscription change request from ${metadata?.businessName || tenant.name}`,
       });
 
-      if (!response.ok) {
+      if (!newRequest) {
         throw new Error('Failed to submit upgrade request');
       }
 

@@ -1,5 +1,5 @@
 import { BusinessProfile, normalizePhoneInput } from '@/lib/validation/businessProfile';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
 /**
  * Service for handling onboarding data operations
@@ -11,47 +11,12 @@ export class OnboardingDataService {
    */
   async fetchTenantData(tenantId: string): Promise<Partial<BusinessProfile>> {
     try {
-      const [tenant, profile] = await Promise.all([
-        this.fetchTenant(tenantId),
-        this.fetchProfile(tenantId),
-      ]);
-
-      return this.mergeData(tenant, profile);
+      const mergedData = await platformHomeService.getOnboardingTenantData(tenantId);
+      return mergedData;
     } catch (error) {
       console.error('[OnboardingDataService] Failed to fetch tenant data:', error);
       return {};
     }
-  }
-
-  /**
-   * Fetch tenant basic info
-   */
-  private async fetchTenant(tenantId: string): Promise<any> {
-    try {
-      const response = await api.get(`/api/tenants/${tenantId}`);
-      if (response.ok) {
-        return await response.json();
-      }
-    } catch (error) {
-      console.error('[OnboardingDataService] Failed to fetch tenant:', error);
-    }
-    return null;
-  }
-
-  /**
-   * Fetch tenant profile
-   */
-  private async fetchProfile(tenantId: string): Promise<any> {
-    try {
-      const response = await api.get(`/api/tenant/profile?tenant_id=${tenantId}`);
-      if (response.ok) {
-        const data = await response.json();
-        return data?.data || data || null;
-      }
-    } catch (error) {
-      console.error('[OnboardingDataService] Failed to fetch profile:', error);
-    }
-    return null;
   }
 
   /**
@@ -119,22 +84,11 @@ export class OnboardingDataService {
    * Save business profile
    */
   async saveProfile(tenantId: string, data: Partial<BusinessProfile>): Promise<void> {
-    const response = await api.post('/api/tenant/profile', {
-      tenant_id: tenantId,
-      ...data,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      
-      // Extract validation errors from the details field
-      if (errorData.details?.fieldErrors) {
-        const fieldErrors = errorData.details.fieldErrors;
-        const firstError = Object.values(fieldErrors).flat()[0];
-        throw new Error(String(firstError) || 'Validation failed');
-      }
-      
-      throw new Error(errorData?.error || 'Failed to save business profile');
+    try {
+      await platformHomeService.saveOnboardingProfile(tenantId, data);
+    } catch (error) {
+      // Error will be caught and displayed in UI
+      throw error;
     }
   }
 }

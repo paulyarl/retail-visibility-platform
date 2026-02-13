@@ -9,6 +9,7 @@ import { FeaturedTypeBadges } from './FeaturedTypeBadges';
 import { Badge } from '@/components/ui/Badge';
 import { getFeaturedTypeDisplay, FeaturedType } from '@/types/product-display';
 import { useVariantsSingleton } from '@/lib/singletons/VariantsSingleton';
+import { getEnhancedTenantFeaturedProductsSingleton } from '@/lib/singletons/EnhancedTenantFeaturedProductsSingleton';
 
 interface ProductWithVariantsProps {
   product: {
@@ -84,13 +85,12 @@ export default function ProductWithVariants({
   // Fetch featured types for variants
   const fetchVariantFeaturedTypes = async (variants: ProductVariant[]) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const featuredTypesMap: Record<string, any> = {};
+      const featuredManager = getEnhancedTenantFeaturedProductsSingleton('default');
       
       for (const variant of variants) {
-        const response = await fetch(`${apiUrl}/api/featured-products/item/${variant.id}`);
-        if (response.ok) {
-          const featuredData = await response.json();
+        const featuredData = await featuredManager.getFeaturedTypes(variant.id);
+        if (featuredData) {
           featuredTypesMap[variant.id] = featuredData.featuredTypes || [];
         }
       }
@@ -107,12 +107,10 @@ export default function ProductWithVariants({
 
     const fetchAllPhotos = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${apiUrl}/api/items/${product.id}/photos`);
+        const featuredManager = getEnhancedTenantFeaturedProductsSingleton('default');
+        const photos = await featuredManager.getProductPhotos(product.id);
         
-        if (response.ok) {
-          const photos = await response.json();
-          
+        if (photos) {
           // Group photos by variant_id
           const photosByVariant: Record<string, string[]> = {};
           const parentPhotos: string[] = [];

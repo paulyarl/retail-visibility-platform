@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '@/providers/StoreProviderSingleton';
 import cacheManager from '@/utils/cacheManager';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 export interface Store {
   id: string;
@@ -137,31 +138,17 @@ export const useFeaturedStores = (
       
       console.log('[useFeaturedStores] Cache MISS - fetching from API');
       
-      // Use the featured stores endpoint
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const params = new URLSearchParams();
-      params.append('limit', limit.toString());
-      
-      if (location) {
-        params.append('lat', location.lat.toString());
-        params.append('lng', location.lng.toString());
-        params.append('maxDistance', '50'); // 50km radius
-      }
-
-      const response = await fetch(`${apiUrl}/api/directory/featured-stores?${params}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      // Use the featured stores endpoint through singleton service
+      const data = await recommendationsService.getFeaturedStores({
+        limit,
+        location
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch featured stores: ${response.status}`);
+      
+      if (!data) {
+        throw new Error('Failed to fetch featured stores: No response from service');
       }
-
-      const data = await response.json();
       
       console.log('[useFeaturedStores] API Response:', {
-        status: response.status,
         success: data.success,
         dataKeys: data.data ? Object.keys(data.data) : 'no data',
         stores: data.data?.stores,

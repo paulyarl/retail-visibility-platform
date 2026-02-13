@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Badge, Alert, AnimatedCard, Modal, ModalFooter, Pagination } from "@/components/ui";
 import { motion } from "framer-motion";
 import PageHeader, { Icons } from "@/components/PageHeader";
-import { api } from "@/lib/api";
+import { platformHomeService } from "@/services/PlatformHomeSingletonService";
 import { useAuth } from "@/contexts/AuthContext";
 import { canEditTenant, canDeleteTenant, canRenameTenant } from "@/lib/auth/access-control";
 import { ContextBadges } from "@/components/ContextBadges";
@@ -121,19 +121,30 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams();
-      if (includeArchived) {
-        params.append('includeArchived', 'true');
+      const tenants = await platformHomeService.getTenants();
+      
+      // Filter tenants based on parameters
+      let filteredTenants = tenants || [];
+      
+      if (tenants) {
+        filteredTenants = tenants.filter(tenant => {
+          // Include archived if requested
+          if (includeArchived && tenant.status === 'archived') {
+            return true;
+          }
+          // Skip archived unless specifically requested
+          if (!includeArchived && tenant.status === 'archived') {
+            return false;
+          }
+          // Apply status filter
+          if (statusParam && tenant.status !== statusParam) {
+            return false;
+          }
+          return true;
+        });
       }
-      if (statusParam) {
-        params.append('status', statusParam);
-      }
-      const url = `/api/tenants${params.toString() ? '?' + params.toString() : ''}`;
-      const res = await api.get(url);
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : [];
-      // The API already filters tenants based on user permissions, so we don't need to filter again
-      setTenants(list);
+      
+      setTenants(filteredTenants);
     } catch (_e) {
       setError("Failed to load tenants");
     } finally {
@@ -158,18 +169,17 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     setLoading(true);
     setError(null);
     try {
-      const res = await api.post("/api/tenants", { 
+      const responseData = await platformHomeService.createTenant({
         name: data.name.trim(),
-        slug: data.slug,
+        slug: data.slug || '',
         city: data.city,
         state: data.state,
         country_code: data.country_code,
       });
-      const responseData = await res.json();
       
-      if (!res.ok) {
-        console.error('[TenantsClient] Create failed:', responseData);
-        throw new Error(responseData?.message || responseData?.error || "Failed to create tenant");
+      if (!responseData) {
+        console.error('[TenantsClient] Create failed: No response data');
+        throw new Error("Failed to create tenant");
       }
       
       const newTenant = responseData as Tenant;
@@ -190,23 +200,26 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
 
   const onRename = async (id: string, newName: string) => {
     if (!newName.trim()) return;
-    const res = await api.put(`/api/tenants/${encodeURIComponent(id)}`, { name: newName.trim() });
-    if (!res.ok) {
+    try {
+      const data = await platformHomeService.updateTenant(id, { name: newName.trim() });
+      if (data) {
+        setTenants((prev) => prev.map((t) => (t.id === id ? data : t)));
+      } else {
+        setError("Failed to rename tenant");
+      }
+    } catch (error) {
       setError("Failed to rename tenant");
-      return;
     }
-    const data = await res.json();
-    setTenants((prev) => prev.map((t) => (t.id === id ? (data as Tenant) : t)));
   };
 
   const onDelete = async (id: string) => {
     if (!confirm("Delete tenant? This cannot be undone.")) return;
-    const res = await api.delete(`/api/tenants/${encodeURIComponent(id)}`);
-    if (res.status !== 204 && !res.ok) {
+    try {
+      await platformHomeService.deleteTenant(id);
+      setTenants((prev) => prev.filter((t) => t.id !== id));
+    } catch (error) {
       setError("Failed to delete tenant");
-      return;
     }
-    setTenants((prev) => prev.filter((t) => t.id !== id));
   };
 
   return (

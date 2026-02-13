@@ -1,4 +1,4 @@
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
 
 export interface RateLimitConfig {
   route_type: string;
@@ -18,19 +18,12 @@ export interface RateLimitWarning {
   blocked: boolean;
 }
 
-class RateLimitSingletonService {
+class RateLimitSingletonService extends AuthenticatedApiSingleton {
   private static instance: RateLimitSingletonService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with rate limiting defaults
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 5 * 60 * 1000, // 5 minutes - rate limit configs don't change often
-      enableLogging: false, // Reduce noise in logs
-      enableMetrics: true
-    });
+    super('rate-limit-service');
+    this.cacheTTL = 5 * 60 * 1000; // 5 minutes - rate limit configs don't change often
   }
 
   public static getInstance(): RateLimitSingletonService {
@@ -46,21 +39,13 @@ class RateLimitSingletonService {
    */
   async getRateLimitConfigurations(): Promise<RateLimitConfig[]> {
     try {
-      const response = await this.client.makeRequest<{ configs?: RateLimitConfig[] } | RateLimitConfig[]>(
-        '/api/rate-limit-configs'
+      const response = await this.makeAuthenticatedRequest<RateLimitConfig[]>(
+        '/api/rate-limit-configs',
+        {},
+        'rate-limit-configs'
       );
 
-      // Handle both direct array and nested data.configs format
-      const data = response.data;
-      if (!data) return this.getDefaultConfigs();
-      const configs = Array.isArray(data) ? data : ((data as any).configs || []);
-      
-      return configs.map((config: any) => ({
-        route_type: config.route_type,
-        max_requests: config.max_requests,
-        window_minutes: config.window_minutes,
-        enabled: config.enabled ?? true,
-      }));
+      return response || this.getDefaultConfigs();
     } catch (error) {
       console.error('Failed to fetch rate limit configurations, using defaults:', error);
       return this.getDefaultConfigs();
@@ -95,12 +80,13 @@ class RateLimitSingletonService {
    */
   async isRateLimitingEnabled(): Promise<boolean> {
     try {
-      const response = await this.client.makeRequest<{ features?: { rateLimitingEnabled?: boolean } }>(
-        '/api/platform-settings'
+      const response = await this.makeAuthenticatedRequest<{ features?: { rateLimitingEnabled?: boolean } }>(
+        '/api/platform-settings',
+        {},
+        'platform-settings-rate-limiting'
       );
       
-      const settings = response.data;
-      return settings?.features?.rateLimitingEnabled ?? true;
+      return response?.features?.rateLimitingEnabled ?? true;
     } catch (error) {
       console.error('Failed to fetch rate limiting enabled status, defaulting to enabled:', error);
       // Default to enabled if we can't fetch settings
@@ -115,10 +101,14 @@ class RateLimitSingletonService {
   async logRateLimitWarning(warning: RateLimitWarning): Promise<void> {
     try {
       // Fire and forget - don't await or block
-      this.client.makeRequest('/api/rate-limit-warnings', {
-        method: 'POST',
-        body: JSON.stringify(warning)
-      }).catch((err: Error) => {
+      this.makeAuthenticatedRequest<void>(
+        '/api/rate-limit-warnings',
+        {
+          method: 'POST',
+          body: JSON.stringify(warning)
+        },
+        `rate-limit-warning-${warning.clientId}`
+      ).catch((err: Error) => {
         console.error('Failed to log rate limit warning:', err);
       });
     } catch (error) {
@@ -129,12 +119,10 @@ class RateLimitSingletonService {
   /**
    * Invalidate rate limit configuration cache
    * Call this when configurations are updated
-   * Note: Cache will expire naturally based on TTL (5 minutes)
    */
-  invalidateConfigCache(): void {
-    // Cache invalidation happens automatically via TTL
-    // Manual cache clearing is not exposed in UniversalSingletonClient
-    console.log('[RateLimitSingleton] Cache will refresh on next request (TTL: 5 minutes)');
+  async invalidateConfigCache(): Promise<void> {
+    await this.invalidateCache('rate-limit-configs');
+    console.log('[RateLimitSingleton] Cache invalidated for rate limit configurations');
   }
 
   /**

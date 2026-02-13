@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Star } from 'lucide-react';
-import { api } from '@/lib/api';
+import { productReviewsService } from '@/services/ProductReviewsSingletonService';
 
 interface ProductRatingBadgeProps {
   productId: string;
@@ -19,13 +19,11 @@ export default function ProductRatingBadge({ productId, tenantId, size = 'sm', s
   useEffect(() => {
     const fetchRating = async () => {
       try {
-        const response = await api.get(`/api/stores/${tenantId}/products/${productId}/reviews/summary`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.data) {
-            setRating(data.data.rating_avg);
-            setCount(data.data.rating_count);
-          }
+        const data = await productReviewsService.getProductReviewSummary(tenantId, productId);
+        
+        if (data) {
+          setRating(data.rating_avg);
+          setCount(data.rating_count);
         }
       } catch (error) {
         console.error('Error fetching product rating:', error);

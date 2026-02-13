@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { Plus, Edit2, Trash2, GripVertical, Save, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 
@@ -77,13 +77,8 @@ export default function PlatformCategoriesPage() {
   const loadCategories = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/admin/platform-categories');
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data.data.categories);
-      } else {
-        throw new Error('Failed to load categories');
-      }
+      const categories = await platformHomeService.getPlatformCategories();
+      setCategories(categories || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load categories');
     } finally {
@@ -140,15 +135,14 @@ export default function PlatformCategoriesPage() {
       };
 
       const response = editingCategory
-        ? await api.patch(`/api/admin/platform-categories/${editingCategory.id}`, payload)
-        : await api.post('/api/admin/platform-categories', payload);
+        ? await platformHomeService.updatePlatformCategory(editingCategory.id, payload)
+        : await platformHomeService.createPlatformCategory(payload);
 
-      if (response.ok) {
+      if (response) {
         await loadCategories();
         setShowModal(false);
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save category');
+        throw new Error('Failed to save category');
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to save category');
@@ -163,12 +157,8 @@ export default function PlatformCategoriesPage() {
     }
 
     try {
-      const response = await api.delete(`/api/admin/platform-categories/${category.id}`);
-      if (response.ok) {
-        await loadCategories();
-      } else {
-        throw new Error('Failed to delete category');
-      }
+      await platformHomeService.deletePlatformCategory(category.id);
+      await loadCategories();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to delete category');
     }
@@ -205,15 +195,8 @@ export default function PlatformCategoriesPage() {
       setReordering(true);
       const categoryIds = categories.map(c => c.id);
       
-      const response = await api.post('/api/admin/platform-categories/reorder', {
-        categoryIds,
-      });
-
-      if (response.ok) {
-        await loadCategories(); // Reload to get updated sort_order values
-      } else {
-        throw new Error('Failed to save order');
-      }
+      await platformHomeService.reorderPlatformCategories(categoryIds);
+      await loadCategories(); // Reload to get updated sort_order values
     } catch (err) {
       alert('Failed to save category order');
       await loadCategories(); // Reload original order

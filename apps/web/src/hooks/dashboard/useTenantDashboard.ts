@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
 export interface TenantDashboardStats {
   totalItems: number;
@@ -53,15 +53,8 @@ export function useTenantDashboard(tenantId: string | null): UseTenantDashboardR
       setError(null);
 
       // Use consolidated endpoint - reduces 2 API calls to 1
-      const response = await api.get(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/dashboard/consolidated/${encodeURIComponent(tenantId)}`);
+      const data = await platformHomeService.getDashboardConsolidated(tenantId);
 
-      console.log('[useTenantDashboard] Consolidated response status:', response.status);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch dashboard data: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
       console.log('[useTenantDashboard] Consolidated data received:', {
         tenant: data.tenant?.id,
         stats: data.stats,

@@ -5,7 +5,7 @@
  * Extends UniversalSingleton for consistent caching and metrics
  */
 
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { AuthenticatedApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
 
 // Tenant Profile Data Interfaces
 export interface TenantProfile {
@@ -160,7 +160,7 @@ export interface TenantProfileStats {
  * 
  * Produces and manages tenant profile data and analytics
  */
-class TenantProfileSingleton extends UniversalSingleton {
+class TenantProfileSingleton extends AuthenticatedApiSingleton {
   private static instance: TenantProfileSingleton;
   private profileCache: Map<string, TenantProfile> = new Map();
   private updateQueue: Array<{
@@ -197,39 +197,17 @@ class TenantProfileSingleton extends UniversalSingleton {
    * Get tenant profile
    */
   async getTenantProfile(tenantId: string): Promise<TenantProfile | null> {
-    const cacheKey = `tenant-profile-${tenantId}`;
-    
-    // Check local cache first
-    const localCached = this.profileCache.get(tenantId);
-    if (localCached) {
-      return localCached;
-    }
-
-    // Check persistent cache
-    const cached = await this.getFromCache<TenantProfile>(cacheKey);
-    if (cached) {
-      this.profileCache.set(tenantId, cached);
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/tenants/${tenantId}/profile`);
+      const profile = await this.makeAuthenticatedRequest<TenantProfile>(`/api/tenants/${tenantId}/profile`, {}, `tenant-profile-${tenantId}`);
       
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error('Failed to fetch tenant profile');
-      }
-
-      const profile = await response.json();
-      
-      // Update caches
+      // Update local cache for quick access
       this.profileCache.set(tenantId, profile);
-      await this.setCache(cacheKey, profile);
 
       return profile;
     } catch (error) {
+      if ((error as any).status === 404) {
+        return null;
+      }
       console.error('Error fetching tenant profile:', error);
       return null;
     }
@@ -251,21 +229,13 @@ class TenantProfileSingleton extends UniversalSingleton {
         lastActivityAt: new Date().toISOString()
       };
 
-      const response = await fetch(`/api/tenants/${tenantId}/profile`, {
+      const createdProfile = await this.makeAuthenticatedRequest<TenantProfile>(`/api/tenants/${tenantId}/profile`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newProfile)
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to create tenant profile');
-      }
-
-      const createdProfile = await response.json();
       
-      // Update caches
+      // Update local cache for quick access
       this.profileCache.set(tenantId, createdProfile);
-      await this.setCache(`tenant-profile-${tenantId}`, createdProfile);
 
       return createdProfile;
     } catch (error) {
@@ -315,22 +285,17 @@ class TenantProfileSingleton extends UniversalSingleton {
    */
   private async processProfileUpdate(tenantId: string, updates: TenantProfileUpdate): Promise<void> {
     try {
-      const response = await fetch(`/api/tenants/${tenantId}/profile`, {
+      await this.makeAuthenticatedRequest(`/api/tenants/${tenantId}/profile`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...updates,
           updatedAt: new Date().toISOString()
         })
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to update tenant profile');
-      }
-
-      // Clear cache to force refresh
+      // Invalidate cache to force refresh
       this.profileCache.delete(tenantId);
-      await this.clearCache(`tenant-profile-${tenantId}`);
+      await this.invalidateCache(`tenant-profile-${tenantId}`);
     } catch (error) {
       console.error('Error processing profile update:', error);
       throw error;
@@ -378,23 +343,9 @@ class TenantProfileSingleton extends UniversalSingleton {
    * Get tenant profile statistics
    */
   async getTenantProfileStats(tenantId: string): Promise<TenantProfileStats> {
-    const cacheKey = `tenant-profile-stats-${tenantId}`;
-    
-    const cached = await this.getFromCache<TenantProfileStats>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/tenants/${tenantId}/profile/stats`);
+      const stats = await this.makeAuthenticatedRequest<TenantProfileStats>(`/api/tenants/${tenantId}/profile/stats`, {}, `tenant-profile-stats-${tenantId}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch tenant profile stats');
-      }
-
-      const stats = await response.json();
-      
-      await this.setCache(cacheKey, stats);
       return stats;
     } catch (error) {
       console.error('Error fetching tenant profile stats:', error);
@@ -423,21 +374,16 @@ class TenantProfileSingleton extends UniversalSingleton {
     analytics: Partial<TenantProfile['analytics']>
   ): Promise<void> {
     try {
-      const response = await fetch(`/api/tenants/${tenantId}/analytics`, {
+      await this.makeAuthenticatedRequest(`/api/tenants/${tenantId}/analytics`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...analytics,
           lastActivityAt: new Date().toISOString()
         })
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to update tenant analytics');
-      }
-
-      // Clear cache
-      await this.clearCache(`tenant-profile-${tenantId}`);
+      // Invalidate cache
+      await this.invalidateCache(`tenant-profile-${tenantId}`);
       this.profileCache.delete(tenantId);
     } catch (error) {
       console.error('Error updating tenant analytics:', error);
@@ -457,24 +403,17 @@ class TenantProfileSingleton extends UniversalSingleton {
     }
   ): Promise<void> {
     try {
-      const response = await fetch(`/api/tenants/${tenantId}/activity`, {
+      await this.makeAuthenticatedRequest(`/api/tenants/${tenantId}/activity`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...activity,
           timestamp: new Date().toISOString()
         })
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to record tenant activity');
-      }
-
-      // Update last activity
-      await this.updateTenantProfile(tenantId, {
-        updatedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString()
-      });
+      // Update last activity - invalidate cache
+      await this.invalidateCache(`tenant-profile-${tenantId}`);
+      this.profileCache.delete(tenantId);
     } catch (error) {
       console.error('Error recording tenant activity:', error);
       throw error;
@@ -520,13 +459,6 @@ class TenantProfileSingleton extends UniversalSingleton {
     } = {},
     limit: number = 20
   ): Promise<TenantProfile[]> {
-    const cacheKey = `tenant-profile-search-${JSON.stringify({ query, filters, limit })}`;
-    
-    const cached = await this.getFromCache<TenantProfile[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
       const params = new URLSearchParams();
       params.append('q', query);
@@ -536,15 +468,8 @@ class TenantProfileSingleton extends UniversalSingleton {
       if (filters.plan) params.append('plan', filters.plan);
       params.append('limit', limit.toString());
 
-      const response = await fetch(`/api/tenants/search?${params}`);
+      const profiles = await this.makeAuthenticatedRequest<TenantProfile[]>(`/api/tenants/search?${params}`, {}, `tenant-profile-search-${JSON.stringify({ query, filters, limit })}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to search tenant profiles');
-      }
-
-      const profiles = await response.json();
-      
-      await this.setCache(cacheKey, profiles);
       return profiles;
     } catch (error) {
       console.error('Error searching tenant profiles:', error);
@@ -556,23 +481,9 @@ class TenantProfileSingleton extends UniversalSingleton {
    * Get featured tenant profiles
    */
   async getFeaturedTenantProfiles(limit: number = 10): Promise<TenantProfile[]> {
-    const cacheKey = `featured-tenant-profiles-${limit}`;
-    
-    const cached = await this.getFromCache<TenantProfile[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/tenants/featured?limit=${limit}`);
+      const profiles = await this.makeAuthenticatedRequest<TenantProfile[]>(`/api/tenants/featured?limit=${limit}`, {}, `featured-tenant-profiles-${limit}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch featured tenant profiles');
-      }
-
-      const profiles = await response.json();
-      
-      await this.setCache(cacheKey, profiles);
       return profiles;
     } catch (error) {
       console.error('Error fetching featured tenant profiles:', error);

@@ -10,7 +10,7 @@
 
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { api } from '@/lib/api';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
 
 // Behavior Tracking Singleton Class
@@ -235,14 +235,7 @@ class BehaviorTrackingCache {
 
       //console.log('[BehaviorTracking] Sending batch data:', JSON.stringify(batchData, null, 2));
 
-      const response = await api.post(`${apiUrl}/api/recommendations/track-batch`, batchData);
-
-      if (!response.ok) {
-        // For tracking failures, handle silently - users don't need to know about behavior tracking failures
-        console.warn(`[BehaviorTracking] Silent tracking failure (${response.status}) - continuing without error`);
-        // Don't throw - just return and continue with retry logic
-        return;
-      }
+      await recommendationsService.trackBehaviorBatch(batchData);
 
       // Success - reset retry state
       this.retryState.attempts = 0;

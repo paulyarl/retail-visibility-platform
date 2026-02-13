@@ -1,11 +1,11 @@
 /**
  * Tiers Singleton - Producer Pattern
  * 
- * Produces and manages tier data with UniversalSingleton integration
- * Extends UniversalSingleton for consistent caching and metrics
+ * Produces and manages tier data with AuthenticatedApiSingleton integration
+ * Extends AuthenticatedApiSingleton for consistent caching and metrics
  */
 
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { AuthenticatedApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
 
 // Tier Types (matching server-side)
 export interface Tier {
@@ -103,14 +103,12 @@ export interface UpgradeEligibility {
   targetTier?: Tier;
 }
 
-class TiersSingleton extends UniversalSingleton {
+class TiersSingleton extends AuthenticatedApiSingleton {
   private static instance: TiersSingleton;
 
   constructor() {
-    super('tiers-singleton', {
-      encrypt: false,
-      userId: undefined
-    });
+    super('tiers-singleton');
+    this.cacheTTL = 30 * 60 * 1000; // 30 minutes for tier data (changes rarely)
   }
 
   static getInstance(): TiersSingleton {
@@ -128,36 +126,18 @@ class TiersSingleton extends UniversalSingleton {
    * Get tier by ID
    */
   async getTier(tierId: string): Promise<Tier | null> {
-    const cacheKey = `tier-${tierId}`;
-    
-    // Check cache first
-    const cached = await this.getFromCache<Tier>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/tiers-singleton/${tierId}`, {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
+        `/api/tiers-singleton/${tierId}`,
+        {},
+        `tier-${tierId}`
+      );
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to fetch tier: ${response.statusText}`);
+      return result.tier;
+    } catch (error: any) {
+      if (error.message?.includes('404')) {
+        return null;
       }
-
-      const result = await response.json();
-      const tier = result.data.tier;
-
-      // Cache the result
-      await this.setCache(cacheKey, tier);
-      
-      return tier;
-    } catch (error) {
       console.error('Error fetching tier', error);
       return null;
     }
@@ -167,36 +147,18 @@ class TiersSingleton extends UniversalSingleton {
    * Get tier by slug
    */
   async getTierBySlug(slug: string): Promise<Tier | null> {
-    const cacheKey = `tier-slug-${slug}`;
-    
-    // Check cache first
-    const cached = await this.getFromCache<Tier>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/tiers-singleton/slug/${slug}`, {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
+        `/api/tiers-singleton/slug/${slug}`,
+        {},
+        `tier-slug-${slug}`
+      );
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to fetch tier by slug: ${response.statusText}`);
+      return result.tier;
+    } catch (error: any) {
+      if (error.message?.includes('404')) {
+        return null;
       }
-
-      const result = await response.json();
-      const tier = result.data.tier;
-
-      // Cache the result
-      await this.setCache(cacheKey, tier);
-      
-      return tier;
-    } catch (error) {
       console.error('Error fetching tier by slug', error);
       return null;
     }
@@ -207,28 +169,17 @@ class TiersSingleton extends UniversalSingleton {
    */
   async createTier(request: CreateTierRequest): Promise<Tier> {
     try {
-      const response = await fetch('/api/tiers-singleton', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+      const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
+        '/api/tiers-singleton',
+        {
+          method: 'POST',
+          body: JSON.stringify(request)
         },
-        body: JSON.stringify(request)
-      });
+        'tier-create'
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to create tier: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const tier = result.data.tier;
-
-      // Clear tier list cache
-      await this.clearCache('tiers-list');
-
-      console.log('Tier created successfully', { tierId: tier.id });
-      
-      return tier;
+      console.log('Tier created successfully', { tierId: result.tier.id });
+      return result.tier;
     } catch (error) {
       console.error('Error creating tier', error);
       throw error;
@@ -240,32 +191,17 @@ class TiersSingleton extends UniversalSingleton {
    */
   async updateTier(tierId: string, updates: UpdateTierRequest): Promise<Tier> {
     try {
-      const response = await fetch(`/api/tiers-singleton/${tierId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+      const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
+        `/api/tiers-singleton/${tierId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(updates)
         },
-        body: JSON.stringify(updates)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update tier: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const tier = result.data.tier;
-
-      // Update cache
-      const cacheKey = `tier-${tierId}`;
-      await this.setCache(cacheKey, tier);
-
-      // Clear tier list cache
-      await this.clearCache('tiers-list');
+        `tier-update-${tierId}`
+      );
 
       console.log('Tier updated successfully', { tierId });
-      
-      return tier;
+      return result.tier;
     } catch (error) {
       console.error('Error updating tier', error);
       throw error;
@@ -277,21 +213,13 @@ class TiersSingleton extends UniversalSingleton {
    */
   async deleteTier(tierId: string): Promise<void> {
     try {
-      const response = await fetch(`/api/tiers-singleton/${tierId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to delete tier: ${response.statusText}`);
-      }
-
-      // Clear caches
-      const cacheKey = `tier-${tierId}`;
-      await this.clearCache(cacheKey);
-      await this.clearCache('tiers-list');
+      await this.makeAuthenticatedRequest<void>(
+        `/api/tiers-singleton/${tierId}`,
+        {
+          method: 'DELETE'
+        },
+        `tier-delete-${tierId}`
+      );
 
       console.log('Tier deleted successfully', { tierId });
     } catch (error) {
@@ -309,14 +237,6 @@ class TiersSingleton extends UniversalSingleton {
     limit?: number;
     offset?: number;
   } = {}): Promise<Tier[]> {
-    const cacheKey = `tiers-list-${JSON.stringify(filters)}`;
-    
-    // Check cache first
-    const cached = await this.getFromCache<Tier[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
@@ -324,23 +244,15 @@ class TiersSingleton extends UniversalSingleton {
       if (filters.limit) params.append('limit', filters.limit.toString());
       if (filters.offset) params.append('offset', filters.offset.toString());
 
-      const response = await fetch(`/api/tiers-singleton?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const cacheKey = `tiers-list-${params.toString()}`;
 
-      if (!response.ok) {
-        throw new Error(`Failed to list tiers: ${response.statusText}`);
-      }
+      const result = await this.makeAuthenticatedRequest<{ tiers: Tier[] }>(
+        `/api/tiers-singleton?${params}`,
+        {},
+        cacheKey
+      );
 
-      const result = await response.json();
-      const tiers = result.data.tiers;
-
-      // Cache the result
-      await this.setCache(cacheKey, tiers);
-      
-      return tiers;
+      return result.tiers;
     } catch (error) {
       console.error('Error listing tiers', error);
       throw error;
@@ -355,32 +267,14 @@ class TiersSingleton extends UniversalSingleton {
    * Get tier statistics
    */
   async getTierStats(): Promise<TierStats> {
-    const cacheKey = 'tier-stats';
-    
-    // Check cache first
-    const cached = await this.getFromCache<TierStats>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch('/api/tiers-singleton/stats', {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const result = await this.makeAuthenticatedRequest<{ stats: TierStats }>(
+        '/api/tiers-singleton/stats',
+        {},
+        'tier-stats'
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tier stats: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const stats = result.data.stats;
-
-      // Cache the result
-      await this.setCache(cacheKey, stats);
-      
-      return stats;
+      return result.stats;
     } catch (error) {
       console.error('Error fetching tier stats', error);
       throw error;
@@ -391,32 +285,14 @@ class TiersSingleton extends UniversalSingleton {
    * Check if tenant can upgrade to tier
    */
   async canUpgradeToTier(tenantId: string, targetTierId: string): Promise<UpgradeEligibility> {
-    const cacheKey = `upgrade-check-${tenantId}-${targetTierId}`;
-    
-    // Check cache first
-    const cached = await this.getFromCache<UpgradeEligibility>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/tiers-singleton/${targetTierId}/can-upgrade/${tenantId}`, {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const result = await this.makeAuthenticatedRequest<UpgradeEligibility>(
+        `/api/tiers-singleton/${targetTierId}/can-upgrade/${tenantId}`,
+        {},
+        `upgrade-check-${tenantId}-${targetTierId}`
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to check upgrade eligibility: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const eligibility = result.data;
-
-      // Cache the result
-      await this.setCache(cacheKey, eligibility);
-      
-      return eligibility;
+      return result;
     } catch (error) {
       console.error('Error checking upgrade eligibility', error);
       throw error;
@@ -431,36 +307,18 @@ class TiersSingleton extends UniversalSingleton {
    * Get tier limits
    */
   async getTierLimits(tierId: string): Promise<Tier['limits'] | null> {
-    const cacheKey = `tier-limits-${tierId}`;
-    
-    // Check cache first
-    const cached = await this.getFromCache<Tier['limits']>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/tiers-singleton/${tierId}/limits`, {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const result = await this.makeAuthenticatedRequest<{ limits: Tier['limits'] }>(
+        `/api/tiers-singleton/${tierId}/limits`,
+        {},
+        `tier-limits-${tierId}`
+      );
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to fetch tier limits: ${response.statusText}`);
+      return result.limits;
+    } catch (error: any) {
+      if (error.message?.includes('404')) {
+        return null;
       }
-
-      const result = await response.json();
-      const limits = result.data.limits;
-
-      // Cache the result
-      await this.setCache(cacheKey, limits);
-      
-      return limits;
-    } catch (error) {
       console.error('Error fetching tier limits', error);
       return null;
     }
@@ -470,32 +328,14 @@ class TiersSingleton extends UniversalSingleton {
    * Check if tier has feature
    */
   async hasFeature(tierId: string, feature: keyof Tier['features']): Promise<boolean> {
-    const cacheKey = `tier-feature-${tierId}-${feature}`;
-    
-    // Check cache first
-    const cached = await this.getFromCache<boolean>(cacheKey);
-    if (cached !== undefined && cached !== null) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/tiers-singleton/${tierId}/has-feature/${feature}`, {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const result = await this.makeAuthenticatedRequest<{ hasFeature: boolean }>(
+        `/api/tiers-singleton/${tierId}/has-feature/${feature}`,
+        {},
+        `tier-feature-${tierId}-${feature}`
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to check tier feature: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const hasFeature = result.data.hasFeature;
-
-      // Cache the result
-      await this.setCache(cacheKey, hasFeature);
-      
-      return hasFeature;
+      return result.hasFeature;
     } catch (error) {
       console.error('Error checking tier feature', error);
       return false;
@@ -568,11 +408,6 @@ class TiersSingleton extends UniversalSingleton {
   // PRIVATE METHODS
   // ====================
 
-  private getAuthToken(): string {
-    // This would get the auth token from cookies, localStorage, or context
-    // For now, return empty string - this would be implemented based on auth system
-    return '';
-  }
 }
 
 export default TiersSingleton;

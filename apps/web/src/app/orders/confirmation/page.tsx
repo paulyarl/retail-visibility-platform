@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { CheckCircle, ArrowLeft } from 'lucide-react';
+import { customerOrderService } from '@/services/CustomerOrderService';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 
 function OrderConfirmationContent() {
   const searchParams = useSearchParams();
@@ -23,46 +25,35 @@ function OrderConfirmationContent() {
   const fetchOrderDetails = async () => {
     try {
       console.log('Fetching order details for paymentId:', paymentId);
-      const response = await fetch(`/api/checkout/payments/${paymentId}`);
-      console.log('Payment details response:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      });
       
-      if (response.ok) {
-        const { payment } = await response.json();
-        console.log('Payment data received:', payment);
-        setOrderDetails(payment);
+      if (!paymentId) {
+        throw new Error('Payment ID is required');
+      }
+      
+      // Fetch payment details
+      const payment = await customerOrderService.getPaymentDetails(paymentId);
+      console.log('Payment data received:', payment);
+      setOrderDetails(payment);
+      
+      // Fetch tenant information if we have the tenant_id
+      if (payment?.tenant_id) {
+        console.log('Fetching tenant info for:', payment.tenant_id);
+        const tenantData = await tenantInfoService.getTenantInfo(payment.tenant_id);
+        console.log('Tenant data received:', tenantData);
+        setTenantInfo(tenantData);
         
-        // Fetch tenant information if we have the tenant_id
-        if (payment.tenant_id) {
-          console.log('Fetching tenant info for:', payment.tenant_id);
-          const tenantResponse = await fetch(`/api/tenants/${payment.tenant_id}`);
-          if (tenantResponse.ok) {
-            const tenantData = await tenantResponse.json();
-            console.log('Tenant data received:', tenantData);
-            setTenantInfo(tenantData);
-            
-            // Also fetch business profile for complete branding info
-            const profileResponse = await fetch(`/api/tenants/${payment.tenant_id}/business-profile`);
-            if (profileResponse.ok) {
-              const profileData = await profileResponse.json();
-              console.log('Business profile data received:', profileData);
-              // Merge business profile data with tenant info
-              setTenantInfo((prev: any) => ({
-                ...prev,
-                ...profileData.business_profile
-              }));
-            }
-          }
-        }
-      } else {
-        const errorData = await response.text();
-        console.error('Payment API error:', errorData);
+        // Also fetch business profile for complete branding info
+        const profileData = await tenantInfoService.getBusinessProfile(payment.tenant_id);
+        console.log('Business profile data received:', profileData);
+        
+        // Merge business profile data with tenant info
+        setTenantInfo((prev: any) => ({
+          ...prev,
+          ...profileData
+        }));
       }
     } catch (error) {
-      console.error('Failed to fetch order details:', error);
+      console.error('Error fetching order details:', error);
     } finally {
       setLoading(false);
     }

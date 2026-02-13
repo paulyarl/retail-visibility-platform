@@ -5,7 +5,7 @@
  */
 
 import { isFeatureEnabled } from './featureFlags';
-import { api } from './api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { LocalStorageCache } from './cache/local-storage-cache';
 
 export interface TenantNavigationOptions {
@@ -62,17 +62,14 @@ export async function trackCurrentPage(tenantId: string, path: string): Promise<
  */
 export async function checkTenantOnboarding(tenantId: string): Promise<OnboardingCheckResult> {
   try {
-    const res = await api.get(`/api/tenant/profile?tenant_id=${encodeURIComponent(tenantId)}`, { 
-      skipAuthRedirect: true 
-    });
+    const p = await platformHomeService.getTenantProfile(tenantId);
     
-    if (res.ok) {
-      const p = await res.json();
-      const nameOk = !!(p.business_name && String(p.business_name).trim().length >= 2);
-      const addrOk = !!(p.address_line1 && String(p.address_line1).trim().length >= 3);
+    if (p) {
+      const nameOk = !!(p.businessName && String(p.businessName).trim().length >= 2);
+      const addrOk = !!(p.addressLine1 && String(p.addressLine1).trim().length >= 3);
       const cityOk = !!(p.city && String(p.city).trim().length >= 2);
-      const postalOk = !!(p.postal_code && String(p.postal_code).trim().length >= 3);
-      const countryOk = !!(p.country_code && String(p.country_code).trim().length === 2);
+      const postalOk = !!(p.postalCode && String(p.postalCode).trim().length >= 3);
+      const countryOk = !!(p.countryCode && String(p.countryCode).trim().length === 2);
       const emailOk = !!(p.email && String(p.email).includes('@'));
 
       const needsOnboarding = !(nameOk && addrOk && cityOk && postalOk && countryOk && emailOk);

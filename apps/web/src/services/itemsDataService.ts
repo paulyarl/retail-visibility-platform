@@ -1,4 +1,4 @@
-import { api } from '@/lib/api';
+import { itemsSingletonService } from '@/services/ItemsSingletonService';
 
 export interface Item {
   id: string;
@@ -83,15 +83,14 @@ export class ItemsDataService {
    */
   async fetchStats(tenantId: string): Promise<ItemStats> {
     try {
-      const response = await api.get(`/api/items/stats?tenant_id=${tenantId}`);
+      const result = await itemsSingletonService.getItemsComplete({ tenant_id: tenantId, page: 1, limit: 1 });
       
-      if (!response.ok) {
-        console.error('[fetchStats] API error:', response.status);
-        // Return default stats on error
+      if (!result) {
+        console.error('[fetchStats] API error: No result returned');
         return { total: 0, active: 0, inactive: 0, syncing: 0, public: 0, private: 0, lowStock: 0 };
       }
 
-      return await response.json();
+      return result.stats;
     } catch (error) {
       console.error('[fetchStats] Error:', error);
       return { total: 0, active: 0, inactive: 0, syncing: 0, public: 0, private: 0, lowStock: 0 };
@@ -126,15 +125,22 @@ export class ItemsDataService {
       // Add tenant identifier (snake_case as expected by backend)
       params.append('tenant_id', tenantId);
       
-      const response = await api.get(`/api/items?${params.toString()}`);
+      const result = await itemsSingletonService.getItemsComplete({
+        tenant_id: tenantId,
+        page: pagination.page,
+        limit: pagination.limit,
+        q: filters.q,
+        status: filters.status,
+        visibility: filters.visibility,
+        categoryId: filters.categoryId,
+        categoryFilter: filters.categoryFilter && filters.categoryFilter !== 'all' ? filters.categoryFilter : undefined
+      });
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[fetchItems] API error:', response.status, response.statusText, errorData);
-        throw new Error(`Failed to fetch items: ${response.status} ${response.statusText}`);
+      if (!result) {
+        throw new Error('Failed to fetch items: No result returned');
       }
 
-      const data = await response.json();
+      const data = result;
 
       // Normalize itemStatus to status for all items
       const normalizeItem = (item: any): Item => ({
@@ -185,27 +191,17 @@ export class ItemsDataService {
    */
   async createItem(tenantId: string, data: CreateItemData): Promise<Item> {
     try {
-      const response = await api.post('api/items', {
-        tenantId: tenantId,
+      const result = await itemsSingletonService.createItem({
         ...data,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData?.error || 'Failed to create item');
+      if (!result) {
+        throw new Error('Failed to create item: No result returned');
       }
 
-      const result = await response.json();
-      
-      // Normalize status fields from API response
-      return {
-        ...result,
-        status: result.itemStatus || result.item_status || result.status || 'active',
-        itemStatus: result.itemStatus || result.item_status || result.status || 'active',
-        condition: result.condition === 'brand_new' ? 'new' : result.condition,
-      };
+      return result;
     } catch (error) {
-      // Error will be caught and displayed in UI
+      console.error('[createItem] Error:', error);
       throw error;
     }
   }
@@ -216,24 +212,18 @@ export class ItemsDataService {
   async updateItem(itemId: string, data: Partial<Item>): Promise<Item> {
     try {
       console.log('[updateItem] Sending data:', { itemId, data });
-      const response = await api.put(`/api/items/${itemId}`, data);
-      console.log('[updateItem] Response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[updateItem] API error response:', response.status, errorData);
-        throw new Error(errorData?.error || `Failed to update item (${response.status})`);
-      }
-
-      const result = await response.json();
+      const result = await itemsSingletonService.updateItem(itemId, data);
       console.log('[updateItem] Result:', result);
+      
+      if (!result) {
+        throw new Error('Failed to update item: No result returned');
+      }
       
       // Normalize status fields from API response
       return {
         ...result,
-        status: result.itemStatus || result.item_status || result.status || 'active',
-        itemStatus: result.itemStatus || result.item_status || result.status || 'active',
-        condition: result.condition === 'brand_new' ? 'new' : result.condition,
+        status: result.status || 'active',
+        condition: result.condition,
       };
     } catch (error) {
       console.error('[updateItem] Error:', error);
@@ -247,11 +237,10 @@ export class ItemsDataService {
    */
   async deleteItem(itemId: string): Promise<void> {
     try {
-      const response = await api.delete(`/api/items/${itemId}`);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData?.error || 'Failed to delete item');
+      const result = await itemsSingletonService.deleteItem(itemId);
+      
+      if (!result) {
+        throw new Error('Failed to delete item: No result returned');
       }
     } catch (error) {
       // Error will be caught and displayed in UI
@@ -264,17 +253,8 @@ export class ItemsDataService {
    */
   async uploadPhotos(itemId: string, files: File[]): Promise<string[]> {
     try {
-      const formData = new FormData();
-      files.forEach((file) => formData.append('photos', file));
-
-      const response = await api.post(`/api/items/${itemId}/photos`, formData);
-
-      if (!response.ok) {
-        throw new Error('Failed to upload photos');
-      }
-
-      const data = await response.json();
-      return data.urls || [];
+      const urls = await itemsSingletonService.uploadPhotos(itemId, files);
+      return urls;
     } catch (error) {
       // Error will be caught and displayed in UI
       throw error;

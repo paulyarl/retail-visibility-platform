@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui';
 import { useLastViewedSession } from '@/hooks/useLastViewedSession';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 // Types for last viewed items
 interface LastViewedStore {
@@ -150,14 +151,12 @@ export default function LastViewed({
           params.set('sessionId', sessionId);
         }
 
-        const res = await fetch(`${apiUrl}/api/recommendations/last-viewed?${params}`);
-
-        if (!res.ok) {
-          throw new Error('Failed to fetch last viewed items');
-        }
-
-        const data = await res.json();
-        const recommendations = data.recommendations || [];
+        const data = await recommendationsService.getLastViewed({
+          sessionId,
+          limit: 8
+        });
+        
+        const recommendations = data?.recommendations || [];
 
         // Transform API response to component format
         const transformedItems: LastViewedItem[] = recommendations.map((item: any) => {

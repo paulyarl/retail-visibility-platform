@@ -3,6 +3,7 @@
 import { useMemo, useCallback } from 'react';
 import CategorySelectorMulti, { CategoryOption } from '@/components/shared/CategorySelectorMulti';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 interface DirectoryCategorySelectorAdapterProps {
   primary: string;
@@ -63,12 +64,8 @@ export default function DirectoryCategorySelectorAdapter({
   // Memoize search function to prevent recreation
   const handleSearch = useCallback(async (query: string): Promise<CategoryOption[]> => {
     try {
-      const response = await fetch(`/api/directory/categories/search?q=${encodeURIComponent(query)}`);
-      if (!response.ok) {
-        throw new Error('Search failed');
-      }
-      const data = await response.json();
-      if (data.success && data.data.categories) {
+      const data = await recommendationsService.searchCategories(query);
+      if (data?.success && data?.data?.categories) {
         // Convert search results to CategoryOption format
         return data.data.categories.map((cat: any) => ({
           id: cat.slug,

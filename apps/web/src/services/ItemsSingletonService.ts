@@ -5,7 +5,8 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { platformDashboardService } from './PlatformDashboardSingletonService';
 
 export interface Item {
   id: string;
@@ -70,19 +71,12 @@ export interface ItemsCompleteParams {
   categoryFilter?: 'assigned' | 'unassigned';
 }
 
-class ItemsSingletonService {
+class ItemsSingletonService extends AuthenticatedApiSingleton {
   private static instance: ItemsSingletonService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with items-specific settings
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 15 * 60 * 1000, // 15 minutes for items data (moderate cache)
-      enableLogging: true,
-      enableMetrics: true
-    });
+    super('items-singleton');
+    this.cacheTTL = 15 * 60 * 1000; // 15 minutes for items data (moderate cache)
   }
 
   public static getInstance(): ItemsSingletonService {
@@ -110,20 +104,14 @@ class ItemsSingletonService {
       if (params.categoryId) queryParams.append('categoryId', params.categoryId);
       if (params.categoryFilter) queryParams.append('categoryFilter', params.categoryFilter);
 
-      const endpoint = `/api/items/complete?${queryParams.toString()}`;
+      const queryString = queryParams.toString();
+      const cacheKey = `items_complete_${queryString}`;
+
+      const endpoint = `/api/items/complete?${queryString}`;
       
-      const result = await this.client.makeRequest<ItemsCompleteResponse>(endpoint);
+      const result = await this.makeAuthenticatedRequest<ItemsCompleteResponse>(endpoint, {}, cacheKey);
 
-      const data = result as unknown as ItemsCompleteResponse;
-      console.log('[ItemsSingleton] getItemsComplete API response:', {
-        endpoint,
-        hasData: !!data,
-        itemsCount: data?.items?.length || 0,
-        totalItems: data?.stats?.total || 0
-      });
-
-      // makeRequest returns data directly, not wrapped in ApiResponse
-      return data;
+      return result;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to get items complete:', error);
       return null;
@@ -135,10 +123,13 @@ class ItemsSingletonService {
    */
   async getItem(itemId: string): Promise<Item | null> {
     try {
-      const result = await this.client.makeRequest<Item>(`/api/items/${itemId}`);
+      const result = await this.makeAuthenticatedRequest<Item>(
+        `/api/items/${itemId}`,
+        {},
+        `item-${itemId}`
+      );
 
-      // makeRequest returns data directly, not wrapped in ApiResponse
-      return result as unknown as Item;
+      return result;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to get item:', error);
       return null;
@@ -149,21 +140,25 @@ class ItemsSingletonService {
    * Create new item
    * Note: This will invalidate relevant cache entries
    */
-  async createItem(itemData: Partial<Item>): Promise<Item | null> {
+  async createItem(itemData: Partial<Item>, tenantId?: string): Promise<Item | null> {
     try {
-      const result = await this.client.makeRequest<Item>(
+      const result = await this.makeAuthenticatedRequest<Item>(
         '/api/items',
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify(itemData),
-        }
+        },
+        'items-create'
       );
 
-      // makeRequest returns data directly, not wrapped in ApiResponse
-      return result as unknown as Item;
+      // Invalidate items complete cache for this tenant
+      const targetTenantId = tenantId || itemData.tenantCategoryId || 'unknown';
+      await this.invalidateCache(`items_complete_tenant_${targetTenantId}*`);
+      
+      // Invalidate platform dashboard cache since items affect stats
+      await platformDashboardService.invalidateCache('platform-dashboard-complete');
+      
+      return result;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to create item:', error);
       return null;
@@ -174,21 +169,25 @@ class ItemsSingletonService {
    * Update existing item
    * Note: This will invalidate relevant cache entries
    */
-  async updateItem(itemId: string, itemData: Partial<Item>): Promise<Item | null> {
+  async updateItem(itemId: string, itemData: Partial<Item>, tenantId?: string): Promise<Item | null> {
     try {
-      const result = await this.client.makeRequest<Item>(
+      const result = await this.makeAuthenticatedRequest<Item>(
         `/api/items/${itemId}`,
         {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify(itemData),
-        }
+        },
+        `item-update-${itemId}`
       );
 
-      // makeRequest returns data directly, not wrapped in ApiResponse
-      return result as unknown as Item;
+      // Invalidate items complete cache for this tenant
+      const targetTenantId = tenantId || itemData.tenantCategoryId || 'unknown';
+      await this.invalidateCache(`items_complete_tenant_${targetTenantId}*`);
+      
+      // Invalidate platform dashboard cache since items affect stats
+      await platformDashboardService.invalidateCache('platform-dashboard-complete');
+      
+      return result;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to update item:', error);
       return null;
@@ -196,20 +195,420 @@ class ItemsSingletonService {
   }
 
   /**
+   * Upload a single photo for an item
+   * Uses the /api/items/:itemId/photos endpoint
+   */
+  async uploadPhoto(itemId: string, photoData: {
+    tenantId: string;
+    dataUrl: string;
+    contentType: string;
+    variant_id?: string | null;
+  }): Promise<any> {
+    try {
+      if (!itemId) {
+        throw new Error('Item ID is required');
+      }
+
+      const result = await this.makeAuthenticatedRequest<any>(
+        `/api/items/${itemId}/photos`,
+        {
+          method: 'POST',
+          body: JSON.stringify(photoData)
+        },
+        `item-upload-photo-${itemId}`
+      );
+
+      return result;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to upload photo:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Upload photos for an item
+   * Note: This will invalidate relevant cache entries
+   */
+  async uploadPhotos(itemId: string, files: File[]): Promise<string[]> {
+    try {
+      const formData = new FormData();
+      files.forEach((file) => formData.append('photos', file));
+
+      const result = await this.makeAuthenticatedRequest<any>(
+        `/api/items/${itemId}/photos`,
+        {
+          method: 'POST',
+          body: formData,
+        },
+        `item-upload-photos-${itemId}`
+      );
+
+      // Invalidate items complete cache for this tenant
+      await this.invalidateCache(`items_complete_*`);
+      
+      return result.urls || [];
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to upload photos:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get photos for an item
+   */
+  async getPhotos(itemId: string): Promise<any> {
+    try {
+      if (!itemId) {
+        throw new Error('Item ID is required');
+      }
+
+      const result = await this.makeAuthenticatedRequest<any>(
+        `/api/items/${itemId}/photos`,
+        {},
+        `item-photos-${itemId}`,
+        this.cacheTTL
+      );
+
+      return result;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to get photos:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Set primary photo for an item
+   * Uses the /api/items/:itemId/photos/:photoId endpoint
+   */
+  async setPrimaryPhoto(itemId: string, photoId: string): Promise<any> {
+    try {
+      if (!itemId || !photoId) {
+        throw new Error('Item ID and Photo ID are required');
+      }
+
+      const result = await this.makeAuthenticatedRequest<any>(
+        `/api/items/${itemId}/photos/${photoId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ position: 0 })
+        },
+        `item-set-primary-photo-${itemId}-${photoId}`
+      );
+
+      return result;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to set primary photo:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete photo for an item
+   * Uses the /api/items/:itemId/photos/:photoId endpoint
+   */
+  async deletePhoto(itemId: string, photoId: string): Promise<any> {
+    try {
+      if (!itemId || !photoId) {
+        throw new Error('Item ID and Photo ID are required');
+      }
+
+      const result = await this.makeAuthenticatedRequest<any>(
+        `/api/items/${itemId}/photos/${photoId}`,
+        {
+          method: 'DELETE'
+        },
+        `item-delete-photo-${itemId}-${photoId}`
+      );
+
+      return result;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to delete photo:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Migrate legacy photos for an item
+   * Uses the /api/items/:itemId/photos/migrate-legacy endpoint
+   */
+  async migrateLegacyPhotos(itemId: string): Promise<any> {
+    try {
+      if (!itemId) {
+        throw new Error('Item ID is required');
+      }
+
+      const result = await this.makeAuthenticatedRequest<any>(
+        `/api/items/${itemId}/photos/migrate-legacy`,
+        {
+          method: 'POST',
+          body: JSON.stringify({})
+        },
+        `item-migrate-photos-${itemId}`
+      );
+
+      return result;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to migrate legacy photos:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update photo metadata
+   * Uses the /api/items/:itemId/photos/:photoId endpoint
+   */
+  async updatePhoto(itemId: string, photoId: string, photoData: {
+    alt?: string | null;
+    caption?: string | null;
+  }): Promise<any> {
+    try {
+      if (!itemId || !photoId) {
+        throw new Error('Item ID and Photo ID are required');
+      }
+
+      const result = await this.makeAuthenticatedRequest<any>(
+        `/api/items/${itemId}/photos/${photoId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(photoData)
+        },
+        `item-update-photo-${itemId}-${photoId}`
+      );
+
+      return result;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to update photo:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get trash capacity for a tenant
+   */
+  async getTrashCapacity(tenantId: string): Promise<any> {
+    try {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      const result = await this.makeAuthenticatedRequest<any>(
+        `/api/trash/capacity?tenantId=${tenantId}`,
+        {},
+        `items-trash-capacity-${tenantId}`,
+        this.cacheTTL
+      );
+
+      return result;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to get trash capacity:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get trashed items for a tenant
+   */
+  async getTrashedItems(tenantId: string, limit: number = 100): Promise<any> {
+    try {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      const result = await this.makeAuthenticatedRequest<any>(
+        `/api/items?tenantId=${tenantId}&status=trashed&limit=${limit}`,
+        {},
+        `items-trashed-${tenantId}-${limit}`,
+        this.cacheTTL
+      );
+
+      return result;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to get trashed items:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Restore a trashed item
+   */
+  async restoreItem(itemId: string): Promise<void> {
+    try {
+      if (!itemId) {
+        throw new Error('Item ID is required');
+      }
+
+      const result = await this.makeAuthenticatedRequest<void>(
+        `/api/items/${itemId}/restore`,
+        { method: 'PATCH' },
+        `item-restore-${itemId}`
+      );
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to restore item:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Purge a trashed item
+   */
+  async purgeItem(itemId: string): Promise<void> {
+    try {
+      if (!itemId) {
+        throw new Error('Item ID is required');
+      }
+
+      const result = await this.makeAuthenticatedRequest<void>(
+        `/api/items/${itemId}/purge`,
+        { method: 'DELETE' },
+        `item-purge-${itemId}`
+      );
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to purge item:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Empty all trash
+   */
+  async emptyTrash(tenantId: string, itemIds: string[]): Promise<void> {
+    try {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      await Promise.all(itemIds.map(itemId => 
+        this.makeAuthenticatedRequest<void>(
+          `/api/items/${itemId}/purge`,
+          { method: 'DELETE' },
+          `item-purge-${itemId}`
+        )
+      ));
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to empty trash:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get my scan sessions for a tenant
+   */
+  async getMyScanSessions(tenantId: string): Promise<any> {
+    try {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      const result = await this.makeAuthenticatedRequest<any>(
+        `/api/scan/my-sessions?tenantId=${tenantId}`,
+        {},
+        `items-my-scan-sessions-${tenantId}`,
+        this.cacheTTL
+      );
+
+      return result;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to get my scan sessions:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start a new scan session
+   */
+  async startScanSession(tenantId: string, deviceType: string): Promise<any> {
+    try {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      const result = await this.makeAuthenticatedRequest<any>(
+        '/api/scan/start',
+        { 
+          method: 'POST',
+          body: JSON.stringify({
+            tenantId,
+            deviceType
+          })
+        },
+        `items-start-scan-session-${tenantId}`
+      );
+
+      return result;
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to start scan session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel a scan session
+   */
+  async cancelScanSession(sessionId: string): Promise<void> {
+    try {
+      if (!sessionId) {
+        throw new Error('Session ID is required');
+      }
+
+      await this.makeAuthenticatedRequest<void>(
+        `/api/scan/${sessionId}`,
+        { method: 'DELETE' },
+        `items-cancel-scan-session-${sessionId}`
+      );
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to cancel scan session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cleanup my scan sessions
+   */
+  async cleanupMyScanSessions(tenantId: string): Promise<void> {
+    try {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      await this.makeAuthenticatedRequest<void>(
+        '/api/scan/cleanup-my-sessions',
+        { 
+          method: 'POST',
+          body: JSON.stringify({ tenantId })
+        },
+        `items-cleanup-scan-sessions-${tenantId}`
+      );
+    } catch (error) {
+      console.error('[ItemsSingleton] Failed to cleanup scan sessions:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Delete item
    * Note: This will invalidate relevant cache entries
    */
-  async deleteItem(itemId: string): Promise<boolean> {
+  async deleteItem(itemId: string, tenantId?: string): Promise<boolean> {
     try {
-      const result = await this.client.makeRequest<{ success: boolean }>(
+      // First get the item to determine its tenant for cache invalidation
+      const item = await this.getItem(itemId);
+      const targetTenantId = tenantId || item?.tenantCategoryId || 'unknown';
+
+      const result = await this.makeAuthenticatedRequest<{ success: boolean }>(
         `/api/items/${itemId}`,
         {
           method: 'DELETE',
-        }
+        },
+        `item-delete-${itemId}`
       );
 
-      // makeRequest returns data directly, not wrapped in ApiResponse
-      return (result as unknown as { success: boolean }).success || false;
+      // Invalidate items complete cache for this tenant
+      await this.invalidateCache(`items_complete_tenant_${targetTenantId}*`);
+      
+      // Invalidate platform dashboard cache since items affect stats
+      await platformDashboardService.invalidateCache('platform-dashboard-complete');
+
+      return result.success || false;
     } catch (error) {
       console.error('[ItemsSingleton] Failed to delete item:', error);
       return false;
@@ -217,19 +616,22 @@ class ItemsSingletonService {
   }
 
   /**
-   * Get performance metrics
+   * Invalidate items complete cache by tenant
    */
-  public getMetrics() {
-    return this.client.getMetrics();
+  public async invalidateItemsCompleteCache(tenantId: string): Promise<void> {
+    await this.invalidateCache(`items_complete_tenant_${tenantId}*`);
   }
 
-  /**
-   * Reset metrics
-   */
-  public resetMetrics(): void {
-    this.client.resetMetrics();
-  }
 }
 
 // Export singleton instance
-export const itemsService = ItemsSingletonService.getInstance();
+export const itemsSingletonService = ItemsSingletonService.getInstance();
+
+// Export alias for backward compatibility
+export const itemsService = itemsSingletonService;
+
+// Export cache invalidation helper for external use
+export const invalidateItemsCache = async (tenantId: string): Promise<void> => {
+  const service = ItemsSingletonService.getInstance();
+  await service.invalidateCache(`items_complete_tenant_${tenantId}*`);
+};

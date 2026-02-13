@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Package, Truck, MapPin, CreditCard, CheckCircle2 } from 'lucide-react';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 
 interface FulfillmentSettings {
   pickup_enabled: boolean;
@@ -46,17 +47,13 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
   }, [tenantId, propPaymentGateways]);
 
   const fetchFulfillmentSettings = async () => {
+    setLoading(true);
+    
     try {
-      setLoading(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-
       // Fetch fulfillment settings only
-      const fulfillmentRes = await fetch(`${apiUrl}/api/public/tenant/${tenantId}/fulfillment-settings`);
-      if (fulfillmentRes.ok) {
-        const fulfillmentData = await fulfillmentRes.json();
-        if (fulfillmentData.success && fulfillmentData.settings) {
-          setFulfillmentSettings(fulfillmentData.settings);
-        }
+      const fulfillmentSettings = await tenantInfoService.getFulfillmentSettings(tenantId);
+      if (fulfillmentSettings) {
+        setFulfillmentSettings(fulfillmentSettings);
       }
     } catch (error) {
       console.error('Error fetching fulfillment info:', error);
@@ -68,24 +65,17 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
   const fetchFulfillmentAndPaymentInfo = async () => {
     try {
       setLoading(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
       // Fetch fulfillment settings
-      const fulfillmentRes = await fetch(`${apiUrl}/api/public/tenant/${tenantId}/fulfillment-settings`);
-      if (fulfillmentRes.ok) {
-        const fulfillmentData = await fulfillmentRes.json();
-        if (fulfillmentData.success && fulfillmentData.settings) {
-          setFulfillmentSettings(fulfillmentData.settings);
-        }
+      const fulfillmentSettings = await tenantInfoService.getFulfillmentSettings(tenantId);
+      if (fulfillmentSettings) {
+        setFulfillmentSettings(fulfillmentSettings);
       }
 
       // Fetch payment gateways
-      const paymentRes = await fetch(`${apiUrl}/api/public/tenant/${tenantId}/payment-gateways`);
-      if (paymentRes.ok) {
-        const paymentData = await paymentRes.json();
-        if (paymentData.success && paymentData.gateways) {
-          setPaymentGateways(paymentData.gateways.filter((g: PaymentGateway) => g.is_active));
-        }
+      const paymentGateways = await tenantInfoService.getPaymentGateways(tenantId);
+      if (paymentGateways) {
+        setPaymentGateways(paymentGateways.filter((g: PaymentGateway) => g.is_active));
       }
     } catch (error) {
       console.error('Error fetching fulfillment/payment info:', error);

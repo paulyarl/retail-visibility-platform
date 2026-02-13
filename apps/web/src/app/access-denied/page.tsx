@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, Button } from '@/components/ui';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -29,10 +29,8 @@ function AccessDeniedContent() {
     // Fetch current user info for debugging
     const fetchUser = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await api.get(`${apiBaseUrl}/auth/me`);
-        if (res.ok) {
-          const data = await res.json();
+        const data = await platformHomeService.getUser();
+        if (data) {
           const user = data.user || data;
           setUserEmail(user.email);
           

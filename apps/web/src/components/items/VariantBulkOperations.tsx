@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Check, X, Tag, DollarSign, Package, Power, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { variantOperationsService } from '@/services/VariantOperationsSingletonService';
 
 export interface ProductVariant {
   id?: string;
@@ -85,72 +86,47 @@ export default function VariantBulkOperations({
     try {
       const selectedVariantIds = Array.from(selectedVariants).map((index: number) => variants[index].id).filter(Boolean) as string[];
 
-      let response;
+      let result;
 
       switch (selectedOperation) {
         case 'featured_type':
-          response = await fetch('/api/variants/bulk/featured-type', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              variantIds: selectedVariantIds,
-              featuredType: operationData.featuredType,
-              priority: 3,
-              autoUnfeature: true,
-            }),
+          result = await variantOperationsService.bulkUpdateFeaturedType({
+            variantIds: selectedVariantIds,
+            featuredType: operationData.featuredType,
+            priority: 3,
+            autoUnfeature: true,
           });
           break;
 
         case 'sale_price':
-          response = await fetch('/api/variants/bulk/sale-price', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              variantIds: selectedVariantIds,
-              salePriceCents: operationData.salePriceCents,
-            }),
+          result = await variantOperationsService.bulkUpdateSalePrice({
+            variantIds: selectedVariantIds,
+            salePrice: operationData.salePriceCents,
+            salePriceType: 'fixed',
           });
           break;
 
         case 'stock':
-          response = await fetch('/api/variants/bulk/stock', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              variantIds: selectedVariantIds,
-              stock: operationData.stock,
-            }),
+          result = await variantOperationsService.bulkUpdateInventory({
+            variantIds: selectedVariantIds,
+            operation: 'set',
+            quantity: operationData.stock,
           });
           break;
 
         case 'activate':
-        case 'deactivate':
-          response = await fetch('/api/variants/bulk/activation', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              variantIds: selectedVariantIds,
-              isActive: selectedOperation === 'activate',
-            }),
-          });
+          result = await variantOperationsService.bulkUpdateVariantStatus(selectedVariantIds, true);
           break;
+
+        case 'deactivate':
+          result = await variantOperationsService.bulkUpdateVariantStatus(selectedVariantIds, false);
+          break;
+
+        default:
+          throw new Error('Unknown operation');
       }
 
-      if (!response?.ok) {
-        throw new Error(`Operation failed: ${response?.statusText}`);
-      }
-
-      const result = await response?.json();
-
-      if (result?.success) {
+      if (result && result.success) {
         // For local state updates, update the variants
         const updatedVariants = [...variants];
 

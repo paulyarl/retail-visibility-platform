@@ -5,7 +5,7 @@
  * Extends UniversalSingleton for consistent caching and metrics
  */
 
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { AuthenticatedApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
 import { RateLimitRule, RateLimitConfig, RateLimitStatus, RateLimitMetrics } from './RateLimitingControllerSingleton';
 
 // Rate Limiting Monitoring Data Interfaces
@@ -40,7 +40,7 @@ export interface RateLimitingFilters {
  * 
  * Consumes rate limiting data for monitoring and dashboard display
  */
-class RateLimitingMonitoringSingleton extends UniversalSingleton {
+class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
   private static instance: RateLimitingMonitoringSingleton;
 
   private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
@@ -109,23 +109,9 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
    * Get rate limiting configuration
    */
   async getRateLimitConfig(): Promise<RateLimitConfig> {
-    const cacheKey = 'rate-limit-config';
-    
-    const cached = await this.getFromCache<RateLimitConfig>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch('/api/admin/rate-limiting/config');
+      const config = await this.makeAuthenticatedRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {}, 'rate-limit-config');
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch rate limit config');
-      }
-
-      const config = await response.json();
-      
-      await this.setCache(cacheKey, config);
       return config;
     } catch (error) {
       console.error('Error fetching rate limit config:', error);
@@ -151,23 +137,9 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
    * Get rate limiting rules
    */
   async getRateLimitRules(): Promise<RateLimitRule[]> {
-    const cacheKey = 'rate-limit-rules';
-    
-    const cached = await this.getFromCache<RateLimitRule[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch('/api/admin/rate-limiting/rules');
+      const rules = await this.makeAuthenticatedRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch rate limit rules');
-      }
-
-      const rules = await response.json();
-      
-      await this.setCache(cacheKey, rules);
       return rules;
     } catch (error) {
       console.error('Error fetching rate limit rules:', error);
@@ -179,23 +151,9 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
    * Get rate limiting metrics
    */
   async getRateLimitMetrics(hours: number = 24): Promise<RateLimitMetrics> {
-    const cacheKey = `rate-limit-metrics-${hours}`;
-    
-    const cached = await this.getFromCache<RateLimitMetrics>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/admin/rate-limiting/metrics?hours=${hours}`);
+      const metrics = await this.makeAuthenticatedRequest<RateLimitMetrics>(`/api/admin/rate-limiting/metrics?hours=${hours}`, {}, `rate-limit-metrics-${hours}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch rate limit metrics');
-      }
-
-      const metrics = await response.json();
-      
-      await this.setCache(cacheKey, metrics);
       return metrics;
     } catch (error) {
       console.error('Error fetching rate limit metrics:', error);
@@ -221,28 +179,14 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
     blockedAt: string;
     expiresAt: string;
   }>> {
-    const cacheKey = 'active-blocks';
-    
-    const cached = await this.getFromCache<Array<{
-      ip: string;
-      reason: string;
-      blockedAt: string;
-      expiresAt: string;
-    }>>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch('/api/admin/rate-limiting/blocks');
+      const blocks = await this.makeAuthenticatedRequest<Array<{
+        ip: string;
+        reason: string;
+        blockedAt: string;
+        expiresAt: string;
+      }>>('/api/admin/rate-limiting/blocks', {}, 'active-blocks');
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch active blocks');
-      }
-
-      const blocks = await response.json();
-      
-      await this.setCache(cacheKey, blocks);
       return blocks;
     } catch (error) {
       console.error('Error fetching active blocks:', error);
@@ -258,27 +202,13 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
     violations: number;
     lastViolation: string;
   }>> {
-    const cacheKey = `top-violators-${hours}`;
-    
-    const cached = await this.getFromCache<Array<{
-      ip: string;
-      violations: number;
-      lastViolation: string;
-    }>>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/admin/rate-limiting/violators?hours=${hours}`);
+      const violators = await this.makeAuthenticatedRequest<Array<{
+        ip: string;
+        violations: number;
+        lastViolation: string;
+      }>>(`/api/admin/rate-limiting/violators?hours=${hours}`, {}, `top-violators-${hours}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch top violators');
-      }
-
-      const violators = await response.json();
-      
-      await this.setCache(cacheKey, violators);
       return violators;
     } catch (error) {
       console.error('Error fetching top violators:', error);
@@ -294,23 +224,9 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
    * Get rate limit status for a specific IP
    */
   async getIPStatus(ip: string): Promise<RateLimitStatus> {
-    const cacheKey = `ip-status-${ip}`;
-    
-    const cached = await this.getFromCache<RateLimitStatus>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/admin/rate-limiting/status?ip=${ip}`);
+      const status = await this.makeAuthenticatedRequest<RateLimitStatus>(`/api/admin/rate-limiting/status?ip=${ip}`, {}, `ip-status-${ip}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to get IP status');
-      }
-
-      const status = await response.json();
-      
-      await this.setCache(cacheKey, status);
       return status;
     } catch (error) {
       console.error('Error getting IP status:', error);
@@ -337,27 +253,13 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
     action: string;
     details: Record<string, any>;
   }>> {
-    const cacheKey = `ip-history-${ip}-${hours}`;
-    
-    const cached = await this.getFromCache<Array<{
-      timestamp: string;
-      action: string;
-      details: Record<string, any>;
-    }>>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/admin/rate-limiting/history/${ip}?hours=${hours}`);
+      const history = await this.makeAuthenticatedRequest<Array<{
+        timestamp: string;
+        action: string;
+        details: Record<string, any>;
+      }>>(`/api/admin/rate-limiting/history/${ip}?hours=${hours}`, {}, `ip-history-${ip}-${hours}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to get IP history');
-      }
-
-      const history = await response.json();
-      
-      await this.setCache(cacheKey, history);
       return history;
     } catch (error) {
       console.error('Error getting IP history:', error);
@@ -383,33 +285,19 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
       blocks: number;
     }>;
   }> {
-    const cacheKey = `route-analytics-${routeType}-${hours}`;
-    
-    const cached = await this.getFromCache<{
-      requests: number;
-      blocks: number;
-      uniqueIPs: number;
-      averageRequestsPerIP: number;
-      topIPs: Array<{
-        ip: string;
+    try {
+      const analytics = await this.makeAuthenticatedRequest<{
         requests: number;
         blocks: number;
-      }>;
-    }>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
-    try {
-      const response = await fetch(`/api/admin/rate-limiting/analytics/${routeType}?hours=${hours}`);
+        uniqueIPs: number;
+        averageRequestsPerIP: number;
+        topIPs: Array<{
+          ip: string;
+          requests: number;
+          blocks: number;
+        }>;
+      }>(`/api/admin/rate-limiting/analytics/${routeType}?hours=${hours}`, {}, `route-analytics-${routeType}-${hours}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to get route analytics');
-      }
-
-      const analytics = await response.json();
-      
-      await this.setCache(cacheKey, analytics);
       return analytics;
     } catch (error) {
       console.error('Error getting route analytics:', error);
@@ -439,33 +327,19 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
       blocks: number;
     }>;
   }>> {
-    const cacheKey = `all-route-analytics-${hours}`;
-    
-    const cached = await this.getFromCache<Record<string, {
-      requests: number;
-      blocks: number;
-      uniqueIPs: number;
-      averageRequestsPerIP: number;
-      topIPs: Array<{
-        ip: string;
+    try {
+      const analytics = await this.makeAuthenticatedRequest<Record<string, {
         requests: number;
         blocks: number;
-      }>;
-    }>>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
-    try {
-      const response = await fetch(`/api/admin/rate-limiting/analytics?hours=${hours}`);
+        uniqueIPs: number;
+        averageRequestsPerIP: number;
+        topIPs: Array<{
+          ip: string;
+          requests: number;
+          blocks: number;
+        }>;
+      }>>(`/api/admin/rate-limiting/analytics?hours=${hours}`, {}, `all-route-analytics-${hours}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to get all route analytics');
-      }
-
-      const analytics = await response.json();
-      
-      await this.setCache(cacheKey, analytics);
       return analytics;
     } catch (error) {
       console.error('Error getting all route analytics:', error);
@@ -482,19 +356,14 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
    */
   async blockIP(ip: string, durationMinutes: number = 60, reason: string = 'Manual block'): Promise<void> {
     try {
-      const response = await fetch('/api/admin/rate-limiting/block', {
+      await this.makeAuthenticatedRequest('/api/admin/rate-limiting/block', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ip, durationMinutes, reason })
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to block IP');
-      }
-
       // Clear relevant cache
-      await this.clearCache('active-blocks');
-      await this.clearCache(`ip-status-${ip}`);
+      await this.invalidateCache('active-blocks');
+      await this.invalidateCache(`ip-status-${ip}`);
     } catch (error) {
       console.error('Error blocking IP:', error);
       throw error;
@@ -506,17 +375,13 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
    */
   async unblockIP(ip: string): Promise<void> {
     try {
-      const response = await fetch(`/api/admin/rate-limiting/unblock/${ip}`, {
+      await this.makeAuthenticatedRequest(`/api/admin/rate-limiting/unblock/${ip}`, {
         method: 'POST'
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to unblock IP');
-      }
-
       // Clear relevant cache
-      await this.clearCache('active-blocks');
-      await this.clearCache(`ip-status-${ip}`);
+      await this.invalidateCache('active-blocks');
+      await this.invalidateCache(`ip-status-${ip}`);
     } catch (error) {
       console.error('Error unblocking IP:', error);
       throw error;
@@ -528,16 +393,12 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
    */
   async resetIPLimit(ip: string): Promise<void> {
     try {
-      const response = await fetch(`/api/admin/rate-limiting/reset?ip=${ip}`, {
+      await this.makeAuthenticatedRequest(`/api/admin/rate-limiting/reset?ip=${ip}`, {
         method: 'POST'
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to reset IP limit');
-      }
-
       // Clear relevant cache
-      await this.clearCache(`ip-status-${ip}`);
+      await this.invalidateCache(`ip-status-${ip}`);
     } catch (error) {
       console.error('Error resetting IP limit:', error);
       throw error;
@@ -578,28 +439,14 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
     issues: string[];
     recommendations: string[];
   }> {
-    const cacheKey = 'rate-limiting-health-status';
-    
-    const cached = await this.getFromCache<{
-      status: 'healthy' | 'warning' | 'critical';
-      score: number;
-      issues: string[];
-      recommendations: string[];
-    }>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch('/api/admin/rate-limiting/health');
+      const healthStatus = await this.makeAuthenticatedRequest<{
+        status: 'healthy' | 'warning' | 'critical';
+        score: number;
+        issues: string[];
+        recommendations: string[];
+      }>('/api/admin/rate-limiting/health', {}, 'rate-limiting-health-status');
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch rate limiting health status');
-      }
-
-      const healthStatus = await response.json();
-      
-      await this.setCache(cacheKey, healthStatus);
       return healthStatus;
     } catch (error) {
       console.error('Error fetching rate limiting health status:', error);
@@ -622,29 +469,15 @@ class RateLimitingMonitoringSingleton extends UniversalSingleton {
     uniqueIPs: number;
     blockRate: number;
   }>> {
-    const cacheKey = `rate-limiting-trends-${days}`;
-    
-    const cached = await this.getFromCache<Array<{
-      date: string;
-      requests: number;
-      blocks: number;
-      uniqueIPs: number;
-      blockRate: number;
-    }>>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/admin/rate-limiting/trends?days=${days}`);
+      const trends = await this.makeAuthenticatedRequest<Array<{
+        date: string;
+        requests: number;
+        blocks: number;
+        uniqueIPs: number;
+        blockRate: number;
+      }>>(`/api/admin/rate-limiting/trends?days=${days}`, {}, `rate-limiting-trends-${days}`);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch rate limiting trends');
-      }
-
-      const trends = await response.json();
-      
-      await this.setCache(cacheKey, trends);
       return trends;
     } catch (error) {
       console.error('Error fetching rate limiting trends:', error);

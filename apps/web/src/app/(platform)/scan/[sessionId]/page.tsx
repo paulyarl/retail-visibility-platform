@@ -6,27 +6,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import BarcodeScanner from '@/components/scan/BarcodeScanner';
 import BatchReview from '@/components/scan/BatchReview';
 import EnrichmentPreview from '@/components/scan/EnrichmentPreview';
-import { api } from '@/lib/api';
-
-interface ScanResult {
-  id: string;
-  barcode: string;
-  sku?: string;
-  status: string;
-  enrichment?: any;
-  duplicateOf?: string;
-  createdAt: string;
-}
-
-interface ScanSession {
-  id: string;
-  status: string;
-  deviceType: string;
-  scannedCount: number;
-  committedCount: number;
-  duplicateCount: number;
-  results: ScanResult[];
-}
+import { platformHomeService, ScanSession, ScanResult } from '@/services/PlatformHomeSingletonService';
 
 export default function ActiveScanPage() {
   const router = useRouter();
@@ -47,16 +27,14 @@ export default function ActiveScanPage() {
 
   const loadSession = async () => {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.get(`${apiBaseUrl}/api/scan/${sessionId}`);
+      const data = await platformHomeService.getScanSession(sessionId);
       
-      if (response.ok) {
-        const data = await response.json();
-        setSession(data.session);
+      if (data) {
+        setSession(data);
         
         // Auto-select first result for preview
-        if (data.session.results?.length > 0 && !selectedResult) {
-          setSelectedResult(data.session.results[0]);
+        if (data.results?.length && data.results.length > 0 && !selectedResult) {
+          setSelectedResult(data.results[0]);
         }
       } else {
         alert('Failed to load session');
@@ -79,33 +57,19 @@ export default function ActiveScanPage() {
 
     try {
       setScanning(true);
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
-      const response = await api.post(`${apiBaseUrl}/api/scan/${sessionId}/lookup-barcode`, {
-        barcode,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Show duplicate warning
-        if (data.duplicate) {
-          alert(`⚠️ ${data.duplicate.warning}\n\nItem: ${data.duplicate.item.name || data.duplicate.item.sku}`);
-        }
-        
-        // Reload session to get updated results
-        await loadSession();
-        
-        // Select the newly added result
-        setSelectedResult(data.result);
-      } else {
-        const error = await response.json();
-        if (error.error === 'duplicate_barcode') {
-          alert('This barcode has already been scanned in this session');
-        } else {
-          alert(`Failed to scan: ${error.error || 'Unknown error'}`);
-        }
+      const data = await platformHomeService.lookupBarcode(sessionId, barcode);
+      
+      // Show duplicate warning
+      if (data.duplicate) {
+        alert(`⚠️ ${data.duplicate.warning}\n\nItem: ${data.duplicate.item.name || data.duplicate.item.sku}`);
       }
+      
+      // Reload session to get updated results
+      await loadSession();
+      
+      // Select the newly added result
+      setSelectedResult(data.result);
     } catch (error) {
       console.error('Failed to scan barcode:', error);
       alert('Failed to scan barcode');
@@ -121,20 +85,15 @@ export default function ActiveScanPage() {
     }
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.delete(`${apiBaseUrl}/api/scan/${sessionId}/results/${resultId}`);
+      await platformHomeService.deleteScanResult(sessionId, resultId);
 
-      if (response.ok) {
-        // Clear selection if we're removing the selected item
-        if (selectedResult?.id === resultId) {
-          setSelectedResult(null);
-        }
-        
-        // Reload session
-        await loadSession();
-      } else {
-        alert('Failed to remove item');
+      // Clear selection if we're removing the selected item
+      if (selectedResult?.id === resultId) {
+        setSelectedResult(null);
       }
+      
+      // Reload session
+      await loadSession();
     } catch (error) {
       console.error('Failed to remove item:', error);
       alert('Failed to remove item');
@@ -147,7 +106,7 @@ export default function ActiveScanPage() {
       return;
     }
 
-    const validCount = session.results.filter(r => r.status !== 'duplicate').length;
+    const validCount = session.results?.filter((r: ScanResult) => r.status !== 'duplicate').length || 0;
     
     if (!confirm(`Commit ${validCount} items to inventory?\n\nThis action cannot be undone.`)) {
       return;
@@ -155,24 +114,10 @@ export default function ActiveScanPage() {
 
     try {
       setCommitting(true);
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
-      const response = await api.post(`${apiBaseUrl}/api/scan/${sessionId}/commit`, {
-        skipValidation: false,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        alert(`✅ Successfully committed ${data.committed} items to inventory!`);
-        router.push('/scan');
-      } else {
-        const error = await response.json();
-        if (error.error === 'validation_failed') {
-          alert(`Validation failed:\n\n${error.validation.errors.map((e: any) => `• ${e.field}: ${e.message}`).join('\n')}`);
-        } else {
-          alert(`Failed to commit: ${error.error || 'Unknown error'}`);
-        }
-      }
+      const data = await platformHomeService.commitScanSession(sessionId);
+      alert(`✅ Successfully committed ${data.committed} items to inventory!`);
+      router.push('/scan');
     } catch (error) {
       console.error('Failed to commit session:', error);
       alert('Failed to commit session');
@@ -187,14 +132,8 @@ export default function ActiveScanPage() {
     }
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.delete(`${apiBaseUrl}/api/scan/${sessionId}`);
-
-      if (response.ok) {
-        router.push('/scan');
-      } else {
-        alert('Failed to cancel session');
-      }
+      await platformHomeService.deleteScanSession(sessionId);
+      router.push('/scan');
     } catch (error) {
       console.error('Failed to cancel session:', error);
       alert('Failed to cancel session');

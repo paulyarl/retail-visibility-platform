@@ -2,9 +2,9 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { api, API_BASE_URL } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { isPlatformUser, isTenantOwnerOrAdmin, getTenantRole } from '@/lib/auth/access-control';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
@@ -109,13 +109,8 @@ export default function AdminSubdomainPage() {
 
       try {
         // Fetch tenant data for store owners (same pattern as subscription page)
-        const tenantRes = await api.get(`/api/tenants/${tenantId}`);
-        if (tenantRes.ok) {
-          const tenantData = await tenantRes.json();
-          setTenant(tenantData);
-        } else {
-          setError('Failed to load tenant information');
-        }
+        const tenantData = await platformHomeService.getTenant(tenantId);
+        setTenant(tenantData);
 
         await fetchSubdomainStats();
         await fetchRateLimits();
@@ -132,11 +127,8 @@ export default function AdminSubdomainPage() {
 
   const fetchSubdomainStats = async () => {
     try {
-      const res = await api.get(`${API_BASE_URL}/api/analytics/subdomain-stats`);
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data.data);
-      }
+      const stats = await platformHomeService.getAdminSubdomainStats();
+      setStats(stats);
     } catch (error) {
       console.error('Failed to fetch subdomain stats:', error);
       setError('Failed to load subdomain statistics');

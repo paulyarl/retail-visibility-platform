@@ -1,11 +1,11 @@
 /**
  * Users Singleton - Producer Pattern
  * 
- * Produces and manages user data with UniversalSingleton integration
- * Extends UniversalSingleton for consistent caching and metrics
+ * Produces and manages user data with AuthenticatedApiSingleton integration
+ * Extends AuthenticatedApiSingleton for consistent caching and metrics
  */
 
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { AuthenticatedApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
 
 // User Types (matching server-side)
 export interface User {
@@ -88,14 +88,12 @@ export interface UpdateUserRequest {
   metadata?: User['metadata'];
 }
 
-class UsersSingleton extends UniversalSingleton {
+class UsersSingleton extends AuthenticatedApiSingleton {
   private static instance: UsersSingleton;
 
   constructor() {
-    super('users-singleton', {
-      encrypt: true,
-      userId: undefined
-    });
+    super('users-singleton');
+    this.cacheTTL = 15 * 60 * 1000; // 15 minutes for user data
   }
 
   static getInstance(): UsersSingleton {
@@ -113,36 +111,18 @@ class UsersSingleton extends UniversalSingleton {
    * Get user by ID
    */
   async getUser(userId: string): Promise<User | null> {
-    const cacheKey = `user-${userId}`;
-    
-    // Check cache first
-    const cached = await this.getFromCache<User>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/users-singleton/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const result = await this.makeAuthenticatedRequest<{ user: User }>(
+        `/api/users-singleton/${userId}`,
+        {},
+        `user-${userId}`
+      );
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to fetch user: ${response.statusText}`);
+      return result.user;
+    } catch (error: any) {
+      if (error.message?.includes('404')) {
+        return null;
       }
-
-      const result = await response.json();
-      const user = result.data.user;
-
-      // Cache the result
-      await this.setCache(cacheKey, user);
-      
-      return user;
-    } catch (error) {
       console.error('Error fetching user', error);
       return null;
     }
@@ -153,28 +133,17 @@ class UsersSingleton extends UniversalSingleton {
    */
   async createUser(request: CreateUserRequest): Promise<User> {
     try {
-      const response = await fetch('/api/users-singleton', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+      const result = await this.makeAuthenticatedRequest<{ user: User }>(
+        '/api/users-singleton',
+        {
+          method: 'POST',
+          body: JSON.stringify(request)
         },
-        body: JSON.stringify(request)
-      });
+        'user-create'
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to create user: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const user = result.data.user;
-
-      // Clear user list cache
-      await this.clearCache('users-list');
-
-      console.log('User created successfully', { userId: user.id });
-      
-      return user;
+      console.log('User created successfully', { userId: result.user.id });
+      return result.user;
     } catch (error) {
       console.error('Error creating user', error);
       throw error;
@@ -186,32 +155,17 @@ class UsersSingleton extends UniversalSingleton {
    */
   async updateUser(userId: string, updates: UpdateUserRequest): Promise<User> {
     try {
-      const response = await fetch(`/api/users-singleton/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+      const result = await this.makeAuthenticatedRequest<{ user: User }>(
+        `/api/users-singleton/${userId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(updates)
         },
-        body: JSON.stringify(updates)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update user: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const user = result.data.user;
-
-      // Update cache
-      const cacheKey = `user-${userId}`;
-      await this.setCache(cacheKey, user);
-
-      // Clear user list cache
-      await this.clearCache('users-list');
+        `user-update-${userId}`
+      );
 
       console.log('User updated successfully', { userId });
-      
-      return user;
+      return result.user;
     } catch (error) {
       console.error('Error updating user', error);
       throw error;
@@ -223,21 +177,13 @@ class UsersSingleton extends UniversalSingleton {
    */
   async deleteUser(userId: string): Promise<void> {
     try {
-      const response = await fetch(`/api/users-singleton/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to delete user: ${response.statusText}`);
-      }
-
-      // Clear caches
-      const cacheKey = `user-${userId}`;
-      await this.clearCache(cacheKey);
-      await this.clearCache('users-list');
+      await this.makeAuthenticatedRequest<void>(
+        `/api/users-singleton/${userId}`,
+        {
+          method: 'DELETE'
+        },
+        `user-delete-${userId}`
+      );
 
       console.log('User deleted successfully', { userId });
     } catch (error) {
@@ -256,14 +202,6 @@ class UsersSingleton extends UniversalSingleton {
     limit?: number;
     offset?: number;
   } = {}): Promise<{ users: User[]; total: number }> {
-    const cacheKey = `users-list-${JSON.stringify(filters)}`;
-    
-    // Check cache first
-    const cached = await this.getFromCache<{ users: User[]; total: number }>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
       const params = new URLSearchParams();
       if (filters.role) params.append('role', filters.role);
@@ -272,23 +210,15 @@ class UsersSingleton extends UniversalSingleton {
       if (filters.limit) params.append('limit', filters.limit.toString());
       if (filters.offset) params.append('offset', filters.offset.toString());
 
-      const response = await fetch(`/api/users-singleton?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const cacheKey = `users-list-${params.toString()}`;
 
-      if (!response.ok) {
-        throw new Error(`Failed to list users: ${response.statusText}`);
-      }
+      const result = await this.makeAuthenticatedRequest<{ users: User[]; total: number }>(
+        `/api/users-singleton?${params}`,
+        {},
+        cacheKey
+      );
 
-      const result = await response.json();
-      const data = result.data;
-
-      // Cache the result
-      await this.setCache(cacheKey, data);
-      
-      return data;
+      return result;
     } catch (error) {
       console.error('Error listing users', error);
       throw error;
@@ -303,32 +233,14 @@ class UsersSingleton extends UniversalSingleton {
    * Get user activity
    */
   async getUserActivity(userId: string, limit: number = 50): Promise<UserActivity[]> {
-    const cacheKey = `user-activity-${userId}-${limit}`;
-    
-    // Check cache first
-    const cached = await this.getFromCache<UserActivity[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch(`/api/users-singleton/${userId}/activity?limit=${limit}`, {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const result = await this.makeAuthenticatedRequest<{ activities: UserActivity[] }>(
+        `/api/users-singleton/${userId}/activity?limit=${limit}`,
+        {},
+        `user-activity-${userId}-${limit}`
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch user activity: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const activities = result.data.activities;
-
-      // Cache the result
-      await this.setCache(cacheKey, activities);
-      
-      return activities;
+      return result.activities;
     } catch (error) {
       console.error('Error fetching user activity', error);
       throw error;
@@ -340,28 +252,17 @@ class UsersSingleton extends UniversalSingleton {
    */
   async recordActivity(userId: string, activity: Omit<UserActivity, 'id' | 'timestamp'>): Promise<UserActivity> {
     try {
-      const response = await fetch(`/api/users-singleton/${userId}/activity`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
+      const result = await this.makeAuthenticatedRequest<{ activity: UserActivity }>(
+        `/api/users-singleton/${userId}/activity`,
+        {
+          method: 'POST',
+          body: JSON.stringify(activity)
         },
-        body: JSON.stringify(activity)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to record activity: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const userActivity = result.data.activity;
-
-      // Clear activity cache for this user
-      await this.clearCache(`user-activity-${userId}-*`);
+        `user-activity-record-${userId}`
+      );
 
       console.log('User activity recorded', { userId, type: activity.type });
-      
-      return userActivity;
+      return result.activity;
     } catch (error) {
       console.error('Error recording activity', error);
       throw error;
@@ -376,32 +277,14 @@ class UsersSingleton extends UniversalSingleton {
    * Get user statistics
    */
   async getUserStats(): Promise<UserStats> {
-    const cacheKey = 'user-stats';
-    
-    // Check cache first
-    const cached = await this.getFromCache<UserStats>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     try {
-      const response = await fetch('/api/users-singleton/stats', {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const result = await this.makeAuthenticatedRequest<{ stats: UserStats }>(
+        '/api/users-singleton/stats',
+        {},
+        'user-stats'
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch user stats: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      const stats = result.data.stats;
-
-      // Cache the result
-      await this.setCache(cacheKey, stats);
-      
-      return stats;
+      return result.stats;
     } catch (error) {
       console.error('Error fetching user stats', error);
       throw error;
@@ -426,18 +309,13 @@ class UsersSingleton extends UniversalSingleton {
    */
   async searchUsers(query: string, limit: number = 20): Promise<User[]> {
     try {
-      const response = await fetch(`/api/users-singleton?limit=${limit}&search=${encodeURIComponent(query)}`, {
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const result = await this.makeAuthenticatedRequest<{ users: User[] }>(
+        `/api/users-singleton?limit=${limit}&search=${encodeURIComponent(query)}`,
+        {},
+        `user-search-${query}-${limit}`
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to search users: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      return result.data.users;
+      return result.users;
     } catch (error) {
       console.error('Error searching users', error);
       throw error;
@@ -448,11 +326,6 @@ class UsersSingleton extends UniversalSingleton {
   // PRIVATE METHODS
   // ====================
 
-  private getAuthToken(): string {
-    // This would get the auth token from cookies, localStorage, or context
-    // For now, return empty string - this would be implemented based on auth system
-    return '';
-  }
 }
 
 export default UsersSingleton;

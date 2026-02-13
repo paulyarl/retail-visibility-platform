@@ -19,15 +19,20 @@ import {
   Package, 
   TrendingUp, 
   AlertTriangle, 
+  CheckCircle, 
+  Clock, 
   DollarSign,
-  Activity,
+  BarChart3,
+  RefreshCw,
+  ShoppingCart,
   Eye,
-  ShoppingCart
+  Activity
 } from 'lucide-react';
-import { Card, CardHeader, CardContent } from '../ui/Card';
-import { Skeleton } from '../ui/Skeleton';
-import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@mantine/core';
+import { inventoryStatsService } from '@/services/InventoryStatsSingletonService';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 /* import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -69,14 +74,8 @@ export default function InventoryStats({ tenantId, loading = false, refresh }: I
       setStatsLoading(true);
       setError(null);
       
-      const response = await fetch(`/api/inventory/stats/${tenantId}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch stats');
-      }
-      
-      const data = await response.json();
-      setStats(data.data);
+      const stats = await inventoryStatsService.getInventoryStats(tenantId);
+      setStats(stats);
     } catch (err) {
       console.error('Error fetching inventory stats:', err);
       setError(err instanceof Error ? err.message : 'Failed to load stats');

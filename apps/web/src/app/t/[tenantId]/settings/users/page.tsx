@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Users, UserPlus, Key, Trash2, Mail } from 'lucide-react';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { Button } from '@mantine/core';
@@ -54,13 +54,8 @@ export default function TenantUsersPage() {
 
   const loadUsers = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.get(`${apiUrl}/api/tenants/${tenantId}/users`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data.users || []);
-      }
+      const users = await tenantInfoService.getUsers(tenantId);
+      setUsers(users);
     } catch (error) {
       console.error('Failed to load users:', error);
     } finally {
@@ -75,12 +70,12 @@ export default function TenantUsersPage() {
     setSuccess('');
 
     try {
-      const response = await api.post(`/api/tenants/${tenantId}/users/invite`, {
+      const response = await tenantInfoService.inviteUser(tenantId, {
         email: inviteEmail,
         role: inviteRole,
       });
 
-      if (response.ok) {
+      if (response) {
         setSuccess(`✅ Invitation sent to ${inviteEmail}`);
         setInviteEmail('');
         setInviteRole('USER');
@@ -90,8 +85,7 @@ export default function TenantUsersPage() {
           setSuccess('');
         }, 2000);
       } else {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to invite user');
+        throw new Error('Failed to invite user');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to invite user');
@@ -106,9 +100,9 @@ export default function TenantUsersPage() {
     }
 
     try {
-      const response = await api.delete(`/api/tenants/${tenantId}/users/${userId}`);
+      const response = await tenantInfoService.deleteUser(tenantId, userId);
 
-      if (response.ok) {
+      if (response) {
         await loadUsers();
       } else {
         alert('Failed to remove user');

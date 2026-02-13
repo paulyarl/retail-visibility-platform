@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Package, ArrowLeft, Search } from 'lucide-react';
 import Link from 'next/link';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 interface Category {
   id: string;
@@ -39,28 +40,23 @@ export default function AllCategoriesClient() {
       setError(null);
 
       try {
-        const apiBaseUrl =
-          process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         // Fetch from materialized view for primary/secondary breakdown
-        const response = await fetch(`${apiBaseUrl}/api/directory/mv/categories`);
+        const result = await recommendationsService.getDirectoryMVCategories();
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch categories');
-        }
-
-        const result = await response.json();
-        const transformedCategories = (result.categories || []).map((cat: any) => ({
-          id: cat.id,
-          name: cat.name,
-          slug: cat.slug,
-          googleCategoryId: cat.googleCategoryId,
-          icon: cat.icon,
-          storeCount: cat.storeCount,
-          primaryStoreCount: cat.primaryStoreCount,
+        if (result) {
+          const transformedCategories = (result.categories || []).map((cat: any) => ({
+            id: cat.id,
+            name: cat.name,
+            slug: cat.slug,
+            googleCategoryId: cat.googleCategoryId,
+            icon: cat.icon,
+            storeCount: cat.storeCount,
+            primaryStoreCount: cat.primaryStoreCount,
           secondaryStoreCount: cat.secondaryStoreCount,
-          productCount: cat.totalProducts,
-        }));
-        setCategories(transformedCategories);
+            productCount: cat.totalProducts,
+          }));
+          setCategories(transformedCategories);
+        }
       } catch (err) {
         console.error('Error fetching categories:', err);
         setError('Failed to load categories. Please try again.');

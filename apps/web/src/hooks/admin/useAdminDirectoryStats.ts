@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
 export interface DirectoryStats {
   total: number;
@@ -27,33 +28,11 @@ export function useAdminDirectoryStats(): AdminDirectoryStatsHook {
       setLoading(true);
       setError(null);
 
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      
-      // Get access token from localStorage
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      const response = await fetch(`${apiBaseUrl}/api/admin/directory/stats`, {
-        credentials: 'include',
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch stats');
-      }
-
-      const data = await response.json();
-      setStats(data);
+      const stats = await platformHomeService.getAdminDirectoryStats();
+      setStats(stats);
     } catch (err) {
-      console.error('Error fetching directory stats:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load stats');
+      console.error('Failed to fetch directory stats:', err);
+      setError('Failed to fetch directory stats');
     } finally {
       setLoading(false);
     }

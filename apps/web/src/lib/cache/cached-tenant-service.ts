@@ -3,7 +3,7 @@
  * Consolidates tenant info, tier, and usage calls with local storage caching
  */
 
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { LocalStorageCache } from './local-storage-cache';
 
 export interface TenantInfo {
@@ -87,52 +87,27 @@ export class CachedTenantService {
 
     try {
       // Try the consolidated endpoint first
-      const consolidatedResponse = await api.get(`/api/tenants/${tenantId}/complete`);
-      if (consolidatedResponse.ok) {
-        const data = await consolidatedResponse.json();
+      const data = await platformHomeService.getTenantComplete(tenantId);
 
-        const cachedData: CachedTenantData = {
-          tenant: data.tenant,
-          tier: data.tier,
-          usage: data.usage,
-          _timestamp: data._timestamp || new Date().toISOString(),
-          _cacheVersion: this.CACHE_VERSION
-        };
+      const cachedData: CachedTenantData = {
+        tenant: data.tenant,
+        tier: data.tier,
+        usage: data.usage,
+        _timestamp: data._timestamp || new Date().toISOString(),
+        _cacheVersion: this.CACHE_VERSION
+      };
 
-        // Cache the consolidated data
-        await LocalStorageCache.set(cacheKey, cachedData, {
-          ttl: Math.min(this.TENANT_CACHE_TTL, this.TIER_CACHE_TTL, this.USAGE_CACHE_TTL),
-          tenantId
-        });
+      // Cache the consolidated data
+      await LocalStorageCache.set(cacheKey, cachedData, {
+        ttl: Math.min(this.TENANT_CACHE_TTL, this.TIER_CACHE_TTL, this.USAGE_CACHE_TTL),
+        userId
+      });
 
-        return cachedData;
-      }
+      return cachedData;
     } catch (error) {
-      console.warn('[CachedTenantService] Consolidated endpoint failed, falling back to individual calls:', error);
+      console.error('[CachedTenantService] Failed to fetch consolidated tenant data:', error);
+      throw error;
     }
-
-    // Fallback to individual API calls
-    const [tenant, tier, usage] = await Promise.all([
-      this.getTenantInfo(tenantId, useCache),
-      this.getTenantTier(tenantId, useCache),
-      this.getTenantUsage(tenantId, useCache)
-    ]);
-
-    const cachedData: CachedTenantData = {
-      tenant,
-      tier,
-      usage,
-      _timestamp: new Date().toISOString(),
-      _cacheVersion: this.CACHE_VERSION
-    };
-
-    // Cache the assembled data
-    await LocalStorageCache.set(cacheKey, cachedData, {
-      ttl: Math.min(this.TENANT_CACHE_TTL, this.TIER_CACHE_TTL, this.USAGE_CACHE_TTL),
-      tenantId
-    });
-
-    return cachedData;
   }
 
   /**
@@ -148,12 +123,25 @@ export class CachedTenantService {
       }
     }
 
-    const response = await api.get(`/api/tenants/${tenantId}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch tenant info: ${response.status}`);
+    const tenant = await platformHomeService.getTenant(tenantId);
+    if (!tenant) {
+      throw new Error(`Tenant not found: ${tenantId}`);
     }
 
-    const data = await response.json();
+    // Transform Tenant to TenantInfo interface
+    const data: TenantInfo = {
+      id: tenant.id,
+      name: tenant.name,
+      organizationId: tenant.organization?.id,
+      subscriptionTier: tenant.subscriptionTier || 'basic',
+      subscriptionStatus: tenant.status || 'active',
+      locationStatus: tenant.status || 'active',
+      subdomain: tenant.metadata?.subdomain,
+      createdAt: tenant.createdAt || new Date().toISOString(),
+      statusInfo: tenant.status,
+      logoUrl: tenant.logoUrl,
+      stats: tenant.metadata?.stats
+    };
 
     await LocalStorageCache.set(cacheKey, data, { ttl: this.TENANT_CACHE_TTL, tenantId });
 
@@ -173,12 +161,7 @@ export class CachedTenantService {
       }
     }
 
-    const response = await api.get(`/api/tenants/${tenantId}/tier`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch tenant tier: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = await platformHomeService.getTenantTier(tenantId);
 
     await LocalStorageCache.set(cacheKey, data, { ttl: this.TIER_CACHE_TTL, tenantId });
 
@@ -198,12 +181,7 @@ export class CachedTenantService {
       }
     }
 
-    const response = await api.get(`/api/tenants/${tenantId}/usage`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch tenant usage: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = await platformHomeService.getTenantUsage(tenantId);
 
     // Transform API response to match TenantUsage interface
     const usage: TenantUsage = {

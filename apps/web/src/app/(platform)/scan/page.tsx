@@ -6,7 +6,7 @@ import { Card } from '@mantine/core';
 import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { Flags } from '@/lib/flags';
 
 // Force edge runtime to prevent prerendering issues
@@ -64,7 +64,6 @@ export default function ScanPage() {
     try {
       setCreating(true);
       
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const tenantId = localStorage.getItem('lastTenantId');
       
       if (!tenantId) {
@@ -72,17 +71,12 @@ export default function ScanPage() {
         return;
       }
 
-      const response = await api.post(`${apiBaseUrl}/api/scan/start`, {
-        tenantId,
-        deviceType: selectedDevice,
-      });
+      const data = await platformHomeService.startScan(tenantId, selectedDevice);
 
-      if (response.ok) {
-        const data = await response.json();
+      if (data && data.session) {
         router.push(`/scan/${data.session.id}`);
       } else {
-        const error = await response.json();
-        alert(`Failed to start session: ${error.error || 'Unknown error'}`);
+        alert('Failed to start session: Unknown error');
       }
     } catch (error) {
       console.error('Failed to start session:', error);

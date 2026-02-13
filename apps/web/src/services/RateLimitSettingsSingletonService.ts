@@ -1,4 +1,4 @@
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
 
 export interface RateLimitConfiguration {
   route_type: string;
@@ -14,19 +14,12 @@ export interface RateLimitSettings {
   updatedBy: string;
 }
 
-class RateLimitSettingsSingletonService {
+class RateLimitSettingsSingletonService extends AuthenticatedApiSingleton {
   private static instance: RateLimitSettingsSingletonService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with rate limiting defaults
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 5 * 60 * 1000, // 5 minutes - rate limit settings change infrequently
-      enableLogging: false, // Reduce noise in logs
-      enableMetrics: true
-    });
+    super('rate-limit-settings-service');
+    this.cacheTTL = 5 * 60 * 1000; // 5 minutes - rate limit settings change infrequently
   }
 
   public static getInstance(): RateLimitSettingsSingletonService {
@@ -41,12 +34,13 @@ class RateLimitSettingsSingletonService {
    */
   async getRateLimitSettings(): Promise<RateLimitSettings | null> {
     try {
-      const response = await this.client.makeRequest<RateLimitSettings>(
+      const response = await this.makeAuthenticatedRequest<RateLimitSettings>(
         '/api/admin/platform-settings',
-        { method: 'GET' }
+        { method: 'GET' },
+        'rate_limit_settings'
       );
 
-      return response as unknown as RateLimitSettings;
+      return response;
     } catch (error) {
       console.error('[RateLimitSettingsSingleton] Failed to fetch rate limit settings:', error);
       return null;
@@ -59,7 +53,7 @@ class RateLimitSettingsSingletonService {
    */
   async updateRateLimitSettings(settings: Partial<RateLimitSettings>): Promise<RateLimitSettings | null> {
     try {
-      const response = await this.client.makeRequest<RateLimitSettings>(
+      const response = await this.makeAuthenticatedRequest<RateLimitSettings>(
         '/api/admin/platform-settings',
         {
           method: 'PUT',
@@ -67,13 +61,11 @@ class RateLimitSettingsSingletonService {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(settings),
-        }
+        },
+        'rate_limit_settings'
       );
 
-      // Clear cache to ensure fresh data on next request
-      this.clearCache();
-
-      return response as unknown as RateLimitSettings;
+      return response;
     } catch (error) {
       console.error('[RateLimitSettingsSingleton] Failed to update rate limit settings:', error);
       return null;
@@ -101,23 +93,8 @@ class RateLimitSettingsSingletonService {
   /**
    * Clear the cache to force fresh data on next request
    */
-  public clearCache(): void {
-    // Access the private clearCache method of the client
-    (this.client as any).clearCache();
-  }
-
-  /**
-   * Get performance metrics
-   */
-  public getMetrics() {
-    return this.client.getMetrics();
-  }
-
-  /**
-   * Reset metrics
-   */
-  public resetMetrics(): void {
-    this.client.resetMetrics();
+  public async clearCache(): Promise<void> {
+    await this.invalidateCache('rate_limit_settings');
   }
 }
 

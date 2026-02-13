@@ -19,6 +19,7 @@ import {
   Pause,
   RotateCcw
 } from 'lucide-react';
+import { inventoryQueueService } from '@/services/InventoryQueueSingletonService';
 import { Button } from '@mantine/core';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -133,21 +134,15 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
     if (localItems.length === 0) return;
     
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      
       // Add each local item to the database
       for (const item of localItems) {
-        await fetch(`${API_BASE_URL}/api/queue/${tenantId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            productData: item.productData,
-            priority: item.priority || 'normal',
-            sessionId: item.sessionId || `session-${Date.now()}`,
-            userAgent: item.userAgent || navigator.userAgent,
-            source: item.source || 'wizard'
-          })
-        });
+        await inventoryQueueService.addToQueue(tenantId, [{
+          productData: item.productData,
+          priority: item.priority || 'normal',
+          sessionId: item.sessionId || `session-${Date.now()}`,
+          userAgent: item.userAgent || navigator.userAgent,
+          source: item.source || 'wizard'
+        }], item.priority || 'normal');
       }
       
       // Clear localStorage after successful sync
@@ -188,19 +183,13 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
       localStorage.removeItem('item-creation-draft');
       
       // Clear database queue
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await fetch(`${API_BASE_URL}/api/queue/${tenantId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action })
-      });
+      const result = await inventoryQueueService.clearQueue(tenantId, action);
       
-      if (!response.ok) {
-        throw new Error(`Failed to clear queue: ${response.statusText}`);
+      if (result) {
+        console.log(`Cleared queue with action: ${action}`);
+      } else {
+        throw new Error('Failed to clear queue');
       }
-      
-      const result = await response.json();
-      console.log(`Cleared ${result.cleared} items from queue`);
       
       // Refresh display
       await fetchQueueData();
@@ -219,21 +208,13 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
     setError(null);
     
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const [itemsResponse, statsResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/queue/${tenantId}?includeCompleted=true`),
-        fetch(`${API_BASE_URL}/api/queue/${tenantId}?stats=true`)
+      const [itemsData, statsData] = await Promise.all([
+        inventoryQueueService.getQueueItems(tenantId, { includeCompleted: true }),
+        inventoryQueueService.getQueueStats(tenantId)
       ]);
 
-      if (!itemsResponse.ok || !statsResponse.ok) {
-        throw new Error('Failed to fetch queue data');
-      }
-
-      const itemsData = await itemsResponse.json();
-      const statsData = await statsResponse.json();
-
-      setQueueItems(itemsData.data || []);
-      setStats(statsData.data);
+      setQueueItems(itemsData || []);
+      setStats(statsData);
     } catch (err) {
       console.error('Error fetching queue:', err);
       setError(err instanceof Error ? err.message : 'Failed to load queue');
@@ -264,24 +245,15 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
   // Add item to queue
   const addToQueue = async (productData: any, priority: 'normal' | 'high' | 'urgent' = 'normal') => {
     try {
-      const response = await fetch(`/api/queue/${tenantId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productData,
-          priority,
-          sessionId: generateSessionId(),
-          userAgent: navigator.userAgent,
-          source: 'wizard'
-        })
-      });
+      const result = await inventoryQueueService.addToQueue(tenantId, [{
+        productData,
+        priority,
+        sessionId: generateSessionId(),
+        userAgent: navigator.userAgent,
+        source: 'wizard'
+      }], priority);
 
-      if (!response.ok) {
-        throw new Error('Failed to add item to queue');
-      }
-
-      const result = await response.json();
-      if (result.success) {
+      if (result) {
         await fetchQueueData(); // Refresh queue
       }
     } catch (error) {
@@ -293,24 +265,14 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
   // Update item status
   const updateItemStatus = async (itemId: string, newStatus: string) => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await fetch(`${API_BASE_URL}/api/queue/${tenantId}/${itemId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update item status to ${newStatus}`);
-      }
-
-      const result = await response.json();
-      if (result.success) {
+      const result = await inventoryQueueService.updateItemStatus(tenantId, itemId, newStatus);
+      
+      if (result) {
         await fetchQueueData(); // Refresh queue
       }
     } catch (error) {
       console.error('Error updating item status:', error);
-      setError(error instanceof Error ? error.message : `Failed to update item status to ${newStatus}`);
+      setError(error instanceof Error ? error.message : 'Failed to update item status');
     }
   };
 
@@ -337,17 +299,9 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
   // Remove item from queue (hard delete)
   const removeFromQueue = async (itemId: string) => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await fetch(`${API_BASE_URL}/api/queue/${tenantId}?itemId=${itemId}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to remove item');
-      }
-
-      const result = await response.json();
-      if (result.success) {
+      const result = await inventoryQueueService.removeFromQueue(tenantId, itemId);
+      
+      if (result) {
         await fetchQueueData(); // Refresh queue
         if (onItemRemove) {
           onItemRemove(itemId);
@@ -365,24 +319,14 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
       setIsProcessing(true);
       setError(null);
 
-      const response = await fetch(`/api/queue/${tenantId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'process',
-          itemIds,
-          maxConcurrent: 3,
-          timeout: 300000,
-          retryFailed: true
-        })
+      const result = await inventoryQueueService.processQueue(tenantId, {
+        itemIds,
+        maxConcurrent: 3,
+        timeout: 300000,
+        retryFailed: true
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to process queue');
-      }
-
-      const result = await response.json();
-      if (result.success) {
+      if (result) {
         await fetchQueueData(); // Refresh queue
         if (onCheckout) {
           const items = itemIds 
@@ -402,22 +346,9 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
   // Update item priority
   const updatePriority = async (itemId: string, priority: 'normal' | 'high' | 'urgent') => {
     try {
-      const response = await fetch(`/api/queue/${tenantId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'update_priority',
-          itemId,
-          priority
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update priority');
-      }
-
-      const result = await response.json();
-      if (result.success) {
+      const result = await inventoryQueueService.updateItemPriority(tenantId, itemId, priority);
+      
+      if (result) {
         await fetchQueueData(); // Refresh queue
       }
     } catch (error) {
@@ -429,40 +360,32 @@ export default function ProductQueue({ tenantId, onCheckout, onItemRemove, previ
   // Cleanup old items
   const cleanupOldItems = async () => {
     try {
-      const response = await fetch(`/api/queue/${tenantId}?cleanup=true&olderThanDays=7`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to cleanup queue');
-      }
-
-      const result = await response.json();
-      if (result.success) {
+      const result = await inventoryQueueService.cleanupOldItems(tenantId, 7);
+      
+      if (result) {
         await fetchQueueData(); // Refresh queue
       }
     } catch (error) {
-      console.error('Error cleaning up queue:', error);
-      setError(error instanceof Error ? error.message : 'Failed to cleanup queue');
+      console.error('Error cleaning up old items:', error);
+      setError(error instanceof Error ? error.message : 'Failed to cleanup old items');
     }
   };
 
   // Export queue
   const exportQueue = async () => {
     try {
-      const response = await fetch(`/api/queue/${tenantId}/export`);
-      if (!response.ok) {
-        throw new Error('Failed to export queue');
+      const result = await inventoryQueueService.exportQueue(tenantId);
+      
+      if (result) {
+        const queueData = result;
+        const blob = new Blob([JSON.stringify(queueData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `queue-export-${tenantId}-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
       }
-
-      const queueData = await response.json();
-      const blob = new Blob([JSON.stringify(queueData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `queue-export-${tenantId}-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting queue:', error);
       setError(error instanceof Error ? error.message : 'Failed to export queue');

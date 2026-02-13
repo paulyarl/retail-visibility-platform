@@ -18,6 +18,8 @@ import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoG
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
+import { directoryService } from '@/services/DirectorySingletonService';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 interface StoreDetailPageProps {
   params: {
@@ -26,20 +28,9 @@ interface StoreDetailPageProps {
 }
 
 async function getConsolidatedDirectoryData(slug: string) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-  
   try {
-    const res = await fetch(`${apiUrl}/api/directory/consolidated/${slug}`, {
-      next: { revalidate: 300 }, // Revalidate every 5 minutes
-    });
-
-    if (!res.ok) {
-      console.error('Consolidated directory API failed:', res.status, res.statusText);
-      return null;
-    }
-
-    const data = await res.json();
-    return data.data;
+    const data = await directoryService.getDirectoryConsolidated(slug);
+    return data;
   } catch (error) {
     console.error('Error fetching consolidated directory data:', error);
     return null;
@@ -47,22 +38,9 @@ async function getConsolidatedDirectoryData(slug: string) {
 }
 
 async function getStorefrontCategories(tenantId: string) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-  
   try {
-    const res = await fetch(`${apiUrl}/api/storefront/${tenantId}/categories`, {
-      next: { revalidate: 300 }, // Revalidate every 5 minutes
-    });
-
-    if (!res.ok) {
-      return { categories: [], uncategorizedCount: 0 };
-    }
-
-    const data = await res.json();
-    return {
-      categories: data.categories || [],
-      uncategorizedCount: data.uncategorizedCount || 0,
-    };
+    const data = await directoryService.getStorefrontCategories(tenantId);
+    return data;
   } catch (error) {
     console.error('Error fetching storefront categories:', error);
     return { categories: [], uncategorizedCount: 0 };
@@ -70,19 +48,9 @@ async function getStorefrontCategories(tenantId: string) {
 }
 
 async function getActualProductCount(tenantId: string) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-  
   try {
-    const res = await fetch(`${apiUrl}/api/storefront/${tenantId}/products?limit=1`, {
-      next: { revalidate: 300 }, // Revalidate every 5 minutes
-    });
-
-    if (!res.ok) {
-      return 0;
-    }
-
-    const data = await res.json();
-    return data.pagination?.totalItems || 0;
+    const count = await directoryService.getStorefrontProductCount(tenantId);
+    return count;
   } catch (error) {
     console.error('Error fetching actual product count:', error);
     return 0;
@@ -90,18 +58,9 @@ async function getActualProductCount(tenantId: string) {
 }
 
 async function getBusinessProfile(tenantId: string) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-  
   try {
-    const res = await fetch(`${apiUrl}/api/public/tenant/${tenantId}/profile`, {
-      next: { revalidate: 300 }, // Revalidate every 5 minutes
-    });
-
-    if (!res.ok) {
-      return null;
-    }
-
-    return await res.json();
+    const profile = await directoryService.getBusinessProfile(tenantId);
+    return profile;
   } catch (error) {
     console.error('Error fetching business profile:', error);
     return null;
@@ -109,14 +68,9 @@ async function getBusinessProfile(tenantId: string) {
 }
 
 async function getBusinessHours(tenantId: string) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-  
   try {
-    const res = await fetch(`${apiUrl}/api/tenant/${tenantId}/business-hours`);
-    if (!res.ok) return null;
-    
-    const data = await res.json();
-    if (!data.success || !data.data) return null;
+    const data = await directoryService.getBusinessHours(tenantId);
+    if (!data?.success || !data?.data) return null;
     
     const { periods, timezone } = data.data;
     const hours: any = { timezone };
@@ -145,20 +99,10 @@ async function getBusinessHours(tenantId: string) {
 }
 
 async function getFeaturedProducts(tenantId: string, limit: number = 6) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-  
   try {
     // Use the featured products endpoint with store_selection type for directory
-    const res = await fetch(`${apiUrl}/api/storefront/${tenantId}/featured-products?type=store_selection&limit=${limit}`, {
-      next: { revalidate: 300 },
-    });
-
-    if (!res.ok) {
-      return [];
-    }
-
-    const data = await res.json();
-    return data.items || [];
+    const items = await directoryService.getFeaturedProducts(tenantId, limit);
+    return items;
   } catch (error) {
     console.error('Error fetching featured products:', error);
     return [];
@@ -166,34 +110,18 @@ async function getFeaturedProducts(tenantId: string, limit: number = 6) {
 }
 
 async function getRelatedProducts(categorySlug: string, excludeTenantId: string, limit: number = 6) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-  
   try {
     // First, get stores in the same category (from directory MV)
-    const storesRes = await fetch(`${apiUrl}/api/directory/mv/search?category=${categorySlug}&limit=10`, {
-      next: { revalidate: 300 },
-    });
-
-    if (!storesRes.ok) {
-      return [];
-    }
-
-    const storesData = await storesRes.json();
-    const otherStores = (storesData.listings || [])
+    const storesData = await directoryService.getStoresByCategoryForProducts(categorySlug, 10);
+    const otherStores = storesData
       .filter((l: any) => l.tenant_id !== excludeTenantId)
       .slice(0, 3); // Get 3 other stores
 
     // Now fetch products from those stores using storefront_products MV
     const productPromises = otherStores.map(async (store: any) => {
       try {
-        const productsRes = await fetch(`${apiUrl}/api/storefront/${store.tenant_id}/products?limit=2`, {
-          next: { revalidate: 300 },
-        });
-        
-        if (!productsRes.ok) return [];
-        
-        const productsData = await productsRes.json();
-        return (productsData.items || []).map((p: any) => ({
+        const productsData = await directoryService.getStorefrontProducts(store.tenant_id, 2);
+        return productsData.map((p: any) => ({
           ...p,
           storeName: store.business_name,
           storeSlug: store.slug,
@@ -213,8 +141,6 @@ async function getRelatedProducts(categorySlug: string, excludeTenantId: string,
 
 // NEW: Track store view for recommendations
 async function trackStoreView(tenantId: string, categories: any[] = []) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-  
   try {
     // Get user location (reuse existing logic)
     const location = await getUserLocation();
@@ -222,25 +148,21 @@ async function trackStoreView(tenantId: string, categories: any[] = []) {
     // Get primary category for context
     const primaryCategory = categories.find((c: any) => c.isPrimary) || categories[0];
     
-    await fetch(`${apiUrl}/api/recommendations/track`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        entityType: 'store',
-        entityId: tenantId,
-        entityName: '', // Will be populated by API
-        context: {
-          category_id: primaryCategory?.id,
-          category_slug: primaryCategory?.slug,
-          categories: categories.map((c: any) => ({ id: c.id, slug: c.slug }))
-        },
-        locationLat: location?.latitude,
-        locationLng: location?.longitude,
-        referrer: typeof document !== 'undefined' ? document.referrer : '',
+    await recommendationsService.trackRecommendations({
+      entityType: 'store',
+      entityId: tenantId,
+      entityName: '', // Will be populated by API
+      context: {
+        category_id: primaryCategory?.id,
+        category_slug: primaryCategory?.slug,
+        categories: categories.map((c: any) => ({ id: c.id, slug: c.slug }))
+      },
+      locationLat: location?.latitude,
+      locationLng: location?.longitude,
+      referrer: typeof document !== 'undefined' ? document.referrer : '',
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
         pageType: 'directory_detail'
-      })
-    });
+      });
   } catch (error) {
     console.error('Error tracking store view:', error);
     // Don't throw - tracking failures shouldn't break the page
@@ -249,24 +171,22 @@ async function trackStoreView(tenantId: string, categories: any[] = []) {
 
 // NEW: Get store recommendations
 async function getStoreRecommendations(tenantId: string, categorySlug?: string) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-  
   try {
     // Get user location
     const location = await getUserLocation();
     
-    const params = new URLSearchParams();
-    if (categorySlug) params.append('categorySlug', categorySlug);
+    const params: any = {};
+    if (categorySlug) params.category = categorySlug;
     if (location) {
-      params.append('lat', location.latitude.toString());
-      params.append('lng', location.longitude.toString());
+      params.lat = location.latitude.toString();
+      params.lng = location.longitude.toString();
     }
     
-    const response = await fetch(`${apiUrl}/api/recommendations/for-storefront/${tenantId}?${params}`);
+    const response = await recommendationsService.getStorefrontRecommendations(tenantId, params);
     
-    if (!response.ok) return { recommendations: [] };
+    if (!response) return { recommendations: [] };
     
-    return await response.json();
+    return response;
   } catch (error) {
     console.error('Error getting recommendations:', error);
     return { recommendations: [] };
@@ -504,7 +424,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   Shop {listing.businessName}
                 </h2>
                 <p className="text-gray-700 mb-6 text-sm sm:text-base max-w-2xl mx-auto">
-                  Browse {listing.productCount > 0 ? `${listing.productCount} products` : 'our full catalog'} and shop directly from their online storefront
+                  Browse {(listing.productCount ?? 0) > 0 ? `${listing.productCount} products` : 'our full catalog'} and shop directly from their online storefront
                 </p>
                 <Link
                   href={`/tenant/${listing.tenantId}`}

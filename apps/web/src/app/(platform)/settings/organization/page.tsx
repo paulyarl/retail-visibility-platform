@@ -9,7 +9,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { ProtectedCard } from '@/lib/auth/ProtectedCard';
-import { api } from '@/lib/api';
+import { organizationsService } from '@/services/OrganizationsSingletonService';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 import { useOrganizationData } from '@/hooks/useApiQueries';
 
@@ -130,18 +130,13 @@ export default function OrganizationPage() {
 
     setSettingHero(true);
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      // Call Railway API directly with auth
-      const res = await api.put(`${API_BASE_URL}/organizations/${organizationId}/hero-location`, {
-        tenantId: selectedHeroId,
-      });
+      // Update hero location using the singleton service
+      const data = await organizationsService.updateHeroLocation(organizationId, selectedHeroId);
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Failed to set hero location');
+      if (!data) {
+        throw new Error('Failed to set hero location');
       }
 
-      const data = await res.json();
       alert(`✅ ${data.heroTenantName} is now set as the hero location!`);
       
       // Reload organization data - React Query handles cache invalidation automatically
@@ -175,7 +170,6 @@ export default function OrganizationPage() {
     setShowCategorySyncModal(false);
 
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const requestBody: any = {
         strategy: 'platform_to_gbp',
         dryRun: false,
@@ -189,18 +183,9 @@ export default function OrganizationPage() {
         requestBody.organizationId = organizationId;
       }
 
-      const response = await fetch(`${API_BASE}/api/categories/mirror`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(requestBody),
-      });
-
-      const data = await response.json();
+      const data = await organizationsService.mirrorCategories(requestBody);
       
-      if (response.ok) {
+      if (data) {
         const locationText = categorySyncScope === 'single' ? '1 location' : `all locations`;
         setCategorySyncResult({
           success: true,
@@ -211,7 +196,7 @@ export default function OrganizationPage() {
       } else {
         setCategorySyncResult({
           success: false,
-          message: data.error || 'Failed to sync categories',
+          message: 'Failed to sync categories',
         });
       }
     } catch (error) {
@@ -235,17 +220,12 @@ export default function OrganizationPage() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch(`/api/organizations/${organizationId}/sync-from-hero`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const data = await organizationsService.syncFromHero(organizationId);
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Failed to sync from hero');
+      if (!data) {
+        throw new Error('Failed to sync from hero');
       }
 
-      const data = await res.json();
       setSyncResult(data);
       
       // Reload organization data - React Query handles cache invalidation automatically

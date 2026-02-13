@@ -5,6 +5,7 @@ import { PayPalButtons, PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { Button } from '@mantine/core';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Loader2, CreditCard, Lock } from 'lucide-react';
+import { customerOrderService } from '@/services/CustomerOrderService';
 
 interface PayPalPaymentFormProps {
   amount: number;
@@ -65,38 +66,22 @@ function PayPalPaymentFormContent({
 
   const createOrder = async () => {
     try {
-      const response = await fetch('/api/checkout/paypal/create-order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          orderId,
-          paymentId,
-          amount,
-          customerInfo,
-          shippingAddress,
-          cartItems,
-        }),
+      const response = await customerOrderService.createPayPalOrder({
+        orderId,
+        paymentId,
+        amount,
+        customerInfo,
+        shippingAddress,
+        cartItems,
       });
 
-      console.log('PayPal create order response:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      });
+      console.log('PayPal create order response:', response);
 
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error('PayPal create order API error:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorData
-        });
-        throw new Error(`Failed to create PayPal order: ${response.status} ${response.statusText}`);
+      if (!response) {
+        throw new Error('Failed to create PayPal order');
       }
 
-      const { orderId: paypalOrderId } = await response.json();
+      const { orderId: paypalOrderId } = response;
       return paypalOrderId;
     } catch (error) {
       console.error('PayPal create order error:', error);
@@ -110,24 +95,18 @@ function PayPalPaymentFormContent({
       setIsProcessing(true);
       setError(null);
 
-      const response = await fetch('/api/checkout/paypal/capture-order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          orderId: data.orderID,
-          paymentId,
-        }),
+      const response = await customerOrderService.capturePayPalOrder({
+        orderId: data.orderID,
+        paymentId,
+        paypalOrderId: data.orderID,
       });
 
-      if (!response.ok) {
+      if (!response) {
         throw new Error('Payment capture failed');
       }
 
-      const result = await response.json();
       // Pass both order number and PayPal transaction ID
-      onSuccess(orderNumber, result.capture?.id || data.orderID);
+      onSuccess(orderNumber, response.capture?.id || data.orderID);
     } catch (error) {
       console.error('PayPal capture error:', error);
       setError('Payment processing failed. Please try again.');
@@ -224,35 +203,19 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
   const createOrderAndPayment = async () => {
     try {
       // Create order
-      const orderResponse = await fetch('/api/checkout/orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          customer: {
-            email: props.customerInfo.email,
-            firstName: props.customerInfo.firstName,
-            lastName: props.customerInfo.lastName,
-            phone: props.customerInfo.phone,
-          },
-          items: props.cartItems.map(item => ({
-            id: item.id,
-            name: item.name,
-            sku: item.sku,
-            quantity: item.quantity,
-            unit_price_cents: item.unitPrice,
-          })),
-          shipping_address: props.shippingAddress,
-          fulfillment_method: props.fulfillmentMethod,
-        }),
+      const orderResponse = await customerOrderService.createCheckoutOrder({
+        customerInfo: props.customerInfo,
+        cartItems: props.cartItems,
+        fulfillmentMethod: props.fulfillmentMethod || 'pickup',
+        shippingAddress: props.shippingAddress,
+        paymentMethod: 'paypal',
       });
 
-      if (!orderResponse.ok) {
+      if (!orderResponse) {
         throw new Error('Failed to create order');
       }
 
-      const orderData = await orderResponse.json();
+      const orderData = orderResponse;
       setOrderId(orderData.order.id);
       setOrderNumber(orderData.order.order_number);
       setPaymentId(orderData.payment.id);

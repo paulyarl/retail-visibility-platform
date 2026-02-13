@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
 
 export interface ReviewSummary {
   rating_avg: number;
@@ -42,19 +42,12 @@ export interface HelpfulVoteRequest {
   isHelpful: boolean;
 }
 
-class ReviewsSingletonService {
+class ReviewsSingletonService extends PublicApiSingleton {
   private static instance: ReviewsSingletonService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with platform defaults
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 5 * 60 * 1000, // 5 minutes for reviews data
-      enableLogging: true,
-      enableMetrics: true
-    });
+    super('reviews-singleton');
+    this.cacheTTL = 5 * 60 * 1000; // 5 minutes for reviews data
   }
 
   public static getInstance(): ReviewsSingletonService {
@@ -75,12 +68,14 @@ class ReviewsSingletonService {
     }
 
     try {
-      const result = await this.client.makeRequest<any>(
-        `/api/stores/${tenantId}/reviews/summary`
+      const result = await this.makePublicRequest<any>(
+        `/api/stores/${tenantId}/reviews/summary`,
+        {},
+        `reviews-summary-${tenantId}`
       );
       
       // Convert numeric strings to numbers (PostgreSQL returns numeric as strings)
-      const summaryData = result.data;
+      const summaryData = result;
       if (summaryData) {
         return {
           ...summaryData,
@@ -114,11 +109,13 @@ class ReviewsSingletonService {
     }
 
     try {
-      const result = await this.client.makeRequest<any>(
-        `/api/stores/${tenantId}/reviews?limit=${limit}`
+      const result = await this.makePublicRequest<{ reviews: Review[] }>(
+        `/api/stores/${tenantId}/reviews?limit=${limit}`,
+        {},
+        `reviews-${tenantId}-${limit}`
       );
       
-      return result.data?.reviews || [];
+      return result.reviews || [];
     } catch (error) {
       console.error('[ReviewsSingleton] Failed to get reviews:', error);
       return [];
@@ -136,11 +133,13 @@ class ReviewsSingletonService {
     }
 
     try {
-      const result = await this.client.makeRequest<any>(
-        `/api/stores/${tenantId}/reviews/user`
+      const result = await this.makePublicRequest<Review>(
+        `/api/stores/${tenantId}/reviews/user`,
+        {},
+        `user-review-${tenantId}`
       );
       
-      return result.data || null;
+      return result || null;
     } catch (error) {
       console.error('[ReviewsSingleton] Failed to get user review:', error);
       return null;
@@ -159,16 +158,14 @@ class ReviewsSingletonService {
     }
 
     try {
-      await this.client.makeRequest<void>(
+      await this.makePublicRequest<void>(
         `/api/reviews/${reviewId}/helpful`,
         {
           method: 'POST',
           body: JSON.stringify({ isHelpful })
-        }
+        },
+        `helpful-vote-${reviewId}`
       );
-      
-      // Note: Cache invalidation would require a public method in UniversalSingletonClient
-      // For now, the cache will expire naturally based on TTL
       
       return true;
     } catch (error) {
@@ -178,17 +175,53 @@ class ReviewsSingletonService {
   }
 
   /**
-   * Get performance metrics
+   * Submit a review for a store
+   * Uses the /api/stores/:tenantId/reviews endpoint
+   * Note: This action invalidates cache for the affected reviews
    */
-  public getMetrics() {
-    return this.client.getMetrics();
-  }
+  async submitReview(tenantId: string, reviewData: {
+    rating: number;
+    content: string;
+    locationLat?: number | null;
+    locationLng?: number | null;
+    sessionId?: string;
+    userName?: string;
+    userEmail?: string;
+  }): Promise<Review | null> {
+    if (!tenantId) {
+      console.error('[ReviewsSingleton] submitReview: tenantId is required');
+      return null;
+    }
 
-  /**
-   * Reset metrics
-   */
-  public resetMetrics(): void {
-    this.client.resetMetrics();
+    try {
+      const response = await this.makePublicRequest<{
+        success: boolean;
+        data: Review;
+      }>(
+        `/api/stores/${tenantId}/reviews`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            rating: reviewData.rating,
+            reviewText: reviewData.content,
+            locationLat: reviewData.locationLat,
+            locationLng: reviewData.locationLng,
+            // For anonymous reviews
+            ...(reviewData.sessionId && {
+              sessionId: reviewData.sessionId,
+              userName: reviewData.userName,
+              userEmail: reviewData.userEmail,
+            })
+          })
+        },
+        `submit-review-${tenantId}`
+      );
+
+      return response?.data || null;
+    } catch (error) {
+      console.error('[ReviewsSingleton] Failed to submit review:', error);
+      return null;
+    }
   }
 }
 

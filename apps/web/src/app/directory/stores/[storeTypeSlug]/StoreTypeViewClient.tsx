@@ -11,6 +11,7 @@ import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import dynamic from 'next/dynamic';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 // Dynamically import Google Maps to avoid SSR issues
 const DirectoryMapGoogle = dynamic(() => import('@/components/directory/DirectoryMapGoogle'), {
@@ -148,22 +149,17 @@ export default function StoreTypeViewClient({
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
         // 1. Fetch store type details
-        const typeRes = await fetch(`${apiBaseUrl}/api/directory/store-types/${storeTypeSlug}`);
-        if (typeRes.ok) {
-          const typeData = await typeRes.json();
+        const typeData = await recommendationsService.getStoreTypeDetails(storeTypeSlug);
+        if (typeData) {
           setStoreType(typeData.data?.storeType || null);
         }
 
         // 2. Fetch stores of this type using store-types endpoint
-        const storesRes = await fetch(
-          `${apiBaseUrl}/api/directory/store-types/${storeTypeSlug}/stores`
-        );
+        const storesData = await recommendationsService.getStoresByStoreType(storeTypeSlug);
 
-        if (!storesRes.ok) {
+        if (!storesData) {
           throw new Error('Failed to fetch stores');
         }
-
-        const storesData = await storesRes.json();
 
         // 3. Transform to DirectoryResponse format
         const stores = storesData.data?.stores || [];
@@ -366,10 +362,8 @@ function StoreTypeRecommendations({ storeTypeSlug }: { storeTypeSlug: string }) 
   useEffect(() => {
     const fetchRecommendations = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${apiUrl}/api/recommendations/for-directory?storeType=${storeTypeSlug}`);
-        const data = await response.json();
-        setRecommendations(data.recommendations || []);
+        const data = await recommendationsService.getStoreTypeRecommendations(storeTypeSlug);
+        setRecommendations(data?.recommendations || []);
       } catch (error) {
         console.error('Error fetching store type recommendations:', error);
       } finally {

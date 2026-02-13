@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 import {
   UserData,
   TenantData,
@@ -83,49 +83,34 @@ export function useAccessControl(
       setError(null);
 
       // Fetch tenant data if tenantId provided
-      // Note: api.get already handles API_BASE_URL prefix for /api/* routes
-      const tenantRes = await api.get(`/api/tenants/${tenantId}`);
-      if (tenantRes.ok) {
-        const tenant = await tenantRes.json();
+      const tenant = await tenantInfoService.getTenantInfo(tenantId);
+      if (tenant) {
         setTenantData(tenant);
 
         // Fetch organization data if needed
         if (fetchOrganization) {
-          if (tenant.organizationId) {
-            const orgRes = await api.get(`/api/organizations/${tenant.organizationId}`);
-            if (orgRes.ok) {
-              const org = await orgRes.json();
-              setOrganizationData(org);
-            } else {
-              setOrganizationData(null);
-            }
+          const organizationId = tenant.metadata?.organizationId;
+          if (organizationId) {
+            const org = await tenantInfoService.getOrganization(organizationId);
+            setOrganizationData(org);
           } else {
             // Try to find organization by searching organizations that contain this tenant
             try {
-              const orgsRes = await api.get(`/api/organizations`);
-              if (orgsRes.ok) {
-                const organizations = await orgsRes.json();
-                // Find the organization that contains this tenant
-                const matchingOrg = organizations.find((org: any) =>
-                  org.tenants?.some((t: any) => t.id === tenantId)
-                );
+              const organizations = await tenantInfoService.getOrganizations();
+              // Find the organization that contains this tenant
+              const matchingOrg = organizations.find((org: any) =>
+                org.tenants?.some((t: any) => t.id === tenantId)
+              );
 
-                if (matchingOrg) {
-                  // Now fetch the full organization data
-                  const fullOrgRes = await api.get(`/api/organizations/${matchingOrg.id}`);
-                  if (fullOrgRes.ok) {
-                    const org = await fullOrgRes.json();
-                    setOrganizationData(org);
-                  } else {
-                    setOrganizationData(null);
-                  }
-                } else {
-                  setOrganizationData(null);
-                }
+              if (matchingOrg) {
+                // Now fetch the full organization data
+                const org = await tenantInfoService.getOrganization(matchingOrg.id);
+                setOrganizationData(org);
               } else {
                 setOrganizationData(null);
               }
-            } catch (error) {
+            } catch (orgError) {
+              console.warn('Failed to fetch organizations:', orgError);
               setOrganizationData(null);
             }
           }
@@ -134,8 +119,9 @@ export function useAccessControl(
         setTenantData(null);
         setOrganizationData(null);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load tenant data');
+    } catch (error) {
+      console.error('Failed to fetch tenant data:', error);
+      setError('Failed to load tenant data');
       setTenantData(null);
       setOrganizationData(null);
     } finally {

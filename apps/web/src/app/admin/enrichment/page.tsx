@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { apiRequest } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { 
   BarChart3, 
   Database, 
@@ -66,16 +66,9 @@ export default function EnrichmentDashboardPage() {
 
   const loadAnalytics = async () => {
     try {
-      // Add cache-busting timestamp
-      const response = await apiRequest(`/api/admin/enrichment/analytics?_t=${Date.now()}`);
-      const data = await response.json();
-      console.log('[Enrichment] Analytics response:', data);
-      if (data.success) {
-        console.log('[Enrichment] Popular products:', data.analytics?.popularProducts);
-        setAnalytics(data.analytics);
-      } else {
-        setError(data.error || 'Failed to load analytics');
-      }
+      const analytics = await platformHomeService.getAdminEnrichmentAnalytics();
+      console.log('[Enrichment] Popular products:', analytics?.popularProducts);
+      setAnalytics(analytics);
     } catch (error) {
       console.error('Failed to load analytics:', error);
       setError('Failed to load analytics');
@@ -87,22 +80,15 @@ export default function EnrichmentDashboardPage() {
   const loadProducts = async () => {
     setSearchLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '20',
-        _t: Date.now().toString(), // Cache-busting
-        ...(searchQuery && { query: searchQuery }),
-        ...(sourceFilter && { source: sourceFilter }),
+      const data = await platformHomeService.searchAdminEnrichmentProducts({
+        limit: 20,
+        search: searchQuery,
+        source: sourceFilter,
       });
-
-      const response = await apiRequest(`/api/admin/enrichment/search?${params}`);
-      const data = await response.json();
-      console.log('[Enrichment] Search response:', data);
-      if (data.success) {
-        console.log('[Enrichment] Products:', data.products);
-        setProducts(data.products);
-        setTotalPages(data.pagination.totalPages);
-      }
+      
+      console.log('[Enrichment] Products:', data.products);
+      setProducts(data.products);
+      setTotalPages(data.pagination?.totalPages || 1);
     } catch (error) {
       console.error('Failed to load products:', error);
     } finally {
@@ -117,9 +103,8 @@ export default function EnrichmentDashboardPage() {
 
   const viewProductDetails = async (barcode: string) => {
     try {
-      const response = await apiRequest(`/api/admin/enrichment/${barcode}`);
-      const data = await response.json();
-      if (data.success) {
+      const data = await platformHomeService.getAdminEnrichmentProduct(barcode);
+      if (data) {
         setSelectedProduct(data.product);
       }
     } catch (error) {

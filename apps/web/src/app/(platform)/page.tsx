@@ -11,7 +11,7 @@ import { usePlatformComplete } from "@/hooks/dashboard/usePlatformComplete";
 import { motion } from "framer-motion";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/lib/api";
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { cachedFetch } from '@/lib/api-cache';
 import Image from "next/image";
 import { canManageTenantSettings } from "@/lib/auth/access-control";
@@ -154,14 +154,12 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
       if (!selectedTenantId) return;
       
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const tenantRes = await api.get(`${apiBaseUrl}/api/tenants/${selectedTenantId}`);
-        if (tenantRes.ok) {
-          const tenantInfo = await tenantRes.json();
+        const tenantInfo = await platformHomeService.getTenant(selectedTenantId);
+        if (tenantInfo) {
           setTenantData({
             name: tenantInfo.name,
-            logoUrl: tenantInfo.metadata?.logo_url,
-            bannerUrl: tenantInfo.metadata?.banner_url,
+            logoUrl: tenantInfo.logoUrl,
+            bannerUrl: tenantInfo.bannerUrl,
           });
         }
       } catch (error) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button, Input } from "@/components/ui";
-import { api } from "@/lib/api";
+import { directoryListingService } from "@/services/DirectoryListingSingletonService";
 import { uploadImage, ImageUploadPresets } from "@/lib/image-upload";
 import { DirectoryListing } from "@/hooks/directory/useDirectoryListing";
 
@@ -40,13 +40,11 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
   const loadPhotos = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`/api/directory/${listing.id}/photos`);
-      const data = await res.json();
-      const photoAssets = Array.isArray(data) ? data : [];
+      const photoAssets = await directoryListingService.getDirectoryPhotos(listing.id);
 
       setPhotos(photoAssets);
-    } catch (e) {
-      console.error("Failed to load directory photos:", e);
+    } catch (error) {
+      console.error("Failed to load photos:", error);
     } finally {
       setLoading(false);
     }
@@ -73,15 +71,14 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       const result = await uploadImage(file, ImageUploadPresets.directory);
       const dataUrl = result.dataUrl;
 
-      const res = await api.post(`/api/directory/${listing.id}/photos`, {
+      const res = await directoryListingService.uploadDirectoryPhoto(listing.id, {
         tenantId,
         dataUrl,
         contentType: "image/jpeg",
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Upload failed");
+      if (!res) {
+        throw new Error("Upload failed");
       }
 
       await loadPhotos();
@@ -120,15 +117,14 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       // Use MEDIUM compression for directory photos (fewer images, better quality)
       const result = await uploadImage(file, ImageUploadPresets.directory);
 
-      const res = await api.post(`/api/directory/${listing.id}/photos`, {
+      const res = await directoryListingService.uploadDirectoryPhoto(listing.id, {
         tenantId,
         dataUrl: result.dataUrl,
         contentType: result.contentType,
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Upload failed");
+      if (!res) {
+        throw new Error("Upload failed");
       }
 
       await loadPhotos();
@@ -143,11 +139,11 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
 
   const handleSetPrimary = async (photoId: string) => {
     try {
-      const res = await api.put(`/api/directory/${listing.id}/photos/${photoId}`, {
+      const res = await directoryListingService.updateDirectoryPhoto(listing.id, photoId, {
         position: 0,
       });
 
-      if (!res.ok) throw new Error("Failed to set primary");
+      if (!res) throw new Error("Failed to set primary");
 
       await loadPhotos();
       onUpdate?.();
@@ -161,8 +157,8 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
     if (!confirm("Delete this photo?")) return;
 
     try {
-      const res = await api.delete(`/api/directory/${listing.id}/photos/${photoId}`);
-      if (!res.ok) throw new Error("Failed to delete");
+      const res = await directoryListingService.deleteDirectoryPhoto(listing.id, photoId);
+      if (!res) throw new Error("Failed to delete");
 
       await loadPhotos();
       onUpdate?.();
@@ -180,12 +176,12 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
 
   const handleEditSave = async (photoId: string) => {
     try {
-      const res = await api.put(`/api/directory/${listing.id}/photos/${photoId}`, {
+      const res = await directoryListingService.updateDirectoryPhoto(listing.id, photoId, {
         alt: editAlt || null,
         caption: editCaption || null,
       });
 
-      if (!res.ok) throw new Error("Failed to update");
+      if (!res) throw new Error("Failed to update");
 
       await loadPhotos();
       setEditingId(null);
@@ -200,11 +196,11 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
     if (!photo || photo.position === 0) return;
 
     try {
-      const res = await api.put(`/api/directory/${listing.id}/photos/${photoId}`, {
+      const res = await directoryListingService.updateDirectoryPhoto(listing.id, photoId, {
         position: photo.position - 1,
       });
 
-      if (!res.ok) throw new Error("Failed to move photo");
+      if (!res) throw new Error("Failed to move photo");
 
       await loadPhotos();
       onUpdate?.();
@@ -219,11 +215,11 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
     if (!photo || photo.position === photos.length - 1) return;
 
     try {
-      const res = await api.put(`/api/directory/${listing.id}/photos/${photoId}`, {
+      const res = await directoryListingService.updateDirectoryPhoto(listing.id, photoId, {
         position: photo.position + 1,
       });
 
-      if (!res.ok) throw new Error("Failed to move photo");
+      if (!res) throw new Error("Failed to move photo");
 
       await loadPhotos();
       onUpdate?.();

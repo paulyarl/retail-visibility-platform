@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { UnifiedStoreCard } from './UnifiedStoreCard';
 import { Skeleton } from '@/components/ui';
+import { directoryService } from '@/services/DirectorySingletonService';
 
 interface RelatedStore {
   id: string;
@@ -54,16 +55,10 @@ export default function RelatedStores({
       setError(null);
 
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await fetch(`${apiUrl}/api/directory/${currentSlug}/related?limit=${limit}`);
-
-        if (!res.ok) {
-          throw new Error('Failed to fetch related stores');
-        }
-
-        const data = await res.json();
+        const data = await directoryService.getRelatedStores(currentSlug, limit);
+        
         // Map API response to expected format (snake_case to camelCase)
-        const mappedStores = (data.related || []).map((store: any) => ({
+        const mappedStores = (data || []).map((store: any) => ({
           id: store.id,
           tenantId: store.tenantId,
           businessName: store.business_name || store.businessName,
@@ -72,18 +67,18 @@ export default function RelatedStores({
           city: store.city,
           state: store.state,
           phone: store.phone,
-          logoUrl: store.logoUrl || store.logo_url,
-          primaryCategory: store.primaryCategory || store.primary_category,
-          ratingAvg: store.ratingAvg || store.rating_avg || 0,
-          ratingCount: store.ratingCount || store.rating_count || 0,
-          productCount: store.productCount || store.product_count || 0,
-          isFeatured: store.isFeatured || store.is_featured || false,
-          subscriptionTier: store.subscriptionTier || store.subscription_tier || 'trial',
-          useCustomWebsite: store.useCustomWebsite || store.use_custom_website || false,
-          website: store.website,
-          businessHours: store.businessHours || store.business_hours,
-          directoryPublished: store.isPublished !== false, // Published stores from related API are in directory
+          logoUrl: store.logo_url || store.logoUrl,
+          primaryCategory: store.primary_category || store.primaryCategory,
+          ratingAvg: store.rating_avg || store.ratingAvg || 0,
+          ratingCount: store.rating_count || store.ratingCount || 0,
+          distance: store.distance,
+          isVerified: store.is_verified || store.isVerified,
+          isFeatured: store.is_featured || store.isFeatured,
+          productCount: store.product_count || store.productCount || 0,
+          subscriptionTier: store.subscription_tier || store.subscriptionTier || 'basic',
+          useCustomWebsite: store.use_custom_website || store.useCustomWebsite || false
         }));
+
         setStores(mappedStores);
       } catch (err) {
         console.error('Error fetching related stores:', err);

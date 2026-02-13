@@ -1,11 +1,11 @@
 /**
  * Branding Settings Singleton Service
  *
- * Extends UniversalSingletonClient to provide cached branding settings operations
+ * Extends AuthenticatedApiSingleton to provide cached branding settings operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
 import { PlatformSettings } from './PlatformSettingsSingletonService';
 
 export interface BrandingSettings {
@@ -15,19 +15,12 @@ export interface BrandingSettings {
   faviconUrl: string | null;
 }
 
-class BrandingSettingsSingletonService {
+class BrandingSettingsSingletonService extends AuthenticatedApiSingleton {
   private static instance: BrandingSettingsSingletonService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with platform defaults
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 15 * 60 * 1000, // 15 minutes for branding settings (changes rarely)
-      enableLogging: true,
-      enableMetrics: true
-    });
+    super('branding-settings-service');
+    this.cacheTTL = 15 * 60 * 1000; // 15 minutes for branding settings (changes rarely)
   }
 
   public static getInstance(): BrandingSettingsSingletonService {
@@ -39,12 +32,13 @@ class BrandingSettingsSingletonService {
 
   async getBrandingSettings(): Promise<PlatformSettings | null> {
     try {
-      const result = await this.client.makeRequest<PlatformSettings>(
-        '/api/platform-settings'
+      const result = await this.makeAuthenticatedRequest<PlatformSettings>(
+        '/api/platform-settings',
+        {},
+        'branding-settings'
       );
 
-      // makeRequest returns ApiResponse<T>, so extract data from response
-      return result?.data || null;
+      return result;
     } catch (error) {
       console.error('[BrandingSettingsSingleton] Failed to get branding settings:', error);
       return null;
@@ -53,7 +47,7 @@ class BrandingSettingsSingletonService {
 
   async updateBrandingSettings(settings: Partial<PlatformSettings>): Promise<PlatformSettings | null> {
     try {
-      const result = await this.client.makeRequest<PlatformSettings>(
+      const result = await this.makeAuthenticatedRequest<PlatformSettings>(
         '/api/platform-settings',
         {
           method: 'POST',
@@ -61,29 +55,15 @@ class BrandingSettingsSingletonService {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(settings),
-        }
+        },
+        'branding-settings'
       );
 
-      // makeRequest returns ApiResponse<T>, so extract data from response
-      return result?.data || null;
+      return result;
     } catch (error) {
       console.error('[BrandingSettingsSingleton] Failed to update branding settings:', error);
       return null;
     }
-  }
-
-  /**
-   * Get performance metrics
-   */
-  public getMetrics() {
-    return this.client.getMetrics();
-  }
-
-  /**
-   * Reset metrics
-   */
-  public resetMetrics(): void {
-    this.client.resetMetrics();
   }
 }
 

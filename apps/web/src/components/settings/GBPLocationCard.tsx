@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { api, API_BASE_URL } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Badge, Skeleton } from '@/components/ui';
 import { 
   MapPin, 
@@ -60,13 +60,11 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
       setError(null);
 
       // Check GBP connection status
-      const statusRes = await api.get(`${API_BASE_URL}/api/google/business/status?tenantId=${tenantId}`);
-      const statusData = statusRes.ok ? await statusRes.json() : null;
+      const statusData = await tenantInfoService.getGBPConnectionStatus(tenantId);
       setGbpConnected(statusData?.data?.isConnected || false);
 
       // Fetch linked location
-      const linkedRes = await api.get(`${API_BASE_URL}/api/google/business/linked-location?tenantId=${tenantId}`);
-      const linkedData = linkedRes.ok ? await linkedRes.json() : null;
+      const linkedData = await tenantInfoService.getGBPLinkedLocation(tenantId);
       setLinkedLocation(linkedData?.data?.location || null);
     } catch (err) {
       console.error('Failed to fetch GBP status:', err);
@@ -80,21 +78,9 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
     try {
       setLoadingLocations(true);
       setError(null);
-      const res = await api.get(`${API_BASE_URL}/api/google/business/locations?tenantId=${tenantId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setGbpLocations(data.data?.locations || []);
-        setShowLocationSelector(true);
-      } else {
-        // Parse error response for user-friendly message
-        try {
-          const errorData = await res.json();
-          const userMessage = errorData.userMessage || errorData.message || 'Failed to fetch GBP locations';
-          setError(userMessage);
-        } catch {
-          setError('Failed to fetch GBP locations');
-        }
-      }
+      const data = await tenantInfoService.getGBPLocations(tenantId);
+      setGbpLocations(data.data?.locations || []);
+      setShowLocationSelector(true);
     } catch (err) {
       console.error('Failed to fetch GBP locations:', err);
       setError('Failed to fetch GBP locations');
@@ -111,24 +97,15 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
       const addressStr = location.address?.addressLines?.join(', ') || '';
       const cityState = [location.address?.locality, location.address?.administrativeArea].filter(Boolean).join(', ');
       const fullAddress = [addressStr, cityState, location.address?.postalCode].filter(Boolean).join(' ');
-
-      const res = await api.post(`${API_BASE_URL}/api/google/business/link-location`, {
-        tenantId,
+      
+      await tenantInfoService.linkGBPLocation(tenantId, location.locationId, location.title || location.name, fullAddress);
+      
+      setLinkedLocation({
         locationId: location.locationId,
-        locationName: location.title || location.name,
+        name: location.title || location.name,
         address: fullAddress,
       });
-      
-      if (res.ok) {
-        setLinkedLocation({
-          locationId: location.locationId,
-          name: location.title || location.name,
-          address: fullAddress,
-        });
-        setShowLocationSelector(false);
-      } else {
-        setError('Failed to link location');
-      }
+      setShowLocationSelector(false);
     } catch (err) {
       console.error('Failed to link location:', err);
       setError('Failed to link location');
@@ -142,15 +119,8 @@ export default function GBPLocationCard({ tenantId }: GBPLocationCardProps) {
       setLinkingLocation(true);
       setError(null);
       
-      const res = await api.post(`${API_BASE_URL}/api/google/business/unlink-location`, {
-        tenantId,
-      });
-      
-      if (res.ok) {
-        setLinkedLocation(null);
-      } else {
-        setError('Failed to unlink location');
-      }
+      await tenantInfoService.unlinkGBPLocation(tenantId);
+      setLinkedLocation(null);
     } catch (err) {
       console.error('Failed to unlink location:', err);
       setError('Failed to unlink location');

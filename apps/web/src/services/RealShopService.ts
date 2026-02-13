@@ -1,11 +1,11 @@
 /**
  * Real Shop Service
  * 
- * Connects to the actual shop management API endpoints using UniversalSingletonClient
+ * Connects to the actual shop management API endpoints using AuthenticatedApiSingleton
  * Follows platform patterns for authentication, caching, and API communication
  */
 
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
 
 export interface ShopData {
   id: string;
@@ -140,20 +140,12 @@ export interface ShopLimitCheck {
   tierName: string;
 }
 
-class RealShopService {
+class RealShopService extends AuthenticatedApiSingleton {
   private static instance: RealShopService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with platform defaults
-    // Auth token is retrieved dynamically for each request
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 5 * 60 * 1000, // 5 minutes
-      enableLogging: true,
-      enableMetrics: true
-    });
+    super('real-shop-service');
+    this.cacheTTL = 5 * 60 * 1000; // 5 minutes for shop data
   }
 
   static getInstance(): RealShopService {
@@ -167,22 +159,15 @@ class RealShopService {
    * Get shop data for a tenant
    */
   async getShop(tenantId: string): Promise<ShopData | null> {
-    console.log('[RealShopService] getShop called with tenantId:', tenantId);
-    
-    if (!tenantId) {
-      console.error('[RealShopService] getShop: tenantId is undefined or null');
-      throw new Error('Tenant ID is required');
-    }
-
     try {
-      // Use UniversalSingletonClient for automatic caching and authentication
-      const result = await this.client.makeRequest<ShopData>(`/api/shop-management/${tenantId}`);
+      // Use makeAuthenticatedRequest for automatic caching and authentication
+      const result = await this.makeAuthenticatedRequest<ShopData>(
+        `/api/shop-management/${tenantId}`,
+        {},
+        `shop-${tenantId}`
+      );
       
-      if (!result.data) {
-        return null;
-      }
-      
-      return result.data;
+      return result;
     } catch (error: any) {
       if (error.message?.includes('404') || error.message?.includes('Not Found')) {
         return null;
@@ -197,16 +182,16 @@ class RealShopService {
    */
   async upsertShop(tenantId: string, data: ShopCreateData | ShopUpdateData): Promise<ShopData> {
     try {
-      const result = await this.client.makeRequest<ShopData>(`/api/shop-management/${tenantId}`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      const result = await this.makeAuthenticatedRequest<ShopData>(
+        `/api/shop-management/${tenantId}`,
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        },
+        `shop-upsert-${tenantId}`
+      );
       
-      if (!result.data) {
-        throw new Error('No data returned from API');
-      }
-      
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Error saving shop:', error);
       throw error;
@@ -218,16 +203,16 @@ class RealShopService {
    */
   async updateShop(tenantId: string, data: ShopUpdateData): Promise<ShopData> {
     try {
-      const result = await this.client.makeRequest<ShopData>(`/api/shop-management/${tenantId}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      });
+      const result = await this.makeAuthenticatedRequest<ShopData>(
+        `/api/shop-management/${tenantId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        },
+        `shop-update-${tenantId}`
+      );
       
-      if (!result.data) {
-        throw new Error('No data returned from API');
-      }
-      
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Error updating shop:', error);
       throw error;
@@ -239,15 +224,15 @@ class RealShopService {
    */
   async publishShop(tenantId: string): Promise<ShopData> {
     try {
-      const result = await this.client.makeRequest<ShopData>(`/api/shop-management/${tenantId}/publish`, {
-        method: 'POST',
-      });
+      const result = await this.makeAuthenticatedRequest<ShopData>(
+        `/api/shop-management/${tenantId}/publish`,
+        {
+          method: 'POST',
+        },
+        `shop-publish-${tenantId}`
+      );
       
-      if (!result.data) {
-        throw new Error('No data returned from API');
-      }
-      
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Error publishing shop:', error);
       throw error;
@@ -259,15 +244,15 @@ class RealShopService {
    */
   async unpublishShop(tenantId: string): Promise<ShopData> {
     try {
-      const result = await this.client.makeRequest<ShopData>(`/api/shop-management/${tenantId}/unpublish`, {
-        method: 'POST',
-      });
+      const result = await this.makeAuthenticatedRequest<ShopData>(
+        `/api/shop-management/${tenantId}/unpublish`,
+        {
+          method: 'POST',
+        },
+        `shop-unpublish-${tenantId}`
+      );
       
-      if (!result.data) {
-        throw new Error('No data returned from API');
-      }
-      
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Error unpublishing shop:', error);
       throw error;
@@ -279,16 +264,16 @@ class RealShopService {
    */
   async updateShopCategory(tenantId: string, categoryId: string): Promise<ShopData> {
     try {
-      const result = await this.client.makeRequest<ShopData>(`/api/shop-management/${tenantId}/category`, {
-        method: 'PUT',
-        body: JSON.stringify({ categoryId }),
-      });
+      const result = await this.makeAuthenticatedRequest<ShopData>(
+        `/api/shop-management/${tenantId}/category`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ categoryId }),
+        },
+        `shop-category-${tenantId}`
+      );
       
-      if (!result.data) {
-        throw new Error('No data returned from API');
-      }
-      
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Error updating shop category:', error);
       throw error;
@@ -304,16 +289,16 @@ class RealShopService {
     colors?: Record<string, string>;
   }): Promise<ShopData> {
     try {
-      const result = await this.client.makeRequest<ShopData>(`/api/shop-management/${tenantId}/branding`, {
-        method: 'PUT',
-        body: JSON.stringify(branding),
-      });
+      const result = await this.makeAuthenticatedRequest<ShopData>(
+        `/api/shop-management/${tenantId}/branding`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(branding),
+        },
+        `shop-branding-${tenantId}`
+      );
       
-      if (!result.data) {
-        throw new Error('No data returned from API');
-      }
-      
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Error updating shop branding:', error);
       throw error;
@@ -333,16 +318,16 @@ class RealShopService {
     sunday?: string;
   }, timezone?: string): Promise<ShopData> {
     try {
-      const result = await this.client.makeRequest<ShopData>(`/api/shop-management/${tenantId}/hours`, {
-        method: 'PUT',
-        body: JSON.stringify({ hours, timezone }),
-      });
+      const result = await this.makeAuthenticatedRequest<ShopData>(
+        `/api/shop-management/${tenantId}/hours`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ hours, timezone }),
+        },
+        `shop-hours-${tenantId}`
+      );
       
-      if (!result.data) {
-        throw new Error('No data returned from API');
-      }
-      
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Error updating shop hours:', error);
       throw error;
@@ -360,16 +345,16 @@ class RealShopService {
     youtube?: string;
   }): Promise<ShopData> {
     try {
-      const result = await this.client.makeRequest<ShopData>(`/api/shop-management/${tenantId}/social`, {
-        method: 'PUT',
-        body: JSON.stringify(socialLinks),
-      });
+      const result = await this.makeAuthenticatedRequest<ShopData>(
+        `/api/shop-management/${tenantId}/social`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(socialLinks),
+        },
+        `shop-social-${tenantId}`
+      );
       
-      if (!result.data) {
-        throw new Error('No data returned from API');
-      }
-      
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Error updating social links:', error);
       throw error;
@@ -381,13 +366,13 @@ class RealShopService {
    */
   async getShopAnalytics(tenantId: string): Promise<ShopAnalytics> {
     try {
-      const result = await this.client.makeRequest<ShopAnalytics>(`/api/shop-management/${tenantId}/analytics`);
+      const result = await this.makeAuthenticatedRequest<ShopAnalytics>(
+        `/api/shop-management/${tenantId}/analytics`,
+        {},
+        `shop-analytics-${tenantId}`
+      );
       
-      if (!result.data) {
-        throw new Error('No data returned from API');
-      }
-      
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Error getting shop analytics:', error);
       throw error;
@@ -399,13 +384,13 @@ class RealShopService {
    */
   async checkShopLimits(tenantId: string): Promise<ShopLimitCheck> {
     try {
-      const result = await this.client.makeRequest<ShopLimitCheck>(`/api/shop-management/${tenantId}/limits`);
+      const result = await this.makeAuthenticatedRequest<ShopLimitCheck>(
+        `/api/shop-management/${tenantId}/limits`,
+        {},
+        `shop-limits-${tenantId}`
+      );
       
-      if (!result.data) {
-        throw new Error('No data returned from API');
-      }
-      
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Error checking shop limits:', error);
       throw error;
@@ -417,9 +402,13 @@ class RealShopService {
    */
   async deleteShop(tenantId: string): Promise<void> {
     try {
-      await this.client.makeRequest<void>(`/api/shop-management/${tenantId}`, {
-        method: 'DELETE',
-      });
+      await this.makeAuthenticatedRequest<void>(
+        `/api/shop-management/${tenantId}`,
+        {
+          method: 'DELETE',
+        },
+        `shop-delete-${tenantId}`
+      );
     } catch (error) {
       console.error('Error deleting shop:', error);
       throw error;
@@ -431,13 +420,13 @@ class RealShopService {
    */
   async getAvailableCategories(): Promise<GBPCategory[]> {
     try {
-      const result = await this.client.makeRequest<GBPCategory[]>('/api/shop-management/categories');
+      const result = await this.makeAuthenticatedRequest<GBPCategory[]>(
+        '/api/shop-management/categories',
+        {},
+        'shop-categories'
+      );
       
-      if (!result.data) {
-        throw new Error('No data returned from API');
-      }
-      
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Error getting available categories:', error);
       throw error;
@@ -449,16 +438,16 @@ class RealShopService {
    */
   async setShopCategory(tenantId: string, categoryId: string): Promise<ShopData> {
     try {
-      const result = await this.client.makeRequest<ShopData>(`/api/shop-management/${tenantId}/category`, {
-        method: 'PUT',
-        body: JSON.stringify({ categoryId }),
-      });
+      const result = await this.makeAuthenticatedRequest<ShopData>(
+        `/api/shop-management/${tenantId}/category`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ categoryId }),
+        },
+        `shop-category-set-${tenantId}`
+      );
       
-      if (!result.data) {
-        throw new Error('No data returned from API');
-      }
-      
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Error setting shop category:', error);
       throw error;

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import {
   resolveTier,
   ResolvedTier,
@@ -112,13 +112,7 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
 
 //      console.log('[useTenantComplete] Fetching consolidated tenant data for:', tenantId);
 
-      const response = await api.get(`/api/tenants/${encodeURIComponent(tenantId)}/complete`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch complete tenant data: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await platformHomeService.getTenantComplete(tenantId);
      /*  console.log('[useTenantComplete] Received consolidated data:', {
         tenant: data.tenant?.id,
         hasTier: !!data.tier,

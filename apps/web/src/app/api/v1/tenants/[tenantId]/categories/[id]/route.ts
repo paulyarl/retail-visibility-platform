@@ -1,4 +1,4 @@
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
@@ -9,28 +9,11 @@ export async function GET(
 ) {
   try {
     const { tenantId, id } = await params;
-
-    // Backend uses /api/tenant/:tenantId/categories (not /api/v1/tenants)
-    const url = `${API_URL}/api/tenant/${tenantId}/categories/${id}`;
-
-    // Forward Authorization header from request
-    const authHeader = request.headers.get('authorization');
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-
-    const response = await api.get(url, {
-      method: 'GET',
-      headers,
-    });
-
-    const data = await response.json();
-
-    return NextResponse.json(data, { status: response.status });
+    
+    // Get tenant category using the singleton service
+    const data = await platformHomeService.getTenantCategory(tenantId, id);
+    
+    return NextResponse.json(data);
   } catch (error) {
     console.error('[API Proxy] Error fetching category:', error);
     return NextResponse.json(
@@ -47,29 +30,11 @@ export async function PATCH(
   try {
     const { tenantId, id } = await params;
     const body = await request.json();
-
-    // Backend uses /api/tenant/:tenantId/categories (not /api/v1/tenants)
-    const url = `${API_URL}/api/tenant/${tenantId}/categories/${id}`;
-
-    // Forward Authorization header from request
-    const authHeader = request.headers.get('authorization');
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-
-    const response = await api.patch(url, body, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    const data = await response.json();
-
-    return NextResponse.json(data, { status: response.status });
+    
+    // Update tenant category using the singleton service
+    const data = await platformHomeService.updateTenantCategory(tenantId, id, body);
+    
+    return NextResponse.json(data);
   } catch (error) {
     console.error('[API Proxy] Error updating category:', error);
     return NextResponse.json(
@@ -85,32 +50,11 @@ export async function DELETE(
 ) {
   try {
     const { tenantId, id } = await params;
-
-    // Backend uses /api/tenant/:tenantId/categories (not /api/v1/tenants)
-    const url = `${API_URL}/api/tenant/${tenantId}/categories/${id}`;
-
-    // Forward Authorization header from request
-    const authHeader = request.headers.get('authorization');
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-
-    const response = await api.delete(url, {
-      method: 'DELETE',
-      headers,
-    });
-
-    if (response.status === 204) {
-      return new NextResponse(null, { status: 204 });
-    }
-
-    const data = await response.json();
-
-    return NextResponse.json(data, { status: response.status });
+    
+    // Delete tenant category using the singleton service
+    const data = await platformHomeService.deleteTenantCategory(tenantId, id);
+    
+    return NextResponse.json(data);
   } catch (error) {
     console.error('[API Proxy] Error deleting category:', error);
     return NextResponse.json(
@@ -127,33 +71,15 @@ export async function PUT(
   try {
     const { tenantId, id } = await params;
     const body = await request.json();
-
-    // Backend uses /api/tenant/:tenantId/categories (not /api/v1/tenants)
-    const url = `${API_URL}/api/tenant/${tenantId}/categories/${id}`;
-
-    // Forward Authorization header from request
-    const authHeader = request.headers.get('authorization');
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-
-    const response = await api.put(url, body, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    const data = await response.json();
-
-    return NextResponse.json(data, { status: response.status });
+    
+    // Create tenant category using the singleton service
+    const data = await platformHomeService.createTenantCategory(tenantId, body);
+    
+    return NextResponse.json(data, { status: 201 });
   } catch (error) {
-    console.error('[API Proxy] Error updating category:', error);
+    console.error('[API Proxy] Error creating category:', error);
     return NextResponse.json(
-      { error: 'Failed to update category' },
+      { error: 'Failed to create category' },
       { status: 500 }
     );
   }

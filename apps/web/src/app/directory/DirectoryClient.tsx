@@ -18,6 +18,8 @@ import DirectoryPopularTags from '@/components/directory/DirectoryPopularTags'; 
 import { Button } from '@mantine/core';
 import { Pagination } from '@/components/ui';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { directoryService } from '@/services/DirectorySingletonService';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import dynamic from 'next/dynamic';
@@ -302,40 +304,19 @@ export default function DirectoryClient() {
         if (typeof window !== 'undefined') {
           localStorage.removeItem(CACHE_CONFIG.categories.key);
         }
-        
+
         let categories = getCachedData(CACHE_CONFIG.categories.key);
         console.log('[DirectoryClient] Categories cache check:', categories ? 'HIT' : 'MISS');
-        
+
         if (!categories) {
-          // Fetch enhanced directory categories with rich insights
-          const categoriesRes = await fetch(`${apiBaseUrl}/api/directory/categories-enhanced`);
-          
-          if (categoriesRes.ok) {
-            const categoriesData = await categoriesRes.json();
-            categories = categoriesData.categories || [];
-            
-            // Cache the fresh data
-            setCachedData(CACHE_CONFIG.categories.key, categories);
+          // Fetch directory categories
+          const categoriesData = await directoryService.getDirectoryCategories();
+
+          if (categoriesData) {
+            categories = categoriesData;
           } else {
-            console.error('Failed to fetch enhanced categories from server, falling back to basic categories');
-            
-            // Fallback to basic categories
-            const fallbackRes = await fetch(`${apiBaseUrl}/api/directory/categories-optimized/counts-by-name`);
-            if (fallbackRes.ok) {
-              const fallbackData = await fallbackRes.json();
-              const counts = fallbackData.counts || {};
-              
-              categories = Object.entries(counts).map(([name, count]) => ({
-                id: name.toLowerCase().replace(/\s+/g, '-'),
-                name: name,
-                slug: name.toLowerCase().replace(/\s+/g, '-'),
-                googleCategoryId: null,
-                storeCount: count as number,
-                productCount: 0,
-              }));
-              
-              setCachedData(CACHE_CONFIG.categories.key, categories);
-            }
+            console.error('Failed to fetch categories from server');
+            categories = [];
           }
         }
         
@@ -351,19 +332,14 @@ export default function DirectoryClient() {
         // console.log('[DirectoryClient] Store types cache check:', storeTypes ? 'HIT' : 'MISS');
         
         if (!storeTypes) {
-          // console.log('[DirectoryClient] Making fresh API call to /api/directory/store-types');
           // Fetch store types
-          const storeTypesRes = await fetch(`${apiBaseUrl}/api/directory/store-types`);
+          const typesData = await directoryService.getDirectoryStoreTypes();
           
-          if (storeTypesRes.ok) {
-            const typesData = await storeTypesRes.json();
-            storeTypes = typesData.data?.storeTypes || [];
-           // console.log('[DirectoryClient] API response:', storeTypes);
-            
-            // Cache the fresh data
-            setCachedData(CACHE_CONFIG.storeTypes.key, storeTypes);
+          if (typesData) {
+            storeTypes = typesData;
           } else {
             console.error('Failed to fetch store types from server');
+            storeTypes = [];
           }
         } else {
           console.log('[DirectoryClient] Using cached store types:', storeTypes);
@@ -794,10 +770,8 @@ function DirectoryHomeRecommendations() {
   useEffect(() => {
     const fetchRecommendations = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${apiUrl}/api/recommendations/for-directory`);
-        const data = await response.json();
-        setRecommendations(data.recommendations || []);
+        const data = await recommendationsService.getDirectoryRecommendations();
+        setRecommendations(data?.recommendations || []);
       } catch (error) {
         console.error('Error fetching directory recommendations:', error);
       } finally {

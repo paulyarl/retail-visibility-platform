@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRateLimitErrorHandler } from './useRateLimitErrorHandler';
 import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/lib/api';
+import { storeStatusService } from '@/services/StoreStatusSingletonService';
 
 export interface StoreStatus {
   isOpen: boolean;
@@ -36,27 +36,15 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
 
       // Use browser cache instead of no-store since we have server-side caching
       //const response = await fetch(`${baseUrl}/public/tenant/${tenantId}/business-hours/status`);
-      const response = await api.get(`${baseUrl}/api/public/tenant/${tenantId}/business-hours/status`);
+      const responseData = await storeStatusService.getStoreStatus(tenantId, baseUrl);
 
-      if (!response.ok) {
-        // Check if this is a rate limit error and handle it with user-friendly messaging
-        if (memoizedHandleRateLimitError(response, `/api/public/tenant/${tenantId}/business-hours/status`)) {
-          // Rate limit error was handled, don't show generic error
-          setError(null);
-          setStatus(null);
-          setLoading(false);
-          return;
-        }
-        throw new Error(`HTTP ${response.status}`);
+      if (!responseData) {
+        setStatus(null);
+        setLoading(false);
+        return;
       }
 
-      const data = await response.json();
-
-      if (data.success && data.data) {
-        setStatus(data.data);
-      } else {
-        throw new Error(data.error || 'Failed to fetch status');
-      }
+      setStatus(responseData);
     } catch (err) {
       console.error('Failed to fetch store status:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');

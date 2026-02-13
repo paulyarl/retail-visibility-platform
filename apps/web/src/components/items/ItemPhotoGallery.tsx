@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button, Input } from "@/components/ui";
-import { api } from "@/lib/api";
+import { itemsService } from "@/services/ItemsSingletonService";
 import { uploadImage, ImageUploadPresets } from "@/lib/image-upload";
 import PhotoSingleton from "@/lib/singletons/PhotoSingleton";
 import { useVariantsSingleton } from "@/lib/singletons/VariantsSingleton";
@@ -127,16 +127,15 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
       const result = await uploadImage(file, ImageUploadPresets.product);
       const dataUrl = result.dataUrl;
 
-      const res = await api.post(`/api/items/${item.id}/photos`, {
+      const res = await itemsService.uploadPhoto(item.id, {
         tenantId,
         dataUrl,
         contentType: "image/jpeg",
         variant_id: selectedVariantId, // Include variant_id if variant is selected
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Upload failed");
+      if (!res) {
+        throw new Error("Upload failed");
       }
 
       await loadPhotos();
@@ -151,14 +150,9 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
 
   const handleSetPrimary = async (photoId: string) => {
     try {
-      const res = await api.put(`/api/items/${item.id}/photos/${photoId}`, {
-        position: 0,
-      }, {
-        // Disable client-side retries since we handle retries in the API route
-        headers: { 'x-no-retry': 'true' }
-      });
+      const res = await itemsService.setPrimaryPhoto(item.id, photoId);
 
-      if (!res.ok) throw new Error("Failed to set primary");
+      if (!res) throw new Error("Failed to set primary");
 
       await loadPhotos();
       onUpdate?.();
@@ -172,8 +166,8 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
     if (!confirm("Delete this photo?")) return;
 
     try {
-      const res = await api.delete(`/api/items/${item.id}/photos/${photoId}`);
-      if (!res.ok) throw new Error("Failed to delete");
+      const res = await itemsService.deletePhoto(item.id, photoId);
+      if (!res) throw new Error("Failed to delete");
 
       await loadPhotos();
       onUpdate?.();
@@ -187,10 +181,9 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
     try {
       setUploading(true);
       setError(null);
-      const res = await api.post(`/api/items/${item.id}/photos/migrate-legacy`, {});
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Migration failed");
+      const res = await itemsService.migrateLegacyPhotos(item.id);
+      if (!res) {
+        throw new Error("Migration failed");
       }
       await loadPhotos();
       onUpdate?.();
@@ -210,12 +203,12 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
 
   const handleEditSave = async (photoId: string) => {
     try {
-      const res = await api.put(`/api/items/${item.id}/photos/${photoId}`, {
+      const res = await itemsService.updatePhoto(item.id, photoId, {
         alt: editAlt || null,
         caption: editCaption || null,
       });
 
-      if (!res.ok) throw new Error("Failed to update");
+      if (!res) throw new Error("Failed to update");
 
       await loadPhotos();
       setEditingId(null);

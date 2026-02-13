@@ -7,7 +7,7 @@ import { Button } from '@mantine/core';
 import { Input } from '@/components/ui/Input';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { CreditCard, Lock, AlertCircle, CheckCircle, Trash2, ShoppingBag, Package } from 'lucide-react';
-import { api } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 import Link from 'next/link';
 import OAuthConnectButton from '@/components/payment-gateways/OAuthConnectButton';
 
@@ -98,16 +98,14 @@ export default function PaymentGatewaysPage() {
   const loadOAuthStatus = async () => {
     try {
       // Load PayPal OAuth status
-      const paypalResponse = await api.get(`/api/oauth/paypal/status?tenantId=${tenantId}`);
-      if (paypalResponse.ok) {
-        const paypalData = await paypalResponse.json();
+      const paypalData = await tenantInfoService.getOAuthStatus(tenantId, 'paypal');
+      if (paypalData) {
         setOauthStatus(prev => ({ ...prev, paypal: paypalData }));
       }
 
       // Load Square OAuth status
-      const squareResponse = await api.get(`/api/oauth/square/status?tenantId=${tenantId}`);
-      if (squareResponse.ok) {
-        const squareData = await squareResponse.json();
+      const squareData = await tenantInfoService.getOAuthStatus(tenantId, 'square');
+      if (squareData) {
         setOauthStatus(prev => ({ ...prev, square: squareData }));
       }
     } catch (err) {
@@ -126,10 +124,8 @@ export default function PaymentGatewaysPage() {
       console.log('- localStorage auth_token:', localStorage.getItem('auth_token') ? 'present' : 'missing');
       console.log('- Cookie auth_token:', document.cookie.includes('auth_token') ? 'present' : 'missing');
       
-      const response = await api.get(`/api/tenants/${tenantId}/payment-gateways`);
-      if (!response.ok) throw new Error('Failed to load payment gateways');
-      const data = await response.json();
-      setGateways(data.gateways || []);
+      const gateways = await tenantInfoService.getPaymentGateways(tenantId);
+      setGateways(gateways || []);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -166,7 +162,7 @@ export default function PaymentGatewaysPage() {
       
       const method = editingPayPalId ? 'put' : 'post';
       
-      const response = await api[method](url, {
+      const data = await tenantInfoService.savePayPalGateway(tenantId, {
         gateway_type: 'paypal',
         mode: paypalForm.mode,
         client_id: paypalForm.client_id,
@@ -175,9 +171,9 @@ export default function PaymentGatewaysPage() {
         is_active: paypalForm.is_active,
         is_default: paypalForm.is_default,
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save PayPal configuration');
+      
+      if (!data) {
+        throw new Error('Failed to save PayPal configuration');
       }
       setSaveSuccess(true);
       setShowPayPalForm(false);
@@ -228,7 +224,7 @@ export default function PaymentGatewaysPage() {
       
       const method = editingSquareId ? 'put' : 'post';
       
-      const response = await api[method](url, {
+      const data = await tenantInfoService.saveSquareGateway(tenantId, {
         gateway_type: 'square',
         environment: squareForm.environment,
         application_id: squareForm.application_id,
@@ -238,9 +234,9 @@ export default function PaymentGatewaysPage() {
         is_active: squareForm.is_active,
         is_default: squareForm.is_default,
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save Square configuration');
+      
+      if (!data) {
+        throw new Error('Failed to save Square configuration');
       }
       setSaveSuccess(true);
       setShowSquareForm(false);
@@ -264,10 +260,9 @@ export default function PaymentGatewaysPage() {
 
   const handleToggleActive = async (gatewayId: string, currentStatus: boolean) => {
     try {
-      const response = await api.patch(`/api/tenants/${tenantId}/payment-gateways/${gatewayId}`, {
-        is_active: !currentStatus,
-      });
-      if (!response.ok) throw new Error('Failed to update gateway status');
+      const result = await tenantInfoService.updatePaymentGatewayStatus(tenantId, gatewayId, !currentStatus);
+      
+      if (!result) throw new Error('Failed to update gateway status');
       await loadGateways();
     } catch (err: any) {
       setError(err.message);
@@ -276,8 +271,9 @@ export default function PaymentGatewaysPage() {
 
   const handleSetDefault = async (gatewayId: string) => {
     try {
-      const response = await api.post(`/api/tenants/${tenantId}/payment-gateways/${gatewayId}/set-default`);
-      if (!response.ok) throw new Error('Failed to set default gateway');
+      const result = await tenantInfoService.setDefaultPaymentGateway(tenantId, gatewayId);
+      
+      if (!result) throw new Error('Failed to set default gateway');
       await loadGateways();
     } catch (err: any) {
       setError(err.message);
@@ -287,8 +283,9 @@ export default function PaymentGatewaysPage() {
   const handleDelete = async (gatewayId: string) => {
     if (!confirm('Are you sure you want to delete this payment gateway?')) return;
     try {
-      const response = await api.delete(`/api/tenants/${tenantId}/payment-gateways/${gatewayId}`);
-      if (!response.ok) throw new Error('Failed to delete gateway');
+      const result = await tenantInfoService.deletePaymentGateway(tenantId, gatewayId);
+      
+      if (!result) throw new Error('Failed to delete gateway');
       await loadGateways();
     } catch (err: any) {
       setError(err.message);

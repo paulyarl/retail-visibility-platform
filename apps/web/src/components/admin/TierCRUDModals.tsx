@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button, Spinner, Badge, Tooltip } from '@/components/ui';
-import { api } from '@/lib/api';
+import { adminSecurityMonitoringService } from '@/services/AdminSecurityMonitoringSingletonService';
 
 interface TierFeature {
   id: string;
@@ -793,21 +793,17 @@ export function AddFeatureModal({ isOpen, tier, onClose, onSubmit, submitting }:
   // Load existing features when modal opens
   useEffect(() => {
     if (isOpen) {
-      loadExistingFeatures();
+      loadFeatures();
     }
   }, [isOpen]);
 
-  const loadExistingFeatures = async () => {
+  const loadFeatures = async () => {
     setLoadingFeatures(true);
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.get(`${apiBaseUrl}/api/admin/tier-system/features`);
-      if (response.ok) {
-        const data = await response.json();
-        setExistingFeatures(data.features || []);
-      }
+      const features = await adminSecurityMonitoringService.getTierSystemFeatures();
+      setExistingFeatures(features);
     } catch (error) {
-      console.error('Failed to load existing features:', error);
+      console.error('Failed to load tier features:', error);
     } finally {
       setLoadingFeatures(false);
     }

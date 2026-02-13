@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { 
   ArrowLeft,
@@ -97,11 +97,10 @@ export default function GBPAdvancedFeaturesPage() {
         setLoading(true);
 
         // Check GBP connection
-        const gbpRes = await api.get(`${API_BASE_URL}/api/google/business/status?tenantId=${tenantId}`);
-        const gbpData = gbpRes.ok ? await gbpRes.json() : null;
-        setGbpConnected(gbpData?.data?.isConnected || false);
+        const gbpData = await platformHomeService.getGoogleGBPStatus(tenantId);
+        setGbpConnected(gbpData?.isConnected || false);
 
-        if (gbpData?.data?.isConnected) {
+        if (gbpData?.isConnected) {
           // Fetch reviews by default
           await fetchReviews();
         }
@@ -119,11 +118,8 @@ export default function GBPAdvancedFeaturesPage() {
 
   async function fetchMedia() {
     try {
-      const res = await api.get(`${API_BASE_URL}/api/google/business/media?tenantId=${tenantId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setMedia(data.data || []);
-      }
+      const data = await platformHomeService.getGoogleBusinessMedia(tenantId);
+      setMedia(data.data || []);
     } catch (error) {
       console.error('Failed to fetch media:', error);
     }
@@ -131,11 +127,8 @@ export default function GBPAdvancedFeaturesPage() {
 
   async function fetchPosts() {
     try {
-      const res = await api.get(`${API_BASE_URL}/api/google/business/posts?tenantId=${tenantId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setPosts(data.data || []);
-      }
+      const data = await platformHomeService.getGoogleBusinessPosts(tenantId);
+      setPosts(data.data || []);
     } catch (error) {
       console.error('Failed to fetch posts:', error);
     }
@@ -143,15 +136,12 @@ export default function GBPAdvancedFeaturesPage() {
 
   async function fetchReviews() {
     try {
-      const res = await api.get(`${API_BASE_URL}/api/google/business/reviews?tenantId=${tenantId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setReviews(data.data?.reviews || []);
-        setReviewStats({
-          averageRating: data.data?.averageRating,
-          totalReviewCount: data.data?.totalReviewCount,
-        });
-      }
+      const data = await platformHomeService.getGoogleBusinessReviews(tenantId);
+      setReviews(data.data?.reviews || []);
+      setReviewStats({
+        averageRating: data.data?.averageRating,
+        totalReviewCount: data.data?.totalReviewCount,
+      });
     } catch (error) {
       console.error('Failed to fetch reviews:', error);
     }
@@ -159,11 +149,8 @@ export default function GBPAdvancedFeaturesPage() {
 
   async function fetchAttributes() {
     try {
-      const res = await api.get(`${API_BASE_URL}/api/google/business/attributes?tenantId=${tenantId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setAttributes(data.data || []);
-      }
+      const data = await platformHomeService.getGoogleBusinessAttributes(tenantId);
+      setAttributes(data.data || []);
     } catch (error) {
       console.error('Failed to fetch attributes:', error);
     }
@@ -173,15 +160,9 @@ export default function GBPAdvancedFeaturesPage() {
     if (!photoUrl) return;
     try {
       setUploadingPhoto(true);
-      const res = await api.post(`${API_BASE_URL}/api/google/business/media`, {
-        tenantId,
-        photoUrl,
-        category: photoCategory,
-      });
-      if (res.ok) {
-        setPhotoUrl('');
-        await fetchMedia();
-      }
+      await platformHomeService.uploadGoogleBusinessMedia(tenantId, photoUrl, photoCategory);
+      setPhotoUrl('');
+      await fetchMedia();
     } catch (error) {
       console.error('Failed to upload photo:', error);
     } finally {
@@ -193,15 +174,9 @@ export default function GBPAdvancedFeaturesPage() {
     if (!newPostSummary) return;
     try {
       setCreatingPost(true);
-      const res = await api.post(`${API_BASE_URL}/api/google/business/posts`, {
-        tenantId,
-        summary: newPostSummary,
-        topicType: 'STANDARD',
-      });
-      if (res.ok) {
-        setNewPostSummary('');
-        await fetchPosts();
-      }
+      await platformHomeService.createGoogleBusinessPost(tenantId, newPostSummary, 'STANDARD');
+      setNewPostSummary('');
+      await fetchPosts();
     } catch (error) {
       console.error('Failed to create post:', error);
     } finally {
@@ -213,15 +188,10 @@ export default function GBPAdvancedFeaturesPage() {
     if (!replyText) return;
     try {
       setSendingReply(true);
-      const res = await api.post(`${API_BASE_URL}/api/google/business/reviews/${encodeURIComponent(reviewName)}/reply`, {
-        tenantId,
-        comment: replyText,
-      });
-      if (res.ok) {
-        setReplyText('');
-        setReplyingTo(null);
-        await fetchReviews();
-      }
+      await platformHomeService.replyGoogleBusinessReview(tenantId, reviewName, replyText);
+      setReplyText('');
+      setReplyingTo(null);
+      await fetchReviews();
     } catch (error) {
       console.error('Failed to reply to review:', error);
     } finally {
@@ -232,13 +202,8 @@ export default function GBPAdvancedFeaturesPage() {
   async function handleSaveCommonAttributes() {
     try {
       setSavingAttributes(true);
-      const res = await api.post(`${API_BASE_URL}/api/google/business/attributes/common`, {
-        tenantId,
-        ...commonAttrs,
-      });
-      if (res.ok) {
-        await fetchAttributes();
-      }
+      await platformHomeService.saveGoogleBusinessCommonAttributes(tenantId, commonAttrs);
+      await fetchAttributes();
     } catch (error) {
       console.error('Failed to save attributes:', error);
     } finally {

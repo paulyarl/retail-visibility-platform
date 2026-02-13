@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
 
 export interface StorefrontCategory {
   id: string;
@@ -37,19 +37,12 @@ export interface DirectoryListing {
   [key: string]: any;
 }
 
-class StorefrontSingletonService {
+class StorefrontSingletonService extends PublicApiSingleton {
   private static instance: StorefrontSingletonService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with platform defaults
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 5 * 60 * 1000, // 5 minutes for storefront data
-      enableLogging: true,
-      enableMetrics: true
-    });
+    super('storefront-singleton');
+    this.cacheTTL = 5 * 60 * 1000; // 5 minutes for storefront data
   }
 
   public static getInstance(): StorefrontSingletonService {
@@ -73,16 +66,18 @@ class StorefrontSingletonService {
     }
 
     try {
-      const result = await this.client.makeRequest<{
+      const result = await this.makePublicRequest<{
         categories: StorefrontCategory[];
         uncategorizedCount: number;
       }>(
-        `/api/storefront/${tenantId}/categories`
+        `/api/storefront/${tenantId}/categories`,
+        {},
+        `storefront-categories-${tenantId}`
       );
       
       return {
-        categories: result.data?.categories || [],
-        uncategorizedCount: result.data?.uncategorizedCount || 0
+        categories: result.categories || [],
+        uncategorizedCount: result.uncategorizedCount || 0
       };
     } catch (error) {
       console.error('[StorefrontSingleton] Failed to get storefront categories:', error);
@@ -125,9 +120,17 @@ class StorefrontSingletonService {
 
       const endpoint = `/api/storefront/${tenantId}/products?${queryParams.toString()}`;
       
-      const result = await this.client.makeRequest<any>(endpoint);
+      const result = await this.makePublicRequest<{
+        items: StorefrontProduct[];
+        pagination?: {
+          totalItems: number;
+          currentPage: number;
+          totalPages: number;
+        };
+        total?: number;
+      }>(endpoint, {}, `storefront-products-${tenantId}-${options.page || 1}-${options.limit || 10}-${options.search || ''}-${options.category || ''}`);
       
-      return result.data || { items: [] };
+      return result || { items: [] };
     } catch (error) {
       console.error('[StorefrontSingleton] Failed to get storefront products:', error);
       return { items: [] };
@@ -160,15 +163,12 @@ class StorefrontSingletonService {
 
       const endpoint = `/api/storefront/${tenantId}/featured-products?${queryParams.toString()}`;
       
-      const result = await this.client.makeRequest<any>(endpoint);
+      const result = await this.makePublicRequest<{
+        items: StorefrontProduct[];
+        count?: number;
+      }>(endpoint, {}, `featured-products-${tenantId}-${options.limit || 10}-${options.search || ''}`);
       
-      // Return the raw API response mapped to expected format
-      // Cast to any since the response structure varies by endpoint
-      const response = result as any;
-      return {
-        items: response?.items || [],
-        count: response?.totalCount || response?.count
-      };
+      return result || { items: [] };
     } catch (error) {
       console.error('[StorefrontSingleton] Failed to get featured products:', error);
       return { items: [] };
@@ -186,11 +186,13 @@ class StorefrontSingletonService {
     }
 
     try {
-      const result = await this.client.makeRequest<DirectoryListing>(
-        `/api/directory/${tenantId}`
+      const result = await this.makePublicRequest<DirectoryListing>(
+        `/api/directory/${tenantId}`,
+        {},
+        `directory-listing-${tenantId}`
       );
       
-      return result.data || null;
+      return result || null;
     } catch (error) {
       console.error('[StorefrontSingleton] Failed to get directory listing:', error);
       return null;
@@ -208,34 +210,23 @@ class StorefrontSingletonService {
     }
 
     try {
-      const result = await this.client.makeRequest<{
+      const result = await this.makePublicRequest<{
         pagination?: {
           totalItems: number;
         };
       }>(
-        `/api/storefront/${tenantId}/products?page=1&limit=1`
+        `/api/storefront/${tenantId}/products?page=1&limit=1`,
+        {},
+        `total-product-count-${tenantId}`
       );
       
-      return result.data?.pagination?.totalItems || 0;
+      return result?.pagination?.totalItems || 0;
     } catch (error) {
       console.error('[StorefrontSingleton] Failed to get total product count:', error);
       return 0;
     }
   }
 
-  /**
-   * Get performance metrics
-   */
-  public getMetrics() {
-    return this.client.getMetrics();
-  }
-
-  /**
-   * Reset metrics
-   */
-  public resetMetrics(): void {
-    this.client.resetMetrics();
-  }
 }
 
 // Export singleton instance

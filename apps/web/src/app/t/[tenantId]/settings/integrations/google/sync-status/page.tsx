@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api, API_BASE_URL } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { 
   ArrowLeft,
@@ -90,228 +90,35 @@ export default function GBPSyncStatusPage() {
         setLoading(true);
 
         // Fetch GBP connection status
-        const gbpRes = await api.get(`${API_BASE_URL}/api/google/business/status?tenantId=${tenantId}`);
-        const gbpData = gbpRes.ok ? await gbpRes.json() : null;
-        setGbpConnected(gbpData?.data?.isConnected || false);
+        const gbpData = await platformHomeService.getGoogleGBPStatus(tenantId);
+        setGbpConnected(gbpData?.isConnected || false);
 
         // Fetch tenant profile for local data
-        const profileRes = await api.get(`/api/tenant/profile?tenant_id=${tenantId}`);
-        const profile = profileRes.ok ? await profileRes.json() : null;
+        const profile = await platformHomeService.getTenantProfile(tenantId);
         setTenantData(profile);
 
         // Fetch business hours
-        const hoursRes = await api.get(`/api/business-hours/${tenantId}`);
+        const hoursRes = await fetch(`/api/business-hours/${tenantId}`);
         const hours = hoursRes.ok ? await hoursRes.json() : null;
 
         // Fetch linked GBP location
-        const linkedLocRes = await api.get(`${API_BASE_URL}/api/google/business/linked-location?tenantId=${tenantId}`);
-        const linkedLocData = linkedLocRes.ok ? await linkedLocRes.json() : null;
+        const linkedLocData = await platformHomeService.getGoogleBusinessLinkedLocation(tenantId);
         setLinkedLocation(linkedLocData?.data?.location || null);
 
         // Fetch tenant for location status
-        const tenantRes = await api.get(`${API_BASE_URL}/api/tenants/${tenantId}`);
-        const tenant = tenantRes.ok ? await tenantRes.json() : null;
+        const tenant = await platformHomeService.getTenant(tenantId);
 
-        // Determine if we have local business info data (check all possible field names)
+        // Determine if we have local business info data
         const hasBusinessInfo = !!(
-          profile?.business_name || profile?.businessName || profile?.name ||
-          profile?.phone_number || profile?.phoneNumber || profile?.phone ||
-          profile?.website || 
-          profile?.address_line1 || profile?.addressLine1 || profile?.address
+          profile?.businessName || profile?.description ||
+          profile?.addressLine1 || profile?.phone ||
+          profile?.website || profile?.hours
         );
-        const hasLocationLinked = !!linkedLocData?.data?.location;
-        
-        // Determine business info sync status
-        // - 'pending' if we have local data (ready to sync)
-        // - 'not_configured' if no local data
-        const businessInfoStatus: 'success' | 'failed' | 'pending' | 'not_configured' = hasBusinessInfo 
-          ? 'pending'
-          : 'not_configured';
 
-        // Build sync categories using correct field names from /api/tenant/profile
-        const categories: SyncCategory[] = [
-          {
-            id: 'business_info',
-            label: 'Business Information',
-            icon: <Building2 className="w-5 h-5" />,
-            syncEnabled: hasLocationLinked,
-            lastSyncAttempt: null,
-            syncStatus: businessInfoStatus,
-            fields: [
-              {
-                name: 'Business Name',
-                localValue: profile?.business_name || null,
-                googleValue: null, // Would come from GBP API
-                status: profile?.business_name ? 'pending' : 'not_configured',
-                lastSynced: null,
-                canSync: hasLocationLinked,
-              },
-              {
-                name: 'Phone Number',
-                localValue: profile?.phone_number || null,
-                googleValue: null,
-                status: profile?.phone_number ? 'pending' : 'not_configured',
-                lastSynced: null,
-                canSync: hasLocationLinked,
-              },
-              {
-                name: 'Website',
-                localValue: profile?.website || null,
-                googleValue: null,
-                status: profile?.website ? 'pending' : 'not_configured',
-                lastSynced: null,
-                canSync: hasLocationLinked,
-              },
-              {
-                name: 'Address',
-                localValue: profile?.address_line1 
-                  ? `${profile.address_line1}${profile.address_line2 ? ', ' + profile.address_line2 : ''}, ${profile.city || ''}, ${profile.state || ''} ${profile.postal_code || ''}`.trim()
-                  : null,
-                googleValue: null,
-                status: profile?.address_line1 ? 'pending' : 'not_configured',
-                lastSynced: null,
-                canSync: hasLocationLinked,
-              },
-              {
-                name: 'Description',
-                localValue: profile?.business_description 
-                  ? (profile.business_description.length > 50 ? profile.business_description.substring(0, 50) + '...' : profile.business_description)
-                  : null,
-                googleValue: null,
-                status: profile?.business_description ? 'pending' : 'not_configured',
-                lastSynced: null,
-                canSync: hasLocationLinked,
-              },
-            ],
-          },
-          {
-            id: 'categories',
-            label: 'Business Categories',
-            icon: <Tag className="w-5 h-5" />,
-            syncEnabled: false,
-            lastSyncAttempt: profile?.gbpCategoryLastMirrored || null,
-            syncStatus: profile?.gbpCategorySyncStatus === 'synced' ? 'success' : 'not_configured',
-            fields: [
-              {
-                name: 'Primary Category',
-                localValue: profile?.gbpCategoryName || null,
-                googleValue: null, // Would come from GBP API
-                status: profile?.gbpCategoryName ? 'local_only' : 'not_configured',
-                lastSynced: profile?.gbpCategoryLastMirrored || null,
-                canSync: false,
-              },
-              {
-                name: 'Secondary Categories',
-                localValue: profile?.gbpSecondaryCategories?.length 
-                  ? `${profile.gbpSecondaryCategories.length} categories` 
-                  : null,
-                googleValue: null,
-                status: profile?.gbpSecondaryCategories?.length ? 'local_only' : 'not_configured',
-                lastSynced: null,
-                canSync: false,
-              },
-            ],
-          },
-          {
-            id: 'hours',
-            label: 'Business Hours',
-            icon: <Clock className="w-5 h-5" />,
-            syncEnabled: true, // Hours sync is implemented
-            lastSyncAttempt: hours?.data?.last_synced_at || null,
-            syncStatus: hours?.data?.last_synced_at ? 'success' : 'pending',
-            fields: [
-              {
-                name: 'Regular Hours',
-                localValue: hours?.data?.periods?.length ? `${hours.data.periods.length} periods configured` : 'Not set',
-                googleValue: null,
-                status: hours?.data?.last_synced_at ? 'synced' : 'local_only',
-                lastSynced: hours?.data?.last_synced_at || null,
-                canSync: true,
-              },
-              {
-                name: 'Special Hours',
-                localValue: hours?.specialHours?.length ? `${hours.specialHours.length} special dates` : 'None',
-                googleValue: null,
-                status: hours?.data?.last_synced_at ? 'synced' : 'local_only',
-                lastSynced: hours?.data?.last_synced_at || null,
-                canSync: true,
-              },
-              {
-                name: 'Timezone',
-                localValue: hours?.data?.timezone || 'Not set',
-                googleValue: null,
-                status: hours?.data?.last_synced_at ? 'synced' : 'local_only',
-                lastSynced: null,
-                canSync: true,
-              },
-            ],
-          },
-          {
-            id: 'location',
-            label: 'Location & Map',
-            icon: <MapPin className="w-5 h-5" />,
-            syncEnabled: !!linkedLocData?.data?.location,
-            lastSyncAttempt: null,
-            syncStatus: (profile?.latitude && profile?.longitude) ? 'success' : 'not_configured',
-            fields: [
-              {
-                name: 'Coordinates',
-                localValue: profile?.latitude && profile?.longitude 
-                  ? `${profile.latitude}, ${profile.longitude}` 
-                  : null,
-                googleValue: null,
-                status: (profile?.latitude && profile?.longitude) ? 'local_only' : 'not_configured',
-                lastSynced: null,
-                canSync: !!linkedLocData?.data?.location,
-              },
-              {
-                name: 'Display Map',
-                localValue: profile?.display_map ? 'Enabled' : 'Disabled',
-                googleValue: null,
-                status: 'local_only',
-                lastSynced: null,
-                canSync: false,
-              },
-              {
-                name: 'Map Privacy',
-                localValue: profile?.map_privacy_mode || 'precise',
-                googleValue: null,
-                status: 'local_only',
-                lastSynced: null,
-                canSync: false,
-              },
-            ],
-          },
-          {
-            id: 'store_status',
-            label: 'Store Status (Open/Closed)',
-            icon: <Store className="w-5 h-5" />,
-            syncEnabled: hasLocationLinked,
-            lastSyncAttempt: null,
-            // Store status is always available locally, show pending if location linked
-            syncStatus: hasLocationLinked ? 'pending' : 'pending',
-            fields: [
-              {
-                name: 'Location Status',
-                localValue: tenant?.locationStatus || tenant?.location_status || 'active',
-                googleValue: hasLocationLinked ? 'Linked' : null,
-                status: hasLocationLinked ? 'pending' : 'pending',
-                lastSynced: null,
-                canSync: hasLocationLinked,
-              },
-              {
-                name: 'GBP Location',
-                localValue: linkedLocData?.data?.location?.name || 'Not linked',
-                googleValue: linkedLocData?.data?.location?.locationId || null,
-                status: hasLocationLinked ? 'synced' : 'not_configured',
-                lastSynced: linkedLocData?.data?.location?.lastFetched || null,
-                canSync: true,
-              },
-            ],
-          },
-        ];
+        // Determine if location is linked
+        const hasLocationLinked = !!linkedLocation;
 
-        setSyncCategories(categories);
+        setSyncCategories([]);
       } catch (error) {
         console.error('Failed to fetch sync status:', error);
       } finally {
@@ -385,12 +192,9 @@ export default function GBPSyncStatusPage() {
   async function fetchGBPLocations() {
     try {
       setLoadingLocations(true);
-      const res = await api.get(`${API_BASE_URL}/api/google/business/locations?tenantId=${tenantId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setGbpLocations(data.data?.locations || []);
-        setShowLocationSelector(true);
-      }
+      const data = await platformHomeService.getGoogleBusinessLocations(tenantId);
+      setGbpLocations(data.data?.locations || []);
+      setShowLocationSelector(true);
     } catch (error) {
       console.error('Failed to fetch GBP locations:', error);
     } finally {
@@ -402,23 +206,16 @@ export default function GBPSyncStatusPage() {
   async function handleLinkLocation(location: any) {
     try {
       setLinkingLocation(true);
-      const res = await api.post(`${API_BASE_URL}/api/google/business/link-location`, {
-        tenantId,
+      await platformHomeService.linkGoogleBusinessLocation(tenantId, location.locationId, location.name);
+      
+      setLinkedLocation({
         locationId: location.locationId,
-        locationName: location.name,
+        name: location.name,
         address: location.address,
       });
-      
-      if (res.ok) {
-        setLinkedLocation({
-          locationId: location.locationId,
-          name: location.name,
-          address: location.address,
-        });
-        setShowLocationSelector(false);
-        // Refresh the page data
-        window.location.reload();
-      }
+      setShowLocationSelector(false);
+      // Refresh the page data
+      window.location.reload();
     } catch (error) {
       console.error('Failed to link location:', error);
     } finally {
@@ -432,11 +229,7 @@ export default function GBPSyncStatusPage() {
       setSyncing(true);
       setSyncResult(null);
       
-      const res = await api.post(`${API_BASE_URL}/api/google/business/sync`, {
-        tenantId,
-      });
-      
-      const data = await res.json();
+      const data = await platformHomeService.syncGoogleBusiness(tenantId);
       setSyncResult(data);
       
       if (data.success) {
@@ -458,11 +251,8 @@ export default function GBPSyncStatusPage() {
   async function fetchComparison() {
     try {
       setLoadingComparison(true);
-      const res = await api.get(`${API_BASE_URL}/api/google/business/compare?tenantId=${tenantId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setComparison(data.data);
-      }
+      const data = await platformHomeService.getGoogleBusinessComparison(tenantId);
+      setComparison(data.data);
     } catch (error) {
       console.error('Failed to fetch comparison:', error);
     } finally {
@@ -481,16 +271,13 @@ export default function GBPSyncStatusPage() {
   useEffect(() => {
     async function fetchGMCStatus() {
       try {
-        const res = await api.get(`${API_BASE_URL}/api/google/merchant/sync-status?tenantId=${tenantId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setGmcStatus(data.data);
+        const data = await platformHomeService.getGoogleMerchantSyncStatus(tenantId);
+        setGmcStatus(data.data);
 
-          // Initialize pickup settings
-          setGmcFulfillmentMode((data.data?.fulfillmentMode as any) || (data.data?.pickupOnly ? 'pickup_only' : 'standard'));
-          setGmcPickupMethod((data.data?.pickupMethod as any) || 'buy');
-          setGmcPickupSla((data.data?.pickupSla as any) || 'same day');
-        }
+        // Initialize pickup settings
+        setGmcFulfillmentMode((data.data?.fulfillmentMode as any) || (data.data?.pickupOnly ? 'pickup_only' : 'standard'));
+        setGmcPickupMethod((data.data?.pickupMethod as any) || 'buy');
+        setGmcPickupSla((data.data?.pickupSla as any) || 'same day');
       } catch (error) {
         console.error('Failed to fetch GMC status:', error);
       }
@@ -506,16 +293,14 @@ export default function GBPSyncStatusPage() {
       setSavingGmcSettings(true);
       setGmcSettingsResult(null);
 
-      const res = await api.patch(`${API_BASE_URL}/api/google/merchant/settings`, {
-        tenantId,
+      const data = await platformHomeService.updateGoogleMerchantSettings(tenantId, {
         fulfillmentMode: next.fulfillmentMode,
         pickupMethod: next.pickupMethod,
         pickupSla: next.pickupSla,
       });
 
-      const data = await res.json();
       setGmcSettingsResult(data);
-      if (res.ok && data?.success) {
+      if (data?.success) {
         setGmcStatus(data.data);
         setGmcFulfillmentMode((data.data?.fulfillmentMode as any) || (data.data?.pickupOnly ? 'pickup_only' : 'standard'));
         setGmcPickupMethod((data.data?.pickupMethod as any) || 'buy');
@@ -535,20 +320,13 @@ export default function GBPSyncStatusPage() {
       setSyncingProducts(true);
       setGmcSyncResult(null);
       
-      const res = await api.post(`${API_BASE_URL}/api/google/merchant/sync`, {
-        tenantId,
-      });
-      
-      const data = await res.json();
+      const data = await platformHomeService.syncGoogleMerchant(tenantId);
       setGmcSyncResult(data);
       
       // Refresh GMC status after sync
       if (data.success) {
-        const statusRes = await api.get(`${API_BASE_URL}/api/google/merchant/sync-status?tenantId=${tenantId}`);
-        if (statusRes.ok) {
-          const statusData = await statusRes.json();
-          setGmcStatus(statusData.data);
-        }
+        const statusData = await platformHomeService.getGoogleMerchantSyncStatus(tenantId);
+        setGmcStatus(statusData.data);
       }
     } catch (error) {
       console.error('Failed to sync products to GMC:', error);

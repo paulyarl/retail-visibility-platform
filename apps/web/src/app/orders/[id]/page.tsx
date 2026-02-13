@@ -17,6 +17,7 @@ import {
   Calendar,
   Download
 } from 'lucide-react';
+import { customerOrderService } from '@/services/CustomerOrderService';
 
 interface OrderDetails {
   orderId: string;
@@ -114,10 +115,9 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
 
   const fetchOrderDetails = async () => {
     try {
-      const response = await fetch(`/api/orders/${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setOrder(data.order);
+      const data = await customerOrderService.getOrder(id);
+      if (data) {
+        setOrder(data);
       }
     } catch (error) {
       console.error('Failed to fetch order details:', error);
@@ -131,13 +131,9 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
     
     try {
       setLoadingDownloads(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await fetch(`${apiUrl}/api/download/orders/${order.orderId}/downloads`);
       
-      if (response.ok) {
-        const data = await response.json();
-        setDigitalDownloads(data.downloads || []);
-      }
+      const data = await customerOrderService.getOrderDownloads(order.orderId);
+      setDigitalDownloads(data?.downloads || []);
     } catch (error) {
       console.error('Error fetching digital downloads:', error);
     } finally {

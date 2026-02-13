@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import TenantShell from './TenantShell';
 import { TenantOption } from './TenantSwitcher';
-import { api } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 
 interface ClientTenantShellProps {
   tenantId: string;
@@ -29,11 +29,9 @@ export default function ClientTenantShell({
   useEffect(() => {
     const fetchTenantData = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await api.get(`${apiBaseUrl}/api/tenants/${encodeURIComponent(tenantId)}`);
+        const tenantData = await tenantInfoService.getTenantInfo(tenantId);
         
-        if (response.ok) {
-          const tenantData = await response.json();
+        if (tenantData) {
           setTenantName(tenantData.name || tenantId);
           setTenantLogoUrl(tenantData.metadata?.logo_url);
         }

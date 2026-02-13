@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { api, API_BASE_URL as API_URL } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 
 // User type
 
@@ -41,7 +41,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_BASE_URL = API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
 // Token management
 const TOKEN_KEY = 'access_token';
@@ -176,43 +176,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Only make API call if no valid cache or force refresh requested
       console.log('[AuthContext] Fetching fresh user data from API');
-      const response = await api.get(`${API_BASE_URL}/auth/me`);
+      const data = await tenantInfoService.getCurrentUser();
 
-      if (response.ok) {
-        const data = await response.json();
+      // Transform API response from snake_case to camelCase
+      const transformedUser = {
+        ...data.user,
+        firstName: data.user.first_name,
+        lastName: data.user.last_name,
+        emailVerified: data.user.email_verified,
+        // Remove snake_case fields
+        first_name: undefined,
+        last_name: undefined,
+        email_verified: undefined,
+      };
 
-        // Transform API response from snake_case to camelCase
-        const transformedUser = {
-          ...data.user,
-          firstName: data.user.first_name,
-          lastName: data.user.last_name,
-          emailVerified: data.user.email_verified,
-          // Remove snake_case fields
-          first_name: undefined,
-          last_name: undefined,
-          email_verified: undefined,
-        };
-
-        setUser(transformedUser);
-        
-        // Cache the authenticated user data
-        setCachedUser(transformedUser, currentTenantId);
-        
-        // Set current tenant if not set
-        if (!currentTenantId && transformedUser && transformedUser.tenants && transformedUser.tenants.length > 0) {
-          const savedTenantId = localStorage.getItem(TENANT_KEY);
-          const tenantExists = transformedUser.tenants.find((t: any) => t.id === savedTenantId);
-          const newTenantId = tenantExists ? savedTenantId : transformedUser.tenants[0].id;
-          setCurrentTenantId(newTenantId);
-          // Update cache with tenant info
-          setCachedUser(transformedUser, newTenantId);
-        }
-      } else if (response.status === 401) {
-        // Token expired, try to refresh
-        await refreshToken();
-      } else {
-        // Do not clear tokens on transient/non-401 errors
-        setUser(null);
+      setUser(transformedUser);
+      
+      // Cache the authenticated user data
+      setCachedUser(transformedUser, currentTenantId);
+      
+      // Set current tenant if not set
+      if (!currentTenantId && transformedUser && transformedUser.tenants && transformedUser.tenants.length > 0) {
+        const savedTenantId = localStorage.getItem(TENANT_KEY);
+        const tenantExists = transformedUser.tenants.find((t: any) => t.id === savedTenantId);
+        const newTenantId = tenantExists ? savedTenantId : transformedUser.tenants[0].id;
+        setCurrentTenantId(newTenantId);
+        // Update cache with tenant info
+        setCachedUser(transformedUser, newTenantId);
       }
     } catch (error) {
       console.error('[AuthContext] Failed to fetch user:', error);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { directoryListingService } from '@/services/DirectoryListingSingletonService';
 
 type DirectoryPhoto = {
   id: string;
@@ -35,13 +36,8 @@ export default function DirectoryPhotoGalleryDisplay({ listing }: DirectoryPhoto
     const loadPhotos = async () => {
       try {
         setLoading(true);
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await fetch(`${apiUrl}/api/directory/${listing.id}/photos`);
-        if (res.ok) {
-          const data = await res.json();
-          const photoAssets = Array.isArray(data) ? data : [];
-          setPhotos(photoAssets.sort((a, b) => a.position - b.position));
-        }
+        const photoAssets = await directoryListingService.getDirectoryPhotos(listing.id);
+        setPhotos(photoAssets.sort((a, b) => a.position - b.position));
       } catch (e) {
         console.error("Failed to load directory photos:", e);
       } finally {

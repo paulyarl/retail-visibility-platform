@@ -5,6 +5,7 @@ import { ShoppingCart, Plus } from 'lucide-react';
 import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
 import ProductQueue from './ProductQueue';
+import { inventoryQueueService } from '@/services/InventoryQueueSingletonService';
 
 interface CartButtonProps {
   tenantId: string;
@@ -67,20 +68,15 @@ export default function CartButton({ tenantId, onOpenCart, onAddToQueue }: CartB
     
     try {
       // Call the API to add item to queue
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await fetch(`${API_BASE_URL}/api/queue/${tenantId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productData: actualProductData,
-          priority: 'normal',
-          sessionId: `session-${Date.now()}`,
-          userAgent: navigator.userAgent,
-          source: 'wizard'
-        })
-      });
+      const result = await inventoryQueueService.addToQueue(tenantId, [{
+        productData: actualProductData,
+        priority: 'normal',
+        sessionId: `session-${Date.now()}`,
+        userAgent: navigator.userAgent,
+        source: 'wizard'
+      }], 'normal');
 
-      if (response.ok) {
+      if (result) {
         // Clear the draft after successful queue addition
         localStorage.removeItem('item-creation-draft');
         

@@ -13,7 +13,7 @@
  * - Cache invalidation on updates
  */
 
-import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton, UniversalSingleton } from '@/providers/base/UniversalSingleton';
 
 // ====================
 // TYPES
@@ -75,7 +75,7 @@ export interface FeaturedProductsLimits {
 // TENANT SETTINGS SINGLETON
 // ====================
 
-class TenantSettingsSingleton extends UniversalSingleton {
+class TenantSettingsSingleton extends AuthenticatedApiSingleton {
   protected static instances: Map<string, TenantSettingsSingleton> = new Map();
   private readonly CACHE_TTL = 15 * 60 * 1000; // 15 minutes
   private readonly tenantId: string;
@@ -105,14 +105,11 @@ class TenantSettingsSingleton extends UniversalSingleton {
    * Fetch tenant info with caching
    */
   async fetchTenantInfo(): Promise<TenantInfo> {
-    const cacheKey = `tenant-info-${this.tenantId}`;
-    
     try {
-      const data = await this.makeApiRequest<TenantInfo>(
+      const data = await this.makeAuthenticatedRequest<TenantInfo>(
         `/api/tenants/${this.tenantId}`,
         { method: 'GET' },
-        cacheKey,
-        this.CACHE_TTL
+        `tenant-info-${this.tenantId}`
       );
 
       console.log('[TenantSettingsSingleton] Fetched tenant info:', this.tenantId);
@@ -127,14 +124,11 @@ class TenantSettingsSingleton extends UniversalSingleton {
    * Fetch tenant profile with caching
    */
   async fetchTenantProfile(): Promise<TenantProfile> {
-    const cacheKey = `tenant-profile-${this.tenantId}`;
-    
     try {
-      const data = await this.makeApiRequest<TenantProfile>(
+      const data = await this.makeAuthenticatedRequest<TenantProfile>(
         `/api/tenant/profile?tenant_id=${this.tenantId}`,
         { method: 'GET' },
-        cacheKey,
-        this.CACHE_TTL
+        `tenant-profile-${this.tenantId}`
       );
 
       console.log('[TenantSettingsSingleton] Fetched tenant profile:', this.tenantId);
@@ -149,14 +143,11 @@ class TenantSettingsSingleton extends UniversalSingleton {
    * Fetch tenant tier information with caching
    */
   async fetchTenantTier(): Promise<TenantTier> {
-    const cacheKey = `tenant-tier-${this.tenantId}`;
-    
     try {
-      const data = await this.makeApiRequest<TenantTier>(
+      const data = await this.makeAuthenticatedRequest<TenantTier>(
         `/api/tenants/${this.tenantId}/tier/public`,
         { method: 'GET' },
-        cacheKey,
-        this.CACHE_TTL
+        `tenant-tier-${this.tenantId}`
       );
 
       console.log('[TenantSettingsSingleton] Fetched tenant tier:', this.tenantId);
@@ -171,14 +162,11 @@ class TenantSettingsSingleton extends UniversalSingleton {
    * Fetch featured products limits with caching
    */
   async fetchFeaturedProductsLimits(): Promise<FeaturedProductsLimits> {
-    const cacheKey = `featured-limits-${this.tenantId}`;
-    
     try {
-      const data = await this.makeApiRequest<FeaturedProductsLimits>(
+      const data = await this.makeAuthenticatedRequest<FeaturedProductsLimits>(
         `/api/tenant-limits/featured-products?tenantId=${this.tenantId}`,
         { method: 'GET' },
-        cacheKey,
-        this.CACHE_TTL
+        `featured-limits-${this.tenantId}`
       );
 
       console.log('[TenantSettingsSingleton] Fetched featured products limits:', this.tenantId);
@@ -224,22 +212,16 @@ class TenantSettingsSingleton extends UniversalSingleton {
    */
   async updateTenantProfile(updates: Partial<TenantProfile>): Promise<TenantProfile> {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      
-      this.apiCalls++;
-      const data = await this.makeApiRequest<TenantProfile>(
+      const data = await this.makeAuthenticatedRequest<TenantProfile>(
         `/api/tenant/profile?tenant_id=${this.tenantId}`,
         {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify(updates),
         }
-      ) as TenantProfile;
+      );
 
       // Invalidate cache
-      await this.clearCache(`tenant-profile-${this.tenantId}`);
+      await this.invalidateCache(`tenant-profile-${this.tenantId}`);
 
       console.log('[TenantSettingsSingleton] Tenant profile updated:', this.tenantId);
       return data;
@@ -264,10 +246,9 @@ class TenantSettingsSingleton extends UniversalSingleton {
   /**
    * Invalidate specific cache
    */
-  async invalidateCache(type: 'info' | 'profile' | 'tier' | 'featured-limits'): Promise<void> {
-    const cacheKey = `tenant-${type}-${this.tenantId}`;
-    await this.clearCache(cacheKey);
-    console.log('[TenantSettingsSingleton] Cache invalidated:', type);
+  async invalidateCache(cacheKey: string): Promise<void> {
+    await super.invalidateCache(cacheKey);
+    console.log('[TenantSettingsSingleton] Cache invalidated:', cacheKey);
   }
 
   // ====================

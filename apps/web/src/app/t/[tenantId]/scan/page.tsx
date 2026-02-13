@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card } from '@mantine/core';
 import { Badge } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { itemsSingletonService } from '@/services/ItemsSingletonService';
 import { Flags } from '@/lib/flags';
 import { ContextBadges } from '@/components/ContextBadges';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
@@ -36,6 +37,7 @@ export default function TenantScanPage() {
   
   const [sessions, setSessions] = useState<ScanSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<'usb' | 'camera' | 'manual'>('manual'); // Default to manual for all tiers
   const [rateLimitError, setRateLimitError] = useState(false);
@@ -49,15 +51,11 @@ export default function TenantScanPage() {
 
   const loadSessions = async () => {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.get(`${apiBaseUrl}/api/scan/my-sessions?tenantId=${tenantId}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setSessions(data.sessions || []);
-      }
-    } catch (error) {
-      console.error('Failed to load sessions:', error);
+      const data = await itemsSingletonService.getMyScanSessions(tenantId);
+      setSessions(data.sessions || []);
+    } catch (err) {
+      console.error('[ScanPage] Failed to load sessions:', err);
+      setError('Failed to load scan sessions');
     } finally {
       setLoading(false);
     }
@@ -77,46 +75,33 @@ export default function TenantScanPage() {
     try {
       setCreating(true);
       
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-
-      const response = await api.post(`${apiBaseUrl}/api/scan/start`, {
-        tenantId,
-        deviceType: selectedDevice,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
+      try {
+        const data = await itemsSingletonService.startScanSession(tenantId, selectedDevice);
         setRateLimitError(false);
         router.push(`/t/${tenantId}/scan/${data.session.id}`);
-      } else {
-        const error = await response.json();
-        if (error.error === 'rate_limit_exceeded') {
+      } catch (error) {
+        console.error('Failed to start session:', error);
+        if (error instanceof Error && error.message === 'rate_limit_exceeded') {
           setRateLimitError(true);
         } else {
-          alert(`Failed to start session: ${error.error || 'Unknown error'}`);
+          alert('Failed to start scanning session');
         }
+      } finally {
+        setCreating(false);
       }
     } catch (error) {
       console.error('Failed to start session:', error);
-      alert('Failed to start scanning session');
-    } finally {
       setCreating(false);
     }
   };
 
   const cancelSession = async (sessionId: string) => {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.delete(`${apiBaseUrl}/api/scan/${sessionId}`);
-
-      if (response.ok) {
-        await loadSessions(); // Refresh the list
-      } else {
-        alert('Failed to cancel session');
-      }
-    } catch (error) {
-      console.error('Failed to cancel session:', error);
-      alert('Failed to cancel session');
+      await itemsSingletonService.cancelScanSession(sessionId);
+      await loadSessions(); // Refresh the list
+    } catch (err) {
+      console.error('[ScanPage] Failed to cancel session:', err);
+      setError('Failed to cancel session');
     }
   };
 
@@ -127,21 +112,11 @@ export default function TenantScanPage() {
 
     try {
       setCleaningUp(true);
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
-      const response = await api.post(`${apiBaseUrl}/api/scan/cleanup-my-sessions`, {
-        tenantId,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        alert(`✅ Cleaned up ${data.cleaned} active sessions. You can now start a new scan.`);
-        setRateLimitError(false);
-        await loadSessions();
-      } else {
-        const error = await response.json();
-        alert(`Failed to cleanup sessions: ${error.message || 'Unknown error'}`);
-      }
+      await itemsSingletonService.cleanupMyScanSessions(tenantId);
+      alert(`✅ Cleaned up active sessions. You can now start a new scan.`);
+      setRateLimitError(false);
+      await loadSessions();
     } catch (error) {
       console.error('Failed to cleanup sessions:', error);
       alert('Failed to cleanup sessions');

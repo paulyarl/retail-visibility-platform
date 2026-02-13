@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Package, Truck, MapPin, Save, AlertCircle, ShoppingBag, CreditCard } from 'lucide-react';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import Link from 'next/link';
 
 interface FulfillmentSettings {
@@ -74,12 +74,9 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/tenants/${tenantId}/fulfillment-settings`);
-      if (!response.ok) throw new Error('Failed to fetch settings');
-      
-      const data = await response.json();
-      if (data.success && data.settings) {
-        setSettings(data.settings);
+      const settingsData = await platformHomeService.getTenantFulfillmentSettings(tenantId);
+      if (settingsData) {
+        setSettings(settingsData);
       }
     } catch (error) {
       console.error('Error fetching fulfillment settings:', error);
@@ -94,12 +91,10 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
       setSaving(true);
       setMessage(null);
       
-      const response = await api.put(`/api/tenants/${tenantId}/fulfillment-settings`, settings);
+      const updatedSettings = await platformHomeService.updateTenantFulfillmentSettings(tenantId, settings);
       
-      if (!response.ok) throw new Error('Failed to save settings');
-      
-      const data = await response.json();
-      if (data.success) {
+      if (updatedSettings) {
+        setSettings(updatedSettings);
         setMessage({ type: 'success', text: 'Settings saved successfully!' });
         setTimeout(() => setMessage(null), 3000);
       }

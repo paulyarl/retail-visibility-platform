@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { ArrowLeft, Play, CheckCircle, XCircle, AlertTriangle, RefreshCw, Zap, Package, DollarSign, Trash2, AlertOctagon, Layers, FolderPlus, FolderEdit, FolderSync, FolderX } from 'lucide-react';
 
 // Types
@@ -152,11 +152,8 @@ export default function CloverIntegrationPage() {
   // Fetch status
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await api.get(`/api/integrations/${tenantId}/clover/status`);
-      if (res.ok) {
-        const data = await res.json();
-        setStatus(data);
-      }
+      const data = await platformHomeService.getCloverStatus(tenantId);
+      setStatus(data);
     } catch (err) {
       console.error('Failed to fetch status:', err);
     }
@@ -165,11 +162,8 @@ export default function CloverIntegrationPage() {
   // Fetch scenarios
   const fetchScenarios = useCallback(async () => {
     try {
-      const res = await api.get(`/api/integrations/${tenantId}/clover/demo/scenarios`);
-      if (res.ok) {
-        const data = await res.json();
-        setScenarios(data.scenarios || []);
-      }
+      const data = await platformHomeService.getCloverDemoScenarios(tenantId);
+      setScenarios(data.scenarios || []);
     } catch (err) {
       console.error('Failed to fetch scenarios:', err);
     }
@@ -178,15 +172,8 @@ export default function CloverIntegrationPage() {
   // Fetch mappings (works for both demo and production)
   const fetchMappings = useCallback(async () => {
     try {
-      // Use demo endpoint for demo mode, regular endpoint for production
-      const endpoint = status?.mode === 'demo' 
-        ? `/api/integrations/${tenantId}/clover/demo/mappings`
-        : `/api/integrations/${tenantId}/clover/mappings`;
-      const res = await api.get(endpoint);
-      if (res.ok) {
-        const data = await res.json();
-        setMappings(data.mappings || []);
-      }
+      const data = await platformHomeService.getCloverMappings(tenantId, status?.mode === 'demo');
+      setMappings(data.mappings || []);
     } catch (err) {
       console.error('Failed to fetch mappings:', err);
     }
@@ -195,15 +182,8 @@ export default function CloverIntegrationPage() {
   // Fetch sync history (works for both demo and production)
   const fetchSyncHistory = useCallback(async () => {
     try {
-      // Use demo endpoint for demo mode, regular endpoint for production
-      const endpoint = status?.mode === 'demo'
-        ? `/api/integrations/${tenantId}/clover/demo/sync-history`
-        : `/api/integrations/${tenantId}/clover/sync-history`;
-      const res = await api.get(endpoint);
-      if (res.ok) {
-        const data = await res.json();
-        setSyncLogs(data.syncLogs || []);
-      }
+      const data = await platformHomeService.getCloverSyncHistory(tenantId, status?.mode === 'demo');
+      setSyncLogs(data.syncLogs || []);
     } catch (err) {
       console.error('Failed to fetch sync history:', err);
     }
@@ -212,11 +192,8 @@ export default function CloverIntegrationPage() {
   // Fetch category mappings
   const fetchCategoryMappings = useCallback(async () => {
     try {
-      const res = await api.get(`/api/integrations/${tenantId}/clover/category-mappings`);
-      if (res.ok) {
-        const data = await res.json();
-        setCategoryMappings(data.categoryMappings || []);
-      }
+      const data = await platformHomeService.getCloverCategoryMappings(tenantId);
+      setCategoryMappings(data.categoryMappings || []);
     } catch (err) {
       console.error('Failed to fetch category mappings:', err);
     }
@@ -251,12 +228,7 @@ export default function CloverIntegrationPage() {
     try {
       setActionLoading(true);
       setError(null);
-      const res = await api.post(`/api/integrations/${tenantId}/clover/demo/enable`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Failed to enable demo mode');
-      }
-      const data = await res.json();
+      const data = await platformHomeService.enableCloverDemo(tenantId);
       alert(`Demo mode enabled! ${data.itemsImported} items imported.`);
       await fetchStatus();
     } catch (err: any) {
@@ -286,9 +258,7 @@ export default function CloverIntegrationPage() {
     
     try {
       setActionLoading(true);
-      const res = await api.post(`/api/integrations/${tenantId}/clover/demo/disable`, { keepItems: !removeItems });
-      if (!res.ok) throw new Error('Failed to disable demo mode');
-      const data = await res.json();
+      const data = await platformHomeService.disableCloverDemo(tenantId, !removeItems);
       
       if (removeItems) {
         alert(`Demo mode disabled. ${data.itemsDeleted || 0} demo items removed from inventory.`);
@@ -308,8 +278,7 @@ export default function CloverIntegrationPage() {
     try {
       setActionLoading(true);
       setError(null);
-      const res = await api.get(`/api/integrations/${tenantId}/clover/oauth/authorize`);
-      const data = await res.json();
+      const data = await platformHomeService.getCloverOAuthUrl(tenantId);
       
       if (data.authorizationUrl) {
         window.location.href = data.authorizationUrl;
@@ -327,9 +296,7 @@ export default function CloverIntegrationPage() {
   const handleSync = async () => {
     try {
       setActionLoading(true);
-      const res = await api.post(`/api/integrations/${tenantId}/clover/sync`);
-      if (!res.ok) throw new Error('Failed to start sync');
-      const data = await res.json();
+      const data = await platformHomeService.startCloverSync(tenantId);
       alert(`Sync started! ${data.message || ''}`);
       await fetchStatus();
     } catch (err: any) {
@@ -344,8 +311,7 @@ export default function CloverIntegrationPage() {
     if (!confirm('Are you sure you want to disconnect Clover? This will stop syncing your inventory.')) return;
     try {
       setActionLoading(true);
-      const res = await api.post(`/api/integrations/${tenantId}/clover/disconnect`);
-      if (!res.ok) throw new Error('Failed to disconnect');
+      await platformHomeService.disconnectClover(tenantId);
       alert('Clover disconnected.');
       await fetchStatus();
     } catch (err: any) {
@@ -360,9 +326,7 @@ export default function CloverIntegrationPage() {
     try {
       setActionLoading(true);
       setSimulationResults([]); // Clear previous results
-      const res = await api.post(`/api/integrations/${tenantId}/clover/demo/simulate`, { scenario });
-      if (!res.ok) throw new Error('Failed to start simulation');
-      const data = await res.json();
+      const data = await platformHomeService.startCloverSimulation(tenantId, scenario);
       setActiveSimulation(data.event);
     } catch (err: any) {
       setError(err.message);
@@ -376,9 +340,7 @@ export default function CloverIntegrationPage() {
     if (!activeSimulation) return;
     try {
       setActionLoading(true);
-      const res = await api.post(`/api/integrations/${tenantId}/clover/demo/simulate/${activeSimulation.id}/execute`);
-      if (!res.ok) throw new Error('Failed to execute simulation');
-      const data = await res.json();
+      const data = await platformHomeService.executeCloverSimulation(tenantId, activeSimulation.id);
       setActiveSimulation(data.event);
       setSimulationResults(data.results || []); // Capture detailed results
       await fetchStatus();
@@ -394,7 +356,7 @@ export default function CloverIntegrationPage() {
   const handleCancelSimulation = async () => {
     if (!activeSimulation) return;
     try {
-      await api.post(`/api/integrations/${tenantId}/clover/demo/simulate/${activeSimulation.id}/cancel`);
+      await platformHomeService.cancelCloverSimulation(tenantId, activeSimulation.id);
       setActiveSimulation(null);
       setSimulationResults([]); // Clear results on cancel
     } catch (err: any) {
@@ -406,12 +368,7 @@ export default function CloverIntegrationPage() {
   const handleResolveConflict = async (mappingId: string, resolution: 'use_clover' | 'use_rvp') => {
     try {
       setActionLoading(true);
-      // Use demo endpoint for demo mode, regular endpoint for production
-      const endpoint = status?.mode === 'demo'
-        ? `/api/integrations/${tenantId}/clover/demo/mappings/${mappingId}/resolve`
-        : `/api/integrations/${tenantId}/clover/mappings/${mappingId}/resolve`;
-      const res = await api.post(endpoint, { resolution });
-      if (!res.ok) throw new Error('Failed to resolve conflict');
+      await platformHomeService.resolveCloverMappingConflict(tenantId, mappingId, { resolution }, status?.mode === 'demo');
       await fetchMappings();
       await fetchStatus();
     } catch (err: any) {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { api } from '@/lib/api';
+import { tenantOrderService, TenantOrder } from '@/services/TenantOrderService';
 import { 
   Package, 
   ArrowLeft, 
@@ -27,7 +27,6 @@ interface OrderItem {
   sku: string;
   quantity: number;
   unitPrice: number;
-  total: number;
   imageUrl?: string;
 }
 
@@ -37,8 +36,6 @@ interface OrderDetail {
   orderStatus: string;
   fulfillmentStatus: string;
   fulfillmentMethod: 'pickup' | 'delivery' | 'shipping' | null;
-  tenantName: string;
-  tenantLogo: string | null;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
@@ -47,7 +44,7 @@ interface OrderDetail {
   subtotal: number;
   shipping: number;
   tax: number;
-  discount: number;
+  discount?: number;
   total: number;
   items: OrderItem[];
   payment?: {
@@ -80,7 +77,7 @@ interface OrderDetailClientProps {
 
 export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClientProps) {
   const router = useRouter();
-  const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [order, setOrder] = useState<TenantOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState('');
@@ -99,15 +96,12 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
 
   const fetchFulfillmentSettings = async () => {
     try {
-      const response = await api.get(`/api/tenants/${tenantId}/fulfillment-settings`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.settings) {
-          setFulfillmentSettings(data.settings);
-          // Pre-populate shipping provider from settings
-          if (data.settings.shipping_provider) {
-            setShippingProvider(data.settings.shipping_provider);
-          }
+      const data = await tenantOrderService.getFulfillmentSettings(tenantId);
+      if (data) {
+        setFulfillmentSettings(data);
+        // Pre-populate shipping provider from settings
+        if (data.shipping_provider) {
+          setShippingProvider(data.shipping_provider);
         }
       }
     } catch (error) {
@@ -119,15 +113,11 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
     try {
       setLoading(true);
       
-      const response = await api.get(`/api/tenants/${tenantId}/orders/${orderId}`);
+      const data = await tenantOrderService.getOrder(tenantId, orderId);
       
-      if (!response.ok) throw new Error('Failed to fetch order details');
-      
-      const data = await response.json();
-      
-      if (data.success && data.data) {
-        setOrder(data.data);
-        setTrackingNumber(data.data.trackingNumber || '');
+      if (data) {
+        setOrder(data);
+        setTrackingNumber(data.trackingNumber || '');
       }
     } catch (error) {
       console.error('Error fetching order details:', error);
@@ -154,9 +144,9 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
         }
       }
       
-      const response = await api.put(`/api/tenants/${tenantId}/orders/${orderId}/fulfillment`, payload);
+      const response = await tenantOrderService.updateOrderFulfillment(tenantId, orderId, payload);
       
-      if (!response.ok) throw new Error('Failed to update fulfillment status');
+      if (!response) throw new Error('Failed to update fulfillment status');
       
       // Refresh order data
       await fetchOrderDetail();
@@ -192,12 +182,12 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
     try {
       setUpdating(true);
       
-      const response = await api.put(`/api/tenants/${tenantId}/orders/${orderId}/fulfillment`, {
+      const response = await tenantOrderService.updateOrderFulfillment(tenantId, orderId, {
         fulfillmentStatus: 'cancelled',
         cancellationReason: finalReason,
       });
       
-      if (!response.ok) throw new Error('Failed to cancel order');
+      if (!response) throw new Error('Failed to cancel order');
       
       // Refresh order data
       await fetchOrderDetail();
@@ -217,11 +207,11 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
     try {
       setUpdating(true);
       
-      const response = await api.put(`/api/tenants/${tenantId}/orders/${orderId}/fulfillment`, {
+      const response = await tenantOrderService.updateOrderFulfillment(tenantId, orderId, {
         trackingNumber: trackingNumber,
       });
       
-      if (!response.ok) throw new Error('Failed to update tracking number');
+      if (!response) throw new Error('Failed to update tracking number');
       
       setShowTrackingInput(false);
       await fetchOrderDetail();
@@ -368,7 +358,7 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
                       <p className="text-sm text-neutral-600">Quantity: {item.quantity}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-neutral-900">{formatCurrency(item.total)}</p>
+                      <p className="font-semibold text-neutral-900">{formatCurrency(item.total || (item.unitPrice * item.quantity))}</p>
                       <p className="text-sm text-neutral-600">{formatCurrency(item.unitPrice)} each</p>
                     </div>
                   </div>
@@ -383,9 +373,9 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
                     <span>Items Subtotal</span>
                     <span>{formatCurrency(order.subtotal)}</span>
                   </div>
-                  {order.discount > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Discount</span>
+                  {order.discount && order.discount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-neutral-600">Discount</span>
                       <span>-{formatCurrency(order.discount)}</span>
                     </div>
                   )}

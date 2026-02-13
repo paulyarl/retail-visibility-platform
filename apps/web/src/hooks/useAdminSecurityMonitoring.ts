@@ -4,7 +4,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { api } from '@/lib/api';
+import { adminSecurityMonitoringService } from '@/services/AdminSecurityMonitoringSingletonService';
+import { securityService } from '@/services/SecuritySingletonService';
 
 interface AdminSession {
   id: string;
@@ -94,33 +95,18 @@ export function useAdminSecurityMonitoring() {
   const fetchSessions = useCallback(async () => {
     try {
       const offset = (currentPage - 1) * pageSize;
-      const params = new URLSearchParams({
-        limit: pageSize.toString(),
-        offset: offset.toString(),
-      });
-      const response = await api.get(`/api/admin/security/sessions?${params}`);
-      if (!response.ok) {
-        // Handle 503 (service temporarily unavailable) gracefully
-        if (response.status === 503) {
-          console.warn('Sessions endpoint temporarily unavailable:', response.statusText);
-          setSessions([]);
-          setTotalSessions(0);
-          return;
-        }
-        throw new Error('Failed to fetch sessions');
+      
+      const response = await adminSecurityMonitoringService.getAdminSecuritySessions(currentPage, pageSize, offset);
+      
+      if (!response) {
+        // Handle service unavailable gracefully
+        setSessions([]);
+        setTotalSessions(0);
+        return;
       }
-      const data = await response.json();
-      // Parse deviceInfo JSON string for each session
-      const parsedSessions = (data.data || []).map((session: any) => ({
-        ...session,
-        deviceInfo: session.deviceInfo ? JSON.parse(session.deviceInfo) : {
-          type: 'Unknown',
-          browser: 'Unknown', 
-          os: 'Unknown'
-        }
-      }));
-      setSessions(parsedSessions);
-      setTotalSessions(data.total || 0);
+      
+      setSessions(response.sessions);
+      setTotalSessions(response.total);
     } catch (err) {
       console.error('Failed to fetch admin sessions:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch sessions');
@@ -129,18 +115,15 @@ export function useAdminSecurityMonitoring() {
 
   const fetchSessionStats = useCallback(async () => {
     try {
-      const response = await api.get('/api/admin/security/sessions/stats');
-      if (!response.ok) {
-        // Handle 503 (service temporarily unavailable) gracefully
-        if (response.status === 503) {
-          console.warn('Session stats endpoint temporarily unavailable:', response.statusText);
-          setSessionStats(null);
-          return;
-        }
-        throw new Error('Failed to fetch session stats');
+      const stats = await adminSecurityMonitoringService.getSessionStats();
+      
+      if (!stats) {
+        // Handle service unavailable gracefully
+        setSessionStats(null);
+        return;
       }
-      const data = await response.json();
-      setSessionStats(data);
+      
+      setSessionStats(stats);
     } catch (err) {
       console.error('Failed to fetch session stats:', err);
     }
@@ -148,10 +131,14 @@ export function useAdminSecurityMonitoring() {
 
   const fetchAlerts = useCallback(async () => {
     try {
-      const response = await api.get('/api/admin/security/alerts');
-      if (!response.ok) throw new Error('Failed to fetch alerts');
-      const data = await response.json();
-      setAlerts(data.data || []);
+      const alerts = await adminSecurityMonitoringService.getSecurityAlerts();
+      
+      if (!alerts) {
+        setAlerts([]);
+        return;
+      }
+      
+      setAlerts(alerts);
     } catch (err) {
       console.error('Failed to fetch admin alerts:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch alerts');
@@ -160,10 +147,21 @@ export function useAdminSecurityMonitoring() {
 
   const fetchAlertStats = useCallback(async () => {
     try {
-      const response = await api.get('/api/admin/security/alerts/stats');
-      if (!response.ok) throw new Error('Failed to fetch alert stats');
-      const data = await response.json();
-      setAlertStats(data);
+      const stats = await adminSecurityMonitoringService.getAlertStats();
+      
+      if (!stats) {
+        setAlertStats({
+          totalAlerts: 0,
+          unreadAlerts: 0,
+          alertsLast24h: 0,
+          criticalAlerts: 0,
+          warningAlerts: 0,
+          typeBreakdown: []
+        });
+        return;
+      }
+      
+      setAlertStats(stats);
     } catch (err) {
       console.error('Failed to fetch alert stats:', err);
     }
@@ -171,18 +169,15 @@ export function useAdminSecurityMonitoring() {
 
   const fetchFailedLogins = useCallback(async () => {
     try {
-      const response = await api.get('/api/admin/security/failed-logins?limit=20');
-      if (!response.ok) {
-        // Handle 503 (service temporarily unavailable) gracefully
-        if (response.status === 503) {
-          console.warn('Failed logins endpoint temporarily unavailable:', response.statusText);
-          setFailedLogins([]);
-          return;
-        }
-        throw new Error('Failed to fetch failed logins');
+      const failedLogins = await adminSecurityMonitoringService.getFailedLogins(20);
+      
+      if (!failedLogins) {
+        // Handle service unavailable gracefully
+        setFailedLogins([]);
+        return;
       }
-      const data = await response.json();
-      setFailedLogins(data.data || []);
+      
+      setFailedLogins(failedLogins);
     } catch (err) {
       console.error('Failed to fetch failed logins:', err);
     }
@@ -190,8 +185,7 @@ export function useAdminSecurityMonitoring() {
 
   const revokeSession = useCallback(async (sessionId: string) => {
     try {
-      const response = await api.delete(`/api/admin/security/sessions/${sessionId}`);
-      if (!response.ok) throw new Error('Failed to revoke session');
+      await securityService.revokeSession(sessionId);
       
       // Refresh sessions
       await fetchSessions();

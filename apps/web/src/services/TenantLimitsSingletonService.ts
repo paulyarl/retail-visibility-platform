@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
 
 export interface TenantLimitsStatus {
   current: number;
@@ -32,19 +32,12 @@ export interface FeaturedProductsLimits {
   displayNames: Record<string, string>;
 }
 
-class TenantLimitsSingletonService {
+class TenantLimitsSingletonService extends AuthenticatedApiSingleton {
   private static instance: TenantLimitsSingletonService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with platform defaults
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 5 * 60 * 1000, // 5 minutes for tenant limits (moderate change frequency)
-      enableLogging: true,
-      enableMetrics: true
-    });
+    super('tenant-limits-singleton');
+    this.cacheTTL = 5 * 60 * 1000; // 5 minutes for tenant limits (moderate change frequency)
   }
 
   public static getInstance(): TenantLimitsSingletonService {
@@ -65,9 +58,11 @@ class TenantLimitsSingletonService {
     }
 
     try {
-      const result = await this.client.makeRequest<FeaturedProductsLimits>(
-        `/api/tenant-limits/featured-products?tenantId=${tenantId}`
-      ) as any;
+      const result = await this.makeAuthenticatedRequest<FeaturedProductsLimits>(
+        `/api/tenant-limits/featured-products?tenantId=${tenantId}`,
+        {},
+        `featured-products-limits-${tenantId}`
+      );
 
       return result;
     } catch (error) {
@@ -82,9 +77,11 @@ class TenantLimitsSingletonService {
    */
   async getTenantLimitsStatus(): Promise<TenantLimitsStatus | null> {
     try {
-      const result = await this.client.makeRequest<TenantLimitsStatus>(
-        '/api/tenant-limits/status'
-      ) as any;
+      const result = await this.makeAuthenticatedRequest<TenantLimitsStatus>(
+        '/api/tenant-limits/status',
+        {},
+        'tenant-limits-status'
+      );
 
       return result;
     } catch (error) {
@@ -119,20 +116,6 @@ class TenantLimitsSingletonService {
       console.error('[TenantLimitsSingleton] Failed to get tenant limits:', error);
       return {};
     }
-  }
-
-  /**
-   * Get performance metrics
-   */
-  public getMetrics() {
-    return this.client.getMetrics();
-  }
-
-  /**
-   * Reset metrics
-   */
-  public resetMetrics(): void {
-    this.client.resetMetrics();
   }
 }
 

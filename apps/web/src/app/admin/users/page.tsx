@@ -5,7 +5,7 @@ import { Users, UserPlus, Key, Trash2, Shield, User as UserIcon, Search, Filter 
 import PageHeader, { Icons } from '@/components/PageHeader';
 import CreateUserModal from '@/components/admin/CreateUserModal';
 import ResetPasswordModal from '@/components/admin/ResetPasswordModal';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useAuth } from '@/contexts/AuthContext';
 import { canManageUsers, canViewUsers } from '@/lib/auth/access-control';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
@@ -57,21 +57,8 @@ export default function AdminUsersPage() {
 
   const loadUsers = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/admin/users`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data.users || []);
-      } else {
-        console.error('Failed to load users:', response.status, response.statusText);
-      }
+      const data = await platformHomeService.getAdminUsers();
+      setUsers(data || []);
     } catch (error) {
       console.error('Failed to load users:', error);
     } finally {
@@ -85,21 +72,8 @@ export default function AdminUsersPage() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/admin/users/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        await loadUsers();
-      } else {
-        alert('Failed to delete user');
-      }
+      await platformHomeService.deleteAdminUser(userId);
+      await loadUsers();
     } catch (error) {
       console.error('Failed to delete user:', error);
       alert('Failed to delete user');

@@ -5,6 +5,8 @@ import { Button } from '@mantine/core';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Printer, Download, Mail, Phone, MapPin, Store, CheckCircle2, Package } from 'lucide-react';
 import QRCode from 'qrcode';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { tenantOrderService } from '@/services/TenantOrderService';
 
 interface OrderReceiptProps {
   cart: {
@@ -100,60 +102,27 @@ export default function OrderReceipt({ cart, onPrint, className = "" }: OrderRec
       
       setIsLoadingProfile(true);
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        
         // Fetch tenant profile
-        const profileResponse = await fetch(`${apiUrl}/api/public/tenant/${cart.tenantId}/profile`);
-        if (profileResponse.ok) {
-          const profile = await profileResponse.json();
-          console.log('[OrderReceipt] Fetched tenant profile:', profile);
-          setTenantProfile(profile);
-        } else {
-          console.error('[OrderReceipt] Failed to fetch tenant profile:', profileResponse.status);
-        }
+        const profile = await tenantInfoService.getBusinessProfile(cart.tenantId);
+        console.log('[OrderReceipt] Fetched tenant profile:', profile);
+        setTenantProfile(profile);
 
         // Fetch business hours for all orders (important for multi-store orders)
-        const hoursResponse = await fetch(`${apiUrl}/api/tenant/${cart.tenantId}/business-hours`);
-        if (hoursResponse.ok) {
-          const hoursData = await hoursResponse.json();
-          if (hoursData.success && hoursData.data) {
-            const { periods, timezone } = hoursData.data;
-            const hours: any = { timezone, periods };
-
-            // Convert periods to day-based format
-            const dayMap: Record<string, string> = {
-              'MONDAY': 'Monday',
-              'TUESDAY': 'Tuesday',
-              'WEDNESDAY': 'Wednesday',
-              'THURSDAY': 'Thursday',
-              'FRIDAY': 'Friday',
-              'SATURDAY': 'Saturday',
-              'SUNDAY': 'Sunday'
-            };
-            
-            periods.forEach((period: any) => {
-              const titleCaseDay = dayMap[period.day] || period.day;
-              if (titleCaseDay && !hours[titleCaseDay]) {
-                hours[titleCaseDay] = {
-                  open: period.open,
-                  close: period.close
-                };
-              }
-            });
-
-            console.log('[OrderReceipt] Fetched business hours:', hours);
-            setBusinessHours(hours);
-          }
+        const hours = await tenantInfoService.getBusinessHours(cart.tenantId);
+        if (hours) {
+          console.log('[OrderReceipt] Fetched business hours:', hours);
+          setBusinessHours(hours);
+        } else {
+          console.error('[OrderReceipt] Failed to fetch business hours');
         }
 
         // Fetch fulfillment settings for pickup ready time
-        const fulfillmentResponse = await fetch(`${apiUrl}/api/public/tenant/${cart.tenantId}/fulfillment-settings`);
-        if (fulfillmentResponse.ok) {
-          const fulfillmentData = await fulfillmentResponse.json();
-          if (fulfillmentData.success && fulfillmentData.settings) {
-            console.log('[OrderReceipt] Fetched fulfillment settings:', fulfillmentData.settings);
-            setFulfillmentSettings(fulfillmentData.settings);
-          }
+        const fulfillmentSettings = await tenantOrderService.getFulfillmentSettings(cart.tenantId);
+        if (fulfillmentSettings) {
+          console.log('[OrderReceipt] Fetched fulfillment settings:', fulfillmentSettings);
+          setFulfillmentSettings(fulfillmentSettings);
+        } else {
+          console.error('[OrderReceipt] Failed to fetch fulfillment settings');
         }
       } catch (error) {
         console.error('[OrderReceipt] Error fetching tenant data:', error);

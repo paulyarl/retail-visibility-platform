@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Spinn
 import { Button } from '@mantine/core';
 import { motion } from 'framer-motion';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 
@@ -57,19 +57,18 @@ export default function SentryMonitoringPage() {
     const loadSentryData = async () => {
       try {
         setError(null);
-        const response = await api.get('/api/admin/sentry');
-        const data = await response.json();
+        const data = await platformHomeService.getSentryConfig();
 
-        setSentryConfigured(data.configured || false);
+        setSentryConfigured(data?.configured || false);
 
-        if (data.configured && data.data) {
+        if (data?.configured && data?.data) {
           // Use real Sentry data
           setMetrics(data.data.metrics || []);
           setProjects(data.data.projects || []);
         } else {
           // Use mock data if API not configured
-          setMetrics(data.mockData?.metrics || []);
-          setProjects(data.mockData?.projects || []);
+          setMetrics(data?.mockData?.metrics || []);
+          setProjects(data?.mockData?.projects || []);
         }
       } catch (error) {
         console.error('Failed to load Sentry data:', error);

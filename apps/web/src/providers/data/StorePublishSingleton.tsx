@@ -7,7 +7,7 @@
  */
 
 import { AutoUserCacheOptions } from '@/utils/userIdentification';
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { PublicApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
 
 // Directory Category Types
 export interface DirectoryCategory {
@@ -123,11 +123,12 @@ export interface StorePublishOptions {
   trending?: boolean;
 }
 
-class StorePublishSingleton extends UniversalSingleton {
+class StorePublishSingleton extends PublicApiSingleton {
   private static instance: StorePublishSingleton;
 
   private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
-    super(singletonKey, cacheOptions);
+    super(singletonKey);
+    this.cacheTTL = 10 * 60 * 1000; // 10 minutes for store publish data
   }
 
   static getInstance(options?: { encrypt?: boolean; userId?: string }): StorePublishSingleton {
@@ -149,21 +150,6 @@ class StorePublishSingleton extends UniversalSingleton {
       featured = false,
       trending = false
     } = options;
-
-    const cacheKey = `store-publish-${JSON.stringify({ limit, offset, category, state, sortBy, sortOrder, featured, trending })}`;
-    
-    // Try cache first
-    const cached = await this.getFromCache(cacheKey, cacheOptions);
-    if (cached) {
-      try {
-        const cachedData = cached as any;
-        if (cachedData && typeof cachedData === 'object' && 'stores' in cachedData) {
-          return cachedData as StorePublishData;
-        }
-      } catch (error) {
-        console.warn('[StorePublishSingleton] Invalid cache data');
-      }
-    }
 
     // Default empty result
     const defaultResult: StorePublishData = {
@@ -187,66 +173,39 @@ class StorePublishSingleton extends UniversalSingleton {
       if (featured) params.append('featured', 'true');
       if (trending) params.append('trending', 'true');
 
-      // Fetch published stores
-      const response = await fetch(`/api/stores/published?${params}`);
-      
-      if (!response.ok) {
-        console.warn('Store publish API response not ok');
-        await this.setCache(cacheKey, defaultResult, cacheOptions);
-        return defaultResult;
-      }
+      const cacheKey = `store-publish-${params.toString()}`;
 
-      const data = await response.json();
+      // Fetch published stores
+      const data = await this.makePublicRequest<StorePublishData>(
+        `/api/stores/published?${params}`,
+        {},
+        cacheKey
+      );
       
       if (!data || !data.stores) {
-        await this.setCache(cacheKey, defaultResult, cacheOptions);
         return defaultResult;
       }
 
-      const result: StorePublishData = {
+      return {
         stores: data.stores || [],
         totalCount: data.totalCount || 0,
         lastUpdated: data.lastUpdated || new Date().toISOString(),
         categories: data.categories || []
       };
-
-      // Cache the result
-      // Cache the result
-      await this.setCache(cacheKey, result, cacheOptions); // 10 minutes
-
-      return result;
     } catch (error) {
-      console.error('Error fetching published stores:', error);
-      await this.setCache(cacheKey, defaultResult, cacheOptions);
+      console.warn('Store publish API error:', error);
       return defaultResult;
     }
   }
 
   // Get a single published store by ID
   async getPublishedStore(storeId: string): Promise<PublishedStore | null> {
-    const cacheKey = `store-publish-single-${storeId}`;
-    
-    // Try cache first
-    const cached = await this.getFromCache(cacheKey);
-    if (cached) {
-      try {
-        return cached as unknown as PublishedStore;
-      } catch (error) {
-        console.warn('[StorePublishSingleton] Invalid single store cache data');
-      }
-    }
-
     try {
-      const response = await fetch(`/api/stores/published/${storeId}`);
-      
-      if (!response.ok) {
-        return null;
-      }
-
-      const store = await response.json();
-      
-      // Cache the single store
-      await this.setCache(cacheKey, store); // 15 minutes
+      const store = await this.makePublicRequest<PublishedStore>(
+        `/api/stores/published/${storeId}`,
+        {},
+        `store-publish-single-${storeId}`
+      );
 
       return store;
     } catch (error) {
@@ -258,25 +217,17 @@ class StorePublishSingleton extends UniversalSingleton {
   // Publish a store (for store owners and admins)
   async publishStore(storeId: string, storeData: Partial<PublishedStore>): Promise<PublishedStore | null> {
     try {
-      const response = await fetch('/api/stores/publish', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const publishedStore = await this.makePublicRequest<PublishedStore>(
+        '/api/stores/publish',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            storeId,
+            ...storeData
+          })
         },
-        body: JSON.stringify({
-          storeId,
-          ...storeData
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to publish store');
-      }
-
-      const publishedStore = await response.json();
-      
-      // Invalidate relevant caches
-      this.invalidateCache();
+        `store-publish-${storeId}`
+      );
       
       return publishedStore;
     } catch (error) {
@@ -288,16 +239,13 @@ class StorePublishSingleton extends UniversalSingleton {
   // Unpublish a store
   async unpublishStore(storeId: string): Promise<boolean> {
     try {
-      const response = await fetch(`/api/stores/publish/${storeId}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to unpublish store');
-      }
-
-      // Invalidate relevant caches
-      this.invalidateCache();
+      await this.makePublicRequest<void>(
+        `/api/stores/publish/${storeId}`,
+        {
+          method: 'DELETE'
+        },
+        `store-unpublish-${storeId}`
+      );
       
       return true;
     } catch (error) {
@@ -309,22 +257,14 @@ class StorePublishSingleton extends UniversalSingleton {
   // Update published store
   async updatePublishedStore(storeId: string, updates: Partial<PublishedStore>): Promise<PublishedStore | null> {
     try {
-      const response = await fetch(`/api/stores/published/${storeId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
+      const updatedStore = await this.makePublicRequest<PublishedStore>(
+        `/api/stores/published/${storeId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(updates)
         },
-        body: JSON.stringify(updates)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update published store');
-      }
-
-      const updatedStore = await response.json();
-      
-      // Invalidate relevant caches
-      this.invalidateCache();
+        `store-update-${storeId}`
+      );
       
       return updatedStore;
     } catch (error) {
@@ -335,34 +275,17 @@ class StorePublishSingleton extends UniversalSingleton {
 
   // Get available directory categories
   async getDirectoryCategories(): Promise<DirectoryCategory[]> {
-    const cacheKey = 'directory-categories';
-    
-    // Try cache first
-    const cached = await this.getFromCache(cacheKey);
-    if (cached) {
-      try {
-        return cached as unknown as DirectoryCategory[];
-      } catch (error) {
-        console.warn('[StorePublishSingleton] Invalid categories cache data');
-      }
-    }
-
     try {
-      const response = await fetch('/api/directory/categories');
-      
-      if (!response.ok) {
-        return [];
-      }
-
-      const categories = await response.json();
+      const categories = await this.makePublicRequest<DirectoryCategory[]>(
+        '/api/directory/categories',
+        {},
+        'directory-categories'
+      );
       
       // Handle null response
       if (!categories || !Array.isArray(categories)) {
         return [];
       }
-      
-      // Cache categories for longer period
-      await this.setCache(cacheKey, categories); // 1 hour
 
       return categories;
     } catch (error) {
@@ -417,19 +340,19 @@ class StorePublishSingleton extends UniversalSingleton {
     reason?: string;
   }> {
     try {
-      const response = await fetch('/api/stores/publish/permissions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const permissions = await this.makePublicRequest<{
+        canPublish: boolean;
+        canPublishAny: boolean;
+        reason?: string;
+      }>(
+        '/api/stores/publish/permissions',
+        {
+          method: 'POST',
+          body: JSON.stringify({ userId, tenantId })
         },
-        body: JSON.stringify({ userId, tenantId })
-      });
+        `permissions-${userId}-${tenantId || 'default'}`
+      );
 
-      if (!response.ok) {
-        return { canPublish: false, canPublishAny: false, reason: 'Permission check failed' };
-      }
-
-      const permissions = await response.json();
       return permissions;
     } catch (error) {
       console.error('Error checking publishing permissions:', error);

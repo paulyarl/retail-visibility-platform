@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
 
 export interface Organization {
   id: string;
@@ -27,19 +27,12 @@ export interface OrganizationsResponse {
   limit: number;
 }
 
-class OrganizationsSingletonService {
+class OrganizationsSingletonService extends AuthenticatedApiSingleton {
   private static instance: OrganizationsSingletonService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with platform defaults
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 15 * 60 * 1000, // 15 minutes for organizations (changes rarely)
-      enableLogging: true,
-      enableMetrics: true
-    });
+    super('organizations-singleton');
+    this.cacheTTL = 15 * 60 * 1000; // 15 minutes for organizations (changes rarely)
   }
 
   public static getInstance(): OrganizationsSingletonService {
@@ -55,10 +48,11 @@ class OrganizationsSingletonService {
    */
   async getOrganizations(page: number = 1, limit: number = 50): Promise<Organization[]> {
     try {
-      // The API returns organizations directly
-      const result = await this.client.makeRequest<any>(
-        `/api/organizations?page=${page}&limit=${limit}`
-      ) as any;
+      const result = await this.makeAuthenticatedRequest<Organization[]>(
+        `/api/organizations?page=${page}&limit=${limit}`,
+        {},
+        `organizations-${page}-${limit}`
+      );
 
       return result || [];
     } catch (error) {
@@ -78,10 +72,11 @@ class OrganizationsSingletonService {
     }
 
     try {
-      // The API returns organization directly
-      const result = await this.client.makeRequest<any>(
-        `/api/organizations/${id}`
-      ) as any;
+      const result = await this.makeAuthenticatedRequest<Organization>(
+        `/api/organizations/${id}`,
+        {},
+        `organization-${id}`
+      );
 
       return result || null;
     } catch (error) {
@@ -101,10 +96,11 @@ class OrganizationsSingletonService {
     }
 
     try {
-      // The API returns organization directly
-      const result = await this.client.makeRequest<any>(
-        `/api/organizations/slug/${slug}`
-      ) as any;
+      const result = await this.makeAuthenticatedRequest<Organization>(
+        `/api/organizations/slug/${slug}`,
+        {},
+        `organization-slug-${slug}`
+      );
 
       return result || null;
     } catch (error) {
@@ -124,15 +120,13 @@ class OrganizationsSingletonService {
     }
 
     try {
-      const result = await this.client.makeRequest<OrganizationsResponse>(
-        `/api/organizations/search?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`
+      const result = await this.makeAuthenticatedRequest<OrganizationsResponse>(
+        `/api/organizations/search?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
+        {},
+        `organizations-search-${query}-${page}-${limit}`
       );
 
-      if (result.success && result.data?.organizations) {
-        return result.data.organizations;
-      }
-
-      return [];
+      return result.organizations || [];
     } catch (error) {
       console.error('[OrganizationsSingleton] Failed to search organizations:', error);
       return [];
@@ -140,18 +134,102 @@ class OrganizationsSingletonService {
   }
 
   /**
-   * Get performance metrics
+   * Update organization hero location
+   * Uses the /organizations/:id/hero-location endpoint
    */
-  public getMetrics() {
-    return this.client.getMetrics();
+  async updateHeroLocation(organizationId: string, tenantId: string): Promise<any> {
+    if (!organizationId || !tenantId) {
+      console.error('[OrganizationsSingleton] updateHeroLocation: organizationId and tenantId are required');
+      return null;
+    }
+
+    try {
+      const result = await this.makeAuthenticatedRequest<any>(
+        `/api/organizations/${organizationId}/hero-location`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ tenantId })
+        },
+        `org-hero-location-${organizationId}`
+      );
+
+      return result || null;
+    } catch (error) {
+      console.error('[OrganizationsSingleton] Failed to update hero location:', error);
+      return null;
+    }
   }
 
   /**
-   * Reset metrics
+   * Mirror categories from platform to GBP
+   * Uses the /api/categories/mirror endpoint
    */
-  public resetMetrics(): void {
-    this.client.resetMetrics();
+  async mirrorCategories(requestData: {
+    strategy: 'platform_to_gbp';
+    dryRun: boolean;
+    scope: 'tenant' | 'organization';
+    tenantId?: string;
+    organizationId?: string;
+  }): Promise<any> {
+    if (!requestData.scope || !requestData.strategy) {
+      console.error('[OrganizationsSingleton] mirrorCategories: scope and strategy are required');
+      return null;
+    }
+
+    if (requestData.scope === 'tenant' && !requestData.tenantId) {
+      console.error('[OrganizationsSingleton] mirrorCategories: tenantId is required for tenant scope');
+      return null;
+    }
+
+    if (requestData.scope === 'organization' && !requestData.organizationId) {
+      console.error('[OrganizationsSingleton] mirrorCategories: organizationId is required for organization scope');
+      return null;
+    }
+
+    try {
+      const result = await this.makeAuthenticatedRequest<any>(
+        '/api/categories/mirror',
+        {
+          method: 'POST',
+          body: JSON.stringify(requestData)
+        },
+        `org-mirror-categories-${requestData.scope}-${requestData.organizationId || requestData.tenantId}`
+      );
+
+      return result || null;
+    } catch (error) {
+      console.error('[OrganizationsSingleton] Failed to mirror categories:', error);
+      return null;
+    }
   }
+
+  /**
+   * Sync from hero location
+   * Uses the /api/organizations/:id/sync-from-hero endpoint
+   */
+  async syncFromHero(organizationId: string): Promise<any> {
+    if (!organizationId) {
+      console.error('[OrganizationsSingleton] syncFromHero: organizationId is required');
+      return null;
+    }
+
+    try {
+      const result = await this.makeAuthenticatedRequest<any>(
+        `/api/organizations/${organizationId}/sync-from-hero`,
+        {
+          method: 'POST',
+          body: JSON.stringify({})
+        },
+        `org-sync-from-hero-${organizationId}`
+      );
+
+      return result || null;
+    } catch (error) {
+      console.error('[OrganizationsSingleton] Failed to sync from hero:', error);
+      return null;
+    }
+  }
+
 }
 
 // Export singleton instance

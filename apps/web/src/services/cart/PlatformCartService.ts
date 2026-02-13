@@ -1,8 +1,10 @@
 /**
  * Universal Singleton Cart Service
  * Multi-shop cart support with platform-wide cart management
+ * Uses PublicApiSingleton for automatic caching and API integration
  */
 
+import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
 import { CartItem, ShopCart, PlatformCart } from '@/types/cart';
 
 export interface ShopCartService {
@@ -16,12 +18,14 @@ export interface ShopCartService {
   mergeCarts(carts: Record<string, ShopCart>): Promise<PlatformCart>;
 }
 
-class PlatformCartService implements ShopCartService {
+class PlatformCartService extends PublicApiSingleton implements ShopCartService {
   private static instance: PlatformCartService;
   private carts: Map<string, ShopCart> = new Map();
   private readonly STORAGE_KEY = 'platform_shopping_cart';
 
   private constructor() {
+    super('platform-cart-service');
+    this.cacheTTL = 15 * 60 * 1000; // 15 minutes for cart data
     this.loadCartsFromStorage();
   }
 
@@ -57,6 +61,21 @@ class PlatformCartService implements ShopCartService {
   }
 
   async addToCart(shopId: string, productId: string, quantity: number): Promise<void> {
+    try {
+      // Sync with server first
+      await this.makePublicRequest<void>(
+        `/api/carts/${shopId}/items`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ productId, quantity })
+        },
+        `cart-add-${shopId}-${productId}`
+      );
+    } catch (error) {
+      console.warn('Failed to sync cart with server, using local fallback:', error);
+    }
+
+    // Local storage fallback
     const shopCart = this.carts.get(shopId) || {
       shopId,
       items: [],

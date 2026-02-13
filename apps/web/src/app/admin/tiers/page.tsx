@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner } from '@/components/ui';
 import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -71,12 +71,8 @@ export default function AdminTiersPage() {
   const loadTiers = async () => {
     try {
       setTiersLoading(true);
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const res = await api.get(`${apiBaseUrl}/api/admin/tier-system/tiers`);
-      if (res.ok) {
-        const data = await res.json();
-        setDbTiers(data.tiers || []);
-      }
+      const data = await platformHomeService.getAdminTiers();
+      setDbTiers(data || []);
     } catch (e) {
       console.error('Failed to load tiers:', e);
     } finally {
@@ -87,12 +83,10 @@ export default function AdminTiersPage() {
   const loadTenants = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/api/admin/tiers/tenants');
-      if (!res.ok) throw new Error('Failed to load tenants');
-      const data = await res.json();
+      const data = await platformHomeService.getAdminTierTenants();
       
       // Use the admin tenants endpoint which includes tier information
-      const tenantsArray = data.tenants || [];
+      const tenantsArray = data || [];
       const transformedTenants = tenantsArray.map((tenant: any) => ({
         id: tenant.id,
         name: tenant.name,
@@ -125,21 +119,16 @@ export default function AdminTiersPage() {
       console.log(`[Tier Management] Updating tenant ${tenantId} to tier: ${tier}, status: ${status}`);
 
       // Call the correct admin tier management endpoint
-      const res = await api.patch(`/api/admin/tiers/tenants/${tenantId}`, {
+      const responseData = await platformHomeService.updateTenantTier(tenantId, {
         subscriptionTier: tier,
         subscriptionStatus: status,
         reason: 'Updated via admin tiers page',
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (res.status === 404) {
-          throw new Error(`This tenant only exists locally and cannot be updated on the production server. Create the tenant on production first.`);
-        }
-        throw new Error(data.message || data.error || 'Failed to update tier');
+      if (!responseData) {
+        throw new Error('Failed to update tier');
       }
 
-      const responseData = await res.json();
       console.log(`[Tier Management] Update response:`, responseData);
 
       setSuccess(`Successfully updated tier for location`);

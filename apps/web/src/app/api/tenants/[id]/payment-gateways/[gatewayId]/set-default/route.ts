@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 
 export async function POST(
   request: NextRequest,
@@ -9,27 +8,20 @@ export async function POST(
   try {
     const { id, gatewayId } = await params;
     
-    // Forward Authorization header
-    const authHeader = request.headers.get('authorization');
-    const headers: HeadersInit = {};
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
+    const result = await tenantInfoService.setDefaultPaymentGateway(id, gatewayId);
+    
+    if (!result) {
+      return NextResponse.json(
+        { error: 'Failed to set default payment gateway' },
+        { status: 500 }
+      );
     }
-
-    const response = await fetch(
-      `${API_BASE_URL}/api/tenants/${id}/payment-gateways/${gatewayId}/set-default`,
-      {
-        method: 'POST',
-        headers,
-      }
-    );
-
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    
+    return NextResponse.json({ success: true, gateway: result });
   } catch (error) {
     console.error('[Payment Gateways API] Set default error:', error);
     return NextResponse.json(
-      { error: 'proxy_failed' },
+      { error: 'Failed to set default payment gateway' },
       { status: 500 }
     );
   }

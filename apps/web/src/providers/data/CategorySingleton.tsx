@@ -6,6 +6,7 @@
  */
 
 import { createContext, useContext, useReducer, useCallback, useMemo, useRef, ReactNode } from 'react';
+import { PublicApiSingleton } from '../base/UniversalSingleton';
 
 // ====================
 // TYPES & INTERFACES
@@ -52,6 +53,54 @@ type CategoryAction =
   | { type: 'FETCH_SUCCESS'; categories: Category[]; cacheKey: string }
   | { type: 'FETCH_ERROR'; error: string }
   | { type: 'CLEAR_CACHE' };
+
+// ====================
+// CATEGORY SERVICE
+// ====================
+
+class CategoryService extends PublicApiSingleton {
+  private static instance: CategoryService;
+
+  private constructor() {
+    super('category-service');
+    this.cacheTTL = 15 * 60 * 1000; // 15 minutes
+  }
+
+  static getInstance(): CategoryService {
+    if (!CategoryService.instance) {
+      CategoryService.instance = new CategoryService();
+    }
+    return CategoryService.instance;
+  }
+
+  async fetchCategories(options: CategoryFetchOptions = {}): Promise<Category[]> {
+    const {
+      includeChildren = true,
+      includeProductCount = true,
+    } = options;
+
+    const params = new URLSearchParams();
+    if (includeChildren) params.append('includeChildren', 'true');
+    if (includeProductCount) params.append('includeProductCount', 'true');
+
+    const cacheKey = `categories_${includeChildren}_${includeProductCount}`;
+
+    try {
+      const response = await this.makePublicRequest<{
+        success: boolean;
+        data: { categories: Category[] };
+      }>(`/api/directory/categories?${params}`, {}, cacheKey);
+
+      if (!response.success || !response.data || !response.data.categories) {
+        throw new Error('Invalid response format');
+      }
+
+      return response.data.categories;
+    } catch (error) {
+      throw error;
+    }
+  }
+}
 
 // ====================
 // CONSTANTS
@@ -178,36 +227,19 @@ export const CategoryProvider: React.FC<CategoryProviderProps> = ({ children }) 
     dispatch({ type: 'FETCH_START' });
 
     try {
-      const params = new URLSearchParams();
-      if (includeChildren) params.append('includeChildren', 'true');
-      if (includeProductCount) params.append('includeProductCount', 'true');
-
-      const response = await fetch(
-        `${getApiBaseUrl()}/api/directory/categories?${params}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch categories: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.success || !data.data || !data.data.categories) {
-        throw new Error('Invalid response format');
-      }
+      const categoryService = CategoryService.getInstance();
+      const categories = await categoryService.fetchCategories({
+        includeChildren,
+        includeProductCount
+      });
 
       dispatch({
         type: 'FETCH_SUCCESS',
-        categories: data.data.categories,
+        categories,
         cacheKey,
       });
 
-      return { categories: data.data.categories, fromCache: false };
+      return { categories, fromCache: false };
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button, ConfirmDialog } from '@/components/ui';
 import PageHeader from '@/components/PageHeader';
-import { api } from '@/lib/api';
+import { itemsSingletonService } from '@/services/ItemsSingletonService';
 import { Item } from '@/services/itemsDataService';
 
 interface TrashBinClientProps {
@@ -55,19 +55,13 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
       setError(null);
       
       // Load items and capacity in parallel
-      const [itemsResponse, capacityResponse] = await Promise.all([
-        api.get(`/api/items?tenantId=${tenantId}&status=trashed&limit=100`),
-        api.get(`/api/trash/capacity?tenantId=${tenantId}`)
+      const [itemsData, capacityData] = await Promise.all([
+        itemsSingletonService.getTrashedItems(tenantId, 100),
+        itemsSingletonService.getTrashCapacity(tenantId)
       ]);
       
-      if (!itemsResponse.ok) throw new Error('Failed to load trash');
-      const itemsData = await itemsResponse.json();
       setItems(itemsData.items || []);
-      
-      if (capacityResponse.ok) {
-        const capacityData = await capacityResponse.json();
-        setCapacity(capacityData);
-      }
+      setCapacity(capacityData);
     } catch (err) {
       console.error('[TrashBin] Load error:', err);
       setError('Failed to load trash bin');
@@ -91,8 +85,7 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
       variant: 'warning',
       onConfirm: async () => {
         try {
-          const response = await api.patch(`/api/items/${item.id}/restore`);
-          if (!response.ok) throw new Error('Failed to restore');
+          await itemsSingletonService.restoreItem(item.id);
           await loadTrash();
         } catch (err) {
           console.error('[TrashBin] Restore error:', err);
@@ -111,8 +104,7 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
       variant: 'danger',
       onConfirm: async () => {
         try {
-          const response = await api.delete(`/api/items/${item.id}/purge`);
-          if (!response.ok) throw new Error('Failed to purge');
+          await itemsSingletonService.purgeItem(item.id);
           await loadTrash();
         } catch (err) {
           console.error('[TrashBin] Purge error:', err);
@@ -133,7 +125,7 @@ export default function TrashBinClient({ tenantId }: TrashBinClientProps) {
       variant: 'danger',
       onConfirm: async () => {
         try {
-          await Promise.all(items.map(item => api.delete(`/api/items/${item.id}/purge`)));
+          await itemsSingletonService.emptyTrash(tenantId, items.map(item => item.id));
           await loadTrash();
         } catch (err) {
           console.error('[TrashBin] Empty trash error:', err);

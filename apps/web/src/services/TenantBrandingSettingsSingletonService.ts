@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
 
 export interface TenantBrandingSettings {
   shopName: string;
@@ -35,19 +35,12 @@ export interface TenantBrandingSettings {
   description: string;
 }
 
-class TenantBrandingSettingsSingletonService {
+class TenantBrandingSettingsSingletonService extends AuthenticatedApiSingleton {
   private static instance: TenantBrandingSettingsSingletonService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with platform defaults
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 10 * 60 * 1000, // 10 minutes for tenant branding (moderate cache)
-      enableLogging: true,
-      enableMetrics: true
-    });
+    super('tenant-branding-settings-singleton');
+    this.cacheTTL = 10 * 60 * 1000; // 10 minutes for tenant branding (moderate cache)
   }
 
   public static getInstance(): TenantBrandingSettingsSingletonService {
@@ -63,12 +56,14 @@ class TenantBrandingSettingsSingletonService {
    */
   async getTenantBrandingSettings(tenantId: string): Promise<TenantBrandingSettings | null> {
     try {
-      const result = await this.client.makeRequest<TenantBrandingSettings>(
-        `/api/branding/${tenantId}`
+      const result = await this.makeAuthenticatedRequest<TenantBrandingSettings>(
+        `/api/branding/${tenantId}`,
+        {},
+        `tenant-branding-${tenantId}`
       );
 
-      // makeRequest returns ApiResponse<T>, so extract data from response
-      return result?.data || null;
+      // makeAuthenticatedRequest returns data directly
+      return result;
     } catch (error) {
       console.error('[TenantBrandingSettingsSingleton] Failed to get branding settings:', error);
       return null;
@@ -81,37 +76,21 @@ class TenantBrandingSettingsSingletonService {
    */
   async updateTenantBrandingSettings(tenantId: string, settings: Partial<TenantBrandingSettings>): Promise<TenantBrandingSettings | null> {
     try {
-      const result = await this.client.makeRequest<TenantBrandingSettings>(
+      const result = await this.makeAuthenticatedRequest<TenantBrandingSettings>(
         `/api/branding/${tenantId}`,
         {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify(settings),
-        }
+        },
+        `tenant-branding-${tenantId}`
       );
 
-      // makeRequest returns ApiResponse<T>, so extract data from response
-      return result?.data || null;
+      // makeAuthenticatedRequest returns data directly
+      return result;
     } catch (error) {
       console.error('[TenantBrandingSettingsSingleton] Failed to update branding settings:', error);
       return null;
     }
-  }
-
-  /**
-   * Get performance metrics
-   */
-  public getMetrics() {
-    return this.client.getMetrics();
-  }
-
-  /**
-   * Reset metrics
-   */
-  public resetMetrics(): void {
-    this.client.resetMetrics();
   }
 }
 

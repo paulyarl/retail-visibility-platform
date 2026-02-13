@@ -26,7 +26,7 @@ export function useGDPR() {
 
   const fetchExports = useCallback(async () => {
     try {
-      const data = await gdprService.getExportHistory();
+      const data = await gdprService.getExports();
       setExports(data);
     } catch (err) {
       console.error('Failed to fetch exports:', err);
@@ -35,7 +35,7 @@ export function useGDPR() {
 
   const fetchDeletionStatus = useCallback(async () => {
     try {
-      const data = await gdprService.getAccountDeletionStatus();
+      const data = await gdprService.getDeletionStatus();
       setDeletionRequest(data);
     } catch (err) {
       console.error('Failed to fetch deletion status:', err);
@@ -44,7 +44,7 @@ export function useGDPR() {
 
   const fetchConsents = useCallback(async () => {
     try {
-      const data = await gdprService.getUserConsents();
+      const data = await gdprService.getConsents();
       setConsents(data);
     } catch (err) {
       console.error('Failed to fetch consents:', err);
@@ -107,23 +107,23 @@ export function useGDPR() {
 
   const updateConsent = useCallback(async (data: ConsentUpdateData) => {
     try {
-      const result = await gdprService.updateConsent(data);
-      setConsents(prev => prev.map(c => c.type === data.type ? result : c));
-      return result;
+      await gdprService.updateConsent(data);
+      // After updating, refetch consents to get the latest state
+      await fetchConsents();
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Failed to update consent');
     }
-  }, []);
+  }, [fetchConsents]);
 
   const updatePreference = useCallback(async (data: PreferenceUpdateData) => {
     try {
-      const result = await gdprService.updatePreference(data);
-      setPreferences(prev => prev.map(p => p.key === data.key ? result : p));
-      return result;
+      await gdprService.updatePreference(data);
+      // After updating, refetch preferences to get the latest state
+      await fetchPreferences();
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Failed to update preference');
     }
-  }, []);
+  }, [fetchPreferences]);
 
   useEffect(() => {
     const loadData = async () => {

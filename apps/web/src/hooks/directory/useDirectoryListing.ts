@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { api } from '@/lib/api';
+import { directoryListingService } from '@/services/DirectoryListingSingletonService';
 
 export interface DirectoryListing {
   id: string;
@@ -48,15 +48,13 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
       setLoading(true);
       setError(null);
       
-      const response = await api.get(`/api/tenants/${tenantId}/directory/listing`);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `Failed to fetch directory listing (${response.status})`);
+      const response = await directoryListingService.getDirectoryListing(tenantId);
+      
+      if (!response) {
+        throw new Error('Failed to fetch directory listing');
       }
-
-      const data = await response.json();
-      setListing(data);
+      
+      setListing(response);
     } catch (err) {
       console.error('Error fetching directory listing:', err);
       setError(err instanceof Error ? err.message : 'Failed to load listing');
@@ -71,16 +69,8 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     try {
       setError(null);
       
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.post(`${apiUrl}/api/tenants/${tenantId}/directory/publish`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = errorData.message || 'Failed to publish listing';
-        setError(errorMessage);
-        return;
-      }
-
+      await directoryListingService.publishDirectoryListing(tenantId);
+      
       await fetchListing();
     } catch (err) {
       console.error('Error publishing listing:', err);
@@ -94,13 +84,8 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     try {
       setError(null);
       
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await api.post(`${apiUrl}/api/tenants/${tenantId}/directory/unpublish`);
-
-      if (!response.ok) {
-        throw new Error('Failed to unpublish listing');
-      }
-
+      await directoryListingService.unpublishDirectoryListing(tenantId);
+      
       await fetchListing();
     } catch (err) {
       console.error('Error unpublishing listing:', err);
@@ -124,22 +109,17 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
       };
       console.log('[updateSettings] Sending data:', requestData);
       
-      const response = await api.patch(`/api/tenants/${tenantId}/directory/listing`, requestData);
+      const updatedListing = await directoryListingService.updateDirectoryListing(tenantId, updates);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error', message: `HTTP ${response.status}` }));
-        console.error('[updateSettings] Server error:', errorData);
-        const errorMessage = errorData.message || errorData.error || `Failed to update listing (HTTP ${response.status})`;
-        throw new Error(errorMessage);
+      if (updatedListing) {
+        setListing(updatedListing);
       }
-
-      await fetchListing();
     } catch (err) {
       console.error('Error updating listing:', err);
       setError(err instanceof Error ? err.message : 'Failed to update');
       throw err;
     }
-  }, [tenantId, fetchListing]);
+  }, [tenantId, setListing]);
 
   useEffect(() => {
     fetchListing();

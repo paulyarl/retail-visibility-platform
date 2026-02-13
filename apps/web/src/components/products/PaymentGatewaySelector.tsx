@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { CreditCard, AlertCircle } from 'lucide-react';
 import { Label } from '@/components/ui/Label';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
 
 interface Gateway {
   id: string;
@@ -53,20 +54,26 @@ export default function PaymentGatewaySelector({
       try {
         setLoading(true);
         
-        // Import api dynamically to avoid SSR issues
-        const { api } = await import('@/lib/api');
-        const response = await api.get(`/api/tenants/${tenantId}/payment-gateways`);
+        const gateways = await tenantInfoService.getPaymentGateways(tenantId);
         
-        if (!response.ok) {
+        if (!gateways) {
           throw new Error('Failed to load payment gateways');
         }
 
-        const data = await response.json();
-        const activeGateways = (data.gateways || []).filter((g: Gateway) => g.is_active);
+        // Filter active gateways
+        const activeGateways = gateways.filter(g => g.is_active);
         setGateways(activeGateways);
-      } catch (err: any) {
-        console.error('[PaymentGatewaySelector] Load error:', err);
-        setError(err.message);
+
+        // Auto-select default gateway if available
+        const defaultGateway = activeGateways.find(g => g.is_default);
+        if (defaultGateway) {
+          setSelectedGatewayId(defaultGateway.id);
+        } else if (activeGateways.length > 0) {
+          setSelectedGatewayId(activeGateways[0].id);
+        }
+      } catch (error) {
+        console.error('Failed to load payment gateways:', error);
+        setError('Failed to load payment gateways');
       } finally {
         setLoading(false);
       }

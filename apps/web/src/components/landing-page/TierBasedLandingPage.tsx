@@ -8,7 +8,7 @@ import { getLandingPageFeatures } from '@/lib/landing-page-tiers';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { SafeImage } from '@/components/SafeImage';
 import ProductActions from '@/components/products/ProductActions';
-import { api } from '@/lib/api';
+import { storefrontService } from '@/services/StorefrontService';
 import Link from 'next/link';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 
@@ -27,14 +27,9 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
       try {
         setIsFetchingTierAndLogo(true);
         
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        
         // Use public tier endpoint (no auth required for public product page)
-        //const tierResponse = await fetch(`${apiUrl}/api/tenants/${tenantId}/tier/public`);
-        const tierResponse = await api.get(`${apiUrl}/api/tenants/${tenantId}/tier/public`);
-        if (tierResponse.ok) {
-          const tierData = await tierResponse.json();
-          
+        const tierData = await storefrontService.getPublicTier(tenantId);
+        if (tierData) {
           // Use tier_key for clean single-word tier name (e.g., "professional")
           const effectiveTier = tierData.effective?.tier_key || tierData.tier || 'starter';
           setTenantTier(effectiveTier);
@@ -42,21 +37,18 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
           // Get tenant profile for logo if professional or above
           if (effectiveTier === 'professional' || effectiveTier === 'enterprise' || effectiveTier === 'organization' || effectiveTier === 'chain_professional' || effectiveTier === 'chain_enterprise') {
             try {
-              const profileResponse = await api.get(`${apiUrl}/api/public/tenant/${tenantId}/profile`);
-              if (profileResponse.ok) {
-                const profile = await profileResponse.json();
+              const profile = await storefrontService.getPublicTenantProfile(tenantId);
+              if (profile) {
                 setTenantLogo(profile.logo_url || null);
               } else {
-                console.warn('[QR Code] Profile fetch failed:', profileResponse.status);
+                console.error('Failed to fetch tenant profile');
               }
-            } catch (error) {
-              console.warn('Failed to fetch tenant logo:', error);
+            } catch (profileError) {
+              console.error('Error fetching tenant profile:', profileError);
             }
-          } else {
-            console.log('[QR Code] Tier not professional+, skipping logo fetch');
           }
         } else {
-          console.warn('[QR Code] Tier fetch failed:', tierResponse.status);
+          console.error('Failed to fetch tier information');
         }
       } catch (error) {
         console.error('[QR Code] Error fetching tenant info:', error);

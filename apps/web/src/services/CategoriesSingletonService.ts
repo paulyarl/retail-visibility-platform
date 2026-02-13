@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
 
 export interface Category {
   id: string;
@@ -26,19 +26,12 @@ export interface CategoriesResponse {
   hasChildren: boolean;
 }
 
-class CategoriesSingletonService {
+class CategoriesSingletonService extends PublicApiSingleton {
   private static instance: CategoriesSingletonService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with platform defaults
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 10 * 60 * 1000, // 10 minutes for categories (moderate change frequency)
-      enableLogging: true,
-      enableMetrics: true
-    });
+    super('categories-singleton');
+    this.cacheTTL = 10 * 60 * 1000; // 10 minutes for categories (moderate change frequency)
   }
 
   public static getInstance(): CategoriesSingletonService {
@@ -54,11 +47,13 @@ class CategoriesSingletonService {
    */
   async getCategories(includeChildren: boolean = true): Promise<Category[]> {
     try {
-      const result = await this.client.makeRequest<any>(
-        `/api/directory/categories?includeChildren=${includeChildren}`
+      const result = await this.makePublicRequest<{ categories: Category[] }>(
+        `/api/directory/categories?includeChildren=${includeChildren}`,
+        {},
+        `categories-${includeChildren}`
       );
 
-      return result.success && result.data?.categories ? result.data.categories : [];
+      return result.categories || [];
     } catch (error) {
       console.error('[CategoriesSingleton] Failed to get categories:', error);
       return [];
@@ -76,11 +71,13 @@ class CategoriesSingletonService {
     }
 
     try {
-      const result = await this.client.makeRequest<any>(
-        `/api/directory/categories/${slug}`
+      const result = await this.makePublicRequest<{ category: Category }>(
+        `/api/directory/categories/${slug}`,
+        {},
+        `category-${slug}`
       );
 
-      return result.success && result.data?.category ? result.data.category : null;
+      return result.category || null;
     } catch (error) {
       console.error('[CategoriesSingleton] Failed to get category by slug:', error);
       return null;
@@ -98,30 +95,19 @@ class CategoriesSingletonService {
     }
 
     try {
-      const result = await this.client.makeRequest<any>(
-        `/api/directory/categories?tenantId=${tenantId}&includeChildren=${includeChildren}`
+      const result = await this.makePublicRequest<{ categories: Category[] }>(
+        `/api/directory/categories?tenantId=${tenantId}&includeChildren=${includeChildren}`,
+        {},
+        `categories-tenant-${tenantId}-${includeChildren}`
       );
 
-      return result.success && result.data?.categories ? result.data.categories : [];
+      return result.categories || [];
     } catch (error) {
       console.error('[CategoriesSingleton] Failed to get categories by tenant:', error);
       return [];
     }
   }
 
-  /**
-   * Get performance metrics
-   */
-  public getMetrics() {
-    return this.client.getMetrics();
-  }
-
-  /**
-   * Reset metrics
-   */
-  public resetMetrics(): void {
-    this.client.resetMetrics();
-  }
 }
 
 // Export singleton instance

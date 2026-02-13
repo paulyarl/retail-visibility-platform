@@ -6,6 +6,7 @@ import { useProductSingleton } from '@/providers/data/ProductSingleton';
 import { useCategorySingleton } from '@/providers/data/CategorySingleton';
 import PhotoSingleton from '@/lib/singletons/PhotoSingleton';
 import ItemUpdateService from '@/lib/singletons/ItemUpdateService';
+import { itemsService } from '@/services/ItemsSingletonService';
 import { Card, CardContent, Badge, Button, Modal, ModalFooter } from '@/components/ui';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import SyncStatusIndicator from '@/components/items/SyncStatusIndicator';
@@ -125,20 +126,12 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       setLoading(true);
       setError(null);
 
-      // Fetch item details via API to get full tenant-specific data
-      const response = await fetch(`/api/items/${itemId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
+      // Fetch item details via ItemsSingletonService (cached, authenticated)
+      const itemData = await itemsService.getItem(itemId);
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch item: ${response.status}`);
+      if (!itemData) {
+        throw new Error('Item not found');
       }
-      
-      const itemData = await response.json();
-      if (!itemData) throw new Error('Failed to load item');
       
       // Extract enriched fields from metadata if present
       const metadata = itemData.metadata || {};
@@ -309,28 +302,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         const itemPhotos = await photoSingleton.fetchItemPhotos(itemId);
         setPhotos(itemPhotos);
       } catch (photoError) {
-        console.warn('Failed to load photos via singleton, trying direct fetch:', photoError);
-        
-        // Fallback to direct fetch if singleton fails
-        try {
-          const photoResponse = await fetch(`/api/items/${itemId}/photos`, {
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-          });
-          
-          if (photoResponse.ok) {
-            const photoData = await photoResponse.json();
-            setPhotos(photoData.photos || []);
-          } else {
-            console.warn('Photo fetch failed, using empty array:', photoResponse.status);
-            setPhotos([]);
-          }
-        } catch (fallbackError) {
-          console.error('Both singleton and direct photo fetch failed:', fallbackError);
-          setPhotos([]);
-        }
+        console.warn('Failed to load photos via singleton:', photoError);
+        setPhotos([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load item');

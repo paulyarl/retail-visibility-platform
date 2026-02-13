@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { ArrowLeft, Zap, ExternalLink, RefreshCw, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 
 // Types
@@ -58,11 +58,8 @@ export default function SquareIntegrationPage() {
   // Fetch status
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await api.get(`/api/integrations/${tenantId}/square/status`);
-      if (res.ok) {
-        const data = await res.json();
-        setStatus(data);
-      }
+      const data = await platformHomeService.getSquareStatus(tenantId);
+      setStatus(data);
     } catch (err) {
       console.error('Failed to fetch status:', err);
     }
@@ -87,8 +84,7 @@ export default function SquareIntegrationPage() {
     try {
       setActionLoading(true);
       setError(null);
-      const res = await api.get(`/api/integrations/${tenantId}/square/oauth/authorize`);
-      const data = await res.json();
+      const data = await platformHomeService.getSquareOAuthAuthorize(tenantId);
       
       if (data.error === 'not_implemented') {
         alert('Square OAuth integration coming soon! This feature is currently in development.');
@@ -107,8 +103,7 @@ export default function SquareIntegrationPage() {
     if (!confirm('Are you sure you want to disconnect Square? This will stop syncing your inventory.')) return;
     try {
       setActionLoading(true);
-      const res = await api.post(`/api/integrations/${tenantId}/square/disconnect`);
-      const data = await res.json();
+      const data = await platformHomeService.disconnectSquare(tenantId);
       
       if (data.error === 'not_implemented') {
         alert('Square integration is not yet connected.');
@@ -126,8 +121,7 @@ export default function SquareIntegrationPage() {
   const handleSync = async () => {
     try {
       setActionLoading(true);
-      const res = await api.post(`/api/integrations/${tenantId}/square/sync`);
-      const data = await res.json();
+      const data = await platformHomeService.startSquareSync(tenantId);
       
       if (data.error === 'not_implemented') {
         alert('Square sync is not yet available.');

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { PublicApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
 
 // ====================
 // STORE INTERFACES
@@ -67,7 +67,7 @@ export interface StoreCategory {
 // STORE SINGLETON CLASS
 // ====================
 
-class StoreSingleton extends UniversalSingleton {
+class StoreSingleton extends PublicApiSingleton {
   private static instance: StoreSingleton;
   
   // Store data
@@ -76,7 +76,8 @@ class StoreSingleton extends UniversalSingleton {
   private featuredStores: Store[] = [];
 
   private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
-    super(singletonKey, cacheOptions);
+    super(singletonKey);
+    this.cacheTTL = 10 * 60 * 1000; // 10 minutes for store data
   }
 
   static getInstance(): StoreSingleton {
@@ -84,34 +85,6 @@ class StoreSingleton extends UniversalSingleton {
       StoreSingleton.instance = new StoreSingleton('store-singleton');
     }
     return StoreSingleton.instance;
-  }
-  
-  // ====================
-  // API METHODS
-  // ====================
-  
-  private async makePublicRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
-    this.apiCalls++;
-    
-    const publicOptions: RequestInit = {
-      ...options,
-      headers: {
-        ...options.headers,
-        'Content-Type': 'application/json',
-      }
-    };
-    
-    const response = await fetch(url, publicOptions);
-    
-    if (!response.ok) {
-      throw new Error(`Public API request failed: ${response.statusText}`);
-    }
-    
-    return response.json();
-  }
-  
-  private handlePublicError(error: any): void {
-    console.error('Public API error:', error);
   }
   
   // ====================
@@ -133,17 +106,7 @@ class StoreSingleton extends UniversalSingleton {
   async fetchFeaturedStores(location?: { lat: number; lng: number }, limit: number = 20): Promise<Store[]> {
     const cacheKey = `featured-stores-${location?.lat || 'default'}-${location?.lng || 'default'}-${limit}`;
     
-    // Check cache first
-    const cached = await this.getFromCache<Store[]>(cacheKey);
-    if (cached) {
-      this.featuredStores = cached;
-      return cached;
-    }
-    
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      let url = `${apiUrl}/api/directory/featured-stores`;
-      
       const params = new URLSearchParams();
       if (location && location.lat != null && location.lng != null) {
         params.append('lat', location.lat.toString());
@@ -151,51 +114,35 @@ class StoreSingleton extends UniversalSingleton {
       }
       params.append('limit', limit.toString());
       
-      const stores = await this.makePublicRequest<any>(`${url}?${params}`);
+      const response = await this.makePublicRequest<any>(`/api/directory/featured-stores?${params}`, {}, cacheKey);
       
       // Extract stores from response
-      const storesData = stores.data?.stores || stores;
-      
-      // Store in cache
-      await this.setCache(cacheKey, storesData);
+      const storesData = response.data?.stores || response;
       
       // Update internal state
       this.featuredStores = storesData;
       storesData.forEach((store: Store) => {
         this.stores.set(store.id, store);
       });
-
+      
       return storesData;
     } catch (error) {
       this.handlePublicError(error);
-      throw error;
+      return [];
     }
   }
 
   async fetchStoreById(storeId: string): Promise<Store | null> {
     const cacheKey = `store-${storeId}`;
     
-    // Check cache first
-    const cached = await this.getFromCache<Store>(cacheKey);
-    if (cached) {
-      this.stores.set(storeId, cached);
-      return cached;
-    }
-    
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const url = `${apiUrl}/api/directory/stores/${storeId}`;
-      
-      const response = await this.makePublicRequest<any>(url);
+      const response = await this.makePublicRequest<any>(`/api/directory/stores/${storeId}`, {}, cacheKey);
 
       if (!response.success || !response.data) {
         throw new Error('Store not found');
       }
 
       const store = response.data;
-      
-      // Store in cache
-      await this.setCache(cacheKey, store);
       
       this.stores.set(storeId, store);
       
@@ -209,30 +156,14 @@ class StoreSingleton extends UniversalSingleton {
   async fetchStoreCategories(): Promise<StoreCategory[]> {
     const cacheKey = 'store-categories';
     
-    // Check cache first
-    const cached = await this.getFromCache<StoreCategory[]>(cacheKey);
-    if (cached) {
-      this.categories.clear();
-      cached.forEach((cat: StoreCategory) => {
-        this.categories.set(cat.id, cat);
-      });
-      return cached;
-    }
-    
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const url = `${apiUrl}/api/directory/categories`;
-      
-      const response = await this.makePublicRequest<any>(url);
+      const response = await this.makePublicRequest<any>('/api/directory/categories', {}, cacheKey);
 
       if (!response.success || !response.data) {
         throw new Error('Failed to fetch categories');
       }
 
       const categories = response.data;
-      
-      // Store in cache
-      await this.setCache(cacheKey, categories);
       
       // Update internal state
       this.categories.clear();
@@ -304,7 +235,7 @@ class StoreSingleton extends UniversalSingleton {
     this.stores.clear();
     this.categories.clear();
     this.featuredStores = [];
-    this.clearCache(); // Use local method
+    super.clearCache(); // Call parent method
   }
 }
 

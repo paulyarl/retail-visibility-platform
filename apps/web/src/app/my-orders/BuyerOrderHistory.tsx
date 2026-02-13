@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Package, Search, ShoppingBag, Mail, Phone, MapPin, Truck, Calendar } from 'lucide-react';
 import OrderReceipt from '@/components/checkout/OrderReceipt';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { tenantOrderService } from '@/services/TenantOrderService';
 
 interface BuyerOrder {
   orderId: string;
@@ -115,15 +116,14 @@ export default function BuyerOrderHistory() {
       if (emailToSearch) params.append('email', emailToSearch);
       if (phoneToSearch) params.append('phone', phoneToSearch);
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await fetch(`${apiUrl}/api/orders/buyer?${params}`);
+      const data = await tenantOrderService.getBuyerOrders({
+        email: emailToSearch,
+        phone: phoneToSearch,
+        page: 1,
+        limit: 50
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch orders');
-      }
-
-      const data = await response.json();
-      setOrders(data.orders || []);
+      setOrders(data?.orders || []);
 
       // Save to localStorage for convenience
       if (emailToSearch) localStorage.setItem('buyer_email', emailToSearch);
@@ -149,38 +149,28 @@ export default function BuyerOrderHistory() {
 
     try {
       setConfirmingPickup(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
-      const response = await fetch(`${apiUrl}/api/orders/${orderId}/pickup`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          phone,
-        }),
-      });
+      const success = await tenantOrderService.confirmPickup(orderId);
+      
+      if (success) {
+        // Update local state
+        if (selectedOrder && selectedOrder.orderId === orderId) {
+          setSelectedOrder({
+            ...selectedOrder,
+            fulfillmentStatus: 'fulfilled',
+          });
+        }
 
-      if (!response.ok) {
+        setOrders(orders.map(order => 
+          order.orderId === orderId 
+            ? { ...order, fulfillmentStatus: 'fulfilled' }
+            : order
+        ));
+
+        alert('Order marked as picked up!');
+      } else {
         throw new Error('Failed to confirm pickup');
       }
-
-      // Update local state
-      if (selectedOrder && selectedOrder.orderId === orderId) {
-        setSelectedOrder({
-          ...selectedOrder,
-          fulfillmentStatus: 'fulfilled',
-        });
-      }
-
-      setOrders(orders.map(order => 
-        order.orderId === orderId 
-          ? { ...order, fulfillmentStatus: 'fulfilled' }
-          : order
-      ));
-
-      alert('Order marked as picked up!');
     } catch (error) {
       console.error('Error confirming pickup:', error);
       alert('Failed to confirm pickup. Please try again.');
@@ -193,51 +183,36 @@ export default function BuyerOrderHistory() {
     try {
       setCancellingOrder(true);
       
-      // Use custom reason if "custom" is selected, otherwise use the dropdown value
       const finalReason = cancellationReason === 'custom' ? customReason.trim() : cancellationReason;
       
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await fetch(`${apiUrl}/api/orders/${selectedOrder?.orderId}/cancel`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          phone,
-          cancellationReason: finalReason || undefined,
-        }),
-      });
+      const success = await tenantOrderService.cancelOrder(selectedOrder?.orderId || '', finalReason || 'Customer request');
+      
+      if (success) {
+        // Update local state
+        if (selectedOrder) {
+          setSelectedOrder({
+            ...selectedOrder,
+            fulfillmentStatus: 'cancelled',
+            cancellationReason: finalReason,
+          });
+        }
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to cancel order');
+        setOrders(orders.map(order => 
+          order.orderId === selectedOrder?.orderId 
+            ? { ...order, fulfillmentStatus: 'cancelled', cancellationReason: finalReason }
+            : order
+        ));
+
+        alert('Order cancelled successfully!');
+      } else {
+        throw new Error('Failed to cancel order');
       }
-
-      // Update local state
-      if (selectedOrder) {
-        setSelectedOrder({
-          ...selectedOrder,
-          fulfillmentStatus: 'cancelled',
-          cancellationReason: finalReason,
-        });
-      }
-
-      setOrders(orders.map(order => 
-        order.orderId === selectedOrder?.orderId 
-          ? { ...order, fulfillmentStatus: 'cancelled', cancellationReason: finalReason }
-          : order
-      ));
-
-      setShowCancelConfirm(false);
-      setCancellationReason('');
-      setCustomReason('');
-      alert('Order cancelled successfully. The store has been notified.');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error cancelling order:', error);
-      alert(error.message || 'Failed to cancel order. Please contact the store directly.');
+      alert('Failed to cancel order. Please try again.');
     } finally {
       setCancellingOrder(false);
+      setShowCancelConfirm(false);
     }
   };
 
@@ -258,15 +233,10 @@ export default function BuyerOrderHistory() {
   const fetchDigitalDownloads = async (orderId: string) => {
     try {
       setLoadingDownloads(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await fetch(`${apiUrl}/api/download/orders/${orderId}/downloads`);
       
-      if (response.ok) {
-        const data = await response.json();
-        setDigitalDownloads(data.downloads || []);
-      } else {
-        setDigitalDownloads([]);
-      }
+      const data = await tenantOrderService.getOrderDownloads(orderId);
+      
+      setDigitalDownloads(data?.downloads || []);
     } catch (error) {
       console.error('Error fetching digital downloads:', error);
       setDigitalDownloads([]);

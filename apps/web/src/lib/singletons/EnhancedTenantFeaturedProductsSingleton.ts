@@ -268,13 +268,52 @@ class EnhancedTenantFeaturedProductsSingleton {
         body: JSON.stringify({
           paths: [
             `/t/${this.tenantId}`,
-            `/directory/t/${this.tenantId}`,
-            `/api/public/products/featured?tenantId=${this.tenantId}`
+            `/t/${this.tenantId}/featured`,
+            `/t/${this.tenantId}/new-arrivals`,
+            `/t/${this.tenantId}/seasonal`
           ]
         })
       });
     } catch (error) {
-      console.warn('Failed to trigger storefront revalidation:', error);
+      console.error('[EnhancedTenantFeaturedProductsSingleton] Failed to trigger revalidation:', error);
+    }
+  }
+
+  /**
+   * Get featured types for a specific product variant
+   * Uses the /api/featured-products/item/:variantId endpoint
+   */
+  async getFeaturedTypes(variantId: string): Promise<any> {
+    try {
+      if (!variantId) {
+        throw new Error('Variant ID is required');
+      }
+
+      const response = await apiRequest(`/api/featured-products/item/${variantId}`);
+
+      return response;
+    } catch (error) {
+      console.error('[EnhancedTenantFeaturedProductsSingleton] Failed to get featured types:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get product photos
+   * Uses the /api/items/:productId/photos endpoint
+   */
+  async getProductPhotos(productId: string): Promise<any> {
+    try {
+      if (!productId) {
+        throw new Error('Product ID is required');
+      }
+
+      const response = await apiRequest(`/api/items/${productId}/photos`);
+
+      return response;
+    } catch (error) {
+      console.error('[EnhancedTenantFeaturedProductsSingleton] Failed to get product photos:', error);
+      return null;
     }
   }
 
