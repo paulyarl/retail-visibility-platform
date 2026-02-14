@@ -53,6 +53,51 @@ const StoreQuerySchema = z.object({
 // ====================
 
 /**
+ * GET /api/public/products
+ * Get general product listing (featured products across all tenants)
+ */
+router.get('/products', async (req, res) => {
+  try {
+    const query = ProductQuerySchema.parse(req.query);
+
+    console.log(`[Public API] General products request with query:`, query);
+
+    // Use FeaturedService to get general product listing
+    const { FeaturedService } = await import('../services/FeaturedService');
+    const featuredService = FeaturedService.getInstance();
+
+    const result = await featuredService.getFeaturedProducts({
+      limit: query.limit || 20,
+      lat: undefined,
+      lng: undefined,
+      radius: undefined,
+      category: query.category,
+      search: query.search,
+      sort: query.sort,
+      tenantId: undefined // Get from all tenants
+    });
+
+    res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache
+    res.setHeader('X-Service-Source', 'FeaturedService');
+
+    res.json({
+      success: true,
+      products: result.products || [],
+      total: result.total || result.products?.length || 0,
+      hasMore: result.hasMore || false,
+      cached: result.cached || false,
+      message: 'General product listing retrieved successfully'
+    });
+  } catch (error) {
+    console.error('[PUBLIC API] General products error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch general products'
+    });
+  }
+});
+
+/**
  * GET /api/public/products/:identifier
  * Get products by tenant identifier (tenant-id, slug, auto-id) - Universal Identifier Pattern
  */

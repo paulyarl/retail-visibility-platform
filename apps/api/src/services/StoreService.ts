@@ -77,7 +77,7 @@ export class StoreService extends UniversalSingleton {
    * Get stores with filtering and pagination (UniversalSingleton caching)
    */
   async getStores(query: StoreQuery = {}): Promise<StoreResponse> {
-    console.log(`[StoreService] Getting stores with query:`, query);
+    //console.log(`[StoreService] Getting stores with query:`, query);
 
     // Create cache key for UniversalSingleton
     const cacheKey = `stores:${JSON.stringify(query)}`;
@@ -85,11 +85,11 @@ export class StoreService extends UniversalSingleton {
     // Check UniversalSingleton cache first
     const cached = await this.getFromCache<StoreResponse>(cacheKey);
     if (cached) {
-      console.log(`[StoreService] Cache hit for stores query`);
+      //console.log(`[StoreService] Cache hit for stores query`);
       return cached;
     }
 
-    console.log(`[StoreService] Cache miss, fetching stores from database`);
+    //console.log(`[StoreService] Cache miss, fetching stores from database`);
 
     // Build orderBy clause
     let orderBy: any = { name: 'asc' };
@@ -161,7 +161,7 @@ export class StoreService extends UniversalSingleton {
       prisma.tenants.count({ where })
     ]);
 
-    console.log(`[StoreService] Found ${stores.length} stores out of ${total}`);
+    //console.log(`[StoreService] Found ${stores.length} stores out of ${total}`);
 
     // Transform results
     const transformedStores: StoreResult[] = stores.map((store: any) => {
@@ -203,7 +203,7 @@ export class StoreService extends UniversalSingleton {
 
     // Cache the result using UniversalSingleton
     await this.setCache(cacheKey, result, { ttl: 300 }); // 5 minutes cache
-    console.log(`[StoreService] Cached stores query result`);
+    //console.log(`[StoreService] Cached stores query result`);
 
     return result;
   }
@@ -212,7 +212,7 @@ export class StoreService extends UniversalSingleton {
    * Get single store by identifier (universal identifier support)
    */
   async getStoreByIdentifier(identifier: string): Promise<StoreResult | null> {
-    console.log(`[StoreService] Getting store by identifier: ${identifier}`);
+    //console.log(`[StoreService] Getting store by identifier: ${identifier}`);
 
     // Resolve tenant using universal identifier cache
     const resolvedTenant = await this.cache.resolveIdentifier(identifier);
@@ -222,7 +222,7 @@ export class StoreService extends UniversalSingleton {
       return null;
     }
 
-    console.log(`[StoreService] Resolved tenant: ${resolvedTenant.id} (${resolvedTenant.type})`);
+    //console.log(`[StoreService] Resolved tenant: ${resolvedTenant.id} (${resolvedTenant.type})`);
 
     const { prisma } = await import('../prisma');
 
@@ -276,7 +276,7 @@ export class StoreService extends UniversalSingleton {
       throw new Error('Search query is required');
     }
 
-    console.log(`[StoreService] Searching stores: "${query.search}"`);
+    //console.log(`[StoreService] Searching stores: "${query.search}"`);
 
     const where: any = {
       subscription_status: 'active',
@@ -347,7 +347,7 @@ export class StoreService extends UniversalSingleton {
    * Get trending stores
    */
   async getTrendingStores(limit: number = 12): Promise<StoreResult[]> {
-    console.log(`[StoreService] Getting trending stores, limit: ${limit}`);
+    //console.log(`[StoreService] Getting trending stores, limit: ${limit}`);
 
     // Use materialized view for trending stores
     const { getDirectPool } = await import('../utils/db-pool');
@@ -380,7 +380,7 @@ export class StoreService extends UniversalSingleton {
     const result = await pool.query(sqlQuery, [limit]);
     const stores = result.rows;
 
-    console.log(`[StoreService] Found ${stores.length} trending stores`);
+    //console.log(`[StoreService] Found ${stores.length} trending stores`);
 
     // Transform results
     const transformedStores: StoreResult[] = stores.map((store: any) => {

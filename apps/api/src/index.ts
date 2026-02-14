@@ -24,6 +24,7 @@ import { setCsrfCookie, csrfProtect } from "./middleware/csrf";
 import { applyRateLimit } from "./middleware/rate-limit";
 import { securityHeaders, additionalSecurityHeaders } from "./middleware/security-headers";
 import { inputValidationMiddleware } from "./middleware/input-validation";
+import { createRateLimitingMiddleware } from "./services/RateLimitingService";
 
 // Security middleware imports
 import { validateInput, securityLogger } from "./middleware/security";
@@ -252,7 +253,43 @@ app.use(additionalSecurityHeaders);
 
 // Security middleware - applied early for protection
 app.use(securityLogger); // Log suspicious requests
-app.use(basicRateLimit()); // Rate limiting
+
+// Rate limiting middleware using RateLimitingService (database-driven with priority logic)
+app.use(async (req, res, next) => {
+  try {
+    const { rateLimitingService } = await import('./services/RateLimitingService');
+    
+    // Check if rate limiting is globally enabled (Environment Variable > Database > Default OFF)
+    const isEnabled = await rateLimitingService.isRateLimitingEnabled();
+    if (!isEnabled) {
+      return next(); // Rate limiting disabled globally
+    }
+
+    // Get client IP and path
+    const ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+    const path = req.path || req.url || '/';
+
+    // Check rate limit
+    const result = await rateLimitingService.checkRateLimit(ip, 'standard', path);
+    
+    if (!result.allowed) {
+      console.warn(`[RATE LIMIT] Blocked ${ip} - exceeded limit for standard on ${path}`);
+      
+      return res.status(429).json({
+        error: 'Too Many Requests',
+        message: `Rate limit exceeded. Please try again after ${result.rule?.windowMinutes || 15} minutes.`,
+        retryAfter: (result.rule?.windowMinutes || 15) * 60,
+        priority: 'Environment Variable > Database > Default OFF'
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('[RateLimitingService] Middleware error:', error);
+    next(); // Allow request on error
+  }
+});
+
 app.use(blockIotRequests); // Block ONVIF/IoT attacks
 app.use(validateInput); // Input validation and sanitization
 app.use(ssrfProtection); // SSRF protection

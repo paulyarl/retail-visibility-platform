@@ -207,6 +207,12 @@ const requestCounts = new Map<string, { count: number; resetTime: number }>();
 
 export function basicRateLimit(windowMs: number = 60000, maxRequests: number = 100) {
   return (req: Request, res: Response, next: NextFunction) => {
+    // Check if rate limiting is globally disabled via environment variable
+    // Note: For full admin toggle support, this would need to be moved to the async applyRateLimit middleware
+    if (process.env.RATE_LIMITING_ENABLED === 'false') {
+      return next(); // Rate limiting disabled via environment variable
+    }
+
     const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
     const now = Date.now();
 

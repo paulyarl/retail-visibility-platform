@@ -233,7 +233,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       : [];
 
     // Debug logging
-    console.log('[Directory Consolidated] Results:', {
+    /* console.log('[Directory Consolidated] Results:', {
       slug,
       listingFound: !!listing,
       tenantId: listing?.tenant_id,
@@ -242,7 +242,7 @@ router.get('/consolidated/:slug', async (req: Request, res: Response) => {
       categoryCountsCount: categoryCounts.length,
       featuredProductsStatus: featuredProductsResult.status,
       featuredProductsError: featuredProductsResult.status === 'rejected' ? featuredProductsResult.reason : null
-    });
+    }); */
 
     // Transform categories like the original endpoint
     const categories = [];

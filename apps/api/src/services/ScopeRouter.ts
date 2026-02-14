@@ -107,13 +107,13 @@ export class ScopeRouter extends UniversalSingleton {
       return cached;
     }
     
-    this.logInfo('Routing discovery request', {
+    /* this.logInfo('Routing discovery request', {
       bucketType,
       scope,
       tenantId: resolvedOptions.tenantId,
       limit: resolvedOptions.limit,
       resolvedFrom: options.scope || 'default'
-    });
+    }); */
 
     try {
       // Execute with retry logic for reliability

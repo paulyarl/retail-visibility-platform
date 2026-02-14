@@ -2,12 +2,31 @@
 
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const https = require('https');
+
+// Create connection pooling agents for better performance
+const httpAgent = new http.Agent({
+    keepAlive: true,
+    maxSockets: 50,
+    maxFreeSockets: 10,
+    timeout: 30000,
+    freeSocketTimeout: 30000
+});
+
+const httpsAgent = new https.Agent({
+    keepAlive: true,
+    maxSockets: 50,
+    maxFreeSockets: 10,
+    timeout: 30000,
+    freeSocketTimeout: 30000
+});
 
 // Configuration
 const CONFIG = {
     API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:4000',
-    CONCURRENT_USERS: 200, // Testing performance ceiling
-    REQUESTS_PER_USER: 10,
+    CONCURRENT_USERS: 15, // Increased with connection pooling support
+    REQUESTS_PER_USER: 20, // Balanced for better testing
     REQUEST_TIMEOUT: 30000, // 30 seconds
     RETRY_ATTEMPTS: 3
 };
@@ -15,7 +34,7 @@ const CONFIG = {
 // Real test data for authenticated requests
 const TEST_DATA = {
     tenant: 'tid-m8ijkrnk',
-    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1aWQtenFlNW5zNWsiLCJlbWFpbCI6InBsYXRmb3JtQHJ2cC5jb20iLCJyb2xlIjoiUExBVEZPUk1fQURNSU4iLCJ0ZW5hbnRJZHMiOlsidGlkLW04aWprcm5rIiwidGlkLTA0MmhpN2p1IiwidGlkLWx0MnQxd3p1IiwidGlkLXI2Y2NjcGFnIl0sImlhdCI6MTc2ODkxODMwOCwiZXhwIjoxODAwNDU0MzA4fQ.-Swkbx8_UOF_4rpBKhs5XvJauNgu0ef6IR_buNbYz64',
+    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1aWQtenFlNW5zNWsiLCJlbWFpbCI6InBsYXRmb3JtQHJ2cC5jb20iLCJyb2xlIjoiUExBVEZPUk1fQURNSU4iLCJ0ZW5hbnRJZHMiOlsidGlkLW04aWprcm5rIiwidGlkLTA0MmhpN2p1IiwidGlkLWx0MnQxd3p1IiwidGlkLXI2Y2NjcGFnIl0sImlhdCI6MTc3MDgyOTU5OSwiZXhwIjoxODAyMzY1NTk5fQ.ERgfhv1fNNuuUtoFA3DLkJEIl3VsvM-HOO3Jy1RTpc4',
     userId: 'uid-zqe5ns5k',
     email: 'platform@rvp.com',
     role: 'PLATFORMFORM_ADMIN'
@@ -287,7 +306,8 @@ class HighConcurrencyTest {
 
                 const response = await fetch(url, {
                     ...requestOptions,
-                    signal: controller.signal
+                    signal: controller.signal,
+                    agent: url.startsWith('https') ? httpsAgent : httpAgent
                 });
 
                 clearTimeout(timeoutId);

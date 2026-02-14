@@ -102,7 +102,7 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
     });
     
     // Debug logging
-    console.log(`[FeaturedProducts] Raw results: ${result.rows.length}`);
+    /* console.log(`[FeaturedProducts] Raw results: ${result.rows.length}`);
     console.log(`[FeaturedProducts] Bucket counts:`, Object.fromEntries(
       Object.entries(buckets).map(([type, products]) => [type, products.length])
     ));
@@ -111,7 +111,7 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
       name: p.product_name,
       type: p.featured_type,
       priority: p.featured_priority
-    })));
+    }))); */
     
     // Calculate total count and bucket counts
     const totalCount = result.rows.length;

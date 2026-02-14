@@ -71,7 +71,7 @@ export class DiscoveryService {
     // Check cache first
     const cached = this.getFromCache(cacheKey);
     if (cached) {
-      console.log(`[DiscoveryService] Cache hit for ${bucketType} discovery`);
+      //console.log(`[DiscoveryService] Cache hit for ${bucketType} discovery`);
       return {
         ...cached,
         metrics: {
@@ -81,7 +81,7 @@ export class DiscoveryService {
       };
     }
 
-    console.log(`[DiscoveryService] Cache miss, routing ${bucketType} discovery with query:`, query);
+    //console.log(`[DiscoveryService] Cache miss, routing ${bucketType} discovery with query:`, query);
 
     let products: any[] = [];
 

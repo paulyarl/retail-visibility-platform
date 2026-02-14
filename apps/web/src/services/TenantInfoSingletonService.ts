@@ -96,7 +96,7 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
    * Uses the /public/tenant/:tenantId endpoint
    */
   async getTenantInfo(tenantId: string): Promise<TenantInfo | null> {
-    console.log(`[TenantInfoSingleton] getTenantInfo START for tenant: ${tenantId}`, new Date().toISOString());
+    //console.log(`[TenantInfoSingleton] getTenantInfo START for tenant: ${tenantId}`, new Date().toISOString());
     
     if (!tenantId) {
       console.error('[TenantInfoSingleton] getTenantInfo: tenantId is required');
@@ -114,7 +114,7 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
       );
       
       const endTime = Date.now();
-      console.log(`[TenantInfoSingleton] API call completed in ${endTime - startTime}ms, result:`, tenant);
+      //console.log(`[TenantInfoSingleton] API call completed in ${endTime - startTime}ms, result:`, tenant);
 
       return tenant || null;
     } catch (error) {
@@ -128,7 +128,7 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
    * Uses the /public/tenant/:tenantId/profile endpoint
    */
   async getBusinessProfile(tenantId: string): Promise<BusinessProfile | null> {
-    console.log(`[TenantInfoSingleton] getBusinessProfile START for tenant: ${tenantId}`, new Date().toISOString());
+    //console.log(`[TenantInfoSingleton] getBusinessProfile START for tenant: ${tenantId}`, new Date().toISOString());
     
     if (!tenantId) {
       console.error('[TenantInfoSingleton] getBusinessProfile: tenantId is required');
@@ -136,7 +136,7 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
     }
 
     try {
-      console.log(`[TenantInfoSingleton] Making API call to /api/public/tenant/${tenantId}/profile`);
+      //console.log(`[TenantInfoSingleton] Making API call to /api/public/tenant/${tenantId}/profile`);
       const startTime = Date.now();
       
       const profile = await this.makeAuthenticatedRequest<BusinessProfile>(
@@ -146,7 +146,7 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
       );
       
       const endTime = Date.now();
-      console.log(`[TenantInfoSingleton] Profile API call completed in ${endTime - startTime}ms, result:`, profile);
+      //console.log(`[TenantInfoSingleton] Profile API call completed in ${endTime - startTime}ms, result:`, profile);
 
       return profile || null;
     } catch (error) {

@@ -6,6 +6,7 @@
  */
 
 import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingleton';
+import { prisma } from '../prisma';
 
 // Rate Limiting Types
 export interface RateLimitRule {
@@ -83,6 +84,9 @@ class RateLimitingService extends UniversalSingleton {
   private rateLimitStatus: Map<string, RateLimitStatus> = new Map();
   private configUpdateInterval: NodeJS.Timeout | null = null;
   private cleanupInterval: NodeJS.Timeout | null = null;
+  private lastEnabledCheck: number = 0;
+  private cachedEnabledStatus: boolean | null = null;
+  private logThrottle: Map<string, number> = new Map();
 
   private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     super(singletonKey, cacheOptions);
@@ -117,54 +121,192 @@ class RateLimitingService extends UniversalSingleton {
 
   /**
    * Load rate limit rules from database
+   * Uses same priority logic: Environment Variable > Database > Default OFF
    */
   private async loadRateLimitRules(): Promise<void> {
     try {
-      // This would query the database for rate limit rules
-      // For now, use default rules
-      const defaultRules: RateLimitRule[] = [
-        {
+      // Check if rate limiting is globally enabled using priority logic
+      const isGloballyEnabled = await this.isRateLimitingEnabled();
+
+      if (!isGloballyEnabled) {
+        // Rate limiting disabled globally - clear all rules
+        this.rateLimitRules.clear();
+        await this.setCache('rate-limit-rules', []);
+        this.throttledLog('Rate limiting disabled - cleared all rules', 'rules-cleared');
+        return;
+      }
+
+      // Load rate limit configurations from database
+      const dbConfigs = await prisma.rate_limit_configurations.findMany({
+        where: { enabled: true },
+        orderBy: { priority: 'asc' }
+      });
+
+      // Convert database configs to service rules
+      const rules: RateLimitRule[] = dbConfigs.map(config => ({
+        id: config.id,
+        routeType: config.route_type,
+        maxRequests: config.max_requests,
+        windowMinutes: config.window_minutes,
+        enabled: config.enabled,
+        priority: config.priority || 1,
+        exemptPaths: config.exempt_paths || [],
+        strictPaths: config.strict_paths || [],
+        createdAt: config.created_at.toISOString(),
+        updatedAt: config.updated_at.toISOString()
+      }));
+
+      // Add default rule if no rules found
+      if (rules.length === 0) {
+        const defaultRule: RateLimitRule = {
           id: 'default',
-          routeType: 'default',
-          maxRequests: 100,
-          windowMinutes: 1,
+          routeType: 'standard',
+          maxRequests: parseInt(process.env.RATE_LIMIT_STANDARD_MAX || '100'),
+          windowMinutes: parseInt(process.env.RATE_LIMIT_STANDARD_WINDOW || '15'),
           enabled: true,
           priority: 1,
-          exemptPaths: ['/api/directory', '/api/items', '/api/storefront', '/api/products'],
+          exemptPaths: ['/health', '/api/public/stores', '/api/items'],
           strictPaths: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
-        },
-        {
-          id: 'strict',
-          routeType: 'strict',
-          maxRequests: 10,
-          windowMinutes: 1,
-          enabled: true,
-          priority: 2,
-          exemptPaths: [],
-          strictPaths: ['/api/tenants'],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ];
+        };
+        rules.push(defaultRule);
+        this.throttledLog('Using default rate limit rule (no database rules found)', 'default-rule');
+      }
 
       // Update rules cache
       this.rateLimitRules.clear();
-      defaultRules.forEach(rule => {
+      rules.forEach(rule => {
         this.rateLimitRules.set(rule.routeType, rule);
       });
 
-      // Cache rules
-      await this.setCache('rate-limit-rules', defaultRules);
+      // Cache rules with TTL
+      await this.setCache('rate-limit-rules', rules, { ttl: 5 * 60 * 1000 }); // 5 minutes
+      
+      this.throttledLog(`Loaded ${rules.length} rate limit rules from database`, 'rules-loaded');
     } catch (error) {
-      console.error('Error loading rate limit rules:', error);
+      console.error('[RateLimitingService] Error loading rate limit rules:', error);
+      
+      // Fallback to environment variables only if environment forces rate limiting on
+      if (process.env.RATE_LIMITING_ENABLED === 'true') {
+        const fallbackRule: RateLimitRule = {
+          id: 'fallback',
+          routeType: 'standard',
+          maxRequests: parseInt(process.env.RATE_LIMIT_STANDARD_MAX || '100'),
+          windowMinutes: parseInt(process.env.RATE_LIMIT_STANDARD_WINDOW || '15'),
+          enabled: true,
+          priority: 1,
+          exemptPaths: ['/health'],
+          strictPaths: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+
+        this.rateLimitRules.set('standard', fallbackRule);
+        await this.setCache('rate-limit-rules', [fallbackRule], { ttl: 5 * 60 * 1000 });
+        this.throttledLog('Using fallback rule (environment override enabled)', 'fallback-rule');
+      } else {
+        // Clear rules if rate limiting is disabled
+        this.rateLimitRules.clear();
+        await this.setCache('rate-limit-rules', []);
+        this.throttledLog('Rate limiting disabled - no rules loaded', 'disabled-no-rules');
+      }
     }
   }
 
   // ====================
   // RATE LIMITING ENFORCEMENT
   // ====================
+
+  /**
+   * Throttled logging to reduce performance impact
+   */
+  private throttledLog(message: string, throttleKey: string = 'default', throttleMs: number = 5000): void {
+    // Completely skip logging if performance mode is enabled
+    if (process.env.RATE_LIMIT_PERFORMANCE_MODE === 'true') {
+      return;
+    }
+    
+    const now = Date.now();
+    const lastLog = this.logThrottle.get(throttleKey) || 0;
+    
+    if (now - lastLog > throttleMs) {
+      console.log(`[RateLimitingService] ${message}`);
+      this.logThrottle.set(throttleKey, now);
+    }
+  }
+
+  /**
+   * Check if rate limiting is globally enabled
+   * Priority: Environment Variable > Database > Default OFF
+   * Optimized for performance with caching and reduced logging
+   */
+  async isRateLimitingEnabled(): Promise<boolean> {
+    // Cache the enabled status for 30 seconds to reduce database queries
+    const now = Date.now();
+    if (this.cachedEnabledStatus !== null && (now - this.lastEnabledCheck) < 30000) {
+      return this.cachedEnabledStatus;
+    }
+
+    try {
+      // 1. Environment Variable takes highest priority
+      if (process.env.RATE_LIMITING_ENABLED === 'true') {
+        this.throttledLog('Rate limiting ENABLED via environment variable (overrides database)', 'env-enabled');
+        this.cachedEnabledStatus = true;
+        this.lastEnabledCheck = now;
+        return true;
+      }
+      
+      if (process.env.RATE_LIMITING_ENABLED === 'false') {
+        this.throttledLog('Rate limiting DISABLED via environment variable (overrides database)', 'env-disabled');
+        this.cachedEnabledStatus = false;
+        this.lastEnabledCheck = now;
+        return false;
+      }
+
+      // 2. Database takes second priority (only if env var not set)
+      const platformSettings = await prisma.platform_settings_list.findFirst({
+        where: { id: 1 },
+        select: { rate_limiting_enabled: true }
+      });
+
+      if (platformSettings?.rate_limiting_enabled === true) {
+        this.throttledLog('Rate limiting ENABLED via database setting', 'db-enabled');
+        this.cachedEnabledStatus = true;
+        this.lastEnabledCheck = now;
+        return true;
+      }
+      
+      if (platformSettings?.rate_limiting_enabled === false) {
+        this.throttledLog('Rate limiting DISABLED via database setting', 'db-disabled');
+        this.cachedEnabledStatus = false;
+        this.lastEnabledCheck = now;
+        return false;
+      }
+
+      // 3. Default to OFF if neither env var nor database is set
+      this.throttledLog('Rate limiting DISABLED (no environment variable or database setting found)', 'default-off');
+      this.cachedEnabledStatus = false;
+      this.lastEnabledCheck = now;
+      return false;
+      
+    } catch (error) {
+      console.error('[RateLimitingService] Error checking rate limiting status:', error);
+      
+      // On error, check environment variable first, then default to OFF
+      if (process.env.RATE_LIMITING_ENABLED === 'true') {
+        this.throttledLog('Rate limiting ENABLED via environment variable (database error fallback)', 'env-fallback');
+        this.cachedEnabledStatus = true;
+        this.lastEnabledCheck = now;
+        return true;
+      }
+      
+      this.throttledLog('Rate limiting DISABLED (database error, no environment override)', 'error-fallback');
+      this.cachedEnabledStatus = false;
+      this.lastEnabledCheck = now;
+      return false;
+    }
+  }
 
   /**
    * Check if request should be allowed
@@ -623,5 +765,75 @@ class RateLimitingService extends UniversalSingleton {
 
 // Export singleton instance
 export const rateLimitingService = RateLimitingService.getInstance();
+
+/**
+ * Rate limiting middleware using RateLimitingService
+ * This replaces the basicRateLimit and aligns with platform standards
+ */
+export async function createRateLimitingMiddleware(routeType: string = 'standard') {
+  return async (req: any, res: any, next: any) => {
+    try {
+      // Check if rate limiting is globally enabled
+      const isEnabled = await rateLimitingService.isRateLimitingEnabled();
+      if (!isEnabled) {
+        return next(); // Rate limiting disabled globally
+      }
+
+      // Get client IP
+      const ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+      const path = req.path || req.url || '/';
+
+      // Check rate limit
+      const result = await rateLimitingService.checkRateLimit(ip, routeType, path);
+      
+      if (!result.allowed) {
+        console.warn(`[RATE LIMIT] Blocked ${ip} - exceeded limit for ${routeType} on ${path}`);
+        
+        // Store rate limit warning for analytics
+        try {
+          await prisma.rate_limit_warnings.create({
+            data: {
+              client_id: `${ip}:${req.get('User-Agent')?.substring(0, 50) || 'unknown'}`,
+              pathname: path,
+              request_count: result.status?.currentRequests || 0,
+              max_requests: result.rule?.maxRequests || 100,
+              window_ms: (result.rule?.windowMinutes || 15) * 60,
+              ip_address: ip,
+              user_agent: req.get('User-Agent'),
+              blocked: true
+            }
+          });
+        } catch (warningError) {
+          console.error('Failed to store rate limit warning:', warningError);
+        }
+
+        return res.status(429).json({
+          error: 'Too Many Requests',
+          message: `Rate limit exceeded. Please try again after ${result.rule?.windowMinutes || 15} minutes.`,
+          retryAfter: (result.rule?.windowMinutes || 15) * 60,
+          rule: {
+            maxRequests: result.rule?.maxRequests,
+            windowMinutes: result.rule?.windowMinutes,
+            resetTime: result.status?.resetTime
+          }
+        });
+      }
+
+      // Add rate limit headers
+      if (result.status) {
+        res.set({
+          'X-RateLimit-Limit': result.status.maxRequests.toString(),
+          'X-RateLimit-Remaining': result.status.remainingRequests.toString(),
+          'X-RateLimit-Reset': new Date(result.status.resetTime).getTime().toString()
+        });
+      }
+
+      next();
+    } catch (error) {
+      console.error('[RateLimitingService] Middleware error:', error);
+      next(); // Allow request on error
+    }
+  };
+}
 
 export default RateLimitingService;

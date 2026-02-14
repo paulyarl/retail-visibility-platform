@@ -124,7 +124,7 @@ export class FeaturedService {
       return cached;
     }
 
-    console.log(`[FeaturedService] Cache miss, fetching featured products with query:`, query);
+    //console.log(`[FeaturedService] Cache miss, fetching featured products with query:`, query);
 
     const limit = Math.min(query.limit || 20, 50); // Cap at 50 for performance
     let products: FeaturedProduct[] = [];
@@ -180,13 +180,14 @@ export class FeaturedService {
         t.name as tenant_name,
         t.slug as tenant_slug,
         t.subscription_tier,
-        t.city as tenant_city,
-        t.state as tenant_state,
-        t.address as tenant_address,
-        t.latitude as tenant_latitude,
-        t.longitude as tenant_longitude
+        dsl.city as tenant_city,
+        dsl.state as tenant_state,
+        dsl.address as tenant_address,
+        dsl.latitude as tenant_latitude,
+        dsl.longitude as tenant_longitude
       FROM mv_global_discovery mv
       JOIN tenants t ON t.id = mv.tenant_id
+      LEFT JOIN directory_listings_list dsl ON dsl.tenant_id = mv.tenant_id
       WHERE mv.tenant_id = COALESCE($1, mv.tenant_id)
         AND mv.featured_is_active = true
         AND mv.item_status = 'active'

@@ -44,9 +44,9 @@ export const getDirectPool = (): Pool => {
   const cleanConnectionString = url.toString();
 
   // Get connection limits from URL params or use higher defaults for better performance
-  const connectionLimit = parseInt(url.searchParams.get('connection_limit') || '20');
-  const poolTimeout = parseInt(url.searchParams.get('pool_timeout') || '30') * 1000; // Convert to ms
-  const connectionTimeout = parseInt(url.searchParams.get('connection_timeout') || '30') * 1000; // Convert to ms
+  const connectionLimit = parseInt(url.searchParams.get('connection_limit') || '50'); // Increased from 20
+  const poolTimeout = parseInt(url.searchParams.get('pool_timeout') || '60') * 1000; // Increased from 30s
+  const connectionTimeout = parseInt(url.searchParams.get('connection_timeout') || '10') * 1000; // Reduced from 30s for faster failover
 
   directPool = new Pool({
     connectionString: cleanConnectionString,
@@ -55,7 +55,7 @@ export const getDirectPool = (): Pool => {
       checkServerIdentity: () => undefined
     } : false,
     max: connectionLimit,
-    min: 2, // Minimum connections to keep alive
+    min: 10, // Increased from 2 to keep more connections ready
     idleTimeoutMillis: poolTimeout,
     connectionTimeoutMillis: connectionTimeout,
     allowExitOnIdle: true,
