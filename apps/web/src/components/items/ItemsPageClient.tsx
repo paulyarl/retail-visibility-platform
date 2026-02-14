@@ -22,6 +22,7 @@ import QuickStartEmptyState from "@/components/items/QuickStartEmptyState";
 import ItemsGuide from "@/components/items/ItemsGuide";
 import { Item } from "@/services/itemsDataService";
 import { useCategorySingleton } from '@/providers/data/CategorySingleton';
+import { itemsService } from '@/services/ItemsService';
 
 interface ItemsPageClientProps {
   tenantId: string;
@@ -427,26 +428,10 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
 
   const handleClone = async (item: Item) => {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      
-      const response = await fetch(`${apiBaseUrl}/api/clone/product`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
-        body: JSON.stringify({
-          productId: item.id,
-          tenantId: tenantId,
-        }),
+      const result = await itemsService.cloneProduct({
+        productId: item.id,
+        tenantId: tenantId,
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to clone product');
-      }
-
-      const result = await response.json();
       
       // Show success message with the new product name
       alert(`✅ Product cloned successfully!\n\nNew product: ${result.product.name}\nSKU: ${result.product.sku}\n\nThe cloned product has been created as a draft. You can edit it to customize the variant.`);

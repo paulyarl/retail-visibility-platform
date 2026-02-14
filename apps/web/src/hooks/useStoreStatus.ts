@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRateLimitErrorHandler } from './useRateLimitErrorHandler';
 import { useAuth } from '@/contexts/AuthContext';
-import { storeStatusService } from '@/services/StoreStatusSingletonService';
+import { hoursStatusService } from '@/services/HoursStatusService';
 
 export interface StoreStatus {
   isOpen: boolean;
@@ -16,7 +16,6 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const baseUrl = apiBase || process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
   const { handleRateLimitError } = useRateLimitErrorHandler();
   const { user } = useAuth();
 
@@ -34,9 +33,8 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
         return;
       }
 
-      // Use browser cache instead of no-store since we have server-side caching
-      //const response = await fetch(`${baseUrl}/public/tenant/${tenantId}/business-hours/status`);
-      const responseData = await storeStatusService.getStoreStatus(tenantId, baseUrl);
+      // Use HoursStatusService for consistent caching and metrics
+      const responseData = await hoursStatusService.getStoreStatus(tenantId);
 
       if (!responseData) {
         setStatus(null);
@@ -52,7 +50,7 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, baseUrl, memoizedHandleRateLimitError]);
+  }, [tenantId, memoizedHandleRateLimitError]);
 
   useEffect(() => {
     if (tenantId) {

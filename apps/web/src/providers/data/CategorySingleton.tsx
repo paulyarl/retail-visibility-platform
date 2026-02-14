@@ -108,9 +108,6 @@ class CategoryService extends PublicApiSingleton {
 
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
-// Helper function to get dynamic API base URL
-const getApiBaseUrl = () => process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-
 // ====================
 // REDUCER
 // ====================

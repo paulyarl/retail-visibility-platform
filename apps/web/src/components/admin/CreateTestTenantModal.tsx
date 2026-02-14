@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { X, Plus, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import CreationCapacityWarning from '@/components/capacity/CreationCapacityWarning';
 import { BusinessTypeSelector } from '@/components/quick-start';
+import { adminUsersService } from '@/services/AdminUsersService';
 
 interface CreateTestTenantModalProps {
   onClose: () => void;
@@ -32,32 +33,15 @@ export default function CreateTestTenantModal({ onClose }: CreateTestTenantModal
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-
-      const response = await fetch(`${apiUrl}/api/admin/tools/tenants`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: tenantName,
-          city: city || undefined,
-          state: state || undefined,
-          seedProducts,
-          scenario,
-          createAsDrafts,
-          generateImages,
-        }),
+      const data = await adminUsersService.createTestTenant({
+        name: tenantName,
+        city: city || undefined,
+        state: state || undefined,
+        seedProducts,
+        scenario,
+        createAsDrafts,
+        generateImages,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Failed to create tenant');
-      }
 
       setCreatedTenant(data.tenant);
       setSuccess(true);

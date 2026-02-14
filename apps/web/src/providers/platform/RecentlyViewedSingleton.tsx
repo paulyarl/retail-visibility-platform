@@ -6,6 +6,7 @@
  */
 
 import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { recentlyViewedService } from '@/services/RecentlyViewedService';
 
 // Recently Viewed Data Interfaces
 export interface RecentlyViewedItem {
@@ -109,27 +110,17 @@ class RecentlyViewedSingleton extends UniversalSingleton {
     };
 
     try {
-      // Send to API
-      const response = await fetch('/api/user/recently-viewed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(recentlyViewedItem)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to add recently viewed item');
-      }
-
-      const createdItem = await response.json();
+      // Track item using service
+      await recentlyViewedService.trackItem(recentlyViewedItem);
 
       // Start tracking view duration
-      this.currentItemId = createdItem.id;
+      this.currentItemId = recentlyViewedItem.id;
       this.currentViewStart = new Date().toISOString();
 
       // Clear cache to force refresh
       await this.clearCache(`recently-viewed-${options.userId || 'anonymous'}`);
 
-      return createdItem;
+      return recentlyViewedItem;
     } catch (error) {
       console.error('Error adding recently viewed item:', error);
       throw error;
@@ -142,18 +133,9 @@ class RecentlyViewedSingleton extends UniversalSingleton {
   async endCurrentView(): Promise<void> {
     if (!this.currentItemId || !this.currentViewStart) return;
 
-    const duration = Math.floor((Date.now() - new Date(this.currentViewStart).getTime()) / 1000);
-
     try {
-      const response = await fetch(`/api/user/recently-viewed/${this.currentItemId}/duration`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ duration })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update view duration');
-      }
+      // End view using service
+      await recentlyViewedService.endView();
     } catch (error) {
       console.error('Error updating view duration:', error);
     } finally {
@@ -181,19 +163,13 @@ class RecentlyViewedSingleton extends UniversalSingleton {
     }
 
     try {
-      const params = new URLSearchParams();
-      if (userId) params.append('userId', userId);
-      if (options.limit) params.append('limit', options.limit.toString());
-      if (options.itemType) params.append('itemType', options.itemType);
-      if (options.tenantId) params.append('tenantId', options.tenantId);
-
-      const response = await fetch(`/api/user/recently-viewed?${params}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch recently viewed items');
-      }
-
-      const items = await response.json();
+      // Get items using service
+      const items = await recentlyViewedService.getRecentlyViewed({
+        userId,
+        itemType: options.itemType,
+        tenantId: options.tenantId,
+        limit: options.limit
+      });
       
       await this.setCache(cacheKey, items);
       return items;

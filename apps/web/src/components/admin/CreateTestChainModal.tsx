@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X, Building2, Loader2, CheckCircle2, Copy } from 'lucide-react';
 import { BusinessTypeSelector, BUSINESS_TYPES } from '@/components/quick-start';
+import { adminUsersService } from '@/services/AdminUsersService';
 
 interface CreateTestChainModalProps {
   onClose: () => void;
@@ -26,31 +27,14 @@ export default function CreateTestChainModal({ onClose }: CreateTestChainModalPr
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
-      const res = await fetch(`${apiUrl}/api/admin/tools/test-chains`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        credentials: 'include', // Send cookies for authentication
-        body: JSON.stringify({
-          name,
-          size,
-          scenario,
-          seedProducts,
-          createAsDrafts,
-          generateImages,
-        }),
+      const data = await adminUsersService.createTestChain({
+        name,
+        size,
+        scenario,
+        seedProducts,
+        createAsDrafts,
+        generateImages,
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || data.error || 'Failed to create test chain');
-      }
 
       setResult(data);
       setSuccess(true);

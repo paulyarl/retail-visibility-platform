@@ -7,6 +7,7 @@ import { Tag, Globe, Edit, Trash2 } from 'lucide-react';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { QuickStartCategoryModal } from '@/components/quick-start';
 import { CategoryEditModal, type CategoryFormData } from '@/components/categories';
+import { adminCategoriesService } from '@/services/AdminCategoriesService';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -21,8 +22,6 @@ interface Category {
   description?: string;
   icon_emoji?: string;
 }
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
 // Component to display Google category ID with lookup utility
 function GoogleCategoryPath({ googleCategoryId }: { googleCategoryId: string }) {
@@ -75,15 +74,10 @@ function GoogleCategoryLookup({ googleCategoryId }: { googleCategoryId: string }
   useEffect(() => {
     async function fetchPath() {
       try {
-        // Use the public Google taxonomy endpoint (no auth required)
-        const res = await fetch(`${API_BASE_URL}/public/google-taxonomy/${googleCategoryId}`);
-        if (res.ok) {
-          const data = await res.json();
-          // data.path is an array like ["Food", "Bakery", "Bread"]
-          if (data.path) {
-            const pathString = Array.isArray(data.path) ? data.path.join(' > ') : data.path;
-            setPath(pathString);
-          }
+        const taxonomyPath = await adminCategoriesService.getGoogleTaxonomyPath(googleCategoryId);
+        if (taxonomyPath && taxonomyPath.path) {
+          const pathString = Array.isArray(taxonomyPath.path) ? taxonomyPath.path.join(' > ') : taxonomyPath.path;
+          setPath(pathString);
         }
       } catch (error) {
         console.error('Failed to fetch Google category path:', error);
@@ -226,13 +220,7 @@ export default function AdminCategoriesPage() {
 
   const loadCategories = async () => {
     try {
-      const res = await fetch('/api/platform/categories', {
-        credentials: 'include',
-      });
-      const data = await res.json();
-      console.log('[Load Categories] Response:', data);
-      // API returns {success: true, data: [...]}
-      const categories = data.success ? data.data : (Array.isArray(data) ? data : []);
+      const categories = await adminCategoriesService.getCategories();
       console.log('[Load Categories] Parsed categories:', categories);
       setCategories(categories);
     } catch (error) {
@@ -282,69 +270,53 @@ export default function AdminCategoriesPage() {
 
   // Handler for CategoryEditModal - works for both create and edit
   const handleSaveCategory = async (data: CategoryFormData) => {
-    const token = localStorage.getItem('access_token');
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    
-    if (selectedCategory) {
-      // Edit existing category
-      const res = await fetch(`/api/platform/categories/${selectedCategory.id}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({
+    try {
+      if (selectedCategory) {
+        // Edit existing category
+        const updated = await adminCategoriesService.updateCategory(selectedCategory.id, {
           name: data.name,
           slug: data.slug,
           googleCategoryId: data.googleCategoryId,
           description: data.description,
           icon_emoji: data.iconEmoji,
-        }),
-        credentials: 'include',
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || errorData.error || 'Failed to update category');
-      }
-    } else {
-      // Create new category
-      const res = await fetch('/api/platform/categories', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          name: data.name,
-          slug: data.slug,
-          googleCategoryId: data.googleCategoryId,
-          description: data.description,
-          icon_emoji: data.iconEmoji,
-        }),
-        credentials: 'include',
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        if (errorData.error === 'duplicate_slug') {
-          throw new Error(`Category already exists: ${errorData.message || 'A category with this name already exists'}`);
+        });
+        
+        if (!updated) {
+          throw new Error('Failed to update category');
         }
-        throw new Error(errorData.message || errorData.error || 'Failed to create category');
+      } else {
+        // Create new category
+        const created = await adminCategoriesService.createCategory({
+          name: data.name,
+          slug: data.slug,
+          googleCategoryId: data.googleCategoryId,
+          description: data.description,
+          icon_emoji: data.iconEmoji,
+        });
+        
+        if (!created) {
+          throw new Error('Failed to create category');
+        }
       }
+      
+      await loadCategories();
+      setShowEditModal(false);
+      setShowCreateModal(false);
+      setSelectedCategory(null);
+    } catch (error: any) {
+      console.error('Failed to save category:', error);
+      // Show error to user (could add toast notification here)
+      throw error;
     }
-    
-    await loadCategories();
-    setShowEditModal(false);
-    setShowCreateModal(false);
-    setSelectedCategory(null);
   };
 
   const handleDelete = async () => {
     if (!selectedCategory) return;
     
     try {
-      const res = await fetch(`/api/platform/categories/${selectedCategory.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
+      const success = await adminCategoriesService.deleteCategory(selectedCategory.id);
       
-      if (res.ok || res.status === 204) {
+      if (success) {
         await loadCategories();
         setShowDeleteModal(false);
         setSelectedCategory(null);
@@ -408,26 +380,15 @@ export default function AdminCategoriesPage() {
 
   // Quick Start handler - used by shared QuickStartCategoryModal
   const handleQuickStart = async (businessType: string, categoryCount: number) => {
-    // Use platform tenant ID for platform-level categories
-    const res = await fetch('/api/platform/categories/quick-start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        businessType,
-        categoryCount,
-      }),
-    });
-    
-    if (res.ok) {
-      const data = await res.json();
-      console.log('[Quick Start] Response:', data);
+    try {
+      const categories = await adminCategoriesService.getQuickStartCategories(businessType, categoryCount);
+      console.log('[Quick Start] Response:', categories);
       await loadCategories();
-      const createdCount = data.categoriesCreated || 0;
-      const totalCount = data.data?.length || 0;
-      alert(`Successfully created ${createdCount} new categories! (${totalCount} total platform categories)`);
-    } else {
-      const data = await res.json();
-      throw new Error(data.message || data.error || 'Unknown error');
+      const createdCount = categories.length;
+      alert(`Successfully created ${createdCount} new categories! (${categories.length} total platform categories)`);
+    } catch (error: any) {
+      console.error('Quick start failed:', error);
+      throw new Error(error.message || 'Unknown error');
     }
   };
 

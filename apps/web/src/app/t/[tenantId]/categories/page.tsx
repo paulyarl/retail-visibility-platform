@@ -9,6 +9,8 @@ import { Pagination } from '@/components/ui'
 import { ContextBadges } from '@/components/ContextBadges'
 import { QuickStartCategoryModal } from '@/components/quick-start'
 import { CategoryEditModal, type CategoryFormData } from '@/components/categories'
+import { tenantCategoriesService } from '@/services/TenantCategoriesService'
+import { tenantManagementService } from '@/services/TenantManagementService'
 
 interface Category {
   id: string
@@ -220,22 +222,17 @@ export default function CategoriesPage() {
       try {
         setLoading(true)
         
-        // Fetch categories
-        const catRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`)
-        if (!catRes.ok) throw new Error('Failed to fetch categories')
-        const catData = await catRes.json()
-        setCategories(catData.data || [])
-/* 
-        // Fetch alignment status
-        const statusRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
-        if (!statusRes.ok) throw new Error('Failed to fetch alignment status')
-        const statusData = await statusRes.json()
-        setAlignmentStatus(statusData.data) */
+        // Fetch categories using TenantCategoriesService
+        const categories = await tenantCategoriesService.getTenantCategories(tenantId)
+        setCategories(categories)
 
-        // Check if this is a hero location and get organization info
-        const tenantRes = await api.get(`${API_BASE_URL}/api/tenants/${tenantId}`)
-        if (tenantRes.ok) {
-          const tenantData = await tenantRes.json()
+        // Fetch alignment status using TenantCategoriesService
+        const alignmentStatus = await tenantCategoriesService.getAlignmentStatus(tenantId)
+        setAlignmentStatus(alignmentStatus)
+
+        // Get tenant info using TenantManagementService
+        const tenantData = await tenantManagementService.getCurrentTenant()
+        if (tenantData) {
           const metadata = tenantData.metadata || {}
           const isHero = metadata.isHeroLocation === true
           setIsHeroLocation(isHero)
@@ -292,45 +289,32 @@ export default function CategoriesPage() {
   // Handler for shared CategoryEditModal
   async function handleSaveCategory(data: CategoryFormData) {
     if (isCreate || !selected) {
-      // Create new category
-      const postRes = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`, { 
-        name: data.name, 
-        slug: data.slug || data.name.toLowerCase().replace(/\s+/g, '-'), 
-        sortOrder: data.sortOrder 
-      })
-      if (!postRes.ok) throw new Error('Failed to create category')
-      const created = await postRes.json()
+      // Create new category using TenantCategoriesService
+      const created = await tenantCategoriesService.createCategory(tenantId, data)
+      if (!created) throw new Error('Failed to create category')
       
       // Align if Google category provided
       if (data.googleCategoryId) {
-        const alignRes = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${created.data.id}/align`, { 
-          googleCategoryId: data.googleCategoryId 
-        })
-        if (!alignRes.ok) throw new Error('Failed to align category')
+        const aligned = await tenantCategoriesService.alignCategory(tenantId, created.id, data.googleCategoryId)
+        if (!aligned) throw new Error('Failed to align category')
       }
       showToast('success', 'Category created')
     } else {
-      // Update existing category
-      const putRes = await api.put(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${selected.id}`, { 
-        name: data.name, 
-        sortOrder: data.sortOrder 
-      })
-      if (!putRes.ok) throw new Error('Failed to update category')
+      // Update existing category using TenantCategoriesService
+      const updated = await tenantCategoriesService.updateCategory(tenantId, selected.id, data)
+      if (!updated) throw new Error('Failed to update category')
 
       // Align if Google category changed
       if (data.googleCategoryId && data.googleCategoryId !== (selected.googleCategoryId || '')) {
-        const alignRes = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${selected.id}/align`, { 
-          googleCategoryId: data.googleCategoryId 
-        })
-        if (!alignRes.ok) throw new Error('Failed to align category')
+        const aligned = await tenantCategoriesService.alignCategory(tenantId, selected.id, data.googleCategoryId)
+        if (!aligned) throw new Error('Failed to align category')
       }
       showToast('success', 'Changes saved')
     }
 
-    // Refresh data
-    const catRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`)
-    const catData = await catRes.json()
-    setCategories(catData.data || [])
+    // Refresh data using TenantCategoriesService
+    const categories = await tenantCategoriesService.getTenantCategories(tenantId)
+    setCategories(categories)
     
     setIsModalOpen(false)
     setSelected(null)
@@ -345,30 +329,16 @@ export default function CategoriesPage() {
       showToast('error', 'Please select a hero location first')
       return
     }
-
-    // Validate that the selected tenant is actually a hero location
-    const selectedTenant = organizationInfo?.tenants.find(t => t.id === selectedHeroId)
-    if (!selectedTenant?.isHero) {
-      showToast('error', 'The selected location is not set as a hero location. Please select the hero location or set one in Organization Settings.')
-      return
-    }
-
     try {
       setPropagating(true)
       setShowPropagateModal(false)
       
-      const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${selectedHeroId}/categories/propagate`, {
-        mode: propagateMode
-      })
+      const success = await tenantCategoriesService.propagateCategories(selectedHeroId, propagateMode)
       
-      if (!res.ok) {
-        const error = await res.json()
-        throw new Error(error.message || error.error || 'Failed to propagate categories')
+      if (!success) {
+        throw new Error('Failed to propagate categories')
       }
-
-      const result = await res.json()
-      const summary = `Created: ${result.data.created}, Updated: ${result.data.updated}, Skipped: ${result.data.skipped}`
-      showToast('success', `Successfully propagated ${result.data.totalCategories} categories to ${result.data.totalLocations} locations (${summary})`)
+      showToast('success', `Successfully propagated categories`)
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'Failed to propagate categories')
     } finally {
@@ -379,15 +349,14 @@ export default function CategoriesPage() {
   async function deleteCategory(cat: Category) {
     if (!confirm(`Delete category "${cat.name}"? This is a soft delete and may be blocked if it has dependencies.`)) return
     try {
-      const res = await api.delete(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${cat.id}`)
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(body || 'Failed to delete category')
+      const success = await tenantCategoriesService.deleteCategory(tenantId, cat.id)
+      if (!success) {
+        throw new Error('Failed to delete category')
       }
-      // Refresh
-      const catRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`)
-      const catData = await catRes.json()
-      setCategories(catData.data || [])
+      
+      // Refresh categories using TenantCategoriesService
+      const categories = await tenantCategoriesService.getTenantCategories(tenantId)
+      setCategories(categories)
       showToast('success', 'Category deleted')
     } catch (err: any) {
       showToast('error', err?.message || 'Failed to delete category')
@@ -403,23 +372,19 @@ export default function CategoriesPage() {
     
     setBulkDeleting(true)
     try {
-      const deletePromises = Array.from(selectedIds).map(id =>
-        api.delete(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/${id}`)
-      )
+      const categoryIds = Array.from(selectedIds)
+      const result = await tenantCategoriesService.bulkDeleteCategories(tenantId, categoryIds)
       
-      const results = await Promise.allSettled(deletePromises)
-      const succeeded = results.filter(r => r.status === 'fulfilled').length
-      const failed = results.filter(r => r.status === 'rejected').length
+      const succeeded = result.success.length
+      const failed = result.failed.length
       
-      // Refresh data
-      const [catRes, statusRes] = await Promise.all([
-        api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`),
-        api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
+      // Refresh data using TenantCategoriesService
+      const [categories, alignmentStatus] = await Promise.all([
+        tenantCategoriesService.getTenantCategories(tenantId),
+        tenantCategoriesService.getAlignmentStatus(tenantId)
       ])
-      const catData = await catRes.json()
-      const statusData = await statusRes.json()
-      setCategories(catData.data || [])
-      setAlignmentStatus(statusData.data)
+      setCategories(categories)
+      setAlignmentStatus(alignmentStatus)
       
       // Clear selection
       setSelectedIds(new Set())
@@ -469,58 +434,47 @@ export default function CategoriesPage() {
   // Debounced taxonomy search
   // Quick Start handler - used by shared QuickStartCategoryModal
   const handleQuickStart = async (businessType: string, categoryCount: number) => {
-    // Get existing category IDs before quick start
-    const existingIds = new Set(categories.map(c => c.id))
-    
-    const res = await api.post(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories/quick-start`, {
-      businessType,
-      categoryCount,
-    })
-    
-    if (res.ok) {
-      const data = await res.json()
+    try {
+      // Get existing category IDs before quick start
+      const existingIds = new Set(categories.map(c => c.id))
       
-      // Refresh categories and alignment status
-      try {
+      const newCategories = await tenantCategoriesService.quickStartCategories(tenantId, businessType, categoryCount)
+      
+      if (newCategories.length > 0) {
+        // Refresh categories and alignment status using TenantCategoriesService
         setLoading(true)
-        const catRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories`)
-        if (catRes.ok) {
-          const catData = await catRes.json()
-          const newCategories = catData.data || []
-          setCategories(newCategories)
-          
-          // Track newly created category IDs (those not in existingIds)
-          const newIds = new Set<string>()
-          newCategories.forEach((cat: Category) => {
-            if (!existingIds.has(cat.id)) {
-              newIds.add(cat.id)
-            }
-          })
-          setNewCategoryIds(newIds)
-          
-          // Clear "New" badges after 30 seconds
-          if (newIds.size > 0) {
-            setTimeout(() => setNewCategoryIds(new Set()), 30000)
+        const [categories, alignmentStatus] = await Promise.all([
+          tenantCategoriesService.getTenantCategories(tenantId),
+          tenantCategoriesService.getAlignmentStatus(tenantId)
+        ])
+        setCategories(categories)
+        setAlignmentStatus(alignmentStatus)
+        
+        // Track newly created category IDs (those not in existingIds)
+        const newIds = new Set<string>()
+        categories.forEach((cat: Category) => {
+          if (!existingIds.has(cat.id)) {
+            newIds.add(cat.id)
           }
+        })
+        setNewCategoryIds(newIds)
+        
+        // Clear "New" badges after 30 seconds
+        if (newIds.size > 0) {
+          setTimeout(() => setNewCategoryIds(new Set()), 30000)
         }
         
-        const statusRes = await api.get(`${API_BASE_URL}/api/v1/tenants/${tenantId}/categories-alignment-status`)
-        if (statusRes.ok) {
-          const statusData = await statusRes.json()
-          setAlignmentStatus(statusData.data)
-        }
-      } catch (error) {
-        console.error('Failed to refresh data:', error)
-      } finally {
-        setLoading(false)
+        const createdCount = newCategories.length
+        const totalCount = categories.length
+        showToast('success', `Successfully created ${createdCount} new categories! (${totalCount} total categories)`)
+      } else {
+        showToast('error', 'Failed to create categories')
       }
-      
-      const createdCount = data.categoriesCreated || 0
-      const totalCount = data.data?.length || 0
-      showToast('success', `Successfully created ${createdCount} new categories! (${totalCount} total categories)`)
-    } else {
-      const data = await res.json()
-      throw new Error(data.message || data.error || 'Unknown error')
+    } catch (err: any) {
+      console.error('Failed to create categories:', err)
+      showToast('error', err?.message || 'Failed to create categories')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -1359,3 +1313,4 @@ export default function CategoriesPage() {
     </div>
   )
 }
+

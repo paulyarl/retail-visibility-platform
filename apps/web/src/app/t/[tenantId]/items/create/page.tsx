@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import SetTenantId from "@/components/client/SetTenantId";
 import ItemCreationWizard from "@/components/inventory/wizards/ItemCreationWizard";
 import CartButton from "@/components/inventory/CartButton";
+import { inventoryQueueService } from '@/services/InventoryQueueSingletonService';
 
 export default function CreateItemPage({
   params,
@@ -22,34 +23,18 @@ export default function CreateItemPage({
     if (!tenantId) return;
     
     try {
-      // Call the API to add item to queue
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await fetch(`${API_BASE_URL}/api/queue/${tenantId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productData,
-          priority: 'normal',
-          sessionId: `session-${Date.now()}`,
-          userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'server',
-          source: 'wizard'
-        })
-      });
-
-      if (response.ok) {
-        // Update local storage for CartButton count
-        const currentCount = localStorage.getItem(`queue-${tenantId}`) || '0';
-        localStorage.setItem(`queue-${tenantId}`, (parseInt(currentCount) + 1).toString());
-        
-        // Show success message
-        alert('Product added to queue! You can process it later from the queue button in the top-right corner.');
-      } else {
-        console.error('Failed to add item to queue');
-        alert('Failed to add product to queue. Please try again.');
-      }
+      // Call the service to add item to queue
+      await inventoryQueueService.addToQueue(tenantId, [productData], 'normal');
+      
+      // Update local storage for CartButton count
+      const currentCount = localStorage.getItem(`queue-${tenantId}`) || '0';
+      localStorage.setItem(`queue-${tenantId}`, (parseInt(currentCount) + 1).toString());
+      
+      // Show success message
+      alert('Product added to queue! You can process it later from the queue button in the top-right corner.');
     } catch (error) {
-      console.error('Error adding to queue:', error);
-      alert('Error adding product to queue. Please try again.');
+      console.error('Failed to add item to queue:', error);
+      alert('Failed to add product to queue. Please try again.');
     }
   };
 

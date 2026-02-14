@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { hoursStatusSingleton, StoreStatus } from '@/providers/data/HoursStatusSingleton';
+import { hoursStatusService, StoreStatus } from '@/services/HoursStatusService';
+import { hoursStatusSingleton } from '@/providers/data/HoursStatusSingleton';
 
 /**
  * Enhanced useStoreStatus hook that uses the HoursStatusSingleton
@@ -23,7 +24,7 @@ export function useStoreStatusEnhanced(tenantId?: string) {
         return;
       }
 
-      const statusData = await hoursStatusSingleton.getStoreStatus(tenantId);
+      const statusData = await hoursStatusService.getStoreStatus(tenantId);
       setStatus(statusData);
     } catch (err) {
       console.error('Failed to fetch store status:', err);

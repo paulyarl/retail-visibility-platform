@@ -73,6 +73,11 @@ interface ServiceMetrics {
 class StorefrontService extends PublicApiSingleton {
   private static instance: StorefrontService;
 
+  // TTL constants for different data types
+  private readonly PRODUCTS_TTL = 5 * 60 * 1000; // 5 minutes for products
+  private readonly CATEGORIES_TTL = 30 * 60 * 1000; // 30 minutes for categories
+  private readonly FEATURED_PRODUCTS_TTL = 10 * 60 * 1000; // 10 minutes for featured products
+
   private constructor() {
     super('storefront-service');
   }
@@ -98,7 +103,7 @@ class StorefrontService extends PublicApiSingleton {
     const cacheKey = `products:${tenantId}:${queryString}`;
 
     try {
-      return await this.makePublicRequest<ProductResponse>(endpoint, {}, cacheKey);
+      return await this.makePublicRequest<ProductResponse>(endpoint, {}, cacheKey, this.PRODUCTS_TTL);
     } catch (error) {
       console.error('[StorefrontService] Failed to get products:', error);
       throw error;
@@ -110,7 +115,8 @@ class StorefrontService extends PublicApiSingleton {
       const data = await this.makePublicRequest<{ categories: Category[] }>(
         `/api/storefront/${tenantId}/categories`,
         {},
-        `categories:${tenantId}`
+        `categories:${tenantId}`,
+        this.CATEGORIES_TTL
       );
       return data.categories || [];
     } catch (error) {
@@ -134,7 +140,7 @@ class StorefrontService extends PublicApiSingleton {
         items: CatalogProduct[];
         totalCount: number;
         bucketCounts: Record<string, number>;
-      }>(endpoint, {}, cacheKey);
+      }>(endpoint, {}, cacheKey, this.FEATURED_PRODUCTS_TTL);
 
       // Transform response to match expected format
       return {
@@ -158,12 +164,11 @@ class StorefrontService extends PublicApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const result = await this.makePublicRequest<any>(
-        `${apiBaseUrl}/api/tenants/${tenantId}/tier/public`,
+        `/api/tenants/${tenantId}/tier/public`,
         {},
         `public-tier-${tenantId}`,
-        this.cacheTTL
+        10 * 60 * 1000 // 10 minutes TTL for tier information
       );
 
       return result;
@@ -183,18 +188,78 @@ class StorefrontService extends PublicApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const result = await this.makePublicRequest<any>(
-        `${apiBaseUrl}/api/public/tenant/${tenantId}/profile`,
+      const response = await this.makePublicRequest<any>(
+        `/public/tenant/${tenantId}/profile`,
         {},
-        `public-profile-${tenantId}`,
-        this.cacheTTL
+        `public-tenant-profile-${tenantId}`,
+        this.CATEGORIES_TTL
       );
 
-      return result;
+      return response;
     } catch (error) {
       console.error('[StorefrontService] Failed to get public tenant profile:', error);
       return null;
+    }
+  }
+
+  /**
+   * Get batch store data for multiple stores
+   * Uses the /api/stores/batch endpoint
+   */
+  async getBatchStores(storeIds: string[]): Promise<any[]> {
+    try {
+      if (!storeIds || storeIds.length === 0) {
+        return [];
+      }
+
+      const response = await this.makePublicRequest<any[]>(
+        '/stores/batch',
+        {
+          method: 'POST',
+          body: JSON.stringify({ storeIds })
+        },
+        'batch-stores',
+        this.CATEGORIES_TTL
+      );
+
+      return response || [];
+    } catch (error) {
+      console.error('[StorefrontService] Failed to get batch stores:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get batch store categories stats
+   * Uses the /api/storefront/:tenantId/storefront/categories-stats endpoint
+   */
+  async getBatchCategoriesStats(tenantId: string, storeIds: string[]): Promise<any[]> {
+    try {
+      if (!storeIds || storeIds.length === 0) {
+        return [];
+      }
+
+      // Fetch stats for all stores in parallel
+      const promises = storeIds.map(async (storeId) => {
+        return await this.makePublicRequest<any>(
+          `/storefront/${tenantId}/storefront/categories-stats`,
+          {},
+          `categories-stats-${storeId}`,
+          this.CATEGORIES_TTL
+        );
+      });
+
+      const results = await Promise.allSettled(promises);
+      
+      return results.map((result, index) => ({
+        storeId: storeIds[index],
+        success: result.status === 'fulfilled',
+        data: result.status === 'fulfilled' ? result.value : null,
+        error: result.status === 'rejected' ? result.reason : null
+      }));
+    } catch (error) {
+      console.error('[StorefrontService] Failed to get batch categories stats:', error);
+      return [];
     }
   }
 }

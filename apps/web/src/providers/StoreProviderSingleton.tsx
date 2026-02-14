@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import { storefrontService } from '@/services/StorefrontService';
 
 // ====================
 // STORE PROVIDER SINGLETON - CLIENT-SIDE IMPLEMENTATION
@@ -222,17 +223,11 @@ class StoreProviderSingleton {
         dispatch({ type: 'FETCH_START', storeIds: uncachedIds });
 
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-          
-          // Use client-side API request method
-          const data = await singletonRef.makeAPIRequest<{ stores: any[] }>(`${apiUrl}/api/stores/batch`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ storeIds: uncachedIds })
-          });
+          // Use StorefrontService for batch operations
+          const stores = await storefrontService.getBatchStores(uncachedIds);
           
           // Transform API response to UniversalStore format
-          const universalStores = data.stores.map((store: any) => ({
+          const universalStores = stores.map((store: any) => ({
             id: store.id,
             tenantId: store.tenantId,
             name: store.name,
@@ -306,22 +301,16 @@ class StoreProviderSingleton {
         });
 
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-          
-          // Fetch stats for all stores in parallel using client-side API method
-          const promises = storeIds.map(async (storeId) => {
-            const data = await singletonRef.makeAPIRequest<any>(`${apiUrl}/api/storefront/${storeId}/storefront/categories-stats`);
-            return { storeId, stats: data };
-          });
-
-          const results = await Promise.all(promises);
+          // Use StorefrontService for batch categories stats
+          const results = await storefrontService.getBatchCategoriesStats('default', storeIds);
           
           // Update stores with enhanced stats
-          results.forEach(({ storeId, stats }) => {
-            if (state.stores[storeId]) {
+          results.forEach((result) => {
+            if (result.success && state.stores[result.storeId]) {
+              const stats = result.data;
               dispatch({
                 type: 'UPDATE_STORE',
-                storeId,
+                storeId: result.storeId,
                 updates: {
                   categories: stats.categories || [],
                   ratingAvg: stats.ratingAvg || 0,

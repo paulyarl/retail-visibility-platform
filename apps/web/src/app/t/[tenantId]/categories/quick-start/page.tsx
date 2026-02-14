@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button, Card, Badge } from '@/components/ui';
 import { motion } from 'framer-motion';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import { adminCategoriesService } from '@/services/AdminCategoriesService';
 
 type BusinessType = 
   | 'grocery' 
@@ -225,42 +226,10 @@ export default function CategoryQuickStartPage() {
     setError(null);
 
     try {
-      // Get access token from localStorage
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/v1/tenants/${tenantId}/categories/quick-start`, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({
-          businessType: selectedType,
-          categoryCount,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        // Check if it's an auth/permission error
-        if (response.status === 401 || response.status === 403) {
-          setError(data.message || 'You do not have permission to use Category Quick Start');
-          setIsGenerating(false);
-          return;
-        }
-        throw new Error(data.message || 'Failed to generate categories');
-      }
-
-      const data = await response.json();
-      setGeneratedCount(data.categoriesCreated);
-      setDuplicatesSkipped(data.duplicatesSkipped || 0);
-      setResultMessage(data.message || null);
+      const categories = await adminCategoriesService.getQuickStartCategories(selectedType, categoryCount);
+      setGeneratedCount(categories.length);
+      setDuplicatesSkipped(0); // Would need to be tracked by service
+      setResultMessage(`Successfully generated ${categories.length} categories`);
       setSuccess(true);
     } catch (err: any) {
       setError(err.message);

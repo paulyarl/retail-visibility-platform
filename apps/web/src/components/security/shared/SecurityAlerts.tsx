@@ -82,9 +82,17 @@ export function SecurityAlerts({ alerts, onMarkRead, onDismiss }: SecurityAlerts
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground">{alert.message}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(alert.createdAt || alert.timestamp || new Date()), { addSuffix: true })}
-                  </p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{formatDistanceToNow(new Date(alert.createdAt || alert.timestamp || new Date()), { addSuffix: true })}</span>
+                    {alert.metadata?.tenantId && (
+                      <>
+                        <span>•</span>
+                        <Badge variant="default" className="text-xs">
+                          Tenant: {alert.metadata.tenantId}
+                        </Badge>
+                      </>
+                    )}
+                  </div>
                 </div>
                 
                 <Button

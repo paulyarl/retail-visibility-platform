@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { X, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { scanAnalyticsService } from '@/services/ScanAnalyticsService';
 
 interface CleanupScanSessionsModalProps {
   isOpen: boolean;
@@ -41,18 +43,9 @@ export default function CleanupScanSessionsModal({ isOpen, onClose }: CleanupSca
   const fetchTenants = async () => {
     setFetchingTenants(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${apiUrl}/api/tenants`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch tenants');
-      const data = await response.json();
+      const data = await platformHomeService.getTenants();
       // API returns array directly, not wrapped in { data: [...] }
-      setTenants(Array.isArray(data) ? data : (data.data || []));
+      setTenants(Array.isArray(data) ? data : []);
     } catch (err) {
       setError('Failed to load tenants');
     } finally {
@@ -62,16 +55,7 @@ export default function CleanupScanSessionsModal({ isOpen, onClose }: CleanupSca
 
   const fetchSessionStats = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${apiUrl}/api/admin/scan-sessions/stats?tenantId=${selectedTenantId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch session stats');
-      const data = await response.json();
+      const data = await scanAnalyticsService.getScanSessionStats(selectedTenantId);
       setSessionStats(data);
     } catch (err) {
       console.error('Failed to fetch session stats:', err);
@@ -89,24 +73,7 @@ export default function CleanupScanSessionsModal({ isOpen, onClose }: CleanupSca
     setSuccess('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/admin/scan-sessions/cleanup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ tenantId: selectedTenantId }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to cleanup sessions');
-      }
-
-      const result = await response.json();
+      const result = await scanAnalyticsService.cleanupScanSessions(selectedTenantId);
       setSuccess(`✅ Cleaned up ${result.cleaned} active scan sessions`);
       
       // Refresh stats
@@ -114,7 +81,6 @@ export default function CleanupScanSessionsModal({ isOpen, onClose }: CleanupSca
       
       // Reset after 2 seconds
       setTimeout(() => {
-        setSelectedTenantId('');
         setSuccess('');
       }, 2000);
     } catch (err: any) {

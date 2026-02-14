@@ -640,9 +640,8 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Gateway type and Tenant ID are required');
       }
 
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const result = await this.makeAuthenticatedRequest<any>(
-        `${apiBaseUrl}/api/oauth/${gatewayType}/disconnect`,
+        `/api/oauth/${gatewayType}/disconnect`,
         {
           method: 'DELETE',
           headers: {

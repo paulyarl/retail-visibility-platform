@@ -23,6 +23,7 @@ interface AdminAlert {
   userEmail: string;
   userFirstName: string | null;
   userLastName: string | null;
+  tenantId?: string;
   type: string;
   severity: 'info' | 'warning' | 'critical';
   title: string;
@@ -84,6 +85,7 @@ export function AdminAlertsTable({ alerts }: AdminAlertsTableProps) {
             <TableHead>Alert</TableHead>
             <TableHead>Type</TableHead>
             <TableHead>Severity</TableHead>
+            <TableHead>Tenant</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Time</TableHead>
           </TableRow>
@@ -116,6 +118,15 @@ export function AdminAlertsTable({ alerts }: AdminAlertsTableProps) {
               </TableCell>
               <TableCell>
                 {getSeverityBadge(alert.severity)}
+              </TableCell>
+              <TableCell>
+                {alert.tenantId ? (
+                  <Badge variant="default" className="text-xs">
+                    {alert.tenantId}
+                  </Badge>
+                ) : (
+                  <span className="text-xs text-muted-foreground">System</span>
+                )}
               </TableCell>
               <TableCell>
                 {!alert.read && (

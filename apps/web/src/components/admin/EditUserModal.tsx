@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X, Edit2, Loader2, AlertTriangle, Shield } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { adminUsersService } from '@/services/AdminUsersService';
 
 interface EditUserModalProps {
   isOpen: boolean;
@@ -34,24 +35,16 @@ export default function EditUserModal({ isOpen, onClose, user, onSuccess }: Edit
     setSuccess('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/admin/users/${user.id}`, {
-        method: 'PUT', // Use PUT instead of PATCH
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
+      const result = await adminUsersService.updateUser(user.id, {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        role: formData.role,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to update user');
+      if (!result) {
+        throw new Error('Failed to update user');
       }
 
-      const result = await response.json();
       setSuccess(`✅ User updated successfully!`);
       
       // Close modal after a short delay

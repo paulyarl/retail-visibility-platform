@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Button, Card } from '@mantine/core';
 import { Badge } from '@/components/ui';
 import { motion } from 'framer-motion';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { itemsService } from '@/services/ItemsService';
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -15,7 +17,10 @@ export const dynamic = 'force-dynamic';
 interface Tenant {
   id: string;
   name: string;
-  organizationId: string;
+  organization?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 interface BusinessType {
@@ -92,27 +97,8 @@ export default function AdminQuickStartProductsPage() {
 
   const loadTenants = async () => {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/tenants`, {
-        headers,
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load tenants');
-      }
-
-      const data = await response.json();
-      setTenants(data);
+      const tenants = await platformHomeService.getTenants();
+      setTenants(tenants || []);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -136,44 +122,8 @@ export default function AdminQuickStartProductsPage() {
     setError(null);
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      const data = await itemsService.quickStartTenant(selectedTenant, selectedType);
       
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      // Use the existing tenant-scoped quick-start endpoint (platform admin bypasses rate limits)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/v1/tenants/${selectedTenant}/quick-start`, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({
-          scenario: selectedType,
-          productCount,
-          assignCategories: true,
-          createAsDrafts: true,
-          generateImages,
-          imageQuality,
-          textModel,
-          imageModel,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        if (response.status === 401 || response.status === 403) {
-          setError(data.message || 'You do not have permission to use Product Quick Start');
-          setIsGenerating(false);
-          return;
-        }
-        throw new Error(data.message || 'Failed to generate products');
-      }
-
-      const data = await response.json();
       setGeneratedCount(data.productsCreated || 0);
       setCategoriesCreated(data.categoriesCreated || 0);
       setSuccess(true);

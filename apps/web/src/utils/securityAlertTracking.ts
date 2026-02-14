@@ -14,6 +14,7 @@
  */
 
 import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { securityAlertTrackingService } from '@/services/SecurityAlertTrackingService';
 
 interface SecurityAlertEvent {
   type: 'rate_limit_exceeded' | 'auth_failure' | 'suspicious_activity' | 'security_incident';
@@ -23,6 +24,7 @@ interface SecurityAlertEvent {
   userId?: string;
   priority?: 'low' | 'normal' | 'high' | 'critical';
   metadata: {
+    tenantId?: string;
     endpoint?: string;
     method?: string;
     ipAddress?: string;
@@ -279,56 +281,26 @@ class SecurityAlertTrackingCache {
    */
   private async sendEventsByType(type: string, events: SecurityAlertEvent[], apiUrl: string): Promise<void> {
     try {
-      // Create a temporary singleton for this request
-      class SecurityTelemetrySingleton extends UniversalSingleton {
-        private static instance: SecurityTelemetrySingleton;
-
-        private constructor() {
-          super('security-telemetry', { encrypt: false });
+      // Transform events to match service interface
+      const serviceEvents = events.map(event => ({
+        id: `${type}-${event.timestamp}-${Math.random()}`,
+        type: event.type,
+        severity: event.severity as 'low' | 'medium' | 'high' | 'critical',
+        priority: event.priority || 'normal',
+        timestamp: new Date(event.timestamp).toISOString(),
+        userId: event.userId,
+        tenantId: event.metadata?.tenantId, // Extract tenantId from metadata for proper tenant-specific tracking
+        sessionId: event.sessionId,
+        data: event.metadata || {},
+        metadata: {
+          endpoint: event.metadata?.endpoint,
+          userAgent: event.metadata?.userAgent,
+          ip: event.metadata?.ipAddress,
+          location: event.metadata?.location
         }
+      }));
 
-        public static getInstance(): SecurityTelemetrySingleton {
-          if (!SecurityTelemetrySingleton.instance) {
-            SecurityTelemetrySingleton.instance = new SecurityTelemetrySingleton();
-          }
-          return SecurityTelemetrySingleton.instance;
-        }
-
-        async sendTelemetry(type: string, payload: any): Promise<any> {
-          const response = await this.makeApiRequest<any>(
-            `/api/security/telemetry/${type}`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Security-Telemetry': 'true'
-              },
-              body: JSON.stringify(payload)
-            }
-          );
-          
-          if (!response.success) {
-            throw new Error(`Failed to send telemetry: ${response.error || 'Unknown error'}`);
-          }
-          
-          return response.data;
-        }
-      }
-
-      const telemetrySingleton = SecurityTelemetrySingleton.getInstance();
-      
-      const response = await telemetrySingleton.sendTelemetry(type, {
-        events,
-        batchMetadata: {
-          batchSize: events.length,
-          priorityBreakdown: this.getPriorityBreakdown(events),
-          clientTimestamp: Date.now(),
-          clientVersion: '1.0.0',
-          eventType: type
-        }
-      });
-
-      console.log(`[SecurityAlertTracking] Successfully sent ${events.length} ${type} events`);
+      await securityAlertTrackingService.sendAlertEvents(serviceEvents);
     } catch (error) {
       console.error(`[SecurityAlertTracking] Failed to send ${type} events:`, error);
       throw error;
@@ -377,22 +349,27 @@ class SecurityAlertTrackingCache {
         const eventsToSend = [...this.events];
         
         // Use sendBeacon for reliable delivery on page unload
-        if (navigator.sendBeacon) {
+        if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
           const eventsByType = this.groupEventsByType(eventsToSend);
           
           Object.entries(eventsByType).forEach(([type, events]) => {
-            const blob = new Blob([JSON.stringify({
-              events,
-              batchMetadata: {
-                batchSize: events.length,
-                priorityBreakdown: this.getPriorityBreakdown(events),
-                clientTimestamp: Date.now(),
-                eventType: type,
-                unload: true
-              }
-            })], { type: 'application/json' });
+            const telemetryData = {
+              type,
+              data: {
+                events,
+                batchMetadata: {
+                  batchSize: events.length,
+                  priorityBreakdown: this.getPriorityBreakdown(events),
+                  clientTimestamp: Date.now(),
+                  eventType: type,
+                  unload: true
+                }
+              },
+              timestamp: new Date().toISOString()
+            };
             
-            navigator.sendBeacon(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/security/telemetry/${type}`, blob);
+            // Use SecurityAlertTrackingService's sendTelemetryBeacon method
+            securityAlertTrackingService.sendTelemetryBeacon(type, telemetryData);
           });
         }
       }

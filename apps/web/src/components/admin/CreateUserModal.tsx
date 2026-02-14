@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, UserPlus, Loader2, AlertTriangle } from 'lucide-react';
+import { adminUsersService } from '@/services/AdminUsersService';
 
 interface CreateUserModalProps {
   isOpen: boolean;
@@ -28,24 +29,17 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }: CreateUs
     setSuccess('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/admin/users`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
+      const result = await adminUsersService.createUser({
+        email: formData.email,
+        firstName: formData.name.split(' ')[0] || '',
+        lastName: formData.name.split(' ').slice(1).join(' ') || '',
+        role: formData.role,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to create user');
+      if (!result) {
+        throw new Error('Failed to create user');
       }
 
-      const result = await response.json();
       setSuccess(`✅ User created successfully! Email: ${formData.email}`);
       
       setTimeout(() => {

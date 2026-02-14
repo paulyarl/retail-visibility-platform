@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Button, Card } from '@mantine/core';
 import { Badge } from '@/components/ui';
 import { motion } from 'framer-motion';
+import { adminCategoriesService } from '@/services/AdminCategoriesService';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 
 
 // Force dynamic rendering to prevent prerendering issues
@@ -78,27 +80,14 @@ export default function AdminCategoryQuickStartPage() {
 
   const loadTenants = async () => {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/tenants`, {
-        headers,
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load tenants');
-      }
-
-      const data = await response.json();
-      setTenants(data);
+      const tenants = await platformHomeService.getTenants();
+      // Transform to match expected Tenant interface
+      const transformedTenants = (tenants || []).map((tenant: any) => ({
+        id: tenant.id,
+        name: tenant.name,
+        organizationId: tenant.organization?.id || ''
+      }));
+      setTenants(transformedTenants);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -122,38 +111,8 @@ export default function AdminCategoryQuickStartPage() {
     setError(null);
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/v1/tenants/${selectedTenant}/categories/quick-start`, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({
-          businessType: selectedType,
-          categoryCount,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        if (response.status === 401 || response.status === 403) {
-          setError(data.message || 'You do not have permission to use Category Quick Start');
-          setIsGenerating(false);
-          return;
-        }
-        throw new Error(data.message || 'Failed to generate categories');
-      }
-
-      const data = await response.json();
-      setGeneratedCount(data.categoriesCreated);
+      const categories = await adminCategoriesService.getQuickStartCategories(selectedType, categoryCount);
+      setGeneratedCount(categories.length);
       setSuccess(true);
     } catch (err: any) {
       setError(err.message);

@@ -13,6 +13,9 @@ import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { cachedFetch } from '@/lib/api-cache';
+import { hoursStatusService } from '@/services/HoursStatusService';
+import { tenantPublicService } from '@/services/TenantPublicService';
+import { platformPublicService } from '@/services/PlatformPublicService';
 import Image from "next/image";
 import { canManageTenantSettings } from "@/lib/auth/access-control";
 import PublicFooter from "@/components/PublicFooter";
@@ -76,13 +79,19 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     if (!isAuthenticated && !authLoading) {
       const fetchPlatformStats = async () => {
         try {
-          // Call backend API directly (public endpoint, no auth needed)
-          const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-          const response = await cachedFetch(`${API_BASE_URL}/api/platform-stats`);
-          if (response.ok) {
-            const data = await response.json();
-            setPlatformStats(data);
-          }
+          // Use platformPublicService for consistent caching and metrics
+          const stats = await platformPublicService.getPlatformStats();
+          // Transform to match expected state format
+          setPlatformStats({
+            activeRetailers: stats.totalTenants,
+            activeRetailersFormatted: stats.totalTenants.toLocaleString(),
+            productsListed: stats.totalProducts,
+            productsListedFormatted: stats.totalProducts.toLocaleString(),
+            storefrontsLive: stats.featuredStores,
+            storefrontsLiveFormatted: stats.featuredStores.toLocaleString(),
+            platformUptime: stats.uptime,
+            platformUptimeFormatted: `${stats.uptime}%`,
+          });
         } catch (error) {
           // Silently fail - platform stats are non-critical for user experience
           console.warn('[Platform Stats] Failed to load public stats, using defaults');
@@ -106,13 +115,16 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
           }
         }
 
-        // Fetch from public endpoint (no auth needed for reading)
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await cachedFetch(`${API_BASE_URL}/api/public/features-showcase-config`);
-        if (response.ok) {
-          const data = await response.json();
-          setShowcaseMode(data.mode || 'hybrid');
-        }
+        // Use platformPublicService for consistent caching and metrics
+        const config = await platformPublicService.getFeaturesShowcaseConfig();
+        // Map config mode to expected ShowcaseMode type
+        const modeMap: Record<string, ShowcaseMode> = {
+          'hybrid': 'hybrid',
+          'featured': 'grid',
+          'recent': 'slider',
+          'trending': 'tabs'
+        };
+        setShowcaseMode(modeMap[config.mode] || 'hybrid');
       } catch (error) {
         // Silently fail - showcase config is non-critical, defaults to 'hybrid'
         console.warn('[Showcase Config] Failed to load config, using hybrid mode');
@@ -127,11 +139,16 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     const fetchHours = async () => {
       try {
         if (!selectedTenantId) { setHoursInfo(null); return; }
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await cachedFetch(`${API_BASE_URL}/public/tenant/${selectedTenantId}/profile`, { cache: 'no-store' });
-        if (!res.ok) { setHoursInfo(null); return; }
-        const prof = await res.json();
-        const hours = prof?.hours;
+        
+        // Use TenantPublicService for tenant profile data
+        const profile = await tenantPublicService.getPublicTenantProfile(selectedTenantId);
+        
+        if (!profile) { 
+          setHoursInfo(null); 
+          return; 
+        }
+        
+        const hours = profile?.hours;
         let hasHours = false;
         if (Array.isArray(hours)) hasHours = hours.length > 0;
         else if (hours && typeof hours === 'object') hasHours = Object.keys(hours).filter(k => k !== 'timezone' && k !== 'special').length > 0;

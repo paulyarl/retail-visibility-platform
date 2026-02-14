@@ -363,15 +363,15 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
 
   /**
    * Get tier system features for admin tier management
-   * Uses the /api/admin/tier-system/features endpoint
+   * Uses the /api/admin/**
+   * Get tier system features
    */
   async getTierSystemFeatures(): Promise<any[]> {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const result = await this.makeAuthenticatedRequest<{
         features: any[];
       }>(
-        `${apiBaseUrl}/api/admin/tier-system/features`,
+        '/api/admin/tier-system/features',
         {},
         'admin-tier-features',
         this.cacheTTL
@@ -396,9 +396,8 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
     limits: any;
   }): Promise<any> {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const result = await this.makeAuthenticatedRequest<any>(
-        `${apiBaseUrl}/api/admin/tier-system/tiers`,
+        '/api/admin/tier-system/tiers',
         {
           method: 'POST',
           body: JSON.stringify(tierData)
@@ -425,9 +424,8 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
     limits?: any;
   }): Promise<any> {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const result = await this.makeAuthenticatedRequest<any>(
-        `${apiBaseUrl}/api/admin/tier-system/tiers/${tierId}`,
+        `/api/admin/tier-system/tiers/${tierId}`,
         {
           method: 'PUT',
           body: JSON.stringify(tierData)
@@ -448,9 +446,8 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
    */
   async deleteTier(tierId: string): Promise<any> {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const result = await this.makeAuthenticatedRequest<any>(
-        `${apiBaseUrl}/api/admin/tier-system/tiers/${tierId}`,
+        `/api/admin/tier-system/tiers/${tierId}`,
         {
           method: 'DELETE'
         },

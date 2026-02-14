@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X, Shield, Mail, Power, UserCheck, Loader2, AlertTriangle, CheckCircle, Clock, AlertCircle, Edit3, Save } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { adminUsersService } from '@/services/AdminUsersService';
 
 interface UserStatusModalProps {
   isOpen: boolean;
@@ -79,36 +80,21 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
     setSuccess('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/admin/users/${user.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          email: tempEmail,
-          firstName: user.name?.split(' ')[0] || '',
-          lastName: user.name?.split(' ').slice(1).join(' ') || '',
-          role: user.role,
-          isActive: user.is_active,
-          emailVerified: user.email_verified,
-        }),
+      await adminUsersService.updateUser(user.id, {
+        email: tempEmail,
+        firstName: user.name?.split(' ')[0] || '',
+        lastName: user.name?.split(' ').slice(1).join(' ') || '',
+        role: user.role,
+        isActive: user.is_active,
+        emailVerified: user.email_verified,
       });
 
-      if (response.ok) {
-        setSuccess('✅ Email updated successfully!');
-        setEditingEmail(false);
-        setTimeout(() => {
-          onClose();
-          onSuccess?.();
-        }, 1500);
-      } else {
-        const data = await response.json();
-        setError(`Failed to update email: ${data.message || data.error || 'Unknown error'}`);
-      }
+      setSuccess('✅ Email updated successfully!');
+      setEditingEmail(false);
+      setTimeout(() => {
+        onClose();
+        onSuccess?.();
+      }, 1500);
     } catch (error) {
       console.error('Failed to update email:', error);
       setError('Failed to update email');
@@ -138,36 +124,21 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
     setSuccess('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/admin/users/${user.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          firstName: newFirstName,
-          lastName: newLastName,
-          email: user.email,
-          role: user.role,
-          isActive: user.is_active,
-          emailVerified: user.email_verified,
-        }),
+      await adminUsersService.updateUser(user.id, {
+        firstName: newFirstName,
+        lastName: newLastName,
+        email: user.email,
+        role: user.role,
+        isActive: user.is_active,
+        emailVerified: user.email_verified,
       });
 
-      if (response.ok) {
-        setSuccess('✅ Name updated successfully!');
-        setEditingName(false);
-        setTimeout(() => {
-          onClose();
-          onSuccess?.();
-        }, 1500);
-      } else {
-        const data = await response.json();
-        setError(`Failed to update name: ${data.message || data.error || 'Unknown error'}`);
-      }
+      setSuccess('✅ Name updated successfully!');
+      setEditingName(false);
+      setTimeout(() => {
+        onClose();
+        onSuccess?.();
+      }, 1500);
     } catch (error) {
       console.error('Failed to update name:', error);
       setError('Failed to update name');
@@ -329,118 +300,37 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
     setSuccess('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      let endpoint = '';
-      let method = 'POST';
-      let body: any = {};
-
       switch (action.type) {
         case 'send_verification':
         case 'resend_verification':
-          endpoint = `/api/admin/users/${user.id}/send-verification-email`;
-          body = { email: user.email };
+          await adminUsersService.sendVerificationEmail(user.id);
           break;
         case 'activate':
-          endpoint = `/api/admin/users/${user.id}`;
-          method = 'PUT';
-          body = { 
-            firstName: user.name?.split(' ')[0] || '',
-            lastName: user.name?.split(' ').slice(1).join(' ') || '',
-            email: user.email,
-            role: user.role,
-            isActive: true, 
-            emailVerified: true 
-          };
+          await adminUsersService.updateUserStatus(user.id, true, user.email_verified);
           break;
         case 'deactivate':
-          endpoint = `/api/admin/users/${user.id}`;
-          method = 'PUT';
-          body = { 
-            firstName: user.name?.split(' ')[0] || '',
-            lastName: user.name?.split(' ').slice(1).join(' ') || '',
-            email: user.email,
-            role: user.role,
-            isActive: false, 
-            emailVerified: user.email_verified 
-          };
+          await adminUsersService.updateUserStatus(user.id, false, user.email_verified);
           break;
         case 'mark_verified':
-          endpoint = `/api/admin/users/${user.id}`;
-          method = 'PUT';
-          body = { 
-            firstName: user.name?.split(' ')[0] || '',
-            lastName: user.name?.split(' ').slice(1).join(' ') || '',
-            email: user.email,
-            role: user.role,
-            isActive: user.is_active, 
-            emailVerified: true 
-          };
+          await adminUsersService.updateUserVerificationStatus(user.id, true);
           break;
         case 'mark_unverified':
-          endpoint = `/api/admin/users/${user.id}`;
-          method = 'PUT';
-          body = { 
-            firstName: user.name?.split(' ')[0] || '',
-            lastName: user.name?.split(' ').slice(1).join(' ') || '',
-            email: user.email,
-            role: user.role,
-            isActive: false, 
-            emailVerified: false 
-          };
+          await adminUsersService.updateUserVerificationStatus(user.id, false);
           break;
+        default:
+          throw new Error('Unknown action type');
       }
 
-      const response = await fetch(`${apiUrl}${endpoint}`, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || data.error || 'Failed to update user status');
+      setSuccess(`✅ ${action.label} completed successfully!`);
+      if (onSuccess) {
+        setTimeout(() => {
+          onSuccess();
+          onClose();
+        }, 1500);
       }
-
-      const result = await response.json();
-      
-      // Success message based on action
-      let successMessage = '';
-      switch (action.type) {
-        case 'send_verification':
-          successMessage = `✅ Verification email sent to ${user.email}`;
-          break;
-        case 'resend_verification':
-          successMessage = `✅ Verification email resent to ${user.email}`;
-          break;
-        case 'activate':
-          successMessage = `✅ User ${user.email} activated successfully`;
-          break;
-        case 'deactivate':
-          successMessage = `✅ User ${user.email} deactivated successfully`;
-          break;
-        case 'mark_verified':
-          successMessage = `✅ Email marked as verified for ${user.email}`;
-          break;
-        case 'mark_unverified':
-          successMessage = `✅ Email marked as unverified for ${user.email}`;
-          break;
-      }
-
-      setSuccess(successMessage);
-      
-      // Refresh user data and close modal after successful action
-      setTimeout(() => {
-        onSuccess?.();
-        handleClose();
-      }, 1500);
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to ${action.label.toLowerCase()}`);
+    } catch (error) {
+      console.error(`Failed to ${action.type}:`, error);
+      setError(`Failed to ${action.label.toLowerCase()}`);
     } finally {
       setLoading(false);
       setActionLoading(null);

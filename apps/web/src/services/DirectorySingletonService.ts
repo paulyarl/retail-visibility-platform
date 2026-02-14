@@ -48,11 +48,17 @@ export interface DirectoryCategory {
   id: string;
   name: string;
   slug: string;
+  googleCategoryId: string | null;
+  storeCount: number;
+  productCount: number;
   description?: string;
   icon?: string;
-  storeCount: number;
   parentCategory?: string;
   subcategories?: DirectoryCategory[];
+  // Enhanced fields from new API
+  totalProducts?: number;
+  totalInStock?: number;
+  avgPriceCents?: number;
 }
 
 export interface DirectoryLocation {
@@ -269,6 +275,77 @@ class DirectorySingletonService extends PublicApiSingleton {
     } catch (error) {
       console.error('[DirectorySingleton] Failed to search by location:', error);
       return null;
+    }
+  }
+
+  /**
+   * Get public shops for directory browsing
+   * Used for shops page and public shop listings
+   */
+  async getPublicShops(): Promise<any[]> {
+    try {
+      const response = await this.makePublicRequest<{
+        success: boolean;
+        shops: any[];
+      }>(
+        '/api/public/shops',
+        {},
+        'public-shops',
+        this.CACHE_TTL_MEDIUM
+      );
+
+      return response?.shops || [];
+    } catch (error) {
+      console.error('[DirectorySingletonService] Failed to get public shops:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get directory map locations
+   * Used for map display with coordinates
+   */
+  async getDirectoryMapLocations(filters: {
+    category?: string;
+    storeType?: string;
+    city?: string;
+    state?: string;
+    q?: string;
+    limit?: number;
+  } = {}): Promise<{
+    listings: any[];
+    total: number;
+  }> {
+    try {
+      const params = new URLSearchParams();
+      if (filters.category) params.append('category', filters.category);
+      if (filters.storeType) params.append('storeType', filters.storeType);
+      if (filters.city) params.append('city', filters.city);
+      if (filters.state) params.append('state', filters.state);
+      if (filters.q) params.append('q', filters.q);
+      params.append('limit', (filters.limit || 100).toString());
+
+      const response = await this.makePublicRequest<{
+        data: {
+          listings: any[];
+        };
+      }>(
+        `/api/directory/map/locations?${params.toString()}`,
+        {},
+        `directory-map-locations-${params.toString()}`,
+        this.CACHE_TTL_MEDIUM
+      );
+
+      return {
+        listings: response?.data?.listings || [],
+        total: response?.data?.listings?.length || 0
+      };
+    } catch (error) {
+      console.error('[DirectorySingletonService] Failed to get map locations:', error);
+      return {
+        listings: [],
+        total: 0
+      };
     }
   }
 
@@ -643,4 +720,5 @@ class DirectorySingletonService extends PublicApiSingleton {
 }
 
 // Export singleton instance
+export const directorySingletonService = DirectorySingletonService.getInstance();
 export const directoryService = DirectorySingletonService.getInstance();

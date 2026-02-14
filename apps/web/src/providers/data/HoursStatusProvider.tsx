@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { hoursStatusSingleton, StoreStatus } from './HoursStatusSingleton';
+import { hoursStatusService, StoreStatus } from '@/services/HoursStatusService';
+import { hoursStatusSingleton } from './HoursStatusSingleton';
 
 // Context interface
 interface HoursStatusContextType {
@@ -44,7 +45,7 @@ export function HoursStatusProvider({ children }: { children: React.ReactNode })
     try {
       setLoading(true);
       setError(null);
-      return await hoursStatusSingleton.getStoreStatus(tenantId);
+      return await hoursStatusService.getStoreStatus(tenantId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch store status');
       return null;
@@ -57,7 +58,7 @@ export function HoursStatusProvider({ children }: { children: React.ReactNode })
     try {
       setLoading(true);
       setError(null);
-      return await hoursStatusSingleton.getMultipleStoreStatus(tenantIds);
+      return await hoursStatusService.getMultipleStoreStatus(tenantIds);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch store statuses');
       return new Map();
@@ -70,7 +71,10 @@ export function HoursStatusProvider({ children }: { children: React.ReactNode })
     try {
       setLoading(true);
       setError(null);
-      return await hoursStatusSingleton.refreshStatus(tenantId);
+      // Invalidate cache first
+      await hoursStatusService.invalidateCache(tenantId);
+      // Then fetch fresh data
+      return await hoursStatusService.getStoreStatus(tenantId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh store status');
       return null;
@@ -80,23 +84,27 @@ export function HoursStatusProvider({ children }: { children: React.ReactNode })
   };
 
   const clearTenantStatus = (tenantId: string): void => {
-    hoursStatusSingleton.clearTenantStatus(tenantId);
+    hoursStatusService.clearCachedStatus(tenantId);
   };
 
   const clearAllStatus = (): void => {
-    hoursStatusSingleton.clearAllStatus();
+    hoursStatusService.clearAllCachedStatus();
   };
 
   const getMetrics = (): any => {
-    return hoursStatusSingleton.getMetrics();
+    // Return basic metrics since getCustomMetrics is protected
+    return {
+      cachedTenants: hoursStatusService.getCachedCount(),
+      totalStatusRequests: 0
+    };
   };
 
   const getCachedStatus = (tenantId: string): StoreStatus | null => {
-    return hoursStatusSingleton.getCachedStatus(tenantId);
+    return hoursStatusService.getCachedStatus(tenantId);
   };
 
   const hasStatus = (tenantId: string): boolean => {
-    return hoursStatusSingleton.hasStatus(tenantId);
+    return hoursStatusService.hasStatus(tenantId);
   };
 
   const value: HoursStatusContextType = {

@@ -6,6 +6,7 @@
  */
 
 import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { behaviorTrackingService } from '@/services/BehaviorTrackingService';
 
 // Behavior Tracking Data Interfaces
 export interface TrackingEvent {
@@ -323,15 +324,22 @@ class BehaviorTrackingSingleton extends UniversalSingleton {
    */
   private async sendEvent(event: TrackingEvent): Promise<void> {
     try {
-      const response = await fetch('/api/analytics/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(event)
-      });
+      // Transform event to match service interface
+      const serviceEvent = {
+        type: event.eventType,
+        action: event.eventType,
+        data: event.eventData,
+        timestamp: event.timestamp,
+        userId: event.userId,
+        sessionId: event.sessionId,
+        tenantId: event.tenantId,
+        metadata: {
+          userAgent: event.userAgent,
+          ip: event.ip
+        }
+      };
 
-      if (!response.ok) {
-        throw new Error('Failed to send tracking event');
-      }
+      await behaviorTrackingService.sendEvent(serviceEvent);
     } catch (error) {
       console.error('Error sending tracking event:', error);
       throw error;
@@ -343,15 +351,22 @@ class BehaviorTrackingSingleton extends UniversalSingleton {
    */
   private async sendBatch(events: TrackingEvent[]): Promise<void> {
     try {
-      const response = await fetch('/api/analytics/events/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ events })
-      });
+      // Transform events to match service interface
+      const serviceEvents = events.map(event => ({
+        type: event.eventType,
+        action: event.eventType,
+        data: event.eventData,
+        timestamp: event.timestamp,
+        userId: event.userId,
+        sessionId: event.sessionId,
+        tenantId: event.tenantId,
+        metadata: {
+          userAgent: event.userAgent,
+          ip: event.ip
+        }
+      }));
 
-      if (!response.ok) {
-        throw new Error('Failed to send tracking batch');
-      }
+      await behaviorTrackingService.sendBatch(serviceEvents);
     } catch (error) {
       console.error('Error sending tracking batch:', error);
       throw error;
@@ -407,17 +422,30 @@ class BehaviorTrackingSingleton extends UniversalSingleton {
    */
   private async sendSession(session: TrackingSession): Promise<void> {
     try {
-      const response = await fetch('/api/analytics/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(session)
-      });
+      // Transform session to match service interface
+      const serviceSession = {
+        id: session.id,
+        userId: session.userId,
+        tenantId: session.tenantId,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        duration: session.duration,
+        events: [], // Service expects array of TrackingEvent, but we only have count
+        metadata: {
+          pageViews: session.pageViews,
+          bounceRate: session.bounceRate,
+          userAgent: session.userAgent,
+          exitPage: session.exitPage,
+          entryPage: session.entryPage,
+          events: session.events, // Keep the count in metadata
+          location: session.location
+        }
+      };
 
-      if (!response.ok) {
-        throw new Error('Failed to send session data');
-      }
+      await behaviorTrackingService.sendSession(serviceSession);
     } catch (error) {
       console.error('Error sending session data:', error);
+      throw error;
     }
   }
 
@@ -478,13 +506,25 @@ class BehaviorTrackingSingleton extends UniversalSingleton {
     }
 
     try {
-      const response = await fetch(`/api/analytics/behavior?hours=${hours}`);
+      // Get analytics using service
+      const serviceAnalytics = await behaviorTrackingService.getBehaviorAnalytics(hours);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch behavior analytics');
-      }
-
-      const analytics = await response.json();
+      // Transform service analytics to match singleton interface
+      const analytics: BehaviorAnalytics = {
+        totalEvents: serviceAnalytics.totalEvents,
+        uniqueUsers: serviceAnalytics.uniqueUsers,
+        uniqueSessions: serviceAnalytics.uniqueUsers, // Approximate from unique users
+        averageSessionDuration: 0, // Not available from service
+        bounceRate: 0, // Not available from service
+        topPages: [], // Not available from service
+        topEvents: serviceAnalytics.topActions.map(action => ({
+          eventType: action.action,
+          count: action.count,
+          uniqueUsers: 0 // Not available from service
+        })),
+        userFlows: [], // Not available from service
+        timeRange: `${hours} hours`
+      };
       
       await this.setCache(cacheKey, analytics);
       return analytics;
@@ -530,13 +570,8 @@ class BehaviorTrackingSingleton extends UniversalSingleton {
     }
 
     try {
-      const response = await fetch(`/api/analytics/users/${userId}/behavior?days=${days}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch user behavior patterns');
-      }
-
-      const patterns = await response.json();
+      // Get user behavior patterns using service
+      const patterns = await behaviorTrackingService.getUserBehaviorPatterns(userId, days);
       
       await this.setCache(cacheKey, patterns);
       return patterns;

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { geocodeAddress, validateCoordinates } from '@/lib/geocoding';
+import { directorySingletonService } from '@/services/DirectorySingletonService';
 
 // Google Maps type declarations
 declare global {
@@ -158,25 +159,16 @@ export default function DirectoryMapGoogle({
 
     const fetchMapData = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const params = new URLSearchParams();
-        if (filters.category) params.append('category', filters.category);
-        if (filters.storeType) params.append('storeType', filters.storeType);
-        if (filters.city) params.append('city', filters.city);
-        if (filters.state) params.append('state', filters.state);
-        if (filters.q) params.append('q', filters.q); // Search query
-        params.append('limit', '100');
-
-        const url = `${apiUrl}/api/directory/map/locations?${params.toString()}`;
+        const result = await directorySingletonService.getDirectoryMapLocations({
+          category: filters.category,
+          storeType: filters.storeType,
+          city: filters.city,
+          state: filters.state,
+          q: filters.q,
+          limit: 100
+        });
         
-        const response = await fetch(url);
-        
-        if (response.ok) {
-          const data = await response.json();
-          setMapListings(data.data?.listings || []);
-        } else {
-          console.error('[DirectoryMapGoogle] API fetch failed:', response.status, response.statusText);
-        }
+        setMapListings(result.listings);
       } catch (err) {
         console.error('[DirectoryMapGoogle] Error fetching map data:', err);
       }

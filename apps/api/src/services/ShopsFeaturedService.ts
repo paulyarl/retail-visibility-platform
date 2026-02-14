@@ -295,11 +295,11 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
   } = {}) {
     const { limit = 12, region } = options;
     
-    this.logger.info('[SHOPS FEATURED] Fetching trending shops from database', {
+   /*  this.logger.info('[SHOPS FEATURED] Fetching trending shops from database', {
       limit,
       region
     } as any);
-
+ */
     try {
       // Use mv_trending_products for trending shops data
       const pool = getDirectPool();
@@ -335,21 +335,21 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
       const result = await pool.query(query, [limit]);
       
       // Debug: Log the raw database rows to see what fields are available
-      console.log('[ShopsFeaturedService] Raw database rows:', result.rows);
+      /* console.log('[ShopsFeaturedService] Raw database rows:', result.rows);
       console.log('[ShopsFeaturedService] Row 0 fields:', Object.keys(result.rows[0] || {}));
       if (result.rows.length > 0) {
         console.log('[ShopsFeaturedService] Row 0 imageurl:', result.rows[0].imageurl);
         console.log('[ShopsFeaturedService] Row 0 primary_category:', result.rows[0].primary_category);
         console.log('[ShopsFeaturedService] Row 0 tenant_slug:', result.rows[0].tenant_slug);
-      }
+      } */
       
       const trendingShops = result.rows.map(row => {
-        console.log('[ShopsFeaturedService] Processing row:', {
+        /* console.log('[ShopsFeaturedService] Processing row:', {
           tenant_id: row.tenant_id,
           tenant_name: row.tenant_name,
           tenant_slug: row.tenant_slug,
           'slug to be used': row.tenant_slug || row.tenant_id
-        });
+        }); */
         
         return {
           tenantId: row.tenant_id,
@@ -373,7 +373,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
         };
       });
 
-      console.log('[ShopsFeaturedService] Final trending shops:', trendingShops.map(s => ({
+     /*  console.log('[ShopsFeaturedService] Final trending shops:', trendingShops.map(s => ({
         tenantId: s.tenantId,
         name: s.name,
         slug: s.slug,
@@ -387,7 +387,7 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
           name: s.name,
           trendingScore: s.trendingScore
         }))
-      } as any);
+      } as any); */
 
       
       return trendingShops;

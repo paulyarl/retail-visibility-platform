@@ -12,6 +12,7 @@ import ManageTenantsModal from '@/components/admin/ManageTenantsModal';
 import UserStatusModal from '@/components/admin/UserStatusModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { canManageUsers, canViewUsers } from '@/lib/auth/access-control';
+import { adminUsersService } from '@/services/AdminUsersService';
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -78,82 +79,28 @@ export default function PlatformUserMaintenancePage() {
 
   const loadUsers = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
+      setLoading(true);
       
-      const response = await fetch(`${apiUrl}/api/admin/users`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const usersWithTenants = await adminUsersService.getUsersWithTenants();
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('DEBUG: API Response:', data);
-        console.log('DEBUG: Users from API:', data.users);
-        console.log('DEBUG: First user tenants:', data.users?.[0]?.tenants);
-        
-        // Debug specific user email verification status
-        const targetUser = data.users?.find((u: any) => u.id === 'adminuser-ZQTQ003Q');
-        if (targetUser) {
-          console.log('DEBUG: Target user status:', {
-            id: targetUser.id,
-            email: targetUser.email,
-            is_active: targetUser.is_active,
-            email_verified: targetUser.email_verified,
-            combined_status: targetUser.is_active && targetUser.email_verified ? 'active' : 
-                           targetUser.is_active && !targetUser.email_verified ? 'active_unverified' :
-                           !targetUser.is_active && targetUser.email_verified ? 'inactive' : 'pending'
-          });
-        }
-        
-        // Fetch tenant data for each user
-        const usersWithTenants = await Promise.all(
-          (data.users || []).map(async (user: any) => {
-            try {
-              const tenantResponse = await fetch(`${apiUrl}/api/admin/users/${user.id}/tenants`, {
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                },
-              });
-              
-              if (tenantResponse.ok) {
-                const tenantData = await tenantResponse.json();
-                const userTenantsArray = tenantData.tenant || tenantData.tenants || [];
-                const formattedTenants = userTenantsArray.map((t: any) => ({
-                  id: t.tenant_id,
-                  name: t.tenantName,
-                  role: t.role,
-                }));
-                
-                console.log(`DEBUG: Fetched tenants for user ${user.id}:`, formattedTenants);
-                
-                return {
-                  ...user,
-                  tenants: formattedTenants
-                };
-              } else {
-                console.log(`DEBUG: Failed to fetch tenants for user ${user.id}`);
-                return {
-                  ...user,
-                  tenants: []
-                };
-              }
-            } catch (error) {
-              console.error(`DEBUG: Error fetching tenants for user ${user.id}:`, error);
-              return {
-                ...user,
-                tenants: []
-              };
-            }
-          })
-        );
-        
-        console.log('DEBUG: Users with tenants:', usersWithTenants);
-        setUsers(usersWithTenants);
-      } else {
-        console.error('Failed to load users:', response.status, response.statusText);
+      console.log('DEBUG: Users from service:', usersWithTenants);
+      console.log('DEBUG: First user tenants:', usersWithTenants?.[0]?.tenants);
+      
+      // Debug specific user email verification status
+      const targetUser = usersWithTenants?.find((u: any) => u.id === 'adminuser-ZQTQ003Q');
+      if (targetUser) {
+        console.log('DEBUG: Target user status:', {
+          id: targetUser.id,
+          email: targetUser.email,
+          is_active: targetUser.is_active,
+          email_verified: targetUser.email_verified,
+          combinedStatus: targetUser.is_active && targetUser.email_verified ? 'active' : 
+                         targetUser.is_active && !targetUser.email_verified ? 'active_unverified' :
+                         !targetUser.is_active && targetUser.email_verified ? 'inactive' : 'pending'
+        });
       }
+      
+      setUsers(usersWithTenants || []);
     } catch (error) {
       console.error('Failed to load users:', error);
     } finally {
@@ -167,23 +114,15 @@ export default function PlatformUserMaintenancePage() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/admin/users/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const success = await adminUsersService.deleteUser(userId);
 
-      if (response.ok) {
+      if (success) {
         await loadUsers();
       } else {
         alert('Failed to delete user');
       }
     } catch (error) {
-      console.error('Failed to delete user:', error);
+      console.error('Delete user error:', error);
       alert('Failed to delete user');
     }
   };
@@ -217,22 +156,12 @@ export default function PlatformUserMaintenancePage() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/admin/users/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          isActive: newStatus,
-          emailVerified: newEmailVerified,
-        }),
+      const success = await adminUsersService.updateUser(userId, {
+        isActive: newStatus,
+        emailVerified: newEmailVerified,
       });
 
-      if (response.ok) {
+      if (success) {
         await loadUsers();
       } else {
         alert('Failed to update user status');

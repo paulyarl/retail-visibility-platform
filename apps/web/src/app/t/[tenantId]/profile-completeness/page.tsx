@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { ContextBadges } from '@/components/ContextBadges'
-import { API_BASE_URL } from '@/lib/api'
+import { tenantPublicService } from '@/services/TenantPublicService'
 
 interface CompletenessData {
   score: number
@@ -47,28 +47,13 @@ export default function ProfileCompletenessPage() {
     async function fetchProfile() {
       try {
         setLoading(true)
-        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
+        // Fetch profile data using TenantPublicService
+        const profileData = await tenantPublicService.getPublicTenantProfile(tenantId)
+
+        if (!profileData) {
+          throw new Error('Profile not found. Please create your business profile first.')
         }
-
-        // Fetch profile data from the public endpoint
-        const res = await fetch(`${API_BASE_URL}/api/public/tenant/${tenantId}/profile`, {
-          headers,
-          credentials: 'include',
-        })
-
-        if (!res.ok) {
-          if (res.status === 404) {
-            throw new Error('Profile not found. Please create your business profile first.')
-          } else {
-            throw new Error('Failed to fetch profile data')
-          }
-        }
-        
-        const profileData = await res.json()
         
         // Calculate completeness score based on available fields
         const totalFields = 14

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Key, Loader2, AlertTriangle } from 'lucide-react';
+import { adminUsersService } from '@/services/AdminUsersService';
 
 interface ResetPasswordModalProps {
   isOpen: boolean;
@@ -23,24 +24,13 @@ export default function ResetPasswordModal({ isOpen, onClose, userEmail, userId 
     setSuccess('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
+      const success = await adminUsersService.resetPassword(userId);
       
-      const response = await fetch(`${apiUrl}/api/admin/users/${userId}/password`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ password: newPassword }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to reset password');
+      if (!success) {
+        throw new Error('Failed to reset password');
       }
 
-      setSuccess(`✅ Password updated successfully for ${userEmail}`);
+      setSuccess(`✅ Password reset successfully for ${userEmail}`);
       
       setTimeout(() => {
         onClose();

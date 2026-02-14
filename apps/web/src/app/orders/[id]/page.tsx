@@ -141,9 +141,25 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  const handleDownload = (accessToken: string) => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-    window.open(`${apiUrl}/api/download/${accessToken}`, '_blank');
+  const handleDownload = async (accessToken: string) => {
+    try {
+      if (!order) {
+        console.error('Order not available for download');
+        return;
+      }
+      
+      const downloads = await customerOrderService.getOrderDownloads(order.orderId);
+      
+      if (downloads && downloads.length > 0) {
+        // Open the first download link in a new window
+        const downloadUrl = downloads[0].url || `/api/download/${accessToken}`;
+        window.open(downloadUrl, '_blank');
+      } else {
+        console.error('No downloads available for this order');
+      }
+    } catch (error) {
+      console.error('Failed to get order downloads:', error);
+    }
   };
 
   const formatFileSize = (bytes: number): string => {

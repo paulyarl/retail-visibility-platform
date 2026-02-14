@@ -122,7 +122,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
           method: 'POST',
           body: JSON.stringify(batchData)
         },
-        null // Don't use cache for tracking requests
+        undefined // Don't use cache for tracking requests
       );
     } catch (error) {
       console.warn('[RecommendationsSingleton] Behavior tracking batch failed:', error);

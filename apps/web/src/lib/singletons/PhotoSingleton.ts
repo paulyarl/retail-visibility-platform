@@ -14,6 +14,7 @@
  */
 
 import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { photoService } from '@/services/PhotoService';
 
 // ====================
 // TYPES
@@ -36,13 +37,15 @@ export interface Photo {
 }
 
 export interface PhotoUploadResult {
-  photo: Photo;
   success: boolean;
+  photo?: Photo;
+  error?: string;
   message?: string;
 }
 
 export interface PhotoDeleteResult {
   success: boolean;
+  error?: string;
   message?: string;
 }
 
@@ -53,6 +56,7 @@ export interface PhotoDeleteResult {
 class PhotoSingleton extends UniversalSingleton {
   protected static instances: Map<string, PhotoSingleton> = new Map();
   private readonly CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+  private lastUpdated: number = Date.now();
 
   private constructor(tenantId: string) {
     super(`photo-singleton-${tenantId}`);
@@ -79,19 +83,8 @@ class PhotoSingleton extends UniversalSingleton {
    * Uses UniversalSingleton's built-in caching with automatic TTL
    */
   async fetchItemPhotos(itemId: string): Promise<Photo[]> {
-    const cacheKey = `item-photos-${itemId}`;
-    
     try {
-      // Use UniversalSingleton's makeApiRequest with automatic caching
-      const data = await this.makeApiRequest<{ photos: Photo[] }>(
-        `/api/items/${itemId}/photos`,
-        { method: 'GET' },
-        cacheKey,
-        this.CACHE_TTL
-      );
-
-      console.log('[PhotoSingleton] Fetched photos for item:', itemId, data.photos?.length || 0);
-      return data.photos || [];
+      return await photoService.fetchItemPhotos(itemId);
     } catch (error) {
       console.error('[PhotoSingleton] Error fetching item photos:', error);
       throw error;
@@ -103,19 +96,8 @@ class PhotoSingleton extends UniversalSingleton {
    * Uses UniversalSingleton's built-in caching with automatic TTL
    */
   async fetchVariantPhotos(variantId: string): Promise<Photo[]> {
-    const cacheKey = `variant-photos-${variantId}`;
-    
     try {
-      // Use UniversalSingleton's makeApiRequest with automatic caching
-      const data = await this.makeApiRequest<{ photos: Photo[] }>(
-        `/api/variants/${variantId}/photos`,
-        { method: 'GET' },
-        cacheKey,
-        this.CACHE_TTL
-      );
-
-      console.log('[PhotoSingleton] Fetched photos for variant:', variantId, data.photos?.length || 0);
-      return data.photos || [];
+      return await photoService.fetchVariantPhotos(variantId);
     } catch (error) {
       console.error('[PhotoSingleton] Error fetching variant photos:', error);
       throw error;
@@ -132,36 +114,15 @@ class PhotoSingleton extends UniversalSingleton {
    */
   async uploadItemPhoto(itemId: string, file: File, isPrimary: boolean = false): Promise<PhotoUploadResult> {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const formData = new FormData();
-      formData.append('photo', file);
-      formData.append('isPrimary', isPrimary.toString());
-
-      this.apiCalls++; // Track API call
-      const data = await this.makeApiRequest<{ photo: Photo }>(
-        `/api/items/${itemId}/photos`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      ) as { photo: Photo };
+      const result = await photoService.uploadItemPhoto(itemId, file, isPrimary);
       
-      // Invalidate cache for this item using UniversalSingleton's clearCache
-      await this.clearCache(`item-photos-${itemId}`);
-
       console.log('[PhotoSingleton] Photo uploaded successfully for item:', itemId);
-      return {
-        photo: data.photo,
-        success: true,
-        message: 'Photo uploaded successfully',
-      };
+      return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to upload photo';
-      console.error('[PhotoSingleton] Error uploading photo:', error);
+      console.error('[PhotoSingleton] Error uploading item photo:', error);
       return {
-        photo: {} as Photo,
         success: false,
-        message: errorMessage,
+        error: error instanceof Error ? error.message : 'Upload failed',
       };
     }
   }
@@ -172,28 +133,15 @@ class PhotoSingleton extends UniversalSingleton {
    */
   async deletePhoto(photoId: string, itemId: string): Promise<PhotoDeleteResult> {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const result = await photoService.deletePhoto(photoId, itemId);
       
-      this.apiCalls++; // Track API call
-      await this.makeApiRequest(
-        `/api/photos/${photoId}`,
-        { method: 'DELETE' }
-      );
-
-      // Invalidate cache for this item using UniversalSingleton's clearCache
-      await this.clearCache(`item-photos-${itemId}`);
-
       console.log('[PhotoSingleton] Photo deleted successfully:', photoId);
-      return {
-        success: true,
-        message: 'Photo deleted successfully',
-      };
+      return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete photo';
       console.error('[PhotoSingleton] Error deleting photo:', error);
       return {
         success: false,
-        message: errorMessage,
+        error: error instanceof Error ? error.message : 'Delete failed',
       };
     }
   }
@@ -204,25 +152,10 @@ class PhotoSingleton extends UniversalSingleton {
    */
   async reorderPhotos(itemId: string, photoIds: string[]): Promise<boolean> {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const result = await photoService.reorderPhotos(itemId, photoIds);
       
-      this.apiCalls++; // Track API call
-      await this.makeApiRequest(
-        `/api/items/${itemId}/photos/reorder`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ photoIds }),
-        }
-      );
-
-      // Invalidate cache for this item using UniversalSingleton's clearCache
-      await this.clearCache(`item-photos-${itemId}`);
-
       console.log('[PhotoSingleton] Photos reordered successfully for item:', itemId);
-      return true;
+      return result.success;
     } catch (error) {
       console.error('[PhotoSingleton] Error reordering photos:', error);
       return false;
@@ -235,19 +168,10 @@ class PhotoSingleton extends UniversalSingleton {
    */
   async setPrimaryPhoto(photoId: string, itemId: string): Promise<boolean> {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+      const result = await photoService.setPrimaryPhoto(photoId, itemId);
       
-      this.apiCalls++; // Track API call
-      await this.makeApiRequest(
-        `/api/photos/${photoId}/primary`,
-        { method: 'PUT' }
-      );
-
-      // Invalidate cache for this item using UniversalSingleton's clearCache
-      await this.clearCache(`item-photos-${itemId}`);
-
       console.log('[PhotoSingleton] Primary photo set successfully:', photoId);
-      return true;
+      return result.success;
     } catch (error) {
       console.error('[PhotoSingleton] Error setting primary photo:', error);
       return false;
@@ -260,29 +184,38 @@ class PhotoSingleton extends UniversalSingleton {
 
   /**
    * Invalidate cache for a specific item
-   * Uses UniversalSingleton's clearCache method
    */
   async invalidateItemCache(itemId: string): Promise<void> {
-    await this.clearCache(`item-photos-${itemId}`);
-    console.log('[PhotoSingleton] Cache invalidated for item:', itemId);
+    try {
+      await photoService.invalidateItemCache(itemId);
+      console.log('[PhotoSingleton] Cache invalidated for item:', itemId);
+    } catch (error) {
+      console.error('[PhotoSingleton] Error invalidating item cache:', error);
+    }
   }
 
   /**
    * Invalidate cache for a specific variant
-   * Uses UniversalSingleton's clearCache method
    */
   async invalidateVariantCache(variantId: string): Promise<void> {
-    await this.clearCache(`variant-photos-${variantId}`);
-    console.log('[PhotoSingleton] Cache invalidated for variant:', variantId);
+    try {
+      await photoService.invalidateVariantCache(variantId);
+      console.log('[PhotoSingleton] Cache invalidated for variant:', variantId);
+    } catch (error) {
+      console.error('[PhotoSingleton] Error invalidating variant cache:', error);
+    }
   }
 
   /**
-   * Clear all cached photos
-   * Uses UniversalSingleton's clearCache method
+   * Clear all photo cache
    */
   async clearAllCache(): Promise<void> {
-    await this.clearCache();
-    console.log('[PhotoSingleton] All cache cleared');
+    try {
+      await photoService.clearAllCache();
+      console.log('[PhotoSingleton] All photo cache cleared');
+    } catch (error) {
+      console.error('[PhotoSingleton] Error clearing all cache:', error);
+    }
   }
 
   // ====================
@@ -291,29 +224,24 @@ class PhotoSingleton extends UniversalSingleton {
 
   /**
    * Get performance metrics
-   * Uses UniversalSingleton's built-in metrics tracking
    */
-  getMetrics() {
+  getMetrics(): any {
     return {
+      apiCalls: this.apiCalls,
       cacheHits: this.cacheHits,
       cacheMisses: this.cacheMisses,
-      cacheHitRate: this.cacheHits + this.cacheMisses > 0 
-        ? (this.cacheHits / (this.cacheHits + this.cacheMisses)) * 100 
-        : 0,
-      apiCalls: this.apiCalls,
-      cacheSize: this.cache.size,
-      inMemoryCacheSize: this.cache.size,
-      persistentCacheSize: 0, // Managed by CacheManager
+      lastUpdated: this.lastUpdated,
     };
   }
 
   /**
-   * Reset metrics
+   * Reset performance metrics
    */
   resetMetrics(): void {
+    this.apiCalls = 0;
     this.cacheHits = 0;
     this.cacheMisses = 0;
-    this.apiCalls = 0;
+    this.lastUpdated = Date.now();
     console.log('[PhotoSingleton] Metrics reset');
   }
 }

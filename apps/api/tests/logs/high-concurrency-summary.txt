@@ -6,43 +6,43 @@ Test Configuration:
   • Requests per User: 10
   • Total Requests: 2000
   • API Base URL: http://localhost:4000
-  • Test Duration: 62.32s
+  • Test Duration: 8.82s
 
 RESULTS:
-  • Successful Requests: 205
-  • Failed Requests: 1795
-  • Success Rate: 10.25%
-  • Requests per Second: 3.29
+  • Successful Requests: 0
+  • Failed Requests: 2000
+  • Success Rate: 0.00%
+  • Requests per Second: 0.00
 
 PERFORMANCE:
-  • Average Response Time: 7815.39ms
-  • Min Response Time: 3418ms
-  • Max Response Time: 18895ms
-  • 50th Percentile: 7988ms
-  • 90th Percentile: 11027ms
-  • 95th Percentile: 11413ms
-  • 99th Percentile: 11913ms
+  • Average Response Time: 0.00ms
+  • Min Response Time: Infinityms
+  • Max Response Time: 0ms
+  • 50th Percentile: undefinedms
+  • 90th Percentile: undefinedms
+  • 95th Percentile: undefinedms
+  • 99th Percentile: undefinedms
 
 ENDPOINT PERFORMANCE:
-  • categories: 516 requests, 0.00ms avg
-  • discovery-random: 403 requests, 3975.57ms avg
-  • stores: 574 requests, 0.00ms avg
-  • category-tree: 306 requests, 0.00ms avg
-  • products-by-identifier: 201 requests, 0.00ms avg
+  • categories: 498 requests, 0.00ms avg
+  • products-by-identifier: 205 requests, 0.00ms avg
+  • stores: 620 requests, 0.00ms avg
+  • category-tree: 289 requests, 0.00ms avg
+  • discovery-random: 388 requests, 0.00ms avg
 
 ASSESSMENT: NEEDS_IMPROVEMENT
 ❌ PERFORMANCE NEEDS IMPROVEMENT! Not ready for viral traffic.
 
-ERRORS: 1795
+ERRORS: 2000
   • User 1: User 1 Request 1 failed: fetch failed
-  • User 1: User 1 Request 4 failed: This operation was aborted
-  • User 1: User 1 Request 5 failed: This operation was aborted
-  • User 1: User 1 Request 6 failed: fetch failed
-  • User 1: User 1 Request 7 failed: fetch failed
+  • User 1: User 1 Request 2 failed: fetch failed
+  • User 1: User 1 Request 3 failed: fetch failed
+  • User 1: User 1 Request 4 failed: fetch failed
+  • User 1: User 1 Request 5 failed: fetch failed
 
 RECOMMENDATIONS:
 ❌ Significant optimization required
 🔧 Review architecture and scaling
-❌ Response times need improvement
+✅ Excellent cached response times
 ❌ 95th percentile is too high for viral traffic
 ❌ 99th percentile is too high

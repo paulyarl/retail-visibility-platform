@@ -18,6 +18,7 @@ import { ScopeParams } from '@/types/scope';
 import TroubleshootingToggle from '@/components/debug/TroubleshootingToggle';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
+import { directorySingletonService } from '@/services/DirectorySingletonService';
 
 interface Shop {
   id: string;
@@ -307,17 +308,8 @@ function ShopsPageContent() {
     setShopsLoading(true);
     setShopsError(null);
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const res = await fetch(`${apiBaseUrl}/api/public/shops`);
-      
-      if (!res.ok) {
-        throw new Error('Failed to fetch shops');
-      }
-      
-      const data = await res.json();
-      if (data.success && data.shops) {
-        setShops(data.shops);
-      }
+      const shops = await directorySingletonService.getPublicShops();
+      setShops(shops);
     } catch (err) {
       setShopsError(err instanceof Error ? err.message : 'Unknown error');
     } finally {

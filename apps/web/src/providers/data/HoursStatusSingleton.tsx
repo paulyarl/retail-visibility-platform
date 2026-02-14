@@ -1,4 +1,5 @@
 import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { hoursStatusService } from '@/services/HoursStatusService';
 
 // TypeScript interfaces for hours status
 export interface StoreStatus {
@@ -89,16 +90,12 @@ class HoursStatusSingleton extends UniversalSingleton {
     }
     
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const url = `${apiUrl}/api/public/tenant/${tenantId}/business-hours/status`;
+      // Use HoursStatusService for consistent caching and error handling
+      const statusData = await hoursStatusService.getStoreStatus(tenantId);
       
-      const response = await this.makePublicRequest<any>(url);
-
-      if (!response.success || !response.data) {
-        throw new Error(response.error || 'Failed to fetch hours status');
+      if (!statusData) {
+        throw new Error('Failed to fetch hours status');
       }
-
-      const statusData: StoreStatus = response.data;
       
       // Store in cache
       await this.setCache(cacheKey, statusData);

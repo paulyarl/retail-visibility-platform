@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Building2, Plus, Trash2, Loader2, AlertTriangle, Users } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { adminUsersService } from '@/services/AdminUsersService';
 
 interface ManageTenantsModalProps {
   isOpen: boolean;
@@ -47,26 +48,15 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
   const loadTenantData = async () => {
     setLoadingTenants(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
+      // Load user's current tenants and all available tenants in parallel
+      const [userTenantsResponse, allTenantsResponse] = await Promise.all([
+        adminUsersService.getUserTenants(user.id),
+        adminUsersService.getAllTenants()
+      ]);
       
-      // Load user's current tenants from admin endpoint
-      const userTenantsResponse = await fetch(`${apiUrl}/api/admin/users/${user.id}/tenants`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
-      // Load all available tenants from admin endpoint (all tenants for user management)
-      const allTenantsResponse = await fetch(`${apiUrl}/api/admin/tenants/all`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
-      if (userTenantsResponse.ok && allTenantsResponse.ok) {
-        const userTenantsData = await userTenantsResponse.json();
-        const allTenantsData = await allTenantsResponse.json();
+      if (userTenantsResponse && allTenantsResponse) {
+        const userTenantsData = userTenantsResponse;
+        const allTenantsData = allTenantsResponse;
         
         console.log('Debug - API responses:', {
           userTenantsData,
@@ -74,11 +64,11 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
         });
         
         // Format user tenants to match expected structure
-        // Note: API returns "tenant" (singular) not "tenants" (plural)
-        const userTenantsArray = userTenantsData.tenant || userTenantsData.tenants || [];
+        // Note: Services return arrays directly
+        const userTenantsArray = Array.isArray(userTenantsData) ? userTenantsData : [];
         const formattedUserTenants = userTenantsArray.map((t: any) => ({
-          id: t.tenant_id,
-          name: t.tenantName,
+          id: t.tenant_id || t.id,
+          name: t.tenantName || t.name,
           role: t.role,
         }));
         
@@ -86,7 +76,7 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
         
         // Filter out tenants the user already has access to
         const userTenantIds = formattedUserTenants.map((t: Tenant) => t.id);
-        const allTenantsArray = allTenantsData.tenants || [];
+        const allTenantsArray = Array.isArray(allTenantsData) ? allTenantsData : [];
         console.log('Debug - Tenant filtering:', {
           userTenantIds,
           allTenantsArray: allTenantsArray.map((t: any) => ({ id: t.id, name: t.name }))
@@ -102,21 +92,7 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
           availableCount: available.length
         });
       } else {
-        console.error('API responses:', {
-          userTenantsStatus: userTenantsResponse.status,
-          allTenantsStatus: allTenantsResponse.status,
-          userTenantsOk: userTenantsResponse.ok,
-          allTenantsOk: allTenantsResponse.ok,
-          userTenantsText: await userTenantsResponse.text(),
-          allTenantsText: await allTenantsResponse.text()
-        });
-        
-        // Check specific error for the /all endpoint
-        if (!allTenantsResponse.ok && allTenantsResponse.status === 403) {
-          setError('Insufficient permissions to view all tenants. Platform Admin or Platform Support required.');
-        } else {
-          setError('Failed to load tenant data');
-        }
+        setError('Failed to load tenant data');
       }
     } catch (error) {
       console.error('Failed to load tenant data:', error);
@@ -134,25 +110,7 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
     setSuccess('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/admin/users/${user.id}/tenants`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          tenant_id: selectedTenant,
-          role: 'ADMIN', // Use ADMIN instead of TENANT_ADMIN to match enum
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || data.error || 'Failed to add tenant access');
-      }
+      await adminUsersService.assignTenantToUser(user.id, selectedTenant, 'ADMIN');
 
       setSuccess(`✅ Tenant access added successfully!`);
       setSelectedTenant('');
@@ -175,20 +133,7 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
     setSuccess('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      const response = await fetch(`${apiUrl}/api/admin/users/${user.id}/tenants/${tenantId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || data.error || 'Failed to remove tenant access');
-      }
+      await adminUsersService.removeTenantFromUser(user.id, tenantId);
 
       setSuccess(`✅ Tenant access removed successfully!`);
       await loadTenantData(); // Reload tenant data
@@ -216,34 +161,7 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
     setSuccess('');
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
-      // First remove the existing assignment
-      await fetch(`${apiUrl}/api/admin/users/${user.id}/tenants/${editingRole.tenantId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      // Then add with new role
-      const response = await fetch(`${apiUrl}/api/admin/users/${user.id}/tenants`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          tenant_id: editingRole.tenantId,
-          role: editingRole.newRole,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || data.error || 'Failed to update tenant role');
-      }
+      await adminUsersService.updateUserTenantRole(user.id, editingRole.tenantId, editingRole.newRole);
 
       setSuccess(`✅ Tenant role updated successfully!`);
       setEditingRole(null);
