@@ -508,7 +508,7 @@ class DirectorySingletonService extends PublicApiSingleton {
   /**
    * Get related stores for a given store
    */
-  async getRelatedStores(slug: string, limit: number = 5): Promise<DirectoryStore[] | null> {
+  async getRelatedStores(slug: string, limit: number = 5): Promise<DirectoryStore[]> {
     try {
       if (!slug) {
         throw new Error('Slug is required');
@@ -521,10 +521,11 @@ class DirectorySingletonService extends PublicApiSingleton {
         this.CACHE_TTL_MEDIUM
       );
 
-      return response?.stores || response;
+      // The API returns { related: [...], count: ..., method: ... }
+      return response?.related || response?.stores || response || [];
     } catch (error) {
       console.error('[DirectorySingleton] Failed to get related stores:', error);
-      return null;
+      return [];
     }
   }
 

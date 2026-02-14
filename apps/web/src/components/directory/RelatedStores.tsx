@@ -57,8 +57,11 @@ export default function RelatedStores({
       try {
         const data = await directoryService.getRelatedStores(currentSlug, limit);
         
+        // Ensure data is always an array
+        const dataArray = Array.isArray(data) ? data : [];
+        
         // Map API response to expected format (snake_case to camelCase)
-        const mappedStores = (data || []).map((store: any) => ({
+        const mappedStores = dataArray.map((store: any) => ({
           id: store.id,
           tenantId: store.tenantId,
           businessName: store.business_name || store.businessName,
