@@ -2575,6 +2575,99 @@ router.get('/tenant/:tenantId/items', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/public/tenant/:identifier/fulfillment-settings
+ * Get tenant fulfillment settings by any identifier (tenant-id, slug, auto-id)
+ */
+router.get('/tenant/:identifier/fulfillment-settings', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    console.log(`[Public API] Fulfillment settings request for identifier: ${identifier}`);
+
+    // Use the universal identifier resolver
+    const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
+    const cache = UniversalIdentifierCache.getInstance();
+    
+    // Add timeout for identifier resolution to prevent hanging
+    const identifierPromise = cache.resolveIdentifier(identifier);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Identifier resolution timeout')), 10000); // 10 second timeout
+    });
+    
+    let resolvedTenant: any = null;
+    try {
+      resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
+      console.log(`[Public API] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
+    } catch (error) {
+      console.error(`[Public API] Error resolving identifier: ${identifier}`, error);
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
+
+    if (!resolvedTenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+        message: `No tenant found for identifier: ${identifier}`
+      });
+    }
+
+    // Get fulfillment settings for the tenant
+    const { prisma } = await import('../prisma');
+    const settings = await prisma.tenant_fulfillment_settings.findUnique({
+      where: { tenant_id: resolvedTenant.id },
+    });
+
+    // If no settings exist, return defaults
+    const defaultSettings = {
+      pickup_enabled: true,
+      pickup_instructions: null,
+      pickup_ready_time_minutes: 120,
+      delivery_enabled: false,
+      delivery_radius_miles: null,
+      delivery_fee_cents: 0,
+      delivery_min_free_cents: null,
+      delivery_time_hours: 24,
+      delivery_instructions: null,
+      shipping_enabled: false,
+      shipping_flat_rate_cents: null,
+      shipping_zones: [],
+      shipping_handling_days: 2,
+      shipping_provider: null,
+    };
+
+    const fulfillmentSettings = settings || defaultSettings;
+
+    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
+    res.setHeader('X-Service-Source', 'Universal-Identifier-Cache');
+
+    res.json({
+      success: true,
+      settings: fulfillmentSettings,
+      metadata: {
+        tenant: {
+          id: resolvedTenant.id,
+          name: resolvedTenant.name,
+          slug: resolvedTenant.slug,
+          type: resolvedTenant.type
+        },
+        identifierType: resolvedTenant.type,
+        hasCustomSettings: !!settings
+      }
+    });
+  } catch (error) {
+    console.error('[Public API] Error fetching fulfillment settings by identifier:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch fulfillment settings',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Mount shops routes under /shops
 router.use('/shops', shopsRoutes);
 

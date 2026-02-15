@@ -83,8 +83,11 @@ export default function ProductRatingDisplay({ productId, tenantId, showWriteRev
       // Fetch reviews
       const reviewsData = await productReviewsService.getProductReviews(tenantId, productId, { limit: 5 });
       if (reviewsData) {
+        // Ensure reviewsData is always an array
+        const reviewsArray = Array.isArray(reviewsData) ? reviewsData : [];
+        
         // Convert to component interface
-        const convertedReviews: Review[] = reviewsData.map(review => ({
+        const convertedReviews: Review[] = reviewsArray.map(review => ({
           id: review.id,
           rating: review.rating,
           review_text: review.content,

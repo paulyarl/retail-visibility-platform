@@ -15,6 +15,8 @@ import FeaturedBucketSimple from '@/components/storefront/FeaturedBucketSimple';
 import StorefrontActions from '@/components/storefront/StorefrontActions';
 import Image from 'next/image';
 import Link from 'next/link';
+import { Pagination } from '@/components/ui';
+import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
 
 interface StorefrontClientWrapperProps {
   tenantId: string;
@@ -28,7 +30,7 @@ interface StorefrontClientWrapperProps {
   productCategories: any[];
   storeCategories: any[];
   uncategorizedCount: number;
-  paymentGateways: any[];
+  paymentGateways?: any[];
   businessName: string;
   search?: string;
   category?: string;
@@ -48,6 +50,7 @@ interface StorefrontClientWrapperProps {
   currentPage?: number;
   totalPages?: number;
   totalItems?: number;
+  directoryData?: any;
 }
 
 export default function StorefrontClientWrapper({
@@ -82,7 +85,13 @@ export default function StorefrontClientWrapper({
   currentPage = 1,
   totalPages = 1,
   totalItems = 0,
+  directoryData,
 }: StorefrontClientWrapperProps) {
+  // Debug: Log directory data for contact info troubleshooting
+  console.log('[StorefrontClientWrapper] Directory data:', directoryData);
+  console.log('[StorefrontClientWrapper] Tenant metadata phone:', tenant.metadata?.phone);
+  console.log('[StorefrontClientWrapper] Tenant metadata email:', tenant.metadata?.email);
+  
   const [featuredCounts, setFeaturedCounts] = useState({
     staffPick: 0,
     seasonal: 0,
@@ -221,9 +230,34 @@ export default function StorefrontClientWrapper({
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
               {/* Review Button */}
-              <button className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Reviews">
+              <button 
+                onClick={() => {
+                  const reviewsSection = document.getElementById('reviews-section');
+                  if (reviewsSection) {
+                    reviewsSection.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" 
+                title="Reviews"
+              >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              </button>
+
+              {/* Contact Button */}
+              <button 
+                onClick={() => {
+                  const contactSection = document.getElementById('contact-section');
+                  if (contactSection) {
+                    contactSection.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" 
+                title="Contact Us"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
               </button>
 
@@ -496,22 +530,59 @@ export default function StorefrontClientWrapper({
                 Page {currentPage} of {totalPages} • {totalItems} total products
               </div>
             )}
+
+            {/* Pagination Component */}
+            {totalPages > 1 && (
+              <div className="mt-6 flex justify-center">
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={totalItems || 0}
+                  pageSize={12} // Fixed page size of 12 products
+                  onPageChange={(page) => {
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('page', page.toString());
+                    // Preserve other parameters
+                    if (search) params.set('search', search);
+                    if (category) params.set('category', category);
+                    if (featured) params.set('featured', featured);
+                    if (view) params.set('view', view);
+                    const newUrl = `${window.location.pathname}?${params.toString()}`;
+                    window.location.href = newUrl;
+                  }}
+                  onPageSizeChange={(size) => {
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('page', '1'); // Reset to first page when changing page size
+                    params.set('limit', size.toString());
+                    const newUrl = `${window.location.pathname}?${params.toString()}`;
+                    window.location.href = newUrl;
+                  }}
+                  pageSizeOptions={[12, 24, 48]}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Contact Information and Business Hours */}
-      <div className="grid grid-cols-1 md:grid-cols-2 md:gap-8 xl:gap-4 2xl:gap-2">
-        {/* Contact Information */}
-        <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 md:border-b-0">
-          <div>
-            <ContactInformationCollapsible tenant={tenant} />
-          </div>
-          
+      {/* Store Ratings and Reviews - Social Proof */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div id="reviews-section" className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
+          <StoreRatingDisplay tenantId={tenantId} showWriteReview={true} />
         </div>
+      </div>
 
-        {/* Business Hours */}
-        <BusinessHoursCollapsible businessHours={businessHours} />
+      {/* Contact Information - Prominent Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div id="contact-section" className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
+          <ContactInformationCollapsible tenant={tenant} />
+        </div>
+      </div>
+
+      {/* Business Hours */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div id="hours-section" className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
+          <BusinessHoursCollapsible businessHours={businessHours} />
+        </div>
       </div>
 
       {/* Map Section - How to Get There */}

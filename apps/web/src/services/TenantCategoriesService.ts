@@ -1,4 +1,5 @@
 import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { googleTaxonomyPublicService, type GoogleTaxonomyPath } from './GoogleTaxonomyPublicService';
 
 export interface Category {
   id: string;
@@ -25,11 +26,6 @@ export interface CategoryFormData {
   slug?: string;
   googleCategoryId?: string;
   sortOrder: number;
-}
-
-export interface GoogleTaxonomyPath {
-  path: string[];
-  fullPath: string;
 }
 
 /**
@@ -281,19 +277,12 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
 
   /**
    * Get Google taxonomy path for a category ID
-   * Uses the /public/google-taxonomy/:googleCategoryId endpoint (public)
+   * Uses the public Google taxonomy service
    */
   async getGoogleTaxonomyPath(googleCategoryId: string): Promise<GoogleTaxonomyPath | null> {
     try {
-      // Use makeAuthenticatedRequest for the endpoint (it's public but called from authenticated service)
-      const response = await this.makeAuthenticatedRequest<GoogleTaxonomyPath>(
-        `/public/google-taxonomy/${googleCategoryId}`,
-        {},
-        `google-taxonomy-${googleCategoryId}`,
-        this.TAXONOMY_TTL
-      );
-
-      return response;
+      // Use the dedicated public service for Google taxonomy operations
+      return await googleTaxonomyPublicService.getGoogleTaxonomyPath(googleCategoryId);
     } catch (error) {
       console.error('[TenantCategoriesService] Failed to get Google taxonomy path:', error);
       return null;

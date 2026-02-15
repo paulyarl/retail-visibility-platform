@@ -14,6 +14,7 @@
  */
 
 import { AuthenticatedApiSingleton, UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { tenantPublicService } from '@/services/TenantPublicService';
 
 // ====================
 // TYPES
@@ -144,16 +145,13 @@ class TenantSettingsSingleton extends AuthenticatedApiSingleton {
    */
   async fetchTenantTier(): Promise<TenantTier> {
     try {
-      const data = await this.makeAuthenticatedRequest<TenantTier>(
-        `/api/tenants/${this.tenantId}/tier/public`,
-        { method: 'GET' },
-        `tenant-tier-${this.tenantId}`
-      );
+      // Use public service for public tier endpoint
+      const data = await tenantPublicService.getPublicTenantTier(this.tenantId);
 
       console.log('[TenantSettingsSingleton] Fetched tenant tier:', this.tenantId);
       return data;
     } catch (error) {
-      console.error('[TenantSettingsSingleton] Error fetching tenant tier:', error);
+      console.error('[TenantSettingsSingleton] Failed to fetch tenant tier:', error);
       throw error;
     }
   }

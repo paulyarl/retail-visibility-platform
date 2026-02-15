@@ -20,21 +20,19 @@ import StorefrontActions from '@/components/products/StorefrontActions';
 import { StorefrontRecommendations } from './StorefrontClient';
 import { ProductSingletonProvider } from '@/providers/data/ProductSingleton';
 import FeaturedProductsSection from '@/components/storefront/FeaturedProductsSection';
-import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
 import { getCategoryUrl } from '@/utils/slug';
 import StorefrontMap from '@/components/storefront/StorefrontMap';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import { trackStorefrontView } from '@/utils/behaviorTracking';
-import ContactInformationCollapsible from '@/components/storefront/ContactInformationCollapsible';
-import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import LastViewed from '@/components/directory/LastViewed';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
 import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
 import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalogSidebar';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { tenantPublicService } from '@/services/TenantPublicService';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import { storefrontService } from '@/services/StorefrontSingletonService';
 import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
+import { directoryService } from '@/services/DirectorySingletonService';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
 
 export const dynamic = 'force-dynamic';
@@ -106,40 +104,54 @@ interface PageProps {
 
 async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string, category?: string, featured?: string) {
   try {
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-
-    // Use singleton service for cached tenant information
-    const tenantInfo = await tenantInfoService.getCompleteTenantInfo(tenantId);
     
-    if (!tenantInfo.tenant) {
+    // Use public services for public tenant page
+    const [tenant, businessProfile, businessHours] = await Promise.all([
+      tenantPublicService.getPublicTenantInfo(tenantId),
+      tenantPublicService.getPublicTenantProfile(tenantId),
+      tenantPublicService.getTenantBusinessHours(tenantId)
+    ]);
+    
+    if (!tenant) {
       return null;
     }
 
-    const { tenant: tenantResponse, businessProfile: businessProfileResponse, businessHours: rawBusinessHours, paymentGateways } = tenantInfo;
-
     // Extract actual data from response objects
-    const tenant = (tenantResponse as any)?.data || tenantResponse;
-    const businessProfile = (businessProfileResponse as any)?.data || businessProfileResponse;
+    const tenantData = (tenant as any)?.data || tenant;
+    const businessProfileData = (businessProfile as any)?.data || businessProfile;
+    const rawBusinessHours = businessHours;
 
-    // Merge business profile into tenant metadata
-    if (businessProfile) {
-      tenant.metadata = {
-        ...tenant.metadata,
-        ...businessProfile.metadata, // Preserve GBP categories and other metadata from profile
-        businessName: businessProfile.business_name,
-        phone: businessProfile.phone_number,
-        email: businessProfile.email,
-        website: businessProfile.website,
-        address: businessProfile.address_line1
-          ? `${businessProfile.address_line1}${businessProfile.address_line2 ? ', ' + businessProfile.address_line2 : ''}, ${businessProfile.city}, ${businessProfile.state} ${businessProfile.postal_code}`
-          : undefined,
-        logo_url: businessProfile.logo_url || tenant.logo_url || tenant.metadata?.logo_url, // Use business profile, tenant record, or tenant metadata logo
-        business_description: businessProfile.business_description,
-        social_links: businessProfile.social_links,
+    // Fetch directory data for contact information (reuses working directory endpoint)
+    let directoryData = null;
+    try {
+      // Get tenant slug for directory lookup
+      const tenantSlug = await tenantDirectoryService.getTenantSlug(tenantId);
+      if (tenantSlug) {
+        directoryData = await directoryService.getDirectoryConsolidated(tenantSlug);
+      }
+    } catch (error) {
+      console.warn('[TenantPage] Failed to fetch directory data:', error);
+    }
+
+    // Merge business profile and directory data into tenant metadata
+    if (businessProfileData || directoryData) {
+      tenantData.metadata = {
+        ...tenantData.metadata,
+        ...businessProfileData?.metadata, // Preserve GBP categories and other metadata from profile
+        businessName: businessProfileData?.business_name || directoryData?.listing?.businessName || tenantData.name,
+        phone: businessProfileData?.phone_number || directoryData?.listing?.phone || null,
+        email: businessProfileData?.email || directoryData?.listing?.email || null,
+        website: businessProfileData?.website || directoryData?.listing?.website || null,
+        address: businessProfileData?.address_line1
+          ? `${businessProfileData.address_line1}${businessProfileData.address_line2 ? ', ' + businessProfileData.address_line2 : ''}, ${businessProfileData.city}, ${businessProfileData.state} ${businessProfileData.postal_code}`
+          : directoryData?.listing?.address || null,
+        logo_url: businessProfileData?.logo_url || directoryData?.listing?.logoUrl || tenantData.logo_url || tenantData.metadata?.logo_url,
+        business_description: businessProfileData?.business_description || directoryData?.listing?.description || null,
+        social_links: businessProfileData?.social_links || (directoryData?.listing as any)?.social_links || null,
       };
     }
 
-    const hasLogo = !!tenant.metadata?.logo_url;
+    const hasLogo = !!tenantData.metadata?.logo_url;
     const hasBranding = hasLogo || !!rawBusinessHours;
     const storeStatus = rawBusinessHours ? computeStoreStatus(rawBusinessHours) : null;
 
@@ -224,7 +236,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Find current category name if filtering
     const currentCategory = category ? categories.find((c: Category) => c.slug === category) : null;
 
-    return { tenant, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours: rawBusinessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, paymentGateways };
+    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours: rawBusinessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, directoryData };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -282,7 +294,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
     }
   };
 
-  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, paymentGateways } = data as any;
+  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, directoryData } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
 
   // Track storefront view for recommendations (fire and forget)
@@ -445,7 +457,6 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
         productCategories={productCategories}
         storeCategories={storeCategories}
         uncategorizedCount={uncategorizedCount}
-        paymentGateways={paymentGateways}
         businessName={businessName}
         search={search}
         category={category}
@@ -465,6 +476,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
         currentPage={currentPage}
         totalPages={totalPages}
         totalItems={total}
+        directoryData={directoryData}
       />
     </ProductSingletonProvider>
   );

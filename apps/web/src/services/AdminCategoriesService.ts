@@ -6,6 +6,7 @@
  */
 
 import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { googleTaxonomyPublicService, type GoogleTaxonomyPath } from './GoogleTaxonomyPublicService';
 
 export interface AdminCategory {
   id: string;
@@ -43,12 +44,6 @@ export interface UpdateCategoryRequest {
   parentId?: string;
   isActive?: boolean;
   sortOrder?: number;
-}
-
-export interface GoogleTaxonomyPath {
-  path: string[];
-  categoryId: string;
-  categoryName: string;
 }
 
 /**
@@ -219,19 +214,8 @@ class AdminCategoriesService extends AuthenticatedApiSingleton {
    */
   async getGoogleTaxonomyPath(googleCategoryId: string): Promise<GoogleTaxonomyPath | null> {
     try {
-      // Use makeAuthenticatedRequest for the public endpoint
-      const data = await this.makeAuthenticatedRequest<any>(
-        `/public/google-taxonomy/${googleCategoryId}`,
-        {},
-        `google-taxonomy-${googleCategoryId}`,
-        this.TAXONOMY_TTL
-      );
-      
-      return {
-        path: data.path || [],
-        categoryId: googleCategoryId,
-        categoryName: data.path?.[data.path.length - 1] || ''
-      };
+      // Use the dedicated public service for Google taxonomy operations
+      return await googleTaxonomyPublicService.getGoogleTaxonomyPath(googleCategoryId);
     } catch (error) {
       console.error('[AdminCategoriesService] Failed to get Google taxonomy path:', error);
       return null;

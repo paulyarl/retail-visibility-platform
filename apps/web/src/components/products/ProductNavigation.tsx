@@ -17,7 +17,18 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 export function ProductNavigation({ tenantId, directorySlug }: ProductNavigationProps) {
-  const { user, isAuthenticated } = useAuth();
+  // Try to get auth context, but don't fail if not available
+  let user = null;
+  let isAuthenticated = false;
+  
+  try {
+    const auth = useAuth();
+    user = auth.user;
+    isAuthenticated = auth.isAuthenticated;
+  } catch (error) {
+    // AuthProvider not available - user is not authenticated
+    console.log('[ProductNavigation] AuthProvider not available, using public mode');
+  }
   
   // Check if user belongs to this item's tenant
   const userBelongsToTenant = user?.tenants?.some(

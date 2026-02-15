@@ -6,6 +6,7 @@
  */
 
 import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { tenantPublicService } from '@/services/TenantPublicService';
 import { platformHomeService } from './PlatformHomeSingletonService';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 
@@ -96,7 +97,7 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
    * Uses the /public/tenant/:tenantId endpoint
    */
   async getTenantInfo(tenantId: string): Promise<TenantInfo | null> {
-    //console.log(`[TenantInfoSingleton] getTenantInfo START for tenant: ${tenantId}`, new Date().toISOString());
+    console.log(`[TenantInfoSingleton] getTenantInfo START for tenant: ${tenantId}`, new Date().toISOString());
     
     if (!tenantId) {
       console.error('[TenantInfoSingleton] getTenantInfo: tenantId is required');
@@ -104,17 +105,14 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
     }
 
     try {
-      console.log(`[TenantInfoSingleton] Making API call to /api/public/tenant/${tenantId}`);
+      //console.log(`[TenantInfoSingleton] Making API call to /api/public/tenant/${tenantId}`);
       const startTime = Date.now();
       
-      const tenant = await this.makeAuthenticatedRequest<TenantInfo>(
-        `/api/public/tenant/${tenantId}`,
-        {},
-        `tenant-info-${tenantId}`
-      );
+      // Use public service for public endpoint
+      const tenant = await tenantPublicService.getPublicTenantInfo(tenantId);
       
       const endTime = Date.now();
-      //console.log(`[TenantInfoSingleton] API call completed in ${endTime - startTime}ms, result:`, tenant);
+      //console.log(`[TenantInfoSingleton] Tenant API call completed in ${endTime - startTime}ms, result:`, tenant);
 
       return tenant || null;
     } catch (error) {
@@ -128,7 +126,7 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
    * Uses the /public/tenant/:tenantId/profile endpoint
    */
   async getBusinessProfile(tenantId: string): Promise<BusinessProfile | null> {
-    //console.log(`[TenantInfoSingleton] getBusinessProfile START for tenant: ${tenantId}`, new Date().toISOString());
+    console.log(`[TenantInfoSingleton] getBusinessProfile START for tenant: ${tenantId}`, new Date().toISOString());
     
     if (!tenantId) {
       console.error('[TenantInfoSingleton] getBusinessProfile: tenantId is required');
@@ -139,11 +137,8 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
       //console.log(`[TenantInfoSingleton] Making API call to /api/public/tenant/${tenantId}/profile`);
       const startTime = Date.now();
       
-      const profile = await this.makeAuthenticatedRequest<BusinessProfile>(
-        `/api/public/tenant/${tenantId}/profile`,
-        {},
-        `tenant-profile-${tenantId}`
-      );
+      // Use public service for public endpoint
+      const profile = await tenantPublicService.getPublicTenantProfile(tenantId);
       
       const endTime = Date.now();
       //console.log(`[TenantInfoSingleton] Profile API call completed in ${endTime - startTime}ms, result:`, profile);
@@ -166,12 +161,8 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
     }
 
     try {
-      const result = await this.makeAuthenticatedRequest<TenantTier>(
-        `/api/tenants/${tenantId}/tier/public`,
-        {},
-        `tenant-tier-${tenantId}`,
-        this.cacheTTL
-      );
+      // Use public service for public endpoint
+      const result = await tenantPublicService.getPublicTenantTier(tenantId);
 
       return result || null;
     } catch (error) {
@@ -303,7 +294,7 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         success: boolean;
         settings: any;
       }>(
-        `/public/tenant/${tenantId}/fulfillment-settings`,
+        `/api/public/tenant/${tenantId}/fulfillment-settings`,
         {},
         `fulfillment-settings-${tenantId}`,
         this.cacheTTL

@@ -70,6 +70,66 @@ class TenantPublicService extends PublicApiSingleton {
   }
 
   /**
+   * Get public tenant info (basic)
+   * Uses the /api/public/tenant/:tenantId endpoint
+   */
+  async getPublicTenantInfo(tenantId: string): Promise<any | null> {
+    try {
+      const response = await this.makePublicRequest<any>(
+        `/api/public/tenant/${tenantId}`,
+        {},
+        `public-tenant-info-${tenantId}`,
+        this.PROFILE_TTL
+      );
+
+      return response;
+    } catch (error) {
+      console.error('[TenantPublicService] Failed to get public tenant info:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get tenant logo (public)
+   * Uses the /api/public/tenant/:tenantId/logo endpoint
+   */
+  async getTenantLogo(tenantId: string): Promise<any | null> {
+    try {
+      const response = await this.makePublicRequest<any>(
+        `/api/public/tenant/${encodeURIComponent(tenantId)}/logo`,
+        {},
+        `public-tenant-logo-${tenantId}`,
+        this.PROFILE_TTL
+      );
+
+      return response;
+    } catch (error) {
+      console.error('[TenantPublicService] Failed to get tenant logo:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get tenant tier information (public)
+   * Uses the /api/tenants/:tenantId/tier/public endpoint
+   */
+  async getPublicTenantTier(tenantId: string): Promise<any | null> {
+    try {
+      const response = await this.makePublicRequest<any>(
+        `/api/tenants/${tenantId}/tier/public`,
+        {},
+        `public-tenant-tier-${tenantId}`,
+        this.PROFILE_TTL
+      );
+
+      return response;
+    } catch (error) {
+      console.error('[TenantPublicService] Failed to get public tenant tier:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get public tenant profile
    * Uses the /api/public/tenant/:tenant_id/profile endpoint for public profile data
    */

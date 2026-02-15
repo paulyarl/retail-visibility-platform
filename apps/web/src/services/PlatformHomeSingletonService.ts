@@ -1757,12 +1757,9 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
-        `/api/public/tenant/${encodeURIComponent(tenantId)}/logo`,
-        {},
-        `platform-tenant-logo-${tenantId}`,
-        this.cacheTTL
-      );
+      // Use public service for public endpoint
+      const { tenantPublicService } = await import('./TenantPublicService');
+      const result = await tenantPublicService.getTenantLogo(tenantId);
 
       return result;
     } catch (error) {

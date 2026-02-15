@@ -93,14 +93,22 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
 
       const response = await this.makePublicRequest<{
         success: boolean;
-        data: ProductReview[];
+        data: {
+          reviews: ProductReview[];
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+          };
+          timestamp: string;
+        };
       }>(
-        `/api/stores/${tenantId}/products/${productId}/reviews?${params.toString()}`,
+        `/api/reviews-singleton/product/${productId}?${params.toString()}`,
         {},
         `product-reviews-${tenantId}-${productId}-${options?.limit || 'default'}`
       );
 
-      return response?.data || [];
+      return response?.data?.reviews || [];
     } catch (error) {
       console.error('[ProductReviewsSingleton] Failed to get product reviews:', error);
       return [];
