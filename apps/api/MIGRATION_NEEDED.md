@@ -1,6 +1,6 @@
 # Migration Required
 
-The following database migrations need to be run before the category directory service will work:
+The following database migrations need to be run before certain features will work:
 
 ## 1. Add Google Sync Fields to Tenant
 
@@ -25,6 +25,29 @@ After the Prisma migration, run the SQL migration manually:
 ```sql
 -- See: apps/api/prisma/migrations/create_directory_category_stores_view/migration.sql
 ```
+
+## 3. Account Deletion Requests Table
+
+The account deletion requests functionality requires the `account_deletion_requests` table:
+
+```bash
+cd apps/api
+npx prisma migrate deploy
+npx prisma generate
+```
+
+This will create the `account_deletion_requests` table with the following fields:
+- `id` (UUID)
+- `user_id` (UUID, foreign key to users)
+- `reason` (TEXT, nullable)
+- `status` (ENUM: pending, cancelled, completed)
+- `requested_at` (TIMESTAMP)
+- `scheduled_deletion_date` (TIMESTAMP)
+- `cancelled_at` (TIMESTAMP, nullable)
+- `completed_at` (TIMESTAMP, nullable)
+- `ip_address` (TEXT, nullable)
+- `admin_notes` (TEXT, nullable)
+- `cancelled_by_admin` (BOOLEAN)
 
 ## Temporary Workaround
 

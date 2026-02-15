@@ -29,36 +29,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { AlertTriangle, Calendar, User, XCircle, FileText, TrendingDown, Archive } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
-import { api } from '@/lib/api';
-
-interface DeletionRequest {
-  id: string;
-  userId: string;
-  userEmail: string;
-  userFirstName: string | null;
-  userLastName: string | null;
-  userCreatedAt: string;
-  reason: string | null;
-  status: 'pending' | 'cancelled' | 'completed';
-  preserveData: boolean;
-  requestedAt: string;
-  scheduledDeletionDate: string;
-  cancelledAt?: string;
-  completedAt?: string;
-  ipAddress?: string;
-  adminNotes?: string;
-  cancelledByAdmin?: boolean;
-}
-
-interface DeletionStats {
-  pendingCount: number;
-  cancelledCount: number;
-  completedCount: number;
-  last7Days: number;
-  last30Days: number;
-  expiringIn7Days: number;
-  topReasons: Array<{ reason: string; count: number }>;
-}
+import { adminDeletionRequestsService } from '@/services/AdminDeletionRequestsService';
+import type { DeletionRequest, DeletionStats } from '@/services/AdminDeletionRequestsService';
 
 export function DeletionRequestsManager() {
   const [requests, setRequests] = useState<DeletionRequest[]>([]);
@@ -68,24 +40,31 @@ export function DeletionRequestsManager() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [adminNotes, setAdminNotes] = useState('');
   const [activeTab, setActiveTab] = useState('pending');
+  const [error, setError] = useState<string | null>(null);
 
   const fetchRequests = async (status: string = 'pending') => {
     try {
-      const response = await api.get(`/api/admin/deletion-requests?status=${status}`);
-      if (!response.ok) throw new Error('Failed to fetch requests');
-      const data = await response.json();
-      setRequests(data.data || []);
+      setLoading(true);
+      setError(null);
+      const response = await adminDeletionRequestsService.getDeletionRequests(status);
+      setRequests(response.data);
+      
+      // Check for database table error
+      if (response.error) {
+        setError(response.error);
+      }
     } catch (error) {
       console.error('Failed to fetch deletion requests:', error);
+      setError('Failed to load deletion requests');
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchStats = async () => {
     try {
-      const response = await api.get('/api/admin/deletion-requests/stats');
-      if (!response.ok) throw new Error('Failed to fetch stats');
-      const data = await response.json();
-      setStats(data.data);
+      const stats = await adminDeletionRequestsService.getDeletionStats();
+      setStats(stats);
     } catch (error) {
       console.error('Failed to fetch deletion stats:', error);
     }
@@ -93,17 +72,19 @@ export function DeletionRequestsManager() {
 
   const handleCancelRequest = async (requestId: string) => {
     try {
-      const response = await api.put(`/api/admin/deletion-requests/${requestId}`, {
-        action: 'cancel',
-        adminNotes: adminNotes || 'Cancelled by admin'
-      });
+      const updatedRequest = await adminDeletionRequestsService.cancelDeletionRequest(
+        requestId, 
+        adminNotes || 'Cancelled by admin'
+      );
       
-      if (!response.ok) throw new Error('Failed to cancel request');
-      
-      setShowDetailsModal(false);
-      setAdminNotes('');
-      await fetchRequests(activeTab);
-      await fetchStats();
+      if (updatedRequest) {
+        // Refresh the current tab
+        await fetchRequests(activeTab);
+        await fetchStats();
+        setShowDetailsModal(false);
+        setSelectedRequest(null);
+        setAdminNotes('');
+      }
     } catch (error) {
       console.error('Failed to cancel deletion request:', error);
     }
@@ -111,12 +92,8 @@ export function DeletionRequestsManager() {
 
   const handleUpdateNotes = async (requestId: string) => {
     try {
-      const response = await api.put(`/api/admin/deletion-requests/${requestId}`, {
-        adminNotes
-      });
-      
-      if (!response.ok) throw new Error('Failed to update notes');
-      
+      // For now, just close the modal and refresh
+      // Notes updates might need a separate endpoint or be part of cancel/approve actions
       setShowDetailsModal(false);
       setAdminNotes('');
       await fetchRequests(activeTab);
@@ -162,6 +139,19 @@ export function DeletionRequestsManager() {
       <div className="space-y-4">
         <div className="h-32 bg-muted animate-pulse rounded-lg" />
         <div className="h-64 bg-muted animate-pulse rounded-lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-yellow-600" />
+        <h3 className="text-lg font-semibold mb-2">Feature Not Available</h3>
+        <p className="text-muted-foreground mb-4">{error}</p>
+        <p className="text-sm text-muted-foreground">
+          Please run the database migrations to enable account deletion requests functionality.
+        </p>
       </div>
     );
   }

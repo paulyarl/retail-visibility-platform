@@ -44,7 +44,7 @@ interface AdminSession {
 }
 
 interface AdminSessionsTableProps {
-  sessions: AdminSession[];
+  sessions?: AdminSession[];
   onRevoke: (sessionId: string) => Promise<void>;
   currentUserId?: string; // Current admin user's ID to prevent self-revocation
   // Pagination props
@@ -94,7 +94,7 @@ export function AdminSessionsTable({
     return name || session.userEmail;
   };
 
-  if (sessions.length === 0) {
+  if (!sessions || sessions.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
         <Monitor className="h-12 w-12 mx-auto mb-4 opacity-50" />

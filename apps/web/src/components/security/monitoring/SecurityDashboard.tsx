@@ -70,8 +70,14 @@ export function SecurityDashboard() {
     );
   }
 
-  const getHealthBadge = () => {
-    if (!healthStatus) return null;
+  const getHealthBadge = (healthStatus: any) => {
+    if (!healthStatus?.status) {
+      return (
+        <Badge variant="default">
+          Unknown
+        </Badge>
+      );
+    }
 
     const variants: Record<string, 'success' | 'warning' | 'error'> = {
       healthy: 'success',
@@ -81,7 +87,7 @@ export function SecurityDashboard() {
     };
 
     return (
-      <Badge variant={variants[healthStatus.status]}>
+      <Badge variant={variants[healthStatus.status] || 'default'}>
         {healthStatus.status.toUpperCase()}
       </Badge>
     );

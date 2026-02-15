@@ -6,6 +6,8 @@
 import { Router } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { basePrisma } from '../prisma';
+import { Prisma } from '@prisma/client';
+import { getDirectPool } from '../utils/db-pool';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
@@ -189,47 +191,68 @@ router.get('/admin/deletion-requests', authenticateToken, requireAdmin, async (r
   try {
     const { status, limit = '50', offset = '0' } = req.query;
 
-    let whereClause = '';
-    if (status && status !== 'all') {
-      whereClause = `WHERE dr.status = '${status}'`;
+    const limitNum = Math.min(parseInt(limit as string) || 50, 100); // Max 100
+    const offsetNum = Math.max(parseInt(offset as string) || 0, 0);
+
+    // Use direct database connection instead of Prisma
+    const pool = getDirectPool();
+    const client = await pool.connect();
+
+    try {
+      // Build query with status filter if provided
+      let whereClause = '';
+      let params: any[] = [];
+
+      if (status && status !== 'all') {
+        whereClause = 'WHERE dr.status = $1';
+        params.push(status);
+      }
+
+      // Main query
+      const queryText = `
+        SELECT
+          dr.id,
+          dr.user_id as "userId",
+          dr.reason,
+          dr.status,
+          dr.requested_at as "requestedAt",
+          dr.scheduled_deletion_date as "scheduledDeletionDate",
+          dr.cancelled_at as "cancelledAt",
+          dr.completed_at as "completedAt",
+          dr.ip_address as "ipAddress",
+          dr.admin_notes as "adminNotes",
+          dr.cancelled_by_admin as "cancelledByAdmin",
+          u.email as "userEmail",
+          u.first_name as "userFirstName",
+          u.last_name as "userLastName",
+          u.created_at as "userCreatedAt"
+        FROM account_deletion_requests dr
+        JOIN users u ON dr.user_id::text = u.id::text
+        ${whereClause}
+        ORDER BY dr.requested_at DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `;
+
+      const requests = await client.query(queryText, [...params, limitNum, offsetNum]);
+
+      // Count query
+      const countQuery = `
+        SELECT COUNT(*) as count
+        FROM account_deletion_requests dr
+        ${whereClause}
+      `;
+
+      const countResult = await client.query(countQuery, params);
+      const total = parseInt(countResult.rows[0].count);
+
+      res.json({
+        success: true,
+        data: requests.rows,
+        total
+      });
+    } finally {
+      client.release();
     }
-
-    const requests = await basePrisma.$queryRaw<any[]>`
-      SELECT 
-        dr.id,
-        dr.user_id as "userId",
-        dr.reason,
-        dr.status,
-        dr.requested_at as "requestedAt",
-        dr.scheduled_deletion_date as "scheduledDeletionDate",
-        dr.cancelled_at as "cancelledAt",
-        dr.completed_at as "completedAt",
-        dr.ip_address as "ipAddress",
-        dr.admin_notes as "adminNotes",
-        dr.cancelled_by_admin as "cancelledByAdmin",
-        u.email as "userEmail",
-        u.first_name as "userFirstName",
-        u.last_name as "userLastName",
-        u.created_at as "userCreatedAt"
-      FROM account_deletion_requests dr
-      JOIN users u ON dr.user_id = u.id
-      ${whereClause}
-      ORDER BY dr.requested_at DESC
-      LIMIT ${parseInt(limit as string)}
-      OFFSET ${parseInt(offset as string)}
-    `;
-
-    const [{ count }] = await basePrisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*) as count
-      FROM account_deletion_requests dr
-      ${whereClause}
-    `;
-
-    res.json({
-      success: true,
-      data: requests,
-      total: Number(count)
-    });
   } catch (error) {
     console.error('[GET /api/admin/deletion-requests] Error:', error);
     res.status(500).json({ error: 'Failed to fetch deletion requests' });
@@ -242,45 +265,61 @@ router.get('/admin/deletion-requests', authenticateToken, requireAdmin, async (r
  */
 router.get('/admin/deletion-requests/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const [stats] = await basePrisma.$queryRaw<any[]>`
-      SELECT 
-        COUNT(*) FILTER (WHERE status = 'pending') as "pendingCount",
-        COUNT(*) FILTER (WHERE status = 'cancelled') as "cancelledCount",
-        COUNT(*) FILTER (WHERE status = 'completed') as "completedCount",
-        COUNT(*) FILTER (WHERE requested_at > NOW() - INTERVAL '7 days') as "last7Days",
-        COUNT(*) FILTER (WHERE requested_at > NOW() - INTERVAL '30 days') as "last30Days",
-        COUNT(*) FILTER (WHERE scheduled_deletion_date <= NOW() + INTERVAL '7 days' AND status = 'pending') as "expiringIn7Days"
-      FROM account_deletion_requests
-    `;
+    // Use direct database connection instead of Prisma
+    const pool = getDirectPool();
+    const client = await pool.connect();
 
-    // Get top reasons
-    const topReasons = await basePrisma.$queryRaw<any[]>`
-      SELECT 
-        reason,
-        COUNT(*) as count
-      FROM account_deletion_requests
-      WHERE reason IS NOT NULL AND reason != ''
-      GROUP BY reason
-      ORDER BY count DESC
-      LIMIT 10
-    `;
+    try {
+      // Get stats
+      const statsQuery = `
+        SELECT
+          COUNT(*) as "totalCount",
+          COUNT(*) FILTER (WHERE status = 'pending') as "pendingCount",
+          COUNT(*) FILTER (WHERE status = 'cancelled') as "cancelledCount",
+          COUNT(*) FILTER (WHERE status = 'completed') as "completedCount",
+          COUNT(*) FILTER (WHERE requested_at > NOW() - INTERVAL '7 days') as "last7Days",
+          COUNT(*) FILTER (WHERE requested_at > NOW() - INTERVAL '30 days') as "last30Days",
+          COUNT(*) FILTER (WHERE scheduled_deletion_date <= NOW() + INTERVAL '7 days' AND status = 'pending') as "expiringIn7Days"
+        FROM account_deletion_requests
+      `;
 
-    res.json({
-      success: true,
-      data: {
-        ...stats,
-        pendingCount: Number(stats.pendingCount),
-        cancelledCount: Number(stats.cancelledCount),
-        completedCount: Number(stats.completedCount),
-        last7Days: Number(stats.last7Days),
-        last30Days: Number(stats.last30Days),
-        expiringIn7Days: Number(stats.expiringIn7Days),
-        topReasons: topReasons.map(r => ({
-          reason: r.reason,
-          count: Number(r.count)
-        }))
-      }
-    });
+      const statsResult = await client.query(statsQuery);
+      const stats = statsResult.rows[0];
+
+      // Get top reasons
+      const topReasonsQuery = `
+        SELECT
+          reason,
+          COUNT(*) as count
+        FROM account_deletion_requests
+        WHERE reason IS NOT NULL AND reason != ''
+        GROUP BY reason
+        ORDER BY count DESC
+        LIMIT 10
+      `;
+
+      const topReasonsResult = await client.query(topReasonsQuery);
+      const topReasons = topReasonsResult.rows;
+
+      res.json({
+        success: true,
+        data: {
+          ...stats,
+          pendingCount: Number(stats.pendingCount),
+          cancelledCount: Number(stats.cancelledCount),
+          completedCount: Number(stats.completedCount),
+          last7Days: Number(stats.last7Days),
+          last30Days: Number(stats.last30Days),
+          expiringIn7Days: Number(stats.expiringIn7Days),
+          topReasons: topReasons.map(r => ({
+            reason: r.reason,
+            count: Number(r.count)
+          }))
+        }
+      });
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('[GET /api/admin/deletion-requests/stats] Error:', error);
     res.status(500).json({ error: 'Failed to fetch deletion stats' });

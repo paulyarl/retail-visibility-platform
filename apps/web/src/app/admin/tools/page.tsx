@@ -100,7 +100,7 @@ export default function AdminToolsPage() {
   const dashboards = [
     {
       id: 'security-dashboard',
-      href: '/(platform)/settings/admin/security',
+      href: '/settings/admin/security',
       icon: Shield,
       title: 'Security Dashboard',
       description: 'Platform-wide security monitoring, threat detection, and blocked IP management',
@@ -110,7 +110,7 @@ export default function AdminToolsPage() {
     },
     {
       id: 'platform-settings',
-      href: '/(platform)/settings/admin/platform',
+      href: '/settings/admin/platform',
       icon: Settings,
       title: 'Platform Settings',
       description: 'Rate limiting controls, security configurations, and platform-wide settings',
@@ -120,7 +120,7 @@ export default function AdminToolsPage() {
     },
     {
       id: 'permissions',
-      href: '/(platform)/settings/admin/permissions',
+      href: '/settings/admin/permissions',
       icon: Lock,
       title: 'Platform Permission Matrix',
       description: 'Configure role-based permissions across the platform',

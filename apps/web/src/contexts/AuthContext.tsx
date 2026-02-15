@@ -96,8 +96,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
     // Also set a non-HttpOnly cookie for SSR guard
     try {
-      document.cookie = `access_token=${encodeURIComponent(accessToken)}; path=/; SameSite=Lax`;
-    } catch {}
+      const isSecure = window.location.protocol === 'https:';
+      const cookieString = `access_token=${encodeURIComponent(accessToken)}; path=/; SameSite=Lax${isSecure ? '; Secure' : ''}; max-age=${7 * 24 * 60 * 60}`; // 7 days
+      document.cookie = cookieString;
+      console.log('[AuthContext] Set cookie:', cookieString);
+    } catch (error) {
+      console.error('[AuthContext] Failed to set cookie:', error);
+    }
   };
 
   const clearTokens = () => {
@@ -235,7 +240,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.ok) {
         const data = await response.json();
         localStorage.setItem(TOKEN_KEY, data.accessToken);
-        try { document.cookie = `access_token=${encodeURIComponent(data.accessToken)}; path=/; SameSite=Lax`; } catch {}
+        try { 
+          const isSecure = window.location.protocol === 'https:';
+          const cookieString = `access_token=${encodeURIComponent(data.accessToken)}; path=/; SameSite=Lax${isSecure ? '; Secure' : ''}; max-age=${7 * 24 * 60 * 60}`;
+          document.cookie = cookieString;
+          console.log('[AuthContext] Refreshed cookie:', cookieString);
+        } catch (error) {
+          console.error('[AuthContext] Failed to set refresh cookie:', error);
+        }
         
         // After token refresh, fetch fresh user data and update cache
         console.log('[AuthContext] Token refreshed, updating cached user data');

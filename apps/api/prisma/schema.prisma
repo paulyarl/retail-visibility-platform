@@ -941,12 +941,11 @@ model platform_settings_list {
   created_at            DateTime @default(now()) @db.Timestamptz(6)
   updated_at            DateTime @db.Timestamptz(6)
   rate_limiting_enabled Boolean? @default(true)
-  // Theme settings
-  theme_preset          String?  @default("default")
+  theme_preset          String?  @default("default") @db.VarChar(255)
   theme_colors          Json?
-  theme_font_family     String?  @default("Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif")
-  theme_border_radius   String?  @default("md")
-  theme_button_size     String?  @default("sm")
+  theme_font_family     String?  @default("Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif") @db.VarChar(255)
+  theme_border_radius   String?  @default("md") @db.VarChar(50)
+  theme_button_size     String?  @default("sm") @db.VarChar(50)
   theme_spacing         Int?     @default(16)
 }
 
@@ -2374,6 +2373,31 @@ model product_queue {
   @@index([tenant_id], map: "idx_product_queue_tenant_id")
   @@index([tenant_id, priority, status], map: "idx_product_queue_tenant_priority_status")
   @@index([tenant_id, status], map: "idx_product_queue_tenant_status")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model account_deletion_requests {
+  id                      String?
+  user_id                 String?
+  reason                  String?
+  status                  String?
+  requested_at            DateTime? @db.Timestamptz(6)
+  scheduled_deletion_date DateTime? @db.Timestamptz(6)
+  cancelled_at            DateTime? @db.Timestamptz(6)
+  completed_at            DateTime? @db.Timestamptz(6)
+  ip_address              String?
+  admin_notes             String?
+  cancelled_by_admin      Boolean?
+  preserve_data           Boolean?
+  created_at              DateTime? @db.Timestamptz(6)
+  updated_at              DateTime? @db.Timestamptz(6)
+
+  @@index([requested_at(sort: Desc)], map: "idx_account_deletion_requests_requested_at")
+  @@index([scheduled_deletion_date], map: "idx_account_deletion_requests_scheduled_deletion_date")
+  @@index([status], map: "idx_account_deletion_requests_status")
+  @@index([user_id], map: "idx_account_deletion_requests_user_id")
+  @@ignore
 }
 
 enum action {

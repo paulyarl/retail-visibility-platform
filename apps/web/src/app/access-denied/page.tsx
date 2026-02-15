@@ -26,6 +26,26 @@ function AccessDeniedContent() {
       url: window.location.href,
     });
 
+    // Ensure auth token is available in cookie for proxy
+    const ensureAuthTokenCookie = () => {
+      try {
+        const accessToken = localStorage.getItem('access_token');
+        if (accessToken) {
+          const isSecure = window.location.protocol === 'https:';
+          const cookieString = `access_token=${encodeURIComponent(accessToken)}; path=/; SameSite=Lax${isSecure ? '; Secure' : ''}; max-age=${7 * 24 * 60 * 60}`;
+          document.cookie = cookieString;
+          console.log('[Access Denied] Set auth token cookie for proxy:', cookieString.substring(0, 50) + '...');
+        } else {
+          console.log('[Access Denied] No access token found in localStorage');
+        }
+      } catch (error) {
+        console.error('[Access Denied] Failed to set auth token cookie:', error);
+      }
+    };
+
+    // Set the cookie immediately
+    ensureAuthTokenCookie();
+
     // Fetch current user info for debugging
     const fetchUser = async () => {
       try {

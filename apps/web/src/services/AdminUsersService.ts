@@ -89,31 +89,41 @@ class AdminUsersService extends AuthenticatedApiSingleton {
    */
   async getUsers(): Promise<AdminUser[]> {
     try {
-      const response = await this.makeAuthenticatedRequest<any[]>(
+      const response = await this.makeAuthenticatedRequest<any>(
         '/api/admin/users',
         {},
         'admin-users-list',
         this.USERS_TTL
       );
 
+      // Extract users array from API response
+      const usersArray = response?.users || response?.user_tenants || [];
+      
       // Transform API response to match both property formats
-      return (response || []).map((user: any) => ({
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName || user.first_name,
-        lastName: user.lastName || user.last_name,
-        role: user.role,
-        isActive: user.isActive || user.is_active,
-        is_active: user.isActive || user.is_active,
-        emailVerified: user.emailVerified || user.email_verified,
-        email_verified: user.emailVerified || user.email_verified,
-        createdAt: user.createdAt || user.created_at,
-        created_at: user.createdAt || user.created_at,
-        updatedAt: user.updatedAt || user.updated_at,
-        lastLogin: user.lastLogin || user.last_login,
-        last_login: user.lastLogin || user.last_login,
-        tenants: user.tenants
-      }));
+      return (usersArray || []).map((user: any) => {
+        const firstName = user.firstName || user.first_name;
+        const lastName = user.lastName || user.last_name;
+        const name = firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || 'Unnamed User';
+        
+        return {
+          id: user.id,
+          email: user.email,
+          name,
+          firstName,
+          lastName,
+          role: user.role,
+          isActive: user.isActive || user.is_active,
+          is_active: user.isActive || user.is_active,
+          emailVerified: user.emailVerified || user.email_verified,
+          email_verified: user.emailVerified || user.email_verified,
+          createdAt: user.createdAt || user.created_at,
+          created_at: user.createdAt || user.created_at,
+          updatedAt: user.updatedAt || user.updated_at,
+          lastLogin: user.lastLogin || user.last_login,
+          last_login: user.lastLogin || user.last_login,
+          tenants: user.tenants
+        };
+      });
     } catch (error) {
       console.error('[AdminUsersService] Failed to get users:', error);
       return [];
@@ -279,7 +289,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
             
             // Transform tenant data to match local interface
             const transformedTenants = tenantsArray.map((t: any) => ({
-              id: t.id,
+              id: t.tenant_id || t.id,
               name: t.tenantName || t.name,
               role: t.role
             }));
@@ -447,14 +457,17 @@ class AdminUsersService extends AuthenticatedApiSingleton {
    */
   async getUserTenants(userId: string): Promise<any[]> {
     try {
-      const response = await this.makeAuthenticatedRequest<any[]>(
+      const response = await this.makeAuthenticatedRequest<any>(
         `/api/admin/users/${userId}/tenants`,
         {},
         `user-tenants-${userId}`,
         this.USER_DETAILS_TTL
       );
 
-      return response || [];
+      // Extract tenants array from API response
+      const tenantsArray = response?.tenants || response?.tenant || [];
+      
+      return tenantsArray || [];
     } catch (error) {
       console.error('[AdminUsersService] Failed to get user tenants:', error);
       return [];
@@ -466,14 +479,17 @@ class AdminUsersService extends AuthenticatedApiSingleton {
    */
   async getAllTenants(): Promise<any[]> {
     try {
-      const response = await this.makeAuthenticatedRequest<any[]>(
+      const response = await this.makeAuthenticatedRequest<any>(
         '/api/admin/tenants/all',
         {},
         'admin-all-tenants',
         this.USERS_TTL
       );
 
-      return response || [];
+      // Extract tenants array from API response
+      const tenantsArray = response?.tenants || [];
+      
+      return tenantsArray || [];
     } catch (error) {
       console.error('[AdminUsersService] Failed to get all tenants:', error);
       return [];

@@ -49,9 +49,26 @@ function setCookie(res: NextResponse, name: string, value: string, maxAgeSec = 6
  */
 async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
   try {
-    // Check both auth_token (legacy) and access_token (current)
-    const authToken = getCookie(req, 'auth_token') || getCookie(req, 'access_token');
-    if (!authToken) return false;
+    // First try to get token from Authorization header (client-side auth)
+    const authHeader = req.headers.get('authorization');
+    let authToken = null;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      authToken = authHeader.substring(7);
+      console.log('[Proxy] Found token in Authorization header');
+    } else {
+      // Fallback to cookies (server-side auth)
+      authToken = getCookie(req, 'auth_token') || getCookie(req, 'access_token');
+      console.log('[Proxy] Looking for token in cookies');
+    }
+    
+    if (!authToken) {
+      console.log('[Proxy] No auth token found in header or cookies');
+      console.log('[Proxy] Available cookies:', req.headers.get('cookie'));
+      return false;
+    }
+
+    console.log('[Proxy] Checking platform admin with token:', authToken.substring(0, 20) + '...');
 
     const response = await fetch(`${API_BASE_URL}/auth/me`, {
       headers: {
@@ -59,15 +76,25 @@ async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
       },
     });
 
-    if (!response.ok) return false;
+    if (!response.ok) {
+      console.log('[Proxy] Auth/me response not OK:', response.status, response.statusText);
+      return false;
+    }
 
     const data = await response.json();
-    const user = data.user || data;
+    console.log('[Proxy] Auth/me response data:', JSON.stringify(data, null, 2));
     
-    // Check if user is platform admin
-    return user.role === 'PLATFORM_ADMIN' || 
+    const user = data.user || data;
+    console.log('[Proxy] Extracted user:', JSON.stringify(user, null, 2));
+    console.log('[Proxy] User role:', user?.role);
+    
+    const isAdmin = user.role === 'PLATFORM_ADMIN' || 
            user.role === 'ADMIN' || 
            user.isPlatformAdmin === true;
+    
+    console.log('[Proxy] Is admin result:', isAdmin, 'for role:', user?.role);
+    
+    return isAdmin;
   } catch (error) {
     console.error('[Proxy] Error checking platform admin:', error);
     return false;
