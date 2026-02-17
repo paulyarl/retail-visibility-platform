@@ -60,8 +60,21 @@ class PlatformPublicService extends PublicApiSingleton {
         'platform-stats',
         this.PLATFORM_STATS_TTL
       );
+      if (!response.success) {
+        console.error('[PlatformPublicService] Failed to get platform stats:', response.error);
+        return {
+          totalTenants: 0,
+          totalProducts: 0,
+          totalCategories: 0,
+          activeUsers: 0,
+          featuredStores: 0,
+          totalScans: 0,
+          uptime: 0,
+          version: '1.0.0'
+        };
+      }
 
-      return response || {
+      return response.data || {
         totalTenants: 0,
         totalProducts: 0,
         totalCategories: 0,
@@ -98,7 +111,17 @@ class PlatformPublicService extends PublicApiSingleton {
         this.SHOWCASE_CONFIG_TTL
       );
 
-      return response || {
+      if (!response.success) {
+        console.error('[PlatformPublicService] Failed to get features showcase config:', response.error);
+        return {
+          mode: 'hybrid',
+          enabled: true,
+          maxItems: 10,
+          refreshInterval: 300000 // 5 minutes
+        };
+      }
+
+      return response.data || {
         mode: 'hybrid',
         enabled: true,
         maxItems: 10,

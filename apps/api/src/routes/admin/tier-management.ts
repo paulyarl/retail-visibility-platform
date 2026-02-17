@@ -182,7 +182,7 @@ router.get('/tenants/:tenantId', async (req, res) => {
     });
 
     if (!tenant) {
-      return res.status(404).json({ error: 'tenant_not_found' });
+      return res.status(400).json({ error: 'tenant_not_found' });
     }
 
     res.json(tenant);
@@ -252,7 +252,7 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     });
 
     if (!currentTenant) {
-      return res.status(404).json({ error: 'tenant_not_found' });
+      return res.status(400).json({ error: 'tenant_not_found' });
     }
 
     // Check SKU limits if changing tier

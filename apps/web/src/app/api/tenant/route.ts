@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
     if (userError || !userData?.tenantId) {
       console.error('[GET /api/tenant] Tenant not found:', userError);
-      return NextResponse.json({ error: 'tenant_not_found', details: 'User has no tenant' }, { status: 404 });
+      return NextResponse.json({ error: 'tenant_not_found', details: 'User has no tenant' }, { status: 400 });
     }
 
     // Fetch tenant from backend API
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     const res = await fetch(`${base}/api/tenants/${userData.tenantId}`);
     
     if (!res.ok) {
-      return NextResponse.json({ error: 'tenant_not_found' }, { status: 404 });
+      return NextResponse.json({ error: 'tenant_not_found' }, { status: 400 });
     }
 
     const tenant = await res.json();

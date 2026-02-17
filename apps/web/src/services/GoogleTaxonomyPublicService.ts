@@ -40,24 +40,24 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
    * Uses the /public/google-taxonomy/:googleCategoryId endpoint
    */
   async getGoogleTaxonomyPath(googleCategoryId: string): Promise<GoogleTaxonomyPath | null> {
-    try {
-      if (!googleCategoryId) {
-        console.error('[GoogleTaxonomyPublicService] Google category ID is required');
-        return null;
-      }
-
-      const response = await this.makePublicRequest<GoogleTaxonomyPath>(
-        `/public/google-taxonomy/${googleCategoryId}`,
-        {},
-        `google-taxonomy-${googleCategoryId}`,
-        this.TAXONOMY_TTL
-      );
-
-      return response;
-    } catch (error) {
-      console.error('[GoogleTaxonomyPublicService] Failed to get Google taxonomy path:', error);
+    if (!googleCategoryId) {
+      console.error('[GoogleTaxonomyPublicService] Google category ID is required');
       return null;
     }
+
+    const response = await this.makePublicRequest<GoogleTaxonomyPath>(
+      `/public/google-taxonomy/${googleCategoryId}`,
+      {},
+      `google-taxonomy-${googleCategoryId}`,
+      this.TAXONOMY_TTL
+    );
+
+    if (!response.success) {
+      console.error('[GoogleTaxonomyPublicService] Failed to get Google taxonomy path:', response.error);
+      return null;
+    }
+
+    return response.data || null;
   }
 
   /**
@@ -65,19 +65,19 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
    * Uses the /public/google-taxonomy/popular endpoint
    */
   async getPopularGoogleCategories(limit: number = 50): Promise<GoogleTaxonomyPath[] | null> {
-    try {
-      const response = await this.makePublicRequest<GoogleTaxonomyPath[]>(
-        `/public/google-taxonomy/popular?limit=${limit}`,
-        {},
-        'google-taxonomy-popular',
-        this.TAXONOMY_TTL
-      );
+    const response = await this.makePublicRequest<GoogleTaxonomyPath[]>(
+      `/public/google-taxonomy/popular?limit=${limit}`,
+      {},
+      'google-taxonomy-popular',
+      this.TAXONOMY_TTL
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[GoogleTaxonomyPublicService] Failed to get popular Google categories:', error);
+    if (!response.success) {
+      console.error('[GoogleTaxonomyPublicService] Failed to get popular Google categories:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
@@ -85,24 +85,24 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
    * Uses the /public/google-taxonomy/search endpoint
    */
   async searchGoogleTaxonomy(query: string, limit: number = 20): Promise<GoogleTaxonomyPath[] | null> {
-    try {
-      if (!query) {
-        console.error('[GoogleTaxonomyPublicService] Search query is required');
-        return null;
-      }
-
-      const response = await this.makePublicRequest<GoogleTaxonomyPath[]>(
-        `/public/google-taxonomy/search?q=${encodeURIComponent(query)}&limit=${limit}`,
-        {},
-        `google-taxonomy-search-${query}`,
-        this.TAXONOMY_TTL
-      );
-
-      return response;
-    } catch (error) {
-      console.error('[GoogleTaxonomyPublicService] Failed to search Google taxonomy:', error);
+    if (!query) {
+      console.error('[GoogleTaxonomyPublicService] Search query is required');
       return null;
     }
+
+    const response = await this.makePublicRequest<GoogleTaxonomyPath[]>(
+      `/public/google-taxonomy/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+      {},
+      `google-taxonomy-search-${query}`,
+      this.TAXONOMY_TTL
+    );
+
+    if (!response.success) {
+      console.error('[GoogleTaxonomyPublicService] Failed to search Google taxonomy:', response.error);
+      return null;
+    }
+
+    return response.data || null;
   }
 }
 

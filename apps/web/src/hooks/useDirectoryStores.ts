@@ -6,7 +6,6 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import cacheManager from '@/utils/cacheManager';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
 export interface DirectoryStore {
@@ -62,7 +61,6 @@ export interface UseDirectoryStoresReturn {
   error: string | null;
   pagination: DirectoryStoresResponse['pagination'] | null;
   refetch: () => Promise<void>;
-  clearCache: () => void;
   fromCache: boolean;
   metrics: {
     cacheHits: number;
@@ -105,9 +103,7 @@ export const useDirectoryStores = (
     const startTime = Date.now();
 
     try {
-      // Create cache key for directory stores
-      const cacheKey = `directory-stores-${search || 'none'}-${category || 'none'}-${lat || 'none'}-${lng || 'none'}-${sort}-${page}-${limit}`;
-      
+      // Log the request parameters (no manual cache key needed since service handles caching)
       console.log('[useDirectoryStores] Fetching with params:', {
         search,
         category,
@@ -115,54 +111,11 @@ export const useDirectoryStores = (
         lng,
         sort,
         page,
-        limit,
-        cacheKey,
-        pageType: typeof page,
-        pageValue: page
-      });
-      
-      // Check cache using universal cache manager
-      const cached = await cacheManager.get<DirectoryStoresResponse>(cacheKey);
-      console.log('[useDirectoryStores] Cache check:', {
-        cacheKey,
-        cached: !!cached,
-        cacheStats: cacheManager.getStats()
-      });
-      
-      if (cached) {
-        console.log('[useDirectoryStores] Cache HIT - serving from cache');
-        setStores(cached.listings);
-        setPagination(cached.pagination);
-        setFromCache(true);
-        const endTime = Date.now();
-        const responseTime = endTime - startTime;
-        
-        // Update metrics for cache hit
-        console.log('[useDirectoryStores] Updating metrics for cache hit:', {
-          before: { cacheHits: localMetrics.cacheHits, totalRequests: localMetrics.totalRequests },
-          responseTime
-        });
-        
-        setLocalMetrics(prev => {
-          const newMetrics = {
-            ...prev,
-            totalRequests: prev.totalRequests + 1,
-            cacheHits: prev.cacheHits + 1,
-            averageResponseTime: (prev.averageResponseTime * prev.totalRequests + responseTime) / (prev.totalRequests + 1),
-          };
-          console.log('[useDirectoryStores] Updated metrics for cache hit:', newMetrics);
-          return newMetrics;
-        });
-        return;
-      }
-      
-      console.log('[useDirectoryStores] Cache MISS - fetching from API', {
-        reason: !cached ? 'No cached data' : 'Cache expired',
-        cached: !!cached,
-        cacheTTL
+        limit
       });
       
       // Use the directory API endpoint through singleton service
+      // Service handles caching automatically through makePublicRequest
       const result = await recommendationsService.searchDirectoryStores({
         search,
         category,
@@ -196,16 +149,7 @@ export const useDirectoryStores = (
         }
       }
 
-      // Store in cache using universal cache manager
-      await cacheManager.set(cacheKey, result);
-      
-      console.log('[useDirectoryStores] Stored in cache:', {
-        cacheKey,
-        cacheStats: cacheManager.getStats(),
-        listingsCount: result.listings?.length || 0
-      });
-
-      // Store the fetched stores
+      // Store the fetched stores (service handles caching automatically)
       setStores(result.listings || []);
       setPagination(result.pagination);
       setFromCache(false);
@@ -251,17 +195,6 @@ export const useDirectoryStores = (
     return fetchDirectoryStores();
   }, [fetchDirectoryStores]);
 
-  const clearCache = useCallback(async () => {
-    setFromCache(false);
-    
-    try {
-      await cacheManager.clear();
-      console.log('[useDirectoryStores] Cache cleared successfully');
-    } catch (error) {
-      console.warn('[useDirectoryStores] Failed to clear cache:', error);
-    }
-  }, []);
-
   // Initial fetch
   useEffect(() => {
     fetchDirectoryStores();
@@ -274,7 +207,6 @@ export const useDirectoryStores = (
     error,
     pagination,
     refetch,
-    clearCache,
     fromCache,
     metrics: localMetrics,
   };

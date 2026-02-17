@@ -125,24 +125,23 @@ class CustomerOrderService extends PublicApiSingleton {
 
   /**
    * Get available payment gateways for a tenant
-   * Public endpoint for checkout page
    */
   async getPaymentGateways(tenantId: string): Promise<PaymentGateway[]> {
-    try {
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        gateways: PaymentGateway[];
-      }>(
-        `/api/tenants/${tenantId}/payment-gateways/public`,
-        {},
-        `payment-gateways-${tenantId}`
-      );
+    const response = await this.makePublicRequest<{
+      success: boolean;
+      gateways: PaymentGateway[];
+    }>(
+      `/api/tenants/${tenantId}/payment-gateways/public`,
+      {},
+      `payment-gateways-${tenantId}`
+    );
 
-      return response.gateways || [];
-    } catch (error) {
-      console.error('[CustomerOrderService] Failed to get payment gateways:', error);
+    if (!response.success) {
+      console.error('[CustomerOrderService] Failed to get payment gateways:', response.error);
       return [];
     }
+
+    return response.data?.gateways || [];
   }
 
   /**
@@ -150,24 +149,24 @@ class CustomerOrderService extends PublicApiSingleton {
    * Public endpoint for customer checkout
    */
   async createOrder(orderRequest: OrderRequest): Promise<CustomerOrder | null> {
-    try {
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        order: CustomerOrder;
-      }>(
-        '/api/orders/create',
-        {
-          method: 'POST',
-          body: JSON.stringify(orderRequest)
-        },
-        `create-order-${orderRequest.tenantId}`
-      );
+    const response = await this.makePublicRequest<{
+      success: boolean;
+      order: CustomerOrder;
+    }>(
+      '/api/orders/create',
+      {
+        method: 'POST',
+        body: JSON.stringify(orderRequest)
+      },
+      `create-order-${orderRequest.tenantId}`
+    );
 
-      return response.order || null;
-    } catch (error) {
-      console.error('[CustomerOrderService] Failed to create order:', error);
+    if (!response.success) {
+      console.error('[CustomerOrderService] Failed to create order:', response.error);
       return null;
     }
+
+    return response.data?.order || null;
   }
 
   /**
@@ -175,21 +174,21 @@ class CustomerOrderService extends PublicApiSingleton {
    * Public endpoint for order tracking
    */
   async getOrder(orderId: string, email?: string): Promise<CustomerOrder | null> {
-    try {
-      const url = email 
-        ? `/api/orders/${orderId}?email=${encodeURIComponent(email)}`
-        : `/api/orders/${orderId}`;
-      
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        order: CustomerOrder;
-      }>(url, {}, `order-${orderId}`);
+    const url = email 
+      ? `/api/orders/${orderId}?email=${encodeURIComponent(email)}`
+      : `/api/orders/${orderId}`;
+    
+    const response = await this.makePublicRequest<{
+      success: boolean;
+      order: CustomerOrder;
+    }>(url, {}, `order-${orderId}`);
 
-      return response.order || null;
-    } catch (error) {
-      console.error('[CustomerOrderService] Failed to get order:', error);
+    if (!response.success) {
+      console.error('[CustomerOrderService] Failed to get order:', response.error);
       return null;
     }
+
+    return response.data?.order || null;
   }
 
   /**
@@ -205,38 +204,43 @@ class CustomerOrderService extends PublicApiSingleton {
       totalPages: number;
     };
   }> {
-    try {
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        orders: CustomerOrder[];
-        pagination: {
-          page: number;
-          limit: number;
-          total: number;
-          totalPages: number;
-        };
-      }>(
-        `/api/orders/customer/${encodeURIComponent(customerEmail)}?page=${page}&limit=${limit}`,
-        {},
-        `customer-orders-${customerEmail}-${page}-${limit}`
-      );
+    const response = await this.makePublicRequest<{
+      success: boolean;
+      orders: CustomerOrder[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    }>(
+      `/api/orders/customer/${encodeURIComponent(customerEmail)}?page=${page}&limit=${limit}`,
+      {},
+      `customer-orders-${customerEmail}-${page}-${limit}`
+    );
 
+    if (!response.success) {
+      console.error('[CustomerOrderService] Failed to get customer orders:', response.error);
       return {
-        orders: response.orders || [],
-        pagination: response.pagination || {
+        orders: [],
+        pagination: {
           page,
           limit,
           total: 0,
           totalPages: 0
         }
       };
-    } catch (error) {
-      console.error('[CustomerOrderService] Failed to get customer orders:', error);
-      return {
-        orders: [],
-        pagination: { page, limit, total: 0, totalPages: 0 }
-      };
     }
+
+    return {
+      orders: response.data?.orders || [],
+      pagination: response.data?.pagination || {
+        page,
+        limit,
+        total: 0,
+        totalPages: 0
+      }
+    };
   }
 
   /**

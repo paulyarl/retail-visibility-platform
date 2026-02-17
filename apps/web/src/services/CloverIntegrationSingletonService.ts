@@ -47,136 +47,136 @@ class CloverIntegrationSingletonService extends AuthenticatedApiSingleton {
    * Get Clover integration status
    */
   async getCloverStatus(tenantId: string): Promise<CloverIntegrationData | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const result = await this.makeAuthenticatedRequest<CloverIntegrationData>(
-        `/api/integrations/${tenantId}/clover/status`,
-        {},
-        `clover-status-${tenantId}`
-      );
+    const result = await this.makeAuthenticatedRequest<CloverIntegrationData>(
+      `/api/integrations/${tenantId}/clover/status`,
+      {},
+      `clover-status-${tenantId}`
+    );
 
-      return result || null;
-    } catch (error) {
-      console.error('[CloverIntegrationSingleton] Failed to get Clover status:', error);
+    if (!result.success) {
+      console.error('[CloverIntegrationSingleton] Failed to get Clover status:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
    * Get Clover OAuth authorization URL
    */
   async getCloverOAuthAuthorize(tenantId: string): Promise<CloverOAuthData | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const result = await this.makeAuthenticatedRequest<CloverOAuthData>(
-        `/api/integrations/${tenantId}/clover/oauth/authorize`,
-        {},
-        `clover-oauth-${tenantId}`
-      );
+    const result = await this.makeAuthenticatedRequest<CloverOAuthData>(
+      `/api/integrations/${tenantId}/clover/oauth/authorize`,
+      {},
+      `clover-oauth-${tenantId}`
+    );
 
-      return result || null;
-    } catch (error) {
-      console.error('[CloverIntegrationSingleton] Failed to get Clover OAuth authorize:', error);
+    if (!result.success) {
+      console.error('[CloverIntegrationSingleton] Failed to get Clover OAuth authorize:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
    * Enable Clover demo mode
    */
   async enableCloverDemo(tenantId: string): Promise<void> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
-
-      await this.makeAuthenticatedRequest<void>(
-        `/api/integrations/${tenantId}/clover/demo/enable`,
-        { method: 'POST' },
-        `clover-demo-enable-${tenantId}`
-      );
-
-      // Invalidate Clover status cache
-      await this.invalidateCache(`clover-status-${tenantId}*`);
-    } catch (error) {
-      console.error('[CloverIntegrationSingleton] Failed to enable Clover demo:', error);
-      throw error;
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
     }
+
+    const result = await this.makeAuthenticatedRequest<void>(
+      `/api/integrations/${tenantId}/clover/demo/enable`,
+      { method: 'POST' },
+      `clover-demo-enable-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[CloverIntegrationSingleton] Failed to enable Clover demo:', result.error);
+      throw result.error;
+    }
+
+    // Invalidate Clover status cache
+    await this.invalidateCache(`clover-status-${tenantId}*`);
   }
 
   /**
    * Disable Clover demo mode
    */
   async disableCloverDemo(tenantId: string): Promise<void> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
-
-      await this.makeAuthenticatedRequest<void>(
-        `/api/integrations/${tenantId}/clover/demo/disable`,
-        { method: 'POST' },
-        `clover-demo-disable-${tenantId}`
-      );
-
-      // Invalidate Clover status cache
-      await this.invalidateCache(`clover-status-${tenantId}*`);
-    } catch (error) {
-      console.error('[CloverIntegrationSingleton] Failed to disable Clover demo:', error);
-      throw error;
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
     }
+
+    const result = await this.makeAuthenticatedRequest<void>(
+      `/api/integrations/${tenantId}/clover/demo/disable`,
+      { method: 'POST' },
+      `clover-demo-disable-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[CloverIntegrationSingleton] Failed to disable Clover demo:', result.error);
+      throw result.error;
+    }
+
+    // Invalidate Clover status cache
+    await this.invalidateCache(`clover-status-${tenantId}*`);
   }
 
   /**
    * Disconnect Clover integration
    */
   async disconnectClover(tenantId: string): Promise<void> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
-
-      await this.makeAuthenticatedRequest<void>(
-        `/api/integrations/${tenantId}/clover/disconnect`,
-        { method: 'POST' },
-        `clover-disconnect-${tenantId}`
-      );
-
-      // Invalidate all Clover cache for this tenant
-      await this.invalidateCache(`clover-${tenantId}*`);
-    } catch (error) {
-      console.error('[CloverIntegrationSingleton] Failed to disconnect Clover:', error);
-      throw error;
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
     }
+
+    const result = await this.makeAuthenticatedRequest<void>(
+      `/api/integrations/${tenantId}/clover/disconnect`,
+      { method: 'POST' },
+      `clover-disconnect-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[CloverIntegrationSingleton] Failed to disconnect Clover:', result.error);
+      throw result.error;
+    }
+
+    // Invalidate Clover status cache
+    await this.invalidateCache(`clover-status-${tenantId}*`);
   }
 
   /**
    * Sync Clover data
    */
   async syncClover(tenantId: string): Promise<void> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
-
-      await this.makeAuthenticatedRequest<void>(
-        `/api/integrations/${tenantId}/clover/sync`,
-        { method: 'POST' },
-        `clover-sync-${tenantId}`
-      );
-
-      // Invalidate Clover status cache to reflect sync results
-      await this.invalidateCache(`clover-status-${tenantId}*`);
-    } catch (error) {
-      console.error('[CloverIntegrationSingleton] Failed to sync Clover:', error);
-      throw error;
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
     }
+
+    const result = await this.makeAuthenticatedRequest<void>(
+      `/api/integrations/${tenantId}/clover/sync`,
+      { method: 'POST' },
+      `clover-sync-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[CloverIntegrationSingleton] Failed to sync Clover:', result.error);
+      throw result.error;
+    }
+
+    // Invalidate Clover status cache
+    await this.invalidateCache(`clover-status-${tenantId}*`);
   }
 
   /**

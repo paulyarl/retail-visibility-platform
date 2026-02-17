@@ -6,7 +6,7 @@ import { Card } from '@mantine/core';
 import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { itemsSingletonService } from '@/services/ItemsSingletonService';
 import { Flags } from '@/lib/flags';
 
 // Force edge runtime to prevent prerendering issues
@@ -71,7 +71,7 @@ export default function ScanPage() {
         return;
       }
 
-      const data = await platformHomeService.startScan(tenantId, selectedDevice);
+      const data = await itemsSingletonService.startScanSession(tenantId, selectedDevice);
 
       if (data && data.session) {
         router.push(`/scan/${data.session.id}`);

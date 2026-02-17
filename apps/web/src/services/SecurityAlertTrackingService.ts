@@ -129,7 +129,7 @@ class SecurityAlertTrackingService extends PublicApiSingleton {
         this.METRICS_TTL
       );
 
-      return response || {
+      return response.data || {
         totalEvents: 0,
         successfulBatches: 0,
         failedBatches: 0,
@@ -163,7 +163,7 @@ class SecurityAlertTrackingService extends PublicApiSingleton {
         this.METRICS_TTL
       );
 
-      return response || [];
+      return response.data || [];
     } catch (error) {
       console.error('[SecurityAlertTrackingService] Failed to get alerts by type:', error);
       return [];
@@ -183,7 +183,7 @@ class SecurityAlertTrackingService extends PublicApiSingleton {
         this.METRICS_TTL
       );
 
-      return response || [];
+      return response.data || [];
     } catch (error) {
       console.error('[SecurityAlertTrackingService] Failed to get alerts by severity:', error);
       return [];

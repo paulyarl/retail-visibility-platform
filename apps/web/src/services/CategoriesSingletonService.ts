@@ -46,18 +46,18 @@ class CategoriesSingletonService extends PublicApiSingleton {
    * Uses the /directory/categories endpoint
    */
   async getCategories(includeChildren: boolean = true): Promise<Category[]> {
-    try {
-      const result = await this.makePublicRequest<{ categories: Category[] }>(
-        `/api/directory/categories?includeChildren=${includeChildren}`,
-        {},
-        `categories-${includeChildren}`
-      );
+    const result = await this.makePublicRequest<{ categories: Category[] }>(
+      `/api/directory/categories?includeChildren=${includeChildren}`,
+      {},
+      `categories-${includeChildren}`
+    );
 
-      return result.categories || [];
-    } catch (error) {
-      console.error('[CategoriesSingleton] Failed to get categories:', error);
+    if (!result.success) {
+      console.error('[CategoriesSingleton] Failed to get categories:', result.error);
       return [];
     }
+
+    return result.data?.categories || [];
   }
 
   /**
@@ -70,18 +70,18 @@ class CategoriesSingletonService extends PublicApiSingleton {
       return null;
     }
 
-    try {
-      const result = await this.makePublicRequest<{ category: Category }>(
-        `/api/directory/categories/${slug}`,
-        {},
-        `category-${slug}`
-      );
+    const result = await this.makePublicRequest<{ category: Category }>(
+      `/api/directory/categories/${slug}`,
+      {},
+      `category-${slug}`
+    );
 
-      return result.category || null;
-    } catch (error) {
-      console.error('[CategoriesSingleton] Failed to get category by slug:', error);
+    if (!result.success) {
+      console.error('[CategoriesSingleton] Failed to get category by slug:', result.error);
       return null;
     }
+
+    return result.data?.category || null;
   }
 
   /**
@@ -94,18 +94,18 @@ class CategoriesSingletonService extends PublicApiSingleton {
       return [];
     }
 
-    try {
-      const result = await this.makePublicRequest<{ categories: Category[] }>(
-        `/api/directory/categories?tenantId=${tenantId}&includeChildren=${includeChildren}`,
-        {},
-        `categories-tenant-${tenantId}-${includeChildren}`
-      );
+    const result = await this.makePublicRequest<{ categories: Category[] }>(
+      `/api/directory/categories?tenantId=${tenantId}&includeChildren=${includeChildren}`,
+      {},
+      `categories-tenant-${tenantId}-${includeChildren}`
+    );
 
-      return result.categories || [];
-    } catch (error) {
-      console.error('[CategoriesSingleton] Failed to get categories by tenant:', error);
+    if (!result.success) {
+      console.error('[CategoriesSingleton] Failed to get categories by tenant:', result.error);
       return [];
     }
+
+    return result.data?.categories || [];
   }
 
 }

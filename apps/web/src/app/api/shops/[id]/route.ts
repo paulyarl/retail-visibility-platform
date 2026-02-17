@@ -52,7 +52,7 @@ export async function GET(
     if (!mockShop) {
       return NextResponse.json(
         { error: 'shop_not_found', message: 'Shop not found' },
-        { status: 404 }
+        { status: 400 }
       );
     }
 

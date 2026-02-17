@@ -71,23 +71,23 @@ class DirectorySupportSingletonService extends UniversalSingleton {
    * Authenticated endpoint for support operations
    */
   async getDirectoryStatus(tenantId: string): Promise<DirectoryStatus | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const response = await this.makeApiRequest<DirectoryStatus>(
-        `/support/directory/tenant/${tenantId}/status`,
-        {},
-        `directory-status-${tenantId}`,
-        this.cacheTTL
-      );
+    const response = await this.makeApiRequest<DirectoryStatus>(
+      `/support/directory/tenant/${tenantId}/status`,
+      {},
+      `directory-status-${tenantId}`,
+      this.cacheTTL
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[DirectorySupportSingleton] Failed to get directory status:', error);
+    if (!response.success) {
+      console.error('[DirectorySupportSingleton] Failed to get directory status:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
@@ -95,23 +95,23 @@ class DirectorySupportSingletonService extends UniversalSingleton {
    * Authenticated endpoint for support operations
    */
   async getDirectoryQualityCheck(tenantId: string): Promise<DirectoryQualityCheck | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const response = await this.makeApiRequest<DirectoryQualityCheck>(
-        `/support/directory/tenant/${tenantId}/quality-check`,
-        {},
-        `directory-quality-check-${tenantId}`,
-        this.cacheTTL
-      );
+    const response = await this.makeApiRequest<DirectoryQualityCheck>(
+      `/support/directory/tenant/${tenantId}/quality-check`,
+      {},
+      `directory-quality-check-${tenantId}`,
+      this.cacheTTL
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[DirectorySupportSingleton] Failed to get directory quality check:', error);
+    if (!response.success) {
+      console.error('[DirectorySupportSingleton] Failed to get directory quality check:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
@@ -119,23 +119,23 @@ class DirectorySupportSingletonService extends UniversalSingleton {
    * Authenticated endpoint for support operations
    */
   async getDirectoryNotes(tenantId: string): Promise<DirectoryNote[] | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const response = await this.makeApiRequest<DirectoryNote[]>(
-        `/support/directory/tenant/${tenantId}/notes`,
-        {},
-        `directory-notes-${tenantId}`,
-        this.cacheTTL
-      );
+    const response = await this.makeApiRequest<DirectoryNote[]>(
+      `/support/directory/tenant/${tenantId}/notes`,
+      {},
+      `directory-notes-${tenantId}`,
+      this.cacheTTL
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[DirectorySupportSingleton] Failed to get directory notes:', error);
+    if (!response.success) {
+      console.error('[DirectorySupportSingleton] Failed to get directory notes:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
@@ -143,29 +143,32 @@ class DirectorySupportSingletonService extends UniversalSingleton {
    * Authenticated endpoint for support operations
    */
   async addDirectoryNote(tenantId: string, note: string): Promise<DirectoryNote | null> {
-    try {
-      if (!tenantId || !note) {
-        throw new Error('Tenant ID and note are required');
-      }
+    if (!tenantId || !note) {
+      throw new Error('Tenant ID and note are required');
+    }
 
-      const response = await this.makeApiRequest<DirectoryNote>(
-        `/support/directory/tenant/${tenantId}/add-note`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ note })
+    const response = await this.makeApiRequest<DirectoryNote>(
+      `/support/directory/tenant/${tenantId}/notes`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        `add-directory-note-${tenantId}`,
-        this.cacheTTL
-      );
+        body: JSON.stringify({ note })
+      },
+      `add-directory-note-${tenantId}`,
+      this.cacheTTL
+    );
 
-      // Invalidate cache for notes after adding a new one
-      this.invalidateCache(`directory-notes-${tenantId}`);
-
-      return response;
-    } catch (error) {
-      console.error('[DirectorySupportSingleton] Failed to add directory note:', error);
+    if (!response.success) {
+      console.error('[DirectorySupportSingleton] Failed to add directory note:', response.error);
       return null;
     }
+
+    // Invalidate cache for notes after adding a new one
+    this.invalidateCache(`directory-notes-${tenantId}`);
+
+    return response.data || null;
   }
 
   /**

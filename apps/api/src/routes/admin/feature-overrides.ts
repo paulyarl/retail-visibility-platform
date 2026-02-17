@@ -134,7 +134,7 @@ router.get('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
     });
 
     if (!override) {
-      return res.status(404).json({
+      return res.status(400).json({
         error: 'not_found',
         message: 'Feature override not found',
       });
@@ -187,7 +187,7 @@ router.post('/', authenticateToken, requirePlatformAdmin, async (req: Request, r
     });
 
     if (!tenant) {
-      return res.status(404).json({ 
+      return res.status(400).json({ 
         error: 'tenant_not_found',
         message: 'Tenant not found',
       });
@@ -285,7 +285,7 @@ router.put('/:id', authenticateToken, requirePlatformAdmin, async (req: Request,
     });
 
     if (!existing) {
-      return res.status(404).json({
+      return res.status(400).json({
         error: 'not_found',
         message: 'Feature override not found',
       });
@@ -368,7 +368,7 @@ router.delete('/:id', authenticateToken, requirePlatformAdmin, async (req: Reque
     });
 
     if (!override) {
-      return res.status(404).json({
+      return res.status(400).json({
         error: 'not_found',
         message: 'Feature override not found',
       });

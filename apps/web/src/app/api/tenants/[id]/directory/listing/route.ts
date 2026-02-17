@@ -14,7 +14,7 @@ export async function GET(
     if (!listing) {
       return NextResponse.json(
         { error: 'Directory listing not found' },
-        { status: 404 }
+        { status: 400 }
       );
     }
 

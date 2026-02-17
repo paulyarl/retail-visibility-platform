@@ -684,7 +684,7 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
         data_policy_accepted: true,
       }
     });
-    if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
+    if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
     
     const now = new Date();
     
@@ -910,7 +910,7 @@ app.post("/api/tenants/:id/geocode", async (req, res) => {
     `;
     
     if (!listingResult || listingResult.length === 0) {
-      return res.status(404).json({ error: "tenant_not_found" });
+      return res.status(400).json({ error: "tenant_not_found" });
     }
     
     const listing = listingResult[0];
@@ -1046,7 +1046,7 @@ app.patch("/api/tenants/:id/coordinates", async (req, res) => {
   } catch (error: any) {
     console.error('[PATCH /api/tenants/:id/coordinates] Error:', error);
     if (error.code === 'P2025') {
-      return res.status(404).json({ error: "tenant_not_found" });
+      return res.status(400).json({ error: "tenant_not_found" });
     }
     res.status(500).json({ error: "failed_to_update_coordinates" });
   }
@@ -1154,7 +1154,7 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
     const tenant = await prisma.tenants.findUnique({ where: { id:id as string } });
     if (!tenant) {
       console.log(`[PATCH /tenants/${id}/status] Tenant not found`);
-      return res.status(404).json({ error: "tenant_not_found" });
+      return res.status(400).json({ error: "tenant_not_found" });
     }
 
     console.log(`[PATCH /tenants/${id}/status] Current tenant status`, {
@@ -1276,7 +1276,7 @@ app.post("/api/tenants/:id/status/preview", authenticateToken, checkTenantAccess
 
     const tenant = await prisma.tenants.findUnique({ where: { id: id as string } });
     if (!tenant) {
-      return res.status(404).json({ error: "tenant_not_found" });
+      return res.status(400).json({ error: "tenant_not_found" });
     }
 
     const impact = getStatusChangeImpact(tenant.location_status as any, status);
@@ -1440,7 +1440,7 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
     const existingTenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
     if (!existingTenant) {
       console.error('[POST /tenant/profile] Tenant not found:', tenant_id);
-      return res.status(404).json({ error: "tenant_not_found" });
+      return res.status(400).json({ error: "tenant_not_found" });
     }
     console.log('[POST /tenant/profile] Found tenant:', existingTenant.name);
 
@@ -1586,7 +1586,7 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
     const tenant_id = (req.query.tenant_id as string) || (req.query.tenant_id as string);
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
     const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
-    if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
+    if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
 
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     // Exclude geography column to avoid Prisma deserialization error
@@ -1815,7 +1815,7 @@ app.get("/public/tenant/:tenant_id", async (req, res) => {
     const tenant = await prisma.tenants.findUnique({ 
       where: { id: tenant_id }
     });
-    if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
+    if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
 
     // Check location status for storefront visibility
     const { shouldShowStorefront, getStorefrontMessage } = await import('./utils/location-status');
@@ -1902,7 +1902,7 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
     
     const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
-    if (!tenant) return res.status(404).json({ error: "tenant_not_found" });
+    if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
 
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     const { basePrisma } = await import('./prisma');
@@ -2550,7 +2550,7 @@ app.get("/public/google-taxonomy/:categoryId", async (req, res) => {
     const category = getCategoryById(categoryId);
     
     if (!category) {
-      return res.status(404).json({ error: "category_not_found" });
+      return res.status(400).json({ error: "category_not_found" });
     }
     
     res.json(category);
@@ -2868,7 +2868,7 @@ app.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
   try {
     const { tenant_id, ...delta } = parsed.data;
     const existingTenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
-    if (!existingTenant) return res.status(404).json({ error: "tenant_not_found" });
+    if (!existingTenant) return res.status(400).json({ error: "tenant_not_found" });
 
     // Use raw SQL instead of Prisma client since it doesn't recognize the new table
     // Import basePrisma to bypass retry wrapper
@@ -3023,7 +3023,7 @@ app.post("/api/tenants/:id/logo", logoUploadMulter.single("file"), async (req, r
     const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id as string } });
     if (!tenant) {
       console.log(`[Logo Upload] Tenant not found: ${tenant_id}`);
-      return res.status(404).json({ error: "tenant_not_found" });
+      return res.status(400).json({ error: "tenant_not_found" });
     }
 
     // Initialize Supabase client (will be initialized below in photos section)
@@ -3166,7 +3166,7 @@ app.post("/api/tenant/:id/banner", logoUploadMulter.single("file"), async (req, 
     // Verify tenant exists
     const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
     if (!tenant) {
-      return res.status(404).json({ error: "tenant_not_found" });
+      return res.status(400).json({ error: "tenant_not_found" });
     }
 
     const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -3316,7 +3316,7 @@ const photoUploadHandler = async (req: any, res: any) => {
     const item = await prisma.inventory_items.findUnique({ where: { id: itemId } });
     if (!item) {
       console.log(`[Photo Upload] Item not found: ${itemId}`);
-      return res.status(404).json({ error: "item_not_found" });
+      return res.status(400).json({ error: "item_not_found" });
     }
     console.log(`[Photo Upload] Item found:`, { id: item.id, tenant_id: item.tenant_id, sku: item.sku });
 
@@ -4173,7 +4173,7 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   const it = await prisma.inventory_items.findUnique({
     where: { id: itemId },
   });
-  if (!it) return res.status(404).json({ error: "not_found" });
+  if (!it) return res.status(400).json({ error: "not_found" });
 
   // Security: Only allow public access to items that are active AND public
   // Draft, archived, and private items should not be accessible via public URLs
@@ -4181,7 +4181,7 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   if (!isAuthenticated) {
     // For unauthenticated requests, only show active + public items
     if (it.item_status !== 'active' || it.visibility !== 'public') {
-      return res.status(404).json({ error: "not_found" });
+      return res.status(400).json({ error: "not_found" });
     }
   }
 
@@ -4306,7 +4306,7 @@ app.get("/api/items/:id/photos", async (req, res) => {
     });
     
     if (!item) {
-      return res.status(404).json({ error: "item_not_found" });
+      return res.status(400).json({ error: "item_not_found" });
     }
     
     // Fetch photos ordered by position
@@ -4567,7 +4567,7 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     });
     
     if (!updated) {
-      return res.status(404).json({ error: 'item_not_found' });
+      return res.status(400).json({ error: 'item_not_found' });
     }
     
     console.log('[PUT /items/:id] Database returned directory_category_id:', updated.directory_category_id);
@@ -4596,13 +4596,13 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
     // Get item to find tenant
     const item = await prisma.inventory_items.findUnique({ where: { id: req.params.id } });
     if (!item) {
-      return res.status(404).json({ error: "item_not_found" });
+      return res.status(400).json({ error: "item_not_found" });
     }
 
     // Get tenant to check tier
     const tenant = await prisma.tenants.findUnique({ where: { id: item.tenant_id } });
     if (!tenant) {
-      return res.status(404).json({ error: "tenant_not_found" });
+      return res.status(400).json({ error: "tenant_not_found" });
     }
 
     // Check trash capacity
@@ -4646,7 +4646,7 @@ app.get(["/api/trash/capacity", "/trash/capacity"], authenticateToken, async (re
     // Get tenant to check tier
     const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
     if (!tenant) {
-      return res.status(404).json({ error: "tenant_not_found" });
+      return res.status(400).json({ error: "tenant_not_found" });
     }
 
     // Get trash count and capacity info
@@ -4682,7 +4682,7 @@ app.delete(["/api/items/:id/purge", "/items/:id/purge"], authenticateToken, requ
     // First check if item is trashed
     const item = await prisma.inventory_items.findUnique({ where: { id: req.params.id } });
     if (!item) {
-      return res.status(404).json({ error: "item_not_found" });
+      return res.status(400).json({ error: "item_not_found" });
     }
     if (item.item_status !== 'trashed') {
       return res.status(400).json({ error: "item_not_in_trash", message: "Item must be in trash before it can be permanently deleted" });
@@ -4714,7 +4714,7 @@ app.patch("/api/v1/tenants/:tenant_id/items/:itemId/category", authenticateToken
 
     // Convert Decimal price to number and hide price_cents for frontend compatibility
     if (!updated) {
-      return res.status(404).json({ error: 'item_not_found' });
+      return res.status(400).json({ error: 'item_not_found' });
     }
     
     const { price_cents, ...itemWithoutPriceCents } = updated;
@@ -5071,7 +5071,7 @@ app.get("/google/auth", async (req, res) => {
     // Verify tenant exists
     const tenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
     if (!tenant) {
-      return res.status(404).json({ error: "tenant_not_found" });
+      return res.status(400).json({ error: "tenant_not_found" });
     }
 
     // Validate NAP (Name, Address, Phone) is complete
@@ -5236,7 +5236,7 @@ app.delete("/google/disconnect", async (req, res) => {
     });
 
     if (!account) {
-      return res.status(404).json({ error: "account_not_found" });
+      return res.status(400).json({ error: "account_not_found" });
     }
 
     // Note: Token revocation would need to be handled differently without the tokens relation
@@ -5275,7 +5275,7 @@ app.get("/google/gmc/accounts", async (req, res) => {
     });
 
     if (!account) {
-      return res.status(404).json({ error: "google_account_not_found" });
+      return res.status(400).json({ error: "google_account_not_found" });
     }
 
     const merchants = await listMerchantAccounts(account.id);
@@ -5303,7 +5303,7 @@ app.post("/google/gmc/sync", async (req, res) => {
     });
 
     if (!account) {
-      return res.status(404).json({ error: "google_account_not_found" });
+      return res.status(400).json({ error: "google_account_not_found" });
     }
 
     const success = await syncMerchantAccount(account.id, merchantId);
@@ -5336,7 +5336,7 @@ app.get("/google/gmc/products", async (req, res) => {
     });
 
     if (!account) {
-      return res.status(404).json({ error: "google_account_not_found" });
+      return res.status(400).json({ error: "google_account_not_found" });
     }
 
     const products = await listProducts(account.id, merchantId as string);
@@ -5364,7 +5364,7 @@ app.get("/google/gmc/stats", async (req, res) => {
     });
 
     if (!account) {
-      return res.status(404).json({ error: "google_account_not_found" });
+      return res.status(400).json({ error: "google_account_not_found" });
     }
 
     const stats = await getProductStats(account.id, merchantId as string);
@@ -5395,7 +5395,7 @@ app.get("/google/gbp/locations", async (req, res) => {
     });
 
     if (!account) {
-      return res.status(404).json({ error: "google_account_not_found" });
+      return res.status(400).json({ error: "google_account_not_found" });
     }
 
     // First get business accounts
@@ -5431,13 +5431,13 @@ app.post("/google/gbp/sync", async (req, res) => {
     });
 
     if (!account) {
-      return res.status(404).json({ error: "google_account_not_found" });
+      return res.status(400).json({ error: "google_account_not_found" });
     }
 
     const locationData = await getLocation(account.id, locationName);
     
     if (!locationData) {
-      return res.status(404).json({ error: "location_not_found" });
+      return res.status(400).json({ error: "location_not_found" });
     }
 
     const success = await syncLocation(account.id, locationData);

@@ -115,102 +115,102 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
     total: number;
     hasMore: boolean;
   } | null> {
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: pageSize.toString(),
-        offset: offset.toString(),
-      });
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: pageSize.toString(),
+      offset: offset.toString(),
+    });
 
-      const result = await this.makeAuthenticatedRequest<{
-        sessions: AdminSession[];
-        total: number;
-        hasMore: boolean;
-      }>(
-        `/api/admin/security/sessions?${params}`,
-        {},
-        `admin-security-sessions-${page}-${pageSize}-${offset}`
-      );
+    const result = await this.makeAdminRequest<{
+      sessions: AdminSession[];
+      total: number;
+      hasMore: boolean;
+    }>(
+      `/api/admin/security/sessions?${params}`,
+      {},
+      `admin-security-sessions-${page}-${pageSize}-${offset}`
+    );
 
-      return result || null;
-    } catch (error) {
-      console.error('[AdminSecurityMonitoringSingleton] Failed to get admin security sessions:', error);
+    if (!result.success) {
+      console.error('[AdminSecurityMonitoringSingleton] Failed to get admin security sessions:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
    * Get session statistics
    */
   async getSessionStats(): Promise<SessionStats | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<SessionStats>(
-        '/api/admin/security/sessions/stats',
-        {},
-        'admin-security-session-stats'
-      );
+    const result = await this.makeAdminRequest<SessionStats>(
+      '/api/admin/security/sessions/stats',
+      {},
+      'admin-security-session-stats'
+    );
 
-      return result || null;
-    } catch (error) {
-      console.error('[AdminSecurityMonitoringSingleton] Failed to get session stats:', error);
+    if (!result.success) {
+      console.error('[AdminSecurityMonitoringSingleton] Failed to get session stats:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
    * Get admin security alerts
    */
   async getSecurityAlerts(): Promise<AdminAlert[] | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{
-        data: AdminAlert[];
-      }>(
-        '/api/admin/security/alerts',
-        {},
-        'admin-security-alerts'
-      );
+    const result = await this.makeAdminRequest<{
+      data: AdminAlert[];
+    }>(
+      '/api/admin/security/alerts',
+      {},
+      'admin-security-alerts'
+    );
 
-      return result?.data || null;
-    } catch (error) {
-      console.error('[AdminSecurityMonitoringSingleton] Failed to get security alerts:', error);
+    if (!result.success) {
+      console.error('[AdminSecurityMonitoringSingleton] Failed to get security alerts:', result.error);
       return null;
     }
+
+    return result.data?.data || null;
   }
 
   /**
    * Get alert statistics
    */
   async getAlertStats(): Promise<AlertStats | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<AlertStats>(
-        '/api/admin/security/alerts/stats',
-        {},
-        'admin-security-alert-stats'
-      );
+    const result = await this.makeAdminRequest<AlertStats>(
+      '/api/admin/security/alerts/stats',
+      {},
+      'admin-security-alert-stats'
+    );
 
-      return result || null;
-    } catch (error) {
-      console.error('[AdminSecurityMonitoringSingleton] Failed to get alert stats:', error);
+    if (!result.success) {
+      console.error('[AdminSecurityMonitoringSingleton] Failed to get alert stats:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
    * Get failed login attempts
    */
   async getFailedLogins(limit: number = 20): Promise<FailedLogin[] | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<FailedLogin[]>(
-        `/api/admin/security/failed-logins?limit=${limit}`,
-        {},
-        `admin-security-failed-logins-${limit}`
-      );
+    const result = await this.makeAdminRequest<FailedLogin[]>(
+      `/api/admin/security/failed-logins?limit=${limit}`,
+      {},
+      `admin-security-failed-logins-${limit}`
+    );
 
-      return result || null;
-    } catch (error) {
-      console.error('[AdminSecurityMonitoringSingleton] Failed to get failed logins:', error);
+    if (!result.success) {
+      console.error('[AdminSecurityMonitoringSingleton] Failed to get failed logins:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
@@ -239,24 +239,24 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
    * Uses the /api/admin/users/:userId/tenants endpoint
    */
   async getUserTenants(userId: string): Promise<any[]> {
-    try {
-      if (!userId) {
-        throw new Error('User ID is required');
-      }
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
 
-      // Add cache-busting timestamp to ensure fresh data
-      const timestamp = Date.now();
-      const result = await this.makeAuthenticatedRequest<any[]>(
-        `/api/admin/users/${userId}/tenants?t=${timestamp}`,
-        {},
-        `admin-user-tenants-${userId}-${timestamp}`
-      );
+    // Add cache-busting timestamp to ensure fresh data
+    const timestamp = Date.now();
+    const result = await this.makeAdminRequest<any[]>(
+      `/api/admin/users/${userId}/tenants?t=${timestamp}`,
+      {},
+      `admin-user-tenants-${userId}-${timestamp}`
+    );
 
-      return result || [];
-    } catch (error) {
-      console.error('[AdminSecurityMonitoring] Failed to get user tenants:', error);
+    if (!result.success) {
+      console.error('[AdminSecurityMonitoring] Failed to get user tenants:', result.error);
       return [];
     }
+
+    return result.data || [];
   }
 
   /**
@@ -264,19 +264,19 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
    * Uses the /api/admin/tenants endpoint
    */
   async getAvailableTenants(): Promise<any[]> {
-    try {
-      const result = await this.makeAuthenticatedRequest<any[]>(
-        '/api/admin/tenants',
-        {},
-        'admin-available-tenants',
-        this.cacheTTL
-      );
+    const result = await this.makeAdminRequest<any[]>(
+      '/api/admin/tenants',
+      {},
+      'admin-available-tenants',
+      this.cacheTTL
+    );
 
-      return result || [];
-    } catch (error) {
-      console.error('[AdminSecurityMonitoring] Failed to get available tenants:', error);
+    if (!result.success) {
+      console.error('[AdminSecurityMonitoring] Failed to get available tenants:', result.error);
       return [];
     }
+
+    return result.data || [];
   }
 
   /**
@@ -292,7 +292,7 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
         throw new Error('User ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeAdminRequest<any>(
         `/api/admin/users/${userId}/tenants`,
         {
           method: 'POST',
@@ -318,7 +318,7 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
         throw new Error('User ID and Tenant ID are required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeAdminRequest<any>(
         `/api/admin/users/${userId}/tenants/${tenantId}`,
         {
           method: 'DELETE'
@@ -345,7 +345,7 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
         throw new Error('User ID and Tenant ID are required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeAdminRequest<any>(
         `/api/admin/users/${userId}/tenants/${tenantId}`,
         {
           method: 'PATCH',
@@ -367,21 +367,21 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
    * Get tier system features
    */
   async getTierSystemFeatures(): Promise<any[]> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{
-        features: any[];
-      }>(
-        '/api/admin/tier-system/features',
-        {},
-        'admin-tier-features',
-        this.cacheTTL
-      );
+    const result = await this.makeAdminRequest<{
+      features: any[];
+    }>(
+      '/api/admin/tier-system/features',
+      {},
+      'admin-tier-features',
+      this.cacheTTL
+    );
 
-      return result?.features || [];
-    } catch (error) {
-      console.error('[AdminSecurityMonitoring] Failed to get tier system features:', error);
+    if (!result.success) {
+      console.error('[AdminSecurityMonitoring] Failed to get tier system features:', result.error);
       return [];
     }
+
+    return result.data?.features || [];
   }
 
   /**
@@ -396,7 +396,7 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
     limits: any;
   }): Promise<any> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeAdminRequest<any>(
         '/api/admin/tier-system/tiers',
         {
           method: 'POST',
@@ -424,7 +424,7 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
     limits?: any;
   }): Promise<any> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeAdminRequest<any>(
         `/api/admin/tier-system/tiers/${tierId}`,
         {
           method: 'PUT',
@@ -446,7 +446,7 @@ class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton 
    */
   async deleteTier(tierId: string): Promise<any> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeAdminRequest<any>(
         `/api/admin/tier-system/tiers/${tierId}`,
         {
           method: 'DELETE'

@@ -171,111 +171,111 @@ class DirectorySingletonService extends PublicApiSingleton {
   }
 
   /**
-   * Get directory categories from materialized view
+   * Get directory categories for MV (Most Valuable)
    * Optimized for category browsing
    */
   async getDirectoryMVCategories(): Promise<DirectoryCategory[] | null> {
-    try {
-      const response = await this.makePublicRequest<any>(
-        '/api/directory/mv/categories',
-        {},
-        'directory-mv-categories',
-        this.CACHE_TTL_LONG
-      );
+    const response = await this.makePublicRequest<any>(
+      '/api/directory/mv/categories',
+      {},
+      'directory-mv-categories',
+      this.CACHE_TTL_LONG
+    );
 
-      return response?.categories || response;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get directory MV categories:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get directory MV categories:', response.error);
       return null;
     }
+
+    return response.data?.categories || response.data;
   }
 
   /**
    * Get all directory categories with full hierarchy
    */
   async getDirectoryCategories(): Promise<DirectoryCategory[] | null> {
-    try {
-      const response = await this.makePublicRequest<any>(
-        '/api/directory/categories',
-        {},
-        'directory-categories',
-        this.CACHE_TTL_LONG
-      );
+    const response = await this.makePublicRequest<any>(
+      '/api/directory/mv/categories',
+      {},
+      'directory-categories',
+      this.CACHE_TTL_LONG
+    );
 
-      return response?.categories || response;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get directory categories:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get directory categories:', response.error);
       return null;
     }
+
+    return response.data?.categories || response.data;
   }
 
   /**
    * Get stores by category slug
    */
   async getStoresByCategory(categorySlug: string): Promise<DirectoryStore[] | null> {
-    try {
-      if (!categorySlug) {
-        throw new Error('Category slug is required');
-      }
+    if (!categorySlug) {
+      throw new Error('Category slug is required');
+    }
 
-      const response = await this.makePublicRequest<any>(
-        `/api/directory/mv/categories/${categorySlug}`,
-        {},
-        `stores-by-category-${categorySlug}`,
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makePublicRequest<any>(
+      `/api/directory/mv/categories/${categorySlug}`,
+      {},
+      `stores-by-category-${categorySlug}`,
+      this.CACHE_TTL_MEDIUM
+    );
 
-      return response?.stores || response;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get stores by category:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get stores by category:', response.error);
       return null;
     }
+
+    return response.data?.stores || response.data;
   }
 
   /**
    * Search directory by category
    */
   async searchByCategory(category: string, page: number = 1, limit: number = 20): Promise<DirectorySearchResult | null> {
-    try {
-      if (!category) {
-        throw new Error('Category is required');
-      }
+    if (!category) {
+      throw new Error('Category is required');
+    }
 
-      const response = await this.makePublicRequest<DirectorySearchResult>(
-        `/api/directory/search?category=${encodeURIComponent(category)}&page=${page}&limit=${limit}`,
-        {},
-        `search-by-category-${category}-${page}-${limit}`,
-        this.CACHE_TTL_SHORT
-      );
+    const response = await this.makePublicRequest<DirectorySearchResult>(
+      `/api/directory/search?category=${encodeURIComponent(category)}&page=${page}&limit=${limit}`,
+      {},
+      `search-by-category-${category}-${page}-${limit}`,
+      this.CACHE_TTL_SHORT
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to search by category:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to search by category:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
    * Search directory by location
    */
   async searchByLocation(city: string, state: string, page: number = 1, limit: number = 20): Promise<DirectorySearchResult | null> {
-    try {
-      if (!city || !state) {
-        throw new Error('City and state are required');
-      }
+    if (!city || !state) {
+      throw new Error('City and state are required');
+    }
 
-      const response = await this.makePublicRequest<DirectorySearchResult>(
-        `/api/directory/search?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&page=${page}&limit=${limit}`,
-        {},
-        `search-by-location-${city}-${state}-${page}-${limit}`,
-        this.CACHE_TTL_SHORT
-      );
+    const response = await this.makePublicRequest<DirectorySearchResult>(
+      `/api/directory/search?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&page=${page}&limit=${limit}`,
+      {},
+      `search-by-location-${city}-${state}-${page}-${limit}`,
+      this.CACHE_TTL_SHORT
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to search by location:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to search by location:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
@@ -283,22 +283,22 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Used for shops page and public shop listings
    */
   async getPublicShops(): Promise<any[]> {
-    try {
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        shops: any[];
-      }>(
-        '/api/public/shops',
-        {},
-        'public-shops',
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makePublicRequest<{
+      success: boolean;
+      shops: any[];
+    }>(
+      '/api/public/shops',
+      {},
+      'public-shops',
+      this.CACHE_TTL_MEDIUM
+    );
 
-      return response?.shops || [];
-    } catch (error) {
-      console.error('[DirectorySingletonService] Failed to get public shops:', error);
+    if (!response.success) {
+      console.error('[DirectorySingletonService] Failed to get public shops:', response.error);
       return [];
     }
+
+    return response.data?.shops || [];
   }
 
   /**
@@ -316,56 +316,56 @@ class DirectorySingletonService extends PublicApiSingleton {
     listings: any[];
     total: number;
   }> {
-    try {
-      const params = new URLSearchParams();
-      if (filters.category) params.append('category', filters.category);
-      if (filters.storeType) params.append('storeType', filters.storeType);
-      if (filters.city) params.append('city', filters.city);
-      if (filters.state) params.append('state', filters.state);
-      if (filters.q) params.append('q', filters.q);
-      params.append('limit', (filters.limit || 100).toString());
+    const params = new URLSearchParams();
+    if (filters.category) params.append('category', filters.category);
+    if (filters.storeType) params.append('storeType', filters.storeType);
+    if (filters.city) params.append('city', filters.city);
+    if (filters.state) params.append('state', filters.state);
+    if (filters.q) params.append('q', filters.q);
+    params.append('limit', (filters.limit || 100).toString());
 
-      const response = await this.makePublicRequest<{
-        data: {
-          listings: any[];
-        };
-      }>(
-        `/api/directory/map/locations?${params.toString()}`,
-        {},
-        `directory-map-locations-${params.toString()}`,
-        this.CACHE_TTL_MEDIUM
-      );
-
-      return {
-        listings: response?.data?.listings || [],
-        total: response?.data?.listings?.length || 0
+    const response = await this.makePublicRequest<{
+      data: {
+        listings: any[];
       };
-    } catch (error) {
-      console.error('[DirectorySingletonService] Failed to get map locations:', error);
+    }>(
+      `/api/directory/map/locations?${params.toString()}`,
+      {},
+      `directory-map-locations-${params.toString()}`,
+      this.CACHE_TTL_MEDIUM
+    );
+
+    if (!response.success) {
+      console.error('[DirectorySingletonService] Failed to get map locations:', response.error);
       return {
         listings: [],
         total: 0
       };
     }
+
+    return {
+      listings: response.data?.data?.listings || [],
+      total: response.data?.data?.listings?.length || 0
+    };
   }
 
   /**
    * Get all available locations
    */
   async getLocations(): Promise<DirectoryLocation[] | null> {
-    try {
-      const response = await this.makePublicRequest<any>(
-        '/api/directory/locations',
-        {},
-        'directory-locations',
-        this.CACHE_TTL_LONG
-      );
+    const response = await this.makePublicRequest<any>(
+      '/api/directory/locations',
+      {},
+      'directory-locations',
+      this.CACHE_TTL_LONG
+    );
 
-      return response?.locations || response;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get directory locations:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get directory locations:', response.error);
       return null;
     }
+
+    return response.data?.locations || response.data;
   }
 
   /**
@@ -379,8 +379,14 @@ class DirectorySingletonService extends PublicApiSingleton {
         'directory-store-types',
         this.CACHE_TTL_LONG
       );
-
-      return response?.storeTypes || response?.data?.storeTypes || response;
+      if (!response.success) {
+        console.error('[DirectorySingleton] Failed to get directory store types:', response.error);
+        return null;
+      }
+      
+      // API returns: { success: true, data: { storeTypes: [...] } }
+      // makePublicRequest wraps this, so we need response.data.data.storeTypes
+      return response.data?.data?.storeTypes || [];
     } catch (error) {
       console.error('[DirectorySingleton] Failed to get directory store types:', error);
       return null;
@@ -391,46 +397,46 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Get tenant directory slug
    */
   async getTenantDirectorySlug(tenantId: string): Promise<{ slug: string } | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const response = await this.makePublicRequest<{ slug: string }>(
-        `/api/directory/tenant/${tenantId}`,
-        {},
-        `tenant-directory-slug-${tenantId}`,
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makePublicRequest<{ slug: string }>(
+      `/api/directory/tenant/${tenantId}`,
+      {},
+      `tenant-directory-slug-${tenantId}`,
+      this.CACHE_TTL_MEDIUM
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get tenant directory slug:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get tenant directory slug:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
    * Search categories with query
    */
   async searchCategories(query: string): Promise<any> {
-    try {
-      if (!query) {
-        throw new Error('Query is required');
-      }
+    if (!query) {
+      throw new Error('Query is required');
+    }
 
-      const response = await this.makePublicRequest<any>(
-        `/api/directory/categories/search?q=${encodeURIComponent(query)}`,
-        {},
-        `search-categories-${query}`,
-        this.CACHE_TTL_SHORT
-      );
+    const response = await this.makePublicRequest<any>(
+      `/api/directory/categories/search?q=${encodeURIComponent(query)}`,
+      {},
+      `search-categories-${query}`,
+      this.CACHE_TTL_SHORT
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to search categories:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to search categories:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
@@ -445,30 +451,30 @@ class DirectorySingletonService extends PublicApiSingleton {
     page?: number;
     limit?: number;
   }): Promise<DirectorySearchResult | null> {
-    try {
-      const searchParams = new URLSearchParams();
-      if (params.search) searchParams.append('search', params.search);
-      if (params.category) searchParams.append('category', params.category);
-      if (params.lat && params.lng) {
-        searchParams.append('lat', params.lat.toString());
-        searchParams.append('lng', params.lng.toString());
-      }
-      if (params.sort) searchParams.append('sort', params.sort);
-      searchParams.append('page', (params.page || 1).toString());
-      searchParams.append('limit', (params.limit || 20).toString());
+    const searchParams = new URLSearchParams();
+    if (params.search) searchParams.append('search', params.search);
+    if (params.category) searchParams.append('category', params.category);
+    if (params.lat && params.lng) {
+      searchParams.append('lat', params.lat.toString());
+      searchParams.append('lng', params.lng.toString());
+    }
+    if (params.sort) searchParams.append('sort', params.sort);
+    searchParams.append('page', (params.page || 1).toString());
+    searchParams.append('limit', (params.limit || 20).toString());
 
-      const response = await this.makePublicRequest<DirectorySearchResult>(
-        `/api/directory/mv/search?${searchParams.toString()}`,
-        {},
-        `search-directory-stores-${JSON.stringify(params)}`,
-        this.CACHE_TTL_SHORT
-      );
+    const response = await this.makePublicRequest<DirectorySearchResult>(
+      `/api/directory/mv/search?${searchParams.toString()}`,
+      {},
+      `search-directory-stores-${JSON.stringify(params)}`,
+      this.CACHE_TTL_SHORT
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to search directory stores:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to search directory stores:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
@@ -481,71 +487,71 @@ class DirectorySingletonService extends PublicApiSingleton {
       lng: number;
     };
   }): Promise<DirectoryStore[] | null> {
-    try {
-      const searchParams = new URLSearchParams();
-      searchParams.append('limit', (params.limit || 10).toString());
-      
-      if (params.location) {
-        searchParams.append('lat', params.location.lat.toString());
-        searchParams.append('lng', params.location.lng.toString());
-        searchParams.append('maxDistance', '50'); // 50km radius
-      }
+    const searchParams = new URLSearchParams();
+    searchParams.append('limit', (params.limit || 10).toString());
+    
+    if (params.location) {
+      searchParams.append('lat', params.location.lat.toString());
+      searchParams.append('lng', params.location.lng.toString());
+      searchParams.append('maxDistance', '50'); // 50km radius
+    }
 
-      const response = await this.makePublicRequest<any>(
-        `/api/directory/featured-stores?${searchParams.toString()}`,
-        {},
-        `featured-stores-${JSON.stringify(params)}`,
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makePublicRequest<any>(
+      `/api/directory/featured-stores?${searchParams.toString()}`,
+      {},
+      `featured-stores-${JSON.stringify(params)}`,
+      this.CACHE_TTL_MEDIUM
+    );
 
-      return response?.stores || response;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get featured stores:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get featured stores:', response.error);
       return null;
     }
+
+    return response.data?.stores || response.data;
   }
 
   /**
    * Get related stores for a given store
    */
   async getRelatedStores(slug: string, limit: number = 5): Promise<DirectoryStore[]> {
-    try {
-      if (!slug) {
-        throw new Error('Slug is required');
-      }
+    if (!slug) {
+      throw new Error('Slug is required');
+    }
 
-      const response = await this.makePublicRequest<any>(
-        `/api/directory/${slug}/related?limit=${limit}`,
-        {},
-        `related-stores-${slug}-${limit}`,
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makePublicRequest<any>(
+      `/api/directory/${slug}/related?limit=${limit}`,
+      {},
+      `related-stores-${slug}-${limit}`,
+      this.CACHE_TTL_MEDIUM
+    );
 
-      // The API returns { related: [...], count: ..., method: ... }
-      return response?.related || response?.stores || response || [];
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get related stores:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get related stores:', response.error);
       return [];
     }
+
+    // The API returns { related: [...], count: ..., method: ... }
+    return response.data?.related || response.data?.stores || response.data || [];
   }
 
   /**
    * Get directory sitemap data
    */
   async getDirectorySitemap(limit: number = 1000): Promise<any> {
-    try {
-      const response = await this.makePublicRequest<any>(
-        `/api/directory/search?limit=${limit}`,
-        {},
-        'directory-sitemap',
-        this.CACHE_TTL_LONG
-      );
+    const response = await this.makePublicRequest<any>(
+      `/api/directory/search?limit=${limit}`,
+      {},
+      'directory-sitemap',
+      this.CACHE_TTL_LONG
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get directory sitemap:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get directory sitemap:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
@@ -553,26 +559,26 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Used in directory context for store category display
    */
   async getStorefrontCategories(tenantId: string): Promise<any> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const response = await this.makePublicRequest<any>(
-        `/api/storefront/${tenantId}/categories`,
-        {},
-        `storefront-categories-${tenantId}`,
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makePublicRequest<any>(
+      `/api/storefront/${tenantId}/categories`,
+      {},
+      `storefront-categories-${tenantId}`,
+      this.CACHE_TTL_MEDIUM
+    );
 
-      return {
-        categories: response?.categories || [],
-        uncategorizedCount: response?.uncategorizedCount || 0,
-      };
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get storefront categories:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get storefront categories:', response.error);
       return { categories: [], uncategorizedCount: 0 };
     }
+
+    return {
+      categories: response.data?.categories || [],
+      uncategorizedCount: response.data?.uncategorizedCount || 0,
+    };
   }
 
   /**
@@ -580,23 +586,23 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Used in directory context for product count display
    */
   async getStorefrontProductCount(tenantId: string): Promise<number> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const response = await this.makePublicRequest<any>(
-        `/api/storefront/${tenantId}/products?limit=1`,
-        {},
-        `storefront-product-count-${tenantId}`,
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makePublicRequest<any>(
+      `/api/storefront/${tenantId}/products?limit=1`,
+      {},
+      `storefront-product-count-${tenantId}`,
+      this.CACHE_TTL_MEDIUM
+    );
 
-      return response?.pagination?.totalItems || 0;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get storefront product count:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get storefront product count:', response.error);
       return 0;
     }
+
+    return response.data?.pagination?.totalItems || 0;
   }
 
   /**
@@ -604,23 +610,23 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Used in directory context for store information display
    */
   async getBusinessProfile(tenantId: string): Promise<any> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const response = await this.makePublicRequest<any>(
-        `/api/public/tenant/${tenantId}/profile`,
-        {},
-        `business-profile-${tenantId}`,
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makePublicRequest<any>(
+      `/api/public/tenant/${tenantId}/profile`,
+      {},
+      `business-profile-${tenantId}`,
+      this.CACHE_TTL_MEDIUM
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get business profile:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get business profile:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
@@ -628,23 +634,23 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Used in directory context for store hours display
    */
   async getBusinessHours(tenantId: string): Promise<any> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const response = await this.makePublicRequest<any>(
-        `/api/tenant/${tenantId}/business-hours`,
-        {},
-        `business-hours-${tenantId}`,
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makePublicRequest<any>(
+      `/api/tenant/${tenantId}/business-hours`,
+      {},
+      `business-hours-${tenantId}`,
+      this.CACHE_TTL_MEDIUM
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get business hours:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get business hours:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
@@ -652,23 +658,23 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Used in directory context for product showcase
    */
   async getFeaturedProducts(tenantId: string, limit: number = 6): Promise<any[]> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const response = await this.makePublicRequest<any>(
-        `/api/storefront/${tenantId}/featured-products?type=store_selection&limit=${limit}`,
-        {},
-        `featured-products-${tenantId}-${limit}`,
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makePublicRequest<any>(
+      `/api/storefront/${tenantId}/featured-products?type=store_selection&limit=${limit}`,
+      {},
+      `featured-products-${tenantId}-${limit}`,
+      this.CACHE_TTL_MEDIUM
+    );
 
-      return response?.items || [];
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get featured products:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get featured products:', response.error);
       return [];
     }
+
+    return response.data?.items || [];
   }
 
   /**
@@ -676,23 +682,23 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Used in directory context for finding related stores
    */
   async getStoresByCategoryForProducts(categorySlug: string, limit: number = 10): Promise<any> {
-    try {
-      if (!categorySlug) {
-        throw new Error('Category slug is required');
-      }
+    if (!categorySlug) {
+      throw new Error('Category slug is required');
+    }
 
-      const response = await this.makePublicRequest<any>(
-        `/api/directory/mv/search?category=${categorySlug}&limit=${limit}`,
-        {},
-        `stores-by-category-products-${categorySlug}-${limit}`,
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makePublicRequest<any>(
+      `/api/directory/mv/search?category=${categorySlug}&limit=${limit}`,
+      {},
+      `stores-by-category-products-${categorySlug}-${limit}`,
+      this.CACHE_TTL_MEDIUM
+    );
 
-      return response?.listings || [];
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get stores by category for products:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get stores by category for products:', response.error);
       return [];
     }
+
+    return response.data?.listings || [];
   }
 
   /**
@@ -700,23 +706,23 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Used in directory context for product display
    */
   async getStorefrontProducts(tenantId: string, limit: number = 2): Promise<any[]> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const response = await this.makePublicRequest<any>(
-        `/api/storefront/${tenantId}/products?limit=${limit}`,
-        {},
-        `storefront-products-${tenantId}-${limit}`,
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makePublicRequest<any>(
+      `/api/storefront/${tenantId}/products?limit=${limit}`,
+      {},
+      `storefront-products-${tenantId}-${limit}`,
+      this.CACHE_TTL_MEDIUM
+    );
 
-      return response?.items || [];
-    } catch (error) {
-      console.error('[DirectorySingleton] Failed to get storefront products:', error);
+    if (!response.success) {
+      console.error('[DirectorySingleton] Failed to get storefront products:', response.error);
       return [];
     }
+
+    return response.data?.items || [];
   }
 }
 

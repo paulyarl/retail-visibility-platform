@@ -162,7 +162,6 @@ export interface TenantProfileStats {
  */
 class TenantProfileSingleton extends AuthenticatedApiSingleton {
   private static instance: TenantProfileSingleton;
-  private profileCache: Map<string, TenantProfile> = new Map();
   private updateQueue: Array<{
     tenantId: string;
     updates: TenantProfileUpdate;
@@ -197,20 +196,23 @@ class TenantProfileSingleton extends AuthenticatedApiSingleton {
    * Get tenant profile
    */
   async getTenantProfile(tenantId: string): Promise<TenantProfile | null> {
-    try {
-      const profile = await this.makeAuthenticatedRequest<TenantProfile>(`/api/tenants/${tenantId}/profile`, {}, `tenant-profile-${tenantId}`);
-      
-      // Update local cache for quick access
-      this.profileCache.set(tenantId, profile);
-
-      return profile;
-    } catch (error) {
-      if ((error as any).status === 404) {
+    const result = await this.makeAuthenticatedRequest<TenantProfile>(`/api/tenants/${tenantId}/profile`, {}, `tenant-profile-${tenantId}`);
+    
+    if (!result.success) {
+      if (result.status === 404) {
         return null;
       }
-      console.error('Error fetching tenant profile:', error);
+      console.error('Error fetching tenant profile:', result.error);
       return null;
     }
+    
+    const profile = result.data;
+    
+    if (!profile) {
+      return null;
+    }
+
+    return profile;
   }
 
   /**
@@ -220,28 +222,31 @@ class TenantProfileSingleton extends AuthenticatedApiSingleton {
     tenantId: string,
     profile: Omit<TenantProfile, 'id' | 'createdAt' | 'updatedAt' | 'lastActivityAt'>
   ): Promise<TenantProfile> {
-    try {
-      const newProfile: TenantProfile = {
-        ...profile,
-        id: tenantId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString()
-      };
+    const newProfile: TenantProfile = {
+      ...profile,
+      id: tenantId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      lastActivityAt: new Date().toISOString()
+    };
 
-      const createdProfile = await this.makeAuthenticatedRequest<TenantProfile>(`/api/tenants/${tenantId}/profile`, {
-        method: 'POST',
-        body: JSON.stringify(newProfile)
-      });
-      
-      // Update local cache for quick access
-      this.profileCache.set(tenantId, createdProfile);
-
-      return createdProfile;
-    } catch (error) {
-      console.error('Error creating tenant profile:', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<TenantProfile>(`/api/tenants/${tenantId}/profile`, {
+      method: 'POST',
+      body: JSON.stringify(newProfile)
+    }, `create-tenant-profile-${tenantId}`);
+    
+    if (!result.success) {
+      console.error('Error creating tenant profile:', result.error);
+      throw new Error(result.error?.message || 'Failed to create tenant profile');
     }
+    
+    const createdProfile = result.data;
+    
+    if (!createdProfile) {
+      throw new Error('No profile data received from server');
+    }
+
+    return createdProfile;
   }
 
   /**
@@ -284,22 +289,21 @@ class TenantProfileSingleton extends AuthenticatedApiSingleton {
    * Process profile update
    */
   private async processProfileUpdate(tenantId: string, updates: TenantProfileUpdate): Promise<void> {
-    try {
-      await this.makeAuthenticatedRequest(`/api/tenants/${tenantId}/profile`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          ...updates,
-          updatedAt: new Date().toISOString()
-        })
-      });
-
-      // Invalidate cache to force refresh
-      this.profileCache.delete(tenantId);
-      await this.invalidateCache(`tenant-profile-${tenantId}`);
-    } catch (error) {
-      console.error('Error processing profile update:', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest(`/api/tenants/${tenantId}/profile`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        ...updates,
+        updatedAt: new Date().toISOString()
+      })
+    }, `update-tenant-profile-${tenantId}`);
+    
+    if (!result.success) {
+      console.error('Error processing profile update:', result.error);
+      throw new Error(result.error?.message || 'Failed to process profile update');
     }
+
+    // Invalidate cache to force refresh
+    await this.invalidateCache(`tenant-profile-${tenantId}`);
   }
 
   /**
@@ -343,12 +347,10 @@ class TenantProfileSingleton extends AuthenticatedApiSingleton {
    * Get tenant profile statistics
    */
   async getTenantProfileStats(tenantId: string): Promise<TenantProfileStats> {
-    try {
-      const stats = await this.makeAuthenticatedRequest<TenantProfileStats>(`/api/tenants/${tenantId}/profile/stats`, {}, `tenant-profile-stats-${tenantId}`);
-      
-      return stats;
-    } catch (error) {
-      console.error('Error fetching tenant profile stats:', error);
+    const result = await this.makeAuthenticatedRequest<TenantProfileStats>(`/api/tenants/${tenantId}/profile/stats`, {}, `tenant-profile-stats-${tenantId}`);
+    
+    if (!result.success) {
+      console.error('Error fetching tenant profile stats:', result.error);
       
       // Return default stats
       return {
@@ -364,6 +366,10 @@ class TenantProfileSingleton extends AuthenticatedApiSingleton {
         }
       };
     }
+    
+    return result.data || (() => { 
+      throw new Error('No profile stats data received'); 
+    })();
   }
 
   /**
@@ -373,22 +379,21 @@ class TenantProfileSingleton extends AuthenticatedApiSingleton {
     tenantId: string,
     analytics: Partial<TenantProfile['analytics']>
   ): Promise<void> {
-    try {
-      await this.makeAuthenticatedRequest(`/api/tenants/${tenantId}/analytics`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          ...analytics,
-          lastActivityAt: new Date().toISOString()
-        })
-      });
-
-      // Invalidate cache
-      await this.invalidateCache(`tenant-profile-${tenantId}`);
-      this.profileCache.delete(tenantId);
-    } catch (error) {
-      console.error('Error updating tenant analytics:', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest(`/api/tenants/${tenantId}/analytics`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        ...analytics,
+        lastActivityAt: new Date().toISOString()
+      })
+    }, `update-tenant-analytics-${tenantId}`);
+    
+    if (!result.success) {
+      console.error('Error updating tenant analytics:', result.error);
+      throw new Error(result.error?.message || 'Failed to update tenant analytics');
     }
+
+    // Invalidate cache
+    await this.invalidateCache(`tenant-profile-${tenantId}`);
   }
 
   /**
@@ -402,22 +407,21 @@ class TenantProfileSingleton extends AuthenticatedApiSingleton {
       metadata?: Record<string, any>;
     }
   ): Promise<void> {
-    try {
-      await this.makeAuthenticatedRequest(`/api/tenants/${tenantId}/activity`, {
-        method: 'POST',
-        body: JSON.stringify({
-          ...activity,
-          timestamp: new Date().toISOString()
-        })
-      });
-
-      // Update last activity - invalidate cache
-      await this.invalidateCache(`tenant-profile-${tenantId}`);
-      this.profileCache.delete(tenantId);
-    } catch (error) {
-      console.error('Error recording tenant activity:', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest(`/api/tenants/${tenantId}/activity`, {
+      method: 'POST',
+      body: JSON.stringify({
+        ...activity,
+        timestamp: new Date().toISOString()
+      })
+    }, `record-tenant-activity-${tenantId}`);
+    
+    if (!result.success) {
+      console.error('Error recording tenant activity:', result.error);
+      throw new Error(result.error?.message || 'Failed to record tenant activity');
     }
+
+    // Update last activity - invalidate cache
+    await this.invalidateCache(`tenant-profile-${tenantId}`);
   }
 
   // ====================
@@ -468,9 +472,14 @@ class TenantProfileSingleton extends AuthenticatedApiSingleton {
       if (filters.plan) params.append('plan', filters.plan);
       params.append('limit', limit.toString());
 
-      const profiles = await this.makeAuthenticatedRequest<TenantProfile[]>(`/api/tenants/search?${params}`, {}, `tenant-profile-search-${JSON.stringify({ query, filters, limit })}`);
+      const result = await this.makeAuthenticatedRequest<TenantProfile[]>(`/api/tenants/search?${params}`, {}, `tenant-profile-search-${JSON.stringify({ query, filters, limit })}`);
       
-      return profiles;
+      if (!result.success) {
+        console.error('Error searching tenant profiles:', result.error);
+        return [];
+      }
+      
+      return result.data || [];
     } catch (error) {
       console.error('Error searching tenant profiles:', error);
       return [];
@@ -481,14 +490,14 @@ class TenantProfileSingleton extends AuthenticatedApiSingleton {
    * Get featured tenant profiles
    */
   async getFeaturedTenantProfiles(limit: number = 10): Promise<TenantProfile[]> {
-    try {
-      const profiles = await this.makeAuthenticatedRequest<TenantProfile[]>(`/api/tenants/featured?limit=${limit}`, {}, `featured-tenant-profiles-${limit}`);
-      
-      return profiles;
-    } catch (error) {
-      console.error('Error fetching featured tenant profiles:', error);
+    const result = await this.makeAuthenticatedRequest<TenantProfile[]>(`/api/tenants/featured?limit=${limit}`, {}, `featured-tenant-profiles-${limit}`);
+    
+    if (!result.success) {
+      console.error('Error fetching featured tenant profiles:', result.error);
       return [];
     }
+    
+    return result.data || [];
   }
 
   // ====================
@@ -497,12 +506,9 @@ class TenantProfileSingleton extends AuthenticatedApiSingleton {
 
   protected getCustomMetrics(): Record<string, any> {
     return {
-      cachedProfiles: this.profileCache.size,
       updateQueueSize: this.updateQueue.length,
       updateProcessingActive: !!this.updateInterval,
-      lastUpdateProcess: new Date().toISOString(),
-      profilesCreated: 0,
-      profilesUpdated: 0
+      lastUpdateProcess: new Date().toISOString()
     };
   }
 
@@ -523,8 +529,7 @@ class TenantProfileSingleton extends AuthenticatedApiSingleton {
       this.updateInterval = null;
     }
     
-    // Clear caches
-    this.profileCache.clear();
+    // Clear cache
     await this.clearCache();
   }
 }

@@ -91,49 +91,49 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
    * Uses the /api/items/complete endpoint
    */
   async getItemsComplete(params: ItemsCompleteParams): Promise<ItemsCompleteResponse | null> {
-    try {
-      // Build query string
-      const queryParams = new URLSearchParams();
-      queryParams.append('tenant_id', params.tenant_id);
-      
-      if (params.page) queryParams.append('page', params.page.toString());
-      if (params.limit) queryParams.append('limit', params.limit.toString());
-      if (params.q) queryParams.append('q', params.q);
-      if (params.status && params.status !== 'all') queryParams.append('status', params.status);
-      if (params.visibility && params.visibility !== 'all') queryParams.append('visibility', params.visibility);
-      if (params.categoryId) queryParams.append('categoryId', params.categoryId);
-      if (params.categoryFilter) queryParams.append('categoryFilter', params.categoryFilter);
+    // Build query string
+    const queryParams = new URLSearchParams();
+    queryParams.append('tenant_id', params.tenant_id);
+    
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.q) queryParams.append('q', params.q);
+    if (params.status && params.status !== 'all') queryParams.append('status', params.status);
+    if (params.visibility && params.visibility !== 'all') queryParams.append('visibility', params.visibility);
+    if (params.categoryId) queryParams.append('categoryId', params.categoryId);
+    if (params.categoryFilter) queryParams.append('categoryFilter', params.categoryFilter);
 
-      const queryString = queryParams.toString();
-      const cacheKey = `items_complete_${queryString}`;
+    const queryString = queryParams.toString();
+    const cacheKey = `items_complete_${queryString}`;
 
-      const endpoint = `/api/items/complete?${queryString}`;
-      
-      const result = await this.makeAuthenticatedRequest<ItemsCompleteResponse>(endpoint, {}, cacheKey);
+    const endpoint = `/api/items/complete?${queryString}`;
+    
+    const result = await this.makeAuthenticatedRequest<ItemsCompleteResponse>(endpoint, {}, cacheKey);
 
-      return result;
-    } catch (error) {
-      console.error('[ItemsSingleton] Failed to get items complete:', error);
+    if (!result.success) {
+      console.error('[ItemsSingleton] Failed to get items complete:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
    * Get items by ID with caching
    */
   async getItem(itemId: string): Promise<Item | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<Item>(
-        `/api/items/${itemId}`,
-        {},
-        `item-${itemId}`
-      );
+    const result = await this.makeAuthenticatedRequest<Item>(
+      `/api/items/${itemId}`,
+      {},
+      `item-${itemId}`
+    );
 
-      return result;
-    } catch (error) {
-      console.error('[ItemsSingleton] Failed to get item:', error);
+    if (!result.success) {
+      console.error('[ItemsSingleton] Failed to get item:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
@@ -141,28 +141,28 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
    * Note: This will invalidate relevant cache entries
    */
   async createItem(itemData: Partial<Item>, tenantId?: string): Promise<Item | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<Item>(
-        '/api/items',
-        {
-          method: 'POST',
-          body: JSON.stringify(itemData),
-        },
-        'items-create'
-      );
+    const result = await this.makeAuthenticatedRequest<Item>(
+      '/api/items',
+      {
+        method: 'POST',
+        body: JSON.stringify(itemData),
+      },
+      'items-create'
+    );
 
-      // Invalidate items complete cache for this tenant
-      const targetTenantId = tenantId || itemData.tenantCategoryId || 'unknown';
-      await this.invalidateCache(`items_complete_tenant_${targetTenantId}*`);
-      
-      // Invalidate platform dashboard cache since items affect stats
-      await platformDashboardService.invalidateCache('platform-dashboard-complete');
-      
-      return result;
-    } catch (error) {
-      console.error('[ItemsSingleton] Failed to create item:', error);
+    if (!result.success) {
+      console.error('[ItemsSingleton] Failed to create item:', result.error);
       return null;
     }
+
+    // Invalidate items complete cache for this tenant
+    const targetTenantId = tenantId || itemData.tenantCategoryId || 'unknown';
+    await this.invalidateCache(`items_complete_tenant_${targetTenantId}*`);
+    
+    // Invalidate platform dashboard cache since items affect stats
+    await platformDashboardService.invalidateCache('platform-dashboard-complete');
+    
+    return result.data || null;
   }
 
   /**
@@ -170,28 +170,28 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
    * Note: This will invalidate relevant cache entries
    */
   async updateItem(itemId: string, itemData: Partial<Item>, tenantId?: string): Promise<Item | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<Item>(
-        `/api/items/${itemId}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(itemData),
-        },
-        `item-update-${itemId}`
-      );
+    const result = await this.makeAuthenticatedRequest<Item>(
+      `/api/items/${itemId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(itemData),
+      },
+      `item-update-${itemId}`
+    );
 
-      // Invalidate items complete cache for this tenant
-      const targetTenantId = tenantId || itemData.tenantCategoryId || 'unknown';
-      await this.invalidateCache(`items_complete_tenant_${targetTenantId}*`);
-      
-      // Invalidate platform dashboard cache since items affect stats
-      await platformDashboardService.invalidateCache('platform-dashboard-complete');
-      
-      return result;
-    } catch (error) {
-      console.error('[ItemsSingleton] Failed to update item:', error);
+    if (!result.success) {
+      console.error('[ItemsSingleton] Failed to update item:', result.error);
       return null;
     }
+
+    // Invalidate items complete cache for this tenant
+    const targetTenantId = tenantId || itemData.tenantCategoryId || 'unknown';
+    await this.invalidateCache(`items_complete_tenant_${targetTenantId}*`);
+    
+    // Invalidate platform dashboard cache since items affect stats
+    await platformDashboardService.invalidateCache('platform-dashboard-complete');
+    
+    return result.data || null;
   }
 
   /**
@@ -204,25 +204,25 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
     contentType: string;
     variant_id?: string | null;
   }): Promise<any> {
-    try {
-      if (!itemId) {
-        throw new Error('Item ID is required');
-      }
-
-      const result = await this.makeAuthenticatedRequest<any>(
-        `/api/items/${itemId}/photos`,
-        {
-          method: 'POST',
-          body: JSON.stringify(photoData)
-        },
-        `item-upload-photo-${itemId}`
-      );
-
-      return result;
-    } catch (error) {
-      console.error('[ItemsSingleton] Failed to upload photo:', error);
-      throw error;
+    if (!itemId) {
+      throw new Error('Item ID is required');
     }
+
+    const result = await this.makeAuthenticatedRequest<any>(
+      `/api/items/${itemId}/photos`,
+      {
+        method: 'POST',
+        body: JSON.stringify(photoData)
+      },
+      `item-upload-photo-${itemId}`
+    );
+
+    if (!result.success) {
+      console.error('[ItemsSingleton] Failed to upload photo:', result.error);
+      throw result.error;
+    }
+
+    return result.data;
   }
 
   /**
@@ -230,27 +230,27 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
    * Note: This will invalidate relevant cache entries
    */
   async uploadPhotos(itemId: string, files: File[]): Promise<string[]> {
-    try {
-      const formData = new FormData();
-      files.forEach((file) => formData.append('photos', file));
+    const formData = new FormData();
+    files.forEach((file) => formData.append('photos', file));
 
-      const result = await this.makeAuthenticatedRequest<any>(
-        `/api/items/${itemId}/photos`,
-        {
-          method: 'POST',
-          body: formData,
-        },
-        `item-upload-photos-${itemId}`
-      );
+    const result = await this.makeAuthenticatedRequest<any>(
+      `/api/items/${itemId}/photos`,
+      {
+        method: 'POST',
+        body: formData,
+      },
+      `item-upload-photos-${itemId}`
+    );
 
-      // Invalidate items complete cache for this tenant
-      await this.invalidateCache(`items_complete_*`);
-      
-      return result.urls || [];
-    } catch (error) {
-      console.error('[ItemsSingleton] Failed to upload photos:', error);
-      throw error;
+    if (!result.success) {
+      console.error('[ItemsSingleton] Failed to upload photos:', result.error);
+      throw result.error;
     }
+
+    // Invalidate items complete cache for this tenant
+    await this.invalidateCache(`items_complete_*`);
+    
+    return result.data?.urls || [];
   }
 
   /**

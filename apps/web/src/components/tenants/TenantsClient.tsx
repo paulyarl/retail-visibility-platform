@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Badge, Alert, AnimatedCard, Modal, ModalFooter, Pagination } from "@/components/ui";
 import { motion } from "framer-motion";
 import PageHeader, { Icons } from "@/components/PageHeader";
@@ -17,6 +17,8 @@ type Tenant = {
   id: string; 
   name: string; 
   createdAt?: string;
+  status?: string;
+  subscriptionStatus?: string;
   locationStatus?: 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
   organization?: {
     id: string;
@@ -33,6 +35,7 @@ export const dynamic = 'force-dynamic';
 
 export default function TenantsClient({ initialTenants = [] }: { initialTenants?: Tenant[] }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   
   const [tenants, setTenants] = useState<Tenant[]>(initialTenants);
@@ -40,6 +43,10 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  
+  // Check if we're viewing a specific tenant
+  const specificTenantId = searchParams?.get('id');
+  const isViewingSpecificTenant = !!specificTenantId;
   
   // Pagination and search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -88,8 +95,23 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
 
   // Filter and paginate tenants
   const filteredTenants = useMemo(() => {
+    let filtered = tenants;
+    
+    console.log('[TenantsClient] Filtering tenants:', { 
+      totalTenants: tenants.length, 
+      isViewingSpecificTenant, 
+      specificTenantId 
+    });
+    
+    // If viewing a specific tenant, filter to just that one
+    if (isViewingSpecificTenant && specificTenantId) {
+      filtered = tenants.filter(t => t.id === specificTenantId);
+      console.log('[TenantsClient] After specific tenant filter:', filtered.length);
+    }
+    
+    // Apply existing filters
     const query = searchQuery.trim().toLowerCase();
-    return tenants.filter((t) => {
+    filtered = filtered.filter((t) => {
       const matchesSearch = !query || t.name.toLowerCase().includes(query) || t.id.toLowerCase().includes(query);
       const matchesChain = chainFilter === 'all' || 
         (chainFilter === 'chain' && t.organization) ||
@@ -98,7 +120,10 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
         (t.locationStatus || 'active') === statusFilter;
       return matchesSearch && matchesChain && matchesStatus;
     });
-  }, [tenants, searchQuery, chainFilter, statusFilter]);
+    
+    console.log('[TenantsClient] Final filtered tenants count:', filtered.length);
+    return filtered;
+  }, [tenants, searchQuery, chainFilter, statusFilter, isViewingSpecificTenant, specificTenantId]);
 
   const paginatedTenants = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
@@ -117,33 +142,45 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     setCurrentPage(1);
   }, [searchQuery, chainFilter]);
 
+  // Initial data load
+  useEffect(() => {
+    refresh();
+  }, []);
+
   const fetchTenants = async (includeArchived = false, statusParam?: string) => {
+    console.log('[TenantsClient] fetchTenants called', { includeArchived, statusParam });
     setLoading(true);
     setError(null);
     try {
       const tenants = await platformHomeService.getTenants();
+      console.log('[TenantsClient] Raw tenants data:', tenants);
       
       // Filter tenants based on parameters
       let filteredTenants = tenants || [];
+      console.log('[TenantsClient] Initial filtered tenants:', filteredTenants);
       
       if (tenants) {
         filteredTenants = tenants.filter(tenant => {
+          const tenantStatus = tenant.status || tenant.subscriptionStatus || 'active';
+          console.log('[TenantsClient] tenant status:', tenantStatus);
+          
           // Include archived if requested
-          if (includeArchived && tenant.status === 'archived') {
+          if (includeArchived && tenantStatus === 'archived') {
             return true;
           }
           // Skip archived unless specifically requested
-          if (!includeArchived && tenant.status === 'archived') {
+          if (!includeArchived && tenantStatus === 'archived') {
             return false;
           }
           // Apply status filter
-          if (statusParam && tenant.status !== statusParam) {
+          if (statusParam && tenantStatus !== statusParam) {
             return false;
           }
           return true;
         });
       }
       
+      console.log('[TenantsClient] Final filtered tenants:', filteredTenants);
       setTenants(filteredTenants);
     } catch (_e) {
       setError("Failed to load tenants");
@@ -153,6 +190,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   };
 
   const refresh = async () => {
+    console.log('[TenantsClient] refresh called, statusFilter:', statusFilter);
     if (statusFilter === 'all') {
       // 'all' filter: include archived tenants but no specific status filter
       await fetchTenants(true);

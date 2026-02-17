@@ -294,7 +294,7 @@ export default function RandomFeaturedProducts() {
 
         {/* Store Attribution Section */}
         <div className="mt-8 bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Featured Stores</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Random Featured Stores</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {Array.from(new Set(products.map(p => p.storeInfo?.storeName))).map((storeName, index) => {
               const product = products.find(p => p.storeInfo?.storeName === storeName);

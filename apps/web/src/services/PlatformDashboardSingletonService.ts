@@ -73,18 +73,18 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
    * Uses the /api/platform/dashboard endpoint
    */
   async getPlatformDashboard(): Promise<PlatformDashboardData | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<PlatformDashboardData>(
-        '/api/platform/dashboard',
-        {},
-        'platform-dashboard-complete'
-      );
+    const result = await this.makeAuthenticatedRequest<PlatformDashboardData>(
+      '/api/platform/dashboard',
+      {},
+      'platform-dashboard-complete'
+    );
 
-      return result;
-    } catch (error) {
-      console.error('[PlatformDashboardSingleton] Failed to get platform dashboard:', error);
+    if (!result.success) {
+      console.error('[PlatformDashboardSingleton] Failed to get platform dashboard:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
@@ -92,18 +92,18 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
    * Uses the /api/platform/stats endpoint
    */
   async getPlatformStats(): Promise<PlatformStats | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<PlatformStats>(
-        '/api/platform/stats',
-        {},
-        'platform-stats'
-      );
+    const result = await this.makeAuthenticatedRequest<PlatformStats>(
+      '/api/platform/stats',
+      {},
+      'platform-stats'
+    );
 
-      return result;
-    } catch (error) {
-      console.error('[PlatformDashboardSingleton] Failed to get platform stats:', error);
+    if (!result.success) {
+      console.error('[PlatformDashboardSingleton] Failed to get platform stats:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
@@ -111,18 +111,18 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
    * Uses the /api/platform/tenants/top endpoint
    */
   async getTopTenants(limit: number = 10): Promise<TenantMetrics[] | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<TenantMetrics[]>(
-        `/api/platform/tenants/top?limit=${limit}`,
-        {},
-        `platform-top-tenants-${limit}`
-      );
+    const result = await this.makeAuthenticatedRequest<TenantMetrics[]>(
+      `/api/platform/tenants/top?limit=${limit}`,
+      {},
+      `platform-top-tenants-${limit}`
+    );
 
-      return result;
-    } catch (error) {
-      console.error('[PlatformDashboardSingleton] Failed to get top tenants:', error);
+    if (!result.success) {
+      console.error('[PlatformDashboardSingleton] Failed to get top tenants:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
@@ -130,18 +130,18 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
    * Uses the /api/platform/activity endpoint
    */
   async getRecentActivity(limit: number = 20): Promise<PlatformActivity[] | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<PlatformActivity[]>(
-        `/api/platform/activity?limit=${limit}`,
-        {},
-        `platform-activity-${limit}`
-      );
+    const result = await this.makeAuthenticatedRequest<PlatformActivity[]>(
+      `/api/platform/activity?limit=${limit}`,
+      {},
+      `platform-activity-${limit}`
+    );
 
-      return result;
-    } catch (error) {
-      console.error('[PlatformDashboardSingleton] Failed to get recent activity:', error);
+    if (!result.success) {
+      console.error('[PlatformDashboardSingleton] Failed to get recent activity:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**

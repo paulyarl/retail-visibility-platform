@@ -80,7 +80,19 @@ class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
         `tenant-slug-${tenantId}`
       );
       
-      return result.slug;
+      // Handle legitimate API responses (should not be 404 for missing records)
+      if (!result) {
+        console.warn('[TenantDirectorySingleton] No directory listing found for tenant:', tenantId, 'No data');
+        return undefined;
+      }
+      
+      // Check if response looks like an error response (has error property instead of slug)
+      if (!result.data || 'error' in result.data || !result.data.slug) {
+        console.warn('[TenantDirectorySingleton] No directory listing found for tenant:', tenantId, (result.data as any)?.error || 'Missing slug');
+        return undefined;
+      }
+      
+      return result.data.slug;
     } catch (error) {
       console.error('[TenantDirectorySingleton] Failed to get tenant slug:', error);
       return undefined;
@@ -160,7 +172,7 @@ class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
         `directory-listing-${tenantId}`
       );
       
-      return result;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantDirectorySingleton] Failed to get directory listing:', error);
       return null;
@@ -187,10 +199,10 @@ class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
         `create-directory-listing-${tenantId}`
       );
 
-      // Invalidate cache for this tenant's listing
+      // Invalidate cache after creation
       this.invalidateCache(`directory-listing-${tenantId}`);
       
-      return result;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantDirectorySingleton] Failed to create directory listing:', error);
       return null;
@@ -220,7 +232,7 @@ class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
       // Invalidate cache for this tenant's listing
       this.invalidateCache(`directory-listing-${tenantId}`);
       
-      return result;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantDirectorySingleton] Failed to update directory listing:', error);
       return null;
@@ -247,10 +259,10 @@ class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
         `patch-directory-listing-${tenantId}`
       );
 
-      // Invalidate cache for this tenant's listing
+      // Invalidate cache after patch
       this.invalidateCache(`directory-listing-${tenantId}`);
       
-      return result;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantDirectorySingleton] Failed to patch directory listing:', error);
       return null;

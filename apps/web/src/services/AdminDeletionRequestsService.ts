@@ -44,6 +44,7 @@ interface DeletionRequestsResponse {
     total: number;
     totalPages: number;
   };
+  error?: string;
 }
 
 class AdminDeletionRequestsService extends AuthenticatedApiSingleton {
@@ -65,20 +66,18 @@ class AdminDeletionRequestsService extends AuthenticatedApiSingleton {
    * Get deletion requests by status
    */
   async getDeletionRequests(status: string = 'pending', page: number = 1, limit: number = 50): Promise<DeletionRequestsResponse> {
-    try {
-      const response = await this.makeAuthenticatedRequest<DeletionRequestsResponse>(
-        `/api/admin/deletion-requests?status=${status}&page=${page}&limit=${limit}`,
-        {},
-        `admin-deletion-requests-${status}-${page}-${limit}`,
-        this.cacheTTL
-      );
+    const response = await this.makeAdminRequest<DeletionRequestsResponse>(
+      `/api/admin/deletion-requests?status=${status}&page=${page}&limit=${limit}`,
+      {},
+      `admin-deletion-requests-${status}-${page}-${limit}`,
+      this.cacheTTL
+    );
 
-      return response || { data: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
-    } catch (error: any) {
-      console.error('[AdminDeletionRequestsService] Failed to get deletion requests:', error);
+    if (!response.success) {
+      console.error('[AdminDeletionRequestsService] Failed to get deletion requests:', response.error);
       
       // Handle specific database errors
-      if (error?.meta?.code === '42P01' || error?.message?.includes('account_deletion_requests')) {
+      if (response.error?.message?.includes('42P01') || response.error?.message?.includes('account_deletion_requests')) {
         console.warn('[AdminDeletionRequestsService] Account deletion requests table not found - feature not available');
         return { 
           data: [], 
@@ -89,62 +88,64 @@ class AdminDeletionRequestsService extends AuthenticatedApiSingleton {
       
       return { data: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     }
+
+    return response.data || { data: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
   }
 
   /**
    * Get deletion requests statistics
    */
   async getDeletionStats(): Promise<DeletionStats | null> {
-    try {
-      const response = await this.makeAuthenticatedRequest<{ success: boolean; data: DeletionStats }>(
-        '/api/admin/deletion-requests/stats',
-        {},
-        'admin-deletion-stats',
-        this.cacheTTL
-      );
+    const response = await this.makeAdminRequest<{ success: boolean; data: DeletionStats }>(
+      '/api/admin/deletion-requests/stats',
+      {},
+      'admin-deletion-stats',
+      this.cacheTTL
+    );
 
-      // Extract data from nested response structure
-      return response?.data || null;
-    } catch (error: any) {
-      console.error('[AdminDeletionRequestsService] Failed to get deletion stats:', error);
+    if (!response.success) {
+      console.error('[AdminDeletionRequestsService] Failed to get deletion stats:', response.error);
 
       // Handle specific database errors
-      if (error?.meta?.code === '42P01' || error?.message?.includes('account_deletion_requests')) {
+      if (response.error?.message?.includes('42P01') || response.error?.message?.includes('account_deletion_requests')) {
         console.warn('[AdminDeletionRequestsService] Account deletion requests table not found - feature not available');
         return null;
       }
-
+      
       return null;
     }
+
+    // Extract data from nested response structure
+    return response.data?.data || null;
   }
 
   /**
    * Update deletion request (cancel/approve)
    */
   async updateDeletionRequest(requestId: string, action: 'cancel' | 'approve', adminNotes?: string): Promise<DeletionRequest | null> {
-    try {
-      const response = await this.makeAuthenticatedRequest<DeletionRequest>(
-        `/api/admin/deletion-requests/${requestId}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify({
-            action,
-            adminNotes: adminNotes || (action === 'cancel' ? 'Cancelled by admin' : 'Approved by admin')
-          })
-        },
-        `admin-deletion-request-${requestId}`,
-        0 // No cache for updates
-      );
+    const response = await this.makeAdminRequest<DeletionRequest>(
+      `/api/admin/deletion-requests/${requestId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          action,
+          adminNotes: adminNotes || (action === 'cancel' ? 'Cancelled by admin' : 'Approved by admin')
+        })
+      },
+      `admin-deletion-request-${requestId}`,
+      0 // No cache for updates
+    );
 
-      // Invalidate related caches
-      await this.invalidateCache('admin-deletion-requests*');
-      await this.invalidateCache('admin-deletion-stats');
-
-      return response;
-    } catch (error) {
-      console.error('[AdminDeletionRequestsService] Failed to update deletion request:', error);
+    if (!response.success) {
+      console.error('[AdminDeletionRequestsService] Failed to update deletion request:', response.error);
       return null;
     }
+
+    // Invalidate related caches
+    await this.invalidateCache('admin-deletion-requests*');
+    await this.invalidateCache('admin-deletion-stats');
+
+    return response.data || null;
   }
 
   /**
@@ -165,19 +166,19 @@ class AdminDeletionRequestsService extends AuthenticatedApiSingleton {
    * Get single deletion request by ID
    */
   async getDeletionRequest(requestId: string): Promise<DeletionRequest | null> {
-    try {
-      const response = await this.makeAuthenticatedRequest<DeletionRequest>(
-        `/api/admin/deletion-requests/${requestId}`,
-        {},
-        `admin-deletion-request-${requestId}`,
-        this.cacheTTL
-      );
+    const response = await this.makeAdminRequest<DeletionRequest>(
+      `/api/admin/deletion-requests/${requestId}`,
+      {},
+      `admin-deletion-request-${requestId}`,
+      this.cacheTTL
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[AdminDeletionRequestsService] Failed to get deletion request:', error);
+    if (!response.success) {
+      console.error('[AdminDeletionRequestsService] Failed to get deletion request:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
@@ -191,19 +192,19 @@ class AdminDeletionRequestsService extends AuthenticatedApiSingleton {
    * Search deletion requests
    */
   async searchDeletionRequests(query: string, page: number = 1, limit: number = 50): Promise<DeletionRequestsResponse> {
-    try {
-      const response = await this.makeAuthenticatedRequest<DeletionRequestsResponse>(
-        `/api/admin/deletion-requests/search?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
-        {},
-        `admin-deletion-requests-search-${query}-${page}-${limit}`,
-        this.cacheTTL
-      );
+    const response = await this.makeAdminRequest<DeletionRequestsResponse>(
+      `/api/admin/deletion-requests/search?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
+      {},
+      `admin-deletion-requests-search-${query}-${page}-${limit}`,
+      this.cacheTTL
+    );
 
-      return response || { data: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
-    } catch (error) {
-      console.error('[AdminDeletionRequestsService] Failed to search deletion requests:', error);
+    if (!response.success) {
+      console.error('[AdminDeletionRequestsService] Failed to search deletion requests:', response.error);
       return { data: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     }
+
+    return response.data || { data: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
   }
 }
 

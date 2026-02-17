@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner } from '@/components/ui';
 import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { tenantTierService } from '@/services/TenantTierService';
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -71,8 +71,22 @@ export default function AdminTiersPage() {
   const loadTiers = async () => {
     try {
       setTiersLoading(true);
-      const data = await platformHomeService.getAdminTiers();
-      setDbTiers(data || []);
+      const data = await tenantTierService.getAdminTiers();
+      
+      // Transform service DbTier to page DbTier format
+      const transformedTiers = (data || []).map((tier: any) => ({
+        id: tier.id,
+        tierKey: tier.type || tier.name, // Use type or fallback to name
+        displayName: tier.displayName,
+        priceMonthly: tier.price,
+        maxSkus: tier.maxSkus,
+        maxLocations: tier.maxLocations,
+        tierType: tier.type,
+        isActive: true, // Default to active since service doesn't have this field
+        sortOrder: tier.sortOrder,
+      }));
+      
+      setDbTiers(transformedTiers);
     } catch (e) {
       console.error('Failed to load tiers:', e);
     } finally {
@@ -83,10 +97,10 @@ export default function AdminTiersPage() {
   const loadTenants = async () => {
     try {
       setLoading(true);
-      const data = await platformHomeService.getAdminTierTenants();
+      const data = await tenantTierService.getAdminTierTenants();
       
       // Use the admin tenants endpoint which includes tier information
-      const tenantsArray = data || [];
+      const tenantsArray = Array.isArray(data) ? data : [];
       const transformedTenants = tenantsArray.map((tenant: any) => ({
         id: tenant.id,
         name: tenant.name,
@@ -104,7 +118,9 @@ export default function AdminTiersPage() {
       
       setTenants(transformedTenants);
     } catch (err: any) {
+      console.error('Failed to load tenants:', err);
       setError(err.message || 'Failed to load tenants');
+      setTenants([]); // Ensure tenants is always an array
     } finally {
       setLoading(false);
     }
@@ -119,7 +135,7 @@ export default function AdminTiersPage() {
       console.log(`[Tier Management] Updating tenant ${tenantId} to tier: ${tier}, status: ${status}`);
 
       // Call the correct admin tier management endpoint
-      const responseData = await platformHomeService.updateTenantTier(tenantId, {
+      const responseData = await tenantTierService.updateTenantTier(tenantId, {
         subscriptionTier: tier,
         subscriptionStatus: status,
         reason: 'Updated via admin tiers page',
@@ -243,7 +259,7 @@ export default function AdminTiersPage() {
                 <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Subscription Tiers</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {getTierOptions().map(tierOption => (
-                    <div key={tierOption.value} className="p-4 border border-neutral-200 rounded-lg">
+                    <div key={`${tierOption.value}-${tierOption.tier.id}`} className="p-4 border border-neutral-200 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-2xl">
                           {tierOption.value === 'google_only' && '🔍'}
@@ -390,7 +406,7 @@ export default function AdminTiersPage() {
                               className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50"
                             >
                               {getTierOptions().map(tierOption => (
-                                <option key={tierOption.value} value={tierOption.value}>
+                                <option key={`${tierOption.value}-${tierOption.tier.id}`} value={tierOption.value}>
                                   {tierOption.tier.displayName} (${(tierOption.tier.priceMonthly / 100).toFixed(0)}/mo)
                                 </option>
                               ))}

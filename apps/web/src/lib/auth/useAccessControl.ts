@@ -97,6 +97,13 @@ export function useAccessControl(
             // Try to find organization by searching organizations that contain this tenant
             try {
               const organizations = await tenantInfoService.getOrganizations();
+              
+              // Ensure organizations is an array before calling find
+              if (!Array.isArray(organizations)) {
+                console.warn('[useAccessControl] Organizations is not an array:', organizations);
+                throw new Error('Invalid organizations data format');
+              }
+              
               // Find the organization that contains this tenant
               const matchingOrg = organizations.find((org: any) =>
                 org.tenants?.some((t: any) => t.id === tenantId)

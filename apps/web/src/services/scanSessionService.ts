@@ -1,4 +1,4 @@
-import { platformHomeService, ScanSession } from '@/services/PlatformHomeSingletonService';
+import { inventoryScanService, type ScanSession } from '@/services/InventoryScanService';
 
 /**
  * Service for handling scan session operations
@@ -10,7 +10,8 @@ export class ScanSessionService {
    */
   async checkActiveSessions(tenantId: string): Promise<ScanSession | null> {
     try {
-      return await platformHomeService.checkActiveScanSessions(tenantId);
+      const sessions = await inventoryScanService.checkActiveSessions(tenantId);
+      return sessions && sessions.length > 0 ? sessions[0] : null;
     } catch (error) {
       console.error('[ScanSessionService] Failed to check sessions:', error);
       return null;
@@ -20,9 +21,9 @@ export class ScanSessionService {
   /**
    * Create a new scan session
    */
-  async createSession(tenantId: string): Promise<ScanSession> {
+  async createSession(tenantId: string): Promise<ScanSession | null> {
     try {
-      return await platformHomeService.createScanSession(tenantId);
+      return await inventoryScanService.createScanSession(tenantId);
     } catch (error) {
       console.error('[ScanSessionService] Failed to create session:', error);
       throw error;
@@ -34,7 +35,7 @@ export class ScanSessionService {
    */
   async endSession(sessionId: string): Promise<void> {
     try {
-      await platformHomeService.endScanSession(sessionId);
+      await inventoryScanService.endScanSession(sessionId);
     } catch (error) {
       console.error('[ScanSessionService] Failed to end session:', error);
       throw error;

@@ -12,7 +12,7 @@ export async function GET(
     const res = await proxyGet(request, `/tenants/${id}/items`);
     
     if (!res.ok) {
-      if (res.status === 404) {
+      if (res.status === 400) {
         return NextResponse.json([]);
       }
       return NextResponse.json(

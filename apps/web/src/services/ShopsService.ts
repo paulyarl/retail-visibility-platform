@@ -26,7 +26,8 @@ class ShopsAPISingleton extends PublicApiSingleton {
     options: RequestInit = {},
     cacheKey?: string
   ): Promise<T> {
-    return this.makePublicRequest<T>(url, options, cacheKey);
+    const result = this.makePublicRequest<T>(url, options, cacheKey);
+    return result.then(r => r.data as T);
   }
 
   /**
@@ -334,7 +335,7 @@ class ShopsService extends PublicApiSingleton {
         body: JSON.stringify({ query, limit }),
       }, `search:${query}:${limit}`);
 
-      return response.data || [];
+      return response.data?.data || [];
     } catch (error) {
       console.error('Error searching shops:', error);
       return [];
@@ -362,7 +363,7 @@ class ShopsService extends PublicApiSingleton {
         parentProductsWithVariants: number;
       }>(`/api/shops/${tenantId}/stats`, {}, `stats:${tenantId}`);
 
-      return response || {
+      return response.data || {
         totalVariants: 0,
         activeVariants: 0,
         variantsOnSale: 0,
@@ -400,7 +401,7 @@ class ShopsService extends PublicApiSingleton {
         }>;
       }>('/api/shops/categories', {}, 'shop-categories');
 
-      const categories = response.data || [];
+      const categories = response.data?.data || [];
       return categories;
     } catch (error) {
       console.error('Error fetching shop categories:', error);
@@ -425,7 +426,7 @@ class ShopsService extends PublicApiSingleton {
         body: JSON.stringify(params),
       }, `categories:${params?.limit || 100}:${params?.minProducts || 1}`);
 
-      return response.data || [];
+      return response.data?.data || [];
     } catch (error) {
       console.error('Error fetching categories:', error);
       return [];
@@ -468,7 +469,7 @@ class ShopsService extends PublicApiSingleton {
         nextCloseTime?: string;
       }>(`/api/shops/${tenantId}/hours-status`, {}, `hours-status-${tenantId}`);
 
-      return response || {
+      return response.data || {
         isOpen: false,
       };
     } catch (error) {

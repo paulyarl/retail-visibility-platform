@@ -54,32 +54,24 @@ class HoursStatusService extends PublicApiSingleton {
 
     const cacheKey = `hours-status-${tenantId}`;
     
-    try {
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        data: StoreStatus;
-        error?: string;
-      }>(
-        `/api/public/tenant/${tenantId}/business-hours/status`,
-        {},
-        cacheKey,
-        this.HOURS_STATUS_TTL
-      );
+    const response = await this.makePublicRequest<StoreStatus>(
+      `/api/public/tenant/${tenantId}/business-hours/status`,
+      {},
+      cacheKey,
+      this.HOURS_STATUS_TTL
+    );
 
-      if (!response.success || !response.data) {
-        throw new Error(response.error || 'Failed to fetch hours status');
-      }
-
-      const statusData: StoreStatus = response.data;
-      
-      // Store in local cache for quick access
-      this.hoursStatus.set(tenantId, statusData);
-      
-      return statusData;
-    } catch (error) {
-      console.error('[HoursStatusService] Failed to get store status:', error);
+    if (!response.success || !response.data) {
+      console.error('[HoursStatusService] Failed to get store status:', response.error);
       return null;
     }
+
+    const statusData: StoreStatus = response.data;
+    
+    // Store in local cache for quick access
+    this.hoursStatus.set(tenantId, statusData);
+    
+    return statusData;
   }
 
   /**

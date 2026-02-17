@@ -64,7 +64,7 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
         this.CATEGORIES_TTL
       );
 
-      return response.data || [];
+      return response.data?.data || [];
     } catch (error) {
       console.error('[TenantCategoriesService] Failed to get tenant categories:', error);
       return [];
@@ -84,7 +84,7 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
         this.ALIGNMENT_TTL
       );
 
-      return response.data || null;
+      return response.data?.data || null;
     } catch (error) {
       console.error('[TenantCategoriesService] Failed to get alignment status:', error);
       return null;
@@ -113,7 +113,7 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
       // Invalidate cached categories
       await this.invalidateCache(`tenant-categories-${tenantId}`);
       
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[TenantCategoriesService] Failed to create category:', error);
       return null;
@@ -141,7 +141,7 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
       // Invalidate cached categories
       await this.invalidateCache(`tenant-categories-${tenantId}`);
       
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[TenantCategoriesService] Failed to update category:', error);
       return null;
@@ -246,7 +246,7 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
       await this.invalidateCache(`tenant-categories-${tenantId}`);
       await this.invalidateCache(`alignment-status-${tenantId}`);
       
-      return response.data || [];
+      return response.data?.data || [];
     } catch (error) {
       console.error('[TenantCategoriesService] Failed to quick start categories:', error);
       return [];

@@ -12,7 +12,7 @@ import TenantLimitBadge from '@/components/tenant/TenantLimitBadge';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 import { useTenantLimits } from '@/hooks/useTenantLimits';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
-import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { userManagementService } from '@/services/UserManagementService';
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -36,7 +36,7 @@ export default function AccountPage() {
       if (!user?.id) return;
       
       try {
-        const preferences = await platformHomeService.getUserPreferences();
+        const preferences = await userManagementService.getUserPreferences();
         if (preferences?.navigationPreference) {
           setNavigationPreference(preferences.navigationPreference as 'last-visited' | 'current-page');
           // Also update localStorage for immediate use in tenant switcher
@@ -56,7 +56,7 @@ export default function AccountPage() {
   const saveNavigationPreference = async (preference: 'last-visited' | 'current-page') => {
     setSavingPreference(true);
     try {
-      const updatedPreferences = await platformHomeService.updateUserPreferences({
+      const updatedPreferences = await userManagementService.updateUserPreferences({
         navigationPreference: preference
       });
 

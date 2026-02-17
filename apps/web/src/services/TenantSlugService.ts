@@ -65,13 +65,13 @@ class TenantSlugService extends AuthenticatedApiSingleton {
       }
 
       // Handle API server response format: { patterns: [...] }
-      if (response.patterns && Array.isArray(response.patterns)) {
-        return response.patterns;
+      if (response.data?.patterns && Array.isArray(response.data.patterns)) {
+        return response.data.patterns;
       }
 
       // Handle array response (original frontend format)
-      if (Array.isArray(response)) {
-        return response;
+      if (Array.isArray(response.data)) {
+        return response.data;
       }
 
       // Handle nested response
@@ -80,8 +80,8 @@ class TenantSlugService extends AuthenticatedApiSingleton {
       }
 
       // Handle single object response
-      if (response.slug) {
-        return [response];
+      if (response.data?.slug) {
+        return [response.data];
       }
 
       throw new Error('Unexpected response format');

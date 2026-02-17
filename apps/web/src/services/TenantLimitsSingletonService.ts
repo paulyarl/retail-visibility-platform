@@ -63,8 +63,12 @@ class TenantLimitsSingletonService extends AuthenticatedApiSingleton {
         {},
         `featured-products-limits-${tenantId}`
       );
+      if (!result.success){
+        console.error('[TenantLimitsSingleton] Failed to get featured products limits:', result.error);
+        return null;
+      }
 
-      return result;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantLimitsSingleton] Failed to get featured products limits:', error);
       return null;
@@ -82,8 +86,12 @@ class TenantLimitsSingletonService extends AuthenticatedApiSingleton {
         {},
         'tenant-limits-status'
       );
+      if (!result.success){
+        console.error('[TenantLimitsSingleton] Failed to get tenant limits status:', result.error);
+        return null;
+      } 
 
-      return result;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantLimitsSingleton] Failed to get tenant limits status:', error);
       return null;

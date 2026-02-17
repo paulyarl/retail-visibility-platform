@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { tenantManagementService } from '@/services/TenantManagementService';
 import {
   resolveTier,
   ResolvedTier,
@@ -41,7 +42,11 @@ interface TenantCompleteResponse {
     locations: number;
     users: number;
     apiCalls: number;
-    storageGB: number;
+    storageGB: number;    
+    totalItems: number;
+    activeItems: number;
+    categories: number;
+    orders: number;
   } | null;
   _timestamp: string;
 }
@@ -52,6 +57,10 @@ export interface TenantUsage {
   users: number;
   apiCalls: number;
   storageGB: number;
+  totalItems: number;
+  activeItems: number;
+  categories: number;
+  orders: number;
 }
 
 export interface TierBadge {
@@ -112,12 +121,53 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
 
 //      console.log('[useTenantComplete] Fetching consolidated tenant data for:', tenantId);
 
-      const data = await platformHomeService.getTenantComplete(tenantId);
-     /*  console.log('[useTenantComplete] Received consolidated data:', {
+      // Get data from multiple services
+      const [tenantData, tierData, usageData] = await Promise.all([
+        tenantInfoService.getCompleteTenantInfo(tenantId),
+        tenantInfoService.getTenantTier(tenantId),
+        tenantManagementService.getTenantUsage(tenantId)
+      ]);
+
+      // Combine data into expected format
+      const data: TenantCompleteResponse = {
+        tenant: {
+          id: tenantData.tenant?.id || tenantId,
+          name: tenantData.tenant?.name || 'Unknown',
+          organizationId: null, // Not available in new structure
+          subscriptionTier: tierData?.name || 'basic',
+          subscriptionStatus: 'active', // Not available in new structure
+          locationStatus: 'active',
+          subdomain: null, // Not available in new structure
+          createdAt: new Date().toISOString(),
+          statusInfo: null,
+          stats: {
+            productCount: usageData?.items || 0,
+            userCount: 0 // Not available in new structure
+          }
+        },
+        tier: tierData ? {
+          tier: tierData.name,
+          status: 'active'
+        } : null,
+        usage: usageData ? {
+          products: usageData.items,
+          locations: 0, // Not available in new structure
+          users: 0, // Not available in new structure
+          apiCalls: 0, // Not available in new structure
+          storageGB: usageData.storage,
+          totalItems: usageData.items,
+          activeItems: usageData.items, // Not available in new structure
+          categories: 0, // Not available in new structure
+          orders: usageData.orders
+        } : null,
+        _timestamp: new Date().toISOString()
+      };
+      console.log('[useTenantComplete] Received consolidated data:', {
         tenant: data.tenant?.id,
         hasTier: !!data.tier,
         hasUsage: !!data.usage,
-      }); */
+        usageData: data.usage
+      });
 
       return data;
     },
@@ -170,13 +220,19 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
   }, [rawTier, tenant]);
 
   // Transform usage data to expected format
+  console.log('[useTenantComplete] Transforming usage data:', { rawUsage });
   const usage: TenantUsage | null = rawUsage ? {
     products: rawUsage.products,
     locations: rawUsage.locations,
     users: rawUsage.users,
     apiCalls: rawUsage.apiCalls,
     storageGB: rawUsage.storageGB,
+    totalItems: rawUsage.totalItems,
+    activeItems: rawUsage.activeItems,
+    categories: rawUsage.categories,
+    orders: rawUsage.orders
   } : null;
+  console.log('[useTenantComplete] Transformed usage data:', { usage });
 
   // Helper functions (copied from useTenantTier for backward compatibility)
   const hasTierFeature = (featureId: string): boolean => {

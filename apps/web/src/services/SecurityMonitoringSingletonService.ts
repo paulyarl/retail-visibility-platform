@@ -108,14 +108,13 @@ class SecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
         `security-resolve-threat-${threatId}`
       );
 
-      if (!result) {
+      if (!result?.data) {
         throw new Error('No data returned from threat resolution');
       }
 
-      // Invalidate threats cache
       await this.invalidateCache('security-threats-*');
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[SecurityMonitoringSingleton] Failed to resolve threat:', error);
       throw error;
@@ -201,7 +200,7 @@ class SecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
         throw new Error('No data returned from security health');
       }
 
-      return result;
+      return result.data || {} as SecurityHealthStatus;
     } catch (error) {
       console.error('[SecurityMonitoringSingleton] Failed to get security health:', error);
       return {} as SecurityHealthStatus;
@@ -238,7 +237,7 @@ class SecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
     startDate: Date,
     endDate: Date,
     format: 'csv' | 'json' = 'csv'
-  ): Promise<Blob> {
+  ): Promise<Blob | null> {
     try {
       const params = new URLSearchParams({
         startDate: startDate.toISOString(),
@@ -253,11 +252,12 @@ class SecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
         `security-export-${format}-${startDate.toISOString()}-${endDate.toISOString()}`
       );
 
-      if (!response) {
+      if (!response.success) {
+        console.error('[SecurityMonitoringSingleton] Failed to export security report:', response.error);
         throw new Error('No response from security export');
       }
 
-      return await response.blob();
+      return await response.data!.blob()||new Blob();
     } catch (error) {
       console.error('[SecurityMonitoringSingleton] Failed to export security report:', error);
       throw error;

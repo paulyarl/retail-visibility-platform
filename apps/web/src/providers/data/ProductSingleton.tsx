@@ -140,9 +140,17 @@ export class ProductSingleton extends UniversalSingleton {
         url += `&lat=${location.lat}&lng=${location.lng}&maxDistance=500`;
       }
       
-      const data = await this.makeApiRequest(url);
-      const response = data as { products: any[] } || { products: [] };
-      const products: PublicProduct[] = response.products || [];
+      // Use makeApiRequest for public endpoint
+      const result = await this.makeApiRequest<{ products: any[] }>(url, {}, cacheKey);
+      
+      if (!result.success) {
+        console.error('[ProductSingleton] Error fetching featured products:', result.error);
+        return [];
+      }
+      
+      // API returns: { products: [...] }
+      // makePublicRequest wraps this, so we need result.data.products
+      const products: PublicProduct[] = result.data?.products || [];
       
       // Store in cache
       await this.setCache(cacheKey, products);
@@ -155,7 +163,8 @@ export class ProductSingleton extends UniversalSingleton {
       
       return products;
     } catch (error) {
-      throw error;
+      console.error('[ProductSingleton] Error in getFeaturedProducts:', error);
+      return [];
     }
   }
   
@@ -190,11 +199,15 @@ export class ProductSingleton extends UniversalSingleton {
       
       // Use the correct Public API endpoint
       const url = `/api/public/products${params.toString() ? `?${params.toString()}` : ''}`;
-      const data = await this.makeApiRequest(url);
+      const result = await this.makeApiRequest<{ products: any[] }>(url);
+      
+      if (!result.success) {
+        console.error('[ProductSingleton] Error fetching products:', result.error);
+        return [];
+      }
       
       // Handle Public API response format
-      const response = data as { products: any[] } || { products: [] };
-      const products: PublicProduct[] = response.products || [];
+      const products: PublicProduct[] = result.data?.products || [];
       
       // Transform to match PublicProduct interface
       const transformedProducts = products.map((product: any) => ({

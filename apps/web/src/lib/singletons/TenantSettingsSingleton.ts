@@ -106,38 +106,38 @@ class TenantSettingsSingleton extends AuthenticatedApiSingleton {
    * Fetch tenant info with caching
    */
   async fetchTenantInfo(): Promise<TenantInfo> {
-    try {
-      const data = await this.makeAuthenticatedRequest<TenantInfo>(
-        `/api/tenants/${this.tenantId}`,
-        { method: 'GET' },
-        `tenant-info-${this.tenantId}`
-      );
+    const result = await this.makeAuthenticatedRequest<TenantInfo>(
+      `/api/tenants/${this.tenantId}`,
+      { method: 'GET' },
+      `tenant-info-${this.tenantId}`
+    );
 
-      console.log('[TenantSettingsSingleton] Fetched tenant info:', this.tenantId);
-      return data;
-    } catch (error) {
-      console.error('[TenantSettingsSingleton] Error fetching tenant info:', error);
-      throw error;
+    if (!result.success) {
+      console.error('[TenantSettingsSingleton] Error fetching tenant info:', result.error);
+      throw new Error(result.error?.message || 'Failed to fetch tenant info');
     }
+
+    console.log('[TenantSettingsSingleton] Fetched tenant info:', this.tenantId);
+    return result.data || (() => { throw new Error('No data received'); })();
   }
 
   /**
    * Fetch tenant profile with caching
    */
   async fetchTenantProfile(): Promise<TenantProfile> {
-    try {
-      const data = await this.makeAuthenticatedRequest<TenantProfile>(
-        `/api/tenant/profile?tenant_id=${this.tenantId}`,
-        { method: 'GET' },
-        `tenant-profile-${this.tenantId}`
-      );
+    const result = await this.makeAuthenticatedRequest<TenantProfile>(
+      `/api/tenant/profile?tenant_id=${this.tenantId}`,
+      { method: 'GET' },
+      `tenant-profile-${this.tenantId}`
+    );
 
-      console.log('[TenantSettingsSingleton] Fetched tenant profile:', this.tenantId);
-      return data;
-    } catch (error) {
-      console.error('[TenantSettingsSingleton] Error fetching tenant profile:', error);
-      throw error;
+    if (!result.success) {
+      console.error('[TenantSettingsSingleton] Error fetching tenant profile:', result.error);
+      throw new Error(result.error?.message || 'Failed to fetch tenant profile');
     }
+
+    console.log('[TenantSettingsSingleton] Fetched tenant profile:', this.tenantId);
+    return result.data || (() => { throw new Error('No profile data received'); })();
   }
 
   /**
@@ -160,19 +160,19 @@ class TenantSettingsSingleton extends AuthenticatedApiSingleton {
    * Fetch featured products limits with caching
    */
   async fetchFeaturedProductsLimits(): Promise<FeaturedProductsLimits> {
-    try {
-      const data = await this.makeAuthenticatedRequest<FeaturedProductsLimits>(
-        `/api/tenant-limits/featured-products?tenantId=${this.tenantId}`,
-        { method: 'GET' },
-        `featured-limits-${this.tenantId}`
-      );
+    const result = await this.makeAuthenticatedRequest<FeaturedProductsLimits>(
+      `/api/tenant-limits/featured-products?tenantId=${this.tenantId}`,
+      { method: 'GET' },
+      `featured-limits-${this.tenantId}`
+    );
 
-      console.log('[TenantSettingsSingleton] Fetched featured products limits:', this.tenantId);
-      return data;
-    } catch (error) {
-      console.error('[TenantSettingsSingleton] Error fetching featured products limits:', error);
-      throw error;
+    if (!result.success) {
+      console.error('[TenantSettingsSingleton] Error fetching featured products limits:', result.error);
+      throw new Error(result.error?.message || 'Failed to fetch featured products limits');
     }
+
+    console.log('[TenantSettingsSingleton] Fetched featured products limits:', this.tenantId);
+    return result.data || (() => { throw new Error('No limits data received'); })();
   }
 
   /**
@@ -209,24 +209,24 @@ class TenantSettingsSingleton extends AuthenticatedApiSingleton {
    * Automatically invalidates cache
    */
   async updateTenantProfile(updates: Partial<TenantProfile>): Promise<TenantProfile> {
-    try {
-      const data = await this.makeAuthenticatedRequest<TenantProfile>(
-        `/api/tenant/profile?tenant_id=${this.tenantId}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(updates),
-        }
-      );
+    const result = await this.makeAuthenticatedRequest<TenantProfile>(
+      `/api/tenant/profile?tenant_id=${this.tenantId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      }
+    );
 
-      // Invalidate cache
-      await this.invalidateCache(`tenant-profile-${this.tenantId}`);
-
-      console.log('[TenantSettingsSingleton] Tenant profile updated:', this.tenantId);
-      return data;
-    } catch (error) {
-      console.error('[TenantSettingsSingleton] Error updating tenant profile:', error);
-      throw error;
+    if (!result.success) {
+      console.error('[TenantSettingsSingleton] Error updating tenant profile:', result.error);
+      throw new Error(result.error?.message || 'Failed to update tenant profile');
     }
+
+    // Invalidate cache
+    await this.invalidateCache(`tenant-profile-${this.tenantId}`);
+
+    console.log('[TenantSettingsSingleton] Tenant profile updated:', this.tenantId);
+    return result.data || (() => { throw new Error('No profile data received'); })();
   }
 
   // ====================

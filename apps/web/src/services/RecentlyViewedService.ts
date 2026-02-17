@@ -180,7 +180,7 @@ class RecentlyViewedService extends PublicApiSingleton {
         this.RECENT_ITEMS_TTL
       );
 
-      return items || [];
+      return items.data || [];
     } catch (error) {
       console.error('[RecentlyViewedService] Error fetching recently viewed items:', error);
       return [];
@@ -250,7 +250,7 @@ class RecentlyViewedService extends PublicApiSingleton {
         this.STATS_TTL
       );
 
-      return stats || {
+      return stats.data || {
         totalViews: 0,
         uniqueItems: 0,
         averageViewDuration: 0,
@@ -292,7 +292,7 @@ class RecentlyViewedService extends PublicApiSingleton {
         this.TRENDS_TTL
       );
 
-      return trends || [];
+      return trends.data || [];
     } catch (error) {
       console.error('[RecentlyViewedService] Error fetching recently viewed trends:', error);
       return [];
@@ -320,7 +320,7 @@ class RecentlyViewedService extends PublicApiSingleton {
         this.RECOMMENDATIONS_TTL
       );
 
-      return recommendations || [];
+      return recommendations.data || [];
     } catch (error) {
       console.error('[RecentlyViewedService] Error fetching personalized recommendations:', error);
       return [];
@@ -341,7 +341,7 @@ class RecentlyViewedService extends PublicApiSingleton {
         this.RECOMMENDATIONS_TTL
       );
 
-      return similarItems || [];
+      return similarItems.data || [];
     } catch (error) {
       console.error('[RecentlyViewedService] Error fetching similar items:', error);
       return [];

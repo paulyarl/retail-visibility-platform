@@ -153,7 +153,11 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
 
         {/* Stats */}
         <DashboardStats
-          activeItems={usage?.products || 0} // Use usage data instead of separate stats
+          activeItems={usage?.activeItems || 0} // Use consolidated usage data
+          totalItems={usage?.totalItems || 0}   // Pass total items for catalog size
+          categories={usage?.categories || 0}    // Pass categories count
+          users={usage?.users || 0}             // Pass users count
+          orders={usage?.orders || 0}           // Pass orders count
           syncIssues={0} // TODO: Implement sync issues tracking
           tenantId={tenantId}
         />

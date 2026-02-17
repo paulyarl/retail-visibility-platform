@@ -58,10 +58,10 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
         const userTenantsData = userTenantsResponse;
         const allTenantsData = allTenantsResponse;
         
-        console.log('Debug - API responses:', {
+       /*  console.log('Debug - API responses:', {
           userTenantsData,
           allTenantsData
-        });
+        }); */
         
         // Format user tenants to match expected structure
         // Note: Services return arrays directly

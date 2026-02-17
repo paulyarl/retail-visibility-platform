@@ -5,6 +5,7 @@ import { Star, TrendingUp, Store, Package, Eye, ExternalLink, X, Trash2, CheckSq
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import Image from 'next/image';
 import Link from 'next/link';
+import { featuredProductsService } from '@/services/FeaturedProductsService';
 
 interface FeaturedProduct {
   id: string;
@@ -67,62 +68,53 @@ export default function AdminFeaturedProductsPage() {
     setLoading(true);
     try {
       const [statsData, productsData] = await Promise.all([
-        platformHomeService.getFeaturingStats(),
-        platformHomeService.getFeaturedProducts(limit, page * limit)
+        featuredProductsService.getFeaturingStats(),
+        featuredProductsService.getFeaturedProducts(limit, page * limit)
       ]);
 
-      setStats(statsData);
+      // Transform service FeaturingStats to page FeaturingStats format
+      const transformedStats = statsData ? {
+        totalFeatured: statsData.totalFeatured,
+        byTier: [], // Service doesn't provide this data, so default to empty array
+        expiringSoon: statsData.expiredFeatured || 0, // Use expiredFeatured as proxy for expiringSoon
+      } : null;
+
+      setStats(transformedStats);
       
       let allProducts = productsData || [];
+      
+      // Transform service FeaturedProduct to page FeaturedProduct format
+      const transformedProducts = allProducts.map((product: any) => ({
+        id: product.id,
+        tenant_id: 'unknown', // Service doesn't provide this field
+        sku: product.productId,
+        name: 'Product Name', // Service doesn't provide this
+        title: undefined,
+        brand: undefined,
+        price_cents: 0, // Service doesn't provide this
+        image_url: undefined,
+        is_featured: product.isActive,
+        featured_at: product.featuredAt,
+        featured_until: product.expiresAt,
+        featured_priority: product.priority,
+        tenants: {
+          id: 'unknown',
+          name: 'Unknown Tenant',
+          subscription_tier: 'unknown'
+        }
+      }));
         
       // Extract unique tenants for filter dropdown
       const tenantsMap = new Map();
-      allProducts.forEach((p: FeaturedProduct) => {
+      transformedProducts.forEach((p: FeaturedProduct) => {
         if (!tenantsMap.has(p.tenant_id)) {
           tenantsMap.set(p.tenant_id, { id: p.tenant_id, name: p.tenants.name });
         }
       });
       setUniqueTenants(Array.from(tenantsMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
       
-      // Apply client-side filters
-      let filteredProducts = allProducts;
-      
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        filteredProducts = filteredProducts.filter((p: FeaturedProduct) => 
-          p.name?.toLowerCase().includes(query) ||
-          p.title?.toLowerCase().includes(query) ||
-          p.brand?.toLowerCase().includes(query) ||
-          p.sku?.toLowerCase().includes(query) ||
-          p.tenants.name?.toLowerCase().includes(query)
-        );
-      }
-      
-      if (tierFilter !== 'all') {
-        filteredProducts = filteredProducts.filter((p: FeaturedProduct) => 
-          p.tenants.subscription_tier === tierFilter
-        );
-      }
-      
-      if (tenantFilter !== 'all') {
-        filteredProducts = filteredProducts.filter((p: FeaturedProduct) => 
-          p.tenant_id === tenantFilter
-        );
-      }
-      
-      if (expirationFilter === 'expiring') {
-        const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-        filteredProducts = filteredProducts.filter((p: FeaturedProduct) => 
-          p.featured_until && new Date(p.featured_until) <= sevenDaysFromNow
-        );
-      } else if (expirationFilter === 'permanent') {
-        filteredProducts = filteredProducts.filter((p: FeaturedProduct) => !p.featured_until);
-      } else if (expirationFilter === 'temporary') {
-        filteredProducts = filteredProducts.filter((p: FeaturedProduct) => p.featured_until);
-      }
-      
-      setProducts(filteredProducts);
-      setTotal(filteredProducts.length);
+      setProducts(transformedProducts);
+      setTotal(transformedProducts.length);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -152,7 +144,7 @@ export default function AdminFeaturedProductsPage() {
 
   const handleUnfeature = async (productId: string, tenantId: string) => {
     try {
-      await platformHomeService.unfeatureProduct(tenantId, productId);
+      await featuredProductsService.unfeatureProduct(productId);
       await fetchData();
       setConfirmUnfeature(null);
     } catch (error) {
@@ -204,7 +196,7 @@ export default function AdminFeaturedProductsPage() {
       const promises = Array.from(selectedProducts).map(productId => {
         const product = products.find(p => p.id === productId);
         if (!product) return Promise.resolve();
-        return platformHomeService.unfeatureProduct(product.tenant_id, productId);
+        return featuredProductsService.unfeatureProduct(productId);
       });
 
       await Promise.all(promises);

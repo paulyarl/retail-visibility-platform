@@ -206,7 +206,7 @@ router.get('/tiers/:tierId', requirePlatformStaff, async (req, res) => {
     });
 
     if (!tier) {
-      return res.status(404).json({ error: 'tier_not_found' });
+      return res.status(400).json({ error: 'tier_not_found' });
     }
 
     // Transform the response to match frontend expectations
@@ -373,7 +373,7 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
     });
 
     if (!currentTier) {
-      return res.status(404).json({ error: 'tier_not_found' });
+      return res.status(400).json({ error: 'tier_not_found' });
     }
 
     // Update tier
@@ -456,7 +456,7 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
     });
 
     if (!currentTier) {
-      return res.status(404).json({ error: 'tier_not_found' });
+      return res.status(400).json({ error: 'tier_not_found' });
     }
 
     // Check if any tenants are using this tier
@@ -591,7 +591,7 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
     });
 
     if (!tier) {
-      return res.status(404).json({ error: 'tier_not_found' });
+      return res.status(400).json({ error: 'tier_not_found' });
     }
 
     // Check if feature already exists
@@ -687,7 +687,7 @@ router.patch('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async (
     });
 
     if (!tier) {
-      return res.status(404).json({ error: 'tier_not_found' });
+      return res.status(400).json({ error: 'tier_not_found' });
     }
 
     // Get current feature state
@@ -697,7 +697,7 @@ router.patch('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async (
     });
 
     if (!currentFeature || currentFeature.tier_id !== tier.id) {
-      return res.status(404).json({ error: 'feature_not_found' });
+      return res.status(400).json({ error: 'feature_not_found' });
     }
 
     // Update feature
@@ -771,7 +771,7 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
     });
 
     if (!targetTier) {
-      return res.status(404).json({ error: 'target_tier_not_found' });
+      return res.status(400).json({ error: 'target_tier_not_found' });
     }
 
     // Check if source tier exists
@@ -785,7 +785,7 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
     });
 
     if (!sourceTier) {
-      return res.status(404).json({ error: 'source_tier_not_found' });
+      return res.status(400).json({ error: 'source_tier_not_found' });
     }
 
     // Prevent self-inheritance
@@ -939,7 +939,7 @@ router.delete('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async 
     });
 
     if (!tier) {
-      return res.status(404).json({ error: 'tier_not_found' });
+      return res.status(400).json({ error: 'tier_not_found' });
     }
 
     // Get current state
@@ -949,7 +949,7 @@ router.delete('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async 
     });
 
     if (!feature || feature.tier_id !== tier.id) {
-      return res.status(404).json({ error: 'feature_not_found' });
+      return res.status(400).json({ error: 'feature_not_found' });
     }
 
     // Delete feature

@@ -35,8 +35,11 @@ class ProductAPISingleton extends UniversalSingleton {
     cacheKey?: string
   ): Promise<{ success: boolean; data?: T; error?: string }> {
     try {
-      const response = await this.makeApiRequest<T>(url, options, cacheKey);
-      return { success: true, data: response };
+      const result = await this.makeApiRequest<T>(url, options, cacheKey);
+      if (!result.success) {
+        return { success: false, error: result.error?.message || 'Request failed' };
+      }
+      return { success: true, data: result.data };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }

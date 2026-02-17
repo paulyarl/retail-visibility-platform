@@ -18,6 +18,17 @@ export interface SingletonCacheOptions {
   userId?: string;
 }
 
+export interface ApiResult<T> {
+  success: boolean;
+  data?: T;
+  error?: {
+    status: number;
+    message: string;
+    code: string;
+  };
+  status: number;
+}
+
 export interface SingletonMetrics {
   cacheHits: number;
   cacheMisses: number;
@@ -287,18 +298,164 @@ export abstract class UniversalSingleton {
   }
 
   /**
+   * Parse error response from API to extract structured error information
+   */
+  protected async parseErrorResponse(response: Response): Promise<{
+    status: number;
+    message: string;
+    code: string;
+  }> {
+    let message = `API request failed: ${response.status} ${response.statusText}`;
+    let code = 'HTTP_ERROR';
+    
+    // Try to extract actual error message from API response
+    try {
+      const errorData = await response.clone().json();
+      if (errorData.error) {
+        message = errorData.error;
+        code = errorData.error;
+      } else if (errorData.message) {
+        message = errorData.message;
+        code = 'API_ERROR';
+      }
+      
+      // Use specific error codes for common scenarios
+      if (response.status === 400) code = 'BAD_REQUEST';
+      if (response.status === 401) code = 'UNAUTHORIZED';
+      if (response.status === 404) code = 'NOT_FOUND';
+      if (response.status === 403) code = 'FORBIDDEN';
+      if (response.status === 500) code = 'SERVER_ERROR';
+    } catch (parseError) {
+      // If we can't parse JSON, keep the generic message
+      console.warn('[UniversalSingleton] Could not parse error response JSON:', parseError);
+    }
+    
+    return {
+      status: response.status,
+      message,
+      code
+    };
+  }
+
+  /**
+   * Unified HTTP error handling with intelligent routing
+   * Routes errors to specific handlers and optionally throws for admin requests
+   */
+  protected handleHttpError(error: any, shouldThrow: boolean = false): void {
+    const statusCode = error?.status || error?.statusCode;
+    
+    // Route to specific handlers
+    switch (statusCode) {
+      case 400:
+        this.handleBadRequest(error);
+        break;
+      case 401:
+        this.handleAuthError(error);
+        break;
+      case 404:
+        this.handleNotFound(error);
+        break;
+      default:
+        // For any other status codes, log and optionally throw
+        console.warn(`Unhandled HTTP error (${statusCode}):`, error?.message || 'Unknown error');
+        break;
+    }
+    
+    // Throw if requested (useful for admin requests that should see the error)
+    if (shouldThrow) {
+      throw error;
+    }
+  }
+
+  /**
+   * Handle bad request errors (400)
+   */
+  protected handleBadRequest(error: any): void {
+    if (error.status === 400) {
+      // Client-side validation error or invalid request - use actual API message
+      console.warn('Bad request error:', error.message || 'Invalid request');
+      // Could trigger form validation updates or user notifications
+    }
+  }
+
+  /**
+   * Handle authentication errors
+   */
+  protected handleAuthError(error: any): void {
+    if (error.status === 401) {
+      // Token expired, trigger refresh or logout
+      console.warn('Authentication token expired');
+      // This would trigger token refresh or logout
+    }
+  }
+
+  /**
+   * Handle not found errors (404)
+   */
+  protected handleNotFound(error: any): void {
+    if (error.status === 404) {
+      // Resource not found - API endpoint doesn't exist - use actual API message
+      console.warn('Resource not found:', error.message || 'API endpoint not found');
+      // Could trigger navigation updates or user notifications
+    }
+  }
+
+  /**
+   * Extract data from ApiResult for backward compatibility
+   * Throws error if result is not successful (maintains old behavior)
+   */
+  protected extractData<T>(result: ApiResult<T>): T {
+    if (!result.success) {
+      throw new Error(result.error?.message || 'API request failed');
+    }
+    return result.data as T;
+  }
+
+  /**
+   * Extract data from ApiResult with optional fallback
+   * Returns fallback value if result is not successful
+   */
+  protected extractDataOrDefault<T>(result: ApiResult<T>, fallback: T): T {
+    if (!result.success) {
+      console.warn('[UniversalSingleton] API request failed, using fallback:', result.error);
+      return fallback;
+    }
+    return result.data as T;
+  }
+
+  /**
+   * Get authentication token from localStorage
+   * Aligned with platform token storage using access_token
+   */
+  protected getAuthToken(): string {
+    // This gets the JWT token from platform's localStorage
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('access_token') || '';
+    }
+    return '';
+  }
+
+  /**
    * Enhanced makeApiRequest method with caching and authentication
+   * Returns consistent ApiResult<T> for both success and error cases
    */
   protected async makeApiRequest<T>(
     url: string,
     options: RequestInit = {},
     cacheKey?: string,
     customTTL?: number,
-    apiUrl: string = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'
-  ): Promise<T> {
+    handle404?: boolean,
+    apiUrl: string = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000',
+    isAdminRequest: boolean = false // Flag to differentiate admin requests
+  ): Promise<ApiResult<T>> {
     // Check cache first if cacheKey provided and it's a GET request
     if (cacheKey && (options.method === 'GET' || !options.method) && this.isCached(cacheKey)) {
-      return this.getCachedData(cacheKey);
+      const cachedData = this.getCachedData(cacheKey);
+      return {
+        success: true,
+        data: cachedData,
+        status: 200
+      };
     }
     
     this.apiCalls++;
@@ -315,7 +472,38 @@ export abstract class UniversalSingleton {
       });
 
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        // Handle 404 errors gracefully if requested (default: true)
+        if ((handle404 ?? true) && response.status === 404) {
+          console.warn(`[UniversalSingleton] 404 Not Found for ${url} - handled gracefully`);
+          return {
+            success: false,
+            error: {
+              status: 404,
+              message: 'Resource not found',
+              code: 'NOT_FOUND'
+            },
+            status: 404
+          };
+        }
+        
+        // Parse error details consistently
+        const errorDetails = await this.parseErrorResponse(response);
+        
+        // Create error object for handleHttpError
+        const error = new Error(errorDetails.message);
+        (error as any).status = errorDetails.status;
+        (error as any).statusCode = errorDetails.status;
+        (error as any).response = response;
+        
+        // Use unified error handling for logging/side effects
+        this.handleHttpError(error, isAdminRequest);
+        
+        // Return structured error result instead of throwing
+        return {
+          success: false,
+          error: errorDetails,
+          status: errorDetails.status
+        };
       }
 
       const data = await response.json();
@@ -332,10 +520,27 @@ export abstract class UniversalSingleton {
       }
       
       this.logApiSuccess(url);
-      return data;
-    } catch (error) {
-      this.logApiError(url, error);
-      throw error;
+      
+      return {
+        success: true,
+        data,
+        status: response.status
+      };
+      
+    } catch (error: any) {
+      // Handle network errors, parsing errors, etc.
+      console.error(`[UniversalSingleton] Network or parsing error for ${url}:`, error);
+      
+      // Create error result for unexpected errors
+      return {
+        success: false,
+        error: {
+          status: 0,
+          message: error.message || 'Network error',
+          code: 'NETWORK_ERROR'
+        },
+        status: 0
+      };
     }
   }
 
@@ -531,8 +736,9 @@ export abstract class PublicApiSingleton extends UniversalSingleton {
     url: string,
     options: RequestInit = {},
     cacheKey?: string,
-    customTTL?: number
-  ): Promise<T> {
+    customTTL?: number,
+    handle404?: boolean
+  ): Promise<ApiResult<T>> {
     // Add public API headers
     const publicOptions: RequestInit = {
       ...options,
@@ -542,15 +748,152 @@ export abstract class PublicApiSingleton extends UniversalSingleton {
       }
     };
     
-    return this.makeApiRequest<T>(url, publicOptions, cacheKey, customTTL);
+    return this.makeApiRequest<T>(url, publicOptions, cacheKey, customTTL, handle404 ?? true);
   }
-  
+
+  /**
+   * Parse error response from API to extract structured error information
+   */
+  protected async parseErrorResponse(response: Response): Promise<{
+    status: number;
+    message: string;
+    code: string;
+  }> {
+    let message = `API request failed: ${response.status} ${response.statusText}`;
+    let code = 'HTTP_ERROR';
+    
+    // Try to extract actual error message from API response
+    try {
+      const errorData = await response.clone().json();
+      if (errorData.error) {
+        message = errorData.error;
+        code = errorData.error;
+      } else if (errorData.message) {
+        message = errorData.message;
+        code = 'API_ERROR';
+      }
+      
+      // Use specific error codes for common scenarios
+      if (response.status === 400) code = 'BAD_REQUEST';
+      if (response.status === 401) code = 'UNAUTHORIZED';
+      if (response.status === 404) code = 'NOT_FOUND';
+      if (response.status === 403) code = 'FORBIDDEN';
+      if (response.status === 500) code = 'SERVER_ERROR';
+    } catch (parseError) {
+      // If we can't parse JSON, keep the generic message
+      console.warn('[UniversalSingleton] Could not parse error response JSON:', parseError);
+    }
+    
+    return {
+      status: response.status,
+      message,
+      code
+    };
+  }
+
   /**
    * Handle public API errors
    */
   protected handlePublicError(error: any): void {
     console.error('Public API error:', error);
     // Public APIs might have different error handling needs
+  }
+
+  /**
+   * Handle authentication errors
+   */
+  protected handleAuthError(error: any): void {
+    if (error.status === 401) {
+      // Token expired, trigger refresh or logout
+      console.warn('Authentication token expired');
+      // This would trigger token refresh or logout
+    }
+  }
+
+  /**
+   * Handle bad request errors (400)
+   */
+  protected handleBadRequest(error: any): void {
+    if (error.status === 400) {
+      // Client-side validation error or invalid request - use actual API message
+      console.warn('Bad request error:', error.message || 'Invalid request');
+      // Could trigger form validation updates or user notifications
+    }
+  }
+
+  /**
+   * Handle not found errors (404)
+   */
+  protected handleNotFound(error: any): void {
+    if (error.status === 404) {
+      // Resource not found - API endpoint doesn't exist - use actual API message
+      console.warn('Resource not found:', error.message || 'API endpoint not found');
+      // Could trigger navigation updates or user notifications
+    }
+  }
+
+  /**
+   * Unified HTTP error handling with intelligent routing
+   * Routes errors to specific handlers and optionally throws for admin requests
+   */
+  protected handleHttpError(error: any, shouldThrow: boolean = false): void {
+    const statusCode = error?.status || error?.statusCode;
+    
+    // Route to specific handlers
+    switch (statusCode) {
+      case 400:
+        this.handleBadRequest(error);
+        break;
+      case 401:
+        this.handleAuthError(error);
+        break;
+      case 404:
+        this.handleNotFound(error);
+        break;
+      default:
+        // For any other status codes, log and optionally throw
+        console.warn(`Unhandled HTTP error (${statusCode}):`, error?.message || 'Unknown error');
+        break;
+    }
+    
+    // Throw if requested (useful for admin requests that should see the error)
+    if (shouldThrow) {
+      throw error;
+    }
+  }
+
+  /**
+   * Backward compatibility wrapper for makeApiRequest
+   * Maintains old API: returns data directly, throws on error
+   * @deprecated Use makeApiRequest for new code (returns ApiResult<T>)
+   */
+  protected async makeApiRequestLegacy<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    customTTL?: number,
+    handle404?: boolean,
+    apiUrl: string = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000',
+    isAdminRequest: boolean = false
+  ): Promise<T> {
+    const result = await this.makeApiRequest<T>(url, options, cacheKey, customTTL, handle404, apiUrl, isAdminRequest);
+    return this.extractData(result);
+  }
+
+  /**
+   * Backward compatibility wrapper for makePublicRequest
+   * Maintains old API: returns data directly, throws on error
+   * @deprecated Use makePublicRequest for new code (returns ApiResult<T>)
+   */
+  protected async makePublicRequestLegacy<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    customTTL?: number,
+    handle404?: boolean
+  ): Promise<T> {
+    const result = await this.makePublicRequest<T>(url, options, cacheKey, customTTL, handle404);
+    return this.extractData(result);
   }
 }
 
@@ -572,8 +915,10 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
     url: string,
     options: RequestInit = {},
     cacheKey?: string,
-    customTTL?: number
-  ): Promise<T> {
+    customTTL?: number,
+    handle404?: boolean,
+    isAdminRequest: boolean = false
+  ): Promise<ApiResult<T>> {
     // Add authentication headers
     const authOptions: RequestInit = {
       ...options,
@@ -584,28 +929,177 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
       }
     };
     
-    return this.makeApiRequest<T>(url, authOptions, cacheKey, customTTL);
+    return this.makeApiRequest<T>(url, authOptions, cacheKey, customTTL, handle404 ?? true, undefined, isAdminRequest);
+  }
+
+  /**
+   * Make admin API request with additional admin validation
+   * Reserved exclusively for admin operations
+   * Layers on top of makeAuthenticatedRequest to follow DRY principle
+   */
+  protected async makeAdminRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    customTTL?: number,
+    handle404?: boolean
+  ): Promise<ApiResult<T>> {
+    // Add admin-specific validation before making request
+    if (!this.isAdminUser()) {
+      return {
+        success: false,
+        error: {
+          status: 403,
+          message: 'Admin access required for this operation',
+          code: 'ADMIN_ACCESS_REQUIRED'
+        },
+        status: 403
+      };
+    }
+
+    // Add admin-specific headers to the options
+    const adminOptions: RequestInit = {
+      ...options,
+      headers: {
+        ...options.headers,
+        'X-Admin-Request': 'true', // Mark as admin request for backend validation
+      }
+    };
+    
+    console.log(`[UniversalSingleton] Making admin request to: ${url}`);
+    // Delegate to makeAuthenticatedRequest which handles token and other auth logic
+    return this.makeAuthenticatedRequest<T>(url, adminOptions, cacheKey, customTTL, handle404, true);
   }
   
   /**
    * Get authentication token
+   * Aligned with platform token storage using access_token
    */
   protected getAuthToken(): string {
-    // This would get the JWT token from localStorage, cookies, or auth context
+    // This gets the JWT token from platform's localStorage
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('authToken') || '';
+      return localStorage.getItem('access_token') || '';
     }
     return '';
   }
-  
+
   /**
-   * Handle authentication errors
+   * Get current tenant ID from platform localStorage
    */
-  protected handleAuthError(error: any): void {
-    if (error.status === 401) {
-      // Token expired, trigger refresh or logout
-      console.warn('Authentication token expired');
-      // This would trigger token refresh or logout
+  protected getCurrentTenantId(): string | null {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('current_tenant_id');
     }
+    return null;
+  }
+
+  /**
+   * Get refresh token from platform localStorage
+   */
+  protected getRefreshToken(): string | null {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('refresh_token');
+    }
+    return null;
+  }
+
+  /**
+   * Get last tenant route from platform localStorage
+   */
+  protected getLastTenantRoute(): string | null {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('last_tenant_route');
+    }
+    return null;
+  }
+
+  /**
+   * Check if current user has admin privileges
+   * Parses JWT token to check user role/permissions
+   */
+  protected isAdminUser(): boolean {
+    try {
+      const token = this.getAuthToken();
+      if (!token) return false;
+
+      // Parse JWT payload (basic parsing without verification for client-side check)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      
+      // Check for admin roles - adjust based on your actual JWT structure
+      const adminRoles = ['PLATFORM_ADMIN', 'ADMIN', 'OWNER'];
+      const userRole = payload.role || payload.userRole || payload.permissions?.role;
+      
+      return adminRoles.includes(userRole) || 
+             payload.permissions?.includes('admin') ||
+             payload.isAdmin === true;
+    } catch (error) {
+      console.warn('[UniversalSingleton] Failed to parse admin status from token:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get user role from JWT token
+   */
+  protected getUserRole(): string | null {
+    try {
+      const token = this.getAuthToken();
+      if (!token) return null;
+
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.role || payload.userRole || payload.permissions?.role || null;
+    } catch (error) {
+      console.warn('[UniversalSingleton] Failed to parse user role from token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get user ID from JWT token
+   */
+  protected getUserId(): string | null {
+    try {
+      const token = this.getAuthToken();
+      if (!token) return null;
+
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.userId || payload.sub || payload.user_id || null;
+    } catch (error) {
+      console.warn('[UniversalSingleton] Failed to parse user ID from token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Backward compatibility wrapper for makeAuthenticatedRequest
+   * Maintains old API: returns data directly, throws on error
+   * @deprecated Use makeAuthenticatedRequest for new code (returns ApiResult<T>)
+   */
+  protected async makeAuthenticatedRequestLegacy<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    customTTL?: number,
+    handle404?: boolean,
+    isAdminRequest: boolean = false
+  ): Promise<T> {
+    const result = await this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, handle404, isAdminRequest);
+    return this.extractData(result);
+  }
+
+  /**
+   * Backward compatibility wrapper for makeAdminRequest
+   * Maintains old API: returns data directly, throws on error
+   * @deprecated Use makeAdminRequest for new code (returns ApiResult<T>)
+   */
+  protected async makeAdminRequestLegacy<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    customTTL?: number,
+    handle404?: boolean
+  ): Promise<T> {
+    const result = await this.makeAdminRequest<T>(url, options, cacheKey, customTTL, handle404);
+    return this.extractData(result);
   }
 }

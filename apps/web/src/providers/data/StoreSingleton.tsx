@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { PublicApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { Store } from 'lucide-react';
 
 // ====================
 // STORE INTERFACES
@@ -115,15 +116,26 @@ class StoreSingleton extends PublicApiSingleton {
       params.append('limit', limit.toString());
       
       const response = await this.makePublicRequest<any>(`/api/directory/featured-stores?${params}`, {}, cacheKey);
+      if (!response.success){
+        throw new Error('Failed to fetch featured stores');
+      }
       
       // Extract stores from response
-      const storesData = response.data?.stores || response;
+      // API returns: { success: true, data: { stores: [...] } }
+      // makePublicRequest wraps this, so we need response.data.data.stores
+      const storesData = response.data?.data?.stores || new Array<Store>();
       
       // Update internal state
       this.featuredStores = storesData;
-      storesData.forEach((store: Store) => {
-        this.stores.set(store.id, store);
-      });
+      
+      // Ensure storesData is an array before calling forEach
+      if (Array.isArray(storesData)) {
+        storesData.forEach((store: Store) => {
+          this.stores.set(store.id, store);
+        });
+      } else {
+        console.warn('[StoreSingleton] storesData is not an array:', storesData);
+      }
       
       return storesData;
     } catch (error) {
@@ -393,6 +405,13 @@ export function useFeaturedStores(location?: { lat: number; lng: number } | unde
     try {
       // Use the cached fetchFeaturedStores method which handles caching
       const fetchedStores = await actions.fetchFeaturedStores(location, limit);
+      
+      // Ensure fetchedStores is an array before calling map
+      if (!Array.isArray(fetchedStores)) {
+        console.warn('[StoreSingleton] fetchedStores is not an array:', fetchedStores);
+        setStores([]);
+        return;
+      }
       
       // Ensure no duplicates by using store ID as unique key
       const uniqueStores = Array.from(

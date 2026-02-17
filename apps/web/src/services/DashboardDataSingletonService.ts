@@ -50,48 +50,48 @@ class DashboardDataSingletonService extends AuthenticatedApiSingleton {
    * Get dashboard data for a specific tenant
    */
   async getDashboardData(tenantId: string): Promise<DashboardData> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const url = `/api/dashboard?tenantId=${encodeURIComponent(tenantId)}`;
-      
-      const result = await this.makeAuthenticatedRequest<DashboardData>(
-        url,
-        {},
-        `dashboard-data-${tenantId}`
-      );
+    const url = `/api/dashboard?tenantId=${encodeURIComponent(tenantId)}`;
+    
+    const result = await this.makeAuthenticatedRequest<DashboardData>(
+      url,
+      {},
+      `dashboard-data-${tenantId}`
+    );
 
-      return result || {} as DashboardData;
-    } catch (error) {
-      console.error('[DashboardDataSingleton] Failed to get dashboard data:', error);
+    if (!result.success) {
+      console.error('[DashboardDataSingleton] Failed to get dashboard data:', result.error);
       return {} as DashboardData;
     }
+
+    return result.data || {} as DashboardData;
   }
 
   /**
    * Get dashboard stats only
    */
   async getDashboardStats(tenantId: string): Promise<DashboardStats> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const url = `/api/dashboard/stats?tenantId=${encodeURIComponent(tenantId)}`;
-      
-      const result = await this.makeAuthenticatedRequest<DashboardStats>(
-        url,
-        {},
-        `dashboard-stats-${tenantId}`
-      );
+    const url = `/api/dashboard/stats?tenantId=${encodeURIComponent(tenantId)}`;
+    
+    const result = await this.makeAuthenticatedRequest<DashboardStats>(
+      url,
+      {},
+      `dashboard-stats-${tenantId}`
+    );
 
-      return result || {} as DashboardStats;
-    } catch (error) {
-      console.error('[DashboardDataSingleton] Failed to get dashboard stats:', error);
+    if (!result.success) {
+      console.error('[DashboardDataSingleton] Failed to get dashboard stats:', result.error);
       return {} as DashboardStats;
     }
+
+    return result.data || {} as DashboardStats;
   }
 
   /**

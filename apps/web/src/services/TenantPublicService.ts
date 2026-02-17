@@ -82,7 +82,12 @@ class TenantPublicService extends PublicApiSingleton {
         this.PROFILE_TTL
       );
 
-      return response;
+      if (!response.success){
+        console.error('[TenantPublicService] Failed to get public tenant info:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[TenantPublicService] Failed to get public tenant info:', error);
       return null;
@@ -102,7 +107,12 @@ class TenantPublicService extends PublicApiSingleton {
         this.PROFILE_TTL
       );
 
-      return response;
+      if (!response.success){
+        console.error('[TenantPublicService] Failed to get tenant logo:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[TenantPublicService] Failed to get tenant logo:', error);
       return null;
@@ -122,7 +132,12 @@ class TenantPublicService extends PublicApiSingleton {
         this.PROFILE_TTL
       );
 
-      return response;
+      if (!response.success){
+        console.error('[TenantPublicService] Failed to get public tenant tier:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[TenantPublicService] Failed to get public tenant tier:', error);
       return null;
@@ -141,8 +156,12 @@ class TenantPublicService extends PublicApiSingleton {
         `public-tenant-profile-${tenantId}`,
         this.PROFILE_TTL
       );
+      if (!response.success){
+        console.error('[TenantPublicService] Failed to get public tenant profile:', response.error);
+        return null;
+      }
 
-      return response;
+      return response.data||null;
     } catch (error) {
       console.error('[TenantPublicService] Failed to get public tenant profile:', error);
       return null;
@@ -162,7 +181,12 @@ class TenantPublicService extends PublicApiSingleton {
         this.HOURS_TTL
       );
 
-      return response;
+      if (!response.success){
+        console.error('[TenantPublicService] Failed to get tenant business hours:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[TenantPublicService] Failed to get tenant business hours:', error);
       return null;

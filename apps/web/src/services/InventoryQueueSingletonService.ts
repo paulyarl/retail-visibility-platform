@@ -118,29 +118,29 @@ class InventoryQueueSingletonService extends UniversalSingleton {
     limit?: number;
     offset?: number;
   } = {}): Promise<QueueItem[] | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const searchParams = new URLSearchParams();
-      if (options.includeCompleted) searchParams.append('includeCompleted', 'true');
-      if (options.status) searchParams.append('status', options.status);
-      if (options.limit) searchParams.append('limit', options.limit.toString());
-      if (options.offset) searchParams.append('offset', options.offset.toString());
+    const searchParams = new URLSearchParams();
+    if (options.includeCompleted) searchParams.append('includeCompleted', 'true');
+    if (options.status) searchParams.append('status', options.status);
+    if (options.limit) searchParams.append('limit', options.limit.toString());
+    if (options.offset) searchParams.append('offset', options.offset.toString());
 
-      const response = await this.makeApiRequest<QueueItem[]>(
-        `/api/queue/${tenantId}?${searchParams.toString()}`,
-        {},
-        `queue-items-${tenantId}-${JSON.stringify(options)}`,
-        this.CACHE_TTL_SHORT
-      );
+    const response = await this.makeApiRequest<QueueItem[]>(
+      `/api/queue/${tenantId}?${searchParams.toString()}`,
+      {},
+      `queue-items-${tenantId}-${JSON.stringify(options)}`,
+      this.CACHE_TTL_SHORT
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[InventoryQueueSingleton] Failed to get queue items:', error);
+    if (!response.success) {
+      console.error('[InventoryQueueSingleton] Failed to get queue items:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
@@ -148,23 +148,23 @@ class InventoryQueueSingletonService extends UniversalSingleton {
    * Authenticated endpoint for queue monitoring
    */
   async getQueueStats(tenantId: string): Promise<QueueStats | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const response = await this.makeApiRequest<QueueStats>(
-        `/api/queue/${tenantId}?stats=true`,
-        {},
-        `queue-stats-${tenantId}`,
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makeApiRequest<QueueStats>(
+      `/api/queue/${tenantId}?stats=true`,
+      {},
+      `queue-stats-${tenantId}`,
+      this.CACHE_TTL_MEDIUM
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[InventoryQueueSingleton] Failed to get queue stats:', error);
+    if (!response.success) {
+      console.error('[InventoryQueueSingleton] Failed to get queue stats:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**

@@ -183,6 +183,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[AuthContext] Fetching fresh user data from API');
       const data = await tenantInfoService.getCurrentUser();
 
+      // Check if user data exists
+      if (!data.user) {
+        // Don't log as error on public pages - this is normal behavior
+        console.log('[AuthContext] No user data returned from API (user not authenticated)');
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
       // Transform API response from snake_case to camelCase
       const transformedUser = {
         ...data.user,
@@ -210,8 +219,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setCachedUser(transformedUser, newTenantId);
       }
     } catch (error) {
-      console.error('[AuthContext] Failed to fetch user:', error);
-      // Keep tokens; treat as unauthenticated view until next successful call
+      // Don't log as error on public pages - authentication failures are normal
+      console.log('[AuthContext] Authentication failed (user not authenticated):', error instanceof Error ? error.message : 'Unknown error');
+      // Clear invalid tokens and treat as unauthenticated view
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
       setUser(null);
     } finally {
       setIsLoading(false);

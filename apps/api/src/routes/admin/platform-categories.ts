@@ -146,7 +146,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     );
 
     if (existing.rows.length === 0) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
         error: 'Category not found',
       });
@@ -248,7 +248,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     );
 
     if (existing.rows.length === 0) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
         error: 'Category not found',
       });

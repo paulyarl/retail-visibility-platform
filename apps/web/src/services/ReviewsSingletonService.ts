@@ -75,7 +75,7 @@ class ReviewsSingletonService extends PublicApiSingleton {
       );
       
       // Convert numeric strings to numbers (PostgreSQL returns numeric as strings)
-      const summaryData = result;
+      const summaryData = result.data;
       if (summaryData) {
         return {
           ...summaryData,
@@ -115,7 +115,7 @@ class ReviewsSingletonService extends PublicApiSingleton {
         `reviews-${tenantId}-${limit}`
       );
       
-      return result.reviews || [];
+      return result.data?.reviews || [];
     } catch (error) {
       console.error('[ReviewsSingleton] Failed to get reviews:', error);
       return [];
@@ -139,7 +139,7 @@ class ReviewsSingletonService extends PublicApiSingleton {
         `user-review-${tenantId}`
       );
       
-      return result || null;
+      return result.data || null;
     } catch (error) {
       console.error('[ReviewsSingleton] Failed to get user review:', error);
       return null;
@@ -217,7 +217,7 @@ class ReviewsSingletonService extends PublicApiSingleton {
         `submit-review-${tenantId}`
       );
 
-      return response?.data || null;
+      return response?.data?.data || null;
     } catch (error) {
       console.error('[ReviewsSingleton] Failed to submit review:', error);
       return null;

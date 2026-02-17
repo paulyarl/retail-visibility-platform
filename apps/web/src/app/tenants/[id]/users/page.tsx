@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Butto
 import PageHeader, { Icons } from '@/components/PageHeader';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { motion } from 'framer-motion';
-import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { tenantUserService, type User } from '@/services/TenantUserService';
 
 
 // Force edge runtime to prevent prerendering issues
@@ -15,16 +15,7 @@ export const runtime = 'edge';
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
-type TenantUser = {
-  id: string;
-  email: string;
-  name: string;
-  platformRole: 'ADMIN' | 'OWNER' | 'USER';
-  tenantRole: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
-  isActive: boolean;
-  lastLogin: string;
-  addedAt: string;
-};
+type TenantUser = User;
 
 export default function TenantUsersPage() {
   const params = useParams();
@@ -58,7 +49,7 @@ export default function TenantUsersPage() {
     try {
       setLoading(true);
       setError(null);
-      const data = await platformHomeService.getTenantUsers(tenantId);
+      const data = await tenantUserService.getTenantUsers(tenantId);
 
       if (!data) {
         throw new Error('Failed to load users');
@@ -83,7 +74,7 @@ export default function TenantUsersPage() {
       setAdding(true);
       setError(null);
 
-      const data = await platformHomeService.addTenantUser(tenantId, {
+      const data = await tenantUserService.addTenantUser(tenantId, {
         email: addEmail.trim(),
         role: addRole,
       });
@@ -114,7 +105,7 @@ export default function TenantUsersPage() {
       setChangingRole(true);
       setError(null);
 
-      const data = await platformHomeService.updateTenantUserRole(tenantId, selectedUser.id, newRole);
+      const data = await tenantUserService.updateTenantUserRole(tenantId, selectedUser.id, newRole);
 
       if (!data) {
         throw new Error('Failed to change role');
@@ -135,13 +126,13 @@ export default function TenantUsersPage() {
   };
 
   const handleRemoveUser = async (user: TenantUser) => {
-    if (!confirm(`Are you sure you want to remove ${user.name} from this tenant?`)) {
+    if (!confirm(`Are you sure you want to remove ${user.name || 'Unknown'} from this tenant?`)) {
       return;
     }
 
     try {
       setError(null);
-      await platformHomeService.removeTenantUser(tenantId, user.id);
+      await tenantUserService.removeTenantUser(tenantId, user.id);
 
       setSuccess(`User removed successfully`);
       await loadUsers();
@@ -154,7 +145,7 @@ export default function TenantUsersPage() {
 
   const openChangeRoleModal = (user: TenantUser) => {
     setSelectedUser(user);
-    setNewRole(user.tenantRole);
+    setNewRole(user.role as 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER');
     setShowRoleModal(true);
   };
 
@@ -268,18 +259,18 @@ export default function TenantUsersPage() {
                       <div className="flex items-center gap-4 flex-1">
                         <div className="h-12 w-12 bg-primary-100 rounded-full flex items-center justify-center">
                           <span className="text-primary-600 font-semibold text-lg">
-                            {user.name.charAt(0).toUpperCase()}
+                            {(user.name || 'Unknown').charAt(0).toUpperCase()}
                           </span>
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <p className="font-medium text-neutral-900">{user.name}</p>
-                            {getRoleBadge(user.tenantRole)}
+                            <p className="font-medium text-neutral-900">{user.name || 'Unknown'}</p>
+                            {getRoleBadge(user.role)}
                             {!user.isActive && <Badge variant="default">Inactive</Badge>}
                           </div>
                           <p className="text-sm text-neutral-600">{user.email}</p>
                           <p className="text-xs text-neutral-500 mt-1">
-                            Last login: {user.lastLogin} • Added: {new Date(user.addedAt).toLocaleDateString()}
+                            Added: {new Date(user.createdAt).toLocaleDateString()}
                           </p>
                         </div>
                       </div>

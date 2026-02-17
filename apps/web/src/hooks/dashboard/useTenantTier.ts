@@ -133,13 +133,11 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
     let tenantTier: TierInfo | null = null;
     let isChain = false;
 
-    if (tierInfo.organizationTier) {
-      organizationTier = mapApiTierToTierInfo(tierInfo.organizationTier);
+    // The new TenantTier interface has different structure
+    if (tierInfo.effective) {
+      tenantTier = mapApiTierToTierInfo(tierInfo.effective);
     }
-    if (tierInfo.tenantTier) {
-      tenantTier = mapApiTierToTierInfo(tierInfo.tenantTier);
-    }
-    isChain = tierInfo.isChain || false;
+    isChain = false; // Not available in new structure
 
     const resolvedTier = resolveTier(organizationTier, tenantTier, isChain);
 
@@ -153,11 +151,11 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
     if (!tenantData?.usage) return null;
 
     return {
-      products: tenantData.usage.currentItems || 0,
-      locations: tenantData.usage.locations || 1,
-      users: tenantData.usage.users || 0,
-      apiCalls: tenantData.usage.apiCalls || 0,
-      storageGB: tenantData.usage.storageGB || 0
+      products: tenantData.usage.items || 0,
+      locations: 1, // Not available in new structure
+      users: 0, // Not available in new structure
+      apiCalls: 0, // Not available in new structure
+      storageGB: tenantData.usage.storage || 0
     };
   }, [tenantData]);
 

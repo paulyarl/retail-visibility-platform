@@ -21,7 +21,6 @@ import PropagateItemModal from "@/components/items/PropagateItemModal";
 import QuickStartEmptyState from "@/components/items/QuickStartEmptyState";
 import ItemsGuide from "@/components/items/ItemsGuide";
 import { Item } from "@/services/itemsDataService";
-import { useCategorySingleton } from '@/providers/data/CategorySingleton';
 import { itemsService } from '@/services/ItemsService';
 
 interface ItemsPageClientProps {
@@ -142,50 +141,38 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const [allTenantCategories, setAllTenantCategories] = useState<Array<{id: string, name: string}>>([]);
   
-  // Fetch ALL tenant categories once (not affected by filters)
-  // Use CategorySingleton for automatic caching (15-min TTL)
-  const { actions: categoryActions } = useCategorySingleton();
-  
-  // Also build from items as fallback
+  // Build categories from actual items (only relevant categories for product filtering)
   const categoriesFromItems = useRef<Map<string, string>>(new Map());
   
   useEffect(() => {
-    const fetchAllCategories = async () => {
-      try {
-        // Use singleton for automatic caching
-        const { categories } = await categoryActions.fetchCategories({
-          includeChildren: true,
-          includeProductCount: false
-        });
-        if (categories.length > 0) {
-          setAllTenantCategories(categories.map((c: any) => ({ id: c.id, name: c.name })).sort((a: any, b: any) => a.name.localeCompare(b.name)));
-          return;
-        }
-      } catch (error) {
-        console.error('[ItemsPageClient] Failed to fetch categories:', error);
-      }
-      // Fallback: use categories collected from items
-      if (categoriesFromItems.current.size > 0) {
-        const cats = Array.from(categoriesFromItems.current.entries()).map(([id, name]) => ({ id, name }));
-        setAllTenantCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
-      }
-    };
-    if (tenantId) fetchAllCategories();
+    // For inventory management, ONLY use product categories from actual items
+    // Store categories are completely irrelevant for filtering products
+    if (categoriesFromItems.current.size > 0) {
+      const cats = Array.from(categoriesFromItems.current.entries()).map(([id, name]) => ({ id, name }));
+      setAllTenantCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
+    }
   }, [tenantId]);
   
   // Collect categories from items as they load (builds up over time)
   useEffect(() => {
+    let hasNewCategories = false;
+    
     items.forEach(item => {
       if (item.tenantCategory?.id && (typeof item.tenantCategory === 'object' ? item.tenantCategory.name : item.tenantCategory)) {
-        categoriesFromItems.current.set(item.tenantCategory.id, typeof item.tenantCategory === 'object' ? item.tenantCategory.name : item.tenantCategory);
+        const categoryName = typeof item.tenantCategory === 'object' ? item.tenantCategory.name : item.tenantCategory;
+        if (!categoriesFromItems.current.has(item.tenantCategory.id)) {
+          categoriesFromItems.current.set(item.tenantCategory.id, categoryName);
+          hasNewCategories = true;
+        }
       }
     });
-    // If API didn't return categories, use collected ones
-    if (allTenantCategories.length === 0 && categoriesFromItems.current.size > 0) {
+    
+    // Update categories when new ones are found
+    if (hasNewCategories) {
       const cats = Array.from(categoriesFromItems.current.entries()).map(([id, name]) => ({ id, name }));
       setAllTenantCategories(cats.sort((a, b) => a.name.localeCompare(b.name)));
     }
-  }, [items, allTenantCategories.length]);
+  }, [items]);
   
   // Click outside handlers for dropdowns
   const statusDropdownRef = useRef<HTMLDivElement>(null);

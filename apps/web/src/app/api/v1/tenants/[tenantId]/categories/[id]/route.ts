@@ -1,4 +1,4 @@
-import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { tenantCategoryService } from '@/services/TenantCategoryService';
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
@@ -11,7 +11,7 @@ export async function GET(
     const { tenantId, id } = await params;
     
     // Get tenant category using the singleton service
-    const data = await platformHomeService.getTenantCategory(tenantId, id);
+    const data = await tenantCategoryService.getTenantCategory(tenantId, id);
     
     return NextResponse.json(data);
   } catch (error) {
@@ -32,7 +32,7 @@ export async function PATCH(
     const body = await request.json();
     
     // Update tenant category using the singleton service
-    const data = await platformHomeService.updateTenantCategory(tenantId, id, body);
+    const data = await tenantCategoryService.updateTenantCategory(tenantId, id, body);
     
     return NextResponse.json(data);
   } catch (error) {
@@ -52,7 +52,7 @@ export async function DELETE(
     const { tenantId, id } = await params;
     
     // Delete tenant category using the singleton service
-    const data = await platformHomeService.deleteTenantCategory(tenantId, id);
+    const data = await tenantCategoryService.deleteTenantCategory(tenantId, id);
     
     return NextResponse.json(data);
   } catch (error) {
@@ -73,7 +73,7 @@ export async function PUT(
     const body = await request.json();
     
     // Create tenant category using the singleton service
-    const data = await platformHomeService.createTenantCategory(tenantId, body);
+    const data = await tenantCategoryService.createTenantCategory(tenantId, body);
     
     return NextResponse.json(data, { status: 201 });
   } catch (error) {

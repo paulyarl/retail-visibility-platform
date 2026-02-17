@@ -33,7 +33,7 @@ class ProductLikesSingletonService extends PublicApiSingleton {
    * Like a product
    * Public endpoint for product interactions
    */
-  async likeProduct(productId: string, userId?: string, sessionId?: string): Promise<ProductLike | null> {
+  async likeProduct(productId: string, userId?: string, sessionId?: string): Promise<boolean> {
     try {
       if (!productId) {
         throw new Error('Product ID is required');
@@ -50,11 +50,15 @@ class ProductLikesSingletonService extends PublicApiSingleton {
         },
         `product-like-${productId}-${userId || 'anonymous'}-${sessionId || 'anonymous'}`
       );
+      if (!response.success) {
+        console.error('[ProductLikesSingleton] Failed to like product:', response.error);
+        return false;
+      }
 
-      return response;
+      return response.data !== null;
     } catch (error) {
       console.error('[ProductLikesSingleton] Failed to like product:', error);
-      return null;
+      return false;
     }
   }
 
@@ -68,7 +72,7 @@ class ProductLikesSingletonService extends PublicApiSingleton {
         throw new Error('Product ID is required');
       }
 
-      await this.makePublicRequest<void>(
+      const response = await this.makePublicRequest<void>(
         `/api/products/${productId}/like`,
         {
           method: 'DELETE',
@@ -79,8 +83,12 @@ class ProductLikesSingletonService extends PublicApiSingleton {
         },
         `product-unlike-${productId}-${userId || 'anonymous'}-${sessionId || 'anonymous'}`
       );
+      if (!response.success) {
+        console.error('[ProductLikesSingleton] Failed to unlike product:', response.error);
+        return false;
+      }
 
-      return true;
+      return response.data || true;
     } catch (error) {
       console.error('[ProductLikesSingleton] Failed to unlike product:', error);
       return false;
@@ -91,7 +99,7 @@ class ProductLikesSingletonService extends PublicApiSingleton {
    * Get product like status
    * Public endpoint for product interactions
    */
-  async getProductLikeStatus(productId: string, userId?: string, sessionId?: string): Promise<ProductLikeStatus> {
+  async getProductLikeStatus(productId: string, userId?: string, sessionId?: string): Promise<ProductLikeStatus | null> {
     try {
       if (!productId) {
         throw new Error('Product ID is required');
@@ -106,11 +114,15 @@ class ProductLikesSingletonService extends PublicApiSingleton {
         {},
         `product-like-status-${productId}-${userId || 'anonymous'}-${sessionId || 'anonymous'}`
       );
+      if (!response.success) {
+        console.error('[ProductLikesSingleton] Failed to get product like status:', response.error);
+        return null;
+      }
 
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[ProductLikesSingleton] Failed to get product like status:', error);
-      return { liked: false, likesCount: 0, userLiked: false };
+      return null;
     }
   }
 }

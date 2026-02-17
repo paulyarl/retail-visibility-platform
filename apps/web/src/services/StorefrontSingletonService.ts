@@ -76,8 +76,8 @@ class StorefrontSingletonService extends PublicApiSingleton {
       );
       
       return {
-        categories: result.categories || [],
-        uncategorizedCount: result.uncategorizedCount || 0
+        categories: result.data?.categories || [],
+        uncategorizedCount: result.data?.uncategorizedCount || 0
       };
     } catch (error) {
       console.error('[StorefrontSingleton] Failed to get storefront categories:', error);
@@ -130,7 +130,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
         total?: number;
       }>(endpoint, {}, `storefront-products-${tenantId}-${options.page || 1}-${options.limit || 10}-${options.search || ''}-${options.category || ''}`);
       
-      return result || { items: [] };
+      return result.data || { items: [] };
     } catch (error) {
       console.error('[StorefrontSingleton] Failed to get storefront products:', error);
       return { items: [] };
@@ -168,7 +168,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
         count?: number;
       }>(endpoint, {}, `featured-products-${tenantId}-${options.limit || 10}-${options.search || ''}`);
       
-      return result || { items: [] };
+      return result.data || { items: [] };
     } catch (error) {
       console.error('[StorefrontSingleton] Failed to get featured products:', error);
       return { items: [] };
@@ -220,7 +220,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
         `total-product-count-${tenantId}`
       );
       
-      return result?.pagination?.totalItems || 0;
+      return result.data?.pagination?.totalItems || 0;
     } catch (error) {
       console.error('[StorefrontSingleton] Failed to get total product count:', error);
       return 0;

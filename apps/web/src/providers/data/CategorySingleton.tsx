@@ -44,6 +44,7 @@ export interface CategoryActions {
 export interface CategoryFetchOptions {
   includeChildren?: boolean;
   includeProductCount?: boolean;
+  tenantId?: string;
   cacheTTL?: number;
   forceRefresh?: boolean;
 }
@@ -77,25 +78,44 @@ class CategoryService extends PublicApiSingleton {
     const {
       includeChildren = true,
       includeProductCount = true,
+      tenantId,
     } = options;
 
-    const params = new URLSearchParams();
-    if (includeChildren) params.append('includeChildren', 'true');
-    if (includeProductCount) params.append('includeProductCount', 'true');
-
-    const cacheKey = `categories_${includeChildren}_${includeProductCount}`;
+    const cacheKey = `categories_${includeChildren}_${includeProductCount}_${tenantId || 'public'}`;
 
     try {
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        data: { categories: Category[] };
-      }>(`/api/directory/categories?${params}`, {}, cacheKey);
+      let response;
+      
+      if (tenantId) {
+        // Use tenant-specific endpoint for inventory management
+        response = await this.makePublicRequest<{
+          categories: Category[];
+        }>(`/api/categories/product-level/${tenantId}`, {}, cacheKey);
+      } else {
+        // Use public directory endpoint for public browsing
+        const params = new URLSearchParams();
+        if (includeChildren) params.append('includeChildren', 'true');
+        if (includeProductCount) params.append('includeProductCount', 'true');
+        
+        response = await this.makePublicRequest<{
+          categories: Category[];
+        }>(`/api/directory/categories?${params}`, {}, cacheKey);
+      }
 
-      if (!response.success || !response.data || !response.data.categories) {
+      if (!response.success || !response.data) {
         throw new Error('Invalid response format');
       }
 
-      return response.data.categories;
+      // Handle different response structures:
+      // - Public endpoint: response.data.categories
+      // - Tenant endpoint: response.data.categories (direct from makeAuthenticatedRequest)
+      const categories = response.data?.categories || [];
+      
+      if (!Array.isArray(categories)) {
+        throw new Error('Categories response is not an array');
+      }
+
+      return categories;
     } catch (error) {
       throw error;
     }

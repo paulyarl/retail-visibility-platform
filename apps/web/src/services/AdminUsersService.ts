@@ -88,180 +88,180 @@ class AdminUsersService extends AuthenticatedApiSingleton {
    * Get all admin users
    */
   async getUsers(): Promise<AdminUser[]> {
-    try {
-      const response = await this.makeAuthenticatedRequest<any>(
-        '/api/admin/users',
-        {},
-        'admin-users-list',
-        this.USERS_TTL
-      );
+    const response = await this.makeAdminRequest<any>(
+      '/api/admin/users',
+      {},
+      'admin-users-list',
+      this.USERS_TTL
+    );
 
-      // Extract users array from API response
-      const usersArray = response?.users || response?.user_tenants || [];
-      
-      // Transform API response to match both property formats
-      return (usersArray || []).map((user: any) => {
-        const firstName = user.firstName || user.first_name;
-        const lastName = user.lastName || user.last_name;
-        const name = firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || 'Unnamed User';
-        
-        return {
-          id: user.id,
-          email: user.email,
-          name,
-          firstName,
-          lastName,
-          role: user.role,
-          isActive: user.isActive || user.is_active,
-          is_active: user.isActive || user.is_active,
-          emailVerified: user.emailVerified || user.email_verified,
-          email_verified: user.emailVerified || user.email_verified,
-          createdAt: user.createdAt || user.created_at,
-          created_at: user.createdAt || user.created_at,
-          updatedAt: user.updatedAt || user.updated_at,
-          lastLogin: user.lastLogin || user.last_login,
-          last_login: user.lastLogin || user.last_login,
-          tenants: user.tenants
-        };
-      });
-    } catch (error) {
-      console.error('[AdminUsersService] Failed to get users:', error);
+    if (!response.success) {
+      console.error('[AdminUsersService] Failed to get users:', response.error);
       return [];
     }
+
+    // Extract users array from API response
+    const usersArray = response.data?.users || response.data?.user_tenants || [];
+    
+    // Transform API response to match both property formats
+    return (usersArray || []).map((user: any) => {
+      const firstName = user.firstName || user.first_name;
+      const lastName = user.lastName || user.last_name;
+      const name = firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || 'Unnamed User';
+      
+      return {
+        id: user.id,
+        email: user.email,
+        name,
+        firstName,
+        lastName,
+        role: user.role,
+        isActive: user.isActive || user.is_active,
+        is_active: user.isActive || user.is_active,
+        emailVerified: user.emailVerified || user.email_verified,
+        email_verified: user.emailVerified || user.email_verified,
+        createdAt: user.createdAt || user.created_at,
+        created_at: user.createdAt || user.created_at,
+        updatedAt: user.updatedAt || user.updated_at,
+        lastLogin: user.lastLogin || user.last_login,
+        last_login: user.lastLogin || user.last_login,
+        tenants: user.tenants
+      };
+    });
   }
 
   /**
    * Get user by ID
    */
   async getUser(userId: string): Promise<AdminUser | null> {
-    try {
-      const response = await this.makeAuthenticatedRequest<AdminUser>(
-        `/api/admin/users/${userId}`,
-        {},
-        `admin-user-${userId}`,
-        this.USER_DETAILS_TTL
-      );
+    const response = await this.makeAdminRequest<AdminUser>(
+      `/api/admin/users/${userId}`,
+      {},
+      `admin-user-${userId}`,
+      this.USER_DETAILS_TTL
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[AdminUsersService] Failed to get user:', error);
+    if (!response.success) {
+      console.error('[AdminUsersService] Failed to get user:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
    * Create a new admin user
    */
   async createUser(userData: CreateUserRequest): Promise<AdminUser | null> {
-    try {
-      const response = await this.makeAuthenticatedRequest<AdminUser>(
-        '/api/admin/users/create',
-        {
-          method: 'POST',
-          body: JSON.stringify(userData)
-        },
-        'admin-create-user',
-        0 // No caching for write operations
-      );
+    const response = await this.makeAdminRequest<AdminUser>(
+      '/api/admin/users/create',
+      {
+        method: 'POST',
+        body: JSON.stringify(userData)
+      },
+      'admin-create-user',
+      0 // No caching for write operations
+    );
 
-      // Invalidate users list cache
-      await this.invalidateCache('admin-users-list');
-      
-      return response;
-    } catch (error) {
-      console.error('[AdminUsersService] Failed to create user:', error);
+    if (!response.success) {
+      console.error('[AdminUsersService] Failed to create user:', response.error);
       return null;
     }
+
+    // Invalidate users list cache
+    await this.invalidateCache('admin-users-list');
+    
+    return response.data || null;
   }
 
   /**
    * Update an admin user
    */
   async updateUser(userId: string, userData: UpdateUserRequest): Promise<AdminUser | null> {
-    try {
-      const response = await this.makeAuthenticatedRequest<AdminUser>(
-        `/api/admin/users/${userId}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(userData)
-        },
-        `admin-update-user-${userId}`,
-        0 // No caching for write operations
-      );
+    const response = await this.makeAdminRequest<AdminUser>(
+      `/api/admin/users/${userId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(userData)
+      },
+      `admin-update-user-${userId}`,
+      0 // No caching for write operations
+    );
 
-      // Invalidate relevant caches
-      await this.invalidateCache('admin-users-list');
-      await this.invalidateCache(`admin-user-${userId}`);
-      
-      return response;
-    } catch (error) {
-      console.error('[AdminUsersService] Failed to update user:', error);
+    if (!response.success) {
+      console.error('[AdminUsersService] Failed to update user:', response.error);
       return null;
     }
+
+    // Invalidate relevant caches
+    await this.invalidateCache('admin-users-list');
+    await this.invalidateCache(`admin-user-${userId}`);
+    
+    return response.data || null;
   }
 
   /**
    * Delete an admin user
    */
   async deleteUser(userId: string): Promise<boolean> {
-    try {
-      await this.makeAuthenticatedRequest<void>(
-        `/api/admin/users/${userId}`,
-        { method: 'DELETE' },
-        `admin-delete-user-${userId}`,
-        0 // No caching for write operations
-      );
+    const response = await this.makeAdminRequest<void>(
+      `/api/admin/users/${userId}`,
+      { method: 'DELETE' },
+      `admin-delete-user-${userId}`,
+      0 // No caching for write operations
+    );
 
-      // Invalidate relevant caches
-      await this.invalidateCache('admin-users-list');
-      await this.invalidateCache(`admin-user-${userId}`);
-      
-      return true;
-    } catch (error) {
-      console.error('[AdminUsersService] Failed to delete user:', error);
+    if (!response.success) {
+      console.error('[AdminUsersService] Failed to delete user:', response.error);
       return false;
     }
+
+    // Invalidate relevant caches
+    await this.invalidateCache('admin-users-list');
+    await this.invalidateCache(`admin-user-${userId}`);
+    
+    return true;
   }
 
   /**
    * Send invitation to a user
    */
   async sendInvitation(invitationData: InvitationRequest): Promise<boolean> {
-    try {
-      await this.makeAuthenticatedRequest<void>(
-        '/api/admin/users/invite-by-email',
-        {
-          method: 'POST',
-          body: JSON.stringify(invitationData)
-        },
-        'admin-send-invitation',
-        0 // No caching for write operations
-      );
+    const response = await this.makeAdminRequest<void>(
+      '/api/admin/users/invite-by-email',
+      {
+        method: 'POST',
+        body: JSON.stringify(invitationData)
+      },
+      'admin-send-invitation',
+      0 // No caching for write operations
+    );
 
-      return true;
-    } catch (error) {
-      console.error('[AdminUsersService] Failed to send invitation:', error);
+    if (!response.success) {
+      console.error('[AdminUsersService] Failed to send invitation:', response.error);
       return false;
     }
+
+    return true;
   }
 
   /**
    * Reset user password
    */
   async resetPassword(userId: string): Promise<boolean> {
-    try {
-      await this.makeAuthenticatedRequest<void>(
-        `/api/admin/users/${userId}/reset-password`,
-        { method: 'POST' },
-        `admin-reset-password-${userId}`,
-        0 // No caching for write operations
-      );
+    const response = await this.makeAdminRequest<void>(
+      `/api/admin/users/${userId}/reset-password`,
+      { method: 'POST' },
+      `admin-reset-password-${userId}`,
+      0 // No caching for write operations
+    );
 
-      return true;
-    } catch (error) {
-      console.error('[AdminUsersService] Failed to reset password:', error);
+    if (!response.success) {
+      console.error('[AdminUsersService] Failed to reset password:', response.error);
       return false;
     }
+
+    return true;
   }
 
   /**
@@ -275,17 +275,17 @@ class AdminUsersService extends AuthenticatedApiSingleton {
       const usersWithTenants = await Promise.all(
         users.map(async (user: AdminUser) => {
           try {
-            const tenantsResponse = await this.makeAuthenticatedRequest<{
+            const tenantsResponse = await this.makeAdminRequest<{
               tenant?: any[];
               tenants?: any[];
             }>(
               `/api/admin/users/${user.id}/tenants`,
               {},
-              `admin-user-tenants-${user.id}`,
+              `user-tenants-${user.id}`,
               this.USER_DETAILS_TTL
             );
 
-            const tenantsArray = tenantsResponse?.tenant || tenantsResponse?.tenants || [];
+            const tenantsArray = tenantsResponse.data?.tenant || tenantsResponse.data?.tenants || [];
             
             // Transform tenant data to match local interface
             const transformedTenants = tenantsArray.map((t: any) => ({
@@ -323,7 +323,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
     unverifiedUsers: number;
   }> {
     try {
-      const response = await this.makeAuthenticatedRequest<{
+      const response = await this.makeAdminRequest<{
         totalUsers: number;
         activeUsers: number;
         inactiveUsers: number;
@@ -336,7 +336,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
         this.USERS_TTL
       );
 
-      return response || {
+      return response.data || {
         totalUsers: 0,
         activeUsers: 0,
         inactiveUsers: 0,
@@ -368,7 +368,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
     generateImages?: boolean;
   }): Promise<any> {
     try {
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeAdminRequest<any>(
         '/api/admin/tools/tenants',
         {
           method: 'POST',
@@ -397,7 +397,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
     generateImages?: boolean;
   }): Promise<any> {
     try {
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeAdminRequest<any>(
         '/api/admin/tools/test-chains',
         {
           method: 'POST',
@@ -419,7 +419,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
    */
   async deleteTestChain(organizationId: string): Promise<any> {
     try {
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeAdminRequest<any>(
         `/api/admin/tools/test-chains/${organizationId}?confirm=true`,
         { method: 'DELETE' },
         'delete-test-chain',
@@ -438,7 +438,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
    */
   async deleteTestTenant(tenantId: string): Promise<any> {
     try {
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeAdminRequest<any>(
         `/api/admin/tools/tenants/${tenantId}?confirm=true`,
         { method: 'DELETE' },
         'delete-test-tenant',
@@ -457,7 +457,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
    */
   async getUserTenants(userId: string): Promise<any[]> {
     try {
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeAdminRequest<any>(
         `/api/admin/users/${userId}/tenants`,
         {},
         `user-tenants-${userId}`,
@@ -465,7 +465,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
       );
 
       // Extract tenants array from API response
-      const tenantsArray = response?.tenants || response?.tenant || [];
+      const tenantsArray = response.data?.tenants || response.data?.tenant || [];
       
       return tenantsArray || [];
     } catch (error) {
@@ -479,7 +479,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
    */
   async getAllTenants(): Promise<any[]> {
     try {
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeAdminRequest<any>(
         '/api/admin/tenants/all',
         {},
         'admin-all-tenants',
@@ -487,7 +487,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
       );
 
       // Extract tenants array from API response
-      const tenantsArray = response?.tenants || [];
+      const tenantsArray = response.data?.tenants || [];
       
       return tenantsArray || [];
     } catch (error) {
@@ -501,7 +501,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
    */
   async assignTenantToUser(userId: string, tenantId: string, role: string): Promise<any> {
     try {
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeAdminRequest<any>(
         `/api/admin/users/${userId}/tenants`,
         {
           method: 'POST',
@@ -526,7 +526,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
    */
   async removeTenantFromUser(userId: string, tenantId: string): Promise<any> {
     try {
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeAdminRequest<any>(
         `/api/admin/users/${userId}/tenants/${tenantId}`,
         { method: 'DELETE' },
         'remove-tenant-from-user',
@@ -564,7 +564,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
    */
   async updateUserStatus(userId: string, isActive: boolean, emailVerified?: boolean): Promise<any> {
     try {
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeAdminRequest<any>(
         `/api/admin/users/${userId}`,
         {
           method: 'PUT',
@@ -592,7 +592,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
    */
   async sendVerificationEmail(userId: string): Promise<any> {
     try {
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeAdminRequest<any>(
         `/api/admin/users/${userId}/send-verification`,
         { method: 'POST' },
         'send-verification-email',
@@ -611,7 +611,7 @@ class AdminUsersService extends AuthenticatedApiSingleton {
    */
   async updateUserVerificationStatus(userId: string, emailVerified: boolean): Promise<any> {
     try {
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeAdminRequest<any>(
         `/api/admin/users/${userId}`,
         {
           method: 'PUT',

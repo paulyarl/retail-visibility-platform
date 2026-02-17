@@ -28,36 +28,60 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    */
   async getActiveSessions(): Promise<LoginSession[]> {
     try {
-      const result = await this.makeAuthenticatedRequest<any[]>(
+      const result = await this.makeAuthenticatedRequest<any>(
         '/api/auth/sessions',
         {},
         'security-active-sessions'
       );
 
+    //  console.log('[SecuritySingletonService] Raw sessions API response:', result);
+
+      // Extract sessions array from nested API response structure
+      const sessionsArray = result?.data || result || [];
+     // console.log('[SecuritySingletonService] Extracted sessions array:', sessionsArray);
+
+      // Ensure we have an array before mapping
+      if (!Array.isArray(sessionsArray)) {
+        console.warn('[SecuritySingletonService] Sessions API response is not an array:', sessionsArray);
+        return [];
+      }
+
       // Map API response to match LoginSession interface
-      const mappedSessions = (result || []).map((session: any): LoginSession => ({
-        id: session.id,
-        device: session.deviceInfo?.type || 'Unknown',
-        deviceInfo: session.deviceInfo ? {
-          type: session.deviceInfo.type || 'Unknown',
-          browser: session.deviceInfo.browser || 'Unknown',
-          os: session.deviceInfo.os || 'Unknown',
-          browserVersion: session.deviceInfo.browserVersion,
-          osVersion: session.deviceInfo.osVersion,
-          device: session.deviceInfo.device,
-        } : {
-          type: 'Unknown',
-          browser: 'Unknown',
-          os: 'Unknown'
-        },
-        location: session.deviceInfo?.location || 'Unknown',
-        ipAddress: session.deviceInfo?.ip || 'Unknown',
-        lastActivity: session.lastActive || session.lastActivity || new Date().toISOString(),
-        isCurrent: session.isCurrent || false,
-        userAgent: session.deviceInfo?.userAgent || session.userAgent || 'Unknown',
-        createdAt: session.createdAt || new Date().toISOString(),
-        expiresAt: session.expiresAt
-      }));
+      const mappedSessions = sessionsArray.map((session: any): LoginSession => {
+        // Parse deviceInfo JSON string to object
+        let deviceInfoObj: any = {};
+        try {
+          deviceInfoObj = session.deviceInfo ? JSON.parse(session.deviceInfo) : {};
+        } catch (e) {
+          console.warn('[SecuritySingletonService] Failed to parse deviceInfo:', session.deviceInfo);
+        }
+
+        return {
+          id: session.id,
+          device: deviceInfoObj?.type || 'Unknown',
+          deviceInfo: deviceInfoObj ? {
+            type: deviceInfoObj?.type || 'Unknown',
+            browser: deviceInfoObj?.browser || 'Unknown',
+            os: deviceInfoObj?.os || 'Unknown',
+            browserVersion: deviceInfoObj?.browserVersion,
+            osVersion: deviceInfoObj?.osVersion,
+            device: deviceInfoObj?.device,
+          } : {
+            type: 'Unknown',
+            browser: 'Unknown',
+            os: 'Unknown'
+          },
+          location: session.location ? 
+            `${session.location.city}, ${session.location.region}` : 
+            'Unknown',
+          ipAddress: session.ipAddress || 'Unknown',
+          lastActivity: session.lastActive || session.lastActivity || new Date().toISOString(),
+          isCurrent: session.isCurrent || false,
+          userAgent: session.userAgent || 'Unknown',
+          createdAt: session.createdAt || new Date().toISOString(),
+          expiresAt: session.expiresAt
+        };
+      });
       
       return mappedSessions;
     } catch (error) {
@@ -109,14 +133,26 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    */
   async getSecurityAlerts(): Promise<SecurityAlert[]> {
     try {
-      const result = await this.makeAuthenticatedRequest<any[]>(
+      const result = await this.makeAuthenticatedRequest<any>(
         '/api/security/security-alerts',
         {},
         'security-alerts'
       );
 
+      console.log('[SecuritySingletonService] Raw API response:', result);
+
+      // Extract alerts array from nested API response structure
+      const alertsArray = result?.data || result || [];
+      console.log('[SecuritySingletonService] Extracted alerts array:', alertsArray);
+
+      // Ensure we have an array before mapping
+      if (!Array.isArray(alertsArray)) {
+        console.warn('[SecuritySingletonService] API response is not an array:', alertsArray);
+        return [];
+      }
+
       // Map API response to match SecurityAlert interface
-      const mappedAlerts = (result || []).map((alert: any): SecurityAlert => ({
+      const mappedAlerts = alertsArray.map((alert: any): SecurityAlert => ({
         id: alert.id,
         type: alert.type || 'suspicious_activity',
         title: alert.title || 'Security Alert',
@@ -186,7 +222,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         'security-alert-preferences'
       );
 
-      return result || {};
+      return result.data || {};
     } catch (error) {
       console.error('[SecuritySingleton] Failed to get alert preferences:', error);
       return {};
@@ -227,11 +263,11 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         this.cacheTTL
       );
 
-      if (!result?.data) {
-        throw new Error('No data returned from MFA status');
+      if (!result?.data?.data) {
+        throw new Error('No MFA status data returned');
       }
 
-      return result.data;
+      return result.data.data;
     } catch (error) {
       console.error('[SecuritySingleton] Failed to get MFA status:', error);
       throw error;
@@ -249,11 +285,11 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         'security-mfa-setup'
       );
 
-      if (!result?.data) {
-        throw new Error('No data returned from MFA setup');
+      if (!result?.data?.data) {
+        throw new Error('No MFA setup data returned');
       }
 
-      return result.data;
+      return result.data.data;
     } catch (error) {
       console.error('[SecuritySingleton] Failed to setup MFA:', error);
       throw error;
@@ -274,7 +310,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         'security-mfa-verify-setup'
       );
 
-      return result.data?.verified || false;
+      return result.data?.data?.verified || false;
     } catch (error) {
       console.error('[SecuritySingleton] Failed to verify MFA setup:', error);
       throw error;
@@ -295,11 +331,11 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         'security-mfa-verify-login'
       );
 
-      if (!result?.data) {
+      if (!result?.data?.data) {
         throw new Error('No data returned from MFA login verification');
       }
 
-      return result.data;
+      return result.data.data;
     } catch (error) {
       console.error('[SecuritySingleton] Failed to verify MFA login:', error);
       throw error;
@@ -336,7 +372,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         'security-mfa-regenerate-backup'
       );
 
-      return result.data?.backupCodes || [];
+      return result.data?.data?.backupCodes || [];
     } catch (error) {
       console.error('[SecuritySingleton] Failed to regenerate backup codes:', error);
       throw error;

@@ -72,8 +72,6 @@ router.get('/products', async (req, res) => {
       lng: undefined,
       radius: undefined,
       category: query.category,
-      search: query.search,
-      sort: query.sort,
       tenantId: undefined // Get from all tenants
     });
 
@@ -83,9 +81,6 @@ router.get('/products', async (req, res) => {
     res.json({
       success: true,
       products: result.products || [],
-      total: result.total || result.products?.length || 0,
-      hasMore: result.hasMore || false,
-      cached: result.cached || false,
       message: 'General product listing retrieved successfully'
     });
   } catch (error) {

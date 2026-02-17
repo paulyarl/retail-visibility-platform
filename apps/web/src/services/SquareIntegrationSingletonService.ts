@@ -55,8 +55,12 @@ class SquareIntegrationSingletonService extends AuthenticatedApiSingleton {
         {},
         `square-status-${tenantId}`
       );
+      if (!result.success){
+        console.error('[SquareIntegrationSingleton] Failed to get Square status:', result.error);
+        return null;
+      }
 
-      return result || null;
+      return result.data || null;
     } catch (error) {
       console.error('[SquareIntegrationSingleton] Failed to get Square status:', error);
       return null;
@@ -77,8 +81,12 @@ class SquareIntegrationSingletonService extends AuthenticatedApiSingleton {
         {},
         `square-oauth-${tenantId}`
       );
+      if (!result.success){
+        console.error('[SquareIntegrationSingleton] Failed to get Square OAuth authorize:', result.error);
+        return null;
+      }
 
-      return result || null;
+      return result.data || null;
     } catch (error) {
       console.error('[SquareIntegrationSingleton] Failed to get Square OAuth authorize:', error);
       return null;

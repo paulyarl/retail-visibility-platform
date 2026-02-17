@@ -139,7 +139,7 @@ class RateLimitingService extends UniversalSingleton {
       // Load rate limit configurations from database
       const dbConfigs = await prisma.rate_limit_configurations.findMany({
         where: { enabled: true },
-        orderBy: { priority: 'asc' }
+        orderBy: { route_type: 'asc' }
       });
 
       // Convert database configs to service rules
@@ -149,11 +149,11 @@ class RateLimitingService extends UniversalSingleton {
         maxRequests: config.max_requests,
         windowMinutes: config.window_minutes,
         enabled: config.enabled,
-        priority: config.priority || 1,
-        exemptPaths: config.exempt_paths || [],
-        strictPaths: config.strict_paths || [],
-        createdAt: config.created_at.toISOString(),
-        updatedAt: config.updated_at.toISOString()
+        priority: 1, // Default priority since DB doesn't have this field
+        exemptPaths: [], // Default empty array since DB doesn't have this field
+        strictPaths: [], // Default empty array since DB doesn't have this field
+        createdAt: (config.created_at || new Date()).toISOString(),
+        updatedAt: (config.updated_at || new Date()).toISOString()
       }));
 
       // Add default rule if no rules found

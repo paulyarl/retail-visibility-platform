@@ -154,7 +154,7 @@ export function createShopProfileRoute(path: string): Router {
       }
       
       if (!shop) {
-        return res.status(404).json({
+        return res.status(400).json({
           success: false,
           error: 'Shop not found'
         });

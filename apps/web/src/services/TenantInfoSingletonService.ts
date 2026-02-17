@@ -1,8 +1,7 @@
 /**
  * Tenant Info Singleton Service
  *
- * Extends UniversalSingleton to provide cached tenant information operations
- * Uses the platform's singleton architecture for automatic authentication and caching
+ * Extends UniversalSingleton to provide architecture for automatic authentication and caching
  */
 
 import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
@@ -205,9 +204,13 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         {},
         `tenant-hours-${tenantId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get business hours:', result.error);
+        return null;
+      }
 
-      if (result && result.success && result.data) {
-        const { periods, timezone } = result.data;
+      if (result && result.data && result.data.success && result.data.data) {
+        const { periods, timezone } = result.data.data;
         const hours: BusinessHours = { timezone };
 
         // Convert periods to day-based format for BusinessHoursDisplay
@@ -263,10 +266,14 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         `payment-gateways-${tenantId}`,
         this.cacheTTL
       );
+      if (!response.success){
+        console.error('[TenantInfoSingleton] Failed to get payment gateways:', response.error);
+        return [];
+      }
 
-      if (response?.success && response.gateways) {
+      if (response?.success && response.data?.gateways) {
         console.log(`[TenantInfoSingleton] getPaymentGateways SUCCESS for tenant: ${tenantId}`, new Date().toISOString());
-        return response.gateways;
+        return response.data.gateways;
       }
 
       console.log(`[TenantInfoSingleton] getPaymentGateways NO DATA for tenant: ${tenantId}`, new Date().toISOString());
@@ -299,10 +306,14 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         `fulfillment-settings-${tenantId}`,
         this.cacheTTL
       );
+      if (!response.success){
+        console.error('[TenantInfoSingleton] Failed to get fulfillment settings:', response.error);
+        return null;
+      }
 
-      if (response?.success && response.settings) {
+      if (response?.success && response.data?.settings) {
         console.log(`[TenantInfoSingleton] getFulfillmentSettings SUCCESS for tenant: ${tenantId}`, new Date().toISOString());
-        return response.settings;
+        return response.data.settings;
       }
 
       console.log(`[TenantInfoSingleton] getFulfillmentSettings NO DATA for tenant: ${tenantId}`, new Date().toISOString());
@@ -335,9 +346,13 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         `payment-gateway-status-${tenantId}`,
         this.cacheTTL
       );
+      if (!response.success){
+        console.error('[TenantInfoSingleton] Failed to get payment gateway status');
+        return null;
+      }
 
       console.log(`[TenantInfoSingleton] getPaymentGatewayStatus SUCCESS for tenant: ${tenantId}`, new Date().toISOString());
-      return response;
+      return response.data;
     } catch (error) {
       console.error(`[TenantInfoSingleton] getPaymentGatewayStatus ERROR for tenant: ${tenantId}`, error);
       return null;
@@ -360,8 +375,13 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         `tenant-oauth-${provider}-status-${tenantId}`,
         this.cacheTTL
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get OAuth status:', result.error);
+        return null;
+      }
+      
 
-      return result || null;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get OAuth status:', error);
       return null;
@@ -387,8 +407,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         },
         `tenant-gateway-update-${tenantId}-${gatewayId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to update payment gateway status:', result.error);
+        return null;
+      }
 
-      return result || null;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to update payment gateway status:', error);
       return null;
@@ -414,8 +438,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         },
         `tenant-gateway-set-default-${tenantId}-${gatewayId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to set default payment gateway:', result.error);
+        return null;
+      }
 
-      return result || null;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to set default payment gateway:', error);
       return null;
@@ -440,8 +468,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         },
         `tenant-gateway-delete-${tenantId}-${gatewayId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to delete payment gateway:', result.error);
+        return null;
+      }
 
-      return result || null;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to delete payment gateway:', error);
       return null;
@@ -475,8 +507,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         },
         `tenant-gateway-save-paypal-${tenantId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to save PayPal gateway:', result.error);
+        return null;
+      }
 
-      return result || null;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to save PayPal gateway:', error);
       return null;
@@ -511,8 +547,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         },
         `tenant-gateway-save-square-${tenantId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to save Square gateway:', result.error);
+        return null;
+      }
 
-      return result || null;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to save Square gateway:', error);
       return null;
@@ -535,8 +575,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         `tenant-users-${tenantId}`,
         this.cacheTTL
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get users:', result.error);
+        return [];
+      }
 
-      return result || [];
+      return result.data || [];
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get users:', error);
       return [];
@@ -564,8 +608,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         },
         `tenant-invite-user-${tenantId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to invite user:', result.error);
+        return null;
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to invite user:', error);
       return null;
@@ -589,8 +637,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         },
         `tenant-delete-user-${tenantId}-${userId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to delete user:', result.error);
+        return null;
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to delete user:', error);
       return null;
@@ -613,8 +665,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         `oauth-authorize-${gatewayType}-${tenantId}`,
         this.cacheTTL
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get OAuth authorization URL:', result.error);
+        return null;
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get OAuth authorization URL:', error);
       return null;
@@ -642,8 +698,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         },
         `oauth-disconnect-${gatewayType}-${tenantId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to disconnect OAuth:', result.error);
+        return null;
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to disconnect OAuth:', error);
       return null;
@@ -717,8 +777,8 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         `tenant-logo-${tenantId}`
       );
       
-      if (result && result.success && result.data && result.data.length > 0) {
-        const logoUrl = result.data[0].tenant_logo_url;
+      if (result && result.data && result.data.success && result.data.data && result.data.data.length > 0) {
+        const logoUrl = result.data.data[0].tenant_logo_url;
         console.log(`[TenantInfoSingleton] Found logo URL from discovery: ${logoUrl}`);
         return logoUrl;
       }
@@ -768,8 +828,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         `tenant-user-subdomains-${tenantId}`,
         this.cacheTTL
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get user subdomains:', result.error);
+        throw new Error(result.error?.message || 'Failed to get user subdomains');
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get user subdomains:', error);
       throw error;
@@ -791,8 +855,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         `tenant-check-subdomain-${subdomain}`,
         this.cacheTTL
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to check subdomain availability:', result.error);
+        throw new Error(result.error?.message || 'Failed to check subdomain availability');
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to check subdomain availability:', error);
       throw error;
@@ -816,6 +884,10 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         },
         `tenant-update-subdomain-${tenantId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to update tenant subdomain:', result.error);
+        throw new Error(result.error?.message || 'Failed to update tenant subdomain', { cause: result.error });
+      }
 
       // Invalidate tenant complete cache for this tenant
       await platformHomeService.invalidateCache(`platform-tenant-complete-${tenantId}`);
@@ -823,7 +895,7 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
       // Invalidate platform dashboard cache since tenant subdomain affects stats
       await platformDashboardService.invalidateCache('platform-dashboard-complete');
       
-      return result;
+      return result.data!;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to update tenant subdomain:', error);
       throw error;
@@ -844,6 +916,10 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         { method: 'DELETE' },
         `tenant-delete-subdomain-${tenantId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to delete tenant subdomain:', result.error);
+        throw new Error(result.error?.message || 'Failed to delete tenant subdomain', { cause: result.error });
+      }
 
       // Invalidate tenant complete cache for this tenant
       await platformHomeService.invalidateCache(`platform-tenant-complete-${tenantId}`);
@@ -851,7 +927,7 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
       // Invalidate platform dashboard cache since tenant subdomain affects stats
       await platformDashboardService.invalidateCache('platform-dashboard-complete');
       
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to delete tenant subdomain:', error);
       throw error;
@@ -872,8 +948,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         { method: 'DELETE' },
         `tenant-delete-subdomain-${tenantId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to delete subdomain:', result.error);
+        throw new Error(result.error?.message || 'Failed to delete subdomain', { cause: result.error });
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to delete subdomain:', error);
       throw error;
@@ -895,8 +975,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         {},
         `tenant-data-cache-busting-${tenantId}-${timestamp}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get tenant data with cache busting:', result.error);
+        throw new Error(result.error?.message || 'Failed to get tenant data with cache busting');
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get tenant data with cache busting:', error);
       throw error;
@@ -920,8 +1004,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         },
         `tenant-status-preview-${tenantId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get tenant status preview:', result.error);
+        throw new Error(result.error?.message || 'Failed to get tenant status preview', { cause: result.error });
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get tenant status preview:', error);
       throw error;
@@ -947,6 +1035,10 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         },
         `tenant-update-status-${tenantId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to update tenant status:', result.error);
+        throw new Error(result.error?.message || 'Failed to update tenant status', { cause: result.error });
+      }
 
       // Invalidate tenant complete cache for this tenant
       await platformHomeService.invalidateCache(`platform-tenant-complete-${tenantId}`);
@@ -954,7 +1046,7 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
       // Invalidate platform dashboard cache since tenant status affects stats
       await platformDashboardService.invalidateCache('platform-dashboard-complete');
       
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to update tenant status:', error);
       throw error;
@@ -976,8 +1068,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         `tenant-gbp-status-${tenantId}`,
         this.cacheTTL
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get GBP connection status:', result.error);
+        throw new Error(result.error?.message || 'Failed to get GBP connection status', { cause: result.error });
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get GBP connection status:', error);
       throw error;
@@ -999,8 +1095,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         `tenant-gbp-linked-location-${tenantId}`,
         this.cacheTTL
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get GBP linked location:', result.error);
+        throw new Error(result.error?.message || 'Failed to get GBP linked location', { cause: result.error });
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get GBP linked location:', error);
       throw error;
@@ -1022,8 +1122,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         `tenant-gbp-locations-${tenantId}`,
         this.cacheTTL
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get GBP locations:', result.error);
+        throw new Error(result.error?.message || 'Failed to get GBP locations', { cause: result.error });
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get GBP locations:', error);
       throw error;
@@ -1052,8 +1156,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         },
         `tenant-gbp-link-location-${tenantId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to link GBP location:', result.error);
+        throw new Error(result.error?.message || 'Failed to link GBP location', { cause: result.error });
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to link GBP location:', error);
       throw error;
@@ -1077,8 +1185,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         },
         `tenant-gbp-unlink-location-${tenantId}`
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to unlink GBP location:', result.error);
+        throw new Error(result.error?.message || 'Failed to unlink GBP location', { cause: result.error });
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to unlink GBP location:', error);
       throw error;
@@ -1096,8 +1208,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         'user-preferences',
         this.cacheTTL
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get user preferences:', result.error);
+        throw new Error(result.error?.message || 'Failed to get user preferences', { cause: result.error });
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get user preferences:', error);
       throw error;
@@ -1115,8 +1231,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         'auth-current-user',
         this.cacheTTL
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get current user:', result.error);
+        throw new Error(result.error?.message || 'Failed to get current user', { cause: result.error });
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get current user:', error);
       throw error;
@@ -1138,8 +1258,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         `tenant-organization-${organizationId}`,
         this.cacheTTL
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get organization:', result.error);
+        throw new Error(result.error?.message || 'Failed to get organization', { cause: result.error });
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get organization:', error);
       throw error;
@@ -1157,8 +1281,12 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         'tenant-organizations',
         this.cacheTTL
       );
+      if (!result.success){
+        console.error('[TenantInfoSingleton] Failed to get organizations:', result.error);
+        throw new Error(result.error?.message || 'Failed to get organizations', { cause: result.error });
+      }
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get organizations:', error);
       throw error;

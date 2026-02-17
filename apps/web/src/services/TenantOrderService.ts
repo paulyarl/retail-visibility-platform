@@ -141,8 +141,8 @@ class TenantOrderService extends AuthenticatedApiSingleton {
       }>(endpoint, {}, cacheKey);
 
       return {
-        orders: response.orders || [],
-        pagination: response.pagination || {
+        orders: response.data?.orders || [],
+        pagination: response.data?.pagination || {
           page: filters.page || 1,
           limit: filters.limit || 10,
           total: 0,
@@ -173,7 +173,7 @@ class TenantOrderService extends AuthenticatedApiSingleton {
         `tenant-order-${tenantId}-${orderId}`
       );
 
-      return response.order || null;
+      return response.data?.order || null;
     } catch (error) {
       console.error('[TenantOrderService] Failed to get order:', error);
       return null;
@@ -198,7 +198,7 @@ class TenantOrderService extends AuthenticatedApiSingleton {
         `fulfillment-update-${tenantId}-${orderId}`
       );
 
-      return response.order || null;
+      return response.data?.order || null;
     } catch (error) {
       console.error('[TenantOrderService] Failed to update fulfillment:', error);
       return null;
@@ -243,7 +243,7 @@ class TenantOrderService extends AuthenticatedApiSingleton {
         `order-stats-${tenantId}-${period || 'default'}`
       );
 
-      return response.stats || {
+      return response.data?.stats || {
         totalOrders: 0,
         totalRevenue: 0,
         pendingOrders: 0,
@@ -284,7 +284,7 @@ class TenantOrderService extends AuthenticatedApiSingleton {
         this.cacheTTL
       );
 
-      return response?.settings || null;
+      return response?.data?.settings || null;
     } catch (error) {
       console.error('[TenantOrderService] Failed to get fulfillment settings:', error);
       return null;
@@ -378,7 +378,7 @@ class TenantOrderService extends AuthenticatedApiSingleton {
         downloadUrl: string;
       }>(endpoint, {}, `export-orders-${tenantId}-${Date.now()}`);
 
-      return response.downloadUrl || null;
+      return response.data?.downloadUrl || null;
     } catch (error) {
       console.error('[TenantOrderService] Failed to export orders:', error);
       return null;

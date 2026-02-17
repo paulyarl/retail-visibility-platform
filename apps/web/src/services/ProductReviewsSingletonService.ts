@@ -65,7 +65,7 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
         `product-review-summary-${tenantId}-${productId}`
       );
 
-      return response?.data || null;
+      return response?.data?.data || null;
     } catch (error) {
       console.error('[ProductReviewsSingleton] Failed to get product review summary:', error);
       return null;
@@ -108,7 +108,7 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
         `product-reviews-${tenantId}-${productId}-${options?.limit || 'default'}`
       );
 
-      return response?.data?.reviews || [];
+      return response?.data?.data?.reviews || [];
     } catch (error) {
       console.error('[ProductReviewsSingleton] Failed to get product reviews:', error);
       return [];
@@ -137,7 +137,7 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
         `user-product-review-${tenantId}-${productId}-${userId || 'anonymous'}`
       );
 
-      return response?.data || null;
+      return response?.data?.data || null;
     } catch (error) {
       console.error('[ProductReviewsSingleton] Failed to get user product review:', error);
       return null;
@@ -171,7 +171,7 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
         `product-review-create-${tenantId}-${productId}`
       );
 
-      return response?.data || null;
+      return response?.data?.data || null;
     } catch (error) {
       console.error('[ProductReviewsSingleton] Failed to create/update product review:', error);
       return null;

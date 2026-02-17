@@ -76,8 +76,12 @@ class SwisPreviewSingletonService extends AuthenticatedApiSingleton {
         {},
         `swis-preview-${tenantId}-${limit}-${sortOrder}`
       );
+      if (!result.success){
+        console.error('[SwisPreviewSingleton] Failed to get SWIS preview:', result.error);
+        return null;
+      }
 
-      return result || null;
+      return result.data || null;
     } catch (error) {
       console.error('[SwisPreviewSingleton] Failed to get SWIS preview:', error);
       return null;

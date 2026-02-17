@@ -3,60 +3,15 @@
  * Consolidates tenant info, tier, and usage calls with local storage caching
  */
 
-import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { tenantInfoService, type TenantInfo } from '@/services/TenantInfoSingletonService';
+import { tenantManagementService, type TenantUsage } from '@/services/TenantManagementService';
 import { LocalStorageCache } from './local-storage-cache';
-
-export interface TenantInfo {
-  id: string;
-  name: string;
-  organizationId?: string;
-  subscriptionTier: string;
-  subscriptionStatus: string;
-  locationStatus: string;
-  subdomain?: string;
-  createdAt: string;
-  statusInfo?: any;
-  logoUrl?: string | null;
-  stats?: {
-    productCount: number;
-    userCount: number;
-  };
-}
-
-export interface TenantTier {
-  tenantId: string;
-  tenantName: string;
-  tier: string;
-  subscriptionStatus: string;
-  trialEndsAt?: string;
-  subscriptionEndsAt?: string;
-  isChain: boolean;
-  organizationId?: string;
-  organizationName?: string;
-  organizationTier?: any;
-  tenantTier?: any;
-  effective?: any;
-}
-
-export interface TenantUsage {
-  tenantId: string;
-  currentItems: number;
-  activeItems: number;
-  monthlySkuQuota?: number;
-  skusAddedThisMonth: number;
-  quotaRemaining?: number;
-  // Additional fields expected by useTenantTier
-  products: number;
-  locations: number;
-  users: number;
-  apiCalls: number;
-  storageGB: number;
-}
+import type { TenantTier } from '@/services/TenantInfoSingletonService';
 
 export interface CachedTenantData {
-  tenant: TenantInfo;
-  tier: TenantTier;
-  usage: TenantUsage;
+  tenant: TenantInfo | null;
+  tier: TenantTier | null;
+  usage: TenantUsage | null;
   _timestamp: string;
   _cacheVersion: number;
 }
@@ -86,14 +41,17 @@ export class CachedTenantService {
     console.log(`[CachedTenantService] Cache miss for tenant ${tenantId}, fetching fresh data`);
 
     try {
-      // Try the consolidated endpoint first
-      const data = await platformHomeService.getTenantComplete(tenantId);
+      // Get tenant info and usage separately
+      const [tenantData, usageData] = await Promise.all([
+        tenantInfoService.getCompleteTenantInfo(tenantId),
+        tenantManagementService.getTenantUsage(tenantId)
+      ]);
 
       const cachedData: CachedTenantData = {
-        tenant: data.tenant,
-        tier: data.tier,
-        usage: data.usage,
-        _timestamp: data._timestamp || new Date().toISOString(),
+        tenant: tenantData.tenant,
+        tier: null, // Would need to get from TenantInfoSingletonService.getTenantTier if needed
+        usage: usageData,
+        _timestamp: new Date().toISOString(),
         _cacheVersion: this.CACHE_VERSION
       };
 
@@ -123,29 +81,15 @@ export class CachedTenantService {
       }
     }
 
-    const tenant = await platformHomeService.getTenant(tenantId);
+    const tenant = await tenantInfoService.getTenantInfo(tenantId);
+    
     if (!tenant) {
       throw new Error(`Tenant not found: ${tenantId}`);
     }
 
-    // Transform Tenant to TenantInfo interface
-    const data: TenantInfo = {
-      id: tenant.id,
-      name: tenant.name,
-      organizationId: tenant.organization?.id,
-      subscriptionTier: tenant.subscriptionTier || 'basic',
-      subscriptionStatus: tenant.status || 'active',
-      locationStatus: tenant.status || 'active',
-      subdomain: tenant.metadata?.subdomain,
-      createdAt: tenant.createdAt || new Date().toISOString(),
-      statusInfo: tenant.status,
-      logoUrl: tenant.logoUrl,
-      stats: tenant.metadata?.stats
-    };
+    await LocalStorageCache.set(cacheKey, tenant, { ttl: this.TENANT_CACHE_TTL, tenantId });
 
-    await LocalStorageCache.set(cacheKey, data, { ttl: this.TENANT_CACHE_TTL, tenantId });
-
-    return data;
+    return tenant;
   }
 
   /**
@@ -161,7 +105,11 @@ export class CachedTenantService {
       }
     }
 
-    const data = await platformHomeService.getTenantTier(tenantId);
+    const data = await tenantInfoService.getTenantTier(tenantId);
+    
+    if (!data) {
+      throw new Error(`Tier data not found for tenant: ${tenantId}`);
+    }
 
     await LocalStorageCache.set(cacheKey, data, { ttl: this.TIER_CACHE_TTL, tenantId });
 
@@ -181,27 +129,15 @@ export class CachedTenantService {
       }
     }
 
-    const data = await platformHomeService.getTenantUsage(tenantId);
+    const data = await tenantManagementService.getTenantUsage(tenantId);
+    
+    if (!data) {
+      throw new Error(`Usage data not found for tenant: ${tenantId}`);
+    }
 
-    // Transform API response to match TenantUsage interface
-    const usage: TenantUsage = {
-      tenantId: data.tenantId,
-      currentItems: data.currentItems || 0,
-      activeItems: data.activeItems || 0,
-      monthlySkuQuota: data.monthlySkuQuota,
-      skusAddedThisMonth: data.skusAddedThisMonth || 0,
-      quotaRemaining: data.quotaRemaining,
-      // Additional fields for compatibility
-      products: data.currentItems || 0,
-      locations: data.locations || 1,
-      users: data.users || 0,
-      apiCalls: data.apiCalls || 0,
-      storageGB: data.storageGB || 0
-    };
+    await LocalStorageCache.set(cacheKey, data, { ttl: this.USAGE_CACHE_TTL, tenantId });
 
-    await LocalStorageCache.set(cacheKey, usage, { ttl: this.USAGE_CACHE_TTL, tenantId });
-
-    return usage;
+    return data;
   }
 
   /**

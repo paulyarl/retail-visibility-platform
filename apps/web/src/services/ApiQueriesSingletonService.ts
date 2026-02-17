@@ -103,82 +103,82 @@ class ApiQueriesSingletonService extends AuthenticatedApiSingleton {
    * Get organization billing counters
    */
   async getOrganizationBillingCounters(organizationId: string): Promise<OrganizationData> {
-    try {
-      if (!organizationId) {
-        throw new Error('Organization ID is required');
-      }
+    if (!organizationId) {
+      throw new Error('Organization ID is required');
+    }
 
-      const result = await this.makeAuthenticatedRequest<OrganizationData>(
-        `/api/organization/billing/counters?organizationId=${organizationId}`,
-        {},
-        `org-billing-counters-${organizationId}`
-      );
+    const result = await this.makeAuthenticatedRequest<OrganizationData>(
+      `/api/organization/billing/counters?organizationId=${organizationId}`,
+      {},
+      `org-billing-counters-${organizationId}`
+    );
 
-      return result || {} as OrganizationData;
-    } catch (error) {
-      console.error('[ApiQueriesSingleton] Failed to get organization billing counters:', error);
+    if (!result.success) {
+      console.error('[ApiQueriesSingleton] Failed to get organization billing counters:', result.error);
       return {} as OrganizationData;
     }
+
+    return result.data || {} as OrganizationData;
   }
 
   /**
    * Get tenant by ID
    */
   async getTenant(tenantId: string): Promise<Tenant> {
-    try {
-      const result = await this.makeAuthenticatedRequest<Tenant>(
-        `/api/tenants/${tenantId}`,
-        {},
-        `tenant-${tenantId}`
-      );
+    const result = await this.makeAuthenticatedRequest<Tenant>(
+      `/api/tenants/${tenantId}`,
+      {},
+      `tenant-${tenantId}`
+    );
 
-      return result || {} as Tenant;
-    } catch (error) {
-      console.error('[ApiQueriesSingleton] Failed to get tenant:', error);
+    if (!result.success) {
+      console.error('[ApiQueriesSingleton] Failed to get tenant:', result.error);
       return {} as Tenant;
     }
+
+    return result.data || {} as Tenant;
   }
 
   /**
    * Get tenant categories
    */
   async getTenantCategories(tenantId: string): Promise<Category[]> {
-    try {
-      const result = await this.makeAuthenticatedRequest<Category[]>(
-        `/api/tenant/${tenantId}/categories`,
-        {},
-        `tenant-categories-${tenantId}`
-      );
+    const result = await this.makeAuthenticatedRequest<Category[]>(
+      `/api/tenant/${tenantId}/categories`,
+      {},
+      `tenant-categories-${tenantId}`
+    );
 
-      return result || [];
-    } catch (error) {
-      console.error('[ApiQueriesSingleton] Failed to get tenant categories:', error);
+    if (!result.success) {
+      console.error('[ApiQueriesSingleton] Failed to get tenant categories:', result.error);
       return [];
     }
+
+    return result.data || [];
   }
 
   /**
    * Get upgrade requests
    */
   async getUpgradeRequests(tenantId?: string, status?: string): Promise<UpgradeRequest[]> {
-    try {
-      const params = new URLSearchParams();
-      if (tenantId) params.set('tenantId', tenantId);
-      if (status) params.set('status', status);
+    const params = new URLSearchParams();
+    if (tenantId) params.set('tenantId', tenantId);
+    if (status) params.set('status', status);
 
-      const cacheKey = `upgrade-requests-${tenantId || 'all'}-${status || 'all'}`;
-      
-      const result = await this.makeAuthenticatedRequest<UpgradeRequest[]>(
-        `/api/upgrade-requests?${params.toString()}`,
-        {},
-        cacheKey
-      );
+    const cacheKey = `upgrade-requests-${tenantId || 'all'}-${status || 'all'}`;
+    
+    const result = await this.makeAuthenticatedRequest<UpgradeRequest[]>(
+      `/api/upgrade-requests?${params.toString()}`,
+      {},
+      cacheKey
+    );
 
-      return result || [];
-    } catch (error) {
-      console.error('[ApiQueriesSingleton] Failed to get upgrade requests:', error);
+    if (!result.success) {
+      console.error('[ApiQueriesSingleton] Failed to get upgrade requests:', result.error);
       return [];
     }
+
+    return result.data || [];
   }
 
   /**

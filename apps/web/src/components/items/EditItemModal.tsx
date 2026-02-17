@@ -3,7 +3,7 @@ import { useParams } from 'next/navigation';
 import { Modal, ModalFooter, Button, Input, Alert } from '@/components/ui';
 import { useFeatureFlag } from '@/lib/featureFlags';
 import { useCategorySingleton } from '@/providers/data/CategorySingleton';
-import TenantCategorySelector from './TenantCategorySelector';
+import CategorySelector from './CategorySelector';
 import PaymentGatewaySelector from '@/components/products/PaymentGatewaySelector';
 import ProductTypeSelector, { ProductType } from './ProductTypeSelector';
 import DigitalProductConfig, { DigitalProductData } from './DigitalProductConfig';
@@ -919,11 +919,19 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
 
               {showCategorySelector && (
                 <div className="mt-3 p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-                  <TenantCategorySelector
-                    selectedCategoryId={tenantCategoryId}
-                    onSelect={(categoryId) => {
-                      setTenantCategoryId(categoryId);
-                      setShowCategorySelector(false);
+                  <CategorySelector
+                    currentCategory={tenantCategoryId ? [tenantCategoryId] : []}
+                    onCategorySelect={async (categoryPath: string[]) => {
+                      if (categoryPath.length > 0) {
+                        const selectedCategory = categoryPath[categoryPath.length - 1];
+                        // For Google taxonomy, extract the ID and path
+                        const googleCategoryId = selectedCategory;
+                        const googleCategoryPath = categoryPath.join(' > ');
+                        
+                        // Set the tenant category ID (you might need to create tenant category from Google taxonomy)
+                        setTenantCategoryId(googleCategoryId);
+                        setShowCategorySelector(false);
+                      }
                     }}
                     onCancel={() => setShowCategorySelector(false)}
                   />

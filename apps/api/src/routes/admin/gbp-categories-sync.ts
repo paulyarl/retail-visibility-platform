@@ -221,7 +221,7 @@ router.patch('/map/:platformCategoryId', async (req: Request, res: Response) => 
     );
 
     if (gbpCategory.rows.length === 0) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
         error: 'GBP category not found',
       });
@@ -237,7 +237,7 @@ router.patch('/map/:platformCategoryId', async (req: Request, res: Response) => 
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
         error: 'Platform category not found',
       });

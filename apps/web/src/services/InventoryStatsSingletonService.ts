@@ -65,23 +65,23 @@ class InventoryStatsSingletonService extends UniversalSingleton {
    * Authenticated endpoint for inventory analytics
    */
   async getInventoryStats(tenantId: string): Promise<InventoryStats | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const response = await this.makeApiRequest<InventoryStats>(
-        `/api/inventory/stats/${tenantId}`,
-        {},
-        `inventory-stats-${tenantId}`,
-        this.CACHE_TTL_MEDIUM
-      );
+    const response = await this.makeApiRequest<InventoryStats>(
+      `/api/inventory/stats/${tenantId}`,
+      {},
+      `inventory-stats-${tenantId}`,
+      this.CACHE_TTL_MEDIUM
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[InventoryStatsSingleton] Failed to get inventory stats:', error);
+    if (!response.success) {
+      console.error('[InventoryStatsSingleton] Failed to get inventory stats:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**
@@ -89,23 +89,23 @@ class InventoryStatsSingletonService extends UniversalSingleton {
    * Authenticated endpoint for inventory monitoring
    */
   async getInventoryMetrics(tenantId: string): Promise<InventoryMetrics | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const response = await this.makeApiRequest<InventoryMetrics>(
-        `/api/inventory/metrics/${tenantId}`,
-        {},
-        `inventory-metrics-${tenantId}`,
-        this.CACHE_TTL_SHORT
-      );
+    const response = await this.makeApiRequest<InventoryMetrics>(
+      `/api/inventory/metrics/${tenantId}`,
+      {},
+      `inventory-metrics-${tenantId}`,
+      this.CACHE_TTL_SHORT
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[InventoryStatsSingleton] Failed to get inventory metrics:', error);
+    if (!response.success) {
+      console.error('[InventoryStatsSingleton] Failed to get inventory metrics:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**

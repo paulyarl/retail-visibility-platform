@@ -90,5 +90,5 @@ export async function exportSecurityReport(
   endDate: Date,
   format: 'csv' | 'json' = 'csv'
 ): Promise<Blob> {
-  return await securityMonitoringService.exportSecurityReport(startDate, endDate, format);
+  return await securityMonitoringService.exportSecurityReport(startDate, endDate, format)||new Blob();
 }

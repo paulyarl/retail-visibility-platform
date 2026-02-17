@@ -44,8 +44,12 @@ class RateLimitSingletonService extends AuthenticatedApiSingleton {
         {},
         'rate-limit-configs'
       );
+      if (!response.success){
+        console.error('Failed to fetch rate limit configurations, using defaults:', response.error);
+        return this.getDefaultConfigs();
+      }
 
-      return response || this.getDefaultConfigs();
+      return response.data || this.getDefaultConfigs();
     } catch (error) {
       console.error('Failed to fetch rate limit configurations, using defaults:', error);
       return this.getDefaultConfigs();
@@ -85,8 +89,12 @@ class RateLimitSingletonService extends AuthenticatedApiSingleton {
         {},
         'platform-settings-rate-limiting'
       );
+      if (!response.success){
+        console.error('Failed to fetch rate limiting enabled status, defaulting to enabled:', response.error);
+        return true;
+      }
       
-      return response?.features?.rateLimitingEnabled ?? true;
+      return response?.data?.features?.rateLimitingEnabled ?? true;
     } catch (error) {
       console.error('Failed to fetch rate limiting enabled status, defaulting to enabled:', error);
       // Default to enabled if we can't fetch settings

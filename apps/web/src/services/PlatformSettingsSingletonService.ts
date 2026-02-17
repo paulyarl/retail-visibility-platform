@@ -1,11 +1,11 @@
 /**
  * Platform Settings Singleton Service
  * 
- * Extends UniversalSingletonClient to provide cached platform settings operations
- * Uses the platform's singleton architecture for automatic authentication and caching
+ * Extends PublicApiSingleton to provide cached platform settings operations
+ * Uses public requests since platform settings should be accessible to all users
  */
 
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
 
 export interface PlatformSettings {
   platformName: string;
@@ -37,19 +37,13 @@ export interface PlatformSettings {
   features?: Record<string, any>;
 }
 
-class PlatformSettingsSingletonService {
+class PlatformSettingsSingletonService extends PublicApiSingleton {
   private static instance: PlatformSettingsSingletonService;
-  private client: UniversalSingletonClient;
 
   private constructor() {
-    // Initialize UniversalSingletonClient with platform defaults
-    this.client = UniversalSingletonClient.getInstance({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-      enableCache: true,
-      defaultTTL: 15 * 60 * 1000, // 15 minutes for platform settings (changes rarely)
-      enableLogging: true,
-      enableMetrics: true
-    });
+    super('platform-settings-service');
+    // Override default TTL for platform settings (changes rarely)
+    this.cacheTTL = 15 * 60 * 1000; // 15 minutes
   }
 
   public static getInstance(): PlatformSettingsSingletonService {
@@ -65,16 +59,18 @@ class PlatformSettingsSingletonService {
    */
   async getPlatformSettings(): Promise<PlatformSettings> {
     try {
-      const result = await this.client.makeRequest<PlatformSettings>(
-        '/api/platform-settings'
+      const result = await this.makePublicRequest<PlatformSettings>(
+        '/api/platform-settings',
+        {},
+        'platform-settings'
       );
       
       // The /api/platform-settings endpoint returns data directly, not wrapped in ApiResponse
       // Check if result itself is the data, not result.data
-      const settings = (result as any)?.data || result;
+      const settings = result?.data || result;
       
-      if (settings) {
-        return settings;
+      if (settings && 'platformName' in settings) {
+        return settings as PlatformSettings;
       }
       
       // Return default settings if no data
@@ -128,7 +124,7 @@ class PlatformSettingsSingletonService {
    */
   async updatePlatformSettings(settings: Partial<PlatformSettings>): Promise<PlatformSettings | null> {
     try {
-      const result = await this.client.makeRequest<PlatformSettings>(
+      const result = await this.makePublicRequest<PlatformSettings>(
         '/api/platform-settings',
         {
           method: 'POST',
@@ -136,7 +132,8 @@ class PlatformSettingsSingletonService {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(settings)
-        }
+        },
+        'platform-settings-update'
       );
       
       // The /api/platform-settings endpoint returns data directly, not wrapped in ApiResponse
@@ -145,7 +142,7 @@ class PlatformSettingsSingletonService {
       
       if (updatedSettings) {
         // Clear cache to ensure fresh data on next request
-        this.clearCache();
+        await this.clearCache();
         return updatedSettings;
       }
       
@@ -154,28 +151,6 @@ class PlatformSettingsSingletonService {
       console.error('[PlatformSettingsSingleton] Failed to update platform settings:', error);
       return null;
     }
-  }
-
-  /**
-   * Clear the cache to force fresh data on next request
-   */
-  public clearCache(): void {
-    // Access the private clearCache method of the client
-    (this.client as any).clearCache();
-  }
-
-  /**
-   * Get performance metrics
-   */
-  public getMetrics() {
-    return this.client.getMetrics();
-  }
-
-  /**
-   * Reset metrics
-   */
-  public resetMetrics(): void {
-    this.client.resetMetrics();
   }
 }
 

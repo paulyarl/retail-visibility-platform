@@ -167,7 +167,7 @@ class RealShopService extends AuthenticatedApiSingleton {
         `shop-${tenantId}`
       );
       
-      return result;
+      return result.data || null;
     } catch (error: any) {
       if (error.message?.includes('404') || error.message?.includes('Not Found')) {
         return null;
@@ -191,7 +191,10 @@ class RealShopService extends AuthenticatedApiSingleton {
         `shop-upsert-${tenantId}`
       );
       
-      return result;
+      if (!result.data) {
+        throw new Error('Failed to save shop: No data returned');
+      }
+      return result.data;
     } catch (error) {
       console.error('Error saving shop:', error);
       throw error;
@@ -212,7 +215,10 @@ class RealShopService extends AuthenticatedApiSingleton {
         `shop-update-${tenantId}`
       );
       
-      return result;
+      if (!result.data) {
+        throw new Error('Failed to save shop: No data returned');
+      }
+      return result.data;
     } catch (error) {
       console.error('Error updating shop:', error);
       throw error;
@@ -232,7 +238,10 @@ class RealShopService extends AuthenticatedApiSingleton {
         `shop-publish-${tenantId}`
       );
       
-      return result;
+      if (!result.data) {
+        throw new Error('Failed to save shop: No data returned');
+      }
+      return result.data;
     } catch (error) {
       console.error('Error publishing shop:', error);
       throw error;
@@ -252,7 +261,10 @@ class RealShopService extends AuthenticatedApiSingleton {
         `shop-unpublish-${tenantId}`
       );
       
-      return result;
+      if (!result.data) {
+        throw new Error('Failed to save shop: No data returned');
+      }
+      return result.data;
     } catch (error) {
       console.error('Error unpublishing shop:', error);
       throw error;
@@ -273,7 +285,10 @@ class RealShopService extends AuthenticatedApiSingleton {
         `shop-category-${tenantId}`
       );
       
-      return result;
+      if (!result.data) {
+        throw new Error('Failed to save shop: No data returned');
+      }
+      return result.data;
     } catch (error) {
       console.error('Error updating shop category:', error);
       throw error;
@@ -298,7 +313,10 @@ class RealShopService extends AuthenticatedApiSingleton {
         `shop-branding-${tenantId}`
       );
       
-      return result;
+      if (!result.data) {
+        throw new Error('Failed to save shop: No data returned');
+      }
+      return result.data;
     } catch (error) {
       console.error('Error updating shop branding:', error);
       throw error;
@@ -327,7 +345,10 @@ class RealShopService extends AuthenticatedApiSingleton {
         `shop-hours-${tenantId}`
       );
       
-      return result;
+      if (!result.data) {
+        throw new Error('Failed to save shop: No data returned');
+      }
+      return result.data;
     } catch (error) {
       console.error('Error updating shop hours:', error);
       throw error;
@@ -354,7 +375,10 @@ class RealShopService extends AuthenticatedApiSingleton {
         `shop-social-${tenantId}`
       );
       
-      return result;
+      if (!result.data) {
+        throw new Error('Failed to save shop: No data returned');
+      }
+      return result.data;
     } catch (error) {
       console.error('Error updating social links:', error);
       throw error;
@@ -372,7 +396,10 @@ class RealShopService extends AuthenticatedApiSingleton {
         `shop-analytics-${tenantId}`
       );
       
-      return result;
+      if (!result.data) {
+        throw new Error('Failed to save shop: No data returned');
+      }
+      return result.data;
     } catch (error) {
       console.error('Error getting shop analytics:', error);
       throw error;
@@ -390,7 +417,10 @@ class RealShopService extends AuthenticatedApiSingleton {
         `shop-limits-${tenantId}`
       );
       
-      return result;
+      if (!result.data) {
+        throw new Error('Failed to save shop: No data returned');
+      }
+      return result.data;
     } catch (error) {
       console.error('Error checking shop limits:', error);
       throw error;
@@ -426,7 +456,10 @@ class RealShopService extends AuthenticatedApiSingleton {
         'shop-categories'
       );
       
-      return result;
+      if (!result.data) {
+        throw new Error('Failed to save shop: No data returned');
+      }
+      return result.data;
     } catch (error) {
       console.error('Error getting available categories:', error);
       throw error;
@@ -447,7 +480,10 @@ class RealShopService extends AuthenticatedApiSingleton {
         `shop-category-set-${tenantId}`
       );
       
-      return result;
+      if (!result.data) {
+        throw new Error('Failed to save shop: No data returned');
+      }
+      return result.data;
     } catch (error) {
       console.error('Error setting shop category:', error);
       throw error;

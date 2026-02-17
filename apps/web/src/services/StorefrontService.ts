@@ -103,7 +103,8 @@ class StorefrontService extends PublicApiSingleton {
     const cacheKey = `products:${tenantId}:${queryString}`;
 
     try {
-      return await this.makePublicRequest<ProductResponse>(endpoint, {}, cacheKey, this.PRODUCTS_TTL);
+      const result = await this.makePublicRequest<ProductResponse>(endpoint, {}, cacheKey, this.PRODUCTS_TTL);
+      return result.data || { items: [], pagination: { page: 1, limit: 10, totalItems: 0, totalPages: 0, hasMore: false } };
     } catch (error) {
       console.error('[StorefrontService] Failed to get products:', error);
       throw error;
@@ -118,7 +119,7 @@ class StorefrontService extends PublicApiSingleton {
         `categories:${tenantId}`,
         this.CATEGORIES_TTL
       );
-      return data.categories || [];
+      return data.data?.categories || [];
     } catch (error) {
       console.error('[StorefrontService] Failed to get categories:', error);
       throw error;
@@ -144,8 +145,8 @@ class StorefrontService extends PublicApiSingleton {
 
       // Transform response to match expected format
       return {
-        items: data.items || [],
-        count: data.totalCount || 0,
+        items: data.data?.items || [],
+        count: data.data?.totalCount || 0,
         buckets: {} as Record<string, CatalogProduct[]>
       };
     } catch (error) {
@@ -222,7 +223,7 @@ class StorefrontService extends PublicApiSingleton {
         this.CATEGORIES_TTL
       );
 
-      return response || [];
+      return response.data || [];
     } catch (error) {
       console.error('[StorefrontService] Failed to get batch stores:', error);
       return [];

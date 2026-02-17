@@ -176,21 +176,22 @@ class StorePublishSingleton extends PublicApiSingleton {
       const cacheKey = `store-publish-${params.toString()}`;
 
       // Fetch published stores
-      const data = await this.makePublicRequest<StorePublishData>(
+      const result = await this.makePublicRequest<StorePublishData>(
         `/api/stores/published?${params}`,
         {},
         cacheKey
       );
       
-      if (!data || !data.stores) {
+      if (!result.success || !result.data || !result.data.stores) {
+        console.error('[StorePublishSingleton] Failed to fetch published stores:', result.error);
         return defaultResult;
       }
 
       return {
-        stores: data.stores || [],
-        totalCount: data.totalCount || 0,
-        lastUpdated: data.lastUpdated || new Date().toISOString(),
-        categories: data.categories || []
+        stores: result.data.stores,
+        totalCount: result.data.totalCount,
+        lastUpdated: result.data.lastUpdated,
+        categories: result.data.categories
       };
     } catch (error) {
       console.warn('Store publish API error:', error);
@@ -201,13 +202,18 @@ class StorePublishSingleton extends PublicApiSingleton {
   // Get a single published store by ID
   async getPublishedStore(storeId: string): Promise<PublishedStore | null> {
     try {
-      const store = await this.makePublicRequest<PublishedStore>(
+      const result = await this.makePublicRequest<PublishedStore>(
         `/api/stores/published/${storeId}`,
         {},
         `store-publish-single-${storeId}`
       );
 
-      return store;
+      if (!result.success) {
+        console.error('Error fetching published store:', result.error);
+        return null;
+      }
+
+      return result.data || null;
     } catch (error) {
       console.error('Error fetching published store:', error);
       return null;
@@ -216,82 +222,82 @@ class StorePublishSingleton extends PublicApiSingleton {
 
   // Publish a store (for store owners and admins)
   async publishStore(storeId: string, storeData: Partial<PublishedStore>): Promise<PublishedStore | null> {
-    try {
-      const publishedStore = await this.makePublicRequest<PublishedStore>(
-        '/api/stores/publish',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            storeId,
-            ...storeData
-          })
-        },
-        `store-publish-${storeId}`
-      );
-      
-      return publishedStore;
-    } catch (error) {
-      console.error('Error publishing store:', error);
+    const result = await this.makePublicRequest<PublishedStore>(
+      '/api/stores/publish',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          storeId,
+          ...storeData
+        })
+      },
+      `store-publish-${storeId}`
+    );
+    
+    if (!result.success) {
+      console.error('Error publishing store:', result.error);
       return null;
     }
+    
+    return result.data || null;
   }
 
   // Unpublish a store
   async unpublishStore(storeId: string): Promise<boolean> {
-    try {
-      await this.makePublicRequest<void>(
-        `/api/stores/publish/${storeId}`,
-        {
-          method: 'DELETE'
-        },
-        `store-unpublish-${storeId}`
-      );
-      
-      return true;
-    } catch (error) {
-      console.error('Error unpublishing store:', error);
+    const result = await this.makePublicRequest<void>(
+      `/api/stores/publish/${storeId}`,
+      {
+        method: 'DELETE'
+      },
+      `store-unpublish-${storeId}`
+    );
+    
+    if (!result.success) {
+      console.error('Error unpublishing store:', result.error);
       return false;
     }
+    
+    return true;
   }
 
   // Update published store
   async updatePublishedStore(storeId: string, updates: Partial<PublishedStore>): Promise<PublishedStore | null> {
-    try {
-      const updatedStore = await this.makePublicRequest<PublishedStore>(
-        `/api/stores/published/${storeId}`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify(updates)
-        },
-        `store-update-${storeId}`
-      );
-      
-      return updatedStore;
-    } catch (error) {
-      console.error('Error updating published store:', error);
+    const result = await this.makePublicRequest<PublishedStore>(
+      `/api/stores/published/${storeId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(updates)
+      },
+      `store-update-${storeId}`
+    );
+    
+    if (!result.success) {
+      console.error('Error updating published store:', result.error);
       return null;
     }
+    
+    return result.data || null;
   }
 
   // Get available directory categories
   async getDirectoryCategories(): Promise<DirectoryCategory[]> {
-    try {
-      const categories = await this.makePublicRequest<DirectoryCategory[]>(
-        '/api/directory/categories',
-        {},
-        'directory-categories'
-      );
-      
-      // Handle null response
-      if (!categories || !Array.isArray(categories)) {
-        return [];
-      }
-
-      return categories;
-    } catch (error) {
-      console.error('Error fetching directory categories:', error);
+    const result = await this.makePublicRequest<DirectoryCategory[]>(
+      '/api/directory/categories',
+      {},
+      'directory-categories'
+    );
+    
+    if (!result.success) {
+      console.error('Error fetching directory categories:', result.error);
       return [];
     }
+    
+    // Handle null response
+    if (!result.data || !Array.isArray(result.data)) {
+      return [];
+    }
+
+    return result.data;
   }
 
   // Validate store publishing requirements
@@ -339,25 +345,25 @@ class StorePublishSingleton extends PublicApiSingleton {
     canPublishAny: boolean;
     reason?: string;
   }> {
-    try {
-      const permissions = await this.makePublicRequest<{
-        canPublish: boolean;
-        canPublishAny: boolean;
-        reason?: string;
-      }>(
-        '/api/stores/publish/permissions',
-        {
-          method: 'POST',
-          body: JSON.stringify({ userId, tenantId })
-        },
-        `permissions-${userId}-${tenantId || 'default'}`
-      );
+    const result = await this.makePublicRequest<{
+      canPublish: boolean;
+      canPublishAny: boolean;
+      reason?: string;
+    }>(
+      '/api/stores/publish/permissions',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, tenantId })
+      },
+      `permissions-${userId}-${tenantId || 'default'}`
+    );
 
-      return permissions;
-    } catch (error) {
-      console.error('Error checking publishing permissions:', error);
+    if (!result.success) {
+      console.error('Error checking publishing permissions:', result.error);
       return { canPublish: false, canPublishAny: false, reason: 'Permission check error' };
     }
+
+    return result.data || { canPublish: false, canPublishAny: false, reason: 'No permission data received' };
   }
 
   // Store publishing metrics for UniversalSingleton

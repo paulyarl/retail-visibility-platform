@@ -59,7 +59,7 @@ export function ProductLikeProvider({ children }: { children: ReactNode }) {
 
       const data = await productLikesService.getProductLikeStatus(productId, userId || undefined, sessionId || undefined);
       
-      return { success: true, likes: data.likesCount, userLiked: data.userLiked };
+      return { success: true, likes: data?.likesCount, userLiked: data?.userLiked };
     } catch (error) {
       console.error('[ProductLikeProvider] Error liking product:', error);
       return { success: false, likes: 0, userLiked: false };
@@ -78,8 +78,8 @@ export function ProductLikeProvider({ children }: { children: ReactNode }) {
       
       return {
         success: true,
-        likes: data.likesCount,
-        userLiked: data.userLiked
+        likes: data?.likesCount || 0,
+        userLiked: data?.userLiked || false
       };
     } catch (error) {
       console.error('[ProductLikeProvider] Error unliking product:', error);
@@ -92,8 +92,8 @@ export function ProductLikeProvider({ children }: { children: ReactNode }) {
       const data = await productLikesService.getProductLikeStatus(productId, userId || undefined, sessionId || undefined);
       
       return {
-        likes: data.likesCount,
-        userLiked: data.userLiked
+        likes: data?.likesCount || 0,
+        userLiked: data?.userLiked || false
       };
     } catch (error) {
       console.error('[ProductLikeProvider] Error getting like status:', error);
@@ -104,9 +104,9 @@ export function ProductLikeProvider({ children }: { children: ReactNode }) {
   const value: LikeContextType = {
     userId,
     sessionId,
-    likeProduct,
-    unlikeProduct,
-    getLikeStatus
+    likeProduct: likeProduct as any,
+    unlikeProduct: unlikeProduct as any,
+    getLikeStatus: getLikeStatus as any
   };
 
   return (

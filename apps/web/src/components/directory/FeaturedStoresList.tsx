@@ -357,7 +357,7 @@ export default function FeaturedStoresList({
     return (
       <div className={`space-y-4 ${className}`}>
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Featured Stores</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Random Featured Stores</h2>
         </div>
         <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -400,7 +400,7 @@ export default function FeaturedStoresList({
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">
-            Featured Stores
+            All Featured Stores
             <span className="ml-2 text-sm text-gray-500">
               ({displayStores.length} stores)
             </span>

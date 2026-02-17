@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button, Input } from '@/components/ui';
-import { api } from '@/lib/api';
+import { googleTaxonomyService, type GoogleTaxonomyCategory } from '@/services/GoogleTaxonomyService';
 
 interface CategorySelectorProps {
   currentCategory: string[];
@@ -17,6 +17,14 @@ interface CategoryOption {
   fullPath: string;
   children?: CategoryOption[];
 }
+
+// Helper function to map GoogleTaxonomyCategory to CategoryOption
+const mapToCategoryOption = (googleCategory: GoogleTaxonomyCategory): CategoryOption => ({
+  id: googleCategory.id,
+  name: googleCategory.name,
+  path: googleCategory.path,
+  fullPath: googleCategory.path.join(' > ')
+});
 
 
 // Force edge runtime to prevent prerendering issues
@@ -78,16 +86,14 @@ export default function CategorySelector({
   const loadCategories = async () => {
     try {
       setLoading(true);
-      const response = await api.get('api/google/taxonomy/browse');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.categories) {
-          setCategories(data.categories);
-          setFilteredCategories(data.categories);
-        }
+      const googleCategories = await googleTaxonomyService.browseGoogleTaxonomy();
+      if (googleCategories) {
+        const categories = googleCategories.map(mapToCategoryOption);
+        setCategories(categories);
+        setFilteredCategories(categories);
       }
     } catch (error) {
-      console.error('Failed to load categories:', error);
+      console.error('[CategorySelector] Failed to load categories:', error);
     } finally {
       setLoading(false);
     }
@@ -101,17 +107,15 @@ export default function CategorySelector({
 
     try {
       setLoading(true);
-      const response = await api.get(`api/google/taxonomy/search?q=${encodeURIComponent(query)}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.categories) {
-          setFilteredCategories(data.categories);
-        } else {
-          setFilteredCategories([]);
-        }
+      const googleCategories = await googleTaxonomyService.searchGoogleTaxonomy(query, 50);
+      if (googleCategories) {
+        const categories = googleCategories.map(mapToCategoryOption);
+        setFilteredCategories(categories);
+      } else {
+        setFilteredCategories([]);
       }
     } catch (error) {
-      console.error('Failed to search categories:', error);
+      console.error('[CategorySelector] Failed to search categories:', error);
       setFilteredCategories([]);
     } finally {
       setLoading(false);

@@ -43,59 +43,59 @@ class BusinessProfileSingletonService extends AuthenticatedApiSingleton {
    * Get business profile for a specific tenant
    */
   async getBusinessProfile(tenantId: string, transform: boolean = false): Promise<BusinessProfile | ApiBusinessProfile | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const result = await this.makeAuthenticatedRequest<ApiBusinessProfile>(
-        `/api/tenants/${tenantId}/profile`,
-        {},
-        `business-profile-${tenantId}`
-      );
+    const result = await this.makeAuthenticatedRequest<ApiBusinessProfile>(
+      `/api/tenants/${tenantId}/profile`,
+      {},
+      `business-profile-${tenantId}`
+    );
 
-      if (!result) {
-        return null;
-      }
-
-      // Apply transformation if requested
-      const processedData = transform 
-        ? safeTransformToCamel<BusinessProfile>(result)
-        : result;
-      
-      return processedData;
-    } catch (error) {
-      console.error('[BusinessProfileSingleton] Failed to get business profile:', error);
+    if (!result.success) {
+      console.error('[BusinessProfileSingleton] Failed to get business profile:', result.error);
       return null;
     }
+
+    if (!result.data) {
+      return null;
+    }
+
+    // Apply transformation if requested
+    const processedData = transform 
+      ? safeTransformToCamel<BusinessProfile>(result.data)
+      : result.data;
+    
+    return processedData;
   }
 
   /**
    * Update business profile
    */
   async updateBusinessProfile(tenantId: string, profileData: Partial<ApiBusinessProfile>): Promise<BusinessProfile | ApiBusinessProfile | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
-
-      const result = await this.makeAuthenticatedRequest<ApiBusinessProfile>(
-        `/api/tenants/${tenantId}/profile`,
-        { 
-          method: 'PUT',
-          body: JSON.stringify(profileData)
-        },
-        `business-profile-update-${tenantId}`
-      );
-
-      // Invalidate business profile cache
-      await this.invalidateCache(`business-profile-${tenantId}*`);
-
-      return result || null;
-    } catch (error) {
-      console.error('[BusinessProfileSingleton] Failed to update business profile:', error);
-      throw error;
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
     }
+
+    const result = await this.makeAuthenticatedRequest<ApiBusinessProfile>(
+      `/api/tenants/${tenantId}/profile`,
+      { 
+        method: 'PUT',
+        body: JSON.stringify(profileData)
+      },
+      `business-profile-update-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[BusinessProfileSingleton] Failed to update business profile:', result.error);
+      throw result.error;
+    }
+
+    // Invalidate business profile cache
+    await this.invalidateCache(`business-profile-${tenantId}*`);
+
+    return result.data || null;
   }
 
   /**

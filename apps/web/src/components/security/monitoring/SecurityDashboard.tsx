@@ -113,7 +113,7 @@ export function SecurityDashboard() {
               <CardTitle>System Health</CardTitle>
               <CardDescription>Overall security status</CardDescription>
             </div>
-            {getHealthBadge()}
+            {getHealthBadge(healthStatus)}
           </div>
         </CardHeader>
         <CardContent>

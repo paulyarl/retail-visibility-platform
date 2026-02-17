@@ -111,85 +111,89 @@ class UsersSingleton extends AuthenticatedApiSingleton {
    * Get user by ID
    */
   async getUser(userId: string): Promise<User | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ user: User }>(
-        `/api/users-singleton/${userId}`,
-        {},
-        `user-${userId}`
-      );
-
-      return result.user;
-    } catch (error: any) {
-      if (error.message?.includes('404')) {
+    const result = await this.makeAuthenticatedRequest<{ user: User }>(
+      `/api/users-singleton/${userId}`,
+      {},
+      `user-${userId}`
+    );
+    
+    if (!result.success) {
+      if (result.status === 404) {
         return null;
       }
-      console.error('Error fetching user', error);
+      console.error('Error fetching user', result.error);
       return null;
     }
+    
+    return result.data?.user || null;
   }
 
   /**
    * Create new user
    */
   async createUser(request: CreateUserRequest): Promise<User> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ user: User }>(
-        '/api/users-singleton',
-        {
-          method: 'POST',
-          body: JSON.stringify(request)
-        },
-        'user-create'
-      );
-
-      console.log('User created successfully', { userId: result.user.id });
-      return result.user;
-    } catch (error) {
-      console.error('Error creating user', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<{ user: User }>(
+      '/api/users-singleton',
+      {
+        method: 'POST',
+        body: JSON.stringify(request)
+      },
+      'user-create'
+    );
+    
+    if (!result.success) {
+      console.error('Error creating user', result.error);
+      throw new Error(result.error?.message || 'Failed to create user');
     }
+
+    console.log('User created successfully', { userId: result.data?.user.id });
+    return result.data?.user || (() => { 
+      throw new Error('No user data received'); 
+    })();
   }
 
   /**
    * Update user
    */
   async updateUser(userId: string, updates: UpdateUserRequest): Promise<User> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ user: User }>(
-        `/api/users-singleton/${userId}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(updates)
-        },
-        `user-update-${userId}`
-      );
-
-      console.log('User updated successfully', { userId });
-      return result.user;
-    } catch (error) {
-      console.error('Error updating user', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<{ user: User }>(
+      `/api/users-singleton/${userId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(updates)
+      },
+      `user-update-${userId}`
+    );
+    
+    if (!result.success) {
+      console.error('Error updating user', result.error);
+      throw new Error(result.error?.message || 'Failed to update user');
     }
+
+    console.log('User updated successfully', { userId });
+    return result.data?.user || (() => { 
+      throw new Error('No user data received'); 
+    })();
   }
 
   /**
    * Delete user
    */
   async deleteUser(userId: string): Promise<void> {
-    try {
-      await this.makeAuthenticatedRequest<void>(
-        `/api/users-singleton/${userId}`,
-        {
-          method: 'DELETE'
-        },
-        `user-delete-${userId}`
-      );
-
-      console.log('User deleted successfully', { userId });
-    } catch (error) {
-      console.error('Error deleting user', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<void>(
+      `/api/users-singleton/${userId}`,
+      {
+        method: 'DELETE'
+      },
+      `user-delete-${userId}`
+    );
+    
+    if (!result.success) {
+      console.error('Error deleting user', result.error);
+      throw new Error(result.error?.message || 'Failed to delete user');
     }
+
+    console.log('User deleted successfully', { userId });
   }
 
   /**
@@ -217,8 +221,13 @@ class UsersSingleton extends AuthenticatedApiSingleton {
         {},
         cacheKey
       );
+      
+      if (!result.success) {
+        console.error('Error listing users', result.error);
+        return { users: [], total: 0 };
+      }
 
-      return result;
+      return result.data || { users: [], total: 0 };
     } catch (error) {
       console.error('Error listing users', error);
       throw error;
@@ -233,40 +242,42 @@ class UsersSingleton extends AuthenticatedApiSingleton {
    * Get user activity
    */
   async getUserActivity(userId: string, limit: number = 50): Promise<UserActivity[]> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ activities: UserActivity[] }>(
-        `/api/users-singleton/${userId}/activity?limit=${limit}`,
-        {},
-        `user-activity-${userId}-${limit}`
-      );
-
-      return result.activities;
-    } catch (error) {
-      console.error('Error fetching user activity', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<{ activities: UserActivity[] }>(
+      `/api/users-singleton/${userId}/activity?limit=${limit}`,
+      {},
+      `user-activity-${userId}-${limit}`
+    );
+    
+    if (!result.success) {
+      console.error('Error fetching user activity', result.error);
+      return [];
     }
+
+    return result.data?.activities || [];
   }
 
   /**
    * Record user activity
    */
   async recordActivity(userId: string, activity: Omit<UserActivity, 'id' | 'timestamp'>): Promise<UserActivity> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ activity: UserActivity }>(
-        `/api/users-singleton/${userId}/activity`,
-        {
-          method: 'POST',
-          body: JSON.stringify(activity)
-        },
-        `user-activity-record-${userId}`
-      );
-
-      console.log('User activity recorded', { userId, type: activity.type });
-      return result.activity;
-    } catch (error) {
-      console.error('Error recording activity', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<{ activity: UserActivity }>(
+      `/api/users-singleton/${userId}/activity`,
+      {
+        method: 'POST',
+        body: JSON.stringify(activity)
+      },
+      `user-activity-record-${userId}`
+    );
+    
+    if (!result.success) {
+      console.error('Error recording activity', result.error);
+      throw new Error(result.error?.message || 'Failed to record activity');
     }
+
+    console.log('User activity recorded', { userId, type: activity.type });
+    return result.data?.activity || (() => { 
+      throw new Error('No activity data received'); 
+    })();
   }
 
   // ====================
@@ -277,18 +288,20 @@ class UsersSingleton extends AuthenticatedApiSingleton {
    * Get user statistics
    */
   async getUserStats(): Promise<UserStats> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ stats: UserStats }>(
-        '/api/users-singleton/stats',
-        {},
-        'user-stats'
-      );
-
-      return result.stats;
-    } catch (error) {
-      console.error('Error fetching user stats', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<{ stats: UserStats }>(
+      '/api/users-singleton/stats',
+      {},
+      'user-stats'
+    );
+    
+    if (!result.success) {
+      console.error('Error fetching user stats', result.error);
+      throw new Error(result.error?.message || 'Failed to fetch user stats');
     }
+
+    return result.data?.stats || (() => { 
+      throw new Error('No user stats data received'); 
+    })();
   }
 
   // ====================
@@ -308,18 +321,18 @@ class UsersSingleton extends AuthenticatedApiSingleton {
    * Search users
    */
   async searchUsers(query: string, limit: number = 20): Promise<User[]> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ users: User[] }>(
-        `/api/users-singleton?limit=${limit}&search=${encodeURIComponent(query)}`,
-        {},
-        `user-search-${query}-${limit}`
-      );
-
-      return result.users;
-    } catch (error) {
-      console.error('Error searching users', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<{ users: User[] }>(
+      `/api/users-singleton?limit=${limit}&search=${encodeURIComponent(query)}`,
+      {},
+      `user-search-${query}-${limit}`
+    );
+    
+    if (!result.success) {
+      console.error('Error searching users', result.error);
+      return [];
     }
+
+    return result.data?.users || [];
   }
 
   // ====================

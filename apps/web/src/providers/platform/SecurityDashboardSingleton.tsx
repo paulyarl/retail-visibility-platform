@@ -108,8 +108,14 @@ class SecurityDashboardSingleton extends AuthenticatedApiSingleton {
     }
 
     try {
-      const data = await this.makeAuthenticatedRequest<{ data: LoginSession[] }>('/api/auth/sessions', {}, 'active_sessions_raw');
-      const sessions = data.data || [];
+      const result = await this.makeAuthenticatedRequest<{ data: LoginSession[] }>('/api/auth/sessions', {}, 'active_sessions_raw');
+      
+      if (!result.success) {
+        console.error('Error fetching active sessions:', result.error);
+        return [];
+      }
+      
+      const sessions = result.data?.data || [];
 
       // Parse deviceInfo JSON string for each session
       const parsedSessions = sessions.map((session: any) => ({
@@ -138,12 +144,10 @@ class SecurityDashboardSingleton extends AuthenticatedApiSingleton {
    * Get security metrics
    */
   async getSecurityMetrics(hours: number = 24): Promise<SecurityMetrics> {
-    try {
-      const metrics = await this.makeAuthenticatedRequest<SecurityMetrics>(`/api/security/metrics?hours=${hours}`, {}, `security-metrics-${hours}`);
-
-      return metrics;
-    } catch (error) {
-      console.error('Error fetching security metrics:', error);
+    const result = await this.makeAuthenticatedRequest<SecurityMetrics>(`/api/security/metrics?hours=${hours}`, {}, `security-metrics-${hours}`);
+    
+    if (!result.success) {
+      console.error('Error fetching security metrics:', result.error);
       return {
         failedLoginAttempts: 0,
         blockedRequests: 0,
@@ -161,6 +165,10 @@ class SecurityDashboardSingleton extends AuthenticatedApiSingleton {
         }
       } as SecurityMetrics;
     }
+    
+    return result.data || (() => { 
+      throw new Error('No security metrics data received'); 
+    })();
   }
 
   /**
@@ -179,7 +187,13 @@ class SecurityDashboardSingleton extends AuthenticatedApiSingleton {
       });
 
       const result = await this.makeAuthenticatedRequest<{ threats: SecurityThreat[] }>(`/api/security/threats?${params}`, {}, `recent-threats-${threatStatus}-${hours}`);
-      const threats = result.threats || [];
+      
+      if (!result.success) {
+        console.error('Error fetching security threats:', result.error);
+        return [];
+      }
+      
+      const threats = result.data?.threats || [];
 
       return threats;
     } catch (error) {
@@ -192,15 +206,16 @@ class SecurityDashboardSingleton extends AuthenticatedApiSingleton {
    * Get blocked IPs
    */
   async getBlockedIPs(hours: number = 24): Promise<BlockedIP[]> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ data: BlockedIP[] }>(`/api/security/blocked-ips?hours=${hours}`, {}, `blocked-ips-${hours}`);
-      const blockedIPs = result.data || [];
-
-      return blockedIPs;
-    } catch (error) {
-      console.error('Error fetching blocked IPs:', error);
+    const result = await this.makeAuthenticatedRequest<{ data: BlockedIP[] }>(`/api/security/blocked-ips?hours=${hours}`, {}, `blocked-ips-${hours}`);
+    
+    if (!result.success) {
+      console.error('Error fetching blocked IPs:', result.error);
       return [];
     }
+    
+    const blockedIPs = result.data?.data || [];
+
+    return blockedIPs;
   }
 
   /**
@@ -217,7 +232,13 @@ class SecurityDashboardSingleton extends AuthenticatedApiSingleton {
       });
 
       const result = await this.makeAuthenticatedRequest<{ data: SecurityAlert[] }>(`/api/security/alerts?${params}`, {}, `security-alerts-${alertLevel}-${hours}`);
-      const alerts = result.data || [];
+      
+      if (!result.success) {
+        console.error('Error fetching security alerts:', result.error);
+        return [];
+      }
+      
+      const alerts = result.data?.data || [];
 
       return alerts;
     } catch (error) {
@@ -234,34 +255,34 @@ class SecurityDashboardSingleton extends AuthenticatedApiSingleton {
    * Revoke a specific session
    */
   async revokeSession(sessionId: string): Promise<void> {
-    try {
-      await this.makeAuthenticatedRequest(`/api/auth/sessions/${sessionId}`, {
-        method: 'DELETE'
-      });
-
-      // Clear cache to refresh data
-      await this.clearCache();
-    } catch (error) {
-      console.error('Error revoking session:', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest(`/api/auth/sessions/${sessionId}`, {
+      method: 'DELETE'
+    });
+    
+    if (!result.success) {
+      console.error('Error revoking session:', result.error);
+      throw new Error(result.error?.message || 'Failed to revoke session');
     }
+
+    // Clear cache to refresh data
+    await this.clearCache();
   }
 
   /**
    * Revoke all sessions except current
    */
   async revokeAllSessions(): Promise<void> {
-    try {
-      await this.makeAuthenticatedRequest('/api/auth/sessions/revoke-all', {
-        method: 'POST'
-      });
-
-      // Clear cache to refresh data
-      await this.clearCache();
-    } catch (error) {
-      console.error('Error revoking all sessions:', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest('/api/auth/sessions/revoke-all', {
+      method: 'POST'
+    });
+    
+    if (!result.success) {
+      console.error('Error revoking all sessions:', result.error);
+      throw new Error(result.error?.message || 'Failed to revoke all sessions');
     }
+
+    // Clear cache to refresh data
+    await this.clearCache();
   }
 
   // ====================
@@ -290,29 +311,33 @@ class SecurityDashboardSingleton extends AuthenticatedApiSingleton {
   }
 
   /**
-   * Get security health status (quick check)
+   * Get security health status
    */
   async getSecurityHealthStatus(): Promise<{
     status: 'healthy' | 'warning' | 'critical';
     score: number;
     issues: string[];
   }> {
-    try {
-      const healthStatus = await this.makeAuthenticatedRequest<{
-        status: 'healthy' | 'warning' | 'critical';
-        score: number;
-        issues: string[];
-      }>('/api/security/health', {}, 'security-health-status');
-      
-      return healthStatus;
-    } catch (error) {
-      console.error('Error fetching security health status:', error);
+    const result = await this.makeAuthenticatedRequest<{
+      status: 'healthy' | 'warning' | 'critical';
+      score: number;
+      issues: string[];
+    }>('/api/security/health', {}, 'security-health-status');
+    
+    if (!result.success) {
+      console.error('Error fetching security health status:', result.error);
       return {
         status: 'warning',
         score: 75,
         issues: ['Unable to fetch complete security status']
       };
     }
+    
+    return result.data || {
+      status: 'warning',
+      score: 75,
+      issues: ['No health data received']
+    };
   }
 }
 

@@ -69,10 +69,14 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         `display:storefront-recommendations-${tenantId}`,
         this.SEMI_STATIC_TTL // 10 minutes for storefront recommendations
       );
+      if (!result.success) {
+        console.error('[RecommendationsSingleton] Failed to get storefront recommendations:', result.error);
+        return [];
+      }
       
       // API returns nested structure: { recommendations: [{ type, title, recommendations: [...stores] }] }
       // Flatten to get the actual store recommendations
-      const allStores = (result.recommendations || []).flatMap(
+      const allStores = (result.data?.recommendations || []).flatMap(
         (group: RecommendationGroup) => group.recommendations || []
       );
       
@@ -98,8 +102,13 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
+      if (!result.success) {
+        console.error('[RecommendationsSingleton] Failed to get storefront recommendations:', result.error);
+        return [];
+      }
+
       // Flatten all recommendation groups into a single array
-      const allStores = (result?.recommendations || []).flatMap(
+      const allStores = (result.data?.recommendations || []).flatMap(
         (group: RecommendationGroup) => group.recommendations || []
       );
       
@@ -143,7 +152,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.STATIC_TTL // 30 minutes for general directory recommendations
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get directory recommendations:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get directory recommendations:', error);
       return null;
@@ -163,7 +177,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get enhanced categories:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get enhanced categories:', error);
       return null;
@@ -183,7 +202,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get category counts:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get category counts:', error);
       return null;
@@ -196,14 +220,27 @@ class RecommendationsSingletonService extends PublicApiSingleton {
    */
   async getDirectoryStoreTypes(): Promise<any> {
     try {
+      console.log('[RecommendationsSingleton] before request');
       const response = await this.makePublicRequest<any>(
         '/api/directory/store-types',
         {},
         'directory-store-types',
         this.cacheTTL
       );
+      
+      console.log('[RecommendationsSingleton] before check response.data?.data?.storeTypes store types:', response.data?.data?.storeTypes);
+      console.log('[RecommendationsSingleton] before chedk response.data?.storeTypes store types:', response.data?.storeTypes);
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get store types:', response.error);
+        return null;
+      }
+
+      // API returns: { success: true, data: { storeTypes: [...] } }
+      // makePublicRequest wraps this, so we need response.data.data.storeTypes
+      console.log('[RecommendationsSingleton] response.data?.data?.storeTypes store types:', response.data?.data?.storeTypes);
+      console.log('[RecommendationsSingleton] response.data?.storeTypes store types:', response.data?.storeTypes);
+      return response.data?.data?.storeTypes || null;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get store types:', error);
       return null;
@@ -223,7 +260,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.SEMI_STATIC_TTL // 10 minutes for store type recommendations
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get store type recommendations:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get store type recommendations:', error);
       return null;
@@ -243,7 +285,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.SEMI_STATIC_TTL // 10 minutes for store type details
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get store type details:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get store type details:', error);
       return null;
@@ -263,7 +310,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get stores by store type:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get stores by store type:', error);
       return null;
@@ -321,7 +373,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.PERSONALIZED_TTL // 1 minute for personalized recommendations
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get last viewed recommendations:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get last viewed recommendations:', error);
       return null;
@@ -348,7 +405,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get product page recommendations:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get product page recommendations:', error);
       return null;
@@ -368,7 +430,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get directory MV categories:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get directory MV categories:', error);
       return null;
@@ -388,7 +455,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get directory categories:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get directory categories:', error);
       return null;
@@ -412,7 +484,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get stores by category:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get stores by category:', error);
       return null;
@@ -441,7 +518,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to search by category:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to search by category:', error);
       return null;
@@ -471,7 +553,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to search by location:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to search by location:', error);
       return null;
@@ -491,7 +578,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get directory locations:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get directory locations:', error);
       return null;
@@ -515,7 +607,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get tenant directory slug:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get tenant directory slug:', error);
       return null;
@@ -539,7 +636,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to search categories:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to search categories:', error);
       return null;
@@ -578,7 +680,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to search directory stores:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to search directory stores:', error);
       return null;
@@ -613,7 +720,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get featured stores:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get featured stores:', error);
       return null;
@@ -637,7 +749,12 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
 
-      return response;
+      if (!response.success) {
+        console.error('[RecommendationsSingleton] Failed to get directory consolidated:', response.error);
+        return null;
+      }
+
+      return response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get directory consolidated:', error);
       return null;

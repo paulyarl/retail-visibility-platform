@@ -74,114 +74,118 @@ class AdminCategoriesService extends AuthenticatedApiSingleton {
    * Get all platform categories
    */
   async getCategories(): Promise<AdminCategory[]> {
-    try {
-      const response = await this.makeAuthenticatedRequest<{
-        categories: AdminCategory[];
-      }>(
-        '/api/platform/categories',
-        {},
-        'admin-categories-list',
-        this.CATEGORIES_TTL
-      );
+    const result = await this.makeAdminRequest<{
+      categories: AdminCategory[];
+    }>(
+      '/api/platform/categories',
+      {},
+      'admin-categories-list',
+      this.CATEGORIES_TTL
+    );
 
-      return response?.categories || [];
-    } catch (error) {
-      console.error('[AdminCategoriesService] Failed to get categories:', error);
+    if (!result.success) {
+      console.error('[AdminCategoriesService] Failed to get categories:', result.error);
       return [];
     }
+
+    return result.data?.categories || [];
   }
 
   /**
    * Get category by ID
    */
   async getCategory(categoryId: string): Promise<AdminCategory | null> {
-    try {
-      const response = await this.makeAuthenticatedRequest<AdminCategory>(
-        `/api/platform/categories/${categoryId}`,
-        {},
-        `admin-category-${categoryId}`,
-        this.CATEGORIES_TTL
-      );
+    const result = await this.makeAdminRequest<AdminCategory>(
+      `/api/platform/categories/${categoryId}`,
+      {},
+      `admin-category-${categoryId}`,
+      this.CATEGORIES_TTL
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[AdminCategoriesService] Failed to get category:', error);
+    if (!result.success) {
+      console.error('[AdminCategoriesService] Failed to get category:', {
+        categoryId,
+        error: result.error,
+        status: result.status
+      });
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
    * Create a new category
    */
   async createCategory(categoryData: CreateCategoryRequest): Promise<AdminCategory | null> {
-    try {
-      const response = await this.makeAuthenticatedRequest<AdminCategory>(
-        '/api/platform/categories',
-        {
-          method: 'POST',
-          body: JSON.stringify(categoryData)
-        },
-        'admin-create-category',
-        0 // No caching for write operations
-      );
+    const response = await this.makeAdminRequest<AdminCategory>(
+      '/api/platform/categories',
+      {
+        method: 'POST',
+        body: JSON.stringify(categoryData)
+      },
+      'admin-create-category',
+      0 // No caching for write operations
+    );
 
-      // Invalidate categories list cache
-      await this.invalidateCache('admin-categories-list');
-      
-      return response;
-    } catch (error) {
-      console.error('[AdminCategoriesService] Failed to create category:', error);
+    if (!response.success) {
+      console.error('[AdminCategoriesService] Failed to create category:', response.error);
       return null;
     }
+
+    // Invalidate categories list cache
+    await this.invalidateCache('admin-categories-list');
+    
+    return response.data || null;
   }
 
   /**
    * Update an existing category
    */
   async updateCategory(categoryId: string, categoryData: UpdateCategoryRequest): Promise<AdminCategory | null> {
-    try {
-      const response = await this.makeAuthenticatedRequest<AdminCategory>(
-        `/api/platform/categories/${categoryId}`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify(categoryData)
-        },
-        `admin-update-category-${categoryId}`,
-        0 // No caching for write operations
-      );
+    const response = await this.makeAdminRequest<AdminCategory>(
+      `/api/platform/categories/${categoryId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(categoryData)
+      },
+      `admin-update-category-${categoryId}`,
+      0 // No caching for write operations
+    );
 
-      // Invalidate relevant caches
-      await this.invalidateCache('admin-categories-list');
-      await this.invalidateCache(`admin-category-${categoryId}`);
-      
-      return response;
-    } catch (error) {
-      console.error('[AdminCategoriesService] Failed to update category:', error);
+    if (!response.success) {
+      console.error('[AdminCategoriesService] Failed to update category:', response.error);
       return null;
     }
+
+    // Invalidate relevant caches
+    await this.invalidateCache('admin-categories-list');
+    await this.invalidateCache(`admin-category-${categoryId}`);
+    
+    return response.data || null;
   }
 
   /**
    * Delete a category
    */
   async deleteCategory(categoryId: string): Promise<boolean> {
-    try {
-      await this.makeAuthenticatedRequest<void>(
-        `/api/platform/categories/${categoryId}`,
-        { method: 'DELETE' },
-        `admin-delete-category-${categoryId}`,
-        0 // No caching for write operations
-      );
+    const response = await this.makeAdminRequest<void>(
+      `/api/platform/categories/${categoryId}`,
+      { method: 'DELETE' },
+      `admin-delete-category-${categoryId}`,
+      0 // No caching for write operations
+    );
 
-      // Invalidate relevant caches
-      await this.invalidateCache('admin-categories-list');
-      await this.invalidateCache(`admin-category-${categoryId}`);
-      
-      return true;
-    } catch (error) {
-      console.error('[AdminCategoriesService] Failed to delete category:', error);
+    if (!response.success) {
+      console.error('[AdminCategoriesService] Failed to delete category:', response.error);
       return false;
     }
+
+    // Invalidate relevant caches
+    await this.invalidateCache('admin-categories-list');
+    await this.invalidateCache(`admin-category-${categoryId}`);
+    
+    return true;
   }
 
   /**
@@ -189,7 +193,7 @@ class AdminCategoriesService extends AuthenticatedApiSingleton {
    */
   async reorderCategories(categoryIds: string[]): Promise<boolean> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeAdminRequest<void>(
         '/api/admin/platform-categories/reorder',
         {
           method: 'POST',
@@ -226,24 +230,24 @@ class AdminCategoriesService extends AuthenticatedApiSingleton {
    * Get categories for quick start
    */
   async getQuickStartCategories(businessType: string, categoryCount: number): Promise<AdminCategory[]> {
-    try {
-      const response = await this.makeAuthenticatedRequest<{
-        categories: AdminCategory[];
-      }>(
-        '/api/platform/categories/quick-start',
-        {
-          method: 'POST',
-          body: JSON.stringify({ businessType, categoryCount })
-        },
-        `admin-quick-start-${businessType}-${categoryCount}`,
-        this.CATEGORIES_TTL
-      );
+    const response = await this.makeAdminRequest<{
+      categories: AdminCategory[];
+    }>(
+      '/api/platform/categories/quick-start',
+      {
+        method: 'POST',
+        body: JSON.stringify({ businessType, categoryCount })
+      },
+      `admin-quick-start-${businessType}-${categoryCount}`,
+      this.CATEGORIES_TTL
+    );
 
-      return response?.categories || [];
-    } catch (error) {
-      console.error('[AdminCategoriesService] Failed to get quick start categories:', error);
+    if (!response.success) {
+      console.error('[AdminCategoriesService] Failed to get quick start categories:', response.error);
       return [];
     }
+
+    return response.data?.categories || [];
   }
 
   /**
@@ -251,7 +255,7 @@ class AdminCategoriesService extends AuthenticatedApiSingleton {
    */
   async seedGBPCategories(): Promise<boolean> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeAdminRequest<void>(
         '/api/platform/categories/gbp-seed',
         { method: 'POST' },
         'admin-seed-gbp-categories',
@@ -280,23 +284,35 @@ class AdminCategoriesService extends AuthenticatedApiSingleton {
     totalProductCount: number;
     totalTenantCount: number;
   }> {
-    try {
-      const response = await this.makeAuthenticatedRequest<{
-        totalCategories: number;
-        activeCategories: number;
-        inactiveCategories: number;
-        categoriesWithGoogleMapping: number;
-        categoriesWithoutGoogleMapping: number;
-        totalProductCount: number;
-        totalTenantCount: number;
-      }>(
-        '/api/admin/categories/stats',
-        {},
-        'admin-category-stats',
-        this.CATEGORIES_TTL
-      );
+    const response = await this.makeAdminRequest<{
+      totalCategories: number;
+      activeCategories: number;
+      inactiveCategories: number;
+      categoriesWithGoogleMapping: number;
+      categoriesWithoutGoogleMapping: number;
+      totalProductCount: number;
+      totalTenantCount: number;
+    }>(
+      '/api/admin/categories/stats',
+      {},
+      'admin-category-stats',
+      this.CATEGORIES_TTL
+    );
 
-      return response || {
+      if (!response.success) {
+        console.error('[AdminCategoriesService] Failed to get category stats:', response.error);
+        return {
+          totalCategories: 0,
+          activeCategories: 0,
+          inactiveCategories: 0,
+          categoriesWithGoogleMapping: 0,
+          categoriesWithoutGoogleMapping: 0,
+          totalProductCount: 0,
+          totalTenantCount: 0
+        };
+      }
+
+      return response.data || {
         totalCategories: 0,
         activeCategories: 0,
         inactiveCategories: 0,
@@ -305,18 +321,6 @@ class AdminCategoriesService extends AuthenticatedApiSingleton {
         totalProductCount: 0,
         totalTenantCount: 0
       };
-    } catch (error) {
-      console.error('[AdminCategoriesService] Failed to get category stats:', error);
-      return {
-        totalCategories: 0,
-        activeCategories: 0,
-        inactiveCategories: 0,
-        categoriesWithGoogleMapping: 0,
-        categoriesWithoutGoogleMapping: 0,
-        totalProductCount: 0,
-        totalTenantCount: 0
-      };
-    }
   }
 
   /**

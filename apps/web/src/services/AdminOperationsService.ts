@@ -89,19 +89,19 @@ class AdminOperationsService extends AuthenticatedApiSingleton {
    * Get admin dashboard statistics
    */
   async getAdminStats(): Promise<AdminStats | null> {
-    try {
-      const response = await this.makeAuthenticatedRequest<AdminStats>(
-        '/api/admin/stats',
-        {},
-        'admin-stats',
-        this.cacheTTL
-      );
+    const result = await this.makeAdminRequest<AdminStats>(
+      '/api/admin/stats',
+      {},
+      'admin-stats',
+      this.cacheTTL
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[AdminOperationsService] Failed to get admin stats:', error);
+    if (!result.success) {
+      console.error('[AdminOperationsService] Failed to get admin stats:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
@@ -112,28 +112,28 @@ class AdminOperationsService extends AuthenticatedApiSingleton {
     status?: 'active' | 'inactive';
     search?: string;
   }): Promise<{ users: AdminUser[]; pagination: any }> {
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-      });
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
 
-      if (filters?.role) params.append('role', filters.role);
-      if (filters?.status) params.append('status', filters.status);
-      if (filters?.search) params.append('search', filters.search);
+    if (filters?.role) params.append('role', filters.role);
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.search) params.append('search', filters.search);
 
-      const response = await this.makeAuthenticatedRequest<{ users: AdminUser[]; pagination: any }>(
-        `/api/admin/users?${params.toString()}`,
-        {},
-        `admin-users-${page}-${limit}-${JSON.stringify(filters)}`,
-        this.cacheTTL
-      );
+    const result = await this.makeAdminRequest<{ users: AdminUser[]; pagination: any }>(
+      `/api/admin/users?${params.toString()}`,
+      {},
+      `admin-users-${page}-${limit}-${JSON.stringify(filters)}`,
+      this.cacheTTL
+    );
 
-      return response || { users: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
-    } catch (error) {
-      console.error('[AdminOperationsService] Failed to get users:', error);
+    if (!result.success) {
+      console.error('[AdminOperationsService] Failed to get users:', result.error);
       return { users: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     }
+
+    return result.data || { users: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
   }
 
   /**
@@ -154,14 +154,19 @@ class AdminOperationsService extends AuthenticatedApiSingleton {
       if (filters?.plan) params.append('plan', filters.plan);
       if (filters?.search) params.append('search', filters.search);
 
-      const response = await this.makeAuthenticatedRequest<{ tenants: AdminTenant[]; pagination: any }>(
+      const result = await this.makeAdminRequest<{ tenants: AdminTenant[]; pagination: any }>(
         `/api/admin/tenants?${params.toString()}`,
         {},
         `admin-tenants-${page}-${limit}-${JSON.stringify(filters)}`,
         this.cacheTTL
       );
 
-      return response || { tenants: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
+      if (!result.success) {
+        console.error('[AdminOperationsService] Failed to get tenants:', result.error);
+        return { tenants: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
+      }
+
+      return result.data || { tenants: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     } catch (error) {
       console.error('[AdminOperationsService] Failed to get tenants:', error);
       return { tenants: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
@@ -173,14 +178,19 @@ class AdminOperationsService extends AuthenticatedApiSingleton {
    */
   async getSystemAlerts(resolved: boolean = false, page: number = 1, limit: number = 50): Promise<{ alerts: SystemAlert[]; pagination: any }> {
     try {
-      const response = await this.makeAuthenticatedRequest<{ alerts: SystemAlert[]; pagination: any }>(
+      const result = await this.makeAdminRequest<{ alerts: SystemAlert[]; pagination: any }>(
         `/api/admin/alerts?resolved=${resolved}&page=${page}&limit=${limit}`,
         {},
         `admin-alerts-${resolved}-${page}-${limit}`,
         this.cacheTTL
       );
 
-      return response || { alerts: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
+      if (!result.success) {
+        console.error('[AdminOperationsService] Failed to get system alerts:', result.error);
+        return { alerts: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
+      }
+
+      return result.data || { alerts: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     } catch (error) {
       console.error('[AdminOperationsService] Failed to get system alerts:', error);
       return { alerts: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
@@ -191,96 +201,96 @@ class AdminOperationsService extends AuthenticatedApiSingleton {
    * Get security metrics
    */
   async getSecurityMetrics(): Promise<SecurityMetrics | null> {
-    try {
-      const response = await this.makeAuthenticatedRequest<SecurityMetrics>(
-        '/api/admin/security/metrics',
-        {},
-        'admin-security-metrics',
-        this.cacheTTL
-      );
+    const result = await this.makeAdminRequest<SecurityMetrics>(
+      '/api/admin/security/metrics',
+      {},
+      'admin-security-metrics',
+      this.cacheTTL
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[AdminOperationsService] Failed to get security metrics:', error);
+    if (!result.success) {
+      console.error('[AdminOperationsService] Failed to get security metrics:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
    * Resolve system alert
    */
   async resolveAlert(alertId: string, resolution: string): Promise<boolean> {
-    try {
-      await this.makeAuthenticatedRequest(
-        `/api/admin/alerts/${alertId}/resolve`,
-        {
-          method: 'PUT',
-          body: JSON.stringify({ resolution })
-        },
-        `admin-alert-${alertId}`,
-        0 // No cache for updates
-      );
+    const result = await this.makeAdminRequest<void>(
+      `/api/admin/alerts/${alertId}/resolve`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ resolution })
+      },
+      `admin-alert-${alertId}`,
+      0 // No cache for updates
+    );
 
-      // Invalidate alerts cache
-      await this.invalidateCache('admin-alerts*');
-
-      return true;
-    } catch (error) {
-      console.error('[AdminOperationsService] Failed to resolve alert:', error);
+    if (!result.success) {
+      console.error('[AdminOperationsService] Failed to resolve alert:', result.error);
       return false;
     }
+
+    // Invalidate alerts cache
+    await this.invalidateCache('admin-alerts*');
+
+    return true;
   }
 
   /**
    * Suspend/unsuspend user
    */
   async updateUserStatus(userId: string, isActive: boolean, reason?: string): Promise<boolean> {
-    try {
-      await this.makeAuthenticatedRequest(
-        `/api/admin/users/${userId}/status`,
-        {
-          method: 'PUT',
-          body: JSON.stringify({ isActive, reason })
-        },
-        `admin-user-status-${userId}`,
-        0 // No cache for updates
-      );
+    const result = await this.makeAdminRequest<void>(
+      `/api/admin/users/${userId}/status`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ isActive, reason })
+      },
+      `admin-user-status-${userId}`,
+      0 // No cache for updates
+    );
 
-      // Invalidate user-related caches
-      await this.invalidateCache('admin-users*');
-      await this.invalidateCache('admin-stats*');
-
-      return true;
-    } catch (error) {
-      console.error('[AdminOperationsService] Failed to update user status:', error);
+    if (!result.success) {
+      console.error('[AdminOperationsService] Failed to update user status:', result.error);
       return false;
     }
+
+    // Invalidate user-related caches
+    await this.invalidateCache('admin-users*');
+    await this.invalidateCache('admin-stats*');
+
+    return true;
   }
 
   /**
    * Suspend/unsuspend tenant
    */
   async updateTenantStatus(tenantId: string, status: 'active' | 'inactive' | 'suspended', reason?: string): Promise<boolean> {
-    try {
-      await this.makeAuthenticatedRequest(
-        `/api/admin/tenants/${tenantId}/status`,
-        {
-          method: 'PUT',
-          body: JSON.stringify({ status, reason })
-        },
-        `admin-tenant-status-${tenantId}`,
-        0 // No cache for updates
-      );
+    const result = await this.makeAdminRequest<void>(
+      `/api/admin/tenants/${tenantId}/status`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ status, reason })
+      },
+      `admin-tenant-status-${tenantId}`,
+      0 // No cache for updates
+    );
 
-      // Invalidate tenant-related caches
-      await this.invalidateCache('admin-tenants*');
-      await this.invalidateCache('admin-stats*');
-
-      return true;
-    } catch (error) {
-      console.error('[AdminOperationsService] Failed to update tenant status:', error);
+    if (!result.success) {
+      console.error('[AdminOperationsService] Failed to update tenant status:', result.error);
       return false;
     }
+
+    // Invalidate tenant-related caches
+    await this.invalidateCache('admin-tenants*');
+    await this.invalidateCache('admin-stats*');
+
+    return true;
   }
 
   /**
@@ -303,14 +313,19 @@ class AdminOperationsService extends AuthenticatedApiSingleton {
       if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
       if (filters?.dateTo) params.append('dateTo', filters.dateTo);
 
-      const response = await this.makeAuthenticatedRequest<{ logs: any[]; pagination: any }>(
+      const result = await this.makeAdminRequest<{ logs: any[]; pagination: any }>(
         `/api/admin/activity-logs?${params.toString()}`,
         {},
         `admin-activity-logs-${page}-${limit}-${JSON.stringify(filters)}`,
         this.cacheTTL
       );
 
-      return response || { logs: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
+      if (!result.success) {
+        console.error('[AdminOperationsService] Failed to get activity logs:', result.error);
+        return { logs: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
+      }
+
+      return result.data || { logs: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
     } catch (error) {
       console.error('[AdminOperationsService] Failed to get activity logs:', error);
       return { logs: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
@@ -327,14 +342,19 @@ class AdminOperationsService extends AuthenticatedApiSingleton {
         ...(filters || {})
       });
 
-      const response = await this.makeAuthenticatedRequest<Blob>(
+      const result = await this.makeAdminRequest<Blob>(
         `/api/admin/export/${type}?${params.toString()}`,
         {},
         `admin-export-${type}-${format}`,
         0 // No cache for exports
       );
 
-      return response;
+      if (!result.success) {
+        console.error('[AdminOperationsService] Failed to export data:', result.error);
+        throw new Error(result.error?.message || 'Failed to export data');
+      }
+
+      return result.data || (() => { throw new Error('No export data received'); })();
     } catch (error) {
       console.error('[AdminOperationsService] Failed to export data:', error);
       throw error;

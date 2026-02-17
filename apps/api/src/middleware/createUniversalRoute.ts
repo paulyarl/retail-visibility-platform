@@ -262,7 +262,7 @@ export function createShopProfileRoute(path: string): Router {
       }
       
       if (!shop) {
-        res.status(404).json({
+        res.status(400).json({
           success: false,
           error: 'Shop not found',
           message: 'Shop details not available for this tenant'

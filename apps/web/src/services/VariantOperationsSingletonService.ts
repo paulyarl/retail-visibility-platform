@@ -89,8 +89,8 @@ class VariantOperationsSingletonService extends UniversalSingleton {
       );
 
       // Add success message if not provided
-      if (response && !response.message) {
-        response.message = `Successfully updated featured type for ${response.processed} variants${response.failed > 0 ? ` (${response.failed} failed)` : ''}`;
+      if (response.data && !response.data.message) {
+        response.data.message = `Successfully updated featured type for ${response.data.processed} variants${response.data.failed > 0 ? ` (${response.data.failed} failed)` : ''}`;
       }
 
       // Invalidate cache for affected variants
@@ -98,7 +98,7 @@ class VariantOperationsSingletonService extends UniversalSingleton {
         this.invalidateCache(`variant-${variantId}`);
       });
 
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[VariantOperationsSingleton] Failed to bulk update featured type:', error);
       return null;
@@ -132,8 +132,8 @@ class VariantOperationsSingletonService extends UniversalSingleton {
       );
 
       // Add success message if not provided
-      if (response && !response.message) {
-        response.message = `Successfully updated sale price for ${response.processed} variants${response.failed > 0 ? ` (${response.failed} failed)` : ''}`;
+      if (response.data && !response.data.message) {
+        response.data.message = `Successfully updated sale price for ${response.data.processed} variants${response.data.failed > 0 ? ` (${response.data.failed} failed)` : ''}`;
       }
 
       // Invalidate cache for affected variants
@@ -141,7 +141,7 @@ class VariantOperationsSingletonService extends UniversalSingleton {
         this.invalidateCache(`variant-${variantId}`);
       });
 
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[VariantOperationsSingleton] Failed to bulk update sale price:', error);
       return null;
@@ -174,8 +174,8 @@ class VariantOperationsSingletonService extends UniversalSingleton {
       );
 
       // Add success message if not provided
-      if (response && !response.message) {
-        response.message = `Successfully updated inventory for ${response.processed} variants${response.failed > 0 ? ` (${response.failed} failed)` : ''}`;
+      if (response.data && !response.data.message) {
+        response.data.message = `Successfully updated inventory for ${response.data.processed} variants${response.data.failed > 0 ? ` (${response.data.failed} failed)` : ''}`;
       }
 
       // Invalidate cache for affected variants
@@ -183,7 +183,7 @@ class VariantOperationsSingletonService extends UniversalSingleton {
         this.invalidateCache(`variant-${variantId}`);
       });
 
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[VariantOperationsSingleton] Failed to bulk update inventory:', error);
       return null;
@@ -211,8 +211,8 @@ class VariantOperationsSingletonService extends UniversalSingleton {
       );
 
       // Add success message if not provided
-      if (response && !response.message) {
-        response.message = `Successfully deleted ${response.processed} variants${response.failed > 0 ? ` (${response.failed} failed)` : ''}`;
+      if (response.data && !response.data.message) {
+        response.data.message = `Successfully deleted ${response.data.processed} variants${response.data.failed > 0 ? ` (${response.data.failed} failed)` : ''}`;
       }
 
       // Invalidate cache for affected variants
@@ -220,7 +220,7 @@ class VariantOperationsSingletonService extends UniversalSingleton {
         this.invalidateCache(`variant-${variantId}`);
       });
 
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[VariantOperationsSingleton] Failed to bulk delete variants:', error);
       return null;
@@ -248,9 +248,9 @@ class VariantOperationsSingletonService extends UniversalSingleton {
       );
 
       // Add success message if not provided
-      if (response && !response.message) {
+      if (response.data && !response.data.message) {
         const action = active ? 'activated' : 'deactivated';
-        response.message = `Successfully ${action} ${response.processed} variants${response.failed > 0 ? ` (${response.failed} failed)` : ''}`;
+        response.data.message = `Successfully ${action} ${response.data.processed} variants${response.data.failed > 0 ? ` (${response.data.failed} failed)` : ''}`;
       }
 
       // Invalidate cache for affected variants
@@ -258,7 +258,7 @@ class VariantOperationsSingletonService extends UniversalSingleton {
         this.invalidateCache(`variant-${variantId}`);
       });
 
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[VariantOperationsSingleton] Failed to bulk update variant status:', error);
       return null;

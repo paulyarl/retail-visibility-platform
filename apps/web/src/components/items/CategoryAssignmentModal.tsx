@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Item } from '@/services/itemsDataService';
-import TenantCategorySelector from './TenantCategorySelector';
+import CategorySelector from './CategorySelector';
 import { apiRequest } from '@/lib/api';
 
 interface CategoryAssignmentModalProps {
@@ -118,9 +118,19 @@ export default function CategoryAssignmentModal({
             </div>
           </div>
 
-          <TenantCategorySelector
-            selectedCategoryId={selectedCategoryId}
-            onSelect={handleCategorySelect}
+          <CategorySelector
+            currentCategory={selectedCategoryId ? [selectedCategoryId] : []}
+            onCategorySelect={async (categoryPath: string[]) => {
+              if (categoryPath.length > 0) {
+                const selectedCategory = categoryPath[categoryPath.length - 1];
+                // For Google taxonomy, we need to extract the ID and create tenant category
+                const googleCategoryId = selectedCategory;
+                const googleCategoryPath = categoryPath.join(' > ');
+                
+                await handleCategorySelect(googleCategoryId, googleCategoryPath, googleCategoryId);
+              }
+            }}
+            onCancel={onClose}
           />
         </div>
 

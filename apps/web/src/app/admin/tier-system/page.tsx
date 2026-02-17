@@ -83,10 +83,11 @@ export default function TierSystemPage() {
       setError(null);
       
       const tiers = await platformHomeService.getTierSystemTiers();
-      setTiers(tiers || []);
+      setTiers(Array.isArray(tiers) ? tiers : []);
     } catch (err) {
       console.error('Failed to load tiers:', err);
       setError('Failed to load tiers');
+      setTiers([]); // Ensure tiers is always an array
     } finally {
       setLoading(false);
     }
@@ -416,7 +417,7 @@ export default function TierSystemPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {tiers
+                {Array.isArray(tiers) && tiers
                   .sort((a, b) => a.sortOrder - b.sortOrder)
                   .map((tier) => (
                     <div

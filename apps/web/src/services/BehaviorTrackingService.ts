@@ -126,27 +126,19 @@ class BehaviorTrackingService extends PublicApiSingleton {
   }
 
   /**
-   * Get behavior analytics data
+   * Get behavior analytics
    * Uses the /api/analytics/behavior endpoint
    */
   async getBehaviorAnalytics(hours: number = 24): Promise<BehaviorAnalytics> {
-    try {
-      const response = await this.makePublicRequest<BehaviorAnalytics>(
-        `/analytics/behavior?hours=${hours}`,
-        {},
-        `behavior-analytics-${hours}`,
-        this.ANALYTICS_TTL
-      );
+    const response = await this.makePublicRequest<BehaviorAnalytics>(
+      `/analytics/behavior?hours=${hours}`,
+      {},
+      `behavior-analytics-${hours}`,
+      this.ANALYTICS_TTL
+    );
 
-      return response || {
-        totalEvents: 0,
-        uniqueUsers: 0,
-        topActions: [],
-        hourlyBreakdown: [],
-        userBehaviorPatterns: []
-      };
-    } catch (error) {
-      console.error('[BehaviorTrackingService] Failed to get behavior analytics:', error);
+    if (!response.success) {
+      console.error('[BehaviorTrackingService] Failed to get behavior analytics:', response.error);
       return {
         totalEvents: 0,
         uniqueUsers: 0,
@@ -155,6 +147,14 @@ class BehaviorTrackingService extends PublicApiSingleton {
         userBehaviorPatterns: []
       };
     }
+
+    return response.data || {
+      totalEvents: 0,
+      uniqueUsers: 0,
+      topActions: [],
+      hourlyBreakdown: [],
+      userBehaviorPatterns: []
+    };
   }
 
   /**
@@ -162,19 +162,19 @@ class BehaviorTrackingService extends PublicApiSingleton {
    * Uses the /api/analytics/users/:userId/behavior endpoint
    */
   async getUserBehaviorPatterns(userId: string, days: number = 30): Promise<any> {
-    try {
-      const response = await this.makePublicRequest<any>(
-        `/analytics/users/${userId}/behavior?days=${days}`,
-        {},
-        `user-behavior-${userId}-${days}`,
-        this.ANALYTICS_TTL
-      );
+    const response = await this.makePublicRequest<any>(
+      `/analytics/users/${userId}/behavior?days=${days}`,
+      {},
+      `user-behavior-${userId}-${days}`,
+      this.ANALYTICS_TTL
+    );
 
-      return response;
-    } catch (error) {
-      console.error('[BehaviorTrackingService] Failed to get user behavior patterns:', error);
+    if (!response.success) {
+      console.error('[BehaviorTrackingService] Failed to get user behavior patterns:', response.error);
       return null;
     }
+
+    return response.data || null;
   }
 
   /**

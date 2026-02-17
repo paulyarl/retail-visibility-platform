@@ -102,19 +102,20 @@ class RateLimitingControllerSingleton extends AuthenticatedApiSingleton {
    * Load rate limit rules from database
    */
   private async loadRateLimitRules(): Promise<void> {
-    try {
-      const rules = await this.makeAuthenticatedRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
-      
-      // Update rules cache
-      this.rateLimitRules.clear();
-      rules.forEach(rule => {
-        this.rateLimitRules.set(rule.routeType, rule);
-      });
-
-      // Cache is handled automatically
-    } catch (error) {
-      console.error('Error loading rate limit rules:', error);
+    const result = await this.makeAuthenticatedRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
+    
+    if (!result.success) {
+      console.error('Error loading rate limit rules:', result.error);
+      return;
     }
+    
+    // Update rules cache
+    this.rateLimitRules.clear();
+    result.data?.forEach(rule => {
+      this.rateLimitRules.set(rule.routeType, rule);
+    });
+
+    // Cache is handled automatically
   }
 
   // ====================
@@ -125,104 +126,108 @@ class RateLimitingControllerSingleton extends AuthenticatedApiSingleton {
    * Create a new rate limit rule
    */
   async createRateLimitRule(rule: Omit<RateLimitRule, 'id' | 'createdAt' | 'updatedAt'>): Promise<RateLimitRule> {
-    try {
-      const newRule: RateLimitRule = {
-        ...rule,
-        id: this.generateRuleId(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
+    const newRule: RateLimitRule = {
+      ...rule,
+      id: this.generateRuleId(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
 
-      const createdRule = await this.makeAuthenticatedRequest<RateLimitRule>('/api/admin/rate-limiting/rules', {
-        method: 'POST',
-        body: JSON.stringify(newRule)
-      });
-      
-      // Update local cache
-      this.rateLimitRules.set(createdRule.routeType, createdRule);
-      
-      // Clear cache to force refresh
-      await this.invalidateCache('rate-limit-rules');
-
-      return createdRule;
-    } catch (error) {
-      console.error('Error creating rate limit rule:', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<RateLimitRule>('/api/admin/rate-limiting/rules', {
+      method: 'POST',
+      body: JSON.stringify(newRule)
+    });
+    
+    if (!result.success) {
+      console.error('Error creating rate limit rule:', result.error);
+      throw new Error(result.error?.message || 'Failed to create rate limit rule');
     }
+    
+    const createdRule = result.data || (() => { throw new Error('No rule data received'); })();
+    
+    // Update local cache
+    this.rateLimitRules.set(createdRule.routeType, createdRule);
+    
+    // Clear cache to force refresh
+    await this.invalidateCache('rate-limit-rules');
+
+    return createdRule;
   }
 
   /**
    * Update an existing rate limit rule
    */
   async updateRateLimitRule(routeType: string, updates: Partial<RateLimitRule>): Promise<RateLimitRule> {
-    try {
-      const existingRule = this.rateLimitRules.get(routeType);
-      if (!existingRule) {
-        throw new Error('Rate limit rule not found');
-      }
-
-      const updatedRule: RateLimitRule = {
-        ...existingRule,
-        ...updates,
-        updatedAt: new Date().toISOString()
-      };
-
-      const returnedRule = await this.makeAuthenticatedRequest<RateLimitRule>(`/api/admin/rate-limiting/rules/${routeType}`, {
-        method: 'PUT',
-        body: JSON.stringify(updatedRule)
-      });
-      
-      // Update local cache
-      this.rateLimitRules.set(routeType, returnedRule);
-      
-      // Clear cache to force refresh
-      await this.invalidateCache('rate-limit-rules');
-
-      return returnedRule;
-    } catch (error) {
-      console.error('Error updating rate limit rule:', error);
-      throw error;
+    const existingRule = this.rateLimitRules.get(routeType);
+    if (!existingRule) {
+      throw new Error('Rate limit rule not found');
     }
+
+    const updatedRule: RateLimitRule = {
+      ...existingRule,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+
+    const result = await this.makeAuthenticatedRequest<RateLimitRule>(`/api/admin/rate-limiting/rules/${routeType}`, {
+      method: 'PUT',
+      body: JSON.stringify(updatedRule)
+    });
+    
+    if (!result.success) {
+      console.error('Error updating rate limit rule:', result.error);
+      throw new Error(result.error?.message || 'Failed to update rate limit rule');
+    }
+    
+    const returnedRule = result.data || (() => { throw new Error('No rule data received'); })();
+    
+    // Update local cache
+    this.rateLimitRules.set(routeType, returnedRule);
+    
+    // Clear cache to force refresh
+    await this.invalidateCache('rate-limit-rules');
+
+    return returnedRule;
   }
 
   /**
    * Delete a rate limit rule
    */
   async deleteRateLimitRule(routeType: string): Promise<void> {
-    try {
-      await this.makeAuthenticatedRequest(`/api/admin/rate-limiting/rules/${routeType}`, {
-        method: 'DELETE'
-      });
+    const result = await this.makeAuthenticatedRequest<void>(`/api/admin/rate-limiting/rules/${routeType}`, {
+      method: 'DELETE'
+    });
 
-      // Remove from local cache
-      this.rateLimitRules.delete(routeType);
-      
-      // Clear cache to force refresh
-      await this.invalidateCache('rate-limit-rules');
-    } catch (error) {
-      console.error('Error deleting rate limit rule:', error);
-      throw error;
+    if (!result.success) {
+      console.error('Error deleting rate limit rule:', result.error);
+      throw new Error(result.error?.message || 'Failed to delete rate limit rule');
     }
+
+    // Remove from local cache
+    this.rateLimitRules.delete(routeType);
+    
+    // Clear cache to force refresh
+    await this.invalidateCache('rate-limit-rules');
   }
 
   /**
    * Get all rate limit rules
    */
   async getRateLimitRules(): Promise<RateLimitRule[]> {
-    try {
-      const rules = await this.makeAuthenticatedRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
-      
-      // Update local cache
-      this.rateLimitRules.clear();
-      rules.forEach((rule: RateLimitRule) => {
-        this.rateLimitRules.set(rule.routeType, rule);
-      });
-
-      return rules;
-    } catch (error) {
-      console.error('Error fetching rate limit rules:', error);
+    const result = await this.makeAuthenticatedRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
+    
+    if (!result.success) {
+      console.error('Error fetching rate limit rules:', result.error);
       return Array.from(this.rateLimitRules.values());
     }
+    
+    // Update local cache
+    this.rateLimitRules.clear();
+    result.data?.forEach((rule: RateLimitRule) => {
+      this.rateLimitRules.set(rule.routeType, rule);
+    });
+
+    return result.data || [];
   }
 
   /**
@@ -241,28 +246,32 @@ class RateLimitingControllerSingleton extends AuthenticatedApiSingleton {
    * Check rate limit status for an IP
    */
   async checkRateLimitStatus(ip: string, routeType: string): Promise<RateLimitStatus> {
-    try {
-      const status = await this.makeAuthenticatedRequest<RateLimitStatus>(`/api/admin/rate-limiting/status?ip=${ip}&routeType=${routeType}`, {}, `rate-limit-status-${ip}-${routeType}`);
-      
-      // Update local cache
-      this.rateLimitStatus.set(`${ip}-${routeType}`, status);
-      
-      return status;
-    } catch (error) {
-      console.error('Error checking rate limit status:', error);
+    const result = await this.makeAuthenticatedRequest<RateLimitStatus>(`/api/admin/rate-limiting/status?ip=${ip}&routeType=${routeType}`, {}, `rate-limit-status-${ip}-${routeType}`);
+    
+    if (!result.success) {
+      console.error('Error checking rate limit status:', result.error);
       
       // Return default status
       return {
         ip,
         currentRequests: 0,
         maxRequests: 100,
-        windowStart: new Date().toISOString(),
-        windowEnd: new Date(Date.now() + 60 * 1000).toISOString(),
+        windowStart: new Date(Date.now()).toISOString(),
+        windowEnd: new Date(Date.now() + 60000).toISOString(),
         isBlocked: false,
         remainingRequests: 100,
-        resetTime: new Date(Date.now() + 60 * 1000).toISOString()
+        resetTime: new Date(Date.now() + 60000).toISOString()
       };
     }
+    
+    const status = result.data || (() => { 
+      throw new Error('No status data received'); 
+    })();
+    
+    // Update local cache
+    this.rateLimitStatus.set(`${ip}-${routeType}`, status);
+    
+    return status;
   }
 
   /**
@@ -347,48 +356,48 @@ class RateLimitingControllerSingleton extends AuthenticatedApiSingleton {
    * Get rate limiting configuration
    */
   async getRateLimitConfig(): Promise<RateLimitConfig> {
-    try {
-      const config = await this.makeAuthenticatedRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {}, 'rate-limit-config');
-      
-      return config;
-    } catch (error) {
-      console.error('Error fetching rate limit config:', error);
+    const result = await this.makeAuthenticatedRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {}, 'rate-limit-config');
+    
+    if (!result.success) {
+      console.error('Error fetching rate limit config:', result.error);
       
       // Return default config
       return {
         enabled: true,
-        defaultLimits: {
-          maxRequests: 100,
-          windowMinutes: 1
-        },
-        strictLimits: {
-          maxRequests: 10,
-          windowMinutes: 1
-        },
-        exemptPaths: ['/api/directory', '/api/items', '/api/storefront', '/api/products'],
-        strictPaths: ['/api/tenants']
+        defaultLimits: {} as any,
+        strictLimits: {} as any,
+        exemptPaths: ['/health', '/metrics'],
+        strictPaths: ['/api/admin', '/api/auth']
       };
     }
+    
+    return result.data || (() => { 
+      throw new Error('No config data received'); 
+    })();
   }
 
   /**
    * Update rate limiting configuration
    */
   async updateRateLimitConfig(config: Partial<RateLimitConfig>): Promise<RateLimitConfig> {
-    try {
-      const updatedConfig = await this.makeAuthenticatedRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {
-        method: 'PUT',
-        body: JSON.stringify(config)
-      });
+    const result = await this.makeAuthenticatedRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {
+      method: 'PUT',
+      body: JSON.stringify(config)
+    });
 
-      // Clear cache
-      await this.invalidateCache('rate-limit-config');
-
-      return updatedConfig;
-    } catch (error) {
-      console.error('Error updating rate limit config:', error);
-      throw error;
+    if (!result.success) {
+      console.error('Error updating rate limit config:', result.error);
+      throw new Error(result.error?.message || 'Failed to update rate limit config');
     }
+
+    const updatedConfig = result.data || (() => { 
+      throw new Error('No config data received'); 
+    })();
+
+    // Clear cache
+    await this.invalidateCache('rate-limit-config');
+
+    return updatedConfig;
   }
 
   // ====================
@@ -399,12 +408,10 @@ class RateLimitingControllerSingleton extends AuthenticatedApiSingleton {
    * Get rate limiting metrics
    */
   async getRateLimitMetrics(hours: number = 24): Promise<RateLimitMetrics> {
-    try {
-      const metrics = await this.makeAuthenticatedRequest<RateLimitMetrics>(`/api/admin/rate-limiting/metrics?hours=${hours}`, {}, `rate-limit-metrics-${hours}`);
-      
-      return metrics;
-    } catch (error) {
-      console.error('Error fetching rate limit metrics:', error);
+    const result = await this.makeAuthenticatedRequest<RateLimitMetrics>(`/api/admin/rate-limiting/metrics?hours=${hours}`, {}, `rate-limit-metrics-${hours}`);
+    
+    if (!result.success) {
+      console.error('Error fetching rate limit metrics:', result.error);
       
       // Return default metrics
       return {
@@ -413,9 +420,18 @@ class RateLimitingControllerSingleton extends AuthenticatedApiSingleton {
         uniqueIPs: 0,
         topViolators: [],
         routeStats: {},
-        timeRange: `${hours} hours`
-      };
+        timeRange: `${hours}h`
+      } as RateLimitMetrics;
     }
+    
+    return result.data || {
+      totalRequests: 0,
+      blockedRequests: 0,
+      uniqueIPs: 0,
+      topViolators: [],
+      routeStats: {},
+      timeRange: `${hours}h`
+    } as RateLimitMetrics;
   }
 
   // ====================

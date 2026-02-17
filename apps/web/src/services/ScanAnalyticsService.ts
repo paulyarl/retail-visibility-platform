@@ -84,7 +84,7 @@ class ScanAnalyticsService extends AuthenticatedApiSingleton {
         this.ANALYTICS_TTL
       );
 
-      return response?.analytics || null;
+      return response?.data?.analytics || null;
     } catch (error) {
       console.error('[ScanAnalyticsService] Failed to get tenant analytics:', error);
       return null;
@@ -112,25 +112,25 @@ class ScanAnalyticsService extends AuthenticatedApiSingleton {
         this.PREVIEW_TTL
       );
 
-      if (!response?.success) {
+      if (!response?.data?.success) {
         return {
           found: false,
-          message: response?.message || 'Product not found'
+          message: response?.data?.message || 'Product not found'
         };
       }
 
       return {
         found: true,
         product: {
-          name: response.product.name,
-          brand: response.product.brand,
+          name: response.data.product.name,
+          brand: response.data.product.brand,
           dataAvailable: {
-            nutrition: response.product.nutrition ? true : false,
-            images: response.product.images ? true : false,
-            allergens: response.product.allergens ? true : false,
-            environmental: response.product.environmental ? true : false,
+            nutrition: response.data.product.nutrition ? true : false,
+            images: response.data.product.images ? true : false,
+            allergens: response.data.product.allergens ? true : false,
+            environmental: response.data.product.environmental ? true : false,
           },
-          popularity: response.product.popularity || 0
+          popularity: response.data.product.popularity || 0
         }
       };
     } catch (error) {
@@ -166,7 +166,7 @@ class ScanAnalyticsService extends AuthenticatedApiSingleton {
         this.ANALYTICS_TTL
       );
 
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[ScanAnalyticsService] Failed to get scan session stats:', error);
       return null;
@@ -189,7 +189,10 @@ class ScanAnalyticsService extends AuthenticatedApiSingleton {
         0 // No caching for write operations
       );
 
-      return response;
+      if (!response.data) {
+        throw new Error('Failed to cleanup scan sessions: No data returned');
+      }
+      return response.data;
     } catch (error) {
       console.error('[ScanAnalyticsService] Failed to cleanup scan sessions:', error);
       throw error;

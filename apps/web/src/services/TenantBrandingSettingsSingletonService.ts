@@ -63,7 +63,7 @@ class TenantBrandingSettingsSingletonService extends AuthenticatedApiSingleton {
       );
 
       // makeAuthenticatedRequest returns data directly
-      return result;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantBrandingSettingsSingleton] Failed to get branding settings:', error);
       return null;
@@ -86,7 +86,7 @@ class TenantBrandingSettingsSingletonService extends AuthenticatedApiSingleton {
       );
 
       // makeAuthenticatedRequest returns data directly
-      return result;
+      return result.data || null;
     } catch (error) {
       console.error('[TenantBrandingSettingsSingleton] Failed to update branding settings:', error);
       return null;

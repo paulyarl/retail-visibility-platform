@@ -307,12 +307,10 @@ class SecurityMonitoringSingleton extends AuthenticatedApiSingleton {
    * Get monitoring statistics
    */
   async getMonitoringStats(): Promise<SecurityMonitoringStats> {
-    try {
-      const stats = await this.makeAuthenticatedRequest<SecurityMonitoringStats>('/api/security/monitoring/stats', {}, 'monitoring-stats');
-      
-      return stats;
-    } catch (error) {
-      console.error('Error fetching monitoring stats:', error);
+    const result = await this.makeAuthenticatedRequest<SecurityMonitoringStats>('/api/security/monitoring/stats', {}, 'monitoring-stats');
+    
+    if (!result.success) {
+      console.error('Error fetching monitoring stats:', result.error);
       return {
         totalEvents: 0,
         activeThreats: 0,
@@ -322,6 +320,10 @@ class SecurityMonitoringSingleton extends AuthenticatedApiSingleton {
         lastEventTime: new Date().toISOString()
       };
     }
+    
+    return result.data || (() => { 
+      throw new Error('No monitoring stats data received'); 
+    })();
   }
 
   // ====================
@@ -396,35 +398,35 @@ class SecurityMonitoringSingleton extends AuthenticatedApiSingleton {
   // ====================
 
   private async sendThreatToAPI(threat: SecurityThreat): Promise<void> {
-    try {
-      await this.makeAuthenticatedRequest('/api/security/threats', {
-        method: 'POST',
-        body: JSON.stringify(threat)
-      });
-    } catch (error) {
-      console.error('Error sending threat to API:', error);
+    const result = await this.makeAuthenticatedRequest('/api/security/threats', {
+      method: 'POST',
+      body: JSON.stringify(threat)
+    });
+    
+    if (!result.success) {
+      console.error('Error sending threat to API:', result.error);
     }
   }
 
   private async sendAlertToAPI(alert: SecurityAlert): Promise<void> {
-    try {
-      await this.makeAuthenticatedRequest('/api/security/alerts', {
-        method: 'POST',
-        body: JSON.stringify(alert)
-      });
-    } catch (error) {
-      console.error('Error sending alert to API:', error);
+    const result = await this.makeAuthenticatedRequest('/api/security/alerts', {
+      method: 'POST',
+      body: JSON.stringify(alert)
+    });
+    
+    if (!result.success) {
+      console.error('Error sending alert to API:', result.error);
     }
   }
 
   private async sendIPBlockToAPI(blockedIP: BlockedIP): Promise<void> {
-    try {
-      await this.makeAuthenticatedRequest('/api/security/blocked-ips', {
-        method: 'POST',
-        body: JSON.stringify(blockedIP)
-      });
-    } catch (error) {
-      console.error('Error sending IP block to API:', error);
+    const result = await this.makeAuthenticatedRequest('/api/security/blocked-ips', {
+      method: 'POST',
+      body: JSON.stringify(blockedIP)
+    });
+    
+    if (!result.success) {
+      console.error('Error sending IP block to API:', result.error);
     }
   }
 

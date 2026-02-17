@@ -31,39 +31,39 @@ class BrandingSettingsSingletonService extends AuthenticatedApiSingleton {
   }
 
   async getBrandingSettings(): Promise<PlatformSettings | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<PlatformSettings>(
-        '/api/platform-settings',
-        {},
-        'branding-settings'
-      );
+    const result = await this.makeAuthenticatedRequest<PlatformSettings>(
+      '/api/platform-settings',
+      {},
+      'branding-settings'
+    );
 
-      return result;
-    } catch (error) {
-      console.error('[BrandingSettingsSingleton] Failed to get branding settings:', error);
+    if (!result.success) {
+      console.error('[BrandingSettingsSingleton] Failed to get branding settings:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   async updateBrandingSettings(settings: Partial<PlatformSettings>): Promise<PlatformSettings | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<PlatformSettings>(
-        '/api/platform-settings',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(settings),
+    const result = await this.makeAuthenticatedRequest<PlatformSettings>(
+      '/api/platform-settings',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        'branding-settings'
-      );
+        body: JSON.stringify(settings),
+      },
+      'branding-settings'
+    );
 
-      return result;
-    } catch (error) {
-      console.error('[BrandingSettingsSingleton] Failed to update branding settings:', error);
+    if (!result.success) {
+      console.error('[BrandingSettingsSingleton] Failed to update branding settings:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 }
 

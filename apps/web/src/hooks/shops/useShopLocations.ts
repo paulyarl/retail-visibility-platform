@@ -91,7 +91,7 @@ class LocationCache extends UniversalSingleton {
   private async fetchLocations(): Promise<ShopLocation[]> {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await this.makeApiRequest<{ success: boolean; data: ShopLocation[] }>(
+      const response = await this.makeApiRequest<ShopLocation[]>(
         `/api/public/shops/locations`,
         {},
         undefined, // No additional caching here, handled by getLocations
@@ -99,7 +99,7 @@ class LocationCache extends UniversalSingleton {
       );
 
       if (!response.success) {
-        throw new Error(response.data as any || 'Failed to fetch locations');
+        throw new Error(response.error?.message || 'Failed to fetch locations');
       }
 
       return response.data || [];

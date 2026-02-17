@@ -280,6 +280,10 @@ export const AdminSidebarTemplate = () => {
         {
           label: 'Integrations',
           href: '/settings/admin/integrations'
+        },
+        {
+          label: 'Account Deletion Requests',
+          href: '/settings/admin/deletion-requests'
         }
       ]
     },
@@ -369,6 +373,10 @@ export const PlatformSidebarTemplate = () => {
             {
               label: 'Feature Flags',
               href: '/settings/admin/features'
+            },
+            {
+              label: 'Account Deletion Requests',
+              href: '/settings/admin/deletion-requests'
             }
           ]
         },

@@ -47,18 +47,18 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
    * Uses the /organizations endpoint
    */
   async getOrganizations(page: number = 1, limit: number = 50): Promise<Organization[]> {
-    try {
-      const result = await this.makeAuthenticatedRequest<Organization[]>(
-        `/api/organizations?page=${page}&limit=${limit}`,
-        {},
-        `organizations-${page}-${limit}`
-      );
+    const result = await this.makeAuthenticatedRequest<Organization[]>(
+      `/api/organizations?page=${page}&limit=${limit}`,
+      {},
+      `organizations-${page}-${limit}`
+    );
 
-      return result || [];
-    } catch (error) {
-      console.error('[OrganizationsSingleton] Failed to get organizations:', error);
+    if (!result.success) {
+      console.error('[OrganizationsSingleton] Failed to get organizations:', result.error);
       return [];
     }
+
+    return result.data || [];
   }
 
   /**
@@ -71,18 +71,18 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    try {
-      const result = await this.makeAuthenticatedRequest<Organization>(
-        `/api/organizations/${id}`,
-        {},
-        `organization-${id}`
-      );
+    const result = await this.makeAuthenticatedRequest<Organization>(
+      `/api/organizations/${id}`,
+      {},
+      `organization-${id}`
+    );
 
-      return result || null;
-    } catch (error) {
-      console.error('[OrganizationsSingleton] Failed to get organization by ID:', error);
+    if (!result.success) {
+      console.error('[OrganizationsSingleton] Failed to get organization by ID:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
@@ -95,18 +95,18 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    try {
-      const result = await this.makeAuthenticatedRequest<Organization>(
-        `/api/organizations/slug/${slug}`,
-        {},
-        `organization-slug-${slug}`
-      );
+    const result = await this.makeAuthenticatedRequest<Organization>(
+      `/api/organizations/slug/${slug}`,
+      {},
+      `organization-slug-${slug}`
+    );
 
-      return result || null;
-    } catch (error) {
-      console.error('[OrganizationsSingleton] Failed to get organization by slug:', error);
+    if (!result.success) {
+      console.error('[OrganizationsSingleton] Failed to get organization by slug:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
@@ -119,18 +119,18 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
       return [];
     }
 
-    try {
-      const result = await this.makeAuthenticatedRequest<OrganizationsResponse>(
-        `/api/organizations/search?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
-        {},
-        `organizations-search-${query}-${page}-${limit}`
-      );
+    const result = await this.makeAuthenticatedRequest<OrganizationsResponse>(
+      `/api/organizations/search?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
+      {},
+      `organizations-search-${query}-${page}-${limit}`
+    );
 
-      return result.organizations || [];
-    } catch (error) {
-      console.error('[OrganizationsSingleton] Failed to search organizations:', error);
+    if (!result.success) {
+      console.error('[OrganizationsSingleton] Failed to search organizations:', result.error);
       return [];
     }
+
+    return result.data?.organizations || [];
   }
 
   /**
@@ -143,21 +143,21 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    try {
-      const result = await this.makeAuthenticatedRequest<any>(
-        `/api/organizations/${organizationId}/hero-location`,
-        {
-          method: 'PUT',
-          body: JSON.stringify({ tenantId })
-        },
-        `org-hero-location-${organizationId}`
-      );
+    const result = await this.makeAuthenticatedRequest<any>(
+      `/api/organizations/${organizationId}/hero-location`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ tenantId })
+      },
+      `org-hero-location-${organizationId}`
+    );
 
-      return result || null;
-    } catch (error) {
-      console.error('[OrganizationsSingleton] Failed to update hero location:', error);
+    if (!result.success) {
+      console.error('[OrganizationsSingleton] Failed to update hero location:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
@@ -186,21 +186,21 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    try {
-      const result = await this.makeAuthenticatedRequest<any>(
-        '/api/categories/mirror',
-        {
-          method: 'POST',
-          body: JSON.stringify(requestData)
-        },
-        `org-mirror-categories-${requestData.scope}-${requestData.organizationId || requestData.tenantId}`
-      );
+    const result = await this.makeAuthenticatedRequest<any>(
+      '/api/categories/mirror',
+      {
+        method: 'POST',
+        body: JSON.stringify(requestData)
+      },
+      `org-mirror-categories-${requestData.scope}-${requestData.organizationId || requestData.tenantId}`
+    );
 
-      return result || null;
-    } catch (error) {
-      console.error('[OrganizationsSingleton] Failed to mirror categories:', error);
+    if (!result.success) {
+      console.error('[OrganizationsSingleton] Failed to mirror categories:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
@@ -213,21 +213,21 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    try {
-      const result = await this.makeAuthenticatedRequest<any>(
-        `/api/organizations/${organizationId}/sync-from-hero`,
-        {
-          method: 'POST',
-          body: JSON.stringify({})
-        },
-        `org-sync-from-hero-${organizationId}`
-      );
+    const result = await this.makeAuthenticatedRequest<any>(
+      `/api/organizations/${organizationId}/sync-from-hero`,
+      {
+        method: 'POST',
+        body: JSON.stringify({})
+      },
+      `org-sync-from-hero-${organizationId}`
+    );
 
-      return result || null;
-    } catch (error) {
-      console.error('[OrganizationsSingleton] Failed to sync from hero:', error);
+    if (!result.success) {
+      console.error('[OrganizationsSingleton] Failed to sync from hero:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
 }

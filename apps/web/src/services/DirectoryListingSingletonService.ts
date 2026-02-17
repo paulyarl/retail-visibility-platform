@@ -47,22 +47,22 @@ class DirectoryListingSingletonService extends AuthenticatedApiSingleton {
    * Get directory listing for a specific tenant
    */
   async getDirectoryListing(tenantId: string): Promise<DirectoryListing | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
 
-      const result = await this.makeAuthenticatedRequest<DirectoryListing>(
-        `/api/tenants/${tenantId}/directory/listing`,
-        {},
-        `directory-listing-${tenantId}`
-      );
+    const result = await this.makeAuthenticatedRequest<DirectoryListing>(
+      `/api/tenants/${tenantId}/directory/listing`,
+      {},
+      `directory-listing-${tenantId}`
+    );
 
-      return result || null;
-    } catch (error) {
-      console.error('[DirectoryListingSingleton] Failed to get directory listing:', error);
+    if (!result.success) {
+      console.error('[DirectoryListingSingleton] Failed to get directory listing:', result.error);
       return null;
     }
+
+    return result.data || null;
   }
 
   /**
@@ -115,28 +115,28 @@ class DirectoryListingSingletonService extends AuthenticatedApiSingleton {
    * Update directory listing settings
    */
   async updateDirectoryListing(tenantId: string, updates: Partial<DirectoryListing>): Promise<DirectoryListing | null> {
-    try {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
-
-      const result = await this.makeAuthenticatedRequest<DirectoryListing>(
-        `/api/tenants/${tenantId}/directory/listing`,
-        { 
-          method: 'PUT',
-          body: JSON.stringify(updates)
-        },
-        `directory-update-${tenantId}`
-      );
-
-      // Invalidate directory listing cache
-      await this.invalidateCache(`directory-listing-${tenantId}*`);
-
-      return result || null;
-    } catch (error) {
-      console.error('[DirectoryListingSingleton] Failed to update directory listing:', error);
-      throw error;
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
     }
+
+    const result = await this.makeAuthenticatedRequest<DirectoryListing>(
+      `/api/tenants/${tenantId}/directory/listing`,
+      { 
+        method: 'PUT',
+        body: JSON.stringify(updates)
+      },
+      `directory-update-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[DirectoryListingSingleton] Failed to update directory listing:', result.error);
+      throw result.error;
+    }
+
+    // Invalidate directory listing cache
+    await this.invalidateCache(`directory-listing-${tenantId}*`);
+
+    return result.data || null;
   }
 
   /**
@@ -163,17 +163,29 @@ class DirectoryListingSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Listing ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any[]>(
+      const result = await this.makeAuthenticatedRequest<any>(
         `/api/directory/${listingId}/photos`,
         {},
         `directory-photos-${listingId}`,
         this.cacheTTL
       );
 
-      return result || [];
+      console.log('[DirectoryListing] Raw photos API response:', result);
+
+      // Handle legitimate API responses (should not be 404 for missing records)
+      if (!result || result.error) {
+        console.warn('[DirectoryListing] No directory photos found for listing:', listingId, result?.error || 'No data');
+        return []; // Return empty array for missing records
+      }
+
+      // Ensure we have an array
+      const photosArray = Array.isArray(result) ? result : [];
+      console.log('[DirectoryListing] Extracted photos array:', photosArray);
+
+      return photosArray;
     } catch (error) {
       console.error('[DirectoryListing] Failed to get directory photos:', error);
-      return [];
+      return []; // Always return empty array on error to prevent user-facing issues
     }
   }
 

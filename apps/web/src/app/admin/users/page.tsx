@@ -5,7 +5,7 @@ import { Users, UserPlus, Key, Trash2, Shield, User as UserIcon, Search, Filter 
 import PageHeader, { Icons } from '@/components/PageHeader';
 import CreateUserModal from '@/components/admin/CreateUserModal';
 import ResetPasswordModal from '@/components/admin/ResetPasswordModal';
-import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { adminUserService } from '@/services/AdminUserService';
 import { useAuth } from '@/contexts/AuthContext';
 import { canManageUsers, canViewUsers } from '@/lib/auth/access-control';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
@@ -57,7 +57,7 @@ export default function AdminUsersPage() {
 
   const loadUsers = async () => {
     try {
-      const data = await platformHomeService.getAdminUsers();
+      const data = await adminUserService.getAdminUsers();
       setUsers(data || []);
     } catch (error) {
       console.error('Failed to load users:', error);
@@ -72,7 +72,7 @@ export default function AdminUsersPage() {
     }
 
     try {
-      await platformHomeService.deleteAdminUser(userId);
+      await adminUserService.deleteAdminUser(userId);
       await loadUsers();
     } catch (error) {
       console.error('Failed to delete user:', error);

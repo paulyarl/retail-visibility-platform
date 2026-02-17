@@ -126,106 +126,110 @@ class TiersSingleton extends AuthenticatedApiSingleton {
    * Get tier by ID
    */
   async getTier(tierId: string): Promise<Tier | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
-        `/api/tiers-singleton/${tierId}`,
-        {},
-        `tier-${tierId}`
-      );
-
-      return result.tier;
-    } catch (error: any) {
-      if (error.message?.includes('404')) {
+    const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
+      `/api/tiers-singleton/${tierId}`,
+      {},
+      `tier-${tierId}`
+    );
+    
+    if (!result.success) {
+      if (result.status === 404) {
         return null;
       }
-      console.error('Error fetching tier', error);
+      console.error('Error fetching tier', result.error);
       return null;
     }
+    
+    return result.data?.tier || null;
   }
 
   /**
    * Get tier by slug
    */
   async getTierBySlug(slug: string): Promise<Tier | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
-        `/api/tiers-singleton/slug/${slug}`,
-        {},
-        `tier-slug-${slug}`
-      );
-
-      return result.tier;
-    } catch (error: any) {
-      if (error.message?.includes('404')) {
+    const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
+      `/api/tiers-singleton/slug/${slug}`,
+      {},
+      `tier-slug-${slug}`
+    );
+    
+    if (!result.success) {
+      if (result.status === 404) {
         return null;
       }
-      console.error('Error fetching tier by slug', error);
+      console.error('Error fetching tier by slug', result.error);
       return null;
     }
+    
+    return result.data?.tier || null;
   }
 
   /**
    * Create new tier
    */
   async createTier(request: CreateTierRequest): Promise<Tier> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
-        '/api/tiers-singleton',
-        {
-          method: 'POST',
-          body: JSON.stringify(request)
-        },
-        'tier-create'
-      );
-
-      console.log('Tier created successfully', { tierId: result.tier.id });
-      return result.tier;
-    } catch (error) {
-      console.error('Error creating tier', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
+      '/api/tiers-singleton',
+      {
+        method: 'POST',
+        body: JSON.stringify(request)
+      },
+      'tier-create'
+    );
+    
+    if (!result.success) {
+      console.error('Error creating tier', result.error);
+      throw new Error(result.error?.message || 'Failed to create tier');
     }
+
+    console.log('Tier created successfully', { tierId: result.data?.tier.id });
+    return result.data?.tier || (() => { 
+      throw new Error('No tier data received'); 
+    })();
   }
 
   /**
    * Update tier
    */
   async updateTier(tierId: string, updates: UpdateTierRequest): Promise<Tier> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
-        `/api/tiers-singleton/${tierId}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(updates)
-        },
-        `tier-update-${tierId}`
-      );
-
-      console.log('Tier updated successfully', { tierId });
-      return result.tier;
-    } catch (error) {
-      console.error('Error updating tier', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
+      `/api/tiers-singleton/${tierId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(updates)
+      },
+      `tier-update-${tierId}`
+    );
+    
+    if (!result.success) {
+      console.error('Error updating tier', result.error);
+      throw new Error(result.error?.message || 'Failed to update tier');
     }
+
+    console.log('Tier updated successfully', { tierId });
+    return result.data?.tier || (() => { 
+      throw new Error('No tier data received'); 
+    })();
   }
 
   /**
    * Delete tier
    */
   async deleteTier(tierId: string): Promise<void> {
-    try {
-      await this.makeAuthenticatedRequest<void>(
-        `/api/tiers-singleton/${tierId}`,
-        {
-          method: 'DELETE'
-        },
-        `tier-delete-${tierId}`
-      );
-
-      console.log('Tier deleted successfully', { tierId });
-    } catch (error) {
-      console.error('Error deleting tier', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<void>(
+      `/api/tiers-singleton/${tierId}`,
+      {
+        method: 'DELETE'
+      },
+      `tier-delete-${tierId}`
+    );
+    
+    if (!result.success) {
+      console.error('Error deleting tier', result.error);
+      throw new Error(result.error?.message || 'Failed to delete tier');
     }
+
+    console.log('Tier deleted successfully', { tierId });
   }
 
   /**
@@ -251,8 +255,13 @@ class TiersSingleton extends AuthenticatedApiSingleton {
         {},
         cacheKey
       );
+      
+      if (!result.success) {
+        console.error('Error listing tiers', result.error);
+        return [];
+      }
 
-      return result.tiers;
+      return result.data?.tiers || [];
     } catch (error) {
       console.error('Error listing tiers', error);
       throw error;
@@ -267,36 +276,40 @@ class TiersSingleton extends AuthenticatedApiSingleton {
    * Get tier statistics
    */
   async getTierStats(): Promise<TierStats> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ stats: TierStats }>(
-        '/api/tiers-singleton/stats',
-        {},
-        'tier-stats'
-      );
-
-      return result.stats;
-    } catch (error) {
-      console.error('Error fetching tier stats', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<{ stats: TierStats }>(
+      '/api/tiers-singleton/stats',
+      {},
+      'tier-stats'
+    );
+    
+    if (!result.success) {
+      console.error('Error fetching tier stats', result.error);
+      throw new Error(result.error?.message || 'Failed to fetch tier stats');
     }
+
+    return result.data?.stats || (() => { 
+      throw new Error('No tier stats data received'); 
+    })();
   }
 
   /**
    * Check if tenant can upgrade to tier
    */
   async canUpgradeToTier(tenantId: string, targetTierId: string): Promise<UpgradeEligibility> {
-    try {
-      const result = await this.makeAuthenticatedRequest<UpgradeEligibility>(
-        `/api/tiers-singleton/${targetTierId}/can-upgrade/${tenantId}`,
-        {},
-        `upgrade-check-${tenantId}-${targetTierId}`
-      );
-
-      return result;
-    } catch (error) {
-      console.error('Error checking upgrade eligibility', error);
-      throw error;
+    const result = await this.makeAuthenticatedRequest<UpgradeEligibility>(
+      `/api/tiers-singleton/${targetTierId}/can-upgrade/${tenantId}`,
+      {},
+      `upgrade-check-${tenantId}-${targetTierId}`
+    );
+    
+    if (!result.success) {
+      console.error('Error checking upgrade eligibility', result.error);
+      throw new Error(result.error?.message || 'Failed to check upgrade eligibility');
     }
+
+    return result.data || (() => { 
+      throw new Error('No upgrade eligibility data received'); 
+    })();
   }
 
   // ====================
@@ -307,39 +320,39 @@ class TiersSingleton extends AuthenticatedApiSingleton {
    * Get tier limits
    */
   async getTierLimits(tierId: string): Promise<Tier['limits'] | null> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ limits: Tier['limits'] }>(
-        `/api/tiers-singleton/${tierId}/limits`,
-        {},
-        `tier-limits-${tierId}`
-      );
-
-      return result.limits;
-    } catch (error: any) {
-      if (error.message?.includes('404')) {
+    const result = await this.makeAuthenticatedRequest<{ limits: Tier['limits'] }>(
+      `/api/tiers-singleton/${tierId}/limits`,
+      {},
+      `tier-limits-${tierId}`
+    );
+    
+    if (!result.success) {
+      if (result.status === 404) {
         return null;
       }
-      console.error('Error fetching tier limits', error);
+      console.error('Error fetching tier limits', result.error);
       return null;
     }
+
+    return result.data?.limits || null;
   }
 
   /**
    * Check if tier has feature
    */
   async hasFeature(tierId: string, feature: keyof Tier['features']): Promise<boolean> {
-    try {
-      const result = await this.makeAuthenticatedRequest<{ hasFeature: boolean }>(
-        `/api/tiers-singleton/${tierId}/has-feature/${feature}`,
-        {},
-        `tier-feature-${tierId}-${feature}`
-      );
-
-      return result.hasFeature;
-    } catch (error) {
-      console.error('Error checking tier feature', error);
+    const result = await this.makeAuthenticatedRequest<{ hasFeature: boolean }>(
+      `/api/tiers-singleton/${tierId}/has-feature/${feature}`,
+      {},
+      `tier-feature-${tierId}-${feature}`
+    );
+    
+    if (!result.success) {
+      console.error('Error checking tier feature', result.error);
       return false;
     }
+
+    return result.data?.hasFeature || false;
   }
 
   /**

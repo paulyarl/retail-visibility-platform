@@ -202,7 +202,6 @@ export default function DirectoryClient() {
     pagination,
     refetch,
     metrics: storesMetrics,
-    clearCache,
     fromCache
   } = useDirectoryStores({
     search: searchParams.get('search') || undefined,
@@ -552,7 +551,7 @@ export default function DirectoryClient() {
                 <span>Avg Response: {storesMetrics.averageResponseTime.toFixed(0)}ms</span>
                 {fromCache && (
                   <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                    📋 From Cache
+                    📋 Refresh
                   </span>
                 )}
               </div>
@@ -560,7 +559,6 @@ export default function DirectoryClient() {
             {/* Refresh Button */}
             <button
               onClick={() => {
-                clearCache();
                 refetch();
               }}
               disabled={loading}

@@ -39,8 +39,12 @@ class RateLimitSettingsSingletonService extends AuthenticatedApiSingleton {
         { method: 'GET' },
         'rate_limit_settings'
       );
+      if (!response.success) {
+        console.error('[RateLimitSettingsSingleton] Failed to fetch rate limit settings:', response.error);
+        return null;
+      }
 
-      return response;
+      return response.data||null;
     } catch (error) {
       console.error('[RateLimitSettingsSingleton] Failed to fetch rate limit settings:', error);
       return null;
@@ -64,8 +68,12 @@ class RateLimitSettingsSingletonService extends AuthenticatedApiSingleton {
         },
         'rate_limit_settings'
       );
+      if (!response.success) {
+        console.error('[RateLimitSettingsSingleton] Failed to update rate limit settings:', response.error);
+        return null;
+      }
 
-      return response;
+      return response.data||null;
     } catch (error) {
       console.error('[RateLimitSettingsSingleton] Failed to update rate limit settings:', error);
       return null;
@@ -87,7 +95,8 @@ class RateLimitSettingsSingletonService extends AuthenticatedApiSingleton {
    */
   async isRateLimitingEnabled(): Promise<boolean> {
     const settings = await this.getRateLimitSettings();
-    return settings?.rateLimitingEnabled ?? true;
+    if (!settings) return true;
+    return settings.rateLimitingEnabled ?? true;
   }
 
   /**

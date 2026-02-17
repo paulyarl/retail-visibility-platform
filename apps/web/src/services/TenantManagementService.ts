@@ -106,7 +106,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
         this.PROFILE_TTL
       );
 
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[TenantManagementService] Failed to get current tenant:', error);
       return null;
@@ -126,7 +126,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
         this.PROFILE_TTL
       );
 
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[TenantManagementService] Failed to get tenant profile:', error);
       return null;
@@ -151,7 +151,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
       // Invalidate cached profile data
       await this.invalidateCache('tenant-profile*');
       
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[TenantManagementService] Failed to update tenant profile:', error);
       return null;
@@ -174,7 +174,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
         this.USAGE_TTL
       );
 
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[TenantManagementService] Failed to get tenant usage:', error);
       return null;
@@ -194,7 +194,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
         this.LIMITS_TTL
       );
 
-      return response;
+      return response.data || null;
     } catch (error) {
       console.error('[TenantManagementService] Failed to get tenant limits:', error);
       return null;
@@ -214,7 +214,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
         this.MEDIA_TTL
       );
 
-      return response?.banner || null;
+      return response?.data?.banner || null;
     } catch (error) {
       console.error('[TenantManagementService] Failed to get tenant banner:', error);
       return null;
@@ -256,7 +256,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
         this.MEDIA_TTL
       );
 
-      return response?.logo || null;
+      return response?.data?.logo || null;
     } catch (error) {
       console.error('[TenantManagementService] Failed to get tenant logo:', error);
       return null;

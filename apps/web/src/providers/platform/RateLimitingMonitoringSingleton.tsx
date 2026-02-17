@@ -109,12 +109,10 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
    * Get rate limiting configuration
    */
   async getRateLimitConfig(): Promise<RateLimitConfig> {
-    try {
-      const config = await this.makeAuthenticatedRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {}, 'rate-limit-config');
-      
-      return config;
-    } catch (error) {
-      console.error('Error fetching rate limit config:', error);
+    const result = await this.makeAuthenticatedRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {}, 'rate-limit-config');
+    
+    if (!result.success) {
+      console.error('Error fetching rate limit config:', result.error);
       
       // Return default config
       return {
@@ -128,35 +126,37 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
           windowMinutes: 1
         },
         exemptPaths: ['/api/directory', '/api/items', '/api/storefront', '/api/products'],
-        strictPaths: ['/api/tenants']
+        strictPaths: ['/api/admin', '/api/auth']
       };
     }
+    
+    return result.data || (() => { 
+      throw new Error('No config data received'); 
+    })();
   }
 
   /**
    * Get rate limiting rules
    */
   async getRateLimitRules(): Promise<RateLimitRule[]> {
-    try {
-      const rules = await this.makeAuthenticatedRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
-      
-      return rules;
-    } catch (error) {
-      console.error('Error fetching rate limit rules:', error);
+    const result = await this.makeAuthenticatedRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
+    
+    if (!result.success) {
+      console.error('Error fetching rate limit rules:', result.error);
       return [];
     }
+    
+    return result.data || [];
   }
 
   /**
    * Get rate limiting metrics
    */
   async getRateLimitMetrics(hours: number = 24): Promise<RateLimitMetrics> {
-    try {
-      const metrics = await this.makeAuthenticatedRequest<RateLimitMetrics>(`/api/admin/rate-limiting/metrics?hours=${hours}`, {}, `rate-limit-metrics-${hours}`);
-      
-      return metrics;
-    } catch (error) {
-      console.error('Error fetching rate limit metrics:', error);
+    const result = await this.makeAuthenticatedRequest<RateLimitMetrics>(`/api/admin/rate-limiting/metrics?hours=${hours}`, {}, `rate-limit-metrics-${hours}`);
+    
+    if (!result.success) {
+      console.error('Error fetching rate limit metrics:', result.error);
       
       // Return default metrics
       return {
@@ -165,9 +165,18 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
         uniqueIPs: 0,
         topViolators: [],
         routeStats: {},
-        timeRange: `${hours} hours`
-      };
+        timeRange: `${hours}h`
+      } as RateLimitMetrics;
     }
+    
+    return result.data || {
+      totalRequests: 0,
+      blockedRequests: 0,
+      uniqueIPs: 0,
+      topViolators: [],
+      routeStats: {},
+      timeRange: `${hours}h`
+    } as RateLimitMetrics;
   }
 
   /**
@@ -179,19 +188,19 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
     blockedAt: string;
     expiresAt: string;
   }>> {
-    try {
-      const blocks = await this.makeAuthenticatedRequest<Array<{
-        ip: string;
-        reason: string;
-        blockedAt: string;
-        expiresAt: string;
-      }>>('/api/admin/rate-limiting/blocks', {}, 'active-blocks');
-      
-      return blocks;
-    } catch (error) {
-      console.error('Error fetching active blocks:', error);
+    const result = await this.makeAuthenticatedRequest<Array<{
+      ip: string;
+      reason: string;
+      blockedAt: string;
+      expiresAt: string;
+    }>>('/api/admin/rate-limiting/blocks', {}, 'active-blocks');
+    
+    if (!result.success) {
+      console.error('Error fetching active blocks:', result.error);
       return [];
     }
+    
+    return result.data || [];
   }
 
   /**
@@ -202,18 +211,18 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
     violations: number;
     lastViolation: string;
   }>> {
-    try {
-      const violators = await this.makeAuthenticatedRequest<Array<{
-        ip: string;
-        violations: number;
-        lastViolation: string;
-      }>>(`/api/admin/rate-limiting/violators?hours=${hours}`, {}, `top-violators-${hours}`);
-      
-      return violators;
-    } catch (error) {
-      console.error('Error fetching top violators:', error);
+    const result = await this.makeAuthenticatedRequest<Array<{
+      ip: string;
+      violations: number;
+      lastViolation: string;
+    }>>(`/api/admin/rate-limiting/violators?hours=${hours}`, {}, `top-violators-${hours}`);
+    
+    if (!result.success) {
+      console.error('Error fetching top violators:', result.error);
       return [];
     }
+    
+    return result.data || [];
   }
 
   // ====================
@@ -224,12 +233,10 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
    * Get rate limit status for a specific IP
    */
   async getIPStatus(ip: string): Promise<RateLimitStatus> {
-    try {
-      const status = await this.makeAuthenticatedRequest<RateLimitStatus>(`/api/admin/rate-limiting/status?ip=${ip}`, {}, `ip-status-${ip}`);
-      
-      return status;
-    } catch (error) {
-      console.error('Error getting IP status:', error);
+    const result = await this.makeAuthenticatedRequest<RateLimitStatus>(`/api/admin/rate-limiting/status?ip=${ip}`, {}, `ip-status-${ip}`);
+    
+    if (!result.success) {
+      console.error('Error getting IP status:', result.error);
       
       // Return default status
       return {
@@ -243,6 +250,10 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
         resetTime: new Date(Date.now() + 60 * 1000).toISOString()
       };
     }
+    
+    return result.data || (() => { 
+      throw new Error('No status data received'); 
+    })();
   }
 
   /**
@@ -253,18 +264,18 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
     action: string;
     details: Record<string, any>;
   }>> {
-    try {
-      const history = await this.makeAuthenticatedRequest<Array<{
-        timestamp: string;
-        action: string;
-        details: Record<string, any>;
-      }>>(`/api/admin/rate-limiting/history/${ip}?hours=${hours}`, {}, `ip-history-${ip}-${hours}`);
-      
-      return history;
-    } catch (error) {
-      console.error('Error getting IP history:', error);
+    const result = await this.makeAuthenticatedRequest<Array<{
+      timestamp: string;
+      action: string;
+      details: Record<string, any>;
+    }>>(`/api/admin/rate-limiting/history/${ip}?hours=${hours}`, {}, `ip-history-${ip}-${hours}`);
+    
+    if (!result.success) {
+      console.error('Error getting IP history:', result.error);
       return [];
     }
+    
+    return result.data || [];
   }
 
   // ====================
@@ -285,22 +296,20 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
       blocks: number;
     }>;
   }> {
-    try {
-      const analytics = await this.makeAuthenticatedRequest<{
+    const result = await this.makeAuthenticatedRequest<{
+      requests: number;
+      blocks: number;
+      uniqueIPs: number;
+      averageRequestsPerIP: number;
+      topIPs: Array<{
+        ip: string;
         requests: number;
         blocks: number;
-        uniqueIPs: number;
-        averageRequestsPerIP: number;
-        topIPs: Array<{
-          ip: string;
-          requests: number;
-          blocks: number;
-        }>;
-      }>(`/api/admin/rate-limiting/analytics/${routeType}?hours=${hours}`, {}, `route-analytics-${routeType}-${hours}`);
-      
-      return analytics;
-    } catch (error) {
-      console.error('Error getting route analytics:', error);
+      }>;
+    }>(`/api/admin/rate-limiting/analytics/${routeType}?hours=${hours}`, {}, `route-analytics-${routeType}-${hours}`);
+    
+    if (!result.success) {
+      console.error('Error getting route analytics:', result.error);
       
       // Return default analytics
       return {
@@ -311,6 +320,14 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
         topIPs: []
       };
     }
+    
+    return result.data || {
+      requests: 0,
+      blocks: 0,
+      uniqueIPs: 0,
+      averageRequestsPerIP: 0,
+      topIPs: []
+    };
   }
 
   /**
@@ -327,24 +344,24 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
       blocks: number;
     }>;
   }>> {
-    try {
-      const analytics = await this.makeAuthenticatedRequest<Record<string, {
+    const result = await this.makeAuthenticatedRequest<Record<string, {
+      requests: number;
+      blocks: number;
+      uniqueIPs: number;
+      averageRequestsPerIP: number;
+      topIPs: Array<{
+        ip: string;
         requests: number;
         blocks: number;
-        uniqueIPs: number;
-        averageRequestsPerIP: number;
-        topIPs: Array<{
-          ip: string;
-          requests: number;
-          blocks: number;
-        }>;
-      }>>(`/api/admin/rate-limiting/analytics?hours=${hours}`, {}, `all-route-analytics-${hours}`);
-      
-      return analytics;
-    } catch (error) {
-      console.error('Error getting all route analytics:', error);
+      }>;
+    }>>(`/api/admin/rate-limiting/analytics?hours=${hours}`, {}, `all-route-analytics-${hours}`);
+    
+    if (!result.success) {
+      console.error('Error getting all route analytics:', result.error);
       return {};
     }
+    
+    return result.data || {};
   }
 
   // ====================
@@ -439,17 +456,15 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
     issues: string[];
     recommendations: string[];
   }> {
-    try {
-      const healthStatus = await this.makeAuthenticatedRequest<{
-        status: 'healthy' | 'warning' | 'critical';
-        score: number;
-        issues: string[];
-        recommendations: string[];
-      }>('/api/admin/rate-limiting/health', {}, 'rate-limiting-health-status');
-      
-      return healthStatus;
-    } catch (error) {
-      console.error('Error fetching rate limiting health status:', error);
+    const result = await this.makeAuthenticatedRequest<{
+      status: 'healthy' | 'warning' | 'critical';
+      score: number;
+      issues: string[];
+      recommendations: string[];
+    }>('/api/admin/rate-limiting/health', {}, 'rate-limiting-health-status');
+    
+    if (!result.success) {
+      console.error('Error fetching rate limiting health status:', result.error);
       return {
         status: 'warning',
         score: 75,
@@ -457,6 +472,13 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
         recommendations: ['Check rate limiting service connectivity']
       };
     }
+    
+    return result.data || {
+      status: 'warning',
+      score: 75,
+      issues: ['No health data received'],
+      recommendations: ['Check rate limiting service connectivity']
+    };
   }
 
   /**
@@ -469,20 +491,20 @@ class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
     uniqueIPs: number;
     blockRate: number;
   }>> {
-    try {
-      const trends = await this.makeAuthenticatedRequest<Array<{
-        date: string;
-        requests: number;
-        blocks: number;
-        uniqueIPs: number;
-        blockRate: number;
-      }>>(`/api/admin/rate-limiting/trends?days=${days}`, {}, `rate-limiting-trends-${days}`);
-      
-      return trends;
-    } catch (error) {
-      console.error('Error fetching rate limiting trends:', error);
+    const result = await this.makeAuthenticatedRequest<Array<{
+      date: string;
+      requests: number;
+      blocks: number;
+      uniqueIPs: number;
+      blockRate: number;
+    }>>(`/api/admin/rate-limiting/trends?days=${days}`, {}, `rate-limiting-trends-${days}`);
+    
+    if (!result.success) {
+      console.error('Error fetching rate limiting trends:', result.error);
       return [];
     }
+    
+    return result.data || [];
   }
 }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { tenantTierService } from '@/services/TenantTierService';
 import { Tenant, DbTier } from '../types';
 
 interface UseBillingDataResult {
@@ -59,9 +60,21 @@ export function useBillingData(): UseBillingDataResult {
       try {
         console.log('[useBillingData] Loading tiers...');
         setTiersLoading(true);
-        const data = await platformHomeService.getAdminTiers();
+        const data = await tenantTierService.getAdminTiers();
         console.log('[useBillingData] Tiers loaded:', data?.length || 0);
-        setTiers(data || []);
+        
+        // Transform service DbTier to billing DbTier format
+        const transformedTiers = (data || []).map((tier: any) => ({
+          id: tier.id,
+          tierKey: tier.type || tier.name, // Use type or fallback to name
+          displayName: tier.displayName,
+          priceMonthly: tier.price,
+          tierType: tier.type,
+          isActive: true, // Default to active since service doesn't have this field
+          sortOrder: tier.sortOrder,
+        }));
+        
+        setTiers(transformedTiers);
       } catch (e) {
         console.error('[useBillingData] Error loading tiers:', e);
       } finally {

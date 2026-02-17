@@ -149,17 +149,22 @@ class RecommendationsSingleton extends PublicApiSingleton {
       if (options.minScore) params.append('minScore', options.minScore.toString());
       if (options.tenantId) params.append('tenantId', options.tenantId);
 
-      const recommendations = await this.makePublicRequest<Recommendation[]>(
+      const result = await this.makePublicRequest<Recommendation[]>(
         `/api/recommendations/personalized?${params}`,
         {},
         `recommendations-personalized-${userId}-${options.type}-${options.tenantId}`,
         this.cacheTTL
       );
       
+      if (!result.success) {
+        console.error('Error fetching personalized recommendations:', result.error);
+        return [];
+      }
+      
       // Filter by minimum score
-      const filteredRecommendations = recommendations.filter((rec: Recommendation) => 
+      const filteredRecommendations = result.data?.filter((rec: Recommendation) => 
         rec.score >= (options.minScore || this.recommendationConfig.minScore)
-      );
+      ) || [];
 
       return filteredRecommendations;
     } catch (error) {
@@ -193,14 +198,19 @@ class RecommendationsSingleton extends PublicApiSingleton {
       if (options.tenantId) params.append('tenantId', options.tenantId);
       if (options.timeRange) params.append('timeRange', options.timeRange.toString());
 
-      const recommendations = await this.makePublicRequest<Recommendation[]>(
+      const result = await this.makePublicRequest<Recommendation[]>(
         `/api/recommendations/popular?${params}`,
         {},
         `recommendations-popular-${options.type}-${options.tenantId}`,
         this.cacheTTL
       );
       
-      return recommendations;
+      if (!result.success) {
+        console.error('Error fetching popular recommendations:', result.error);
+        return [];
+      }
+      
+      return result.data || [];
     } catch (error) {
       console.error('Error fetching popular recommendations:', error);
       return [];
@@ -234,14 +244,19 @@ class RecommendationsSingleton extends PublicApiSingleton {
       if (options.userId) params.append('userId', options.userId);
       if (options.tenantId) params.append('tenantId', options.tenantId);
 
-      const recommendations = await this.makePublicRequest<Recommendation[]>(
+      const result = await this.makePublicRequest<Recommendation[]>(
         `/api/recommendations/similar?${params}`,
         {},
         `recommendations-similar-${itemId}-${itemType}-${options.tenantId}`,
         this.cacheTTL
       );
       
-      return recommendations;
+      if (!result.success) {
+        console.error('Error fetching similar item recommendations:', result.error);
+        return [];
+      }
+      
+      return result.data || [];
     } catch (error) {
       console.error('Error fetching similar item recommendations:', error);
       return [];
@@ -257,7 +272,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
     limit: number = 10
   ): Promise<Recommendation[]> {
     try {
-      const recommendations = await this.makePublicRequest<Recommendation[]>(
+      const result = await this.makePublicRequest<Recommendation[]>(
         '/api/recommendations/from-recently-viewed',
         {
           method: 'POST',
@@ -271,7 +286,12 @@ class RecommendationsSingleton extends PublicApiSingleton {
         this.cacheTTL
       );
       
-      return recommendations;
+      if (!result.success) {
+        console.error('Error fetching recommendations from recently viewed:', result.error);
+        return [];
+      }
+      
+      return result.data || [];
     } catch (error) {
       console.error('Error fetching recommendations from recently viewed:', error);
       return [];
@@ -299,7 +319,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
     }
 
     try {
-      const recommendations = await this.makePublicRequest<Recommendation[]>(
+      const result = await this.makePublicRequest<Recommendation[]>(
         '/api/recommendations/contextual',
         {
           method: 'POST',
@@ -313,7 +333,12 @@ class RecommendationsSingleton extends PublicApiSingleton {
         this.cacheTTL
       );
       
-      return recommendations;
+      if (!result.success) {
+        console.error('Error fetching contextual recommendations:', result.error);
+        return [];
+      }
+      
+      return result.data || [];
     } catch (error) {
       console.error('Error fetching contextual recommendations:', error);
       return [];
@@ -374,18 +399,18 @@ class RecommendationsSingleton extends PublicApiSingleton {
    * Send single feedback to API
    */
   private async sendFeedback(feedback: RecommendationFeedback): Promise<void> {
-    try {
-      await this.makePublicRequest<void>(
-        '/api/recommendations/feedback',
-        {
-          method: 'POST',
-          body: JSON.stringify(feedback)
-        },
-        `recommendations-feedback-${feedback.recommendationId}`
-      );
-    } catch (error) {
-      console.error('Error sending recommendation feedback:', error);
-      throw error;
+    const result = await this.makePublicRequest<void>(
+      '/api/recommendations/feedback',
+      {
+        method: 'POST',
+        body: JSON.stringify(feedback)
+      },
+      `recommendations-feedback-${feedback.recommendationId}`
+    );
+    
+    if (!result.success) {
+      console.error('Error sending recommendation feedback:', result.error);
+      throw new Error(result.error?.message || 'Failed to send feedback');
     }
   }
 
@@ -393,18 +418,18 @@ class RecommendationsSingleton extends PublicApiSingleton {
    * Send feedback batch to API
    */
   private async sendFeedbackBatch(feedbacks: RecommendationFeedback[]): Promise<void> {
-    try {
-      await this.makePublicRequest<void>(
-        '/api/recommendations/feedback/batch',
-        {
-          method: 'POST',
-          body: JSON.stringify({ feedbacks })
-        },
-        `recommendations-feedback-batch`
-      );
-    } catch (error) {
-      console.error('Error sending recommendation feedback batch:', error);
-      throw error;
+    const result = await this.makePublicRequest<void>(
+      '/api/recommendations/feedback/batch',
+      {
+        method: 'POST',
+        body: JSON.stringify({ feedbacks })
+      },
+      `recommendations-feedback-batch`
+    );
+    
+    if (!result.success) {
+      console.error('Error sending recommendation feedback batch:', result.error);
+      throw new Error(result.error?.message || 'Failed to send feedback batch');
     }
   }
 
@@ -424,15 +449,30 @@ class RecommendationsSingleton extends PublicApiSingleton {
     }
 
     try {
-      const analytics = await this.makePublicRequest<any>(
+      const result = await this.makePublicRequest<any>(
         `/api/recommendations/analytics?days=${days}`,
         {},
         `recommendations-analytics-${days}`,
         this.cacheTTL
       );
       
-      await this.setCache(cacheKey, analytics);
-      return analytics;
+      if (!result.success) {
+        console.error('Error fetching recommendation analytics:', result.error);
+        
+        // Return default analytics
+        return {
+          totalRecommendations: 0,
+          clickThroughRate: 0,
+          conversionRate: 0,
+          topSources: [],
+          topTypes: [],
+          averageScore: 0,
+          performanceTrends: []
+        };
+      }
+      
+      await this.setCache(cacheKey, result.data);
+      return result.data;
     } catch (error) {
       console.error('Error fetching recommendation analytics:', error);
       
@@ -484,15 +524,29 @@ class RecommendationsSingleton extends PublicApiSingleton {
       if (type) params.append('type', type);
       params.append('days', days.toString());
 
-      const performance = await this.makePublicRequest<any>(
+      const result = await this.makePublicRequest<any>(
         `/api/recommendations/performance?${params}`,
         {},
         `recommendations-performance-${type}-${days}`,
         this.cacheTTL
       );
       
-      await this.setCache(cacheKey, performance);
-      return performance;
+      if (!result.success) {
+        console.error('Error fetching recommendation performance:', result.error);
+        
+        // Return default performance
+        return {
+          impressions: 0,
+          clicks: 0,
+          conversions: 0,
+          ctr: 0,
+          conversionRate: 0,
+          averageScore: 0
+        };
+      }
+      
+      await this.setCache(cacheKey, result.data);
+      return result.data;
     } catch (error) {
       console.error('Error fetching recommendation performance:', error);
       

@@ -42,8 +42,12 @@ class StoreStatusSingletonService extends PublicApiSingleton {
         {},
         `store-status-${tenantId}`
       );
+      if (!result.success){
+        console.error('[StoreStatusSingleton] Failed to get store status:', result.error);
+        return null;
+      }
 
-      return result || null;
+      return result.data || null;
     } catch (error) {
       console.error('[StoreStatusSingleton] Failed to get store status:', error);
       return null;
