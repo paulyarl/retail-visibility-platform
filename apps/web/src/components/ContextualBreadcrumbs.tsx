@@ -193,6 +193,8 @@ function getContextualLabel(segment: string, fullPath: string, isTenantContext: 
     // Platform Dashboard
     'admin': 'Admin Controls',
     'insights': 'Insights',
+    'shops': 'Shops',
+    'directory': 'Directory',
     'analytics': 'Analytics',
     'reports': 'Reports',
     'performance': 'Performance',
@@ -216,7 +218,6 @@ function getContextualLabel(segment: string, fullPath: string, isTenantContext: 
     'billing': 'Billing',
     'permissions': 'Permissions',
     'system': 'System',
-    'directory': 'Directory',
     'storefront': 'Storefront',
     'trash': 'Trash',
     'location-status': 'Location Status',

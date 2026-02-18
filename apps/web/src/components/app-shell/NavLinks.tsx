@@ -2,6 +2,8 @@ interface NavLinksProps {
   links: {
     dashboard: string;
     tenants: string;
+    shops: string;
+    directory: string;
     analytics?: string;
     settings: string;
   };
@@ -38,6 +40,22 @@ export default function NavLinks({
       >
         Tenants
       </a>
+       <a 
+        className={itemClassName} 
+        href={links.shops}
+        onClick={onClick}
+      >
+        Shops
+      </a> 
+        {links.directory && (
+      <a 
+        className={itemClassName} 
+        href={links.directory}
+        onClick={onClick}
+      >
+        Directory
+      </a>
+        )}
       {links.analytics && (
         <a 
           className={itemClassName} 
