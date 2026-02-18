@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button, Input } from '@/components/ui';
 import { googleTaxonomyService, type GoogleTaxonomyCategory } from '@/services/GoogleTaxonomyService';
 
@@ -15,6 +15,7 @@ interface CategoryOption {
   name: string;
   path: string[];
   fullPath: string;
+  hasChildren?: boolean;
   children?: CategoryOption[];
 }
 
@@ -23,7 +24,8 @@ const mapToCategoryOption = (googleCategory: GoogleTaxonomyCategory): CategoryOp
   id: googleCategory.id,
   name: googleCategory.name,
   path: googleCategory.path,
-  fullPath: googleCategory.path.join(' > ')
+  fullPath: googleCategory.path.join(' > '),
+  hasChildren: (googleCategory as any).hasChildren || false
 });
 
 
@@ -45,48 +47,82 @@ export default function CategorySelector({
   const [loading, setLoading] = useState(false);
   const [searchMode, setSearchMode] = useState(false);
   const [browsePath, setBrowsePath] = useState<string[]>([]); // Track current browse path
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load initial categories
   useEffect(() => {
     loadCategories();
   }, []);
 
-  // Filter categories based on search or browse path
+  // Cleanup timeout on unmount
   useEffect(() => {
-    if (searchMode) {
-      if (searchQuery.trim()) {
-        searchCategories(searchQuery);
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Debounced search function
+  const debouncedSearch = useCallback((query: string) => {
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Set new timeout
+    const timeout = setTimeout(() => {
+      if (query.trim()) {
+        searchCategories(query);
       } else {
         setFilteredCategories([]);
       }
+    }, 300); // 300ms debounce delay
+
+    searchTimeoutRef.current = timeout;
+  }, []); // Empty dependency array - no dependencies needed
+
+  // Filter categories based on search or browse path
+  useEffect(() => {
+    if (searchMode) {
+      debouncedSearch(searchQuery);
     } else {
       // Browse mode: show categories at current path level
       if (browsePath.length === 0) {
         // Show top-level categories
         setFilteredCategories(categories);
       } else {
-        // Navigate through the hierarchy to find children at current path
-        let currentLevel = categories;
-        for (let i = 0; i < browsePath.length; i++) {
-          const segment = browsePath[i];
-          const parent = currentLevel.find(cat => cat.name === segment);
-          if (parent && parent.children) {
-            currentLevel = parent.children;
-          } else {
-            // Path not found, reset to top level
-            currentLevel = [];
-            break;
-          }
-        }
-        setFilteredCategories(currentLevel);
+        // Need to fetch children for the current path
+        fetchChildrenForPath(browsePath);
       }
     }
-  }, [searchQuery, categories, searchMode, browsePath]);
+  }, [searchQuery, categories, searchMode, browsePath, debouncedSearch]);
+
+  const fetchChildrenForPath = async (path: string[]) => {
+    try {
+      setLoading(true);
+      const fullPath = path.join(' > ');
+      const googleCategories = await googleTaxonomyService.browseGoogleTaxonomy(fullPath);
+      
+      if (googleCategories) {
+        const childCategories = googleCategories.map(mapToCategoryOption);
+        setFilteredCategories(childCategories);
+      } else {
+        setFilteredCategories([]);
+      }
+    } catch (error) {
+      console.error('[CategorySelector] Failed to fetch children:', error);
+      setFilteredCategories([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadCategories = async () => {
     try {
       setLoading(true);
       const googleCategories = await googleTaxonomyService.browseGoogleTaxonomy();
+      
       if (googleCategories) {
         const categories = googleCategories.map(mapToCategoryOption);
         setCategories(categories);
@@ -108,6 +144,7 @@ export default function CategorySelector({
     try {
       setLoading(true);
       const googleCategories = await googleTaxonomyService.searchGoogleTaxonomy(query, 50);
+      
       if (googleCategories) {
         const categories = googleCategories.map(mapToCategoryOption);
         setFilteredCategories(categories);
@@ -123,6 +160,12 @@ export default function CategorySelector({
   };
 
   const handleModeSwitch = (newMode: boolean) => {
+    // Clear any pending search
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+    
     setSearchMode(newMode);
     setSearchQuery('');
     setBrowsePath([]);
@@ -145,13 +188,19 @@ export default function CategorySelector({
       
       if (isAlreadySelected) {
         // If already selected, clicking again navigates into children (if any)
-        if (category.children && category.children.length > 0) {
+        if (category.hasChildren) {
           setBrowsePath(category.path);
         }
       } else {
         // First click selects the category
         setSelectedCategory(category.path);
       }
+    }
+  };
+
+  const handleChevronClick = (category: CategoryOption) => {
+    if (category.hasChildren) {
+      setBrowsePath(category.path);
     }
   };
 
@@ -260,7 +309,7 @@ export default function CategorySelector({
           <div className="divide-y divide-neutral-200 dark:divide-neutral-700">
             {filteredCategories.map((category) => {
               const isSelected = JSON.stringify(selectedCategory) === JSON.stringify(category.path);
-              const hasChildren = category.children && category.children.length > 0;
+              const hasChildren = category.hasChildren;
               
               return (
                 <div
@@ -278,16 +327,21 @@ export default function CategorySelector({
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-neutral-900 dark:text-white">
+                        <p className="text-sm font-medium text-neutral-900 dark:text-white flex items-center gap-2">
                           {category.name}
+                          {hasChildren && (
+                            <svg className="w-3 h-3 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          )}
                         </p>
                         <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                           {category.fullPath}
                         </p>
                       </div>
                       {hasChildren && (
-                        <div className="flex items-center gap-1 text-xs text-neutral-400 ml-2">
-                          <span>+{category.children?.length || 0} subcategories</span>
+                        <div className="flex items-center gap-1 text-xs text-blue-500 ml-2">
+                          <span>Click to browse</span>
                         </div>
                       )}
                     </div>
@@ -295,11 +349,11 @@ export default function CategorySelector({
                   {hasChildren && (
                     <button
                       type="button"
-                      onClick={() => setBrowsePath(category.path)}
+                      onClick={() => handleChevronClick(category)}
                       className="px-3 border-l border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors flex items-center"
                       title="Browse subcategories"
                     >
-                      <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </button>

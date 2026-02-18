@@ -112,6 +112,21 @@ export const TenantLayout = ({ children, tenantId }: { children: ReactNode; tena
       ]
     },
     {
+      label: 'Reviews',
+      href: `/t/${tenantId}/reviews`,
+      icon: NavigationHelpers.getStandardIcon('USER_PANEL'),
+      children: [
+        {
+          label: 'Review Management',
+          href: `/t/${tenantId}/settings/reviews`
+        },
+        {
+          label: 'Customer Reviews',
+          href: `/t/${tenantId}/reviews`
+        }
+      ]
+    },
+    {
       label: 'Settings',
       href: `/t/${tenantId}/settings`,
       icon: NavigationHelpers.getStandardIcon('USER_PANEL'),
@@ -204,6 +219,21 @@ export const AdminLayout = ({ children }: { children: ReactNode }) => {
         {
           label: 'Blocked IPs',
           href: '/settings/admin/security#blocked-ips'
+        }
+      ]
+    },
+    {
+      label: 'Review Management',
+      href: '/admin/reviews',
+      icon: NavigationHelpers.getStandardIcon('USER_PANEL'),
+      children: [
+        {
+          label: 'Review Moderation',
+          href: '/admin/reviews'
+        },
+        {
+          label: 'Review Analytics',
+          href: '/admin/reviews/analytics'
         }
       ]
     },
@@ -345,7 +375,29 @@ export const PlatformLayout = ({ children, tenantCount = 0 }: { children: ReactN
         {
           label: 'Admin Panel',
           href: '/settings/admin',
-          accessLevel: 'admin'
+          accessLevel: 'admin',
+          children: [
+            {
+              label: 'Review Management',
+              href: '/admin/reviews'
+            },
+            {
+              label: 'User Management',
+              href: '/settings/admin/users'
+            },
+            {
+              label: 'Tenant Management',
+              href: '/settings/admin/tenants'
+            },
+            {
+              label: 'System Settings',
+              href: '/settings/admin/system'
+            },
+            {
+              label: 'Feature Flags',
+              href: '/settings/admin/features'
+            }
+          ]
         }
       ]
     }

@@ -163,7 +163,7 @@ class DirectorySingletonService extends PublicApiSingleton {
         this.CACHE_TTL_MEDIUM
       );
 
-      return response?.data || response;
+      return response?.data?.data || response?.data || response;
     } catch (error) {
       console.error('[DirectorySingleton] Failed to get directory consolidated:', error);
       return null;

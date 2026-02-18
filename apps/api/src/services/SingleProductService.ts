@@ -3,15 +3,18 @@ import { UniversalIdentifierCache } from './UniversalIdentifierCache';
 export interface SingleProductResult {
   id: string;
   name: string;
+  title: string;
   description: string;
   price: number | null;
+  priceCents: number;
   sku: string;
-  availability: 'in_stock' | 'out_of_stock' | 'limited';
+  availability: string;
   stock: number;
   quantity: number;
   images: Array<{
     id: string;
     url: string;
+    position: number;
     isPrimary: boolean;
   }>;
   tenant: {
@@ -28,7 +31,6 @@ export interface SingleProductResult {
     slug: string;
   };
   brand?: string;
-  manufacturer?: string;
   condition?: string;
   weight?: number;
   dimensions?: {
@@ -46,6 +48,22 @@ export interface SingleProductResult {
   }>;
   createdAt: Date;
   updatedAt: Date;
+  metadata?: any;
+  tenantId: string;
+  itemStatus: string;
+  visibility: string;
+  gtin?: string;
+  mpn?: string;
+  manufacturer?: string;
+  imageUrl?: string;
+  currency: string;
+  tenantCategoryId?: string;
+  tenantCategory?: {
+    id: string;
+    name: string;
+    slug: string;
+    googleCategoryId?: string | null;
+  } | null;
 }
 
 export class SingleProductService {
@@ -128,8 +146,10 @@ export class SingleProductService {
     const transformedProduct: SingleProductResult = {
       id: product.id,
       name: product.name,
+      title: product.name, // Add title field
       description: product.description || '',
       price: product.price_cents ? product.price_cents / 100 : null,
+      priceCents: product.price_cents || 0, // Add priceCents field
       sku: product.sku || '',
       availability: this.determineAvailability(product.stock, product.quantity),
       stock: product.stock || 0,
@@ -159,7 +179,24 @@ export class SingleProductService {
       brand: product.brand || '',
       condition: product.condition || '',
       createdAt: product.created_at,
-      updatedAt: product.updated_at
+      updatedAt: product.updated_at,
+      // Add missing fields from the working API
+      metadata: product.metadata || {},
+      tenantId: product.tenant_id,
+      itemStatus: product.item_status || 'unknown',
+      visibility: product.visibility || 'public',
+      gtin: product.gtin || undefined,
+      mpn: product.mpn || undefined,
+      manufacturer: product.manufacturer || undefined,
+      imageUrl: photos.length > 0 ? photos[0].url : undefined,
+      currency: 'USD', // Default currency
+      tenantCategoryId: product.directory_category_id || undefined,
+      tenantCategory: category ? {
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+        googleCategoryId: null
+      } : null
     };
 
     // Cache the result
@@ -224,8 +261,10 @@ export class SingleProductService {
       return {
         id: product.id,
         name: product.name,
+        title: product.name, // Add title field
         description: product.description || '',
         price: product.price_cents ? product.price_cents / 100 : null,
+        priceCents: product.price_cents || 0, // Add priceCents field
         sku: product.sku || '',
         availability: this.determineAvailability(product.stock, product.quantity),
         stock: product.stock || 0,
@@ -252,15 +291,31 @@ export class SingleProductService {
           state: undefined
         },
         category: category || undefined,
-        brand: (product as any).brand,
-        manufacturer: (product as any).manufacturer,
-        condition: (product as any).condition,
+        brand: (product as any).brand || '',
+        manufacturer: (product as any).manufacturer || undefined,
+        condition: (product as any).condition || '',
         weight: (product as any).weight,
         dimensions: this.parseDimensions((product as any).dimensions),
         tags: this.parseTags((product as any).tags),
         variants: [],
         createdAt: product.created_at,
-        updatedAt: product.updated_at
+        updatedAt: product.updated_at,
+        // Add missing required fields
+        metadata: (product as any).metadata || {},
+        tenantId: product.tenant_id,
+        itemStatus: (product as any).item_status || 'unknown',
+        visibility: (product as any).visibility || 'public',
+        gtin: (product as any).gtin || undefined,
+        mpn: (product as any).mpn || undefined,
+        imageUrl: productPhotos.length > 0 ? productPhotos[0].url : undefined,
+        currency: 'USD',
+        tenantCategoryId: (product as any).directory_category_id || undefined,
+        tenantCategory: category ? {
+          id: category.id,
+          name: category.name,
+          slug: category.slug,
+          googleCategoryId: null
+        } : null
       };
     });
 
@@ -350,8 +405,10 @@ export class SingleProductService {
     return {
       id: product.id,
       name: product.name,
+      title: product.name, // Add title field
       description: product.description || '',
       price: product.price_cents ? product.price_cents / 100 : null,
+      priceCents: product.price_cents || 0, // Add priceCents field
       sku: product.sku || '',
       availability: this.determineAvailability(product.stock, product.quantity),
       stock: product.stock || 0,
@@ -366,15 +423,26 @@ export class SingleProductService {
         state: undefined
       },
       category: undefined, // Should be populated by the calling method
-      brand: (product as any).brand,
-      manufacturer: (product as any).manufacturer,
-      condition: (product as any).condition,
+      brand: (product as any).brand || '',
+      manufacturer: (product as any).manufacturer || undefined,
+      condition: (product as any).condition || '',
       weight: (product as any).weight,
       dimensions: this.parseDimensions((product as any).dimensions),
       tags: this.parseTags((product as any).tags),
       variants: [],
       createdAt: product.created_at,
-      updatedAt: product.updated_at
+      updatedAt: product.updated_at,
+      // Add missing required fields
+      metadata: (product as any).metadata || {},
+      tenantId: product.tenant_id,
+      itemStatus: (product as any).item_status || 'unknown',
+      visibility: (product as any).visibility || 'public',
+      gtin: (product as any).gtin || undefined,
+      mpn: (product as any).mpn || undefined,
+      imageUrl: undefined, // Should be populated by the calling method
+      currency: 'USD',
+      tenantCategoryId: (product as any).directory_category_id || undefined,
+      tenantCategory: null // Should be populated by the calling method
     };
   }
 

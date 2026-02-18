@@ -421,16 +421,12 @@ router.post('/:tenantId/categories', requireTenantManagement, async (req, res) =
  * Body: { name, googleCategoryId?, itemId? }
  */
 router.post('/:tenantId/categories/from-enrichment', requireTenantManagement, async (req, res) => {
-  console.log('[from-enrichment] Endpoint called:', {
-    tenantId: req.params.tenantId,
-    body: req.body,
-    user: req.user?.userId
-  });
   try {
     const { tenantId } = req.params;
     const enrichmentCategorySchema = z.object({
       name: z.string().min(1, 'Category name is required'),
       googleCategoryId: z.string().optional(),
+      googleCategoryPath: z.string().optional(), // Full Google taxonomy path
       itemId: z.string().optional(), // Optional: assign to item immediately
     });
 
@@ -455,7 +451,10 @@ router.post('/:tenantId/categories/from-enrichment', requireTenantManagement, as
       if (body.itemId) {
         await prisma.inventory_items.update({
           where: { id: body.itemId },
-          data: { directory_category_id: existing.id },
+          data: { 
+            directory_category_id: existing.id,
+            category_path: body.googleCategoryPath ? body.googleCategoryPath.split(' > ') : [], // Convert string path to array
+          },
         });
       }
 

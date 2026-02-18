@@ -34,12 +34,6 @@ export default function CategoryAssignmentModal({
         // Get the category name (last part of path)
         const categoryName = googleCategoryPath.split(' > ').pop() || 'Unknown Category';
 
-        console.log('[CategoryAssignment] Creating category from Google taxonomy:', {
-          googleCategoryPath,
-          googleTaxonomyId,
-          categoryName
-        });
-
         // Create category with Google taxonomy ID
         const createResponse = await apiRequest(`/api/v1/tenants/${tenantId}/categories/from-enrichment`, {
           method: 'POST',
@@ -47,12 +41,12 @@ export default function CategoryAssignmentModal({
           body: JSON.stringify({
             name: categoryName,
             googleCategoryId: googleTaxonomyId,
+            googleCategoryPath: googleCategoryPath, // Add the full path
           }),
         });
 
         if (createResponse.ok) {
           const createResult = await createResponse.json();
-          console.log('[CategoryAssignment] Category created successfully:', createResult);
           setSelectedCategoryId(createResult.data.id);
         } else {
           const errorText = await createResponse.text();
@@ -61,12 +55,10 @@ export default function CategoryAssignmentModal({
             statusText: createResponse.statusText,
             errorText
           });
-          // Fallback: just set the category ID (though it won't work)
           setSelectedCategoryId(categoryId);
         }
       } catch (error) {
         console.error('[CategoryAssignment] Error creating category from Google taxonomy:', error);
-        // Fallback: just set the category ID
         setSelectedCategoryId(categoryId);
       } finally {
         setIsCreatingCategory(false);

@@ -285,9 +285,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
 
   const handleCategoryAssign = async (itemId: string, categoryId: string) => {
     try {
-      console.log('[handleCategoryAssign] Called with:', { itemId, categoryId });
       const updateData = { tenantCategoryId: categoryId };
-      console.log('[handleCategoryAssign] Update data:', updateData);
       
       // Update the item with the tenant category ID
       await updateItem(itemId, updateData);

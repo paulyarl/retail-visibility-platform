@@ -56,16 +56,13 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
         throw new Error('Tenant ID and Product ID are required');
       }
 
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        data: ProductReviewSummary;
-      }>(
+      const result = await this.makePublicRequest<ProductReviewSummary>(
         `/api/stores/${tenantId}/products/${productId}/reviews/summary`,
         {},
         `product-review-summary-${tenantId}-${productId}`
       );
 
-      return response?.data?.data || null;
+      return this.extractDataOrDefault(result, null);
     } catch (error) {
       console.error('[ProductReviewsSingleton] Failed to get product review summary:', error);
       return null;
@@ -86,29 +83,21 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
         throw new Error('Tenant ID and Product ID are required');
       }
 
-      const params = new URLSearchParams();
-      if (options?.limit) params.append('limit', options.limit.toString());
-      if (options?.offset) params.append('offset', options.offset.toString());
-      if (options?.sortBy) params.append('sortBy', options.sortBy);
-
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        data: {
-          reviews: ProductReview[];
-          pagination: {
-            page: number;
-            limit: number;
-            total: number;
-          };
-          timestamp: string;
+      const result = await this.makePublicRequest<{
+        reviews: ProductReview[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
         };
+        timestamp: string;
       }>(
-        `/api/reviews-singleton/product/${productId}?${params.toString()}`,
+        `/api/reviews-singleton/product/${productId}`,
         {},
         `product-reviews-${tenantId}-${productId}-${options?.limit || 'default'}`
       );
 
-      return response?.data?.data?.reviews || [];
+      return result?.data?.reviews || [];
     } catch (error) {
       console.error('[ProductReviewsSingleton] Failed to get product reviews:', error);
       return [];
@@ -128,16 +117,13 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
       const params = new URLSearchParams();
       if (userId) params.append('userId', userId);
 
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        data: ProductReview;
-      }>(
+      const result = await this.makePublicRequest<ProductReview>(
         `/api/stores/${tenantId}/products/${productId}/reviews/user?${params.toString()}`,
         {},
         `user-product-review-${tenantId}-${productId}-${userId || 'anonymous'}`
       );
 
-      return response?.data?.data || null;
+      return this.extractDataOrDefault(result, null);
     } catch (error) {
       console.error('[ProductReviewsSingleton] Failed to get user product review:', error);
       return null;
@@ -159,10 +145,7 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
         throw new Error('Tenant ID and Product ID are required');
       }
 
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        data: ProductReview;
-      }>(
+      const result = await this.makePublicRequest<ProductReview>(
         `/api/stores/${tenantId}/products/${productId}/reviews`,
         {
           method: 'POST',
@@ -171,7 +154,7 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
         `product-review-create-${tenantId}-${productId}`
       );
 
-      return response?.data?.data || null;
+      return this.extractDataOrDefault(result, null);
     } catch (error) {
       console.error('[ProductReviewsSingleton] Failed to create/update product review:', error);
       return null;

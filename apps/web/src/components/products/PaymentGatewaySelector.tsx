@@ -113,6 +113,11 @@ export default function PaymentGatewaySelector({
   };
 
   const getGatewayDisplayName = (gateway: Gateway) => {
+    // Handle case where config might be undefined
+    if (!gateway.config) {
+      return `${gateway.gateway_type.charAt(0).toUpperCase() + gateway.gateway_type.slice(1)}${gateway.is_default ? ' (Default)' : ''}`;
+    }
+    
     const displayName = gateway.config.display_name;
     const mode = gateway.config.mode || gateway.config.environment;
     const isDefault = gateway.is_default ? ' (Default)' : '';
@@ -121,7 +126,9 @@ export default function PaymentGatewaySelector({
       return `${displayName}${isDefault}`;
     }
     
-    return `${gateway.gateway_type.charAt(0).toUpperCase() + gateway.gateway_type.slice(1)} - ${mode}${isDefault}`;
+    // Fallback to gateway type with mode if available
+    const modeText = mode ? ` - ${mode}` : '';
+    return `${gateway.gateway_type.charAt(0).toUpperCase() + gateway.gateway_type.slice(1)}${modeText}${isDefault}`;
   };
 
   if (loading) {

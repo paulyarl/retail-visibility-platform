@@ -39,11 +39,18 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
    * Browse Google taxonomy categories
    * Uses the /api/google/taxonomy/browse endpoint (original endpoint)
    */
-  async browseGoogleTaxonomy(): Promise<GoogleTaxonomyCategory[] | null> {
-    const response = await this.makeAuthenticatedRequest<GoogleTaxonomyCategory[]>(
-      '/api/google/taxonomy/browse',
+  async browseGoogleTaxonomy(parentPath?: string): Promise<GoogleTaxonomyCategory[] | null> {
+    const url = parentPath 
+      ? `/api/google/taxonomy/browse?parent=${encodeURIComponent(parentPath)}`
+      : '/api/google/taxonomy/browse';
+    
+    const response = await this.makeAuthenticatedRequest<{
+      success: boolean;
+      categories: GoogleTaxonomyCategory[];
+    }>(
+      url,
       {},
-      'google-taxonomy-browse',
+      `google-taxonomy-browse-${parentPath || 'root'}`,
       this.TAXONOMY_TTL
     );
 
@@ -52,7 +59,7 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    return response.data || null;
+    return response.data?.categories || null;
   }
 
   /**
@@ -65,7 +72,10 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    const response = await this.makeAuthenticatedRequest<GoogleTaxonomyCategory[]>(
+    const response = await this.makeAuthenticatedRequest<{
+      success: boolean;
+      categories: GoogleTaxonomyCategory[];
+    }>(
       `/api/google/taxonomy/search?q=${encodeURIComponent(query)}&limit=${limit}`,
       {},
       `google-taxonomy-search-${query}`,
@@ -77,7 +87,7 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    return response.data || null;
+    return response.data?.categories || null;
   }
 }
 

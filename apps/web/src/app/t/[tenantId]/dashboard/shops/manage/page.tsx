@@ -265,7 +265,7 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
         <p className="text-xs font-semibold text-gray-700 mb-2">Shop URLs:</p>
         
         {/* Primary URL (Canonical) */}
-        <div className="flex items-center justify-between">
+        <div key="primary-url" className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-gray-900">Primary:</p>
             <p className="text-xs text-blue-600 truncate">{urls.canonicalUrl}</p>
@@ -282,7 +282,7 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
 
         {/* Slug URL (if available) */}
         {urls.slugUrl && (
-          <div className="flex items-center justify-between">
+          <div key="slug-url" className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-gray-900">Slug:</p>
               <p className="text-xs text-green-600 truncate">{urls.slugUrl}</p>
@@ -299,7 +299,7 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
         )}
 
         {/* Tenant ID URL */}
-        <div className="flex items-center justify-between">
+        <div key="tenant-url" className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-gray-900">Tenant ID:</p>
             <p className="text-xs text-orange-600 truncate">{urls.tenantIdUrl}</p>
@@ -315,7 +315,7 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
         </div>
 
         {/* Auto ID URL */}
-        <div className="flex items-center justify-between">
+        <div key="auto-url" className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-gray-900">Auto ID:</p>
             <p className="text-xs text-purple-600 truncate">{urls.autoIdUrl}</p>
@@ -434,11 +434,11 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="branding">Branding</TabsTrigger>
-          <TabsTrigger value="publishing">Publishing</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger key="overview" value="overview">Overview</TabsTrigger>
+          <TabsTrigger key="analytics" value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger key="branding" value="branding">Branding</TabsTrigger>
+          <TabsTrigger key="publishing" value="publishing">Publishing</TabsTrigger>
+          <TabsTrigger key="settings" value="settings">Settings</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -453,7 +453,7 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
                 {loading ? (
                   <div className="space-y-4">
                     {[...Array(3)].map((_, i) => (
-                      <div key={i} className="animate-pulse">
+                      <div key={`skeleton-${i}`} className="animate-pulse">
                         <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
                         <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                       </div>

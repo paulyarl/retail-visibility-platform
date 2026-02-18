@@ -963,33 +963,77 @@ router.post('/:tenantId/products/:productId/reviews/anonymous', async (req: Requ
   }
 });
 
+// GET /api/stores/:tenantId/products/:productId/reviews/summary - Get rating summary for a product
+router.get('/:tenantId/products/:productId/reviews/summary', async (req: Request, res: Response) => {
+  try {
+    const { tenantId, productId } = req.params;
+
+    const pool = getDirectPool();
+
+    const summaryQuery = `
+      SELECT
+        COALESCE(AVG(rating), 0) as rating_avg,
+        COUNT(*) as rating_count,
+        COUNT(*) FILTER (WHERE rating = 1) as rating_1_count,
+        COUNT(*) FILTER (WHERE rating = 2) as rating_2_count,
+        COUNT(*) FILTER (WHERE rating = 3) as rating_3_count,
+        COUNT(*) FILTER (WHERE rating = 4) as rating_4_count,
+        COUNT(*) FILTER (WHERE rating = 5) as rating_5_count,
+        COALESCE(SUM(helpful_count), 0) as helpful_count_total,
+        COUNT(*) FILTER (WHERE verified_purchase = true) as verified_purchase_count,
+        MAX(created_at) as last_review_at
+      FROM store_reviews
+      WHERE tenant_id = $1 AND product_id = $2 AND approval_status = 'approved'
+    `;
+    const result = await pool.query(summaryQuery, [tenantId, productId]);
+
+    const summary = result.rows[0] || {
+      rating_avg: 0,
+      rating_count: 0,
+      rating_1_count: 0,
+      rating_2_count: 0,
+      rating_3_count: 0,
+      rating_4_count: 0,
+      rating_5_count: 0,
+      helpful_count_total: 0,
+      verified_purchase_count: 0,
+      last_review_at: null
+    };
+
+    res.json({
+      success: true,
+      data: summary
+    });
+
+  } catch (error) {
+    console.error('Error fetching product review summary:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch product review summary'
+    });
+  }
+});
+
 // POST /api/stores/:tenantId/products/:productId/reviews - Create a new authenticated product review
 router.post('/:tenantId/products/:productId/reviews', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId, productId } = req.params;
     const userId = req.user?.userId;
 
-    console.log('Creating product review:', { tenantId, productId, userId, body: req.body });
-
     // Validate request body
     const validatedData = createReviewSchema.parse(req.body);
     const { rating, reviewText, verifiedPurchase, locationLat, locationLng } = validatedData;
 
-    console.log('Validated review data:', { rating, reviewText, verifiedPurchase, locationLat, locationLng });
-
     const pool = getDirectPool();
 
-    // Check if user already reviewed this product
+    // Check if review exists
     const existingReviewQuery = `
       SELECT id FROM store_reviews
       WHERE tenant_id = $1 AND product_id = $2 AND user_id = $3
     `;
     const existingReviewResult = await pool.query(existingReviewQuery, [tenantId, productId, userId]);
 
-    console.log('Existing review check:', existingReviewResult.rows.length);
-
     if (existingReviewResult.rows.length > 0) {
-      console.log('User already reviewed this product');
       return res.status(400).json({
         success: false,
         error: 'You have already submitted a review for this product. Use PUT to update your review.'
@@ -1005,10 +1049,6 @@ router.post('/:tenantId/products/:productId/reviews', authenticateToken, async (
       RETURNING id, rating, review_text, helpful_count, verified_purchase, created_at, approval_status
     `;
 
-    console.log('Executing insert query with params:', [
-      tenantId, productId, userId, rating, reviewText, verifiedPurchase, locationLat, locationLng
-    ]);
-
     const result = await pool.query(insertQuery, [
       tenantId,
       productId,
@@ -1021,7 +1061,6 @@ router.post('/:tenantId/products/:productId/reviews', authenticateToken, async (
     ]);
 
     const review = result.rows[0];
-    console.log('Review created successfully:', review);
 
     // Update rating summary for authenticated reviews (approved immediately)
     await updateRatingSummary(pool, tenantId);
@@ -1034,7 +1073,6 @@ router.post('/:tenantId/products/:productId/reviews', authenticateToken, async (
   } catch (error) {
     console.error('Error creating authenticated product review:', error);
     if (error instanceof z.ZodError) {
-      console.error('Zod validation errors:', error.issues);
       const errors = error.issues || [];
       return res.status(400).json({
         success: false,
@@ -1335,57 +1373,6 @@ router.get('/:tenantId/products/:productId/reviews/user', authenticateToken, asy
     res.status(500).json({
       success: false,
       error: 'Failed to fetch user product review'
-    });
-  }
-});
-
-// GET /api/stores/:tenantId/products/:productId/reviews/summary - Get rating summary for a product
-router.get('/:tenantId/products/:productId/reviews/summary', async (req: Request, res: Response) => {
-  try {
-    const { tenantId, productId } = req.params;
-
-    const pool = getDirectPool();
-
-    const summaryQuery = `
-      SELECT
-        COALESCE(AVG(rating), 0) as rating_avg,
-        COUNT(*) as rating_count,
-        COUNT(*) FILTER (WHERE rating = 1) as rating_1_count,
-        COUNT(*) FILTER (WHERE rating = 2) as rating_2_count,
-        COUNT(*) FILTER (WHERE rating = 3) as rating_3_count,
-        COUNT(*) FILTER (WHERE rating = 4) as rating_4_count,
-        COUNT(*) FILTER (WHERE rating = 5) as rating_5_count,
-        COALESCE(SUM(helpful_count), 0) as helpful_count_total,
-        COUNT(*) FILTER (WHERE verified_purchase = true) as verified_purchase_count,
-        MAX(created_at) as last_review_at
-      FROM store_reviews
-      WHERE tenant_id = $1 AND product_id = $2 AND approval_status = 'approved'
-    `;
-    const result = await pool.query(summaryQuery, [tenantId, productId]);
-
-    const summary = result.rows[0] || {
-      rating_avg: 0,
-      rating_count: 0,
-      rating_1_count: 0,
-      rating_2_count: 0,
-      rating_3_count: 0,
-      rating_4_count: 0,
-      rating_5_count: 0,
-      helpful_count_total: 0,
-      verified_purchase_count: 0,
-      last_review_at: null
-    };
-
-    res.json({
-      success: true,
-      data: summary
-    });
-
-  } catch (error) {
-    console.error('Error fetching product review summary:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch product review summary'
     });
   }
 });

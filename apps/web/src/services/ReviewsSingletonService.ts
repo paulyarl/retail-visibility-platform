@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '../providers/base/UniversalSingleton';
 
 export interface ReviewSummary {
   rating_avg: number;
@@ -140,7 +141,12 @@ class ReviewsSingletonService extends PublicApiSingleton {
       );
       
       return result.data || null;
-    } catch (error) {
+    } catch (error: any) {
+      // Handle 401 errors gracefully for public pages
+      if (error?.status === 401 || error?.code === 'UNAUTHORIZED') {
+        console.log('[ReviewsSingleton] User not authenticated, skipping user review fetch');
+        return null;
+      }
       console.error('[ReviewsSingleton] Failed to get user review:', error);
       return null;
     }
@@ -218,9 +224,111 @@ class ReviewsSingletonService extends PublicApiSingleton {
       );
 
       return response?.data?.data || null;
-    } catch (error) {
+    } catch (error: any) {
+      // Handle 401 errors gracefully for public pages
+      if (error?.status === 401 || error?.code === 'UNAUTHORIZED') {
+        console.log('[ReviewsSingleton] User not authenticated, cannot submit review');
+        return null;
+      }
       console.error('[ReviewsSingleton] Failed to submit review:', error);
       return null;
+    }
+  }
+
+  /**
+   * Get pending reviews for a store (requires authentication)
+   * Uses the /api/stores/:tenantId/reviews/pending endpoint
+   * Note: Only store owners and platform admins can access this
+   */
+  async getPendingReviews(tenantId: string): Promise<Review[] | null> {
+    if (!tenantId) {
+      console.error('[ReviewsSingleton] getPendingReviews: tenantId is required');
+      return null;
+    }
+
+    try {
+      const result = await this.makePublicRequest<{
+        success: boolean;
+        data: Review[];
+      }>(
+        `/api/stores/${tenantId}/reviews/pending`,
+        {},
+        `pending-reviews-${tenantId}`
+      );
+
+      // Handle the response structure - if success, return the data array
+      if (result && typeof result === 'object' && 'data' in result && Array.isArray(result.data)) {
+        return result.data;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[ReviewsSingleton] Failed to get pending reviews:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Approve a pending review (requires authentication)
+   * Uses the /api/stores/:tenantId/reviews/:reviewId/approve endpoint
+   * Note: Only store owners and platform admins can approve reviews
+   */
+  async approveReview(tenantId: string, reviewId: string): Promise<boolean> {
+    if (!tenantId || !reviewId) {
+      console.error('[ReviewsSingleton] approveReview: tenantId and reviewId are required');
+      return false;
+    }
+
+    try {
+      const result = await this.makePublicRequest<{
+        success: boolean;
+        message: string;
+      }>(
+        `/api/stores/${tenantId}/reviews/${reviewId}/approve`,
+        { method: 'POST' },
+        `approve-review-${reviewId}`
+      );
+
+      // Invalidate related caches
+      this.cache.delete(`rating-summary-${tenantId}`);
+      this.cache.delete(`reviews-${tenantId}`);
+
+      return result?.success || false;
+    } catch (error) {
+      console.error('[ReviewsSingleton] Failed to approve review:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Reject a pending review (requires authentication)
+   * Uses the /api/stores/:tenantId/reviews/:reviewId/reject endpoint
+   * Note: Only store owners and platform admins can reject reviews
+   */
+  async rejectReview(tenantId: string, reviewId: string): Promise<boolean> {
+    if (!tenantId || !reviewId) {
+      console.error('[ReviewsSingleton] rejectReview: tenantId and reviewId are required');
+      return false;
+    }
+
+    try {
+      const result = await this.makePublicRequest<{
+        success: boolean;
+        message: string;
+      }>(
+        `/api/stores/${tenantId}/reviews/${reviewId}/reject`,
+        { method: 'POST' },
+        `reject-review-${reviewId}`
+      );
+
+      // Invalidate related caches
+      this.cache.delete(`rating-summary-${tenantId}`);
+      this.cache.delete(`reviews-${tenantId}`);
+
+      return result?.success || false;
+    } catch (error) {
+      console.error('[ReviewsSingleton] Failed to reject review:', error);
+      return false;
     }
   }
 }

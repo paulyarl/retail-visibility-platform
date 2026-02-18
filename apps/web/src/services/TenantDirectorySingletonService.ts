@@ -73,30 +73,60 @@ class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
       return undefined;
     }
 
-    try {
-      const result = await this.makeAuthenticatedRequest<TenantSlugResponse>(
-        `/api/directory/tenant/${tenantId}`,
-        {},
-        `tenant-slug-${tenantId}`
-      );
-      
-      // Handle legitimate API responses (should not be 404 for missing records)
-      if (!result) {
-        console.warn('[TenantDirectorySingleton] No directory listing found for tenant:', tenantId, 'No data');
-        return undefined;
-      }
-      
-      // Check if response looks like an error response (has error property instead of slug)
-      if (!result.data || 'error' in result.data || !result.data.slug) {
-        console.warn('[TenantDirectorySingleton] No directory listing found for tenant:', tenantId, (result.data as any)?.error || 'Missing slug');
-        return undefined;
-      }
-      
-      return result.data.slug;
-    } catch (error) {
-      console.error('[TenantDirectorySingleton] Failed to get tenant slug:', error);
+    // Check if we're in a server environment where auth might not be available
+    const isServer = typeof window === 'undefined';
+    
+    // During SSR, we should not make authenticated requests at all
+    // The tenant slug will be fetched client-side
+    if (isServer) {
+      console.log('[TenantDirectorySingleton] Skipping tenant slug fetch during SSR');
       return undefined;
     }
+    
+    // Add retry logic for connection issues during startup
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 second
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await this.makeAuthenticatedRequest<TenantSlugResponse>(
+          `/api/directory/tenant/${tenantId}`,
+          {},
+          `tenant-slug-${tenantId}`
+        );
+        
+        // Handle legitimate API responses (should not be 404 for missing records)
+        if (!result) {
+          console.warn('[TenantDirectorySingleton] No directory listing found for tenant:', tenantId, 'No data');
+          return undefined;
+        }
+        
+        // Check if response looks like an error response (has error property instead of slug)
+        if (!result.data || 'error' in result.data || !result.data.slug) {
+          console.warn('[TenantDirectorySingleton] No directory listing found for tenant:', tenantId, (result.data as any)?.error || 'Missing slug');
+          return undefined;
+        }
+        
+        return result.data.slug;
+      } catch (error: any) {
+        // Check if this is a connection error that might be resolved with retry
+        const isConnectionError = error?.message?.includes('ECONNREFUSED') || 
+                               error?.code === 'ECONNREFUSED' ||
+                               error?.cause?.code === 'ECONNREFUSED' ||
+                               error?.message?.includes('fetch failed');
+        
+        if (isConnectionError && attempt < maxRetries) {
+          console.warn(`[TenantDirectorySingleton] Connection failed (attempt ${attempt}/${maxRetries}), retrying in ${retryDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        }
+        
+        console.error('[TenantDirectorySingleton] Failed to get tenant slug:', error);
+        return undefined;
+      }
+    }
+    
+    return undefined;
   }
 
   /**

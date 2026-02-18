@@ -53,88 +53,45 @@ const StoreQuerySchema = z.object({
 // ====================
 
 /**
- * GET /api/public/products
- * Get general product listing (featured products across all tenants)
+ * GET /api/public/products/:id
+ * Get single product by ID with full details - Universal Identifier Pattern
  */
-router.get('/products', async (req, res) => {
+router.get('/products/:id', async (req, res) => {
   try {
-    const query = ProductQuerySchema.parse(req.query);
+    const { id } = req.params;
 
-    console.log(`[Public API] General products request with query:`, query);
+    console.log(`[Public API] Single product request for ID: ${id}`);
 
-    // Use FeaturedService to get general product listing
-    const { FeaturedService } = await import('../services/FeaturedService');
-    const featuredService = FeaturedService.getInstance();
+    // Use SingleProductService with caching
+    const { SingleProductService } = await import('../services/SingleProductService');
+    const productService = SingleProductService.getInstance();
 
-    const result = await featuredService.getFeaturedProducts({
-      limit: query.limit || 20,
-      lat: undefined,
-      lng: undefined,
-      radius: undefined,
-      category: query.category,
-      tenantId: undefined // Get from all tenants
-    });
+    const product = await productService.getProductById(id);
 
-    res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache
-    res.setHeader('X-Service-Source', 'FeaturedService');
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found',
+        message: `No product found with ID: ${id}`
+      });
+    }
+
+    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
+    res.setHeader('X-Service-Source', 'SingleProductService');
 
     res.json({
       success: true,
-      products: result.products || [],
-      message: 'General product listing retrieved successfully'
-    });
-  } catch (error) {
-    console.error('[PUBLIC API] General products error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch general products'
-    });
-  }
-});
-
-/**
- * GET /api/public/products/:identifier
- * Get products by tenant identifier (tenant-id, slug, auto-id) - Universal Identifier Pattern
- */
-router.get('/products/:identifier', async (req, res) => {
-  try {
-    const { identifier } = req.params;
-    const query = ProductQuerySchema.parse(req.query);
-
-    console.log(`[Public API] Products request for identifier: ${identifier}`);
-
-    // Use ProductService with Universal Identifier support
-    const { ProductService } = await import('../services/ProductService');
-    const productService = ProductService.getInstance();
-
-    const result = await productService.getProductsByTenant(identifier, {
-      limit: query.limit,
-      offset: query.offset,
-      sort: query.sort,
-      order: query.order,
-      search: query.search,
-      category: (query as any).category,
-      minPrice: (query as any).minPrice,
-      maxPrice: (query as any).maxPrice
-    });
-
-    res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache
-    res.setHeader('X-Service-Source', 'ProductService');
-
-    res.json({
-      success: true,
-      ...result,
+      data: product,
       metadata: {
-        identifier,
-        cacheTTL: 5 * 60 * 1000 // 5 minutes
+        productId: id,
+        cacheTTL: 15 * 60 * 1000 // 15 minutes
       }
     });
   } catch (error) {
-    console.error('[PUBLIC API] Products by identifier error:', error);
-    const statusCode = error instanceof Error && error.message.includes('not found') ? 404 : 500;
-    res.status(statusCode).json({
+    console.error('[PUBLIC API] Single product error:', error);
+    res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch products'
+      error: 'Failed to fetch product'
     });
   }
 });
@@ -237,45 +194,41 @@ router.get('/products/search/global', async (req, res) => {
 });
 
 /**
- * GET /api/public/products/:id
- * Get single product by ID with full details - Universal Identifier Pattern
+ * GET /api/public/products
+ * Get general product listing (featured products across all tenants)
  */
-router.get('/products/:id', async (req, res) => {
+router.get('/products', async (req, res) => {
   try {
-    const { id } = req.params;
+    const query = ProductQuerySchema.parse(req.query);
 
-    console.log(`[Public API] Single product request for ID: ${id}`);
+    console.log(`[Public API] General products request with query:`, query);
 
-    // Use SingleProductService with caching
-    const { SingleProductService } = await import('../services/SingleProductService');
-    const productService = SingleProductService.getInstance();
+    // Use FeaturedService to get general product listing
+    const { FeaturedService } = await import('../services/FeaturedService');
+    const featuredService = FeaturedService.getInstance();
 
-    const product = await productService.getProductById(id);
+    const result = await featuredService.getFeaturedProducts({
+      limit: query.limit || 20,
+      lat: undefined,
+      lng: undefined,
+      radius: undefined,
+      category: query.category,
+      tenantId: undefined // Get from all tenants
+    });
 
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        error: 'Product not found',
-        message: `No product found with ID: ${id}`
-      });
-    }
-
-    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
-    res.setHeader('X-Service-Source', 'SingleProductService');
+    res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache
+    res.setHeader('X-Service-Source', 'FeaturedService');
 
     res.json({
       success: true,
-      product,
-      metadata: {
-        productId: id,
-        cacheTTL: 15 * 60 * 1000 // 15 minutes
-      }
+      products: result.products || [],
+      message: 'General product listing retrieved successfully'
     });
   } catch (error) {
-    console.error('[PUBLIC API] Single product error:', error);
+    console.error('[PUBLIC API] General products error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch product'
+      error: 'Failed to fetch general products'
     });
   }
 });

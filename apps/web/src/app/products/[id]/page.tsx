@@ -8,7 +8,7 @@ import { ProductRecommendations } from '@/components/products/ProductRecommendat
 import LastViewed from '@/components/directory/LastViewed';
 import { computeStoreStatus } from '@/lib/hours-utils';
 import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
-import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { UniversalSingleton, PublicApiSingleton } from '@/providers/base/UniversalSingleton';
 import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import ProductBusinessInfoCollapsible from '@/components/products/ProductBusinessInfoCollapsible';
@@ -41,6 +41,14 @@ interface Product {
   gtin?: string;
   mpn?: string;
   tenantId: string;
+  tenant?: {
+    id: string;
+    name: string;
+    slug: string;
+    subscriptionTier?: string;
+    city?: string;
+    state?: string;
+  };
   createdAt: string;
   updatedAt: string;
   
@@ -142,7 +150,7 @@ interface Tenant {
 }
 
 // Product Data API Singleton
-class ProductDataSingleton extends UniversalSingleton {
+class ProductDataSingleton extends PublicApiSingleton {
   private static instance: ProductDataSingleton;
 
   private constructor() {
@@ -158,15 +166,17 @@ class ProductDataSingleton extends UniversalSingleton {
 
   async fetchProduct(id: string): Promise<any> {
     try {
-      const response = await this.makeApiRequest<any>(
-        `/items/${id}`,
-        { 
-          cache: 'no-store',
-          headers: { 'Content-Type': 'application/json' }
-        }
+      const response = await this.makePublicRequest<any>(
+        `/api/public/products/${id}`,
+        {},
+        'product-data'
       );
-      
-      return response;
+      if (!response.success){
+        console.error('[ProductDataSingleton] Failed to fetch products:', response.error);
+        return null;
+      }
+
+      return response.data.data;
     } catch (error) {
       throw new Error(`Failed to fetch product: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -174,27 +184,27 @@ class ProductDataSingleton extends UniversalSingleton {
 
   async fetchTenantProfile(tenantId: string): Promise<any> {
     try {
-      const response = await this.makeApiRequest<any>(
-        `/public/tenant/${tenantId}/profile`,
-        { 
-          cache: 'no-store',
-          headers: { 'Content-Type': 'application/json' }
-        }
+      const response = await this.makePublicRequest<any>(
+        `/api/public/tenant/${tenantId}/profile`,
+        {},
+        'tenant-profile'
       );
-      
-      return response;
+      if (!response.success){
+        console.error('[ProductDataSingleton] Failed to fetch tenant profile:', response.error);
+        return null;
+      }
+
+      return response.data.data;
     } catch (error) {
       throw new Error(`Failed to fetch tenant profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   async fetchDirectoryEntry(tenantSlug: string): Promise<any> {
-    const response = await this.makeApiRequest<any>(
+    const response = await this.makePublicRequest<any>(
       `/api/directory/${tenantSlug}`,
-      { 
-        cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' }
-      }
+      {},
+      'directory-entry'
     );
     
     if (!response.success) {
@@ -205,12 +215,17 @@ class ProductDataSingleton extends UniversalSingleton {
   }
 }
 
-async function getProduct(id: string): Promise<{ product: Product; tenant: Tenant; storeStatus?: any; directorySlug?: string } | null> {
+async function getProduct(id: string): Promise<{ product: Product; tenant: Tenant | null; storeStatus?: any; directorySlug?: string } | null> {
   try {
     const productDataSingleton = ProductDataSingleton.getInstance();
     
     // Fetch product
     const productData = await productDataSingleton.fetchProduct(id);
+    
+    if (!productData) {
+      console.error('Product data is null');
+      return null;
+    }
     
     // Extract enriched fields from metadata if present
     const metadata = productData.metadata || {};
@@ -242,62 +257,61 @@ async function getProduct(id: string): Promise<{ product: Product; tenant: Tenan
     };
 
     // Fetch tenant info and business profile using public endpoint
-    const profileData = await productDataSingleton.fetchTenantProfile(product.tenantId);
-
-    // Payment gateway status is already included in the product data from the MV
-    const tenant: Tenant = { 
-      id: product.tenantId, 
-      name: 'Store', 
-      metadata: {},
-      hasActivePaymentGateway: productData.hasActivePaymentGateway || false,
-    };
-    let businessName;
-
-    let storeStatus = null;
-    if (profileData) {
-      const profile = profileData;
-      // Extract business name from profile
-      tenant.name = profile.business_name || 'Store';
-      // Merge business profile data into tenant metadata
-      businessName = profile.business_name;
-      tenant.metadata = {
-        businessName: profile.business_name,
-        phone: profile.phone_number,
-        email: profile.email,
-        website: profile.website,
-        address: profile.address_line1 
-          ? `${profile.address_line1}${profile.address_line2 ? ', ' + profile.address_line2 : ''}, ${profile.city}, ${profile.state} ${profile.postal_code}`
-          : undefined,
-        logo_url: profile.logo_url,
-        social_links: profile.social_links,
-      };
-      
-      // Extract store hours for status calculation
-      storeStatus = computeStoreStatus(profile.hours);
+    let tenant: Tenant | null = null;
+    let storeStatus = 'unknown';
+    
+    if (product.tenant?.id) {
+      try {
+        const profileData = await productDataSingleton.fetchTenantProfile(product.tenant.id);
+        
+        // Transform to match expected Tenant interface
+        tenant = {
+          id: product.tenant.id,
+          name: profileData.name || 'Unknown Store',
+          subscriptionTier: profileData.subscriptionTier,
+          hasActivePaymentGateway: productData.hasActivePaymentGateway || false,
+          metadata: {
+            businessName: profileData.businessName,
+            phone: profileData.phone,
+            email: profileData.email,
+            website: profileData.website,
+            address: profileData.address,
+            logo_url: profileData.logo_url,
+            social_links: profileData.social_links,
+          },
+        };
+        
+        // Extract store hours for status calculation
+        const statusResult = computeStoreStatus(profileData.hours);
+        storeStatus = statusResult?.status || 'unknown';
+      } catch (e) {
+        console.warn('Failed to fetch tenant profile:', e);
+      }
     }
     
-  // Fetch directory publish status
-  let directoryPublished = false;
-  const tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  try {
-    await productDataSingleton.fetchDirectoryEntry(tenantSlug);
-    // If the directory page exists, the store is published
-    directoryPublished = true;
-  } catch (e) {
-    // Directory page doesn't exist or error - store is not published
-    directoryPublished = false;
-  }
-  let returnSlang;
-
-  if (directoryPublished) {
-    returnSlang = tenantSlug;
+    // Fetch directory publish status (optional for public pages)
+    let directoryPublished = false;
+    let tenantSlug: string | null = null;
+    if (tenant?.metadata?.businessName) {
+      tenantSlug = tenant.metadata.businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      try {
+        await productDataSingleton.fetchDirectoryEntry(tenantSlug);
+        // If the directory page exists, the store is published
+        directoryPublished = true;
+      } catch (e) {
+        // Directory page doesn't exist or error - store is not published
+        directoryPublished = false;
+      }
+    }
     
-  } else {
-    returnSlang = null;
-  }
-product.tenantId
+    let returnSlang: string | undefined;
     
-    // Return tenant ID for directory link (we'll use tenant ID directly)
+    if (directoryPublished && tenantSlug) {
+      returnSlang = tenantSlug;
+    } else {
+      returnSlang = undefined;
+    }
+    
     return { product, tenant, storeStatus, directorySlug: returnSlang };
   } catch (error) {
     console.error('Error fetching product:', error);
@@ -313,7 +327,7 @@ type Photo = {
 };
 
 // Product Photos API Singleton
-class ProductPhotosSingleton extends UniversalSingleton {
+class ProductPhotosSingleton extends PublicApiSingleton {
   private static instance: ProductPhotosSingleton;
 
   private constructor() {
@@ -329,22 +343,19 @@ class ProductPhotosSingleton extends UniversalSingleton {
 
   async fetchProductPhotos(id: string): Promise<Photo[]> {
     try {
-      const data = await this.makeApiRequest<any>(
+      const data = await this.makePublicRequest<any>(
         `/api/items/${id}/photos`,
-        { 
-          cache: 'no-store',
-          headers: { 'Content-Type': 'application/json' }
-        }
+        {},
+        'product-photos'
       );
       
-      if (!Array.isArray(data)) return [];
+      if (!data.success) {
+        console.warn(`Failed to fetch product photos: ${data.error || 'Unknown error'}`);
+        return [];
+      }
       
-      // Expecting array of { url, position, alt, caption } objects
-      const sorted = (data as Array<{ url?: string; position?: number; alt?: string | null; caption?: string | null }>)
-        .filter((p) => typeof p?.url === 'string' && (p.url as string).length > 0)
-        .sort((a, b) => ((a?.position ?? 0) - (b?.position ?? 0)));
-      return sorted.map((p) => ({
-        url: p.url as string,
+      return (data.data || []).map((p: any) => ({
+        url: p.url,
         alt: p.alt,
         caption: p.caption,
         position: p.position ?? 0,
@@ -356,10 +367,21 @@ class ProductPhotosSingleton extends UniversalSingleton {
   }
 }
 
-async function getProductPhotos(id: string): Promise<Photo[]> {
+async function getProductPhotos(productData: any): Promise<Photo[]> {
   try {
+    // Use images from the product data (already fetched from /public/products/:id)
+    if (productData.images && Array.isArray(productData.images)) {
+      return productData.images.map((img: any) => ({
+        url: img.url,
+        alt: img.alt || null,
+        caption: null,
+        position: img.position ?? 0,
+      }));
+    }
+    
+    // Fallback: try photos endpoint (for backward compatibility)
     const photosSingleton = ProductPhotosSingleton.getInstance();
-    return await photosSingleton.fetchProductPhotos(id);
+    return await photosSingleton.fetchProductPhotos(productData.id);
   } catch (error) {
     console.warn('Error fetching product photos:', error);
     return [];
@@ -377,7 +399,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const { product, tenant } = data;
-  const businessName = tenant.metadata?.businessName || tenant.name;
+  const businessName = tenant?.metadata?.businessName || tenant?.name || 'Unknown Store';
 
   return {
     title: `${product.title} - ${businessName}`,
@@ -400,7 +422,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   }
 
   const { product, tenant, storeStatus, directorySlug } = data;
-  const businessName = tenant.metadata?.businessName || tenant.name;
+  const businessName = tenant?.metadata?.businessName || tenant?.name || 'Unknown Store';
   
   // Track product view for recommendations (using client component)
   // This will run on the client side where we can access localStorage for user info
@@ -410,8 +432,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const statusLabel = product.itemStatus === 'draft' ? 'Draft' : product.itemStatus === 'archived' ? 'Archived' : product.itemStatus;
   const visibilityLabel = product.visibility === 'private' ? 'Private' : 'Public';
 
-  // Build image gallery: try photos endpoint; fall back to product.imageUrl
-  const photos = await getProductPhotos(product.id);
+  // Build image gallery: use images from product data
+  const photos = await getProductPhotos(product);
   const gallery = photos.length > 0
     ? photos
     : (product.imageUrl ? [{ url: product.imageUrl, alt: product.title, caption: null, position: 0 }] : []);
@@ -504,30 +526,38 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Tier-Based Landing Page with Gallery (only if multiple images) */}
-      <TierBasedLandingPage 
-        product={product} 
-        tenant={tenant}
-        storeStatus={storeStatus}
-        gallery={gallery.length > 1 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
-        fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenantId} />}
-      />
+      {tenant && (
+        <TierBasedLandingPage 
+          product={product} 
+          tenant={tenant}
+          storeStatus={storeStatus}
+          gallery={gallery.length > 1 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
+          fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenantId} />}
+        />
+      )}
 
       {/* Product Recommendations */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <ProductRecommendations productId={product.id} tenantId={product.tenantId} />
-      </div>
+      {product && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ProductRecommendations productId={product.id} tenantId={product.tenantId} />
+        </div>
+      )}
 
       {/* Product Reviews */}
-      <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <ProductReviewsSection productId={product.id} tenantId={product.tenantId} />
+      {product && (
+        <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <ProductReviewsSection productId={product.id} tenantId={product.tenantId} />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Business Information */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <ProductBusinessInfoCollapsible product={product} tenant={tenant} storeStatus={storeStatus} />
-      </div>
+      {tenant && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ProductBusinessInfoCollapsible product={product} tenant={tenant} storeStatus={storeStatus} />
+        </div>
+      )}
 
       {/* Recently Viewed Products */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -278,6 +278,10 @@ const adminNavItems: NavItem[] = [
       {
         label: 'Featured Products',
         href: '/admin/featured-products'
+      },
+      {
+        label: 'Review Management',
+        href: '/admin/reviews'
       }
     ]
   },

@@ -921,16 +921,20 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
     handle404?: boolean,
     isAdminRequest: boolean = false
   ): Promise<ApiResult<T>> {
-    // Add authentication headers
+    // Add authentication headers only if token is available
+    const token = this.getAuthToken();
     const authOptions: RequestInit & { skipAuth?: boolean } = {
       ...options,
       headers: {
         ...options.headers,
-        'Authorization': `Bearer ${this.getAuthToken()}`,
         'Content-Type': 'application/json',
+        // Only add Authorization header if we have a token
+        ...(token && { 'Authorization': `Bearer ${token}` }),
       }
     };
     
+    // During SSR, we rely on credentials: 'include' in the apiRequest function
+    // The cookie-based authentication should work for server-side requests
     return this.makeApiRequest<T>(url, authOptions, cacheKey, customTTL, handle404 ?? true, undefined, isAdminRequest);
   }
 
@@ -977,12 +981,17 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
   /**
    * Get authentication token
    * Aligned with platform token storage using access_token
+   * Falls back to empty string for server-side rendering
    */
   protected getAuthToken(): string {
-    // This gets the JWT token from platform's localStorage
+    // This gets the JWT token from platform's localStorage or cookies
     if (typeof window !== 'undefined') {
       return localStorage.getItem('access_token') || '';
     }
+    
+    // Server-side: try to get from cookies (though this may not work in all SSR contexts)
+    // In Next.js, cookies() is only available in Server Components, not in regular server code
+    // So we return empty string and let the request use credentials: 'include' instead
     return '';
   }
 
