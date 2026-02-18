@@ -55,7 +55,7 @@ class PlatformPublicService extends PublicApiSingleton {
   async getPlatformStats(): Promise<PlatformStats> {
     try {
       const response = await this.makePublicRequest<PlatformStats>(
-        '/api/platform-stats',
+        '/api/public/platform/stats',
         {},
         'platform-stats',
         this.PLATFORM_STATS_TTL

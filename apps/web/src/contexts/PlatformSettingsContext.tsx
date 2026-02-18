@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { brandingSettingsService } from '@/services/BrandingSettingsSingletonService';
+import { publicBrandingService } from '@/services/PublicBrandingService';
 
 interface PlatformSettings {
   platformName: string;
@@ -28,24 +29,45 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
     try {
       setLoading(true);
       setError(null);
-      // Use the singleton service instead of direct fetch to leverage caching
-      const settings = await brandingSettingsService.getBrandingSettings();
+      
+      // Try public service first (works for everyone)
+      let settingsData = await publicBrandingService.getPublicBrandingSettings();
+      
+      // If public service fails (404 or other error), try authenticated service
+      if (!settingsData) {
+        try {
+          settingsData = await brandingSettingsService.getBrandingSettings();
+          console.log('[PlatformSettingsProvider] Using authenticated service as fallback');
+        } catch (authError) {
+          // Auth service also failed, use defaults
+          console.warn('[PlatformSettingsProvider] Both services failed, using defaults');
+          settingsData = null;
+        }
+      } else {
+        console.log('[PlatformSettingsProvider] Using public branding service');
+      }
 
       // Map PlatformSettings to the context's PlatformSettings interface
-      if (settings) {
+      if (settingsData) {
         const mappedSettings: PlatformSettings = {
-          platformName: settings.platformName || 'Visible Shelf',
-          platformDescription: 'Manage your retail operations with ease', // Default since not in PlatformSettings
-          logoUrl: settings.logoUrl || null,
-          faviconUrl: settings.faviconUrl || null,
+          platformName: settingsData.platformName || 'Visible Shelf',
+          platformDescription: settingsData.platformDescription || 'Manage your retail operations with ease',
+          logoUrl: settingsData.logoUrl || null,
+          faviconUrl: settingsData.faviconUrl || null,
         };
         setSettings(mappedSettings);
       } else {
-        setSettings(null);
+        // Use default settings when both services fail
+        setSettings({
+          platformName: 'Visible Shelf',
+          platformDescription: 'Manage your retail operations with ease',
+          logoUrl: null,
+          faviconUrl: null,
+        });
       }
     } catch (err) {
       console.error('Error fetching platform settings:', err);
-      // Silently set default values on error (no error state)
+      // Use default settings on error
       setSettings({
         platformName: 'Visible Shelf',
         platformDescription: 'Manage your retail operations with ease',

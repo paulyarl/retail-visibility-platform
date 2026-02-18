@@ -441,7 +441,7 @@ export abstract class UniversalSingleton {
    */
   protected async makeApiRequest<T>(
     url: string,
-    options: RequestInit = {},
+    options: RequestInit & { skipAuth?: boolean } = {},
     cacheKey?: string,
     customTTL?: number,
     handle404?: boolean,
@@ -469,6 +469,7 @@ export abstract class UniversalSingleton {
         ...options,
         skipCache: true, // We handle caching ourselves
         skipAuthRedirect: false, // Allow auth redirects
+        skipAuth: options.skipAuth, // Pass skipAuth to apiRequest
       });
 
       if (!response.ok) {
@@ -740,12 +741,13 @@ export abstract class PublicApiSingleton extends UniversalSingleton {
     handle404?: boolean
   ): Promise<ApiResult<T>> {
     // Add public API headers
-    const publicOptions: RequestInit = {
+    const publicOptions: RequestInit & { skipAuth?: boolean } = {
       ...options,
       headers: {
         ...options.headers,
         'Content-Type': 'application/json',
-      }
+      },
+      skipAuth: true // Skip authentication headers for public requests
     };
     
     return this.makeApiRequest<T>(url, publicOptions, cacheKey, customTTL, handle404 ?? true);
@@ -913,14 +915,14 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
    */
   protected async makeAuthenticatedRequest<T>(
     url: string,
-    options: RequestInit = {},
+    options: RequestInit & { skipAuth?: boolean } = {},
     cacheKey?: string,
     customTTL?: number,
     handle404?: boolean,
     isAdminRequest: boolean = false
   ): Promise<ApiResult<T>> {
     // Add authentication headers
-    const authOptions: RequestInit = {
+    const authOptions: RequestInit & { skipAuth?: boolean } = {
       ...options,
       headers: {
         ...options.headers,
@@ -950,9 +952,10 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
         success: false,
         error: {
           status: 403,
-          message: 'Admin access required for this operation',
+          message: 'Admin access required',
           code: 'ADMIN_ACCESS_REQUIRED'
         },
+        data: undefined,
         status: 403
       };
     }
@@ -984,36 +987,6 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
   }
 
   /**
-   * Get current tenant ID from platform localStorage
-   */
-  protected getCurrentTenantId(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('current_tenant_id');
-    }
-    return null;
-  }
-
-  /**
-   * Get refresh token from platform localStorage
-   */
-  protected getRefreshToken(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('refresh_token');
-    }
-    return null;
-  }
-
-  /**
-   * Get last tenant route from platform localStorage
-   */
-  protected getLastTenantRoute(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('last_tenant_route');
-    }
-    return null;
-  }
-
-  /**
    * Check if current user has admin privileges
    * Parses JWT token to check user role/permissions
    */
@@ -1024,16 +997,11 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
 
       // Parse JWT payload (basic parsing without verification for client-side check)
       const payload = JSON.parse(atob(token.split('.')[1]));
+      const role = payload.role;
       
-      // Check for admin roles - adjust based on your actual JWT structure
-      const adminRoles = ['PLATFORM_ADMIN', 'ADMIN', 'OWNER'];
-      const userRole = payload.role || payload.userRole || payload.permissions?.role;
-      
-      return adminRoles.includes(userRole) || 
-             payload.permissions?.includes('admin') ||
-             payload.isAdmin === true;
+      return ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT', 'ADMIN'].includes(role);
     } catch (error) {
-      console.warn('[UniversalSingleton] Failed to parse admin status from token:', error);
+      console.warn('[AuthenticatedApiSingleton] Failed to parse admin role from token:', error);
       return false;
     }
   }
@@ -1047,9 +1015,9 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
       if (!token) return null;
 
       const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.role || payload.userRole || payload.permissions?.role || null;
+      return payload.role || null;
     } catch (error) {
-      console.warn('[UniversalSingleton] Failed to parse user role from token:', error);
+      console.warn('[AuthenticatedApiSingleton] Failed to parse user role from token:', error);
       return null;
     }
   }
@@ -1063,15 +1031,15 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
       if (!token) return null;
 
       const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.userId || payload.sub || payload.user_id || null;
+      return payload.userId || payload.sub || null;
     } catch (error) {
-      console.warn('[UniversalSingleton] Failed to parse user ID from token:', error);
+      console.warn('[AuthenticatedApiSingleton] Failed to parse user ID from token:', error);
       return null;
     }
   }
 
   /**
-   * Backward compatibility wrapper for makeAuthenticatedRequest
+   * Legacy wrapper for makeAuthenticatedRequest
    * Maintains old API: returns data directly, throws on error
    * @deprecated Use makeAuthenticatedRequest for new code (returns ApiResult<T>)
    */
@@ -1088,7 +1056,7 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
   }
 
   /**
-   * Backward compatibility wrapper for makeAdminRequest
+   * Legacy wrapper for makeAdminRequest
    * Maintains old API: returns data directly, throws on error
    * @deprecated Use makeAdminRequest for new code (returns ApiResult<T>)
    */
@@ -1101,5 +1069,49 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
   ): Promise<T> {
     const result = await this.makeAdminRequest<T>(url, options, cacheKey, customTTL, handle404);
     return this.extractData(result);
+  }
+}
+
+/**
+ * Base class for Admin API singletons
+ * Extends AuthenticatedApiSingleton with admin-specific functionality
+ * All admin services should extend this class
+ */
+export abstract class AdminApiSingleton extends AuthenticatedApiSingleton {
+  protected cacheTTL: number = 2 * 60 * 1000; // 2 minutes for admin data (more frequent refresh)
+  
+  constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
+    super(singletonKey, cacheOptions);
+  }
+
+  /**
+   * Make admin API request with automatic admin validation
+   * All admin services should use this method by default
+   */
+  protected async makeAdminRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    customTTL?: number,
+    handle404: boolean = false
+  ): Promise<ApiResult<T>> {
+    // Use parent's makeAdminRequest with admin-specific defaults
+    return super.makeAdminRequest<T>(url, options, cacheKey, customTTL, handle404);
+  }
+
+  /**
+   * Validate admin permissions before making requests
+   * Override in subclasses for specific admin role validation
+   */
+  protected validateAdminPermissions(): boolean {
+    return this.isAdminUser();
+  }
+
+  /**
+   * Get admin-specific cache key
+   * Adds admin prefix to distinguish from regular authenticated caches
+   */
+  protected getAdminCacheKey(baseKey: string): string {
+    return `admin-${baseKey}`;
   }
 }

@@ -1,6 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { platformDashboardService, PlatformDashboardData, PlatformStats, TenantMetrics, PlatformActivity } from '@/services/PlatformDashboardSingletonService';
+import { platformDashboardService } from '@/services/PlatformDashboardSingletonService';
+import { publicPlatformDashboardService } from '@/services/PublicPlatformDashboardService';
+import { PlatformDashboardData, PlatformStats, TenantMetrics, PlatformActivity } from '@/services/interfaces/PlatformDashboardInterfaces';
+
+export interface UsePlatformCompleteProps {
+  isAuthenticated: boolean;
+}
 
 export interface UsePlatformCompleteReturn {
   data: PlatformDashboardData | null;
@@ -22,7 +28,7 @@ export interface UsePlatformCompleteReturn {
  * Platform Dashboard Hook - Phase 2 Implementation
  * 
  * This hook provides consolidated access to platform-wide dashboard data
- * using the new PlatformDashboardSingletonService for optimal performance.
+ * using the appropriate service based on authentication state.
  * 
  * Benefits:
  * - Single API call instead of multiple separate calls
@@ -33,17 +39,18 @@ export interface UsePlatformCompleteReturn {
  * 
  * Usage:
  * ```typescript
- * const { data, loading, error, metrics } = usePlatformComplete();
+ * const { data, loading, error, metrics } = usePlatformComplete({ isAuthenticated });
  * ```
  */
-export function usePlatformComplete(): UsePlatformCompleteReturn {
-  // Single consolidated query - replaces multiple separate API calls
+export function usePlatformComplete({ isAuthenticated }: UsePlatformCompleteProps): UsePlatformCompleteReturn {
+  // Single consolidated query - uses appropriate service based on auth state
   const { data: dashboardData, isLoading, error, refetch } = useQuery({
-    queryKey: ['platform', 'dashboard', 'complete'],
+    queryKey: ['platform', 'dashboard', 'complete', isAuthenticated ? 'authenticated' : 'public'],
     queryFn: async (): Promise<PlatformDashboardData> => {
-//      console.log('[usePlatformComplete] Fetching consolidated platform dashboard data');
-
-      const data = await platformDashboardService.getPlatformDashboard();
+      // Choose service based on authentication state prop
+      const data = isAuthenticated 
+        ? await platformDashboardService.getPlatformDashboard()
+        : await publicPlatformDashboardService.getPublicPlatformDashboard();
       
       if (!data) {
         throw new Error('Failed to fetch platform dashboard data');
@@ -94,28 +101,38 @@ export function usePlatformComplete(): UsePlatformCompleteReturn {
  * Hook for platform stats only
  * Use when you only need statistics and don't need tenant/activity data
  */
-export function usePlatformStats(): {
+export function usePlatformStats({ isAuthenticated }: UsePlatformCompleteProps): {
   data: PlatformStats | null;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
 } {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['platform', 'stats'],
+    queryKey: ['platform', 'stats', isAuthenticated ? 'authenticated' : 'public'],
     queryFn: async (): Promise<PlatformStats> => {
       console.log('[usePlatformStats] Fetching platform statistics');
       
-      const data = await platformDashboardService.getPlatformStats();
+      // Choose service based on authentication state prop
+      let result: PlatformStats;
       
-      if (!data) {
-        throw new Error('Failed to fetch platform stats');
+      if (isAuthenticated) {
+        const data = await platformDashboardService.getPlatformStats();
+        result = data!;
+      } else {
+        const data = await publicPlatformDashboardService.getPublicPlatformStats();
+        result = data!;
       }
       
-      return data;
+      if (!result) {
+        throw new Error('Failed to fetch platform stats');
+      }
+
+      return result;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 15 * 60 * 1000,
+    gcTime: 15 * 60 * 1000, // 15 minutes cache
     retry: 2,
+    refetchOnWindowFocus: false,
   });
 
   const queryError = error ? (error instanceof Error ? error.message : String(error)) : null;
@@ -129,8 +146,9 @@ export function usePlatformStats(): {
 }
 
 /**
- * Hook for top performing tenants
- * Use when you only need tenant performance data
+ * Hook for top performing tenants (Authenticated Only)
+ * Use when you need tenant performance data (requires authentication)
+ * Note: Returns empty data for unauthenticated users
  */
 export function useTopTenants(): {
   data: TenantMetrics[] | null;
@@ -143,17 +161,20 @@ export function useTopTenants(): {
     queryFn: async (): Promise<TenantMetrics[]> => {
       console.log('[useTopTenants] Fetching top performing tenants');
       
+      // Only authenticated service has this endpoint
       const data = await platformDashboardService.getTopTenants();
       
       if (!data) {
         throw new Error('Failed to fetch top tenants');
       }
-      
+
       return data;
     },
-    staleTime: 3 * 60 * 1000, // 3 minutes
-    gcTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 15 * 60 * 1000, // 15 minutes cache
     retry: 2,
+    refetchOnWindowFocus: false,
+    enabled: typeof window !== 'undefined' && localStorage.getItem('access_token') !== null, // Only run if authenticated
   });
 
   const queryError = error ? (error instanceof Error ? error.message : String(error)) : null;
@@ -167,8 +188,9 @@ export function useTopTenants(): {
 }
 
 /**
- * Hook for recent platform activity
- * Use when you only need activity feed data
+ * Hook for recent platform activity (Authenticated Only)
+ * Use when you need activity feed data (requires authentication)
+ * Note: Returns empty data for unauthenticated users
  */
 export function useRecentActivity(): {
   data: PlatformActivity[] | null;
@@ -192,6 +214,8 @@ export function useRecentActivity(): {
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000,
     retry: 2,
+    refetchOnWindowFocus: false,
+    enabled: typeof window !== 'undefined' && localStorage.getItem('access_token') !== null, // Only run if authenticated
   });
 
   const queryError = error ? (error instanceof Error ? error.message : String(error)) : null;

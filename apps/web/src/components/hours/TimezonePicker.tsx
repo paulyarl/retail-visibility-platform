@@ -21,7 +21,11 @@ export default function TimezonePicker({ tenantId, apiBase, onTimezoneChange }: 
     const load = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`${apiBase}/api/public/tenant/${tenantId}/profile`, { cache: "no-store" });
+        const { apiRequest } = await import('@/lib/api');
+        const res = await apiRequest(`/public/tenant/${tenantId}/profile`, { 
+          skipAuth: true,
+          cache: "no-store" 
+        });
         if (res.ok) {
           const prof = await res.json();
           const tz = prof?.hours?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";

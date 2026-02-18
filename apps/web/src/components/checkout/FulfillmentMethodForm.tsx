@@ -44,8 +44,10 @@ export default function FulfillmentMethodForm({
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await fetch(`${apiUrl}/api/public/tenant/${tenantId}/fulfillment-settings`);
+      const { apiRequest } = await import('@/lib/api');
+      const response = await apiRequest(`/public/tenant/${tenantId}/fulfillment-settings`, {
+        skipAuth: true // Skip authentication for public endpoint
+      });
       
       if (!response.ok) throw new Error('Failed to fetch settings');
       

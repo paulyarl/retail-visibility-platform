@@ -23,8 +23,10 @@ export interface MapLocation {
 export async function getTenantMapLocation(tenantId: string): Promise<MapLocation | null> {
   try {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${apiBaseUrl}/api/public/tenant/${tenantId}/profile`, {
-      cache: 'no-store',
+    const { apiRequest } = await import('./api');
+    
+    const res = await apiRequest(`/public/tenant/${tenantId}/profile`, {
+      skipAuth: true // Skip authentication for public endpoint
     });
 
     if (!res.ok) {

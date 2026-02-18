@@ -13,6 +13,8 @@
  */
 
 import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
+import { usePublicSubscriptionUsage } from '@/hooks/usePublicSubscriptionUsage';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge } from '@/components/ui';
 import { Package, AlertTriangle, Lock } from 'lucide-react';
 import { getStatusLabel } from '@/lib/subscription-status';
@@ -30,7 +32,17 @@ export default function SubscriptionUsageBadge({
   tenantId,
   className = '',
 }: SubscriptionUsageBadgeProps) {
-  const { usage, loading, error } = useSubscriptionUsage(tenantId);
+  const { isAuthenticated } = useAuth();
+  
+  // Use appropriate hook based on authentication state
+  const { usage, loading, error } = isAuthenticated 
+    ? useSubscriptionUsage(tenantId)
+    : usePublicSubscriptionUsage(tenantId);
+
+  // Don't show anything for unauthenticated users
+  if (!isAuthenticated) {
+    return null;
+  }
 
   if (loading) {
     return (

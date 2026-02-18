@@ -12,6 +12,7 @@ import { motion } from "framer-motion";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { publicPlatformHomeService } from '@/services/PublicPlatformHomeService';
 import { cachedFetch } from '@/lib/api-cache';
 import { hoursStatusService } from '@/services/HoursStatusService';
 import { tenantPublicService } from '@/services/TenantPublicService';
@@ -40,7 +41,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
   const router = useRouter();
   
   // Use consolidated platform dashboard hook
-  const { data: platformData, loading, error, metrics } = usePlatformComplete();
+  const { data: platformData, loading, error, metrics } = usePlatformComplete({ isAuthenticated });
   
   const [scopedLinks, setScopedLinks] = useState<{ items: string; createItem: string; tenants: string; settingsTenant: string }>({
     items: "/items",
@@ -61,6 +62,11 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     storefrontsLiveFormatted: '0',
     platformUptime: 99.9,
     platformUptimeFormatted: '99.9%',
+    // Additional fields for authenticated users
+    totalUsers: 0,
+    activeUsers: 0,
+    systemHealth: null,
+    growthMetrics: null
   });
   
   // Extract stats from platform data
@@ -74,23 +80,38 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
   };
   const selectedTenantId = null; // Platform view doesn't have selected tenant
   
-  // Fetch public platform stats for visitors
+  // Fetch platform stats for all users (public and authenticated)
   useEffect(() => {
-    if (!isAuthenticated && !authLoading) {
+    if (!authLoading) {
       const fetchPlatformStats = async () => {
         try {
-          // Use platformPublicService for consistent caching and metrics
-          const stats = await platformPublicService.getPlatformStats();
+          let statsData;
+          
+          if (isAuthenticated) {
+            // Authenticated users get full data from platform dashboard
+            const { platformDashboardService } = await import('@/services/PlatformDashboardSingletonService');
+            const dashboardData = await platformDashboardService.getPlatformDashboard();
+            statsData = dashboardData?.stats;
+          } else {
+            // Public users get limited data from public service
+            statsData = await platformPublicService.getPlatformStats();
+          }
+          
           // Transform to match expected state format
           setPlatformStats({
-            activeRetailers: stats.totalTenants,
-            activeRetailersFormatted: stats.totalTenants.toLocaleString(),
-            productsListed: stats.totalProducts,
-            productsListedFormatted: stats.totalProducts.toLocaleString(),
-            storefrontsLive: stats.featuredStores,
-            storefrontsLiveFormatted: stats.featuredStores.toLocaleString(),
-            platformUptime: stats.uptime,
-            platformUptimeFormatted: `${stats.uptime}%`,
+            activeRetailers: (statsData as any).activeRetailers || (statsData as any).activeTenants || (statsData as any).totalTenants || 0,
+            activeRetailersFormatted: ((statsData as any).activeRetailers || (statsData as any).activeTenants || (statsData as any).totalTenants || 0).toLocaleString(),
+            productsListed: (statsData as any).productsListed || (statsData as any).activeItems || (statsData as any).totalItems || (statsData as any).totalProducts || 0,
+            productsListedFormatted: ((statsData as any).productsListed || (statsData as any).activeItems || (statsData as any).totalItems || (statsData as any).totalProducts || 0).toLocaleString(),
+            storefrontsLive: (statsData as any).storefrontsLive || Math.floor(((statsData as any).activeTenants || (statsData as any).totalTenants || 0) * 0.5),
+            storefrontsLiveFormatted: ((statsData as any).storefrontsLive || Math.floor(((statsData as any).activeTenants || (statsData as any).totalTenants || 0) * 0.5)).toLocaleString(),
+            platformUptime: (statsData as any).platformUptime || 99.9,
+            platformUptimeFormatted: (statsData as any).platformUptimeFormatted || '99.9%',
+            // Add additional data for authenticated users
+            totalUsers: (statsData as any).totalUsers || 0,
+            activeUsers: (statsData as any).activeUsers || 0,
+            systemHealth: (statsData as any).systemHealth || null,
+            growthMetrics: (statsData as any).growthMetrics || null
           });
         } catch (error) {
           // Silently fail - platform stats are non-critical for user experience
@@ -171,7 +192,11 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
       if (!selectedTenantId) return;
       
       try {
-        const tenantInfo = await platformHomeService.getTenant(selectedTenantId);
+        // Use appropriate service based on authentication state
+        const tenantInfo = isAuthenticated 
+          ? await platformHomeService.getTenant(selectedTenantId)
+          : await tenantPublicService.getPublicTenantInfo(selectedTenantId);
+          
         if (tenantInfo) {
           setTenantData({
             name: tenantInfo.name,
@@ -450,6 +475,85 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                 </div>
               </AnimatedCard>
             </div>
+
+            {/* Additional badges for authenticated users */}
+            {isAuthenticated && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-6">
+                <AnimatedCard delay={0.4} className="p-4 sm:p-5 md:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-neutral-600">Total Users</p>
+                      <motion.p 
+                        className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.6, type: "spring" }}
+                      >
+                        {platformStats.totalUsers?.toLocaleString() || '0'}
+                      </motion.p>
+                      <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">registered users</p>
+                    </div>
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-info rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                </AnimatedCard>
+
+                <AnimatedCard delay={0.5} className="p-4 sm:p-5 md:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-neutral-600">Active Users</p>
+                      <motion.p 
+                        className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.7, type: "spring" }}
+                      >
+                        {platformStats.activeUsers?.toLocaleString() || '0'}
+                      </motion.p>
+                      <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">currently active</p>
+                    </div>
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-success rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                </AnimatedCard>
+
+                <AnimatedCard delay={0.6} className="p-4 sm:p-5 md:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-neutral-600">System Health</p>
+                      <motion.p 
+                        className="text-2xl sm:text-3xl font-bold text-neutral-900 mt-1 sm:mt-2"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.8, type: "spring" }}
+                      >
+                        {(platformStats.systemHealth as any)?.database === 'healthy' && 
+                         (platformStats.systemHealth as any)?.cache === 'healthy' && 
+                         (platformStats.systemHealth as any)?.api === 'healthy' ? 'Healthy' : 'Issues'}
+                      </motion.p>
+                      <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">system status</p>
+                    </div>
+                    <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                      (platformStats.systemHealth as any)?.database === 'healthy' && 
+                      (platformStats.systemHealth as any)?.cache === 'healthy' && 
+                      (platformStats.systemHealth as any)?.api === 'healthy' 
+                        ? 'bg-success' 
+                        : 'bg-warning'
+                    }`}>
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    </div>
+                  </div>
+                </AnimatedCard>
+              </div>
+            )}
 
             {/* Mission Statement - For visitors */}
             <div className="my-8 sm:my-12 md:my-16 text-center max-w-4xl mx-auto px-2">

@@ -8,6 +8,9 @@ import { Star, Package, Search, Filter, Grid, List, ChevronDown, ShoppingCart, H
 import { useProductLayout, layoutVariantDescriptions } from '@/contexts/ProductLayoutContext';
 import StorefrontActions from '@/components/storefront/StorefrontActions';
 
+// Dynamic import for apiRequest to avoid SSR issues
+const apiRequest = () => import('@/lib/api').then(mod => mod.apiRequest);
+
 interface CatalogProduct {
   id: string;
   sku: string;
@@ -93,7 +96,9 @@ function CatalogPageContent() {
         ...(sortBy && { sort: sortBy }),
       });
 
-      const response = await fetch(`/api/public/catalog?${params}`);
+      const response = await (await apiRequest())(`/public/catalog?${params}`, {
+        skipAuth: true // Skip authentication for public endpoint
+      });
       if (!response.ok) throw new Error('Failed to fetch products');
       
       const data: CatalogResponse = await response.json();
@@ -111,7 +116,9 @@ function CatalogPageContent() {
   // Fetch categories
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/public/categories');
+      const response = await (await apiRequest())('/public/categories', {
+        skipAuth: true // Skip authentication for public endpoint
+      });
       if (!response.ok) throw new Error('Failed to fetch categories');
       
       const data = await response.json();
@@ -124,7 +131,9 @@ function CatalogPageContent() {
   // Fetch tenants
   const fetchTenants = async () => {
     try {
-      const response = await fetch('/api/public/tenants');
+      const response = await (await apiRequest())('/public/tenants', {
+        skipAuth: true // Skip authentication for public endpoint
+      });
       if (!response.ok) throw new Error('Failed to fetch tenants');
       
       const data = await response.json();

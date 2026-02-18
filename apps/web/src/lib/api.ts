@@ -79,7 +79,7 @@ function getCookie(name: string): string | null {
  */
 export async function apiRequest(
   endpoint: string,
-  options: RequestInit & { skipAuthRedirect?: boolean; skipCache?: boolean } = {}
+  options: RequestInit & { skipAuthRedirect?: boolean; skipCache?: boolean; skipAuth?: boolean } = {}
 ): Promise<Response> {
   const token = getAccessToken();
   const tenantId = getLastTenantId();
@@ -108,12 +108,14 @@ export async function apiRequest(
     headers['Content-Type'] = 'application/json';
   }
 
-  // Add Authorization header if token exists (for ALL requests, not just writes)
-  if (token) {
+  // Add Authorization header if token exists and skipAuth is not set
+  if (token && !options.skipAuth) {
     headers['Authorization'] = `Bearer ${token}`;
-   // console.log('[API] Adding Authorization header to request:', endpoint);
-  } else {
+    // console.log('[API] Adding Authorization header to request:', endpoint);
+  } else if (!token) {
     console.log('[API] No token available for request:', endpoint);
+  } else if (options.skipAuth) {
+    console.log('[API] Skipping Authorization header for public request:', endpoint);
   }
 
   // Attach tenant and CSRF headers on write operations
@@ -204,17 +206,17 @@ async function executeRequest(
  * Convenience methods
  */
 export const api = {
-  get: (endpoint: string, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
+  get: (endpoint: string, options?: RequestInit & { skipAuthRedirect?: boolean; skipAuth?: boolean }) =>
     apiRequest(endpoint, { ...options, method: 'GET' }),
 
-  post: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
+  post: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean; skipAuth?: boolean }) =>
     apiRequest(endpoint, {
       ...options,
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
     }),
 
-  put: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean }) => {
+  put: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean; skipAuth?: boolean }) => {
     console.log('[api.put] Endpoint:', endpoint, 'Data:', data);
     const body = data ? JSON.stringify(data) : undefined;
     console.log('[api.put] Body:', body);
@@ -225,13 +227,13 @@ export const api = {
     });
   },
 
-  patch: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
+  patch: (endpoint: string, data?: any, options?: RequestInit & { skipAuthRedirect?: boolean; skipAuth?: boolean }) =>
     apiRequest(endpoint, {
       ...options,
       method: 'PATCH',
       body: data ? JSON.stringify(data) : undefined,
     }),
 
-  delete: (endpoint: string, options?: RequestInit & { skipAuthRedirect?: boolean }) =>
+  delete: (endpoint: string, options?: RequestInit & { skipAuthRedirect?: boolean; skipAuth?: boolean }) =>
     apiRequest(endpoint, { ...options, method: 'DELETE' }),
 };

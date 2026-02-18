@@ -6,52 +6,7 @@
  */
 
 import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
-
-export interface PlatformStats {
-  totalTenants: number;
-  activeTenants: number;
-  totalItems: number;
-  activeItems: number;
-  totalUsers: number;
-  activeUsers: number;
-  totalOrganizations: number;
-  systemHealth: {
-    database: 'healthy' | 'degraded' | 'down';
-    cache: 'healthy' | 'degraded' | 'down';
-    api: 'healthy' | 'degraded' | 'down';
-  };
-  growthMetrics: {
-    newTenantsThisMonth: number;
-    newItemsThisMonth: number;
-    newUsersThisMonth: number;
-  };
-}
-
-export interface TenantMetrics {
-  id: string;
-  name: string;
-  subscriptionTier: string;
-  subscriptionStatus: string;
-  locationStatus: string;
-  itemCount: number;
-  userCount: number;
-  lastActive: string;
-  healthScore: number;
-}
-
-export interface PlatformActivity {
-  type: 'tenant_created' | 'item_added' | 'user_registered';
-  tenantId: string;
-  tenantName: string;
-  timestamp: string;
-  details: string;
-}
-
-export interface PlatformDashboardData {
-  stats: PlatformStats;
-  topTenants: TenantMetrics[];
-  recentActivity: PlatformActivity[];
-}
+import { PlatformDashboardData, PlatformStats, TenantMetrics, PlatformActivity } from './interfaces/PlatformDashboardInterfaces';
 
 class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
   private static instance: PlatformDashboardSingletonService;
@@ -71,6 +26,7 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
   /**
    * Get complete platform dashboard data with caching
    * Uses the /api/platform/dashboard endpoint
+   * For authenticated tenant merchants only
    */
   async getPlatformDashboard(): Promise<PlatformDashboardData | null> {
     const result = await this.makeAuthenticatedRequest<PlatformDashboardData>(

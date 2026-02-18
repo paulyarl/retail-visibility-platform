@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '../providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '../providers/base/UniversalSingleton';
 
 export interface AdminUser {
   id: string;
@@ -28,7 +28,7 @@ export interface AdminUserTenant {
  * Service for managing admin users
  * Handles administrative user operations across the platform
  */
-export class AdminUserService extends AuthenticatedApiSingleton {
+export class AdminUserService extends AdminApiSingleton {
   private static instance: AdminUserService;
 
   private constructor() {
