@@ -1,11 +1,11 @@
 /**
- * Admin Users Service - Authenticated API Pattern
+ * Admin Users Service - Admin API Pattern
  * 
  * Manages admin user operations for platform administration
- * Extends AuthenticatedApiSingleton for consistent caching and metrics
+ * Extends AdminApiSingleton for admin privilege validation and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/UniversalSingleton';
 
 export interface AdminUser {
   id: string;
@@ -64,9 +64,9 @@ export interface InvitationRequest {
  * Admin Users Service - Authenticated API Pattern
  * 
  * Manages admin user operations for platform administration
- * Uses AuthenticatedApiSingleton for consistent caching and metrics
+ * Uses AdminApiSingleton for admin privilege validation and caching
  */
-class AdminUsersService extends AuthenticatedApiSingleton {
+class AdminUsersService extends AdminApiSingleton {
   private static instance: AdminUsersService;
 
   // TTL constants for different data types

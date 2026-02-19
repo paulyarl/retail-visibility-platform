@@ -280,7 +280,7 @@ export default function ItemsClient({
       console.log('[ItemsClient] Updating stock for item:', itemId, 'to:', newStock);
       
       // Use the StockUpdateService middleware
-      await StockUpdateService.updateStock(itemId, newStock, {
+      await StockUpdateService.getInstance().updateStock(itemId, newStock, {
         tenantId: initialTenantId,
         onSuccess: (updatedStock) => {
           console.log('[ItemsClient] Stock update successful:', updatedStock);

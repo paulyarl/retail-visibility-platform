@@ -74,9 +74,14 @@ class ReviewsSingletonService extends PublicApiSingleton {
         {},
         `reviews-summary-${tenantId}`
       );
+
+      if (!result.success){
+        console.error('[ReviewsSingleton] Failed to get rating summary:', result.error);
+        return null;
+      }
       
       // Convert numeric strings to numbers (PostgreSQL returns numeric as strings)
-      const summaryData = result.data;
+      const summaryData = result.data.data;
       if (summaryData) {
         return {
           ...summaryData,
@@ -110,13 +115,19 @@ class ReviewsSingletonService extends PublicApiSingleton {
     }
 
     try {
-      const result = await this.makePublicRequest<{ reviews: Review[] }>(
+      const result = await this.makePublicRequest<{ data: { reviews: Review[] } }>(
         `/api/stores/${tenantId}/reviews?limit=${limit}`,
         {},
         `reviews-${tenantId}-${limit}`
       );
+
+      if (!result.success){
+        console.error('[ReviewsSingleton] Failed to get reviews:', result.error);
+        return [];
+
+      }     
       
-      return result.data?.reviews || [];
+      return result.data?.data?.reviews || [];
     } catch (error) {
       console.error('[ReviewsSingleton] Failed to get reviews:', error);
       return [];

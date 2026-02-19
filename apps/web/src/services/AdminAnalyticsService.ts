@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '../providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '../providers/base/UniversalSingleton';
 
 export interface AdminAnalytics {
   totalTenants: number;
@@ -56,7 +56,7 @@ export interface EnrichmentAnalytics {
  * Service for managing admin analytics and reporting
  * Handles admin dashboard analytics, directory stats, and enrichment analytics
  */
-export class AdminAnalyticsService extends AuthenticatedApiSingleton {
+export class AdminAnalyticsService extends AdminApiSingleton {
   private static instance: AdminAnalyticsService;
 
   private constructor() {
@@ -74,7 +74,7 @@ export class AdminAnalyticsService extends AuthenticatedApiSingleton {
    * Get admin directory stats
    */
   async getAdminDirectoryStats(): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeAdminRequest<any>(
       '/api/admin/directory/stats',
       {},
       'platform-admin-directory-stats',
@@ -116,7 +116,7 @@ export class AdminAnalyticsService extends AuthenticatedApiSingleton {
     if (filters.page) params.append('page', filters.page.toString());
     if (filters.limit) params.append('limit', filters.limit.toString());
 
-    const result = await this.makeAuthenticatedRequest<{
+    const result = await this.makeAdminRequest<{
       listings: any[];
       pagination: {
         page: number;
@@ -143,7 +143,7 @@ export class AdminAnalyticsService extends AuthenticatedApiSingleton {
    * Get admin enrichment analytics
    */
   async getAdminEnrichmentAnalytics(): Promise<EnrichmentAnalytics | null> {
-    const result = await this.makeAuthenticatedRequest<EnrichmentAnalytics>(
+    const result = await this.makeAdminRequest<EnrichmentAnalytics>(
       `/api/admin/enrichment/analytics?_t=${Date.now()}`,
       {},
       'platform-admin-enrichment-analytics',
@@ -173,7 +173,7 @@ export class AdminAnalyticsService extends AuthenticatedApiSingleton {
     if (params.limit) queryParams.append('limit', params.limit.toString());
     if (params.offset) queryParams.append('offset', params.offset.toString());
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeAdminRequest<any>(
       `/api/admin/enrichment/products/search?${queryParams}`,
       {},
       'platform-admin-enrichment-search',
@@ -192,7 +192,7 @@ export class AdminAnalyticsService extends AuthenticatedApiSingleton {
    * Get admin subdomain statistics
    */
   async getAdminSubdomainStats(): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<{ data: any }>(
+    const result = await this.makeAdminRequest<{ data: any }>(
       '/api/analytics/subdomain-stats',
       {},
       'platform-admin-subdomain-stats',
@@ -211,7 +211,7 @@ export class AdminAnalyticsService extends AuthenticatedApiSingleton {
    * Get platform overview analytics
    */
   async getPlatformOverview(): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeAdminRequest<any>(
       '/api/admin/analytics/overview',
       {},
       'platform-admin-overview',
@@ -234,7 +234,7 @@ export class AdminAnalyticsService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeAdminRequest<any>(
       `/api/admin/analytics/tenant/${tenantId}/usage`,
       {},
       `platform-tenant-usage-stats-${tenantId}`,
@@ -253,7 +253,7 @@ export class AdminAnalyticsService extends AuthenticatedApiSingleton {
    * Get feature adoption metrics
    */
   async getFeatureAdoptionMetrics(timeframe: string = '30d'): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeAdminRequest<any>(
       `/api/admin/analytics/feature-adoption?timeframe=${timeframe}`,
       {},
       'platform-feature-adoption-metrics',
@@ -272,7 +272,7 @@ export class AdminAnalyticsService extends AuthenticatedApiSingleton {
    * Get performance metrics
    */
   async getPerformanceMetrics(timeframe: string = '24h'): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeAdminRequest<any>(
       `/api/admin/analytics/performance?timeframe=${timeframe}`,
       {},
       'platform-performance-metrics',
@@ -291,7 +291,7 @@ export class AdminAnalyticsService extends AuthenticatedApiSingleton {
    * Get user activity analytics
    */
   async getUserActivityAnalytics(timeframe: string = '7d'): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeAdminRequest<any>(
       `/api/admin/analytics/user-activity?timeframe=${timeframe}`,
       {},
       'platform-user-activity-analytics',
@@ -310,7 +310,7 @@ export class AdminAnalyticsService extends AuthenticatedApiSingleton {
    * Get revenue analytics
    */
   async getRevenueAnalytics(timeframe: string = '30d'): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeAdminRequest<any>(
       `/api/admin/analytics/revenue?timeframe=${timeframe}`,
       {},
       'platform-revenue-analytics',
@@ -331,7 +331,7 @@ export class AdminAnalyticsService extends AuthenticatedApiSingleton {
   async exportAnalyticsData(type: string, format: string = 'csv', params: any = {}): Promise<any> {
     const queryParams = new URLSearchParams({ format, ...params });
     
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeAdminRequest<any>(
       `/api/admin/analytics/export/${type}?${queryParams}`,
       {},
       `platform-export-analytics-${type}`,
@@ -355,7 +355,7 @@ export class AdminAnalyticsService extends AuthenticatedApiSingleton {
     }
 
     const queryParams = new URLSearchParams(params);
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeAdminRequest<any>(
       `/api/admin/reports/${reportId}?${queryParams}`,
       {},
       `platform-custom-report-${reportId}`,

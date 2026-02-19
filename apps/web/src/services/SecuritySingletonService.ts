@@ -1,19 +1,18 @@
 /**
  * Security Singleton Service
  * 
- * Extends AuthenticatedApiSingleton to provide cached security operations
- * Uses the platform's singleton architecture for automatic authentication and caching
+ * Extends AdminApiSingleton to provide cached admin security operations
+ * Uses the platform's singleton architecture for admin authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/UniversalSingleton';
 import { LoginSession, SecurityAlert, ApiResponse, MFAStatus, MFASetupData, MFAVerificationResult, MFASetupFormData } from '@/types/security';
 
-class SecuritySingletonService extends AuthenticatedApiSingleton {
+class SecuritySingletonService extends AdminApiSingleton {
   private static instance: SecuritySingletonService;
 
   private constructor() {
     super('security-singleton');
-    this.cacheTTL = 2 * 60 * 1000; // 2 minutes for security data (changes frequently)
   }
 
   public static getInstance(): SecuritySingletonService {
@@ -28,7 +27,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    */
   async getActiveSessions(): Promise<LoginSession[]> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeAdminRequest<any>(
         '/api/auth/sessions',
         {},
         'security-active-sessions'
@@ -95,7 +94,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    */
   async revokeSession(sessionId: string): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeAdminRequest<void>(
         `/api/auth/sessions/${sessionId}`,
         { method: 'DELETE' },
         `security-revoke-session-${sessionId}`
@@ -114,7 +113,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    */
   async revokeAllSessions(): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeAdminRequest<void>(
         '/api/auth/sessions/revoke-all',
         { method: 'POST' },
         'security-revoke-all-sessions'
@@ -133,7 +132,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    */
   async getSecurityAlerts(): Promise<SecurityAlert[]> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeAdminRequest<any>(
         '/api/security/security-alerts',
         {},
         'security-alerts'
@@ -178,7 +177,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    */
   async markAlertAsRead(alertId: string): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeAdminRequest<void>(
         `/api/security/security-alerts/${alertId}/read`,
         { method: 'PUT' },
         `security-mark-alert-read-${alertId}`
@@ -197,7 +196,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    */
   async dismissAlert(alertId: string): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeAdminRequest<void>(
         `/api/security/security-alerts/${alertId}`,
         { method: 'DELETE' },
         `security-dismiss-alert-${alertId}`
@@ -216,7 +215,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    */
   async getAlertPreferences(): Promise<Record<string, boolean>> {
     try {
-      const result = await this.makeAuthenticatedRequest<Record<string, boolean>>(
+      const result = await this.makeAdminRequest<Record<string, boolean>>(
         '/api/security/security-alerts/preferences',
         {},
         'security-alert-preferences'
@@ -234,7 +233,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    */
   async updateAlertPreferences(preferences: any): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeAdminRequest<void>(
         '/api/security/security-alerts/preferences',
         { 
           method: 'PUT',
@@ -256,7 +255,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    */
   async getMFAStatus(): Promise<MFAStatus> {
     try {
-      const result = await this.makeAuthenticatedRequest<ApiResponse<MFAStatus>>(
+      const result = await this.makeAdminRequest<ApiResponse<MFAStatus>>(
         '/api/auth/mfa/status',
         {},
         'security-mfa-status',
@@ -279,7 +278,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    */
   async setupMFA(): Promise<MFASetupData> {
     try {
-      const result = await this.makeAuthenticatedRequest<ApiResponse<MFASetupData>>(
+      const result = await this.makeAdminRequest<ApiResponse<MFASetupData>>(
         '/api/auth/mfa/setup',
         { method: 'POST' },
         'security-mfa-setup'

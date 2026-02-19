@@ -1,11 +1,11 @@
 /**
  * Admin Deletion Requests Service
  * 
- * Extends AuthenticatedApiSingleton to provide cached admin deletion request operations
+ * Extends AdminApiSingleton to provide cached admin deletion request operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '../providers/base/UniversalSingleton';
 
 interface DeletionRequest {
   id: string;
@@ -47,12 +47,11 @@ interface DeletionRequestsResponse {
   error?: string;
 }
 
-class AdminDeletionRequestsService extends AuthenticatedApiSingleton {
+class AdminDeletionRequestsService extends AdminApiSingleton {
   private static instance: AdminDeletionRequestsService;
 
   private constructor() {
     super('admin-deletion-requests');
-    this.cacheTTL = 2 * 60 * 1000; // 2 minutes for deletion requests (changes frequently)
   }
 
   static getInstance(): AdminDeletionRequestsService {

@@ -1,11 +1,11 @@
 /**
  * Admin Security Monitoring Singleton Service
  * 
- * Extends AuthenticatedApiSingleton to provide cached admin security monitoring operations
+ * Extends AdminApiSingleton to provide cached admin security monitoring operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '../providers/base/UniversalSingleton';
 
 interface AdminSession {
   id: string;
@@ -92,12 +92,11 @@ interface FailedLogin {
   createdAt: string;
 }
 
-class AdminSecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
+class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
   private static instance: AdminSecurityMonitoringSingletonService;
 
   private constructor() {
     super('admin-security-monitoring-singleton');
-    this.cacheTTL = 2 * 60 * 1000; // 2 minutes for security monitoring data (changes frequently)
   }
 
   public static getInstance(): AdminSecurityMonitoringSingletonService {

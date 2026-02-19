@@ -29,6 +29,8 @@ import { createRateLimitingMiddleware } from "./services/RateLimitingService";
 // Security middleware imports
 import { validateInput, securityLogger } from "./middleware/security";
 import { ssrfProtection, basicRateLimit, blockIotRequests } from "./middleware/ssrf-protection";
+import { requireRoleGroup } from "./middleware/role-validation";
+import { requirePermission } from "./middleware/role-validation";
 
 // Migration fix applied: ProductCondition enum renamed 'new' to 'brand_new'
 // Force rebuild v3: Railway build cache bypass
@@ -1052,7 +1054,7 @@ app.patch("/api/tenants/:id/coordinates", async (req, res) => {
   }
 });
 
-app.delete("/api/tenants/:id", authenticateToken, checkTenantAccess, requireTenantOwner, async (req, res) => {
+app.delete("/api/tenants/:id", authenticateToken, checkTenantAccess, requireRoleGroup('IS_TENANT_OWNER'), async (req, res) => {
   try {
     const tenant_id = req.params.id;
     
@@ -6282,6 +6284,214 @@ console.log('✅ Tenant orders routes mounted at /api/tenants/:tenantId/orders')
 // NOTE: Must be mounted BEFORE tenantCategoriesRoutes to avoid /:tenantId/categories/:id matching /coverage
 app.use('/api/tenant', authenticateToken, feedValidationRoutes);
 console.log('✅ Feed validation routes mounted at /api/tenant');
+
+/* ------------------------------ role groups (API-driven security) ------------------------------ */
+app.get('/api/auth/role-groups', authenticateToken, (req, res) => {
+  try {
+    const { ROLE_GROUPS } = require('./config/role-groups');
+    res.json(ROLE_GROUPS);
+  } catch (error) {
+    console.error('[API] Failed to load role groups:', error);
+    res.status(500).json({ error: 'Failed to load role groups' });
+  }
+});
+console.log('✅ Role groups endpoint mounted at /api/auth/role-groups (API-driven security)');
+
+/* ------------------------------ user groups (Phase 1) ------------------------------ */
+app.get('/api/auth/user-groups', authenticateToken, (req, res) => {
+  try {
+    const { getUserRoleGroups } = require('./config/role-groups');
+    const userRole = req.user?.role;
+    
+    if (!userRole) {
+      return res.status(401).json({ error: 'User role not found' });
+    }
+    
+    const userGroups = getUserRoleGroups(userRole);
+    res.json({ 
+      userId: req.user?.id,
+      userRole,
+      groups: userGroups 
+    });
+  } catch (error) {
+    console.error('[API] Failed to get user groups:', error);
+    res.status(500).json({ error: 'Failed to get user groups' });
+  }
+});
+console.log('✅ User groups endpoint mounted at /api/auth/user-groups (Phase 1)');
+
+/* ------------------------------ permissions (Maximum Flexibility) ------------------------------ */
+app.get('/api/auth/permissions', authenticateToken, (req, res) => {
+  try {
+    const { getAllPermissions } = require('./config/role-groups');
+    const permissions = getAllPermissions();
+    res.json(permissions);
+  } catch (error) {
+    console.error('[API] Failed to load permissions:', error);
+    res.status(500).json({ error: 'Failed to load permissions' });
+  }
+});
+console.log('✅ Permissions endpoint mounted at /api/auth/permissions (CAN_ groups)');
+
+app.get('/api/auth/user-permissions', authenticateToken, (req, res) => {
+  try {
+    const { getUserPermissions, isValidRole } = require('./config/role-groups');
+    const userRole = req.user?.role;
+    
+    if (!userRole) {
+      return res.status(401).json({ error: 'User role not found' });
+    }
+    
+    if (!isValidRole(userRole)) {
+      return res.status(401).json({ error: 'Invalid user role', userRole });
+    }
+    
+    const userPermissions = getUserPermissions(userRole);
+    res.json({ 
+      userId: req.user?.id,
+      userRole,
+      permissions: userPermissions 
+    });
+  } catch (error) {
+    console.error('[API] Failed to get user permissions:', error);
+    res.status(500).json({ error: 'Failed to get user permissions' });
+  }
+});
+console.log('✅ User permissions endpoint mounted at /api/auth/user-permissions (Maximum flexibility)');
+
+/* ------------------------------ combined user access (Unified Endpoint) ------------------------------ */
+app.get('/api/auth/user-access', authenticateToken, (req, res) => {
+  try {
+    const { getUserRoleGroups, getUserPermissions, isValidRole } = require('./config/role-groups');
+    const userRole = req.user?.role;
+    
+    if (!userRole) {
+      return res.status(401).json({ error: 'User role not found' });
+    }
+    
+    if (!isValidRole(userRole)) {
+      return res.status(401).json({ error: 'Invalid user role', userRole });
+    }
+    
+    const userGroups = getUserRoleGroups(userRole);
+    const userPermissions = getUserPermissions(userRole);
+    
+    res.json({ 
+      userId: req.user?.id,
+      userRole,
+      access: {
+        groups: userGroups,        // IS_ prefix - what user IS part of
+        permissions: userPermissions // CAN_ prefix - what user CAN do
+      },
+      summary: {
+        totalGroups: userGroups.length,
+        totalPermissions: userPermissions.length,
+        accessLevel: getAccessLevelSummary(userRole, userGroups, userPermissions)
+      }
+    });
+  } catch (error) {
+    console.error('[API] Failed to get user access:', error);
+    res.status(500).json({ error: 'Failed to get user access' });
+  }
+});
+console.log('✅ Combined user access endpoint mounted at /api/auth/user-access (Unified - Groups + Permissions)');
+
+/**
+ * Get human-readable access level summary
+ */
+function getAccessLevelSummary(userRole: string, groups: string[], permissions: string[]): string {
+  if (permissions.includes('CAN_ADMIN_PLATFORM')) {
+    return 'Platform Administrator (Full System Access)';
+  }
+  if (permissions.includes('CAN_SUPPORT_PLATFORM')) {
+    return 'Platform Support (System Troubleshooting)';
+  }
+  if (groups.includes('IS_TENANT_OWNER')) {
+    return 'Tenant Owner (Billing & Critical Settings)';
+  }
+  if (groups.includes('IS_TENANT_ADMIN')) {
+    return 'Tenant Administrator (Users & Settings)';
+  }
+  if (groups.includes('IS_TENANT_MANAGER')) {
+    return 'Tenant Manager (Operations & Analytics)';
+  }
+  if (groups.includes('IS_TENANT_USER')) {
+    return 'Tenant User (Basic Access)';
+  }
+  return 'Limited Access';
+}
+
+/* ------------------------------ example role-protected routes ------------------------------ */
+// Tenant admin operations
+app.get('/api/tenants/:id/users', authenticateToken, requireRoleGroup('IS_TENANT_ADMIN'), (req, res) => {
+  res.json({ message: 'Tenant admin access granted', tenantId: req.params.id });
+});
+console.log('✅ Tenant admin route mounted at /api/tenants/:id/users (IS_TENANT_ADMIN protected)');
+
+// Tenant owner operations
+app.get('/api/tenants/:id/billing', authenticateToken, requireRoleGroup('IS_TENANT_OWNER'), (req, res) => {
+  res.json({ message: 'Tenant owner access granted', tenantId: req.params.id });
+});
+console.log('✅ Tenant owner route mounted at /api/tenants/:id/billing (IS_TENANT_OWNER protected)');
+
+// Platform admin operations
+app.get('/api/admin/system/status', authenticateToken, requireRoleGroup('IS_PLATFORM_ADMIN'), (req, res) => {
+  res.json({ message: 'Platform admin access granted', status: 'operational' });
+});
+console.log('✅ Platform admin route mounted at /api/admin/system/status (IS_PLATFORM_ADMIN protected)');
+
+// Platform support operations
+app.get('/api/admin/support/tools', authenticateToken, requireRoleGroup('IS_PLATFORM_SUPPORT'), (req, res) => {
+  res.json({ message: 'Platform support access granted', tools: ['debug', 'logs', 'user_impersonation'] });
+});
+console.log('✅ Platform support route mounted at /api/admin/support/tools (IS_PLATFORM_SUPPORT protected)');
+
+/* ------------------------------ permission-protected routes (Maximum Flexibility) ------------------------------ */
+// Granular permission-based routes - just set permission, platform handles security
+app.get('/api/tenants/:id/users/manage', authenticateToken, requirePermission('CAN_MANAGE_TENANT_USERS'), (req, res) => {
+  res.json({ message: 'User management access granted', tenantId: req.params.id });
+});
+console.log('✅ User management route mounted at /api/tenants/:id/users/manage (CAN_MANAGE_TENANT_USERS)');
+
+app.get('/api/tenants/:id/billing/manage', authenticateToken, requirePermission('CAN_MANAGE_TENANT_BILLING'), (req, res) => {
+  res.json({ message: 'Billing management access granted', tenantId: req.params.id });
+});
+console.log('✅ Billing management route mounted at /api/tenants/:id/billing/manage (CAN_MANAGE_TENANT_BILLING)');
+
+app.get('/api/tenants/:id/analytics', authenticateToken, requirePermission('CAN_MANAGE_TENANT_ANALYTICS'), (req, res) => {
+  res.json({ message: 'Analytics access granted', tenantId: req.params.id });
+});
+console.log('✅ Analytics route mounted at /api/tenants/:id/analytics (CAN_MANAGE_TENANT_ANALYTICS)');
+
+app.get('/api/tenants/:id/inventory', authenticateToken, requirePermission('CAN_MANAGE_TENANT_INVENTORY'), (req, res) => {
+  res.json({ message: 'Inventory management access granted', tenantId: req.params.id });
+});
+console.log('✅ Inventory route mounted at /api/tenants/:id/inventory (CAN_MANAGE_TENANT_INVENTORY)');
+
+app.get('/api/tenants/:id/export', authenticateToken, requirePermission('CAN_EXPORT_TENANT_DATA'), (req, res) => {
+  res.json({ message: 'Data export access granted', tenantId: req.params.id });
+});
+console.log('✅ Data export route mounted at /api/tenants/:id/export (CAN_EXPORT_TENANT_DATA)');
+
+app.get('/api/admin/system/logs', authenticateToken, requirePermission('CAN_VIEW_PLATFORM_LOGS'), (req, res) => {
+  res.json({ message: 'System logs access granted', logs: ['system.log', 'error.log', 'access.log'] });
+});
+console.log('✅ System logs route mounted at /api/admin/system/logs (CAN_VIEW_PLATFORM_LOGS)');
+
+app.get('/api/admin/system/tools', authenticateToken, requirePermission('CAN_ACCESS_SYSTEM_TOOLS'), (req, res) => {
+  res.json({ message: 'System tools access granted', tools: ['database-backup', 'cache-clear', 'system-diagnostic'] });
+});
+console.log('✅ System tools route mounted at /api/admin/system/tools (CAN_ACCESS_SYSTEM_TOOLS)');
+
+app.get('/api/data/sensitive', authenticateToken, requirePermission('CAN_VIEW_SENSITIVE_DATA'), (req, res) => {
+  res.json({ message: 'Sensitive data access granted', dataLevel: 'confidential' });
+});
+console.log('✅ Sensitive data route mounted at /api/data/sensitive (CAN_VIEW_SENSITIVE_DATA)');
+
+app.get('/api/data/bulk-operations', authenticateToken, requirePermission('CAN_BULK_OPERATIONS'), (req, res) => {
+  res.json({ message: 'Bulk operations access granted', operations: ['bulk-import', 'bulk-export', 'bulk-delete'] });
+});
+console.log('✅ Bulk operations route mounted at /api/data/bulk-operations (CAN_BULK_OPERATIONS)');
 
 /* ------------------------------ tenant categories (GBP) ------------------------------ */
 app.use('/api/tenant', authenticateToken, tenantCategoriesRoutes);

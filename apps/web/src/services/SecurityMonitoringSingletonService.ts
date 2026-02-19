@@ -1,11 +1,11 @@
 /**
  * Security Monitoring Singleton Service
  * 
- * Extends AuthenticatedApiSingleton to provide cached security monitoring operations
- * Uses the platform's singleton architecture for automatic authentication and caching
+ * Extends AdminApiSingleton to provide cached admin security monitoring operations
+ * Uses the platform's singleton architecture for admin authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/UniversalSingleton';
 import {
   SecurityMetrics,
   SecurityThreat,
@@ -16,12 +16,11 @@ import {
   PaginationInfo,
 } from '@/types/security';
 
-class SecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
+class SecurityMonitoringSingletonService extends AdminApiSingleton {
   private static instance: SecurityMonitoringSingletonService;
 
   private constructor() {
     super('security-monitoring-singleton');
-    this.cacheTTL = 3 * 60 * 1000; // 3 minutes for monitoring data (changes frequently)
   }
 
   public static getInstance(): SecurityMonitoringSingletonService {
@@ -36,7 +35,7 @@ class SecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
    */
   async getSecurityMetrics(hours: number = 24): Promise<SecurityMetrics> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeAdminRequest<any>(
         `/api/security/metrics?hours=${hours}`,
         {},
         `security-metrics-${hours}h`
@@ -67,7 +66,7 @@ class SecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
         hours: hours.toString(),
       });
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeAdminRequest<any>(
         `/api/security/threats?${params}`,
         {},
         `security-threats-${resolved}-${hours}h-${page}`
@@ -99,7 +98,7 @@ class SecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
    */
   async resolveThreat(threatId: string, notes: string): Promise<SecurityThreat> {
     try {
-      const result = await this.makeAuthenticatedRequest<SecurityThreat>(
+      const result = await this.makeAdminRequest<SecurityThreat>(
         `/api/security/threats/${threatId}/resolve`,
         { 
           method: 'POST',
@@ -136,7 +135,7 @@ class SecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
         limit: limit.toString(),
       });
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeAdminRequest<any>(
         `/api/security/blocked-ips?${params}`,
         {},
         `security-blocked-ips-${hours}h-${page}`
@@ -168,7 +167,7 @@ class SecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
    */
   async unblockIP(ipAddress: string, notes: string): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeAdminRequest<void>(
         `/api/security/blocked-ips/${ipAddress}/unblock`,
         { 
           method: 'POST',
@@ -190,7 +189,7 @@ class SecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
    */
   async getSecurityHealth(): Promise<SecurityHealthStatus> {
     try {
-      const result = await this.makeAuthenticatedRequest<SecurityHealthStatus>(
+      const result = await this.makeAdminRequest<SecurityHealthStatus>(
         '/api/security/health',
         {},
         'security-health'
@@ -217,7 +216,7 @@ class SecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
         hours: hours.toString(),
       });
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeAdminRequest<any>(
         `/api/admin/security/alerts/by-type?${params}`,
         {},
         `security-alerts-by-type-${limit}-${hours}h`
@@ -246,7 +245,7 @@ class SecurityMonitoringSingletonService extends AuthenticatedApiSingleton {
       });
 
       // For blob responses, we need to handle differently
-      const response = await this.makeAuthenticatedRequest<Response>(
+      const response = await this.makeAdminRequest<Response>(
         `/api/security/export?${params}`,
         {},
         `security-export-${format}-${startDate.toISOString()}-${endDate.toISOString()}`

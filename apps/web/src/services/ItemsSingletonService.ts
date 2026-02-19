@@ -624,6 +624,9 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
 
 }
 
+// Export the class for extension
+export { ItemsSingletonService };
+
 // Export singleton instance
 export const itemsSingletonService = ItemsSingletonService.getInstance();
 

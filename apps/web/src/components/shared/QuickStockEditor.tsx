@@ -42,7 +42,7 @@ export default function QuickStockEditor({
   const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const stockStatus = StockUpdateService.getStockStatus(currentStock);
+  const stockStatus = StockUpdateService.getInstance().getStockStatus(currentStock);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {

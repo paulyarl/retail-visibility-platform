@@ -19,22 +19,8 @@ import {
   Check,
   X
 } from 'lucide-react';
+import { authenticatedReviewService, Review } from '@/services/AuthenticatedReviewService';
 import { reviewsService } from '@/services/ReviewsSingletonService';
-import { authenticatedReviewService } from '@/services/AuthenticatedReviewService';
-
-interface Review {
-  id: string;
-  rating: number;
-  reviewText?: string;
-  createdAt: string;
-  approvalStatus: 'pending' | 'approved' | 'rejected';
-  helpfulCount: number;
-  verifiedPurchase: boolean;
-  userName?: string;
-  userEmail?: string;
-  locationLat?: number;
-  locationLng?: number;
-}
 
 interface ReviewStats {
   totalReviews: number;
@@ -64,21 +50,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
     try {
       setLoading(true);
       const pendingReviews = await authenticatedReviewService.getPendingReviews(tenantId);
-      // Transform snake_case fields to camelCase
-      const transformedReviews = (pendingReviews || []).map(review => ({
-        id: review.id,
-        rating: review.rating,
-        reviewText: review.title && review.content ? `${review.title}\n\n${review.content}` : review.content || review.title || undefined,
-        createdAt: review.createdAt,
-        approvalStatus: (review.isApproved ? 'approved' : 'pending') as 'pending' | 'approved' | 'rejected',
-        helpfulCount: review.helpfulVotes,
-        verifiedPurchase: review.isVerifiedPurchase,
-        userName: review.isAnonymous ? 'Anonymous' : 'User',
-        userEmail: review.isAnonymous ? undefined : review.userEmail,
-        locationLat: undefined, // Not available in this endpoint
-        locationLng: undefined, // Not available in this endpoint
-      }));
-      setReviews(transformedReviews);
+      setReviews(pendingReviews || []);
     } catch (error) {
       console.error('Error fetching pending reviews:', error);
       setReviews([]);
@@ -146,7 +118,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
     setProcessingIds(prev => new Set([...prev, ...reviewIds]));
 
     try {
-      await Promise.all(reviewIds.map(id => authenticatedReviewService.approveReview(tenantId, id)));
+      await authenticatedReviewService.bulkApproveReviews(tenantId, reviewIds);
       setReviews(prev => prev.filter(review => !selectedReviews.has(review.id)));
       setSelectedReviews(new Set());
       fetchStats();
@@ -166,7 +138,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
     setProcessingIds(prev => new Set([...prev, ...reviewIds]));
 
     try {
-      await Promise.all(reviewIds.map(id => authenticatedReviewService.rejectReview(tenantId, id)));
+      await authenticatedReviewService.bulkRejectReviews(tenantId, reviewIds);
       setReviews(prev => prev.filter(review => !selectedReviews.has(review.id)));
       setSelectedReviews(new Set());
       fetchStats();
@@ -393,7 +365,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
                           <Badge variant="light" size="sm">
                             {review.rating}/5
                           </Badge>
-                          {review.verifiedPurchase && (
+                          {review.isVerifiedPurchase && (
                             <Badge variant="outline" size="sm" color="green">
                               Verified Purchase
                             </Badge>
@@ -402,9 +374,9 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
                         <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
                           <div className="flex items-center">
                             <User className="w-4 h-4 mr-1" />
-                            {review.userName || 'Anonymous'}
+                            {review.isAnonymous ? 'Anonymous' : 'User'}
                           </div>
-                          {review.userEmail && (
+                          {!review.isAnonymous && review.userEmail && (
                             <div className="flex items-center">
                               <Mail className="w-4 h-4 mr-1" />
                               {review.userEmail}
@@ -449,11 +421,18 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
                     </div>
                   </div>
 
-                  {review.reviewText && (
+                  {(review.title || review.content) && (
                     <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
-                      <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
-                        {review.reviewText}
-                      </p>
+                      {review.title && (
+                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                          {review.title}
+                        </h4>
+                      )}
+                      {review.content && (
+                        <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
+                          {review.content}
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -461,14 +440,8 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
                     <div className="flex items-center space-x-4">
                       <span className="flex items-center">
                         <ThumbsUp className="w-3 h-3 mr-1" />
-                        {review.helpfulCount} helpful
+                        {review.helpfulVotes} helpful
                       </span>
-                      {review.locationLat && review.locationLng && (
-                        <span className="flex items-center">
-                          <Eye className="w-3 h-3 mr-1" />
-                          Location verified
-                        </span>
-                      )}
                     </div>
                     <span>Review ID: {review.id.slice(-8)}</span>
                   </div>

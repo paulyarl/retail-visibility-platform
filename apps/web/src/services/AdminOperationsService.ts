@@ -1,11 +1,11 @@
 /**
  * Admin Operations Service
  * 
- * Extends AuthenticatedApiSingleton to provide cached admin operations
+ * Extends AdminApiSingleton to provide cached admin operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '../providers/base/UniversalSingleton';
 
 interface AdminStats {
   totalUsers: number;
@@ -70,12 +70,11 @@ interface SecurityMetrics {
   threatsBlocked: number;
 }
 
-class AdminOperationsService extends AuthenticatedApiSingleton {
+class AdminOperationsService extends AdminApiSingleton {
   private static instance: AdminOperationsService;
 
   private constructor() {
     super('admin-operations');
-    this.cacheTTL = 5 * 60 * 1000; // 5 minutes for admin operations
   }
 
   static getInstance(): AdminOperationsService {

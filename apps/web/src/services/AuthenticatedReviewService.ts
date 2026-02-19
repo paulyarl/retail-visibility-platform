@@ -149,6 +149,82 @@ class AuthenticatedReviewService extends AuthenticatedApiSingleton {
       return false;
     }
   }
+
+  /**
+   * Bulk approve multiple pending reviews (admin only)
+   * Uses authenticated endpoint: /api/stores/:tenantId/reviews/bulk-approve
+   */
+  async bulkApproveReviews(tenantId: string, reviewIds: string[]): Promise<boolean> {
+    if (!tenantId || !reviewIds.length) {
+      console.error('[AuthenticatedReviewService] bulkApproveReviews: tenantId and reviewIds are required');
+      return false;
+    }
+
+    try {
+      const result = await this.makeAuthenticatedRequest<{
+        success: boolean;
+        message?: string;
+      }>(
+        `/api/stores/${tenantId}/reviews/bulk-approve`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reviewIds })
+        },
+        `bulk-approve-reviews-${tenantId}`,
+        0 // Don't cache this operation
+      );
+
+      if (!result.success) {
+        console.error('[AuthenticatedReviewService] Failed to bulk approve reviews:', result.error);
+        return false;
+      }
+
+      console.log(`[AuthenticatedReviewService] ${reviewIds.length} reviews approved successfully`);
+      return true;
+    } catch (error) {
+      console.error('[AuthenticatedReviewService] Failed to bulk approve reviews:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Bulk reject multiple pending reviews (admin only)
+   * Uses authenticated endpoint: /api/stores/:tenantId/reviews/bulk-reject
+   */
+  async bulkRejectReviews(tenantId: string, reviewIds: string[]): Promise<boolean> {
+    if (!tenantId || !reviewIds.length) {
+      console.error('[AuthenticatedReviewService] bulkRejectReviews: tenantId and reviewIds are required');
+      return false;
+    }
+
+    try {
+      const result = await this.makeAuthenticatedRequest<{
+        success: boolean;
+        message?: string;
+      }>(
+        `/api/stores/${tenantId}/reviews/bulk-reject`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reviewIds })
+        },
+        `bulk-reject-reviews-${tenantId}`,
+        0 // Don't cache this operation
+      );
+
+      if (!result.success) {
+        console.error('[AuthenticatedReviewService] Failed to bulk reject reviews:', result.error);
+        return false;
+      }
+
+      console.log(`[AuthenticatedReviewService] ${reviewIds.length} reviews rejected successfully`);
+      return true;
+    } catch (error) {
+      console.error('[AuthenticatedReviewService] Failed to bulk reject reviews:', error);
+      return false;
+    }
+  }
 }
 
 // Export authenticated service instance

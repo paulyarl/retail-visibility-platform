@@ -1,11 +1,11 @@
 /**
- * Admin Categories Service - Authenticated API Pattern
+ * Admin Categories Service - Admin API Pattern
  * 
  * Manages admin category operations for platform administration
- * Extends AuthenticatedApiSingleton for consistent caching and metrics
+ * Extends AdminApiSingleton for admin privilege validation and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/UniversalSingleton';
 import { googleTaxonomyPublicService, type GoogleTaxonomyPath } from './GoogleTaxonomyPublicService';
 
 export interface AdminCategory {
@@ -50,9 +50,9 @@ export interface UpdateCategoryRequest {
  * Admin Categories Service - Authenticated API Pattern
  * 
  * Manages admin category operations for platform administration
- * Uses AuthenticatedApiSingleton for consistent caching and metrics
+ * Uses AdminApiSingleton for admin privilege validation and caching
  */
-class AdminCategoriesService extends AuthenticatedApiSingleton {
+class AdminCategoriesService extends AdminApiSingleton {
   private static instance: AdminCategoriesService;
 
   // TTL constants for different data types

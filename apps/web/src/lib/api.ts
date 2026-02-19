@@ -12,7 +12,7 @@ interface CachedRequest {
 }
 
 const requestCache = new Map<string, CachedRequest>();
-const CACHE_TTL_MS = 4000; // 4 second deduplication window
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes for proper caching
 
 function getCacheKey(url: string, token: string | null): string {
   return `${url}:${token || 'anonymous'}`;

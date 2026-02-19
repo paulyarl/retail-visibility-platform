@@ -308,7 +308,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
       console.log('[FeaturedProductsManager] Updating stock for item:', itemId, 'to:', newStock);
       
       // Use the StockUpdateService middleware with singleton refresh
-      await StockUpdateService.updateStock(itemId, newStock, {
+      await StockUpdateService.getInstance().updateStock(itemId, newStock, {
         tenantId,
         onSuccess: (updatedStock: number) => {
           console.log('[FeaturedProductsManager] Stock update successful:', updatedStock);

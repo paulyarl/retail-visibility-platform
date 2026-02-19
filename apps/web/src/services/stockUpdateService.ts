@@ -1,4 +1,6 @@
-import { api } from '@/lib/api';
+import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { ItemsSingletonService, Item } from './ItemsSingletonService';
+import { platformDashboardService } from './PlatformDashboardSingletonService';
 
 export interface StockUpdateOptions {
   tenantId?: string;
@@ -8,14 +10,32 @@ export interface StockUpdateOptions {
 }
 
 /**
- * Reusable stock update service
- * Can be used across the platform for quick stock changes
+ * Stock Update Service
+ * Extends AuthenticatedApiSingleton for platform-aligned stock management
+ * Uses singleton pattern with proper caching and authentication
+ * Composes ItemsSingletonService for item-related operations
  */
-export class StockUpdateService {
+export class StockUpdateService extends AuthenticatedApiSingleton {
+  private static instance: StockUpdateService;
+  private itemsService: ItemsSingletonService;
+
+  private constructor() {
+    super('stock-update-service');
+    this.cacheTTL = 5 * 60 * 1000; // 5 minutes for stock updates
+    this.itemsService = ItemsSingletonService.getInstance();
+  }
+
+  public static getInstance(): StockUpdateService {
+    if (!StockUpdateService.instance) {
+      StockUpdateService.instance = new StockUpdateService();
+    }
+    return StockUpdateService.instance;
+  }
   /**
    * Update stock for a single item
+   * Uses platform-aligned API calls with proper caching
    */
-  static async updateStock(
+  async updateStock(
     itemId: string, 
     newStock: number, 
     options: StockUpdateOptions = {}
@@ -28,18 +48,24 @@ export class StockUpdateService {
         throw new Error('Stock cannot be negative');
       }
 
-      // Call the items API to update stock
-      const response = await api.put(`/api/items/${itemId}`, {
-        stock: newStock
-      });
+      // Use ItemsSingletonService's makeAuthenticatedRequest for platform alignment
+      const result = await this.makeAuthenticatedRequest<Item>(
+        `/api/items/${itemId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ stock: newStock }),
+        },
+        `stock-update-${itemId}`
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData?.error || `Failed to update stock (${response.status})`);
+      if (!result.success) {
+        throw new Error(result.error?.message || `Failed to update stock (${result.status})`);
       }
 
-      const result = await response.json();
-      console.log(`[StockUpdateService] Stock update successful:`, result);
+      console.log(`[StockUpdateService] Stock update successful:`, result.data);
+
+      // Invalidate relevant cache entries
+      await this.invalidateStockCaches(itemId, options.tenantId);
 
       // Trigger singleton refresh if provided (for MV cache invalidation)
       if (options.singletonRefresh) {
@@ -72,8 +98,9 @@ export class StockUpdateService {
 
   /**
    * Bulk update stock for multiple items
+   * Uses platform-aligned API calls with proper caching
    */
-  static async bulkUpdateStock(
+  async bulkUpdateStock(
     updates: Array<{ itemId: string; newStock: number }>,
     options: StockUpdateOptions = {}
   ): Promise<void> {
@@ -91,7 +118,8 @@ export class StockUpdateService {
       const updatePromises = updates.map(({ itemId, newStock }) =>
         this.updateStock(itemId, newStock, {
           onSuccess: undefined, // Don't call individual success callbacks for bulk updates
-          onError: undefined
+          onError: undefined,
+          tenantId: options.tenantId
         })
       );
 
@@ -116,7 +144,7 @@ export class StockUpdateService {
   /**
    * Get stock status with recommendations
    */
-  static getStockStatus(stock: number): {
+  getStockStatus(stock: number): {
     status: 'in_stock' | 'low_stock' | 'out_of_stock';
     color: string;
     message: string;
@@ -143,6 +171,34 @@ export class StockUpdateService {
         message: 'In Stock',
         recommendation: 'Stock level is healthy'
       };
+    }
+  }
+
+  /**
+   * Invalidate relevant caches after stock update
+   */
+  private async invalidateStockCaches(itemId: string, tenantId?: string): Promise<void> {
+    try {
+      console.log(`[StockUpdateService] Invalidating caches for item ${itemId}`);
+      
+      // Invalidate specific item cache using itemsService
+      await this.itemsService.invalidateCache(`item-${itemId}`);
+      
+      // Invalidate items complete cache for tenant using itemsService
+      const targetTenantId = tenantId || 'unknown';
+      await this.itemsService.invalidateCache(`items_complete_tenant_${targetTenantId}*`);
+      
+      // Invalidate stock-related caches using this service
+      await this.invalidateCache(`stock-status-${itemId}`);
+      await this.invalidateCache(`low-stock-items-${targetTenantId}`);
+      
+      // Invalidate platform dashboard cache since items affect stats
+      await platformDashboardService.invalidateCache('platform-dashboard-complete');
+      
+      console.log(`[StockUpdateService] Cache invalidation completed for item ${itemId}`);
+    } catch (error) {
+      console.warn(`[StockUpdateService] Failed to invalidate caches:`, error);
+      // Don't fail the stock update if cache invalidation fails
     }
   }
 }

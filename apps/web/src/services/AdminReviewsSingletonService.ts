@@ -1,0 +1,262 @@
+/**
+ * Admin Reviews Singleton Service
+ * 
+ * Extends AdminApiSingleton for admin-only review operations
+ * Follows single responsibility principle - only admin review management
+ */
+
+import { AdminApiSingleton } from '@/providers/base/UniversalSingleton';
+
+// Admin-specific interfaces
+export interface AdminReview {
+  id: string;
+  rating: number;
+  reviewText?: string;
+  createdAt: string;
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  helpfulCount: number;
+  verifiedPurchase: boolean;
+  userName?: string;
+  userEmail?: string;
+  locationLat?: number;
+  locationLng?: number;
+  tenantId: string;
+  tenantName: string;
+  tenantSlug: string;
+  productId?: string;
+  productName?: string;
+  productSku?: string;
+  reviewType: 'store' | 'product' | 'google';
+}
+
+export interface AdminReviewStats {
+  totalReviews: number;
+  pendingReviews: number;
+  approvedReviews: number;
+  rejectedReviews: number;
+  averageRating: number;
+}
+
+class AdminReviewsSingletonService extends AdminApiSingleton {
+  private static instance: AdminReviewsSingletonService;
+
+  private constructor() {
+    super('admin-reviews-singleton');
+  }
+
+  public static getInstance(): AdminReviewsSingletonService {
+    if (!AdminReviewsSingletonService.instance) {
+      AdminReviewsSingletonService.instance = new AdminReviewsSingletonService();
+    }
+    return AdminReviewsSingletonService.instance;
+  }
+
+  /**
+   * Get all reviews across all stores (admin only)
+   * Uses the /api/admin/reviews endpoint
+   * Note: Only platform admins can access this
+   */
+  async getAllAdminReviews(filters?: {
+    status?: 'pending' | 'approved' | 'rejected' | 'all';
+    rating?: '1' | '2' | '3' | '4' | '5' | 'all';
+    reviewType?: 'store' | 'product' | 'google' | 'all';
+    search?: string;
+    store?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AdminReview[]> {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      if (filters?.status && filters.status !== 'all') {
+        queryParams.append('status', filters.status);
+      }
+      if (filters?.rating && filters.rating !== 'all') {
+        queryParams.append('rating', filters.rating);
+      }
+      if (filters?.reviewType && filters.reviewType !== 'all') {
+        queryParams.append('reviewType', filters.reviewType);
+      }
+      if (filters?.search) {
+        queryParams.append('search', filters.search);
+      }
+      if (filters?.store) {
+        queryParams.append('store', filters.store);
+      }
+      if (filters?.limit) {
+        queryParams.append('limit', filters.limit.toString());
+      }
+      if (filters?.offset) {
+        queryParams.append('offset', filters.offset.toString());
+      }
+
+      const url = `/api/admin/reviews${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      
+      const result = await this.makeAdminRequest<{
+        success: boolean;
+        data: AdminReview[];
+      }>(
+        url,
+        {},
+        `admin-reviews-${JSON.stringify(filters)}`
+      );
+
+      return result?.data?.data || [];
+    } catch (error: any) {
+      // Handle 401/403 errors gracefully
+      if (error?.status === 401 || error?.status === 403 || error?.code === 'UNAUTHORIZED') {
+        console.log('[AdminReviewsSingleton] User not authorized for admin reviews');
+        return [];
+      }
+      console.error('[AdminReviewsSingleton] Failed to get admin reviews:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get admin review statistics (admin only)
+   * Uses the /api/admin/reviews/stats endpoint
+   * Note: Only platform admins can access this
+   */
+  async getAdminReviewStats(): Promise<AdminReviewStats | null> {
+    try {
+      const result = await this.makeAdminRequest<{
+        success: boolean;
+        data: AdminReviewStats;
+      }>(
+        '/api/admin/reviews/stats',
+        {},
+        'admin-review-stats'
+      );
+
+      return result?.data?.data || null;
+    } catch (error: any) {
+      // Handle 401/403 errors gracefully
+      if (error?.status === 401 || error?.status === 403 || error?.code === 'UNAUTHORIZED') {
+        console.log('[AdminReviewsSingleton] User not authorized for admin stats');
+        return null;
+      }
+      console.error('[AdminReviewsSingleton] Failed to get admin review stats:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Approve a pending review (admin only)
+   * Uses the /api/admin/reviews/:reviewId/approve endpoint
+   * Note: Only platform admins can approve reviews
+   */
+  async approveReview(reviewId: string): Promise<boolean> {
+    if (!reviewId) {
+      console.error('[AdminReviewsSingleton] approveReview: reviewId is required');
+      return false;
+    }
+
+    try {
+      const result = await this.makeAdminRequest<{
+        success: boolean;
+        message: string;
+      }>(
+        `/api/admin/reviews/${reviewId}/approve`,
+        { method: 'POST' },
+        `approve-review-${reviewId}`
+      );
+
+      return result?.success || false;
+    } catch (error) {
+      console.error('[AdminReviewsSingleton] Failed to approve review:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Reject a pending review (admin only)
+   * Uses the /api/admin/reviews/:reviewId/reject endpoint
+   * Note: Only platform admins can reject reviews
+   */
+  async rejectReview(reviewId: string): Promise<boolean> {
+    if (!reviewId) {
+      console.error('[AdminReviewsSingleton] rejectReview: reviewId is required');
+      return false;
+    }
+
+    try {
+      const result = await this.makeAdminRequest<{
+        success: boolean;
+        message: string;
+      }>(
+        `/api/admin/reviews/${reviewId}/reject`,
+        { method: 'POST' },
+        `reject-review-${reviewId}`
+      );
+
+      return result?.success || false;
+    } catch (error) {
+      console.error('[AdminReviewsSingleton] Failed to reject review:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Bulk approve multiple reviews (admin only)
+   * Uses the /api/admin/reviews/bulk-approve endpoint
+   */
+  async bulkApproveReviews(reviewIds: string[]): Promise<boolean> {
+    if (!reviewIds.length) {
+      console.error('[AdminReviewsSingleton] bulkApproveReviews: reviewIds array is required');
+      return false;
+    }
+
+    try {
+      const result = await this.makeAdminRequest<{
+        success: boolean;
+        message: string;
+      }>(
+        '/api/admin/reviews/bulk-approve',
+        {
+          method: 'POST',
+          body: JSON.stringify({ reviewIds })
+        },
+        `bulk-approve-${reviewIds.length}`
+      );
+
+      return result?.success || false;
+    } catch (error) {
+      console.error('[AdminReviewsSingleton] Failed to bulk approve reviews:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Bulk reject multiple reviews (admin only)
+   * Uses the /api/admin/reviews/bulk-reject endpoint
+   */
+  async bulkRejectReviews(reviewIds: string[]): Promise<boolean> {
+    if (!reviewIds.length) {
+      console.error('[AdminReviewsSingleton] bulkRejectReviews: reviewIds array is required');
+      return false;
+    }
+
+    try {
+      const result = await this.makeAdminRequest<{
+        success: boolean;
+        message: string;
+      }>(
+        '/api/admin/reviews/bulk-reject',
+        {
+          method: 'POST',
+          body: JSON.stringify({ reviewIds })
+        },
+        `bulk-reject-${reviewIds.length}`
+      );
+
+      return result?.success || false;
+    } catch (error) {
+      console.error('[AdminReviewsSingleton] Failed to bulk reject reviews:', error);
+      return false;
+    }
+  }
+}
+
+// Export singleton instance
+export const adminReviewsService = AdminReviewsSingletonService.getInstance();

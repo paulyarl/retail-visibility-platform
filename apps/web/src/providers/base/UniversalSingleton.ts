@@ -64,6 +64,10 @@ export abstract class UniversalSingleton {
   private static emergencyBustReason: string = '';
   private static readonly STORAGE_KEY = 'emergency_bust_mode';
 
+  // API-driven role definitions cache
+  protected static roleGroupsCache: { data: any; timestamp: number; ttl: number } | null = null;
+  protected static readonly ROLE_GROUPS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes for role groups
+
   /**
    * Enable/disable emergency cache busting mode
    * When enabled, all cache operations are bypassed and fresh data is always fetched
@@ -897,6 +901,85 @@ export abstract class PublicApiSingleton extends UniversalSingleton {
     const result = await this.makePublicRequest<T>(url, options, cacheKey, customTTL, handle404);
     return this.extractData(result);
   }
+
+  /**
+   * Get role groups from RBAC Service with platform caching
+   * Pre-request check of resource readiness for executing requests
+   * Now uses platform-aligned caching for optimal performance
+   */
+  protected static async getRoleGroups(): Promise<any> {
+    try {
+      console.log('[UniversalSingleton] Fetching role groups via RBACService');
+      
+      // Dynamic import to avoid circular dependency
+      const { RBACService } = await import('../../services/RBACService');
+      return await RBACService.getInstance().getRoleGroups();
+    } catch (error) {
+      console.error('[UniversalSingleton] Failed to fetch role groups from RBACService:', error);
+      
+      // Return fallback role groups as last resort
+      console.error('[UniversalSingleton] Using fallback role groups');
+      return {
+        IS_TENANT_ADMIN: ['OWNER', 'TENANT_ADMIN', 'TENANT_OWNER', 'PLATFORM_ADMIN', 'PLATFORM_SUPPORT', 'ADMIN'],
+        IS_TENANT_OWNER: ['OWNER', 'TENANT_ADMIN', 'TENANT_OWNER', 'PLATFORM_ADMIN', 'ADMIN'],
+        IS_TENANT_MANAGER: ['OWNER', 'TENANT_ADMIN', 'TENANT_OWNER', 'PLATFORM_ADMIN', 'ADMIN', 'PLATFORM_SUPPORT'],
+        IS_TENANT_USER: ['OWNER', 'TENANT_ADMIN', 'TENANT_OWNER', 'ADMIN', 'PLATFORM_ADMIN', 'USER'],
+        IS_PLATFORM_ADMIN: ['PLATFORM_ADMIN', 'ADMIN'],
+        IS_PLATFORM_SUPPORT: ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT', 'ADMIN']
+      };
+    }
+  }
+
+  /**
+   * Invalidate role groups cache
+   * Call this when role definitions change
+   * Now delegates to RBACService for platform-wide cache coordination
+   */
+  protected static async invalidateRoleGroupsCache(): Promise<void> {
+    console.log('[UniversalSingleton] Invalidating role groups cache via RBACService');
+    
+    // Dynamic import to avoid circular dependency
+    const { RBACService } = await import('../../services/RBACService');
+    await RBACService.getInstance().invalidateCache('role-groups');
+  }
+
+  /**
+   * Get current user role from JWT token
+   */
+  protected getUserRole(): string {
+    try {
+      const token = this.getAuthToken();
+      if (!token) return 'USER';
+
+      // Simple JWT parsing (in production, use proper JWT library)
+      const payload = token.split('.')[1];
+      if (!payload) return 'USER';
+
+      const decoded = JSON.parse(atob(payload));
+      return decoded.role || decoded.userRole || 'USER';
+    } catch (error) {
+      console.error('[UniversalSingleton] Failed to get user role from token:', error);
+      return 'USER';
+    }
+  }
+
+  /**
+   * Validate user role against API-driven role groups
+   * Pre-request validation before executing actual requests
+   * Now uses RBACService for platform-aligned validation
+   */
+  public static async validateRoleAgainstGroup(userRole: string, requiredGroup: string): Promise<boolean> {
+    try {
+      console.log(`[UniversalSingleton] Validating role ${userRole} against group ${requiredGroup} via RBACService`);
+      
+      // Dynamic import to avoid circular dependency
+      const { RBACService } = await import('../../services/RBACService');
+      return await RBACService.getInstance().validateRoleAgainstGroup(userRole, requiredGroup);
+    } catch (error) {
+      console.error('[UniversalSingleton] Failed to validate role against group:', error);
+      return false;
+    }
+  }
 }
 
 /**
@@ -1008,7 +1091,7 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const role = payload.role;
       
-      return ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT', 'ADMIN'].includes(role);
+      return ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT', 'ADMIN','PLATFORM_VIEWER'].includes(role);
     } catch (error) {
       console.warn('[AuthenticatedApiSingleton] Failed to parse admin role from token:', error);
       return false;
@@ -1087,11 +1170,12 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
  * All admin services should extend this class
  */
 export abstract class AdminApiSingleton extends AuthenticatedApiSingleton {
-  protected cacheTTL: number = 2 * 60 * 1000; // 2 minutes for admin data (more frequent refresh)
+  protected cacheTTL: number = 10 * 60 * 1000; // 10 minutes for admin data (smaller user base, less frequent changes)
   
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     super(singletonKey, cacheOptions);
   }
+  
 
   /**
    * Make admin API request with automatic admin validation
@@ -1122,5 +1206,209 @@ export abstract class AdminApiSingleton extends AuthenticatedApiSingleton {
    */
   protected getAdminCacheKey(baseKey: string): string {
     return `admin-${baseKey}`;
+  }
+}
+
+/**
+ * Base class for Tenant Admin API singletons
+ * Extends AuthenticatedApiSingleton with tenant admin role validation
+ * For services that require tenant admin level access
+ */
+export abstract class TenantAdminApiSingleton extends AuthenticatedApiSingleton {
+  protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for tenant admin data
+  
+  constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
+    super(singletonKey, cacheOptions);
+  }
+
+  /**
+   * Make tenant admin API request with automatic role validation
+   * All tenant admin services should use this method by default
+   */
+  protected async makeTenantAdminRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    customTTL?: number,
+    handle404: boolean = false
+  ): Promise<ApiResult<T>> {
+    // Validate tenant admin permissions before making request
+    if (!this.validateTenantAdminPermissions()) {
+      return {
+        success: false,
+        error: {
+          status: 403,
+          message: 'Tenant admin access required',
+          code: 'INSUFFICIENT_PERMISSIONS'
+        },
+        data: undefined,
+        status: 403
+      };
+    }
+
+    return this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, handle404);
+  }
+
+  /**
+   * Validate tenant admin permissions
+   */
+  protected async validateTenantAdminPermissions(): Promise<boolean> {
+    const userRole = this.getUserRole();
+    // Dynamic import to avoid circular dependency
+    const { validateRoleAgainstGroup } = await import('@/utils/rbacValidation');
+    return await validateRoleAgainstGroup(userRole || 'USER', 'IS_TENANT_ADMIN');
+  }
+}
+
+/**
+ * Base class for Tenant Owner API singletons
+ * Extends AuthenticatedApiSingleton with tenant owner role validation
+ * For services that require tenant owner level access
+ */
+export abstract class TenantOwnerApiSingleton extends AuthenticatedApiSingleton {
+  protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for tenant owner data
+  
+  constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
+    super(singletonKey, cacheOptions);
+  }
+
+  /**
+   * Make tenant owner API request with automatic role validation
+   * All tenant owner services should use this method by default
+   */
+  protected async makeTenantOwnerRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    customTTL?: number,
+    handle404: boolean = false
+  ): Promise<ApiResult<T>> {
+    // Validate tenant owner permissions before making request
+    if (!this.validateTenantOwnerPermissions()) {
+      return {
+        success: false,
+        error: {
+          status: 403,
+          message: 'Tenant owner access required',
+          code: 'INSUFFICIENT_PERMISSIONS'
+        },
+        data: undefined,
+        status: 403
+      };
+    }
+
+    return this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, handle404);
+  }
+
+  /**
+   * Validate tenant owner permissions
+   */
+  protected async validateTenantOwnerPermissions(): Promise<boolean> {
+    const userRole = this.getUserRole();
+    // Dynamic import to avoid circular dependency
+    const { validateRoleAgainstGroup } = await import('@/utils/rbacValidation');
+    return await validateRoleAgainstGroup(userRole || 'USER', 'IS_TENANT_OWNER');
+  }
+}
+
+/**
+ * Base class for Tenant Manager API singletons
+ * Extends AuthenticatedApiSingleton with tenant manager role validation
+ * For services that require tenant manager level access
+ */
+export abstract class TenantManagerApiSingleton extends AuthenticatedApiSingleton {
+  protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for tenant manager data
+  
+  constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
+    super(singletonKey, cacheOptions);
+  }
+
+  /**
+   * Make tenant manager API request with automatic role validation
+   * All tenant manager services should use this method by default
+   */
+  protected async makeTenantManagerRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    customTTL?: number,
+    handle404: boolean = false
+  ): Promise<ApiResult<T>> {
+    // Validate tenant manager permissions before making request
+    if (!this.validateTenantManagerPermissions()) {
+      return {
+        success: false,
+        error: {
+          status: 403,
+          message: 'Tenant manager access required',
+          code: 'INSUFFICIENT_PERMISSIONS'
+        },
+        data: undefined,
+        status: 403
+      };
+    }
+
+    return this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, handle404);
+  }
+
+  /**
+   * Validate tenant manager permissions
+   */
+  protected async validateTenantManagerPermissions(): Promise<boolean> {
+    const userRole = this.getUserRole();
+    // Dynamic import to avoid circular dependency
+    const { validateRoleAgainstGroup } = await import('@/utils/rbacValidation');
+    return await validateRoleAgainstGroup(userRole || 'USER', 'IS_TENANT_MANAGER');
+  }
+}
+
+/**
+ * Base class for Tenant User API singletons
+ * Extends AuthenticatedApiSingleton with tenant user role validation
+ * For services that require basic tenant user level access
+ */
+export abstract class TenantUserApiSingleton extends AuthenticatedApiSingleton {
+  protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for tenant user data
+  
+  constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
+    super(singletonKey, cacheOptions);
+  }
+
+  /**
+   * Make tenant user API request with automatic role validation
+   * All tenant user services should use this method by default
+   */
+  protected async makeTenantUserRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    customTTL?: number,
+    handle404: boolean = false
+  ): Promise<ApiResult<T>> {
+    // Validate tenant user permissions before making request
+    if (!this.validateTenantUserPermissions()) {
+      return {
+        success: false,
+        error: {
+          status: 403,
+          message: 'Tenant user access required',
+          code: 'INSUFFICIENT_PERMISSIONS'
+        },
+        data: undefined,
+        status: 403
+      };
+    }
+
+    return this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, handle404);
+  }
+
+  /**
+   * Validate tenant user permissions
+   */
+  protected async validateTenantUserPermissions(): Promise<boolean> {
+    const userRole = this.getUserRole();
+    // Dynamic import to avoid circular dependency
+    const { validateRoleAgainstGroup } = await import('@/utils/rbacValidation');
+    return await validateRoleAgainstGroup(userRole || 'USER', 'IS_TENANT_USER');
   }
 }

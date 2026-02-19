@@ -20,36 +20,7 @@ import {
   X,
   Eye
 } from 'lucide-react';
-import { reviewsService } from '@/services/ReviewsSingletonService';
-
-interface AdminReview {
-  id: string;
-  rating: number;
-  reviewText?: string;
-  createdAt: string;
-  approvalStatus: 'pending' | 'approved' | 'rejected';
-  helpfulCount: number;
-  verifiedPurchase: boolean;
-  userName?: string;
-  userEmail?: string;
-  locationLat?: number;
-  locationLng?: number;
-  tenantId: string;
-  tenantName: string;
-  tenantSlug: string;
-  productId?: string;
-  productName?: string;
-  productSku?: string;
-  reviewType: 'store' | 'product' | 'google';
-}
-
-interface AdminReviewStats {
-  totalReviews: number;
-  pendingReviews: number;
-  approvedReviews: number;
-  rejectedReviews: number;
-  averageRating: number;
-}
+import { adminReviewsService, AdminReview, AdminReviewStats } from '@/services/AdminReviewsSingletonService';
 
 interface AdminReviewManagementProps {}
 
@@ -70,51 +41,23 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
   useEffect(() => {
     fetchReviews();
     fetchStats();
-  }, [statusFilter, ratingFilter, reviewTypeFilter]);
+  }, [statusFilter, ratingFilter, reviewTypeFilter, searchTerm, storeFilter]);
 
   const fetchReviews = async () => {
     try {
       setLoading(true);
-      // For admin, we need to get all reviews across all stores
-      // This would require a new admin endpoint or iterating through stores
-      // For now, we'll simulate with sample data structure
+      
+      // Build filters object for the API call
+      const filters = {
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        rating: ratingFilter === 'all' ? undefined : ratingFilter,
+        reviewType: reviewTypeFilter === 'all' ? undefined : reviewTypeFilter,
+        search: searchTerm || undefined,
+        store: storeFilter || undefined,
+      };
 
-      // TODO: Implement admin API endpoint to get all reviews
-      const allReviews: AdminReview[] = [];
-
-      // Filter reviews based on current filters
-      let filteredReviews = allReviews;
-
-      if (statusFilter !== 'all') {
-        filteredReviews = filteredReviews.filter(review => review.approvalStatus === statusFilter);
-      }
-
-      if (ratingFilter !== 'all') {
-        filteredReviews = filteredReviews.filter(review => review.rating === parseInt(ratingFilter));
-      }
-
-      if (reviewTypeFilter !== 'all') {
-        filteredReviews = filteredReviews.filter(review => review.reviewType === reviewTypeFilter);
-      }
-
-      if (searchTerm) {
-        filteredReviews = filteredReviews.filter(review =>
-          review.reviewText?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          review.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          review.tenantName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          review.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          review.productSku?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      }
-
-      if (storeFilter) {
-        filteredReviews = filteredReviews.filter(review =>
-          review.tenantName?.toLowerCase().includes(storeFilter.toLowerCase()) ||
-          review.tenantSlug?.toLowerCase().includes(storeFilter.toLowerCase())
-        );
-      }
-
-      setReviews(filteredReviews);
+      const allReviews = await adminReviewsService.getAllAdminReviews(filters);
+      setReviews(allReviews);
     } catch (error) {
       console.error('Error fetching admin reviews:', error);
       setReviews([]);
@@ -125,7 +68,10 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
 
   const fetchStats = async () => {
     try {
-      // TODO: Implement admin stats endpoint
+      const stats = await adminReviewsService.getAdminReviewStats();
+      setStats(stats);
+    } catch (error) {
+      console.error('Error fetching admin review stats:', error);
       setStats({
         totalReviews: 0,
         pendingReviews: 0,
@@ -133,15 +79,13 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
         rejectedReviews: 0,
         averageRating: 0
       });
-    } catch (error) {
-      console.error('Error fetching admin review stats:', error);
     }
   };
 
   const handleApprove = async (reviewId: string, tenantId: string) => {
     setProcessingIds(prev => new Set(prev).add(reviewId));
     try {
-      await reviewsService.approveReview(tenantId, reviewId);
+      await adminReviewsService.approveReview(reviewId);
       setReviews(prev => prev.map(review =>
         review.id === reviewId
           ? { ...review, approvalStatus: 'approved' as const }
@@ -162,7 +106,7 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
   const handleReject = async (reviewId: string, tenantId: string) => {
     setProcessingIds(prev => new Set(prev).add(reviewId));
     try {
-      await reviewsService.rejectReview(tenantId, reviewId);
+      await adminReviewsService.rejectReview(reviewId);
       setReviews(prev => prev.map(review =>
         review.id === reviewId
           ? { ...review, approvalStatus: 'rejected' as const }
@@ -185,11 +129,7 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
     setProcessingIds(prev => new Set([...prev, ...reviewIds]));
 
     try {
-      await Promise.all(
-        reviews
-          .filter(review => selectedReviews.has(review.id))
-          .map(review => reviewsService.approveReview(review.tenantId, review.id))
-      );
+      await adminReviewsService.bulkApproveReviews(reviewIds);
 
       setReviews(prev => prev.map(review =>
         selectedReviews.has(review.id)
@@ -215,11 +155,7 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
     setProcessingIds(prev => new Set([...prev, ...reviewIds]));
 
     try {
-      await Promise.all(
-        reviews
-          .filter(review => selectedReviews.has(review.id))
-          .map(review => reviewsService.rejectReview(review.tenantId, review.id))
-      );
+      await adminReviewsService.bulkRejectReviews(reviewIds);
 
       setReviews(prev => prev.map(review =>
         selectedReviews.has(review.id)

@@ -322,7 +322,7 @@ export default function ProductFeaturingPage() {
       console.log('[ProductFeaturingPage] Updating stock for item:', itemId, 'to:', newStock);
       
       // Use the StockUpdateService middleware with singleton refresh
-      await StockUpdateService.updateStock(itemId, newStock, {
+      await StockUpdateService.getInstance().updateStock(itemId, newStock, {
         tenantId,
         onSuccess: (updatedStock: number) => {
           console.log('[ProductFeaturingPage] Stock update successful:', updatedStock);
