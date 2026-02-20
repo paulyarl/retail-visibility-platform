@@ -90,18 +90,22 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
         queryParams.append('offset', filters.offset.toString());
       }
 
-      const url = `/api/admin/reviews${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const url = `/api/reviews-singleton${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       
       const result = await this.makeAdminRequest<{
         success: boolean;
-        data: AdminReview[];
+        data: {
+          reviews: AdminReview[];
+          pagination: any;
+          timestamp: string;
+        };
       }>(
         url,
         {},
         `admin-reviews-${JSON.stringify(filters)}`
       );
 
-      return result?.data?.data || [];
+      return result.data?.data?.reviews || [];
     } catch (error: any) {
       // Handle 401/403 errors gracefully
       if (error?.status === 401 || error?.status === 403 || error?.code === 'UNAUTHORIZED') {
@@ -122,14 +126,17 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
     try {
       const result = await this.makeAdminRequest<{
         success: boolean;
-        data: AdminReviewStats;
+        data: {
+          stats: AdminReviewStats;
+          timestamp: string;
+        };
       }>(
-        '/api/admin/reviews/stats',
+        '/api/reviews-singleton/stats',
         {},
         'admin-review-stats'
       );
 
-      return result?.data?.data || null;
+      return result.data?.data?.stats || null;
     } catch (error: any) {
       // Handle 401/403 errors gracefully
       if (error?.status === 401 || error?.status === 403 || error?.code === 'UNAUTHORIZED') {
@@ -157,7 +164,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
         success: boolean;
         message: string;
       }>(
-        `/api/admin/reviews/${reviewId}/approve`,
+        `/api/reviews-singleton/${reviewId}/approve`,
         { method: 'POST' },
         `approve-review-${reviewId}`
       );
@@ -185,7 +192,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
         success: boolean;
         message: string;
       }>(
-        `/api/admin/reviews/${reviewId}/reject`,
+        `/api/reviews-singleton/${reviewId}/reject`,
         { method: 'POST' },
         `reject-review-${reviewId}`
       );

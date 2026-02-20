@@ -359,7 +359,7 @@ export default function GoogleIntegrationsPage() {
         <div className="p-6">
           {/* Setup Steps */}
           <div className="space-y-4 mb-6">
-            {setupStatus?.setupSteps.map((step, index) => (
+            {Array.isArray(setupStatus?.setupSteps) && setupStatus.setupSteps.map((step, index) => (
               <div 
                 key={step.id} 
                 className={`flex items-start gap-4 p-4 rounded-lg border ${

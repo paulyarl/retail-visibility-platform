@@ -578,7 +578,7 @@ router.get('/admin/products/featuring/stats', authenticateToken, async (req, res
       return res.status(403).json({ error: 'Platform admin access required' });
     }
 
-    const [totalFeatured, byTierRaw, expiringSoon] = await Promise.all([
+    const [totalFeatured, featuredItems, expiringSoon] = await Promise.all([
       // Total featured products
       prisma.inventory_items.count({
         where: {
@@ -590,18 +590,23 @@ router.get('/admin/products/featuring/stats', authenticateToken, async (req, res
         }
       }),
       
-      // Featured products by tier
-      prisma.$queryRaw`
-        SELECT 
-          t.subscription_tier as tier,
-          COUNT(i.id) as count
-        FROM inventory_items i
-        JOIN tenants t ON i.tenant_id = t.id
-        WHERE i.is_featured = true
-        AND (i.featured_until IS NULL OR i.featured_until >= NOW())
-        GROUP BY t.subscription_tier
-        ORDER BY count DESC
-      `,
+      // Featured products by tier - use standard query instead of raw
+      prisma.inventory_items.findMany({
+        where: {
+          is_featured: true,
+          OR: [
+            { featured_until: null },
+            { featured_until: { gte: new Date() } }
+          ]
+        },
+        include: {
+          tenants: {
+            select: {
+              subscription_tier: true
+            }
+          }
+        }
+      }),
       
       // Expiring soon (next 7 days)
       prisma.inventory_items.count({
@@ -615,11 +620,16 @@ router.get('/admin/products/featuring/stats', authenticateToken, async (req, res
       })
     ]);
 
-    // Convert BigInt to number for JSON serialization
-    const byTier = (byTierRaw as any[]).map(row => ({
-      tier: row.tier,
-      count: Number(row.count)
-    }));
+    // Process featured items by tier
+    const tierCounts = featuredItems.reduce((acc, item) => {
+      const tier = item.tenants?.subscription_tier || 'unknown';
+      acc[tier] = (acc[tier] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const byTier = Object.entries(tierCounts)
+      .map(([tier, count]) => ({ tier, count }))
+      .sort((a, b) => b.count - a.count);
 
     res.json({
       totalFeatured,

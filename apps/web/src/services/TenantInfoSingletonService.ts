@@ -4,7 +4,7 @@
  * Extends UniversalSingleton to provide architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/UniversalSingleton';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { platformHomeService } from './PlatformHomeSingletonService';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
@@ -77,7 +77,7 @@ export interface PaymentGateway {
   [key: string]: any;
 }
 
-class TenantInfoSingletonService extends AuthenticatedApiSingleton {
+class TenantInfoSingletonService extends TenantApiSingleton {
   private static instance: TenantInfoSingletonService;
 
   private constructor() {
@@ -569,7 +569,7 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any[]>(
+      const result = await this.makeAuthenticatedRequest<any>(
         `/api/tenants/${tenantId}/users`,
         {},
         `tenant-users-${tenantId}`,
@@ -580,7 +580,16 @@ class TenantInfoSingletonService extends AuthenticatedApiSingleton {
         return [];
       }
 
-      return result.data || [];
+      console.log('[TenantInfoSingleton] API Response:', result);
+      console.log('[TenantInfoSingleton] result.data:', result.data);
+
+      // Extract users from the nested response structure
+      // API returns: { success: true, users: [...], data: [...], items: [...], results: [...] }
+      const users = result.data?.users || result.data?.data || result.data?.items || result.data?.results || [];
+      console.log('[TenantInfoSingleton] Extracted users:', users);
+      console.log('[TenantInfoSingleton] Is users array?', Array.isArray(users));
+
+      return Array.isArray(users) ? users : [];
     } catch (error) {
       console.error('[TenantInfoSingleton] Failed to get users:', error);
       return [];

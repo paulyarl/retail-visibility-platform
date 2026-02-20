@@ -55,9 +55,13 @@ export default function TenantUsersPage() {
   const loadUsers = async () => {
     try {
       const users = await tenantInfoService.getUsers(tenantId);
-      setUsers(users);
+      console.log('[TenantUsersPage] Users loaded:', users);
+      console.log('[TenantUsersPage] Users type:', typeof users);
+      console.log('[TenantUsersPage] Is array?', Array.isArray(users));
+      setUsers(Array.isArray(users) ? users : []);
     } catch (error) {
       console.error('Failed to load users:', error);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -195,7 +199,7 @@ export default function TenantUsersPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {users.map((user) => (
+                  {Array.isArray(users) && users.map((user) => (
                     <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">

@@ -74,7 +74,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
 
       // API returns { success: true, data: { threats: [], pagination: {...}, ... } }
       return {
-        threats: result?.data?.threats || result?.data || [],
+        threats: result?.data?.threats || [],
         pagination: result?.data?.pagination || { 
           page: 1, 
           limit, 
@@ -143,7 +143,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
 
       // API returns { success: true, data: { blockedIPs: [], pagination: {...}, ... } }
       return {
-        blockedIPs: result?.data?.blockedIPs || result?.data || [],
+        blockedIPs: result?.data?.blockedIPs || [],
         pagination: result?.data?.pagination || { 
           page: 1, 
           limit, 
@@ -222,7 +222,9 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
         `security-alerts-by-type-${limit}-${hours}h`
       );
 
-      return result?.data || [];
+      // API returns { data: [], totalTypes: 0, timeRange: "...", generatedAt: "..." }
+      // Ensure we always return an array
+      return Array.isArray(result?.data) ? result.data : [];
     } catch (error) {
       console.error('[SecurityMonitoringSingleton] Failed to get alerts by type:', error);
       return [];

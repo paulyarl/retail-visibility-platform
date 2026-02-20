@@ -17,7 +17,8 @@ import {
   Eye,
   AlertTriangle,
   Check,
-  X
+  X,
+  CheckSquare
 } from 'lucide-react';
 import { authenticatedReviewService, Review } from '@/services/AuthenticatedReviewService';
 import { reviewsService } from '@/services/ReviewsSingletonService';
@@ -40,19 +41,51 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
   const [loading, setLoading] = useState(true);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const [selectedReviews, setSelectedReviews] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalReviews, setTotalReviews] = useState(0);
+  const [pageSize] = useState(5); // Show 5 reviews per page
+  const [activeTab, setActiveTab] = useState<'store' | 'product' | 'all'>('all');
 
   useEffect(() => {
+    setCurrentPage(1); // Reset to page 1 when tab changes
     fetchPendingReviews();
     fetchStats();
-  }, [tenantId]);
+  }, [tenantId, currentPage, activeTab]);
+
+  useEffect(() => {
+    console.log('[ReviewManagementDashboard] Reviews state changed:', reviews);
+    console.log('[ReviewManagementDashboard] Reviews type:', typeof reviews);
+    console.log('[ReviewManagementDashboard] Is array?', Array.isArray(reviews));
+    console.log('[ReviewManagementDashboard] Loading state:', loading);
+    console.log('[ReviewManagementDashboard] Active tab:', activeTab);
+  }, [reviews, loading, activeTab]);
 
   const fetchPendingReviews = async () => {
     try {
       setLoading(true);
-      const pendingReviews = await authenticatedReviewService.getPendingReviews(tenantId);
+      console.log('[ReviewManagementDashboard] Fetching pending reviews for tenant:', tenantId);
+      const offset = (currentPage - 1) * pageSize;
+      const pendingReviews = await authenticatedReviewService.getPendingReviews(tenantId, {
+        limit: pageSize,
+        offset: offset,
+        reviewType: activeTab === 'all' ? undefined : activeTab
+      });
+      console.log('[ReviewManagementDashboard] Received pending reviews:', pendingReviews);
+      console.log('[ReviewManagementDashboard] Setting reviews state to:', pendingReviews || []);
       setReviews(pendingReviews || []);
+      
+      // For now, we'll need to fetch total count separately since the API doesn't return pagination info
+      // In a real implementation, the API should return pagination metadata
+      if (currentPage === 1) {
+        // Fetch all reviews to get total count (this is a temporary solution)
+        const allReviews = await authenticatedReviewService.getPendingReviews(tenantId, {
+          reviewType: activeTab === 'all' ? undefined : activeTab
+        });
+        setTotalReviews(allReviews?.length || 0);
+      }
     } catch (error) {
       console.error('Error fetching pending reviews:', error);
+      console.log('[ReviewManagementDashboard] Setting reviews to empty array due to error');
       setReviews([]);
     } finally {
       setLoading(false);
@@ -166,11 +199,34 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
   };
 
   const selectAll = () => {
-    setSelectedReviews(new Set(reviews.map(review => review.id)));
+    setSelectedReviews(new Set(Array.isArray(reviews) ? reviews.map(review => review.id) : []));
   };
 
   const clearSelection = () => {
     setSelectedReviews(new Set());
+  };
+
+  // Pagination functions
+  const totalPages = Math.ceil(totalReviews / pageSize);
+  const hasNextPage = currentPage < totalPages;
+  const hasPreviousPage = currentPage > 1;
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (hasNextPage) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (hasPreviousPage) {
+      setCurrentPage(currentPage - 1);
+    }
   };
 
   const renderStars = (rating: number) => {
@@ -314,7 +370,13 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center">
               <AlertTriangle className="w-5 h-5 mr-2 text-orange-500" />
-              Pending Reviews ({reviews.length})
+              Pending {activeTab === 'all' ? '' : activeTab === 'store' ? 'Store ' : 'Product '}Reviews 
+              ({reviews.length}{totalReviews > pageSize ? ` of ${totalReviews}` : ''})
+              {totalReviews > pageSize && (
+                <span className="ml-2 text-sm text-gray-500">
+                  Page {currentPage} of {totalPages}
+                </span>
+              )}
             </CardTitle>
             {reviews.length > 0 && (
               <Button
@@ -323,12 +385,58 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
                 onClick={selectAll}
                 disabled={selectedReviews.size === reviews.length}
               >
-                Select All
+                {selectedReviews.size === reviews.length ? (
+                  <>
+                    <Check className="w-4 h-4 mr-1" />
+                    Deselect All
+                  </>
+                ) : (
+                  <>
+                    <CheckSquare className="w-4 h-4 mr-1" />
+                    Select All
+                  </>
+                )}
               </Button>
             )}
           </div>
         </CardHeader>
         <CardContent>
+          {/* Tabs for Review Types */}
+          <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'all'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                All Reviews
+              </button>
+              <button
+                onClick={() => setActiveTab('store')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'store'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Store Reviews
+              </button>
+              <button
+                onClick={() => setActiveTab('product')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'product'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Product Reviews
+              </button>
+            </nav>
+          </div>
+
           {loading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
@@ -346,7 +454,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
             </div>
           ) : (
             <div className="space-y-4">
-              {reviews.map((review) => (
+              {Array.isArray(reviews) && reviews.map((review) => (
                 <div
                   key={review.id}
                   className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -365,7 +473,16 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
                           <Badge variant="light" size="sm">
                             {review.rating}/5
                           </Badge>
-                          {review.isVerifiedPurchase && (
+                          {review.product_id ? (
+                            <Badge variant="outline" size="sm" color="blue">
+                              📦 Product
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" size="sm" color="green">
+                              🏪 Store
+                            </Badge>
+                          )}
+                          {review.verified_purchase && (
                             <Badge variant="outline" size="sm" color="green">
                               Verified Purchase
                             </Badge>
@@ -374,17 +491,20 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
                         <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
                           <div className="flex items-center">
                             <User className="w-4 h-4 mr-1" />
-                            {review.isAnonymous ? 'Anonymous' : 'User'}
+                            {review.first_name && review.last_name ? 
+                              `${review.first_name} ${review.last_name}` : 
+                              'User'
+                            }
                           </div>
-                          {!review.isAnonymous && review.userEmail && (
+                          {review.email && (
                             <div className="flex items-center">
                               <Mail className="w-4 h-4 mr-1" />
-                              {review.userEmail}
+                              {review.email}
                             </div>
                           )}
                           <div className="flex items-center">
                             <Calendar className="w-4 h-4 mr-1" />
-                            {formatDate(review.createdAt)}
+                            {formatDate(review.created_at)}
                           </div>
                         </div>
                       </div>
@@ -421,18 +541,11 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
                     </div>
                   </div>
 
-                  {(review.title || review.content) && (
+                  {review.review_text && (
                     <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
-                      {review.title && (
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                          {review.title}
-                        </h4>
-                      )}
-                      {review.content && (
-                        <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
-                          {review.content}
-                        </p>
-                      )}
+                      <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
+                        {review.review_text}
+                      </p>
                     </div>
                   )}
 
@@ -440,13 +553,67 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
                     <div className="flex items-center space-x-4">
                       <span className="flex items-center">
                         <ThumbsUp className="w-3 h-3 mr-1" />
-                        {review.helpfulVotes} helpful
+                        {review.helpful_count} helpful
                       </span>
                     </div>
                     <span>Review ID: {review.id.slice(-8)}</span>
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          
+          {/* Pagination Controls */}
+          {totalReviews > pageSize && (
+            <div className="mt-6 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div className="text-sm text-gray-700 dark:text-gray-300">
+                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalReviews)} of {totalReviews} reviews
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPreviousPage}
+                  disabled={!hasPreviousPage}
+                  className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Previous
+                </Button>
+                
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "solid" : "outline"}
+                      size="sm"
+                      onClick={() => goToPage(page)}
+                      className={`${
+                        currentPage === page
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "text-gray-600 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextPage}
+                  disabled={!hasNextPage}
+                  className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                >
+                  Next
+                  <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

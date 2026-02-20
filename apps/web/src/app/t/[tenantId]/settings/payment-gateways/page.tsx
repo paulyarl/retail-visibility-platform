@@ -136,10 +136,10 @@ export default function PaymentGatewaysPage() {
   const handleEditPayPal = (gateway: PaymentGateway) => {
     setEditingPayPalId(gateway.id);
     setPaypalForm({
-      mode: gateway.config.mode || 'sandbox',
-      client_id: gateway.config.client_id || '',
-      client_secret: gateway.config.client_secret || '',
-      display_name: gateway.config.display_name || '',
+      mode: gateway.config?.mode || 'sandbox',
+      client_id: gateway.config?.client_id || '',
+      client_secret: gateway.config?.client_secret || '',
+      display_name: gateway.config?.display_name || '',
       is_active: gateway.is_active,
       is_default: gateway.is_default,
     });
@@ -197,11 +197,11 @@ export default function PaymentGatewaysPage() {
   const handleEditSquare = (gateway: PaymentGateway) => {
     setEditingSquareId(gateway.id);
     setSquareForm({
-      environment: gateway.config.environment || 'sandbox',
-      application_id: gateway.config.application_id || '',
-      access_token: gateway.config.access_token || '',
-      location_id: gateway.config.location_id || '',
-      display_name: gateway.config.display_name || '',
+      environment: gateway.config?.environment || 'sandbox',
+      application_id: gateway.config?.application_id || '',
+      access_token: gateway.config?.access_token || '',
+      location_id: gateway.config?.location_id || '',
+      display_name: gateway.config?.display_name || '',
       is_active: gateway.is_active,
       is_default: gateway.is_default,
     });
@@ -474,8 +474,8 @@ export default function PaymentGatewaysPage() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle>{gateway.config.display_name || 'PayPal Account'}</CardTitle>
-                        <p className="text-sm text-neutral-600">Mode: {gateway.config.mode}</p>
+                        <CardTitle>{gateway.config?.display_name || 'PayPal Account'}</CardTitle>
+                        <p className="text-sm text-neutral-600">Mode: {gateway.config?.mode || 'Unknown'}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         {gateway.is_default && (
@@ -496,7 +496,7 @@ export default function PaymentGatewaysPage() {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <p className="text-neutral-600">Client ID</p>
-                          <p className="font-mono text-xs">{gateway.config.client_id?.substring(0, 20)}...</p>
+                          <p className="font-mono text-xs">{gateway.config?.client_id?.substring(0, 20)}...</p>
                         </div>
                       </div>
                       <div className="flex gap-2 pt-4 border-t">
@@ -582,8 +582,8 @@ export default function PaymentGatewaysPage() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle>{gateway.config.display_name || 'Square Account'}</CardTitle>
-                        <p className="text-sm text-neutral-600">Environment: {gateway.config.environment}</p>
+                        <CardTitle>{gateway.config?.display_name || 'Square Account'}</CardTitle>
+                        <p className="text-sm text-neutral-600">Environment: {gateway.config?.environment || 'Unknown'}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         {gateway.is_default && (
@@ -604,11 +604,11 @@ export default function PaymentGatewaysPage() {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <p className="text-neutral-600">Application ID</p>
-                          <p className="font-mono text-xs">{gateway.config.application_id?.substring(0, 20)}...</p>
+                          <p className="font-mono text-xs">{gateway.config?.application_id?.substring(0, 20)}...</p>
                         </div>
                         <div>
                           <p className="text-neutral-600">Location ID</p>
-                          <p className="font-mono text-xs">{gateway.config.location_id?.substring(0, 20)}...</p>
+                          <p className="font-mono text-xs">{gateway.config?.location_id?.substring(0, 20)}...</p>
                         </div>
                       </div>
                       <div className="flex gap-2 pt-4 border-t">

@@ -333,7 +333,7 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
                       type="number"
                       min="0"
                       step="0.1"
-                      value={settings.delivery_radius_miles || ''}
+                      value={settings.delivery_radius_miles ?? ''}
                       onChange={(e) => setSettings({ ...settings, delivery_radius_miles: parseFloat(e.target.value) || null })}
                       className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       placeholder="5.0"
@@ -436,7 +436,7 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
                     Default Shipping Provider
                   </label>
                   <select
-                    value={settings.shipping_provider || ''}
+                    value={settings.shipping_provider ?? ''}
                     onChange={(e) => setSettings({ ...settings, shipping_provider: e.target.value || null })}
                     className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   >

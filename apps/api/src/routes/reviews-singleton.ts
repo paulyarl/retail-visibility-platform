@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import ReviewsService from '../services/ReviewsService';
+import { getDirectPool } from '../utils/db-pool';
 import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
@@ -111,7 +112,7 @@ router.get('/product/:productId', async (req, res) => {
     });
     
     // Filter reviews user has access to
-    const accessibleReviews = reviews.filter(review => 
+    const accessibleReviews = reviews.filter((review: any) => 
       !req.user?.tenantIds || req.user.tenantIds.includes(review.tenantId)
     );
     
@@ -204,18 +205,80 @@ router.get('/', async (req, res) => {
     });
     
     // Filter reviews user has access to
-    const accessibleReviews = reviews.filter(review => 
+    const accessibleReviews = reviews.filter((review: any) => 
       !req.user?.tenantIds || req.user.tenantIds.includes(review.tenantId)
+    );
+    
+    // Enhance reviews with additional data
+    const enhancedReviews = await Promise.all(
+      accessibleReviews.map(async (review: any) => {
+        // Get tenant information
+        const tenantQuery = `
+          SELECT id, name, slug 
+          FROM tenants 
+          WHERE id = $1
+        `;
+        const tenantResult = await getDirectPool().query(tenantQuery, [review.tenantId]);
+        const tenant = tenantResult?.rows[0];
+        
+        // Get product information if productId exists
+        let product = null;
+        if (review.productId) {
+          const productQuery = `
+            SELECT id, name, sku 
+            FROM inventory_items 
+            WHERE id = $1
+          `;
+          const productResult = await getDirectPool().query(productQuery, [review.productId]);
+          product = productResult?.rows[0];
+        }
+        
+        // Get user information
+        let userName = null;
+        let userEmail = null;
+        if (review.userId) {
+          const userQuery = `
+            SELECT first_name, last_name, email 
+            FROM users 
+            WHERE id = $1
+          `;
+          const userResult = await getDirectPool().query(userQuery, [review.userId]);
+          const user = userResult?.rows[0];
+          if (user) {
+            userName = `${user.first_name} ${user.last_name}`.trim() || null;
+            userEmail = user.email;
+          }
+        }
+        
+        // Determine review type
+        let reviewType: 'store' | 'product' | 'google' = 'store';
+        if (review.productId) {
+          reviewType = 'product';
+        } else if ((review as any).source === 'google') {
+          reviewType = 'google';
+        }
+        
+        return {
+          ...review,
+          userName: userName || 'Anonymous',
+          userEmail: userEmail,
+          tenantName: tenant?.name || 'Unknown Tenant',
+          tenantSlug: tenant?.slug || 'unknown',
+          productName: product?.name,
+          productSku: product?.sku,
+          reviewType
+        };
+      })
     );
     
     res.json({
       success: true,
       data: {
-        reviews: accessibleReviews,
+        reviews: enhancedReviews,
         pagination: {
           page: parseInt(page as string),
           limit: parseInt(limit as string),
-          total: accessibleReviews.length
+          total: enhancedReviews.length
         },
         timestamp: new Date().toISOString()
       },
@@ -459,7 +522,7 @@ router.get('/pending', async (req, res) => {
     const reviews = await reviewsService.getPendingReviews(tenantId as string);
     
     // Filter reviews user has access to
-    const accessibleReviews = reviews.filter(review => 
+    const accessibleReviews = reviews.filter((review: any) => 
       !req.user?.tenantIds || req.user.tenantIds.includes(review.tenantId)
     );
     

@@ -145,6 +145,18 @@ export default function TenantSettings({ tenantId }: { tenantId: string }) {
           color: 'bg-blue-500',
         },
         {
+          title: 'Review Management',
+          description: 'Moderate and manage customer reviews for your store',
+          icon: (
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.009 9.009 0 01-2.347-.615l-2.448.848c-.796.276-1.684.276-2.48 0l-2.448-.848A9.009 9.009 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          ),
+          href: `/t/${tenantId}/settings/reviews`,
+          color: 'bg-purple-500',
+          badge: 'Moderate',
+        },
+        {
           title: 'Location Status',
           description: 'Manage operational status and temporary closures',
           icon: (

@@ -9,18 +9,18 @@ import { AuthenticatedApiSingleton } from '../providers/base/UniversalSingleton'
 
 export interface Review {
   id: string;
-  tenantId: string;
-  userId: string;
-  userEmail: string;
   rating: number;
-  title: string;
-  content: string;
-  isVerifiedPurchase: boolean;
-  isAnonymous: boolean;
-  isApproved: boolean;
-  helpfulVotes: number;
-  createdAt: string;
-  updatedAt: string;
+  review_text: string;
+  helpful_count: number;
+  verified_purchase: boolean;
+  created_at: string;
+  updated_at: string;
+  session_id: string | null;
+  user_id: string;
+  product_id: string | null;
+  first_name: string;
+  last_name: string;
+  email: string;
 }
 
 /**
@@ -47,29 +47,55 @@ class AuthenticatedReviewService extends AuthenticatedApiSingleton {
    * Get pending reviews for moderation (admin only)
    * Uses authenticated endpoint: /api/stores/:tenantId/reviews/pending
    */
-  async getPendingReviews(tenantId: string): Promise<Review[] | null> {
+  async getPendingReviews(tenantId: string, options?: {
+    limit?: number;
+    offset?: number;
+    reviewType?: 'store' | 'product' | 'all';
+  }): Promise<Review[] | null> {
     if (!tenantId) {
       console.error('[AuthenticatedReviewService] getPendingReviews: tenantId is required');
       return null;
     }
 
     try {
+      console.log('[AuthenticatedReviewService] Fetching pending reviews for tenant:', tenantId);
+      
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      if (options?.limit) {
+        queryParams.append('limit', options.limit.toString());
+      }
+      if (options?.offset) {
+        queryParams.append('offset', options.offset.toString());
+      }
+      if (options?.reviewType && options.reviewType !== 'all') {
+        queryParams.append('reviewType', options.reviewType);
+      }
+      
+      const url = `/api/stores/${tenantId}/reviews/pending${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      
       const result = await this.makeAuthenticatedRequest<{
         success: boolean;
-        reviews: Review[];
+        data: any[];
       }>(
-        `/api/stores/${tenantId}/reviews/pending`,
+        url,
         {},
-        `pending-reviews-${tenantId}`,
+        `pending-reviews-${tenantId}-${options?.limit || 'all'}-${options?.offset || '0'}-${options?.reviewType || 'all'}`,
         this.cacheTTL
       );
+
+      console.log('[AuthenticatedReviewService] API result:', result);
 
       if (!result.success) {
         console.error('[AuthenticatedReviewService] Failed to get pending reviews:', result.error);
         return null;
       }
 
-      return result.data?.reviews || [];
+      const reviews = (result.data?.data as unknown as Review[]) || [];
+      console.log('[AuthenticatedReviewService] Extracted reviews:', reviews);
+      console.log('[AuthenticatedReviewService] Reviews count:', reviews.length);
+      
+      return reviews;
     } catch (error) {
       console.error('[AuthenticatedReviewService] Failed to get pending reviews:', error);
       return null;

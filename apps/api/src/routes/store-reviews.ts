@@ -701,6 +701,7 @@ router.get('/:tenantId/reviews/user', authenticateToken, async (req: Request, re
 router.get('/:tenantId/reviews/pending', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
+    const { limit, offset, reviewType } = req.query;
     const userId = req.user?.userId || req.user?.user_id;
     const userRole = req.user?.role;
 
@@ -724,7 +725,27 @@ router.get('/:tenantId/reviews/pending', authenticateToken, async (req: Request,
       }
     }
 
-    // Get pending reviews
+    // Build the query with review type filtering
+    let whereClause = `WHERE sr.tenant_id = $1 AND sr.approval_status = 'pending'`;
+    const queryParams: any[] = [tenantId];
+    
+    // Add review type filter
+    if (reviewType === 'store') {
+      whereClause += ` AND sr.product_id IS NULL`;
+    } else if (reviewType === 'product') {
+      whereClause += ` AND sr.product_id IS NOT NULL`;
+    }
+    
+    // Add pagination
+    let limitClause = '';
+    if (limit) {
+      limitClause += ` LIMIT ${parseInt(limit as string)}`;
+    }
+    if (offset) {
+      limitClause += ` OFFSET ${parseInt(offset as string)}`;
+    }
+
+    // Get pending reviews with product information
     const pendingReviewsQuery = `
       SELECT 
         sr.id,
@@ -736,16 +757,18 @@ router.get('/:tenantId/reviews/pending', authenticateToken, async (req: Request,
         sr.updated_at,
         sr.session_id,
         sr.user_id,
+        sr.product_id,
         u.first_name,
         u.last_name,
         u.email
       FROM store_reviews sr
       LEFT JOIN users u ON sr.user_id = u.id
-      WHERE sr.tenant_id = $1 AND sr.approval_status = 'pending'
+      ${whereClause}
       ORDER BY sr.created_at ASC
+      ${limitClause}
     `;
 
-    const result = await pool.query(pendingReviewsQuery, [tenantId]);
+    const result = await pool.query(pendingReviewsQuery, queryParams);
 
     res.json({
       success: true,

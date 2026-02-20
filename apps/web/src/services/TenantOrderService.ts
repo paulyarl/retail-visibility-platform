@@ -131,18 +131,22 @@ class TenantOrderService extends AuthenticatedApiSingleton {
 
       const response = await this.makeAuthenticatedRequest<{
         success: boolean;
-        orders: TenantOrder[];
-        pagination: {
-          page: number;
-          limit: number;
-          total: number;
-          totalPages: number;
+        data: {
+          orders: TenantOrder[];
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+          };
         };
       }>(endpoint, {}, cacheKey);
 
+      console.log('[TenantOrderService] API Response:', response);
+
       return {
-        orders: response.data?.orders || [],
-        pagination: response.data?.pagination || {
+        orders: response.data?.data?.orders || [],
+        pagination: response.data?.data?.pagination || {
           page: filters.page || 1,
           limit: filters.limit || 10,
           total: 0,

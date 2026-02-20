@@ -1,12 +1,23 @@
-import { AuthenticatedApiSingleton } from '../providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '../providers/base/UniversalSingleton';
 
 export interface FeaturedProduct {
   id: string;
-  productId: string;
-  priority: number;
-  featuredAt: string;
-  expiresAt?: string;
-  isActive: boolean;
+  tenant_id: string;
+  sku: string;
+  name: string;
+  title: string;
+  brand: string;
+  price_cents: number;
+  image_url: string;
+  is_featured: boolean;
+  featured_at: string;
+  featured_until: string | null;
+  featured_priority: number;
+  tenants: {
+    id: string;
+    name: string;
+    subscription_tier: string;
+  };
 }
 
 export interface FeaturingStats {
@@ -20,7 +31,7 @@ export interface FeaturingStats {
  * Service for managing featured products
  * Handles product featuring operations and statistics
  */
-export class FeaturedProductsService extends AuthenticatedApiSingleton {
+export class FeaturedProductsService extends AdminApiSingleton {
   private static instance: FeaturedProductsService;
 
   private constructor() {
@@ -38,7 +49,7 @@ export class FeaturedProductsService extends AuthenticatedApiSingleton {
    * Get featuring statistics
    */
   async getFeaturingStats(): Promise<FeaturingStats | null> {
-    const result = await this.makeAuthenticatedRequest<FeaturingStats>(
+    const result = await this.makeAdminRequest<FeaturingStats>(
       '/api/admin/products/featuring/stats',
       {},
       'platform-featuring-stats',
@@ -57,7 +68,7 @@ export class FeaturedProductsService extends AuthenticatedApiSingleton {
    * Get featured products with pagination
    */
   async getFeaturedProducts(limit: number, offset: number): Promise<FeaturedProduct[] | null> {
-    const result = await this.makeAuthenticatedRequest<FeaturedProduct[]>(
+    const result = await this.makeAdminRequest<any>(
       `/api/admin/products/featured?limit=${limit}&offset=${offset}`,
       {},
       'platform-featured-products',
@@ -69,7 +80,9 @@ export class FeaturedProductsService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    return result.data || null;
+    // API returns { products: [...], total: 13, limit: 20, offset: 0 }
+    // Extract the products array from the nested response
+    return result.data?.products || null;
   }
 
   /**
@@ -80,7 +93,7 @@ export class FeaturedProductsService extends AuthenticatedApiSingleton {
       throw new Error('Product ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeAdminRequest<void>(
       `/api/admin/products/featured/${productId}`,
       { method: 'DELETE' },
       `platform-unfeature-product-${productId}`
@@ -104,7 +117,7 @@ export class FeaturedProductsService extends AuthenticatedApiSingleton {
       throw new Error('Product ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<FeaturedProduct>(
+    const result = await this.makeAdminRequest<FeaturedProduct>(
       `/api/admin/products/featured/${productId}/priority`,
       { 
         method: 'PATCH',
@@ -132,7 +145,7 @@ export class FeaturedProductsService extends AuthenticatedApiSingleton {
       throw new Error('Product ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<FeaturedProduct>(
+    const result = await this.makeAdminRequest<FeaturedProduct>(
       `/api/admin/products/featured`,
       { 
         method: 'POST',
@@ -157,7 +170,7 @@ export class FeaturedProductsService extends AuthenticatedApiSingleton {
    * Bulk update product priorities
    */
   async bulkUpdatePriorities(updates: { productId: string; priority: number }[]): Promise<void> {
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeAdminRequest<void>(
       '/api/admin/products/featured/bulk-priority',
       { 
         method: 'PATCH',

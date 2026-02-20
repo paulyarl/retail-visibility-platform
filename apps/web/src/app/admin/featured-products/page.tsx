@@ -86,21 +86,21 @@ export default function AdminFeaturedProductsPage() {
       // Transform service FeaturedProduct to page FeaturedProduct format
       const transformedProducts = allProducts.map((product: any) => ({
         id: product.id,
-        tenant_id: 'unknown', // Service doesn't provide this field
-        sku: product.productId,
-        name: 'Product Name', // Service doesn't provide this
-        title: undefined,
-        brand: undefined,
-        price_cents: 0, // Service doesn't provide this
-        image_url: undefined,
-        is_featured: product.isActive,
-        featured_at: product.featuredAt,
-        featured_until: product.expiresAt,
-        featured_priority: product.priority,
+        tenant_id: product.tenant_id,
+        sku: product.sku,
+        name: product.name,
+        title: product.title,
+        brand: product.brand,
+        price_cents: product.price_cents,
+        image_url: product.image_url,
+        is_featured: product.is_featured,
+        featured_at: product.featured_at,
+        featured_until: product.featured_until,
+        featured_priority: product.featured_priority,
         tenants: {
-          id: 'unknown',
-          name: 'Unknown Tenant',
-          subscription_tier: 'unknown'
+          id: product.tenants.id,
+          name: product.tenants.name,
+          subscription_tier: product.tenants.subscription_tier
         }
       }));
         

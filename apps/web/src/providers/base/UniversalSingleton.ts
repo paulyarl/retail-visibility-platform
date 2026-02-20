@@ -1022,29 +1022,121 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
   }
 
   /**
+   * Validate request group against API-driven role groups
+   */
+  protected async validateRequestGroup(group: string): Promise<boolean> {
+    const userRole = this.getUserRole();
+    // Dynamic import to avoid circular dependency
+    const { validateRoleAgainstGroup } = await import('@/utils/rbacValidation');
+    return await validateRoleAgainstGroup(userRole || 'USER', group);
+  }
+
+  /**
+   * Validate multiple request groups with AND/OR logic
+   * @param groups - Array of groups to validate
+   * @param requireAll - true = AND logic (user must have ALL groups), false = OR logic (user needs ANY group)
+   */
+  protected async validateRequestGroups(groups: string[], requireAll: boolean = true): Promise<boolean> {
+    if (requireAll) {
+      // AND logic: User must have ALL specified groups
+      for (const group of groups) {
+        if (!(await this.validateRequestGroup(group))) {
+          return false;
+        }
+      }
+      return true;
+    } else {
+      // OR logic: User needs AT LEAST ONE of the groups
+      for (const group of groups) {
+        if (await this.validateRequestGroup(group)) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
+  /**
    * Make admin API request with additional admin validation
    * Reserved exclusively for admin operations
    * Layers on top of makeAuthenticatedRequest to follow DRY principle
+   * 
+   * @param options.requestGroup - Optional single validation group (platform: IS_PLATFORM_ADMIN, IS_PLATFORM_SUPPORT)
+   * @param options.requestGroups - Optional multiple validation groups with AND/OR logic
+   * @param options.requireAll - For multiple groups: true = AND logic (default), false = OR logic
    */
   protected async makeAdminRequest<T>(
     url: string,
-    options: RequestInit = {},
+    options: RequestInit & { 
+      requestGroup?: string;
+      requestGroups?: string[];
+      requireAll?: boolean;
+    } = {},
     cacheKey?: string,
     customTTL?: number,
-    handle404?: boolean
+    handle404: boolean = false
   ): Promise<ApiResult<T>> {
-    // Add admin-specific validation before making request
-    if (!this.isAdminUser()) {
-      return {
-        success: false,
-        error: {
-          status: 403,
-          message: 'Admin access required',
-          code: 'ADMIN_ACCESS_REQUIRED'
-        },
-        data: undefined,
-        status: 403
-      };
+    // Handle multiple groups validation
+    if (options.requestGroups) {
+      // Validate all groups are allowed for admin operations
+      const invalidGroups = options.requestGroups.filter(group => !this.isValidAdminGroup(group));
+      if (invalidGroups.length > 0) {
+        return {
+          success: false,
+          error: {
+            status: 403,
+            message: `Invalid admin groups: ${invalidGroups.join(', ')}. Allowed groups: IS_PLATFORM_ADMIN, IS_PLATFORM_SUPPORT`,
+            code: 'INVALID_ADMIN_GROUPS'
+          },
+          data: undefined,
+          status: 403
+        };
+      }
+
+      // Validate user has required groups
+      const hasPermission = await this.validateRequestGroups(options.requestGroups, options.requireAll ?? true);
+      if (!hasPermission) {
+        const logic = options.requireAll === false ? 'any of' : 'all';
+        return {
+          success: false,
+          error: {
+            status: 403,
+            message: `Requires ${logic} these admin groups: ${options.requestGroups.join(', ')}`,
+            code: 'MULTIPLE_ADMIN_GROUPS_REQUIRED'
+          },
+          data: undefined,
+          status: 403
+        };
+      }
+    }
+    // Handle single group validation (backward compatibility)
+    else if (options.requestGroup) {
+      if (!this.isValidAdminGroup(options.requestGroup)) {
+        return {
+          success: false,
+          error: {
+            status: 403,
+            message: `Invalid admin group: ${options.requestGroup}. Allowed groups: IS_PLATFORM_ADMIN, IS_PLATFORM_SUPPORT`,
+            code: 'INVALID_ADMIN_GROUP'
+          },
+          data: undefined,
+          status: 403
+        };
+      }
+
+      const hasPermission = await this.validateRequestGroup(options.requestGroup);
+      if (!hasPermission) {
+        return {
+          success: false,
+          error: {
+            status: 403,
+            message: `${options.requestGroup} admin access required`,
+            code: `${options.requestGroup.toUpperCase()}_ADMIN_ACCESS_REQUIRED`
+          },
+          data: undefined,
+          status: 403
+        };
+      }
     }
 
     // Add admin-specific headers to the options
@@ -1053,14 +1145,65 @@ export abstract class AuthenticatedApiSingleton extends UniversalSingleton {
       headers: {
         ...options.headers,
         'X-Admin-Request': 'true', // Mark as admin request for backend validation
+        ...(options.requestGroup && { 'X-Request-Group': options.requestGroup }),
+        ...(options.requestGroups && { 'X-Request-Groups': options.requestGroups.join(',') }),
+        ...(options.requestGroups && options.requireAll !== undefined && { 'X-Require-All': options.requireAll.toString() })
       }
     };
     
-    console.log(`[UniversalSingleton] Making admin request to: ${url}`);
+    const groupInfo = options.requestGroups 
+      ? ` (groups: ${options.requestGroups.join(', ')}, logic: ${options.requireAll !== false ? 'AND' : 'OR'})`
+      : options.requestGroup 
+        ? ` (group: ${options.requestGroup})`
+        : '';
+    
+    console.log(`[UniversalSingleton] Making admin request to: ${url}${groupInfo}`);
     // Delegate to makeAuthenticatedRequest which handles token and other auth logic
     return this.makeAuthenticatedRequest<T>(url, adminOptions, cacheKey, customTTL, handle404, true);
   }
-  
+
+  /**
+   * Check if group is valid for admin operations
+   */
+  private isValidAdminGroup(group: string): boolean {
+    const validAdminGroups = ['IS_PLATFORM_ADMIN', 'IS_PLATFORM_SUPPORT'];
+    return validAdminGroups.includes(group);
+  }
+
+  /**
+   * Make tenant API request with tenant context validation
+   * For tenant-specific operations that require tenant validation
+   * Layers on top of makeAuthenticatedRequest to follow DRY principle
+   * 
+   * @param options.requestGroup - Optional single validation group (tenant: IS_TENANT_ADMIN, IS_TENANT_OWNER, IS_TENANT_MANAGER, IS_TENANT_USER)
+   * @param options.requestGroups - Optional multiple validation groups with AND/OR logic
+   * @param options.requireAll - For multiple groups: true = AND logic (default), false = OR logic
+   */
+  protected async makeTenantRequest<T>(
+    url: string,
+    options: RequestInit & { 
+      requestGroup?: string;
+      requestGroups?: string[];
+      requireAll?: boolean;
+    } = {},
+    cacheKey?: string,
+    customTTL?: number,
+    handle404: boolean = false
+  ): Promise<ApiResult<T>> {
+    // Add tenant-specific headers to the options
+    const tenantOptions: RequestInit = {
+      ...options,
+      headers: {
+        ...options.headers,
+        'X-Tenant-Request': 'true', // Mark as tenant request for backend validation
+      }
+    };
+    
+    console.log(`[UniversalSingleton] Making tenant request to: ${url}`);
+    // Delegate to makeAuthenticatedRequest which handles token and other auth logic
+    return this.makeAuthenticatedRequest<T>(url, tenantOptions, cacheKey, customTTL, handle404);
+  }
+
   /**
    * Get authentication token
    * Aligned with platform token storage using access_token
@@ -1210,205 +1353,75 @@ export abstract class AdminApiSingleton extends AuthenticatedApiSingleton {
 }
 
 /**
- * Base class for Tenant Admin API singletons
- * Extends AuthenticatedApiSingleton with tenant admin role validation
- * For services that require tenant admin level access
+ * Base class for Tenant API singletons
+ * Extends AuthenticatedApiSingleton with tenant request validation
+ * For services that require tenant-level access and validation
  */
-export abstract class TenantAdminApiSingleton extends AuthenticatedApiSingleton {
-  protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for tenant admin data
-  
-  constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
-    super(singletonKey, cacheOptions);
-  }
-
+export abstract class TenantApiSingleton extends AuthenticatedApiSingleton {
   /**
-   * Make tenant admin API request with automatic role validation
-   * All tenant admin services should use this method by default
+   * Make tenant API request with tenant context validation
+   * For tenant-specific operations that require tenant validation
+   * Layers on top of makeAuthenticatedRequest to follow DRY principle
+   * 
+   * @param options.requestGroup - Optional validation group (tenant: IS_TENANT_ADMIN, IS_TENANT_OWNER, IS_TENANT_MANAGER, IS_TENANT_USER)
    */
-  protected async makeTenantAdminRequest<T>(
+  protected async makeTenantRequest<T>(
     url: string,
-    options: RequestInit = {},
+    options: RequestInit & { requestGroup?: string } = {},
     cacheKey?: string,
     customTTL?: number,
     handle404: boolean = false
   ): Promise<ApiResult<T>> {
-    // Validate tenant admin permissions before making request
-    if (!this.validateTenantAdminPermissions()) {
+    // Validate request group is allowed for tenant operations
+    if (options.requestGroup && !this.isValidTenantGroup(options.requestGroup)) {
       return {
         success: false,
         error: {
           status: 403,
-          message: 'Tenant admin access required',
-          code: 'INSUFFICIENT_PERMISSIONS'
+          message: `Invalid tenant group: ${options.requestGroup}. Allowed groups: IS_TENANT_ADMIN, IS_TENANT_OWNER, IS_TENANT_MANAGER, IS_TENANT_USER`,
+          code: 'INVALID_TENANT_GROUP'
         },
         data: undefined,
         status: 403
       };
     }
 
-    return this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, handle404);
-  }
-
-  /**
-   * Validate tenant admin permissions
-   */
-  protected async validateTenantAdminPermissions(): Promise<boolean> {
-    const userRole = this.getUserRole();
-    // Dynamic import to avoid circular dependency
-    const { validateRoleAgainstGroup } = await import('@/utils/rbacValidation');
-    return await validateRoleAgainstGroup(userRole || 'USER', 'IS_TENANT_ADMIN');
-  }
-}
-
-/**
- * Base class for Tenant Owner API singletons
- * Extends AuthenticatedApiSingleton with tenant owner role validation
- * For services that require tenant owner level access
- */
-export abstract class TenantOwnerApiSingleton extends AuthenticatedApiSingleton {
-  protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for tenant owner data
-  
-  constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
-    super(singletonKey, cacheOptions);
-  }
-
-  /**
-   * Make tenant owner API request with automatic role validation
-   * All tenant owner services should use this method by default
-   */
-  protected async makeTenantOwnerRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    customTTL?: number,
-    handle404: boolean = false
-  ): Promise<ApiResult<T>> {
-    // Validate tenant owner permissions before making request
-    if (!this.validateTenantOwnerPermissions()) {
-      return {
-        success: false,
-        error: {
-          status: 403,
-          message: 'Tenant owner access required',
-          code: 'INSUFFICIENT_PERMISSIONS'
-        },
-        data: undefined,
-        status: 403
-      };
+    // Validate request group if provided
+    if (options.requestGroup) {
+      const hasPermission = await this.validateRequestGroup(options.requestGroup);
+      if (!hasPermission) {
+        return {
+          success: false,
+          error: {
+            status: 403,
+            message: `${options.requestGroup} access required`,
+            code: `${options.requestGroup.toUpperCase()}_ACCESS_REQUIRED`
+          },
+          data: undefined,
+          status: 403
+        };
+      }
     }
 
-    return this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, handle404);
+    // Add tenant-specific headers to the options
+    const tenantOptions: RequestInit = {
+      ...options,
+      headers: {
+        ...options.headers,
+        'X-Tenant-Request': 'true', // Mark as tenant request for backend validation
+        ...(options.requestGroup && { 'X-Request-Group': options.requestGroup }) // Add validation group header
+      }
+    };
+    
+    console.log(`[UniversalSingleton] Making tenant request to: ${url}${options.requestGroup ? ` (group: ${options.requestGroup})` : ''}`);
+    // Delegate to makeAuthenticatedRequest which handles token and other auth logic
+    return this.makeAuthenticatedRequest<T>(url, tenantOptions, cacheKey, customTTL, handle404);
   }
 
   /**
-   * Validate tenant owner permissions
+   * Check if group is valid for tenant operations
    */
-  protected async validateTenantOwnerPermissions(): Promise<boolean> {
-    const userRole = this.getUserRole();
-    // Dynamic import to avoid circular dependency
-    const { validateRoleAgainstGroup } = await import('@/utils/rbacValidation');
-    return await validateRoleAgainstGroup(userRole || 'USER', 'IS_TENANT_OWNER');
-  }
-}
-
-/**
- * Base class for Tenant Manager API singletons
- * Extends AuthenticatedApiSingleton with tenant manager role validation
- * For services that require tenant manager level access
- */
-export abstract class TenantManagerApiSingleton extends AuthenticatedApiSingleton {
-  protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for tenant manager data
-  
-  constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
-    super(singletonKey, cacheOptions);
-  }
-
-  /**
-   * Make tenant manager API request with automatic role validation
-   * All tenant manager services should use this method by default
-   */
-  protected async makeTenantManagerRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    customTTL?: number,
-    handle404: boolean = false
-  ): Promise<ApiResult<T>> {
-    // Validate tenant manager permissions before making request
-    if (!this.validateTenantManagerPermissions()) {
-      return {
-        success: false,
-        error: {
-          status: 403,
-          message: 'Tenant manager access required',
-          code: 'INSUFFICIENT_PERMISSIONS'
-        },
-        data: undefined,
-        status: 403
-      };
-    }
-
-    return this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, handle404);
-  }
-
-  /**
-   * Validate tenant manager permissions
-   */
-  protected async validateTenantManagerPermissions(): Promise<boolean> {
-    const userRole = this.getUserRole();
-    // Dynamic import to avoid circular dependency
-    const { validateRoleAgainstGroup } = await import('@/utils/rbacValidation');
-    return await validateRoleAgainstGroup(userRole || 'USER', 'IS_TENANT_MANAGER');
-  }
-}
-
-/**
- * Base class for Tenant User API singletons
- * Extends AuthenticatedApiSingleton with tenant user role validation
- * For services that require basic tenant user level access
- */
-export abstract class TenantUserApiSingleton extends AuthenticatedApiSingleton {
-  protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for tenant user data
-  
-  constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
-    super(singletonKey, cacheOptions);
-  }
-
-  /**
-   * Make tenant user API request with automatic role validation
-   * All tenant user services should use this method by default
-   */
-  protected async makeTenantUserRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    customTTL?: number,
-    handle404: boolean = false
-  ): Promise<ApiResult<T>> {
-    // Validate tenant user permissions before making request
-    if (!this.validateTenantUserPermissions()) {
-      return {
-        success: false,
-        error: {
-          status: 403,
-          message: 'Tenant user access required',
-          code: 'INSUFFICIENT_PERMISSIONS'
-        },
-        data: undefined,
-        status: 403
-      };
-    }
-
-    return this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, handle404);
-  }
-
-  /**
-   * Validate tenant user permissions
-   */
-  protected async validateTenantUserPermissions(): Promise<boolean> {
-    const userRole = this.getUserRole();
-    // Dynamic import to avoid circular dependency
-    const { validateRoleAgainstGroup } = await import('@/utils/rbacValidation');
-    return await validateRoleAgainstGroup(userRole || 'USER', 'IS_TENANT_USER');
-  }
-}
+  private isValidTenantGroup(group: string): boolean {
+    const validTenantGroups = ['IS_TENANT_ADMIN', 'IS_TENANT_OWNER', 'IS_TENANT_MANAGER', 'IS_TENANT_USER'];
+    return validTenantGroups.includes(group);
+  }}

@@ -189,7 +189,7 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
   };
 
   const selectAll = () => {
-    setSelectedReviews(new Set(reviews.map(review => review.id)));
+    setSelectedReviews(new Set(Array.isArray(reviews) ? reviews.map(review => review.id) : []));
   };
 
   const clearSelection = () => {
@@ -502,7 +502,7 @@ export default function AdminReviewManagement({}: AdminReviewManagementProps) {
             </div>
           ) : (
             <div className="space-y-4">
-              {reviews.map((review) => (
+              {Array.isArray(reviews) && reviews.map((review) => (
                 <div
                   key={review.id}
                   className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"

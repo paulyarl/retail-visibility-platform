@@ -139,6 +139,7 @@ export default function DynamicTenantSidebar({ tenantId, slug, children }: Dynam
         children: [
           // Store Settings
           { label: 'Store Settings', href: `/t/${tenantId}/settings` },
+          { label: 'Review Management', href: `/t/${tenantId}/settings/reviews` },
           // Account & Preferences
           { label: 'Appearance', href: `/t/${tenantId}/settings/appearance` },
           { label: 'Language & Region', href: `/t/${tenantId}/settings/language` },
