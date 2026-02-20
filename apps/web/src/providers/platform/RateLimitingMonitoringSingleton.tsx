@@ -5,7 +5,8 @@
  * Extends UniversalSingleton for consistent caching and metrics
  */
 
-import { AuthenticatedApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { RateLimitRule, RateLimitConfig, RateLimitStatus, RateLimitMetrics } from './RateLimitingControllerSingleton';
 
 // Rate Limiting Monitoring Data Interfaces
@@ -40,7 +41,7 @@ export interface RateLimitingFilters {
  * 
  * Consumes rate limiting data for monitoring and dashboard display
  */
-class RateLimitingMonitoringSingleton extends AuthenticatedApiSingleton {
+class RateLimitingMonitoringSingleton extends AdminApiSingleton {
   private static instance: RateLimitingMonitoringSingleton;
 
   private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {

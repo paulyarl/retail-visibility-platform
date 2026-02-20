@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AdminApiSingleton } from '../providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 
 interface DeletionRequest {
   id: string;
@@ -50,13 +50,16 @@ interface DeletionRequestsResponse {
 class AdminDeletionRequestsService extends AdminApiSingleton {
   private static instance: AdminDeletionRequestsService;
 
-  private constructor() {
-    super('admin-deletion-requests');
+  private constructor(singletonKey: string, cacheOptions?: any) {
+    super(singletonKey, {
+      ttl: 5 * 60 * 1000, // 5 minutes cache for deletion requests
+      ...cacheOptions
+    });
   }
 
   static getInstance(): AdminDeletionRequestsService {
     if (!AdminDeletionRequestsService.instance) {
-      AdminDeletionRequestsService.instance = new AdminDeletionRequestsService();
+      AdminDeletionRequestsService.instance = new AdminDeletionRequestsService('admin-deletion-requests-service');
     }
     return AdminDeletionRequestsService.instance;
   }
@@ -65,7 +68,8 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
    * Get deletion requests by status
    */
   async getDeletionRequests(status: string = 'pending', page: number = 1, limit: number = 50): Promise<DeletionRequestsResponse> {
-    const response = await this.makeAdminRequest<DeletionRequestsResponse>(
+    // Use default request type (ADMIN) for primary operation
+    const response = await this.makeDefaultRequest<DeletionRequestsResponse>(
       `/api/admin/deletion-requests?status=${status}&page=${page}&limit=${limit}`,
       {},
       `admin-deletion-requests-${status}-${page}-${limit}`,
@@ -76,7 +80,8 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
       console.error('[AdminDeletionRequestsService] Failed to get deletion requests:', response.error);
       
       // Handle specific database errors
-      if (response.error?.message?.includes('42P01') || response.error?.message?.includes('account_deletion_requests')) {
+      const errorMessage = typeof response.error === 'string' ? response.error : response.error?.message || '';
+      if (errorMessage.includes('42P01') || errorMessage.includes('account_deletion_requests')) {
         console.warn('[AdminDeletionRequestsService] Account deletion requests table not found - feature not available');
         return { 
           data: [], 
@@ -106,7 +111,8 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
       console.error('[AdminDeletionRequestsService] Failed to get deletion stats:', response.error);
 
       // Handle specific database errors
-      if (response.error?.message?.includes('42P01') || response.error?.message?.includes('account_deletion_requests')) {
+      const errorMessage = typeof response.error === 'string' ? response.error : response.error?.message || '';
+      if (errorMessage.includes('42P01') || errorMessage.includes('account_deletion_requests')) {
         console.warn('[AdminDeletionRequestsService] Account deletion requests table not found - feature not available');
         return null;
       }

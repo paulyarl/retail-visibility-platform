@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { Bug, Settings } from 'lucide-react';
-import { ProductCache } from '@/hooks/shops/useShopsFeaturedBuckets';
 
 /**
  * Troubleshooting Toggle Component
  * 
  * Provides a toggle switch to enable/disable caching for debugging purposes.
+ * Note: ProductCache has been migrated to modern architecture, troubleshooting mode
+ * is now handled via simple state management.
+ * 
  * When enabled, all API calls will bypass cache using timestamps.
  * 
  * Usage:
@@ -22,16 +24,17 @@ export default function TroubleshootingToggle() {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // Check current troubleshooting mode status
-    const currentMode = ProductCache.getTroubleshootingMode();
-    setIsTroubleshooting(currentMode);
+    // Check URL parameters for troubleshooting mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const debugMode = urlParams.has('debug') || urlParams.has('troubleshoot');
+    
+    if (debugMode) {
+      setIsTroubleshooting(true);
+    }
 
     // Show toggle only in development or when explicitly enabled
-    const isDev = process.env.NODE_ENV === 'development';
-    const hasDebugParam = typeof window !== 'undefined' && 
-      (window.location.search.includes('debug') || window.location.search.includes('troubleshoot'));
-    
-    setIsVisible(isDev || hasDebugParam);
+    const showToggle = process.env.NODE_ENV === 'development' || debugMode;
+    setIsVisible(showToggle);
 
     // Listen for storage changes (in case toggled in another tab)
     const handleStorageChange = (e: StorageEvent) => {
@@ -46,9 +49,19 @@ export default function TroubleshootingToggle() {
     }
   }, []);
 
-  const handleToggle = () => {
-    const newMode = ProductCache.toggleTroubleshootingMode();
+  const toggleTroubleshooting = () => {
+    const newMode = !isTroubleshooting;
     setIsTroubleshooting(newMode);
+    
+    // Update URL parameter if needed
+    const url = new URL(window.location.href);
+    if (newMode) {
+      url.searchParams.set('debug', 'true');
+    } else {
+      url.searchParams.delete('debug');
+      url.searchParams.delete('troubleshoot');
+    }
+    window.history.replaceState({}, '', url.toString());
   };
 
   if (!isVisible) return null;
@@ -68,7 +81,7 @@ export default function TroubleshootingToggle() {
         </div>
         
         <button
-          onClick={handleToggle}
+          onClick={toggleTroubleshooting}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
             isTroubleshooting ? 'bg-red-500' : 'bg-gray-200 dark:bg-gray-600'
           }`}

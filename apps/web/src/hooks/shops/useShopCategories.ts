@@ -5,7 +5,9 @@ import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
 import { shopsService } from '@/services/ShopsService';
 
 interface ShopCategory {
-  shop_category: string;
+  id: string;
+  name: string;
+  slug: string;
   count?: number;
 }
 
@@ -43,23 +45,23 @@ class ShopCategoriesCache extends UniversalSingleton {
     const cacheKey = 'shop-categories:all';
 
     // Check cache first using UniversalSingleton's cache management
-    const cached = await this.getFromCache<ShopCategory[]>(cacheKey);
+    /* const cached = await this.getFromCache<ShopCategory[]>(cacheKey);
     if (cached) {
-      console.log('[ShopCategoriesCache] Cache hit for shop categories');
+      //console.log('[ShopCategoriesCache] Cache hit for shop categories');
       return cached;
-    }
+    } */
 
-    console.log('[ShopCategoriesCache] Fetching shop categories from service');
+    //console.log('[ShopCategoriesCache] Fetching shop categories from service');
 
     // Fetch from service (includes built-in caching)
-    const categories = await shopsService.getShopCategories();
+    const response = await shopsService.getShopCategories();
     
     // Store in cache using UniversalSingleton's cache management
-    await this.setCache(cacheKey, categories);
+    /* await this.setCache(cacheKey, categories);
     // Also store in in-memory cache with TTL
-    this.setCachedData(cacheKey, categories, this.cacheTTL);
+    this.setCachedData(cacheKey, categories, this.cacheTTL); */
     
-    return categories;
+    return response.categories;
   }
 
   /**

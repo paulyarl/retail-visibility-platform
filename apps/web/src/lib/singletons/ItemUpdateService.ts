@@ -12,7 +12,7 @@
  * - Performance metrics tracking
  */
 
-import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 // ====================
 // TYPES
@@ -56,7 +56,7 @@ export interface ItemUpdateResult {
 // ITEM UPDATE SERVICE
 // ====================
 
-class ItemUpdateService extends UniversalSingleton {
+class ItemUpdateService extends TenantApiSingleton {
   protected static instances: Map<string, ItemUpdateService> = new Map();
 
   private constructor(tenantId: string) {
@@ -84,7 +84,7 @@ class ItemUpdateService extends UniversalSingleton {
    */
   async updateItem(itemId: string, data: ItemUpdateData): Promise<ItemUpdateResult> {
     try {
-      const updatedItem = await this.makeApiRequest(
+      const updatedItem = await this.makeDefaultRequest(
         `/api/items/${itemId}`,
         {
           method: 'PUT',
@@ -131,7 +131,7 @@ class ItemUpdateService extends UniversalSingleton {
    */
   async createItem(data: ItemUpdateData): Promise<ItemUpdateResult> {
     try {
-      const newItem = await this.makeApiRequest(
+      const newItem = await this.makeDefaultRequest(
         `/api/items`,
         {
           method: 'POST',
@@ -173,7 +173,7 @@ class ItemUpdateService extends UniversalSingleton {
    */
   async deleteItem(itemId: string): Promise<ItemUpdateResult> {
     try {
-      const response = await this.makeApiRequest(
+      const response = await this.makeDefaultRequest(
         `/api/items/${itemId}`,
         {
           method: 'DELETE',
@@ -208,7 +208,7 @@ class ItemUpdateService extends UniversalSingleton {
    */
   async restoreItem(itemId: string): Promise<ItemUpdateResult> {
     try {
-      const restoredItem = await this.makeApiRequest(
+      const restoredItem = await this.makeDefaultRequest(
         `/api/items/${itemId}/restore`,
         {
           method: 'PATCH',
@@ -309,6 +309,8 @@ class ItemUpdateService extends UniversalSingleton {
       cacheSize: this.cache.size,
       inMemoryCacheSize: this.cache.size,
       persistentCacheSize: 0, // Managed by CacheManager
+      errors: 0, // TODO: Track errors
+      lastUpdated: new Date().toISOString(),
     };
   }
 

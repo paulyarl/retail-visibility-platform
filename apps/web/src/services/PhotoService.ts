@@ -5,7 +5,7 @@
  * Extends AuthenticatedApiSingleton for consistent authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 
 // Photo Data Interfaces
 export interface Photo {

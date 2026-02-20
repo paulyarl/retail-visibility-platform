@@ -185,42 +185,38 @@ export default function ShopCreationWizard({ tenantId, onComplete, onCancel }: S
     try {
       // Mock API call - would be actual shop creation
       const newShop: Shop = {
-        id: `shop-${Date.now()}`,
         tenantId,
         name: formData.name,
         slug: formData.slug,
         description: formData.description,
-        tagline: formData.tagline,
-        email: formData.email,
-        phone: formData.phone,
-        website: formData.website,
+        contact: {
+          email: formData.email,
+          phone: formData.phone,
+          website: formData.website
+        },
         address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        country: formData.country,
-        postalCode: formData.postalCode,
-        monday: formData.monday,
-        tuesday: formData.tuesday,
-        wednesday: formData.wednesday,
-        thursday: formData.thursday,
-        friday: formData.friday,
-        saturday: formData.saturday,
-        sunday: formData.sunday,
-        facebook: formData.facebook,
-        instagram: formData.instagram,
-        twitter: formData.twitter,
-        linkedin: formData.linkedin,
-        youtube: formData.youtube,
-        logoUrl: formData.logoUrl,
+        location: `${formData.city}, ${formData.state}`, // Combine city and state into location
+        // Remove individual city, state, country, postalCode as they're not in Shop interface
+        // Remove business hours as they're not in Shop interface
+        // Remove social media and logoUrl as they're not in Shop interface
+        imageUrl: formData.logoUrl, // Map logoUrl to imageUrl
         bannerUrl: formData.bannerUrl,
+        autoId: `shop-${Date.now()}`, // Add missing autoId
+        category: 'general', // Add missing category
+        urls: { // Add missing urls
+          slugUrl: `/directory/${formData.slug}`,
+          tenantIdUrl: `/directory/${tenantId}`,
+          autoIdUrl: `/directory/${tenantId}`,
+          canonicalUrl: `/directory/${formData.slug}`
+        },
         isVerified: false,
         isActive: true,
         rating: 0,
         reviewCount: 0,
         productCount: 0,
-        followerCount: 0,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        // Remove followerCount as it's not in Shop interface
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
 
       onComplete(newShop);

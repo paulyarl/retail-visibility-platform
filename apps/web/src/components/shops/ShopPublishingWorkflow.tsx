@@ -82,13 +82,13 @@ export default function ShopPublishingWorkflow({ shop, onUpdate, onCancel }: Sho
         id: 'basic-info',
         title: 'Basic Information',
         description: 'Verify shop name, description, and contact details',
-        status: shop.name && shop.description && shop.email ? 'completed' : 'pending'
+        status: shop.name && shop.description && shop.contact?.email ? 'completed' : 'pending'
       },
       {
         id: 'branding',
         title: 'Shop Branding',
         description: 'Upload logo and banner, customize colors and fonts',
-        status: shop.logoUrl && shop.bannerUrl ? 'completed' : 'pending'
+        status: shop.imageUrl && shop.bannerUrl ? 'completed' : 'pending'
       },
       {
         id: 'products',
@@ -136,7 +136,7 @@ export default function ShopPublishingWorkflow({ shop, onUpdate, onCancel }: Sho
         title: 'Contact email is set',
         description: 'Customers can reach you via email',
         required: true,
-        completed: !!shop.email,
+        completed: !!shop.contact?.email,
         category: 'basic'
       },
       {
@@ -144,7 +144,7 @@ export default function ShopPublishingWorkflow({ shop, onUpdate, onCancel }: Sho
         title: 'Phone number is set',
         description: 'Customers can call your shop',
         required: false,
-        completed: !!shop.phone,
+        completed: !!shop.contact?.phone,
         category: 'basic'
       },
       {
@@ -152,7 +152,7 @@ export default function ShopPublishingWorkflow({ shop, onUpdate, onCancel }: Sho
         title: 'Address is provided',
         description: 'Customers can find your physical location',
         required: true,
-        completed: !!shop.address && !!shop.city && !!shop.state,
+        completed: !!shop.address && !!shop.location,
         category: 'basic'
       },
 
@@ -162,7 +162,7 @@ export default function ShopPublishingWorkflow({ shop, onUpdate, onCancel }: Sho
         title: 'Shop logo is uploaded',
         description: 'Add your shop logo for brand recognition',
         required: true,
-        completed: !!shop.logoUrl,
+        completed: !!shop.imageUrl,
         category: 'content'
       },
       {
@@ -298,7 +298,7 @@ export default function ShopPublishingWorkflow({ shop, onUpdate, onCancel }: Sho
       const updatedShop: Shop = {
         ...shop,
         isActive: updatedShopData.isActive,
-        updatedAt: new Date(updatedShopData.updatedAt)
+        updatedAt: new Date(updatedShopData.updatedAt).toISOString()
       };
       
       onUpdate(updatedShop);
@@ -331,7 +331,7 @@ export default function ShopPublishingWorkflow({ shop, onUpdate, onCancel }: Sho
       const updatedShop: Shop = {
         ...shop,
         isActive: updatedShopData.isActive,
-        updatedAt: new Date(updatedShopData.updatedAt)
+        updatedAt: new Date(updatedShopData.updatedAt).toISOString()
       };
       
       onUpdate(updatedShop);
@@ -574,9 +574,9 @@ export default function ShopPublishingWorkflow({ shop, onUpdate, onCancel }: Sho
         <CardContent>
           <div className="rounded-lg border-2 p-6">
             <div className="flex items-center gap-4 mb-6">
-              {shop.logoUrl ? (
+              {shop.imageUrl ? (
                 <img
-                  src={shop.logoUrl}
+                  src={shop.imageUrl}
                   alt="Shop logo"
                   className="w-16 h-16 rounded-lg object-cover"
                 />
@@ -618,36 +618,36 @@ export default function ShopPublishingWorkflow({ shop, onUpdate, onCancel }: Sho
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                {shop.email && (
+                {shop.contact?.email && (
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4 text-gray-400" />
-                    <span>{shop.email}</span>
+                    <span>{shop.contact?.email}</span>
                   </div>
                 )}
-                {shop.phone && (
+                {shop.contact?.phone && (
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4 text-gray-400" />
-                    <span>{shop.phone}</span>
+                    <span>{shop.contact?.phone}</span>
                   </div>
                 )}
-                {shop.website && (
+                {shop.contact?.website && (
                   <div className="flex items-center gap-2">
                     <Globe className="w-4 h-4 text-gray-400" />
                     <a
-                      href={shop.website}
+                      href={shop.contact?.website}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:text-blue-700"
                     >
-                      {shop.website.replace(/^https?:\/\//, '')}
+                      {shop.contact?.website.replace(/^https?:\/\//, '')}
                     </a>
                   </div>
                 )}
-                {shop.address && shop.city && (
+                {shop.address && shop.location && (
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-gray-400" />
                     <span>
-                      {shop.address}, {shop.city}, {shop.state}
+                      {shop.address}, {shop.location}
                     </span>
                   </div>
                 )}

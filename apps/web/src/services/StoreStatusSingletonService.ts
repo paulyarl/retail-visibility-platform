@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface StoreStatus {
   isOpen: boolean;

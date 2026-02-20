@@ -7,7 +7,8 @@
  */
 
 import { AutoUserCacheOptions } from '@/utils/userIdentification';
-import { PublicApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 
 // Directory Category Types
 export interface DirectoryCategory {

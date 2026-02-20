@@ -1,11 +1,11 @@
 /**
- * Security Alert Tracking Service - Public API Pattern
+ * Security Alert Tracking Service - Admin API Pattern
  * 
  * Handles security alert tracking and telemetry events
- * Extends PublicApiSingleton for consistent caching and metrics
+ * Extends AdminApiSingleton for admin-level security operations
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 
 // Security Alert Data Interfaces
 export interface SecurityAlertEvent {
@@ -40,20 +40,23 @@ export interface SecurityAlertMetrics {
   eventsBySeverity: Record<string, number>;
 }
 
-class SecurityAlertTrackingService extends PublicApiSingleton {
+class SecurityAlertTrackingService extends AdminApiSingleton {
   private static instance: SecurityAlertTrackingService;
 
   // TTL constants for different data types
   private readonly EVENTS_TTL = 2 * 60 * 1000; // 2 minutes for events (real-time)
   private readonly METRICS_TTL = 5 * 60 * 1000; // 5 minutes for metrics
 
-  private constructor() {
-    super('security-alert-tracking-service');
+  private constructor(singletonKey: string, cacheOptions?: any) {
+    super(singletonKey, {
+      ttl: 5 * 60 * 1000, // 5 minutes cache for security alerts
+      ...cacheOptions
+    });
   }
 
   static getInstance(): SecurityAlertTrackingService {
     if (!SecurityAlertTrackingService.instance) {
-      SecurityAlertTrackingService.instance = new SecurityAlertTrackingService();
+      SecurityAlertTrackingService.instance = new SecurityAlertTrackingService('security-alert-tracking-service');
     }
     return SecurityAlertTrackingService.instance;
   }

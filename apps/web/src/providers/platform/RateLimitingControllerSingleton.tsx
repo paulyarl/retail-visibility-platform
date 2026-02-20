@@ -5,7 +5,8 @@
  * Extends UniversalSingleton for consistent caching and metrics
  */
 
-import { AuthenticatedApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 
 // Rate Limiting Data Interfaces
 export interface RateLimitRule {
@@ -66,7 +67,7 @@ export interface RateLimitMetrics {
  * 
  * Produces and manages rate limiting rules and enforcement
  */
-class RateLimitingControllerSingleton extends AuthenticatedApiSingleton {
+class RateLimitingControllerSingleton extends AdminApiSingleton {
   private static instance: RateLimitingControllerSingleton;
   private rateLimitRules: Map<string, RateLimitRule> = new Map();
   private rateLimitStatus: Map<string, RateLimitStatus> = new Map();

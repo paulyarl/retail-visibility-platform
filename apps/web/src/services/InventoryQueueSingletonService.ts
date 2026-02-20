@@ -14,7 +14,7 @@
  * - Error handling and logging
  */
 
-import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 export interface QueueItem {
   id: string;
@@ -55,7 +55,7 @@ export interface QueueOperation {
   timestamp: string;
 }
 
-class InventoryQueueSingletonService extends UniversalSingleton {
+class InventoryQueueSingletonService extends TenantApiSingleton {
   private static instance: InventoryQueueSingletonService;
   
   // Different TTLs for different data types
@@ -84,7 +84,7 @@ class InventoryQueueSingletonService extends UniversalSingleton {
         throw new Error('Tenant ID and items are required');
       }
 
-      const response = await this.makeApiRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/queue/${tenantId}`,
         {
           method: 'POST',
@@ -128,7 +128,7 @@ class InventoryQueueSingletonService extends UniversalSingleton {
     if (options.limit) searchParams.append('limit', options.limit.toString());
     if (options.offset) searchParams.append('offset', options.offset.toString());
 
-    const response = await this.makeApiRequest<QueueItem[]>(
+    const response = await this.makeDefaultRequest<QueueItem[]>(
       `/api/queue/${tenantId}?${searchParams.toString()}`,
       {},
       `queue-items-${tenantId}-${JSON.stringify(options)}`,
@@ -152,7 +152,7 @@ class InventoryQueueSingletonService extends UniversalSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makeApiRequest<QueueStats>(
+    const response = await this.makeDefaultRequest<QueueStats>(
       `/api/queue/${tenantId}?stats=true`,
       {},
       `queue-stats-${tenantId}`,
@@ -177,7 +177,7 @@ class InventoryQueueSingletonService extends UniversalSingleton {
         throw new Error('Tenant ID, item ID, and status are required');
       }
 
-      const response = await this.makeApiRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/queue/${tenantId}/${itemId}`,
         {
           method: 'PATCH',
@@ -211,7 +211,7 @@ class InventoryQueueSingletonService extends UniversalSingleton {
       const searchParams = new URLSearchParams();
       if (itemId) searchParams.append('itemId', itemId);
 
-      const response = await this.makeApiRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/queue/${tenantId}?${searchParams.toString()}`,
         {
           method: 'DELETE'
@@ -241,7 +241,7 @@ class InventoryQueueSingletonService extends UniversalSingleton {
         throw new Error('Tenant ID and action are required');
       }
 
-      const response = await this.makeApiRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/queue/${tenantId}`,
         {
           method: 'DELETE',
@@ -272,7 +272,7 @@ class InventoryQueueSingletonService extends UniversalSingleton {
         throw new Error('Tenant ID, item ID, and priority are required');
       }
 
-      const response = await this.makeApiRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/queue/${tenantId}`,
         {
           method: 'PUT',
@@ -312,7 +312,7 @@ class InventoryQueueSingletonService extends UniversalSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const response = await this.makeApiRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/queue/${tenantId}`,
         {
           method: 'PUT',
@@ -346,7 +346,7 @@ class InventoryQueueSingletonService extends UniversalSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const response = await this.makeApiRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/queue/${tenantId}?cleanup=true&olderThanDays=${olderThanDays}`,
         {
           method: 'DELETE'
@@ -376,7 +376,7 @@ class InventoryQueueSingletonService extends UniversalSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const response = await this.makeApiRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/queue/${tenantId}/export`,
         {},
         `export-queue-${tenantId}`,

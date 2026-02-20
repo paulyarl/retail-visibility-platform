@@ -258,7 +258,7 @@ class RateLimitingService extends UniversalSingleton {
       }
       
       if (process.env.RATE_LIMITING_ENABLED === 'false') {
-        this.throttledLog('Rate limiting DISABLED via environment variable (overrides database)', 'env-disabled');
+//        this.throttledLog('Rate limiting DISABLED via environment variable (overrides database)', 'env-disabled');
         this.cachedEnabledStatus = false;
         this.lastEnabledCheck = now;
         return false;
@@ -278,14 +278,14 @@ class RateLimitingService extends UniversalSingleton {
       }
       
       if (platformSettings?.rate_limiting_enabled === false) {
-        this.throttledLog('Rate limiting DISABLED via database setting', 'db-disabled');
+//        this.throttledLog('Rate limiting DISABLED via database setting', 'db-disabled');
         this.cachedEnabledStatus = false;
         this.lastEnabledCheck = now;
         return false;
       }
 
       // 3. Default to OFF if neither env var nor database is set
-      this.throttledLog('Rate limiting DISABLED (no environment variable or database setting found)', 'default-off');
+//      this.throttledLog('Rate limiting DISABLED (no environment variable or database setting found)', 'default-off');
       this.cachedEnabledStatus = false;
       this.lastEnabledCheck = now;
       return false;
@@ -301,7 +301,7 @@ class RateLimitingService extends UniversalSingleton {
         return true;
       }
       
-      this.throttledLog('Rate limiting DISABLED (database error, no environment override)', 'error-fallback');
+//      this.throttledLog('Rate limiting DISABLED (database error, no environment override)', 'error-fallback');
       this.cachedEnabledStatus = false;
       this.lastEnabledCheck = now;
       return false;

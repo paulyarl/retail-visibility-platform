@@ -74,11 +74,11 @@ export default function ShopProducts({
     onFilterChange({ category: value === 'all' ? undefined : value });
   };
 
-  const handleSortChange = (value: string) => {
+  const handleSortChange = (value: 'name' | 'rating' | 'created' | 'default' | undefined) => {
     onFilterChange({ sort: value });
   };
 
-  const totalPages = Math.ceil(totalCount / filters.limit);
+  const totalPages = Math.ceil(totalCount / (filters.limit || 10));
 
   const formatPrice = (price: number, salePrice?: number) => {
     const hasSale = salePrice && salePrice < price;
@@ -291,7 +291,7 @@ export default function ShopProducts({
             {/* Sort */}
             <Select 
               value={filters.sort || 'default'} 
-              onChange={(e) => handleSortChange(e.target.value)}
+              onChange={(e) => handleSortChange(e.target.value as 'name' | 'rating' | 'created' | 'default' | undefined)}
               options={[
                 { value: 'default', label: 'Default' },
                 { value: 'name-asc', label: 'Name (A-Z)' },
@@ -375,8 +375,8 @@ export default function ShopProducts({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onPageChange(filters.page - 1)}
-            disabled={filters.page === 1}
+            onClick={() => onPageChange((filters.page || 1) - 1)}
+            disabled={(filters.page || 1) === 1}
           >
             <ChevronLeft className="w-4 h-4" />
             Previous
@@ -385,7 +385,7 @@ export default function ShopProducts({
           <div className="flex gap-1">
             {[...Array(Math.min(5, totalPages))].map((_, i) => {
               const page = i + 1;
-              const isActive = page === filters.page;
+              const isActive = page === (filters.page || 1);
               return (
                 <Button
                   key={page}
@@ -402,8 +402,8 @@ export default function ShopProducts({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onPageChange(filters.page + 1)}
-            disabled={filters.page === totalPages}
+            onClick={() => onPageChange((filters.page || 1) + 1)}
+            disabled={(filters.page || 1) === totalPages}
           >
             Next
             <ChevronRight className="w-4 h-4" />

@@ -1,11 +1,11 @@
 /**
  * Tenant Directory Singleton Service
  * 
- * Extends UniversalSingletonClient to provide cached tenant directory operations
+ * Extends AuthenticatedApiSingleton to provide cached tenant directory operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 
 export interface TenantSlugResponse {
   slug: string;
@@ -52,8 +52,9 @@ class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
   private static instance: TenantDirectorySingletonService;
 
   private constructor() {
-    super('tenant-directory-singleton');
-    this.cacheTTL = 10 * 60 * 1000; // 10 minutes for tenant data (longer than regular API)
+    super('tenant-directory-singleton', {
+      ttl: 10 * 60 * 1000 // 10 minutes for tenant data (longer than regular API)
+    });
   }
 
   public static getInstance(): TenantDirectorySingletonService {

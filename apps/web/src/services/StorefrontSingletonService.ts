@@ -1,11 +1,11 @@
 /**
  * Storefront Singleton Service
  * 
- * Extends UniversalSingletonClient to provide cached storefront operations
+ * Extends PublicApiSingleton to provide cached storefront operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface StorefrontCategory {
   id: string;
@@ -41,8 +41,9 @@ class StorefrontSingletonService extends PublicApiSingleton {
   private static instance: StorefrontSingletonService;
 
   private constructor() {
-    super('storefront-singleton');
-    this.cacheTTL = 5 * 60 * 1000; // 5 minutes for storefront data
+    super('storefront-singleton', {
+      ttl: 5 * 60 * 1000 // 5 minutes for storefront data
+    });
   }
 
   public static getInstance(): StorefrontSingletonService {

@@ -8,7 +8,7 @@ import { ProductRecommendations } from '@/components/products/ProductRecommendat
 import LastViewed from '@/components/directory/LastViewed';
 import { computeStoreStatus } from '@/lib/hours-utils';
 import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
-import { UniversalSingleton, PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { ProductLikeProvider } from '@/components/likes/ProductLikeProvider';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import ProductBusinessInfoCollapsible from '@/components/products/ProductBusinessInfoCollapsible';
@@ -166,7 +166,7 @@ class ProductDataSingleton extends PublicApiSingleton {
 
   async fetchProduct(id: string): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/public/products/${id}`,
         {},
         'product-data'
@@ -184,7 +184,7 @@ class ProductDataSingleton extends PublicApiSingleton {
 
   async fetchTenantProfile(tenantId: string): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/public/tenant/${tenantId}/profile`,
         {},
         'tenant-profile'
@@ -201,7 +201,7 @@ class ProductDataSingleton extends PublicApiSingleton {
   }
 
   async fetchDirectoryEntry(tenantSlug: string): Promise<any> {
-    const response = await this.makePublicRequest<any>(
+    const response = await this.makeDefaultRequest<any>(
       `/api/directory/${tenantSlug}`,
       {},
       'directory-entry'
@@ -343,7 +343,7 @@ class ProductPhotosSingleton extends PublicApiSingleton {
 
   async fetchProductPhotos(id: string): Promise<Photo[]> {
     try {
-      const data = await this.makePublicRequest<any>(
+      const data = await this.makeDefaultRequest<any>(
         `/api/items/${id}/photos`,
         {},
         'product-photos'

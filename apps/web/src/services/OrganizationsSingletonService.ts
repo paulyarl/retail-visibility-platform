@@ -1,11 +1,11 @@
 /**
  * Organizations Singleton Service
  *
- * Extends UniversalSingletonClient to provide cached organizations operations
+ * Extends AuthenticatedApiSingleton to provide cached organizations operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 
 export interface Organization {
   id: string;
@@ -31,8 +31,9 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
   private static instance: OrganizationsSingletonService;
 
   private constructor() {
-    super('organizations-singleton');
-    this.cacheTTL = 15 * 60 * 1000; // 15 minutes for organizations (changes rarely)
+    super('organizations-singleton', {
+      ttl: 15 * 60 * 1000 // 15 minutes for organizations (changes rarely)
+    });
   }
 
   public static getInstance(): OrganizationsSingletonService {

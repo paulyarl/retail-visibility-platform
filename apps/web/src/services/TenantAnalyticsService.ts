@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '../providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 
 export interface TenantAnalytics {
   performanceMetrics: {
@@ -47,16 +47,19 @@ export interface TenantAnalytics {
  * Service for managing tenant-specific analytics and usage data
  * Handles tenant analytics, usage statistics, and performance metrics
  */
-export class TenantAnalyticsService extends AuthenticatedApiSingleton {
+export class TenantAnalyticsService extends TenantApiSingleton {
   private static instance: TenantAnalyticsService;
 
-  private constructor() {
-    super('TenantAnalyticsService');
+  private constructor(singletonKey: string, cacheOptions?: any) {
+    super(singletonKey, {
+      ttl: 5 * 60 * 1000, // 5 minutes cache for analytics
+      ...cacheOptions
+    });
   }
 
   static getInstance(): TenantAnalyticsService {
     if (!TenantAnalyticsService.instance) {
-      TenantAnalyticsService.instance = new TenantAnalyticsService();
+      TenantAnalyticsService.instance = new TenantAnalyticsService('tenant-analytics-service');
     }
     return TenantAnalyticsService.instance;
   }
@@ -69,7 +72,8 @@ export class TenantAnalyticsService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    // Use default request type (TENANT) for primary operation
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/usage`,
       {},
       `platform-tenant-usage-${tenantId}`,

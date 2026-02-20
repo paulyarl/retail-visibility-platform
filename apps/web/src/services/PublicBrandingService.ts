@@ -5,7 +5,7 @@
  * Used for public platform branding that doesn't require authentication
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface PublicBrandingSettings {
   platformName: string;

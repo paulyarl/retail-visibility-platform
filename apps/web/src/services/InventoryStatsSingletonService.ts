@@ -12,7 +12,7 @@
  * - Error handling and logging
  */
 
-import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 export interface InventoryStats {
   totalProducts: number;
@@ -41,7 +41,7 @@ export interface InventoryMetrics {
   throughput?: number;
 }
 
-class InventoryStatsSingletonService extends UniversalSingleton {
+class InventoryStatsSingletonService extends TenantApiSingleton {
   private static instance: InventoryStatsSingletonService;
   
   // Different TTLs for different data types
@@ -69,7 +69,7 @@ class InventoryStatsSingletonService extends UniversalSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makeApiRequest<InventoryStats>(
+    const response = await this.makeDefaultRequest<InventoryStats>(
       `/api/inventory/stats/${tenantId}`,
       {},
       `inventory-stats-${tenantId}`,
@@ -93,7 +93,7 @@ class InventoryStatsSingletonService extends UniversalSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makeApiRequest<InventoryMetrics>(
+    const response = await this.makeDefaultRequest<InventoryMetrics>(
       `/api/inventory/metrics/${tenantId}`,
       {},
       `inventory-metrics-${tenantId}`,
@@ -118,7 +118,7 @@ class InventoryStatsSingletonService extends UniversalSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const response = await this.makeApiRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/inventory/health/${tenantId}`,
         {},
         `inventory-health-${tenantId}`,
@@ -151,7 +151,7 @@ class InventoryStatsSingletonService extends UniversalSingleton {
       if (options.metric) searchParams.append('metric', options.metric);
       if (options.limit) searchParams.append('limit', options.limit.toString());
 
-      const response = await this.makeApiRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/inventory/trends/${tenantId}?${searchParams.toString()}`,
         {},
         `inventory-trends-${tenantId}-${JSON.stringify(options)}`,

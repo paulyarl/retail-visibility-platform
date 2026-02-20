@@ -5,7 +5,8 @@
  * Extends UniversalSingleton for consistent caching and metrics
  */
 
-import { AuthenticatedApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 
 // Tenant Profile Data Interfaces
 export interface TenantProfile {
@@ -160,7 +161,7 @@ export interface TenantProfileStats {
  * 
  * Produces and manages tenant profile data and analytics
  */
-class TenantProfileSingleton extends AuthenticatedApiSingleton {
+class TenantProfileSingleton extends TenantApiSingleton {
   private static instance: TenantProfileSingleton;
   private updateQueue: Array<{
     tenantId: string;

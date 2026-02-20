@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 
 export interface RateLimitConfig {
   route_type: string;
@@ -22,8 +22,9 @@ class RateLimitSingletonService extends AuthenticatedApiSingleton {
   private static instance: RateLimitSingletonService;
 
   private constructor() {
-    super('rate-limit-service');
-    this.cacheTTL = 5 * 60 * 1000; // 5 minutes - rate limit configs don't change often
+    super('rate-limit-service', {
+      ttl: 5 * 60 * 1000 // 5 minutes - rate limit configs don't change often
+    });
   }
 
   public static getInstance(): RateLimitSingletonService {
@@ -80,7 +81,7 @@ class RateLimitSingletonService extends AuthenticatedApiSingleton {
 
   /**
    * Check if rate limiting is globally enabled
-   * Cached via UniversalSingletonClient
+   * Cached via AuthenticatedApiSingleton
    */
   async isRateLimitingEnabled(): Promise<boolean> {
     try {

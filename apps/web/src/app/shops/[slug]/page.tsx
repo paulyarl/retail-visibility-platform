@@ -7,7 +7,7 @@
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import ShopProfileClient from './ShopProfileClient';
-import { ShopsAPISingleton } from '@/services/ShopsService';
+import { ShopsAPISingleton, shopsService } from '@/services/ShopsService';
 
 // Types
 interface Shop {
@@ -48,21 +48,11 @@ interface ShopProfilePageProps {
 // Shop data fetching function
 export async function getShopBySlug(identifier: string): Promise<Shop | null> {
   try {
-    // Use ShopsAPISingleton for consistent API communication and caching
-    const apiSingleton = ShopsAPISingleton.getInstance();
-    const response = await apiSingleton.makeShopsApiRequest<any>(`/api/public/shops/${identifier}`, {}, `shop:${identifier}`);
+    // Use shopsService for consistent API communication and caching
+    const response = await shopsService.getShopByIdentifier(identifier);
     
-    if (response.success) {
-      // The API returns the shop directly in the response
-      if (response.shop) {
-        return response.shop as Shop;
-      } else if (response.data?.shop) {
-        return response.data.shop as Shop;
-      } else if (response.data?.data) {
-        return response.data.data as Shop;
-      } else if (response.data && typeof response.data === 'object' && response.data.id) {
-        return response.data as Shop;
-      }
+    if (response) {
+      return response as unknown as Shop;
     }
     
     return null;

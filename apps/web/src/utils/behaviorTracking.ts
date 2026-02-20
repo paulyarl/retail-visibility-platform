@@ -11,10 +11,10 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
-import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 // Behavior Tracking Singleton Class
-class BehaviorTrackingSingleton extends UniversalSingleton {
+class BehaviorTrackingSingleton extends PublicApiSingleton {
   private static instance: BehaviorTrackingSingleton;
 
   private constructor() {
@@ -29,7 +29,7 @@ class BehaviorTrackingSingleton extends UniversalSingleton {
   }
 
   async trackRecommendation(userId: string, sessionToken: string, trackingData: any, location?: any): Promise<void> {
-    const response = await this.makeApiRequest<any>(
+    const response = await this.makeDefaultRequest<any>(
       `/api/recommendations/track`,
       {
         method: 'POST',
@@ -242,7 +242,7 @@ class BehaviorTrackingCache {
       this.retryState.nextRetryAt = 0;
       this.saveRetryState();
 
-      console.log(`[BehaviorTracking] Sent ${eventsToSend.length} events in batch (priorities: ${Object.entries(this.getPriorityBreakdown(eventsToSend)).map(([p, c]) => `${p}:${c}`).join(', ')})`);
+      // console.log(`[BehaviorTracking] Sent ${eventsToSend.length} events in batch (priorities: ${Object.entries(this.getPriorityBreakdown(eventsToSend)).map(([p, c]) => `${p}:${c}`).join(', ')})`);
     } catch (error) {
       // For tracking failures, use warn instead of error - these are not user-facing issues
       console.warn('[BehaviorTracking] Tracking batch failed, will retry:', error instanceof Error ? error.message : 'Unknown error');
@@ -263,7 +263,7 @@ class BehaviorTrackingCache {
       this.events.unshift(...eventsToSend);
       this.saveToStorage();
       
-      console.log(`[BehaviorTracking] Re-queued ${eventsToSend.length} events, retry attempt ${this.retryState.attempts} in ${Math.round(exponentialDelay / 1000)}s`);
+      // console.log(`[BehaviorTracking] Re-queued ${eventsToSend.length} events, retry attempt ${this.retryState.attempts} in ${Math.round(exponentialDelay / 1000)}s`);
     } finally {
       this.isSending = false;
     }

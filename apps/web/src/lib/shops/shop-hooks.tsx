@@ -8,11 +8,10 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { ShopService } from './universal-singleton-client';
+import { shopsService } from '@/services/ShopsService';
 
 export function useShopService() {
-  const [service] = useState(() => new ShopService());
-  return service;
+  return shopsService;
 }
 
 export function useShopDirectory(params: {
@@ -39,9 +38,9 @@ export function useShopDirectory(params: {
       setError(null);
       
       const result = await shopService.getShopDirectory(params);
-      if (result.success && result.data) {
-        setShops(result.data);
-        setHasMore(result.data.length >= (params.limit || 10));
+      if (result && Array.isArray(result)) {
+        setShops(result);
+        setHasMore(result.length >= (params.limit || 10));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch shops');
@@ -61,9 +60,9 @@ export function useShopDirectory(params: {
       setLoading(true);
       const newParams = { ...params, offset: shops.length };
       const result = await shopService.getShopDirectory(newParams);
-      if (result.success && result.data) {
-        setShops(prev => [...prev, ...(result.data || [])]);
-        setHasMore((result.data || []).length >= (params.limit || 10));
+      if (result && Array.isArray(result)) {
+        setShops(prev => [...prev, ...result]);
+        setHasMore(result.length >= (params.limit || 10));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load more shops');
@@ -115,8 +114,8 @@ export function useShopSearch() {
       };
       
       const searchResult = await shopService.getShopDirectory(searchParams);
-      if (searchResult.success && searchResult.data) {
-        setResults(searchResult.data);
+      if (searchResult && Array.isArray(searchResult)) {
+        setResults(searchResult);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
@@ -152,8 +151,8 @@ export function useShopCategories() {
 
     try {
       const response = await shopService.getShopCategories();
-      if (response.success && response.data) {
-        setData(response.data);
+      if (response && Array.isArray(response)) {
+        setData(response);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch categories');
@@ -190,8 +189,8 @@ export function useTrendingShops(params: {
 
     try {
       const response = await shopService.getTrendingShops({ limit, region });
-      if (response.success && response.data) {
-        setData(response.data);
+      if (response && Array.isArray(response)) {
+        setData(response);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch trending shops');

@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { use } from 'react';
 import { shopsService, type Shop } from '@/services/ShopsService';
 import RealShopService, { type ShopData as RealShop, type ShopAnalytics as ShopAnalyticsType } from '@/services/RealShopService';
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
@@ -103,30 +102,34 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
       
       // Convert to the expected Shop format for compatibility
       const shops: Shop[] = shop ? [{
-        id: shop.id,
-        tenantId: shop.tenantId,
+        tenantId: shop.tenantId, // Use tenantId as the primary identifier
         name: shop.name,
         slug: shop.slug,
-        description: shop.description,
+        description: shop.description || '',
         bannerUrl: shop.bannerUrl,
-        logoUrl: shop.logoUrl,
-        tagline: shop.description,
-        email: shop.email,
-        phone: shop.phone,
-        website: shop.website,
+        imageUrl: shop.logoUrl, // Map logoUrl to imageUrl
+        autoId: shop.id || shop.tenantId, // Map id to autoId
+        category: shop.categoryId || 'general',
+        location: shop.address ? `${shop.address.line1}, ${shop.address.city}` : '',
         address: shop.address ? `${shop.address.line1}, ${shop.address.city}` : undefined,
-        city: shop.address?.city,
-        state: shop.address?.state,
-        country: shop.address?.countryCode,
-        postalCode: shop.address?.postalCode,
-        isVerified: shop.isVerified,
-        isActive: shop.isActive,
-        rating: shop.rating,
-        reviewCount: shop.reviewCount,
-        productCount: shop.productCount,
-        followerCount: 0,
-        createdAt: new Date(shop.createdAt),
-        updatedAt: new Date(shop.updatedAt)
+        contact: {
+          email: shop.email || '',
+          phone: shop.phone || '',
+          website: shop.website || ''
+        },
+        productCount: 0,
+        rating: 0,
+        reviewCount: 0,
+        isVerified: true,
+        isActive: true,
+        createdAt: shop.createdAt || new Date().toISOString(),
+        updatedAt: shop.updatedAt || new Date().toISOString(),
+        urls: {
+          slugUrl: shop.slug ? `/directory/${shop.slug}` : null,
+          tenantIdUrl: `/directory/${shop.tenantId}`,
+          autoIdUrl: `/directory/${shop.tenantId}`,
+          canonicalUrl: shop.slug ? `/directory/${shop.slug}` : `/directory/${shop.tenantId}`
+        }
       }] : [];
       
       setShops(shops);
@@ -186,13 +189,13 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
 
   const handleShopUpdated = (updatedShop: Shop) => {
     setShops(prev => prev.map(shop => 
-      shop.id === updatedShop.id ? updatedShop : shop
+      shop.tenantId === updatedShop.tenantId ? updatedShop : shop
     ));
     setSelectedShop(updatedShop);
   };
 
   const handleShopDeleted = (shopId: string) => {
-    setShops(prev => prev.filter(shop => shop.id !== shopId));
+    setShops(prev => prev.filter(shop => shop.tenantId !== shopId));
     setSelectedShop(null);
     fetchStats(); // Refresh stats
   };
@@ -226,8 +229,7 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
     useEffect(() => {
       const fetchUrls = async () => {
         try {
-          const client = UniversalSingletonClient.getInstance();
-          const shopUrls = await client.getShopUrls(shop.tenantId, shop.slug);
+          const shopUrls = await shopsService.getShopUrls(shop.tenantId, shop.slug);
           setUrls(shopUrls);
         } catch (error) {
           console.error('Error fetching shop URLs:', error);
@@ -474,11 +476,11 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
                 ) : (
                   <div className="space-y-4">
                     {shops.map((shop) => (
-                      <div key={shop.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div key={shop.tenantId} className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex items-center gap-4">
-                          {shop.logoUrl ? (
+                          {shop.imageUrl ? (
                             <img
-                              src={shop.logoUrl}
+                              src={shop.imageUrl}
                               alt={shop.name}
                               className="w-12 h-12 rounded-lg object-cover"
                             />

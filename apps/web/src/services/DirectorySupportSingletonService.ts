@@ -5,7 +5,7 @@
  * Extends UniversalSingleton for authenticated requests.
  */
 
-import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 export interface DirectoryStatus {
   tenant: {
@@ -50,7 +50,7 @@ export interface DirectoryNote {
   };
 }
 
-class DirectorySupportSingletonService extends UniversalSingleton {
+class DirectorySupportSingletonService extends TenantApiSingleton {
   protected cacheTTL = 5 * 60 * 1000; // 5 minutes for support data
 
   private static instance: DirectorySupportSingletonService;
@@ -75,7 +75,7 @@ class DirectorySupportSingletonService extends UniversalSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makeApiRequest<DirectoryStatus>(
+    const response = await this.makeDefaultRequest<DirectoryStatus>(
       `/support/directory/tenant/${tenantId}/status`,
       {},
       `directory-status-${tenantId}`,
@@ -99,7 +99,7 @@ class DirectorySupportSingletonService extends UniversalSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makeApiRequest<DirectoryQualityCheck>(
+    const response = await this.makeDefaultRequest<DirectoryQualityCheck>(
       `/support/directory/tenant/${tenantId}/quality-check`,
       {},
       `directory-quality-check-${tenantId}`,
@@ -123,7 +123,7 @@ class DirectorySupportSingletonService extends UniversalSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makeApiRequest<DirectoryNote[]>(
+    const response = await this.makeDefaultRequest<DirectoryNote[]>(
       `/support/directory/tenant/${tenantId}/notes`,
       {},
       `directory-notes-${tenantId}`,
@@ -147,7 +147,7 @@ class DirectorySupportSingletonService extends UniversalSingleton {
       throw new Error('Tenant ID and note are required');
     }
 
-    const response = await this.makeApiRequest<DirectoryNote>(
+    const response = await this.makeDefaultRequest<DirectoryNote>(
       `/support/directory/tenant/${tenantId}/notes`,
       {
         method: 'POST',
@@ -181,7 +181,7 @@ class DirectorySupportSingletonService extends UniversalSingleton {
         throw new Error('Query is required');
       }
 
-      const response = await this.makeApiRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/support/directory/search?q=${encodeURIComponent(query)}`,
         {},
         `search-directory-${query}`,

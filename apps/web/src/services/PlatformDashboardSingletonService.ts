@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 import { PlatformDashboardData, PlatformStats, TenantMetrics, PlatformActivity } from './interfaces/PlatformDashboardInterfaces';
 
 class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
@@ -29,7 +29,7 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
    * For authenticated tenant merchants only
    */
   async getPlatformDashboard(): Promise<PlatformDashboardData | null> {
-    const result = await this.makeAuthenticatedRequest<PlatformDashboardData>(
+    const result = await this.makeDefaultRequest<PlatformDashboardData>(
       '/api/platform/dashboard',
       {},
       'platform-dashboard-complete'
@@ -48,7 +48,7 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
    * Uses the /api/platform/stats endpoint
    */
   async getPlatformStats(): Promise<PlatformStats | null> {
-    const result = await this.makeAuthenticatedRequest<PlatformStats>(
+    const result = await this.makeDefaultRequest<PlatformStats>(
       '/api/platform/stats',
       {},
       'platform-stats'
@@ -67,7 +67,7 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
    * Uses the /api/platform/tenants/top endpoint
    */
   async getTopTenants(limit: number = 10): Promise<TenantMetrics[] | null> {
-    const result = await this.makeAuthenticatedRequest<TenantMetrics[]>(
+    const result = await this.makeDefaultRequest<TenantMetrics[]>(
       `/api/platform/tenants/top?limit=${limit}`,
       {},
       `platform-top-tenants-${limit}`
@@ -86,7 +86,7 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
    * Uses the /api/platform/activity endpoint
    */
   async getRecentActivity(limit: number = 20): Promise<PlatformActivity[] | null> {
-    const result = await this.makeAuthenticatedRequest<PlatformActivity[]>(
+    const result = await this.makeDefaultRequest<PlatformActivity[]>(
       `/api/platform/activity?limit=${limit}`,
       {},
       `platform-activity-${limit}`

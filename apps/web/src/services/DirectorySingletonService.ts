@@ -14,7 +14,7 @@
  * - Error handling and logging
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface DirectoryStore {
   id: string;
@@ -137,13 +137,16 @@ class DirectorySingletonService extends PublicApiSingleton {
 
   static getInstance(): DirectorySingletonService {
     if (!DirectorySingletonService.instance) {
-      DirectorySingletonService.instance = new DirectorySingletonService();
+      DirectorySingletonService.instance = new DirectorySingletonService('directory-service');
     }
     return DirectorySingletonService.instance;
   }
 
-  constructor() {
-    super('DirectorySingletonService');
+  constructor(singletonKey: string, cacheOptions?: any) {
+    super(singletonKey, {
+      ttl: 10 * 60 * 1000, // 10 minutes cache
+      ...cacheOptions
+    });
   }
 
   /**

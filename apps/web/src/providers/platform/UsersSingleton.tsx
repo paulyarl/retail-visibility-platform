@@ -5,7 +5,8 @@
  * Extends AuthenticatedApiSingleton for consistent caching and metrics
  */
 
-import { AuthenticatedApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 
 // User Types (matching server-side)
 export interface User {
@@ -88,7 +89,7 @@ export interface UpdateUserRequest {
   metadata?: User['metadata'];
 }
 
-class UsersSingleton extends AuthenticatedApiSingleton {
+class UsersSingleton extends TenantApiSingleton {
   private static instance: UsersSingleton;
 
   constructor() {

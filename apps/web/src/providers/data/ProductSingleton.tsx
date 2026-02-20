@@ -1,7 +1,8 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { CacheManager } from '@/utils/cacheManager';
 import { AutoUserCacheOptions } from '@/utils/userIdentification';
 
@@ -80,7 +81,7 @@ export interface ProductFilters {
 // PRODUCT SINGLETON CLASS
 // ====================
 
-export class ProductSingleton extends UniversalSingleton {
+export class ProductSingleton extends PublicApiSingleton {
   private static instance: ProductSingleton;
   
   // Product state
@@ -140,8 +141,8 @@ export class ProductSingleton extends UniversalSingleton {
         url += `&lat=${location.lat}&lng=${location.lng}&maxDistance=500`;
       }
       
-      // Use makeApiRequest for public endpoint
-      const result = await this.makeApiRequest<{ products: any[] }>(url, {}, cacheKey);
+      // Use makeDefaultRequest for public endpoint
+      const result = await this.makeDefaultRequest<{ products: any[] }>(url, {}, cacheKey);
       
       if (!result.success) {
         console.error('[ProductSingleton] Error fetching featured products:', result.error);
@@ -199,7 +200,7 @@ export class ProductSingleton extends UniversalSingleton {
       
       // Use the correct Public API endpoint
       const url = `/api/public/products${params.toString() ? `?${params.toString()}` : ''}`;
-      const result = await this.makeApiRequest<{ products: any[] }>(url);
+      const result = await this.makeDefaultRequest<{ products: any[] }>(url);
       
       if (!result.success) {
         console.error('[ProductSingleton] Error fetching products:', result.error);
@@ -268,7 +269,7 @@ export class ProductSingleton extends UniversalSingleton {
     try {
       // Use the correct Public API endpoint
       const url = `/api/public/products/${productId}`;
-      const data = await this.makeApiRequest(url);
+      const data = await this.makeDefaultRequest(url);
       const product = (data as any)?.product || (data as any) || null;
       
       // Handle null product case
@@ -329,7 +330,7 @@ export class ProductSingleton extends UniversalSingleton {
     }
     
     try {
-      const data = await this.makeApiRequest('/api/products/categories');
+      const data = await this.makeDefaultRequest('/api/products/categories');
       const categories: ProductCategory[] = Array.isArray(data) ? data : (data as any)?.categories || [];
       
       // Store in cache

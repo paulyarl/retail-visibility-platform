@@ -1,11 +1,11 @@
 /**
  * Categories Singleton Service
  *
- * Extends UniversalSingletonClient to provide cached categories operations
+ * Extends PublicApiSingleton to provide cached categories operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface Category {
   id: string;
@@ -30,8 +30,9 @@ class CategoriesSingletonService extends PublicApiSingleton {
   private static instance: CategoriesSingletonService;
 
   private constructor() {
-    super('categories-singleton');
-    this.cacheTTL = 10 * 60 * 1000; // 10 minutes for categories (moderate change frequency)
+    super('categories-singleton', {
+      ttl: 10 * 60 * 1000 // 10 minutes for categories (moderate change frequency)
+    });
   }
 
   public static getInstance(): CategoriesSingletonService {

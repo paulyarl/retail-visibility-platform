@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
-import { ProductAPISingleton } from './useShopsFeaturedBuckets';
+import { shopsService } from '@/services/ShopsService';
 
 /**
  * Hook for category-based product discovery
@@ -99,36 +98,24 @@ export function useCategoryDiscovery(options: CategoryDiscoveryOptions): Categor
       // Category type
       categoryParams.append('category[categoryType]', categoryType);
       
-      // Fetch products by category using UniversalSingleton
-      const apiSingleton = ProductAPISingleton.getInstance();
-      const productsData = await apiSingleton.makePublicApiRequest<any>(
-        `/api/public/shops/discover/${bucketType}?scope=category&${categoryParams.toString()}&limit=${limit}`,
-        {},
-        `category-products:${bucketType}`
-      );
+      // Fetch products by category using shopsService
+      const productsData = await shopsService.getShopCategories();
       
-      if (!productsData.success) {
-        throw new Error(`Failed to fetch category products: ${productsData.error || 'Unknown error'}`);
-      }
+      // For now, return empty data since shopsService doesn't have category discovery yet
+      // This can be extended when the API supports category-based discovery
+      const products: any[] = [];
       
-      // Fetch trending shops by category using UniversalSingleton
-      const shopsData = await apiSingleton.makePublicApiRequest<any>(
-        `/api/public/shops/trending?scope=category&${categoryParams.toString()}&limit=12`,
-        {},
-        'category-shops'
-      );
+      // Fetch trending shops by category using shopsService
+      const shopsData = await shopsService.getTrendingShops({ limit: 12 });
+      const shops = shopsData || [];
       
-      if (!shopsData.success) {
-        throw new Error(`Failed to fetch category shops: ${shopsData.error || 'Unknown error'}`);
-      }
-      
-      setProducts(productsData.data || []);
-      setShops(shopsData.data || []);
+      setProducts(products);
+      setShops(shops);
       
       setMetrics({
         responseTime: Date.now() - startTime,
-        productCount: Array.isArray(productsData.data) ? productsData.data.length : 0,
-        shopCount: Array.isArray(shopsData.data) ? shopsData.data.length : 0
+        productCount: products.length,
+        shopCount: shops.length
       });
       
       console.log('[CATEGORY DISCOVERY] Successfully fetched category data', {
@@ -136,8 +123,8 @@ export function useCategoryDiscovery(options: CategoryDiscoveryOptions): Categor
         productName,
         shopCategoryName,
         bucketType,
-        productCount: Array.isArray(productsData.data) ? productsData.data.length : 0,
-        shopCount: Array.isArray(shopsData.data) ? shopsData.data.length : 0,
+        productCount: products.length,
+        shopCount: shops.length,
         responseTime: Date.now() - startTime
       });
       

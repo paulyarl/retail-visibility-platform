@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 export interface TenantUsage {
   items: number;
@@ -73,7 +73,7 @@ export interface TenantProfile {
  * Handles authenticated tenant operations with proper caching
  * Used for tenant management, settings, and administrative operations
  */
-class TenantManagementService extends AuthenticatedApiSingleton {
+class TenantManagementService extends TenantApiSingleton {
   private static instance: TenantManagementService;
 
   // Different TTL for different management operations
@@ -94,12 +94,12 @@ class TenantManagementService extends AuthenticatedApiSingleton {
   }
 
   /**
-   * Get current user's tenant information
+   * Get current user's tenant profile
    * Uses the /api/tenant endpoint (authenticated)
    */
-  async getCurrentTenant(): Promise<TenantProfile | null> {
+  async getCurrentTenantProfile(): Promise<TenantProfile | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<TenantProfile>(
+      const response = await this.makeDefaultRequest<TenantProfile>(
         '/api/tenant',
         {},
         'current-tenant',
@@ -108,9 +108,17 @@ class TenantManagementService extends AuthenticatedApiSingleton {
 
       return response.data || null;
     } catch (error) {
-      console.error('[TenantManagementService] Failed to get current tenant:', error);
+      console.error('[TenantManagementService] Failed to get current tenant profile:', error);
       return null;
     }
+  }
+
+  /**
+   * Get current tenant ID (base class method)
+   * Uses the base class implementation for compatibility
+   */
+  getCurrentTenant(): string | undefined {
+    return super.getCurrentTenant();
   }
 
   /**
@@ -119,7 +127,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
    */
   async getTenantProfile(): Promise<TenantProfile | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<TenantProfile>(
+      const response = await this.makeDefaultRequest<TenantProfile>(
         '/api/tenant/profile',
         {},
         'tenant-profile',
@@ -139,7 +147,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
    */
   async updateTenantProfile(profileData: Partial<TenantProfile>): Promise<TenantProfile | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<TenantProfile>(
+      const response = await this.makeDefaultRequest<TenantProfile>(
         '/api/tenant/profile',
         {
           method: 'PATCH',
@@ -167,7 +175,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
       const endpoint = tenantId ? `/api/tenants/${tenantId}/usage` : '/api/tenant-limits/status';
       const cacheKey = tenantId ? `tenant-usage-${tenantId}` : 'current-tenant-usage';
 
-      const response = await this.makeAuthenticatedRequest<TenantUsage>(
+      const response = await this.makeDefaultRequest<TenantUsage>(
         endpoint,
         {},
         cacheKey,
@@ -187,7 +195,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
    */
   async getTenantLimits(): Promise<TenantLimits | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<TenantLimits>(
+      const response = await this.makeDefaultRequest<TenantLimits>(
         '/api/tenant-limits/status',
         {},
         'tenant-limits',
@@ -207,7 +215,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
    */
   async getTenantBanner(tenantId: string): Promise<string | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<{ banner: string }>(
+      const response = await this.makeDefaultRequest<{ banner: string }>(
         `/api/tenants/${tenantId}/banner`,
         {},
         `tenant-banner-${tenantId}`,
@@ -227,7 +235,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
    */
   async updateTenantBanner(tenantId: string, bannerUrl: string): Promise<boolean> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/tenants/${tenantId}/banner`,
         {
           method: 'PUT',
@@ -249,7 +257,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
    */
   async getTenantLogo(tenantId: string): Promise<string | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<{ logo: string }>(
+      const response = await this.makeDefaultRequest<{ logo: string }>(
         `/api/tenants/${tenantId}/logo`,
         {},
         `tenant-logo-${tenantId}`,
@@ -269,7 +277,7 @@ class TenantManagementService extends AuthenticatedApiSingleton {
    */
   async updateTenantLogo(tenantId: string, logoUrl: string): Promise<boolean> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/tenants/${tenantId}/logo`,
         {
           method: 'PUT',

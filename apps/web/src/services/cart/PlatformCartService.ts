@@ -4,7 +4,7 @@
  * Uses PublicApiSingleton for automatic caching and API integration
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { CartItem, ShopCart, PlatformCart } from '@/types/cart';
 
 export interface ShopCartService {

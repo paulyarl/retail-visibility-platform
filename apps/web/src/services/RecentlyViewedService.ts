@@ -5,7 +5,7 @@
  * Extends PublicApiSingleton for consistent caching and metrics
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 // Recently Viewed Data Interfaces
 export interface RecentlyViewedItem {
@@ -96,7 +96,7 @@ class RecentlyViewedService extends PublicApiSingleton {
 
     try {
       // Send to API
-      await this.makePublicRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/api/user/recently-viewed',
         {
           method: 'POST',
@@ -131,7 +131,7 @@ class RecentlyViewedService extends PublicApiSingleton {
     const duration = Math.floor((Date.now() - new Date(this.currentViewStart).getTime()) / 1000);
 
     try {
-      await this.makePublicRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/user/recently-viewed/${this.currentItemId}/duration`,
         {
           method: 'PUT',
@@ -173,7 +173,7 @@ class RecentlyViewedService extends PublicApiSingleton {
       const queryString = params.toString();
       const endpoint = `/api/user/recently-viewed${queryString ? `?${queryString}` : ''}`;
 
-      const items = await this.makePublicRequest<RecentlyViewedItem[]>(
+      const items = await this.makeDefaultRequest<RecentlyViewedItem[]>(
         endpoint,
         {},
         cacheKey,
@@ -195,7 +195,7 @@ class RecentlyViewedService extends PublicApiSingleton {
       const params = new URLSearchParams();
       if (userId) params.append('userId', userId);
 
-      await this.makePublicRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/user/recently-viewed/${itemId}${params ? `?${params}` : ''}`,
         { method: 'DELETE' },
         `remove-item-${itemId}-${userId || 'anonymous'}`,
@@ -216,7 +216,7 @@ class RecentlyViewedService extends PublicApiSingleton {
       const params = new URLSearchParams();
       if (userId) params.append('userId', userId);
 
-      await this.makePublicRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/user/recently-viewed${params ? `?${params}` : ''}`,
         { method: 'DELETE' },
         `clear-recently-viewed-${userId || 'anonymous'}`,
@@ -243,7 +243,7 @@ class RecentlyViewedService extends PublicApiSingleton {
       const queryString = params.toString();
       const endpoint = `/api/user/recently-viewed/stats?${queryString}`;
 
-      const stats = await this.makePublicRequest<RecentlyViewedStats>(
+      const stats = await this.makeDefaultRequest<RecentlyViewedStats>(
         endpoint,
         {},
         cacheKey,
@@ -285,7 +285,7 @@ class RecentlyViewedService extends PublicApiSingleton {
       const queryString = params.toString();
       const endpoint = `/api/user/recently-viewed/trends?${queryString}`;
 
-      const trends = await this.makePublicRequest<Array<{ date: string; views: number }>>(
+      const trends = await this.makeDefaultRequest<Array<{ date: string; views: number }>>(
         endpoint,
         {},
         cacheKey,
@@ -313,7 +313,7 @@ class RecentlyViewedService extends PublicApiSingleton {
       const queryString = params.toString();
       const endpoint = `/api/user/recently-viewed/recommendations?${queryString}`;
 
-      const recommendations = await this.makePublicRequest<RecentlyViewedItem[]>(
+      const recommendations = await this.makeDefaultRequest<RecentlyViewedItem[]>(
         endpoint,
         {},
         cacheKey,
@@ -334,7 +334,7 @@ class RecentlyViewedService extends PublicApiSingleton {
     const cacheKey = `similar-items-${itemId}-${limit}`;
 
     try {
-      const similarItems = await this.makePublicRequest<RecentlyViewedItem[]>(
+      const similarItems = await this.makeDefaultRequest<RecentlyViewedItem[]>(
         `/api/user/recently-viewed/${itemId}/similar?limit=${limit}`,
         {},
         cacheKey,

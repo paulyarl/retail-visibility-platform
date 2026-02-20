@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 
 export interface Tenant {
@@ -511,7 +511,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
    * Get all tenants for the current user
    */
   async getTenants(): Promise<Tenant[] | null> {
-    const result = await this.makeAuthenticatedRequest<Tenant[]>(
+    const result = await this.makeDefaultRequest<Tenant[]>(
       '/api/tenants',
       {},
       'platform-tenants',
@@ -530,7 +530,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
    * Get all organizations
    */
   async getOrganizations(): Promise<Organization[] | null> {
-    const result = await this.makeAuthenticatedRequest<Organization[]>(
+    const result = await this.makeDefaultRequest<Organization[]>(
       '/api/organizations',
       {},
       'platform-organizations',
@@ -553,7 +553,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<PendingRequest>(
+    const result = await this.makeDefaultRequest<PendingRequest>(
       `/api/organization-requests?tenantId=${tenantId}&status=pending`,
       {},
       `platform-pending-request-${tenantId}`,
@@ -576,7 +576,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<Tenant>(
+    const result = await this.makeDefaultRequest<Tenant>(
       `/api/tenants/${tenantId}`,
       {},
       `platform-tenant-${tenantId}`,
@@ -599,7 +599,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<BusinessProfile>(
+    const result = await this.makeDefaultRequest<BusinessProfile>(
       `/api/tenant/profile?tenant_id=${encodeURIComponent(tenantId)}`,
       {},
       `platform-tenant-profile-${tenantId}`,
@@ -622,7 +622,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<BusinessProfile>(
+    const result = await this.makeDefaultRequest<BusinessProfile>(
       '/api/tenant/profile',
       { 
         method: 'PATCH',
@@ -655,7 +655,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
     state?: string;
     country_code?: string;
   }): Promise<Tenant | null> {
-    const result = await this.makeAuthenticatedRequest<Tenant>(
+    const result = await this.makeDefaultRequest<Tenant>(
       '/api/tenants',
       { 
         method: 'POST',
@@ -689,7 +689,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<Tenant>(
+    const result = await this.makeDefaultRequest<Tenant>(
       `/api/tenants/${tenantId}`,
       { 
         method: 'PUT',
@@ -724,7 +724,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/tenants/${tenantId}`,
       { method: 'DELETE' },
       `platform-delete-tenant-${tenantId}`
@@ -749,7 +749,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
    * Get admin tier tenants
    */
   async getAdminTierTenants(): Promise<Tenant[] | null> {
-    const result = await this.makeAuthenticatedRequest<{ tenants: Tenant[] }>(
+    const result = await this.makeDefaultRequest<{ tenants: Tenant[] }>(
       '/api/admin/tiers/tenants',
       {},
       'platform-admin-tier-tenants',
@@ -776,7 +776,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<Tenant>(
+    const result = await this.makeDefaultRequest<Tenant>(
       `/api/admin/tiers/tenants/${tenantId}`,
       { 
         method: 'PATCH',
@@ -809,7 +809,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID and Product ID are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/tenants/${tenantId}/products/${productId}/feature/priority`,
       { 
         method: 'PATCH',
@@ -831,7 +831,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
    * Get platform categories
    */
   async getPlatformCategories(): Promise<PlatformCategory[] | null> {
-    const result = await this.makeAuthenticatedRequest<{ data: { categories: PlatformCategory[] } }>(
+    const result = await this.makeDefaultRequest<{ data: { categories: PlatformCategory[] } }>(
       '/api/admin/platform-categories',
       {},
       'platform-platform-categories',
@@ -850,7 +850,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
    * Create platform category
    */
   async createPlatformCategory(categoryData: Partial<PlatformCategory>): Promise<PlatformCategory | null> {
-    const result = await this.makeAuthenticatedRequest<PlatformCategory>(
+    const result = await this.makeDefaultRequest<PlatformCategory>(
       '/api/admin/platform-categories',
       { 
         method: 'POST',
@@ -878,7 +878,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Category ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<PlatformCategory>(
+    const result = await this.makeDefaultRequest<PlatformCategory>(
       `/api/admin/platform-categories/${categoryId}`,
       { 
         method: 'PATCH',
@@ -906,7 +906,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Category ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/admin/platform-categories/${categoryId}`,
       { method: 'DELETE' },
       `platform-delete-platform-category-${categoryId}`
@@ -925,7 +925,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
    * Reorder platform categories
    */
   async reorderPlatformCategories(categoryIds: string[]): Promise<void> {
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       '/api/admin/platform-categories/reorder',
       { 
         method: 'POST',
@@ -947,7 +947,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
    * Bulk import platform categories
    */
   async bulkImportPlatformCategories(source: string): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       '/api/platform/categories/bulk-import',
       { 
         method: 'POST',
@@ -976,7 +976,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
     googleCategoryId: string;
   }): Promise<any> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         '/api/platform/categories',
         { 
           method: 'POST',
@@ -999,7 +999,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
    * Get tier system tiers
    */
   async getTierSystemTiers(): Promise<Tier[] | null> {
-    const result = await this.makeAuthenticatedRequest<{ individual: any[], organization: any[] }>(
+    const result = await this.makeDefaultRequest<{ individual: any[], organization: any[] }>(
       '/api/admin/tiers/tiers',
       {},
       'platform-tier-system-tiers',
@@ -1043,7 +1043,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tier ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<Tier>(
+    const result = await this.makeDefaultRequest<Tier>(
       `/api/admin/tier-system/tiers/${tierId}`,
       { 
         method: 'PATCH',
@@ -1071,7 +1071,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tier ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<Tier>(
+    const result = await this.makeDefaultRequest<Tier>(
       `/api/admin/tier-system/tiers/${tierId}`,
       { 
         method: 'PUT',
@@ -1099,7 +1099,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tier ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/admin/tier-system/tiers/${tierId}/sort-order`,
       { 
         method: 'PATCH',
@@ -1121,7 +1121,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
    * Create tier
    */
   async createTier(tierData: Omit<Tier, 'id' | 'createdAt' | 'updatedAt'>): Promise<Tier | null> {
-    const result = await this.makeAuthenticatedRequest<Tier>(
+    const result = await this.makeDefaultRequest<Tier>(
       '/api/admin/tier-system/tiers',
       { 
         method: 'POST',
@@ -1154,7 +1154,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tier ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/admin/tier-system/tiers/${tierId}`,
       { method: 'DELETE' },
       `platform-delete-tier-${tierId}`
@@ -1173,7 +1173,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
    * Get admin directory stats
    */
   async getAdminDirectoryStats(): Promise<DirectoryStats | null> {
-    const result = await this.makeAuthenticatedRequest<DirectoryStats>(
+    const result = await this.makeDefaultRequest<DirectoryStats>(
       '/api/admin/directory/stats',
       {},
       'platform-admin-directory-stats',
@@ -1208,7 +1208,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
     if (filters.page) params.append('page', filters.page.toString());
     if (filters.limit) params.append('limit', filters.limit.toString());
 
-    const result = await this.makeAuthenticatedRequest<{
+    const result = await this.makeDefaultRequest<{
       listings: AdminDirectoryListing[];
       pagination: {
         page: number;
@@ -1240,7 +1240,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/admin/directory/feature/${tenantId}`,
         { 
           method: 'POST',
@@ -1270,7 +1270,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/admin/directory/unfeature/${tenantId}`,
         { method: 'DELETE' },
         `platform-unfeature-directory-listing-${tenantId}`
@@ -1289,7 +1289,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
    * Get admin enrichment analytics
    */
   async getAdminEnrichmentAnalytics(): Promise<Analytics | null> {
-    const result = await this.makeAuthenticatedRequest<Analytics>(
+    const result = await this.makeDefaultRequest<Analytics>(
       `/api/admin/enrichment/analytics?_t=${Date.now()}`,
       {},
       'platform-admin-enrichment-analytics',
@@ -1318,7 +1318,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       if (params.source) searchParams.append('source', params.source);
       if (params.limit) searchParams.append('limit', params.limit.toString());
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/admin/enrichment/search?${searchParams}`,
         {},
         'platform-admin-enrichment-search',
@@ -1341,7 +1341,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Barcode is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/admin/enrichment/${barcode}`,
         {},
         `platform-admin-enrichment-product-${barcode}`,
@@ -1359,7 +1359,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
    * Get admin subdomain stats
    */
   async getAdminSubdomainStats(): Promise<SubdomainStats | null> {
-    const result = await this.makeAuthenticatedRequest<{ data: SubdomainStats }>(
+    const result = await this.makeDefaultRequest<{ data: SubdomainStats }>(
       '/api/analytics/subdomain-stats',
       {},
       'platform-admin-subdomain-stats',
@@ -1403,7 +1403,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/tenant/${encodeURIComponent(tenantId)}/logo`,
         { 
           method: 'POST',
@@ -1436,7 +1436,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/tenant/${encodeURIComponent(tenantId)}/banner`,
         { 
           method: 'POST',
@@ -1467,7 +1467,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<Tenant>(
+    const result = await this.makeDefaultRequest<Tenant>(
       `/api/tenants/${encodeURIComponent(tenantId)}`,
       { 
         method: 'PUT',
@@ -1501,7 +1501,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/tenant/profile`,
         { 
           method: 'PATCH',
@@ -1532,7 +1532,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<FulfillmentSettings>(
+    const result = await this.makeDefaultRequest<FulfillmentSettings>(
       `/api/tenants/${tenantId}/fulfillment-settings`,
       {},
       `platform-tenant-fulfillment-settings-${tenantId}`,
@@ -1555,7 +1555,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<FulfillmentSettings>(
+    const result = await this.makeDefaultRequest<FulfillmentSettings>(
       `/api/tenants/${tenantId}/fulfillment-settings`,
       { 
         method: 'PUT',
@@ -1584,7 +1584,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/dashboard/consolidated/${encodeURIComponent(tenantId)}`,
         {},
         `platform-dashboard-consolidated-${tenantId}`,
@@ -1607,7 +1607,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/feed-jobs/setup-status/${tenantId}`,
         {},
         `platform-google-feed-jobs-setup-${tenantId}`,
@@ -1630,7 +1630,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/status?tenantId=${tenantId}`,
         {},
         `platform-google-gbp-status-${tenantId}`,
@@ -1653,7 +1653,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/oauth/merchants?tenantId=${tenantId}`,
         {},
         `platform-google-oauth-merchants-${tenantId}`,
@@ -1676,7 +1676,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/oauth/link-merchant`,
         { 
           method: 'POST',
@@ -1701,7 +1701,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/oauth/disconnect`,
         { 
           method: 'POST',
@@ -1726,7 +1726,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/disconnect`,
         { 
           method: 'POST',
@@ -1751,7 +1751,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/media?tenantId=${tenantId}`,
         {},
         `platform-google-business-media-${tenantId}`,
@@ -1774,7 +1774,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/posts?tenantId=${tenantId}`,
         {},
         `platform-google-business-posts-${tenantId}`,
@@ -1797,7 +1797,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/reviews?tenantId=${tenantId}`,
         {},
         `platform-google-business-reviews-${tenantId}`,
@@ -1820,7 +1820,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/attributes?tenantId=${tenantId}`,
         {},
         `platform-google-business-attributes-${tenantId}`,
@@ -1843,7 +1843,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/media`,
         { 
           method: 'POST',
@@ -1868,7 +1868,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/posts`,
         { 
           method: 'POST',
@@ -1893,7 +1893,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/reviews/${encodeURIComponent(reviewName)}/reply`,
         { 
           method: 'POST',
@@ -1918,7 +1918,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/attributes/common`,
         { 
           method: 'POST',
@@ -1943,7 +1943,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/linked-location?tenantId=${tenantId}`,
         {},
         `platform-google-business-linked-location-${tenantId}`,
@@ -1966,7 +1966,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/locations?tenantId=${tenantId}`,
         {},
         `platform-google-business-locations-${tenantId}`,
@@ -1989,7 +1989,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/link-location`,
         { 
           method: 'POST',
@@ -2014,7 +2014,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/sync`,
         { 
           method: 'POST',
@@ -2039,7 +2039,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/business/compare?tenantId=${tenantId}`,
         {},
         `platform-google-business-comparison-${tenantId}`,
@@ -2062,7 +2062,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/merchant/sync-status?tenantId=${tenantId}`,
         {},
         `platform-google-merchant-sync-status-${tenantId}`,
@@ -2085,7 +2085,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/merchant/settings`,
         { 
           method: 'PATCH',
@@ -2110,7 +2110,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/google/merchant/sync`,
         { 
           method: 'POST',
@@ -2134,7 +2134,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<SquareStatus>(
+    const result = await this.makeDefaultRequest<SquareStatus>(
       `/api/integrations/${tenantId}/square/status`,
       {},
       `platform-square-status-${tenantId}`,
@@ -2157,7 +2157,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/square/oauth/authorize`,
       {},
       `platform-square-oauth-authorize-${tenantId}`,
@@ -2180,7 +2180,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/square/disconnect`,
       { 
         method: 'POST',
@@ -2205,7 +2205,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/square/sync`,
       { 
         method: 'POST',
@@ -2258,7 +2258,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       '/api/tenant/profile',
       { 
         method: 'POST',
@@ -2304,7 +2304,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/v1/tenants/${encodeURIComponent(tenantId)}/categories/complete`,
         {},
         `platform-categories-complete-${tenantId}`,
@@ -2326,7 +2326,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/tier`,
       {},
       `platform-tenant-tier-${tenantId}`,
@@ -2345,7 +2345,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
    * Get Sentry configuration
    */
   async getSentryConfig(): Promise<SentryConfig | null> {
-    const result = await this.makeAuthenticatedRequest<SentryConfig>(
+    const result = await this.makeDefaultRequest<SentryConfig>(
       '/api/admin/sentry/config',
       {},
       'platform-sentry-config',
@@ -2369,7 +2369,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
     }
 
     const statusParam = status ? `&status=${status}` : '';
-    const result = await this.makeAuthenticatedRequest<UpgradeRequestsResponse>(
+    const result = await this.makeDefaultRequest<UpgradeRequestsResponse>(
       `/api/upgrade-requests?tenantId=${tenantId}${statusParam}`,
       {},
       `platform-upgrade-requests-${tenantId}-${status || 'all'}`,
@@ -2394,7 +2394,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
     requestedTier: string;
     notes?: string;
   }): Promise<UpgradeRequest | null> {
-    const result = await this.makeAuthenticatedRequest<UpgradeRequest>(
+    const result = await this.makeDefaultRequest<UpgradeRequest>(
       '/api/upgrade-requests',
       { 
         method: 'POST',
@@ -2423,7 +2423,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Organization ID and Tenant ID are required');
       }
 
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/organizations/${organizationId}/tenants`,
         { 
           method: 'POST',
@@ -2450,7 +2450,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Organization ID and Tenant ID are required');
       }
 
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/organizations/${organizationId}/tenants/${tenantId}`,
         { method: 'DELETE' },
         `org-remove-${organizationId}-${tenantId}`
@@ -2475,7 +2475,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
     notes?: string;
     requestType?: string;
   }): Promise<PendingRequest | null> {
-    const result = await this.makeAuthenticatedRequest<PendingRequest>(
+    const result = await this.makeDefaultRequest<PendingRequest>(
       '/api/organization-requests',
       { 
         method: 'POST',
@@ -2504,7 +2504,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Request ID is required');
       }
 
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/organization-requests/${requestId}`,
         { method: 'DELETE' },
         `platform-delete-pending-request-${requestId}`
@@ -2526,7 +2526,7 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Request ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<PendingRequest>(
+    const result = await this.makeDefaultRequest<PendingRequest>(
       `/api/organization-requests/${requestId}`,
       {
         method: 'PATCH',

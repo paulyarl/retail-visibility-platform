@@ -5,7 +5,7 @@
  * Follows single responsibility principle - only admin review management
  */
 
-import { AdminApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 
 // Admin-specific interfaces
 export interface AdminReview {

@@ -104,39 +104,39 @@ const fontFamilies = [
 export default function ShopBrandingCustomizer({ shop, onUpdate, onCancel }: ShopBrandingCustomizerProps) {
   const [activeTab, setActiveTab] = useState('visual');
   const [branding, setBranding] = useState<BrandingData>({
-    logoUrl: shop.logoUrl || '',
+    logoUrl: shop.imageUrl || '',
     bannerUrl: shop.bannerUrl || '',
     primaryColor: '#0EA5E9',
     secondaryColor: '#0284C7',
     accentColor: '#0369A1',
     fontFamily: 'Inter, sans-serif',
-    tagline: shop.tagline || '',
+    tagline: shop.description || '', // Use description as tagline fallback
     description: shop.description || '',
     socialLinks: {
-      facebook: shop.facebook || '',
-      instagram: shop.instagram || '',
-      twitter: shop.twitter || '',
-      linkedin: shop.linkedin || '',
-      youtube: shop.youtube || '',
+      facebook: '', // Social links not available in current Shop interface
+      instagram: '',
+      twitter: '',
+      linkedin: '',
+      youtube: '',
     },
     contactInfo: {
-      email: shop.email || '',
-      phone: shop.phone || '',
-      website: shop.website || '',
+      email: shop.contact?.email || '',
+      phone: shop.contact?.phone || '',
+      website: shop.contact?.website || '',
       address: shop.address || '',
-      city: shop.city || '',
-      state: shop.state || '',
-      country: shop.country || '',
-      postalCode: shop.postalCode || '',
+      city: shop.location?.split(',')[1] || '', // Extract city from location
+      state: '',
+      country: '',
+      postalCode: '',
     },
     businessHours: {
-      monday: shop.monday || '9:00 AM - 6:00 PM',
-      tuesday: shop.tuesday || '9:00 AM - 6:00 PM',
-      wednesday: shop.wednesday || '9:00 AM - 6:00 PM',
-      thursday: shop.thursday || '9:00 AM - 6:00 PM',
-      friday: shop.friday || '9:00 AM - 6:00 PM',
-      saturday: shop.saturday || '10:00 AM - 4:00 PM',
-      sunday: shop.sunday || 'Closed',
+      monday: '9:00 AM - 6:00 PM',
+      tuesday: '9:00 AM - 6:00 PM',
+      wednesday: '9:00 AM - 6:00 PM',
+      thursday: '9:00 AM - 6:00 PM',
+      friday: '9:00 AM - 6:00 PM',
+      saturday: '10:00 AM - 4:00 PM',
+      sunday: 'Closed',
     },
   });
 
@@ -151,7 +151,7 @@ export default function ShopBrandingCustomizer({ shop, onUpdate, onCancel }: Sho
       const updatedShop: Shop = {
         ...shop,
         ...branding,
-        updatedAt: new Date()
+        updatedAt: new Date().toISOString()
       };
       onUpdate(updatedShop);
     } catch (error) {
@@ -196,39 +196,39 @@ export default function ShopBrandingCustomizer({ shop, onUpdate, onCancel }: Sho
 
   const resetToDefaults = () => {
     setBranding({
-      logoUrl: shop.logoUrl || '',
+      logoUrl: shop.imageUrl || '',
       bannerUrl: shop.bannerUrl || '',
       primaryColor: '#0EA5E9',
       secondaryColor: '#0284C7',
       accentColor: '#0369A1',
       fontFamily: 'Inter, sans-serif',
-      tagline: shop.tagline || '',
+      tagline: shop.description || '',
       description: shop.description || '',
       socialLinks: {
-        facebook: shop.facebook || '',
-        instagram: shop.instagram || '',
-        twitter: shop.twitter || '',
-        linkedin: shop.linkedin || '',
-        youtube: shop.youtube || '',
+        facebook: '',
+        instagram: '',
+        twitter: '',
+        linkedin: '',
+        youtube: '',
       },
       contactInfo: {
-        email: shop.email || '',
-        phone: shop.phone || '',
-        website: shop.website || '',
+        email: shop.contact?.email || '',
+        phone: shop.contact?.phone || '',
+        website: shop.contact?.website || '',
         address: shop.address || '',
-        city: shop.city || '',
-        state: shop.state || '',
-        country: shop.country || '',
-        postalCode: shop.postalCode || '',
+        city: shop.location?.split(',')[1] || '',
+        state: '',
+        country: '',
+        postalCode: '',
       },
       businessHours: {
-        monday: shop.monday || '9:00 AM - 6:00 PM',
-        tuesday: shop.tuesday || '9:00 AM - 6:00 PM',
-        wednesday: shop.wednesday || '9:00 AM - 6:00 PM',
-        thursday: shop.thursday || '9:00 AM - 6:00 PM',
-        friday: shop.friday || '9:00 AM - 6:00 PM',
-        saturday: shop.saturday || '10:00 AM - 4:00 PM',
-        sunday: shop.sunday || 'Closed',
+        monday: '9:00 AM - 6:00 PM',
+        tuesday: '9:00 AM - 6:00 PM',
+        wednesday: '9:00 AM - 6:00 PM',
+        thursday: '9:00 AM - 6:00 PM',
+        friday: '9:00 AM - 6:00 PM',
+        saturday: '10:00 AM - 4:00 PM',
+        sunday: 'Closed',
       },
     });
   };

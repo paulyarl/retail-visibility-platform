@@ -5,7 +5,7 @@
  * Extends PublicApiSingleton for consistent caching and metrics
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface PlatformStats {
   totalTenants: number;

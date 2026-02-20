@@ -1,12 +1,11 @@
 /**
  * Reviews Singleton Service
  * 
- * Extends UniversalSingletonClient to provide cached reviews operations
+ * Extends PublicApiSingleton to provide cached reviews operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
-import { AuthenticatedApiSingleton } from '../providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface ReviewSummary {
   rating_avg: number;
@@ -47,8 +46,9 @@ class ReviewsSingletonService extends PublicApiSingleton {
   private static instance: ReviewsSingletonService;
 
   private constructor() {
-    super('reviews-singleton');
-    this.cacheTTL = 5 * 60 * 1000; // 5 minutes for reviews data
+    super('reviews-singleton', {
+      ttl: 5 * 60 * 1000 // 5 minutes for reviews data
+    });
   }
 
   public static getInstance(): ReviewsSingletonService {
@@ -301,8 +301,8 @@ class ReviewsSingletonService extends PublicApiSingleton {
       );
 
       // Invalidate related caches
-      this.cache.delete(`rating-summary-${tenantId}`);
-      this.cache.delete(`reviews-${tenantId}`);
+      await this.invalidateCache(`rating-summary-${tenantId}`);
+      await this.invalidateCache(`reviews-${tenantId}`);
 
       return result?.success || false;
     } catch (error) {
@@ -333,8 +333,8 @@ class ReviewsSingletonService extends PublicApiSingleton {
       );
 
       // Invalidate related caches
-      this.cache.delete(`rating-summary-${tenantId}`);
-      this.cache.delete(`reviews-${tenantId}`);
+      await this.invalidateCache(`rating-summary-${tenantId}`);
+      await this.invalidateCache(`reviews-${tenantId}`);
 
       return result?.success || false;
     } catch (error) {

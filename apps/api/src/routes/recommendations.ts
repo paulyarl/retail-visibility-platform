@@ -38,9 +38,9 @@ router.post('/track-batch', async (req: Request, res: Response) => {
     let failureCount = 0;
 
     // Log batch metadata for analytics dashboard
-    if (batchMetadata) {
+   /*  if (batchMetadata) {
       console.log(`[TrackBatch] Processing batch - Size: ${batchMetadata.batchSize}, Priorities: ${JSON.stringify(batchMetadata.priorityBreakdown)}, Compression: ${batchMetadata.compressionUsed}`);
-    }
+    } */
 
     // Process each event in the batch
     for (const event of events) {
@@ -102,7 +102,7 @@ router.post('/track-batch', async (req: Request, res: Response) => {
       }
     }
 
-    console.log(`[TrackBatch] Processed ${events.length} events: ${successCount} successful, ${failureCount} failed`);
+    //console.log(`[TrackBatch] Processed ${events.length} events: ${successCount} successful, ${failureCount} failed`);
 
     // Include analytics metadata in response for dashboard adjustments
     const responseData = {

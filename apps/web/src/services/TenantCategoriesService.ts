@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { googleTaxonomyPublicService, type GoogleTaxonomyPath } from './GoogleTaxonomyPublicService';
 
 export interface Category {
@@ -32,7 +32,7 @@ export interface CategoryFormData {
  * Tenant Categories Singleton Service
  * Handles all tenant category operations with proper authentication and caching
  */
-class TenantCategoriesService extends AuthenticatedApiSingleton {
+class TenantCategoriesService extends TenantApiSingleton {
   private static instance: TenantCategoriesService;
 
   // Different TTL for different category operations
@@ -57,7 +57,7 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
    */
   async getTenantCategories(tenantId: string): Promise<Category[]> {
     try {
-      const response = await this.makeAuthenticatedRequest<{ data: Category[] }>(
+      const response = await this.makeDefaultRequest<{ data: Category[] }>(
         `/api/v1/tenants/${tenantId}/categories`,
         {},
         `tenant-categories-${tenantId}`,
@@ -77,7 +77,7 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
    */
   async getAlignmentStatus(tenantId: string): Promise<AlignmentStatus | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<{ data: AlignmentStatus }>(
+      const response = await this.makeDefaultRequest<{ data: AlignmentStatus }>(
         `/api/v1/tenants/${tenantId}/categories-alignment-status`,
         {},
         `alignment-status-${tenantId}`,
@@ -97,7 +97,7 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
    */
   async createCategory(tenantId: string, data: CategoryFormData): Promise<Category | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<Category>(
+      const response = await this.makeDefaultRequest<Category>(
         `/api/v1/tenants/${tenantId}/categories`,
         {
           method: 'POST',
@@ -126,7 +126,7 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
    */
   async updateCategory(tenantId: string, categoryId: string, data: Partial<CategoryFormData>): Promise<Category | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<Category>(
+      const response = await this.makeDefaultRequest<Category>(
         `/api/v1/tenants/${tenantId}/categories/${categoryId}`,
         {
           method: 'PUT',
@@ -154,7 +154,7 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
    */
   async deleteCategory(tenantId: string, categoryId: string): Promise<boolean> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/v1/tenants/${tenantId}/categories/${categoryId}`,
         {
           method: 'DELETE',
@@ -178,7 +178,7 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
    */
   async alignCategory(tenantId: string, categoryId: string, googleCategoryId: string): Promise<boolean> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/v1/tenants/${tenantId}/categories/${categoryId}/align`,
         {
           method: 'POST',
@@ -233,7 +233,7 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
    */
   async quickStartCategories(tenantId: string, businessType: string, categoryCount: number): Promise<Category[]> {
     try {
-      const response = await this.makeAuthenticatedRequest<{ data: Category[] }>(
+      const response = await this.makeDefaultRequest<{ data: Category[] }>(
         `/api/v1/tenants/${tenantId}/categories/quick-start`,
         {
           method: 'POST',
@@ -259,7 +259,7 @@ class TenantCategoriesService extends AuthenticatedApiSingleton {
    */
   async propagateCategories(heroTenantId: string, mode: string = 'all'): Promise<boolean> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/v1/tenants/${heroTenantId}/categories/propagate`,
         {
           method: 'POST',

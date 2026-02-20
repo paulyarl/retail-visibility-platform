@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 
 interface SquareIntegrationData {
   enabled: boolean;
@@ -50,7 +50,7 @@ class SquareIntegrationSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<SquareIntegrationData>(
+      const result = await this.makeDefaultRequest<SquareIntegrationData>(
         `/api/integrations/${tenantId}/square/status`,
         {},
         `square-status-${tenantId}`
@@ -76,7 +76,7 @@ class SquareIntegrationSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<SquareOAuthData>(
+      const result = await this.makeDefaultRequest<SquareOAuthData>(
         `/api/integrations/${tenantId}/square/oauth/authorize`,
         {},
         `square-oauth-${tenantId}`
@@ -102,7 +102,7 @@ class SquareIntegrationSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/integrations/${tenantId}/square/disconnect`,
         { method: 'POST' },
         `square-disconnect-${tenantId}`
@@ -125,7 +125,7 @@ class SquareIntegrationSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/integrations/${tenantId}/square/sync`,
         { method: 'POST' },
         `square-sync-${tenantId}`

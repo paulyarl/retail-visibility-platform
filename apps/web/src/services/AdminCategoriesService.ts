@@ -5,7 +5,7 @@
  * Extends AdminApiSingleton for admin privilege validation and caching
  */
 
-import { AdminApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 import { googleTaxonomyPublicService, type GoogleTaxonomyPath } from './GoogleTaxonomyPublicService';
 
 export interface AdminCategory {

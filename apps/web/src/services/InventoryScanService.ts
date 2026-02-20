@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '../providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 
 export interface ScanSession {
   id: string;
@@ -29,7 +29,7 @@ export interface ScanResult {
  * Service for managing inventory scan sessions and results
  * Handles inventory scanning operations and data analysis
  */
-export class InventoryScanService extends AuthenticatedApiSingleton {
+export class InventoryScanService extends TenantApiSingleton {
   private static instance: InventoryScanService;
 
   private constructor() {

@@ -231,7 +231,7 @@ export default function CategoriesPage() {
         setAlignmentStatus(alignmentStatus)
 
         // Get tenant info using TenantManagementService
-        const tenantData = await tenantManagementService.getCurrentTenant()
+        const tenantData = await tenantManagementService.getCurrentTenantProfile()
         if (tenantData) {
           const metadata = tenantData.metadata || {}
           const isHero = metadata.isHeroLocation === true

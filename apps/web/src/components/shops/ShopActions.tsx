@@ -25,7 +25,7 @@ export default function ShopActions({ shop }: ShopActionsProps) {
   const [copied, setCopied] = useState(false);
 
   const handleFollow = async () => {
-    const success = await shopsService.followShop(shop.tenantId, !isFollowing);
+    const success = await shopsService.followShop(shop.tenantId);
     if (success) {
       setIsFollowing(!isFollowing);
     }
@@ -59,20 +59,20 @@ export default function ShopActions({ shop }: ShopActionsProps) {
   const handleContact = (method: 'phone' | 'email' | 'website') => {
     switch (method) {
       case 'phone':
-        if (shop.phone) {
-          window.location.href = `tel:${shop.phone}`;
+        if (shop.contact?.phone) {
+          window.location.href = `tel:${shop.contact.phone}`;
         }
         break;
       
       case 'email':
-        if (shop.email) {
-          window.location.href = `mailto:${shop.email}`;
+        if (shop.contact?.email) {
+          window.location.href = `mailto:${shop.contact.email}`;
         }
         break;
       
       case 'website':
-        if (shop.website) {
-          window.open(shop.website, '_blank');
+        if (shop.contact?.website) {
+          window.open(shop.contact.website, '_blank');
         }
         break;
     }
@@ -93,33 +93,33 @@ export default function ShopActions({ shop }: ShopActionsProps) {
 
         {/* Contact Actions */}
         <div className="grid grid-cols-1 gap-2">
-          {shop.phone && (
+          {shop.contact?.phone && (
             <Button
               variant="outline"
               onClick={() => handleContact('phone')}
-              className="w-full justify-start"
+              className="justify-start"
             >
               <Phone className="w-4 h-4 mr-2" />
-              Call Shop
+              Call {shop.contact.phone}
             </Button>
           )}
           
-          {shop.email && (
+          {shop.contact?.email && (
             <Button
               variant="outline"
               onClick={() => handleContact('email')}
-              className="w-full justify-start"
+              className="justify-start"
             >
               <Mail className="w-4 h-4 mr-2" />
-              Send Email
+              Email Shop
             </Button>
           )}
           
-          {shop.website && (
+          {shop.contact?.website && (
             <Button
               variant="outline"
               onClick={() => handleContact('website')}
-              className="w-full justify-start"
+              className="justify-start"
             >
               <Globe className="w-4 h-4 mr-2" />
               Visit Website
@@ -206,7 +206,7 @@ export default function ShopActions({ shop }: ShopActionsProps) {
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-lg font-semibold text-gray-900">
-                {shop.followerCount || 0}
+                {shop.reviewCount || 0}
               </div>
               <div className="text-xs text-gray-600">Followers</div>
             </div>

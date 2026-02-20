@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '../providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 
 export interface IntegrationStatus {
   id: string;
@@ -24,11 +24,13 @@ export interface SyncResult {
  * Handles integration status, configuration, and synchronization
  * Updated: Added comprehensive Clover integration methods
  */
-export class IntegrationService extends AuthenticatedApiSingleton {
+export class IntegrationService extends TenantApiSingleton {
   private static instance: IntegrationService;
 
   private constructor() {
-    super('IntegrationService');
+    super('integration-service', {
+      ttl: 15 * 60 * 1000 // 15 minutes for integration status
+    });
   }
 
   static getInstance(): IntegrationService {

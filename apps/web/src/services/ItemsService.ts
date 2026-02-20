@@ -5,7 +5,7 @@
  * Extends AuthenticatedApiSingleton for consistent caching and metrics
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 export interface Item {
   id: string;
@@ -44,7 +44,7 @@ export interface CloneProductResponse {
  * Manages item operations for tenant inventory management
  * Uses AuthenticatedApiSingleton for consistent caching and metrics
  */
-class ItemsService extends AuthenticatedApiSingleton {
+class ItemsService extends TenantApiSingleton {
   private static instance: ItemsService;
 
   // TTL constants for different data types
@@ -66,7 +66,7 @@ class ItemsService extends AuthenticatedApiSingleton {
    * Clone a product
    */
   async cloneProduct(request: CloneProductRequest): Promise<CloneProductResponse> {
-    const response = await this.makeAuthenticatedRequest<CloneProductResponse>(
+    const response = await this.makeDefaultRequest<CloneProductResponse>(
       '/api/clone/product',
       {
         method: 'POST',
@@ -118,7 +118,7 @@ class ItemsService extends AuthenticatedApiSingleton {
 
     const cacheKey = `items-${tenantId}-${params.toString()}`;
     
-    const response = await this.makeAuthenticatedRequest<{
+    const response = await this.makeDefaultRequest<{
       items: Item[];
       total: number;
       page: number;
@@ -155,7 +155,7 @@ class ItemsService extends AuthenticatedApiSingleton {
    * Get item by ID
    */
   async getItem(tenantId: string, itemId: string): Promise<Item | null> {
-    const response = await this.makeAuthenticatedRequest<Item>(
+    const response = await this.makeDefaultRequest<Item>(
       `/api/tenants/${tenantId}/items/${itemId}`,
       {},
       `item-${itemId}`,
@@ -174,7 +174,7 @@ class ItemsService extends AuthenticatedApiSingleton {
    * Create a new item
    */
   async createItem(tenantId: string, itemData: Partial<Item>): Promise<Item | null> {
-    const response = await this.makeAuthenticatedRequest<Item>(
+    const response = await this.makeDefaultRequest<Item>(
       `/api/tenants/${tenantId}/items`,
       {
         method: 'POST',
@@ -199,7 +199,7 @@ class ItemsService extends AuthenticatedApiSingleton {
    * Update an existing item
    */
   async updateItem(tenantId: string, itemId: string, itemData: Partial<Item>): Promise<Item | null> {
-    const response = await this.makeAuthenticatedRequest<Item>(
+    const response = await this.makeDefaultRequest<Item>(
       `/api/tenants/${tenantId}/items/${itemId}`,
       {
         method: 'PUT',
@@ -226,7 +226,7 @@ class ItemsService extends AuthenticatedApiSingleton {
    */
   async deleteItem(tenantId: string, itemId: string): Promise<boolean> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/tenants/${tenantId}/items/${itemId}`,
         { method: 'DELETE' },
         `delete-item-${itemId}`,
@@ -257,7 +257,7 @@ class ItemsService extends AuthenticatedApiSingleton {
    */
   async quickStartTenant(tenantId: string, businessType?: string): Promise<any> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/v1/tenants/${tenantId}/quick-start`,
         {
           method: 'POST',

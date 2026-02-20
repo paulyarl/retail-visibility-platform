@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 
 export interface DashboardStats {
   totalItems: number;
@@ -56,7 +56,7 @@ class DashboardDataSingletonService extends AuthenticatedApiSingleton {
 
     const url = `/api/dashboard?tenantId=${encodeURIComponent(tenantId)}`;
     
-    const result = await this.makeAuthenticatedRequest<DashboardData>(
+    const result = await this.makeDefaultRequest<DashboardData>(
       url,
       {},
       `dashboard-data-${tenantId}`
@@ -80,7 +80,7 @@ class DashboardDataSingletonService extends AuthenticatedApiSingleton {
 
     const url = `/api/dashboard/stats?tenantId=${encodeURIComponent(tenantId)}`;
     
-    const result = await this.makeAuthenticatedRequest<DashboardStats>(
+    const result = await this.makeDefaultRequest<DashboardStats>(
       url,
       {},
       `dashboard-stats-${tenantId}`

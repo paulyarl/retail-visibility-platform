@@ -4,7 +4,7 @@
  * Used for Google taxonomy lookups that don't require authentication
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface GoogleTaxonomyPath {
   id: string;

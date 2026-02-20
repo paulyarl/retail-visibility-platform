@@ -5,7 +5,7 @@
  * Used for public platform home page data that doesn't require authentication
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface PublicTenant {
   id: string;

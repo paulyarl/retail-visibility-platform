@@ -21,53 +21,15 @@ interface ShopInfoProps {
 }
 
 export default function ShopInfo({ shop }: ShopInfoProps) {
-  const formatAddress = () => {
+  const getFullAddress = () => {
     if (!shop.address) return null;
-    const parts = [shop.address, shop.city, shop.state, shop.postalCode].filter(Boolean);
-    return parts.join(', ');
+    // Use location which contains city, state combined
+    return shop.location ? `${shop.address}, ${shop.location}` : shop.address;
   };
 
   const getOperatingStatus = () => {
-    const now = new Date();
-    const day = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const currentTime = now.getHours() * 60 + now.getMinutes();
-    
-    const dayHours = [
-      shop.sunday,    // 0
-      shop.monday,    // 1
-      shop.tuesday,   // 2
-      shop.wednesday, // 3
-      shop.thursday,  // 4
-      shop.friday,    // 5
-      shop.saturday   // 6
-    ][day];
-
-    if (!dayHours || dayHours === 'Closed') {
-      return { status: 'closed', label: 'Closed Now' };
-    }
-
-    // Parse hours like "9:00 AM - 6:00 PM"
-    const match = dayHours.match(/(\d+):?\d*\s*(AM|PM)\s*-\s*(\d+):?\d*\s*(AM|PM)/i);
-    if (!match) {
-      return { status: 'unknown', label: dayHours };
-    }
-
-    const [, openTime, openPeriod, closeTime, closePeriod] = match;
-    
-    const convertToMinutes = (time: string, period: string) => {
-      const [hours, minutes = '0'] = time.split(':').map(Number);
-      const totalMinutes = hours * 60 + (minutes as number);
-      return period.toUpperCase() === 'PM' && hours !== 12 ? totalMinutes + 720 : totalMinutes;
-    };
-
-    const openMinutes = convertToMinutes(openTime, openPeriod);
-    const closeMinutes = convertToMinutes(closeTime, closePeriod);
-
-    if (currentTime >= openMinutes && currentTime < closeMinutes) {
-      return { status: 'open', label: 'Open Now' };
-    }
-
-    return { status: 'closed', label: 'Closed Now' };
+    // Business hours not available in Shop interface
+    return { status: 'unknown', label: 'Hours Not Available' };
   };
 
   const operatingStatus = getOperatingStatus();
@@ -90,13 +52,6 @@ export default function ShopInfo({ shop }: ShopInfoProps) {
             </div>
           )}
 
-          {shop.tagline && (
-            <div>
-              <h4 className="font-semibold mb-2">Tagline</h4>
-              <p className="text-gray-600 italic">{shop.tagline}</p>
-            </div>
-          )}
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h4 className="font-semibold mb-2">Shop ID</h4>
@@ -105,7 +60,7 @@ export default function ShopInfo({ shop }: ShopInfoProps) {
             <div>
               <h4 className="font-semibold mb-2">Member Since</h4>
               <p className="text-gray-600">
-                {shop.createdAt.toLocaleDateString('en-US', { 
+                {new Date(shop.createdAt).toLocaleDateString('en-US', { 
                   year: 'numeric', 
                   month: 'long' 
                 })}
@@ -124,58 +79,58 @@ export default function ShopInfo({ shop }: ShopInfoProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {formatAddress() && (
+          {getFullAddress() && (
             <div className="flex items-start gap-3">
               <MapPin className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
               <div>
                 <h4 className="font-semibold mb-1">Address</h4>
-                <p className="text-gray-600">{formatAddress()}</p>
+                <p className="text-gray-600">{getFullAddress()}</p>
               </div>
             </div>
           )}
 
-          {shop.phone && (
+          {shop.contact?.phone && (
             <div className="flex items-center gap-3">
               <Phone className="w-5 h-5 text-gray-400 flex-shrink-0" />
               <div>
                 <h4 className="font-semibold mb-1">Phone</h4>
                 <a 
-                  href={`tel:${shop.phone}`} 
+                  href={`tel:${shop.contact?.phone}`} 
                   className="text-blue-600 hover:text-blue-700"
                 >
-                  {shop.phone}
+                  {shop.contact?.phone}
                 </a>
               </div>
             </div>
           )}
 
-          {shop.email && (
+          {shop.contact?.email && (
             <div className="flex items-center gap-3">
               <Mail className="w-5 h-5 text-gray-400 flex-shrink-0" />
               <div>
                 <h4 className="font-semibold mb-1">Email</h4>
                 <a 
-                  href={`mailto:${shop.email}`} 
+                  href={`mailto:${shop.contact?.email}`} 
                   className="text-blue-600 hover:text-blue-700"
                 >
-                  {shop.email}
+                  {shop.contact?.email}
                 </a>
               </div>
             </div>
           )}
 
-          {shop.website && (
+          {shop.contact?.website && (
             <div className="flex items-center gap-3">
               <Globe className="w-5 h-5 text-gray-400 flex-shrink-0" />
               <div>
                 <h4 className="font-semibold mb-1">Website</h4>
                 <a 
-                  href={shop.website} 
+                  href={shop.contact?.website} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:text-blue-700"
                 >
-                  {shop.website.replace(/^https?:\/\//, '')}
+                  {shop.contact?.website.replace(/^https?:\/\//, '')}
                 </a>
               </div>
             </div>
@@ -183,77 +138,12 @@ export default function ShopInfo({ shop }: ShopInfoProps) {
         </CardContent>
       </Card>
 
-      {/* Business Hours */}
-      {(shop.monday || shop.tuesday || shop.wednesday || shop.thursday || 
-        shop.friday || shop.saturday || shop.sunday) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="w-5 h-5" />
-              Business Hours
-              <Badge 
-                variant={operatingStatus.status === 'open' ? 'default' : 'info'}
-                className="ml-auto"
-              >
-                {operatingStatus.label}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {shop.monday && (
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span className="font-medium">Monday</span>
-                  <span className="text-gray-600">{shop.monday}</span>
-                </div>
-              )}
-              {shop.tuesday && (
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span className="font-medium">Tuesday</span>
-                  <span className="text-gray-600">{shop.tuesday}</span>
-                </div>
-              )}
-              {shop.wednesday && (
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span className="font-medium">Wednesday</span>
-                  <span className="text-gray-600">{shop.wednesday}</span>
-                </div>
-              )}
-              {shop.thursday && (
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span className="font-medium">Thursday</span>
-                  <span className="text-gray-600">{shop.thursday}</span>
-                </div>
-              )}
-              {shop.friday && (
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span className="font-medium">Friday</span>
-                  <span className="text-gray-600">{shop.friday}</span>
-                </div>
-              )}
-              {shop.saturday && (
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span className="font-medium">Saturday</span>
-                  <span className="text-gray-600">{shop.saturday}</span>
-                </div>
-              )}
-              {shop.sunday && (
-                <div className="flex justify-between items-center py-2">
-                  <span className="font-medium">Sunday</span>
-                  <span className="text-gray-600">{shop.sunday}</span>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Shop Statistics */}
+      {/* Stats */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="w-5 h-5" />
-            Shop Statistics
+            Shop Stats
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -266,7 +156,7 @@ export default function ShopInfo({ shop }: ShopInfoProps) {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
-                {shop.followerCount || 0}
+                {shop.reviewCount || 0}
               </div>
               <div className="text-sm text-gray-600">Followers</div>
             </div>

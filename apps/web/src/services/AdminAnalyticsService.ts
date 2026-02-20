@@ -1,4 +1,4 @@
-import { AdminApiSingleton } from '../providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 
 export interface AdminAnalytics {
   totalTenants: number;
@@ -59,13 +59,16 @@ export interface EnrichmentAnalytics {
 export class AdminAnalyticsService extends AdminApiSingleton {
   private static instance: AdminAnalyticsService;
 
-  private constructor() {
-    super('AdminAnalyticsService');
+  private constructor(singletonKey: string, cacheOptions?: any) {
+    super(singletonKey, {
+      ttl: 15 * 60 * 1000, // 15 minutes cache for analytics
+      ...cacheOptions
+    });
   }
 
   static getInstance(): AdminAnalyticsService {
     if (!AdminAnalyticsService.instance) {
-      AdminAnalyticsService.instance = new AdminAnalyticsService();
+      AdminAnalyticsService.instance = new AdminAnalyticsService('admin-analytics-service');
     }
     return AdminAnalyticsService.instance;
   }
@@ -74,7 +77,8 @@ export class AdminAnalyticsService extends AdminApiSingleton {
    * Get admin directory stats
    */
   async getAdminDirectoryStats(): Promise<any> {
-    const result = await this.makeAdminRequest<any>(
+    // Use default request type (ADMIN) for primary operation
+    const result = await this.makeDefaultRequest<any>(
       '/api/admin/directory/stats',
       {},
       'platform-admin-directory-stats',

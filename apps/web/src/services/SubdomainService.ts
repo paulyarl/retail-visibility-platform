@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '../providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 
 export interface Subdomain {
   id: string;
@@ -36,18 +36,21 @@ export interface SubdomainStats {
  * Service for managing subdomain operations
  * Handles subdomain management, DNS records, and statistics
  */
-export class SubdomainService extends AuthenticatedApiSingleton {
-  private static instance: SubdomainService;
+export class SubdomainService extends TenantApiSingleton {
+  private static _instance: SubdomainService;
 
-  private constructor() {
-    super('SubdomainService');
+  private constructor(singletonKey: string, cacheOptions?: any) {
+    super(singletonKey, {
+      ttl: 15 * 60 * 1000, // 15 minutes cache for subdomain operations
+      ...cacheOptions
+    });
   }
 
   static getInstance(): SubdomainService {
-    if (!SubdomainService.instance) {
-      SubdomainService.instance = new SubdomainService();
+    if (!SubdomainService._instance) {
+      SubdomainService._instance = new SubdomainService('subdomain-service');
     }
-    return SubdomainService.instance;
+    return SubdomainService._instance;
   }
 
   /**
@@ -58,7 +61,8 @@ export class SubdomainService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    // Use default request type (TENANT) for primary operation
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}`,
       {},
       `platform-tenant-subdomain-${tenantId}`,
@@ -81,7 +85,7 @@ export class SubdomainService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/my-subdomains?tenantId=${tenantId}`,
       {},
       `platform-user-subdomains-${tenantId}`,
@@ -104,7 +108,7 @@ export class SubdomainService extends AuthenticatedApiSingleton {
       throw new Error('Subdomain is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/check-subdomain/${subdomain}`,
       {},
       `platform-check-subdomain-${subdomain}`,
@@ -127,7 +131,7 @@ export class SubdomainService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/subdomain`,
       { 
         method: 'PUT',
@@ -156,7 +160,7 @@ export class SubdomainService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/subdomain`,
       { method: 'DELETE' },
       `platform-delete-tenant-subdomain-${tenantId}`
@@ -178,7 +182,7 @@ export class SubdomainService extends AuthenticatedApiSingleton {
    * Get admin subdomain statistics
    */
   async getAdminSubdomainStats(): Promise<SubdomainStats | null> {
-    const result = await this.makeAuthenticatedRequest<{ data: SubdomainStats }>(
+    const result = await this.makeDefaultRequest<{ data: SubdomainStats }>(
       '/api/analytics/subdomain-stats',
       {},
       'platform-admin-subdomain-stats',
@@ -201,7 +205,7 @@ export class SubdomainService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID and subdomain are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/reserve-subdomain`,
       { 
         method: 'POST',
@@ -230,7 +234,7 @@ export class SubdomainService extends AuthenticatedApiSingleton {
       throw new Error('Subdomain is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<{ verified: boolean }>(
+    const result = await this.makeDefaultRequest<{ verified: boolean }>(
       `/api/tenants/verify-subdomain/${subdomain}`,
       {},
       `platform-verify-subdomain-${subdomain}`,
@@ -253,7 +257,7 @@ export class SubdomainService extends AuthenticatedApiSingleton {
       throw new Error('Subdomain is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/subdomain-config/${subdomain}`,
       {},
       `platform-subdomain-config-${subdomain}`,
@@ -276,7 +280,7 @@ export class SubdomainService extends AuthenticatedApiSingleton {
       throw new Error('Subdomain is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/subdomain-config/${subdomain}`,
       { 
         method: 'PATCH',

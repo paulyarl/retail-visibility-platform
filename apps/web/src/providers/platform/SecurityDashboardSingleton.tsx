@@ -5,7 +5,8 @@
  * Extends UniversalSingleton for consistent caching and metrics
  */
 
-import { AuthenticatedApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { LoginSession, SecurityAlert, SecurityMetrics, SecurityThreat, BlockedIP } from '@/types/security';
 
 // Security Dashboard Data Interfaces
@@ -31,7 +32,7 @@ export interface SecurityDashboardFilters {
  * Consumes security data from various sources and provides
  * unified access for dashboard components
  */
-class SecurityDashboardSingleton extends AuthenticatedApiSingleton {
+class SecurityDashboardSingleton extends AdminApiSingleton {
   private static instance: SecurityDashboardSingleton;
 
   private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {

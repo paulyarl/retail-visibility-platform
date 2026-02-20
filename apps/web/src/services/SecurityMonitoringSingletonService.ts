@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for admin authentication and caching
  */
 
-import { AdminApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 import {
   SecurityMetrics,
   SecurityThreat,
@@ -35,7 +35,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
    */
   async getSecurityMetrics(hours: number = 24): Promise<SecurityMetrics> {
     try {
-      const result = await this.makeAdminRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/security/metrics?hours=${hours}`,
         {},
         `security-metrics-${hours}h`
@@ -66,7 +66,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
         hours: hours.toString(),
       });
 
-      const result = await this.makeAdminRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/security/threats?${params}`,
         {},
         `security-threats-${resolved}-${hours}h-${page}`
@@ -98,7 +98,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
    */
   async resolveThreat(threatId: string, notes: string): Promise<SecurityThreat> {
     try {
-      const result = await this.makeAdminRequest<SecurityThreat>(
+      const result = await this.makeDefaultRequest<SecurityThreat>(
         `/api/security/threats/${threatId}/resolve`,
         { 
           method: 'POST',
@@ -135,7 +135,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
         limit: limit.toString(),
       });
 
-      const result = await this.makeAdminRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/security/blocked-ips?${params}`,
         {},
         `security-blocked-ips-${hours}h-${page}`
@@ -167,7 +167,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
    */
   async unblockIP(ipAddress: string, notes: string): Promise<void> {
     try {
-      await this.makeAdminRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/security/blocked-ips/${ipAddress}/unblock`,
         { 
           method: 'POST',
@@ -189,7 +189,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
    */
   async getSecurityHealth(): Promise<SecurityHealthStatus> {
     try {
-      const result = await this.makeAdminRequest<SecurityHealthStatus>(
+      const result = await this.makeDefaultRequest<SecurityHealthStatus>(
         '/api/security/health',
         {},
         'security-health'
@@ -216,7 +216,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
         hours: hours.toString(),
       });
 
-      const result = await this.makeAdminRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/admin/security/alerts/by-type?${params}`,
         {},
         `security-alerts-by-type-${limit}-${hours}h`
@@ -247,7 +247,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
       });
 
       // For blob responses, we need to handle differently
-      const response = await this.makeAdminRequest<Response>(
+      const response = await this.makeDefaultRequest<Response>(
         `/api/security/export?${params}`,
         {},
         `security-export-${format}-${startDate.toISOString()}-${endDate.toISOString()}`

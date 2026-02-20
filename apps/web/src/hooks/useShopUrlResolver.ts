@@ -5,7 +5,7 @@
 
 import { useMemo, useCallback } from 'react';
 import { Shop, ShopUrls, ShopResolution } from '@/types/shop';
-import { UniversalSingletonClient } from '@/lib/shops/universal-singleton-client';
+import { shopsService } from '@/services/ShopsService';
 
 export interface ShopUrlOptions {
   preferSlug?: boolean;
@@ -23,8 +23,6 @@ export interface ResolvedShopUrl {
  * Hook for resolving shop URLs by any identifier
  */
 export function useShopUrlResolver() {
-  const client = UniversalSingletonClient.getInstance();
-
   /**
    * Resolve shop by identifier and return URL information
    */
@@ -33,7 +31,7 @@ export function useShopUrlResolver() {
     options: ShopUrlOptions = {}
   ): Promise<ResolvedShopUrl | null> => {
     try {
-      const resolution = await client.resolveShop(identifier);
+      const resolution = await shopsService.resolveShop(identifier);
       
       if (!resolution.found || !resolution.shop) {
         return null;
@@ -64,7 +62,7 @@ export function useShopUrlResolver() {
       console.error('[SHOP URL RESOLVER] Failed to resolve shop URL:', error);
       return null;
     }
-  }, [client]);
+  }, [shopsService]);
 
   /**
    * Generate shop URLs for a given tenant
@@ -74,12 +72,12 @@ export function useShopUrlResolver() {
     slug?: string
   ): Promise<ShopUrls> => {
     try {
-      return await client.getShopUrls(tenantId, slug);
+      return await shopsService.getShopUrls(tenantId, slug);
     } catch (error) {
       console.error('[SHOP URL RESOLVER] Failed to generate shop URLs:', error);
       throw error;
     }
-  }, [client]);
+  }, [shopsService]);
 
   /**
    * Validate if an identifier is a valid shop identifier

@@ -43,9 +43,9 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
           console.warn('[PlatformSettingsProvider] Both services failed, using defaults');
           settingsData = null;
         }
-      } else {
+      } /* else {
         console.log('[PlatformSettingsProvider] Using public branding service');
-      }
+      } */
 
       // Map PlatformSettings to the context's PlatformSettings interface
       if (settingsData) {

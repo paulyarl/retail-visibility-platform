@@ -15,7 +15,11 @@ export async function getShopByIdentifier(identifier: string): Promise<Shop | nu
  * Generate shop URL based on available identifiers
  */
 export function generateShopUrl(shop: Shop): string {
-  return shopsService.generateShopUrl(shop);
+  // Prefer slug if available, otherwise use tenantId
+  if (shop.slug) {
+    return `/directory/${shop.slug}`;
+  }
+  return `/directory/${shop.tenantId}`;
 }
 
 /**

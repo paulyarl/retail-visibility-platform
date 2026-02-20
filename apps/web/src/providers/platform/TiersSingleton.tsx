@@ -5,7 +5,8 @@
  * Extends AuthenticatedApiSingleton for consistent caching and metrics
  */
 
-import { AuthenticatedApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 
 // Tier Types (matching server-side)
 export interface Tier {
@@ -103,7 +104,7 @@ export interface UpgradeEligibility {
   targetTier?: Tier;
 }
 
-class TiersSingleton extends AuthenticatedApiSingleton {
+class TiersSingleton extends TenantApiSingleton {
   private static instance: TiersSingleton;
 
   constructor() {

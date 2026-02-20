@@ -7,7 +7,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 interface ShopLocation {
   city: string;
@@ -24,25 +24,20 @@ interface UseShopLocationsResult {
 
 /**
  * Location Cache Singleton
- * Extends UniversalSingleton for built-in cache management
+ * Extends PublicApiSingleton for built-in cache management
  */
-class LocationCache extends UniversalSingleton {
+class LocationCache extends PublicApiSingleton {
   private static instance: LocationCache;
   private pendingRequest: Promise<ShopLocation[]> | null = null;
 
   private constructor() {
-    super('shop-locations-singleton', {
-      encrypt: false // Locations are public data, no encryption needed
-    });
+    super('shop-locations-singleton');
     
     // Set cache TTL to 1 hour for location data
     this.cacheTTL = 60 * 60 * 1000;
-    
-    // Attach emergency bust controls
-    LocationCache.attachToWindow();
   }
 
-  public static getInstance(): LocationCache {
+  static getInstance(): LocationCache {
     if (!LocationCache.instance) {
       LocationCache.instance = new LocationCache();
     }
@@ -72,10 +67,8 @@ class LocationCache extends UniversalSingleton {
     // Create and store the pending request
     this.pendingRequest = this.fetchLocations()
       .then(async (locations) => {
-        // Store in cache using UniversalSingleton's cache management
+        // Store in cache using PublicApiSingleton's cache management
         await this.setCache(cacheKey, locations);
-        // Also store in in-memory cache with TTL
-        this.setCachedData(cacheKey, locations, this.cacheTTL);
         return locations;
       })
       .finally(() => {
@@ -86,21 +79,14 @@ class LocationCache extends UniversalSingleton {
   }
 
   /**
-   * Fetch locations from API using UniversalSingleton's makeApiRequest
+   * Fetch locations from API using PublicApiSingleton's makeDefaultRequest
    */
   private async fetchLocations(): Promise<ShopLocation[]> {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const response = await this.makeApiRequest<ShopLocation[]>(
+      const response = await this.makeDefaultRequest<ShopLocation[]>(
         `/api/public/shops/locations`,
-        {},
-        undefined, // No additional caching here, handled by getLocations
-        undefined
+        {}
       );
-
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to fetch locations');
-      }
 
       return response.data || [];
     } catch (error) {

@@ -103,7 +103,7 @@ export class ScopeRouter extends UniversalSingleton {
     // Try cache first
     const cached = await this.getFromCache<any>(cacheKey);
     if (cached) {
-      this.logInfo('Cache hit for discovery', { bucketType, scope });
+   //   this.logInfo('Cache hit for discovery', { bucketType, scope });
       return cached;
     }
     
@@ -164,7 +164,7 @@ export class ScopeRouter extends UniversalSingleton {
     // If no tenantId provided, fallback from shop to global
     if (resolvedScope === 'shop' && !options.tenantId) {
       resolvedScope = 'global';
-      this.logInfo('[SCOPE ROUTER] No tenantId provided, falling back from shop to global scope');
+//      this.logInfo('[SCOPE ROUTER] No tenantId provided, falling back from shop to global scope');
     }
 
     // Smart bucket type resolution

@@ -5,7 +5,7 @@
  * Extends PublicApiSingleton for consistent caching and metrics
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 // TypeScript interfaces for hours status
 export interface StoreStatus {

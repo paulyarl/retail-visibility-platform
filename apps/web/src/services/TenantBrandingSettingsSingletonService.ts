@@ -1,11 +1,11 @@
 /**
  * Tenant Branding Settings Singleton Service
  *
- * Extends UniversalSingletonClient to provide cached tenant-specific branding settings operations
+ * Extends AuthenticatedApiSingleton to provide cached tenant-specific branding settings operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 
 export interface TenantBrandingSettings {
   shopName: string;
@@ -39,8 +39,9 @@ class TenantBrandingSettingsSingletonService extends AuthenticatedApiSingleton {
   private static instance: TenantBrandingSettingsSingletonService;
 
   private constructor() {
-    super('tenant-branding-settings-singleton');
-    this.cacheTTL = 10 * 60 * 1000; // 10 minutes for tenant branding (moderate cache)
+    super('tenant-branding-settings-singleton', {
+      ttl: 10 * 60 * 1000 // 10 minutes for tenant branding (moderate cache)
+    });
   }
 
   public static getInstance(): TenantBrandingSettingsSingletonService {

@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '../providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 
 /**
  * Tenant category interface
@@ -38,16 +38,19 @@ export interface CategoryAnalytics {
  * Service for managing tenant categories
  * Handles tenant category CRUD operations and analytics
  */
-export class TenantCategoryService extends AuthenticatedApiSingleton {
+export class TenantCategoryService extends TenantApiSingleton {
   private static instance: TenantCategoryService;
 
-  private constructor() {
-    super('TenantCategoryService');
+  private constructor(singletonKey: string, cacheOptions?: any) {
+    super(singletonKey, {
+      ttl: 10 * 60 * 1000, // 10 minutes cache for categories
+      ...cacheOptions
+    });
   }
 
   static getInstance(): TenantCategoryService {
     if (!TenantCategoryService.instance) {
-      TenantCategoryService.instance = new TenantCategoryService();
+      TenantCategoryService.instance = new TenantCategoryService('tenant-category-service');
     }
     return TenantCategoryService.instance;
   }

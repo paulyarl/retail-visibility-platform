@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 // Import ProductVariant from the components to ensure consistency
 export type { ProductVariant } from '@/components/items/ProductVariants';
@@ -39,7 +39,7 @@ export interface VariantResult {
 // VARIANTS SINGLETON
 // ====================
 
-class VariantsSingleton extends UniversalSingleton {
+class VariantsSingleton extends TenantApiSingleton {
   protected static instances: Map<string, VariantsSingleton> = new Map();
 
   private constructor(tenantId: string) {
@@ -58,7 +58,7 @@ class VariantsSingleton extends UniversalSingleton {
    */
   async fetchItemVariants(itemId: string): Promise<VariantResult> {
     try {
-      const response = await this.makeApiRequest(
+      const response = await this.makeDefaultRequest(
         `/api/items/${itemId}/variants`,
         { method: 'GET' }
       ) as any;
@@ -84,7 +84,7 @@ class VariantsSingleton extends UniversalSingleton {
    */
   async createVariant(itemId: string, data: VariantCreateData): Promise<VariantResult> {
     try {
-      const response = await this.makeApiRequest(
+      const response = await this.makeDefaultRequest(
         `/api/items/${itemId}/variants`,
         {
           method: 'POST',
@@ -119,7 +119,7 @@ class VariantsSingleton extends UniversalSingleton {
    */
   async updateVariant(variantId: string, data: VariantUpdateData): Promise<VariantResult> {
     try {
-      const response = await this.makeApiRequest(
+      const response = await this.makeDefaultRequest(
         `/api/variants/${variantId}`,
         {
           method: 'PUT',
@@ -154,7 +154,7 @@ class VariantsSingleton extends UniversalSingleton {
    */
   async deleteVariant(variantId: string): Promise<VariantResult> {
     try {
-      await this.makeApiRequest(
+      await this.makeDefaultRequest(
         `/api/variants/${variantId}`,
         { method: 'DELETE' }
       );
@@ -182,7 +182,7 @@ class VariantsSingleton extends UniversalSingleton {
    */
   async createBulkVariants(itemId: string, variants: VariantCreateData[]): Promise<VariantResult> {
     try {
-      const response = await this.makeApiRequest(
+      const response = await this.makeDefaultRequest(
         `/api/items/${itemId}/variants/bulk`,
         {
           method: 'POST',
@@ -217,7 +217,7 @@ class VariantsSingleton extends UniversalSingleton {
    */
   async updateBulkVariants(updates: Array<{ variantId: string; data: VariantUpdateData }>): Promise<VariantResult> {
     try {
-      const response = await this.makeApiRequest(
+      const response = await this.makeDefaultRequest(
         `/api/variants/bulk`,
         {
           method: 'PUT',
@@ -252,7 +252,7 @@ class VariantsSingleton extends UniversalSingleton {
    */
   async getVariantStats(itemId: string): Promise<VariantResult> {
     try {
-      const response = await this.makeApiRequest(
+      const response = await this.makeDefaultRequest(
         `/api/items/${itemId}/variants/stats`,
         { method: 'GET' }
       ) as any;

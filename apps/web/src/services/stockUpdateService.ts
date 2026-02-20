@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { ItemsSingletonService, Item } from './ItemsSingletonService';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 
@@ -15,7 +15,7 @@ export interface StockUpdateOptions {
  * Uses singleton pattern with proper caching and authentication
  * Composes ItemsSingletonService for item-related operations
  */
-export class StockUpdateService extends AuthenticatedApiSingleton {
+export class StockUpdateService extends TenantApiSingleton {
   private static instance: StockUpdateService;
   private itemsService: ItemsSingletonService;
 
@@ -48,8 +48,8 @@ export class StockUpdateService extends AuthenticatedApiSingleton {
         throw new Error('Stock cannot be negative');
       }
 
-      // Use ItemsSingletonService's makeAuthenticatedRequest for platform alignment
-      const result = await this.makeAuthenticatedRequest<Item>(
+      // Use ItemsSingletonService's makeDefaultRequest for platform alignment
+      const result = await this.makeDefaultRequest<Item>(
         `/api/items/${itemId}`,
         {
           method: 'PUT',

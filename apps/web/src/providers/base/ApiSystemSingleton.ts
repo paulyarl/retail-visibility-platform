@@ -1,19 +1,30 @@
-import { UniversalSingleton, SingletonCacheOptions, ApiResult } from './UniversalSingleton';
-
 /**
- * Base class for API system singletons
- * Extends UniversalSingleton with backend API functionality
- * Uses port 4000 for backend API operations
+ * API System Singleton - Backend API Operations
+ * 
+ * Extends FlexibleApiSingleton for system-level operations:
+ * - Backend API request handling (port 4000)
+ * - API-specific headers and validation
+ * - System-level TTL (10 minutes)
+ * - Optimized for backend system data
+ * - Default request type: SYSTEM
  */
-export abstract class ApiSystemSingleton extends UniversalSingleton {
+
+import { FlexibleApiSingleton, RequestType, SingletonCacheOptions, SystemApiResponse, ApiResult } from './FlexibleApiSingleton';
+
+// ====================
+// API SYSTEM SINGLETON
+// ====================
+
+export abstract class ApiSystemSingleton extends FlexibleApiSingleton {
+  protected defaultRequestType: RequestType = RequestType.SYSTEM;
   protected cacheTTL: number = 10 * 60 * 1000; // 10 minutes for API data
   
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
-    super(singletonKey, cacheOptions);
-    // Override the default TTL for API data
-    this.cacheTTL = (cacheOptions as any)?.ttl || this.cacheTTL;
+    super(singletonKey, {
+      ttl: 10 * 60 * 1000, // 10 minutes for API data
+      ...cacheOptions
+    });
   }
-
 
   /**
    * Make API request to backend (port 4000)
@@ -24,8 +35,8 @@ export abstract class ApiSystemSingleton extends UniversalSingleton {
     options: RequestInit = {},
     cacheKey?: string,
     customTTL?: number,
-    handle404?: boolean
-  ): Promise<ApiResult<T>> {
+    handle404: boolean = true
+  ): Promise<SystemApiResponse<T>> {
     // Use port 4000 environment variables for API requests
     // Priority order: NEXT_PUBLIC_API_BASE_URL > API_BASE_URL > http://localhost:4000
     const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 
@@ -41,8 +52,8 @@ export abstract class ApiSystemSingleton extends UniversalSingleton {
       }
     };
 
-    // Use UniversalSingleton's makeApiRequest for proper platform caching
-    return super.makeApiRequest(url, apiOptions, cacheKey, customTTL, handle404, apiUrl);
+    // Use makeDefaultRequest for primary system operations
+    return this.makeDefaultRequest(url, apiOptions, cacheKey, customTTL, handle404);
   }
 
   /**
@@ -53,7 +64,7 @@ export abstract class ApiSystemSingleton extends UniversalSingleton {
     options: RequestInit = {},
     cacheKey?: string,
     customTTL?: number,
-    handle404?: boolean
+    handle404: boolean = true
   ): Promise<ApiResult<T>> {
     return this.makeApiRequest(url, options, cacheKey, customTTL, handle404);
   }
@@ -68,7 +79,7 @@ export abstract class ApiSystemSingleton extends UniversalSingleton {
     options: RequestInit = {},
     cacheKey?: string,
     customTTL?: number,
-    handle404?: boolean
+    handle404: boolean = true
   ): Promise<ApiResult<T>> {
     // Add public-specific headers to the options
     const publicOptions: RequestInit = {
@@ -78,7 +89,7 @@ export abstract class ApiSystemSingleton extends UniversalSingleton {
         'X-Public-Request': 'true', // Mark as public request for backend validation
       }
     };
-    
+
     // Use longer cache for public data (15 minutes)
     const publicTTL = customTTL || (15 * 60 * 1000);
     
@@ -109,5 +120,12 @@ export abstract class ApiSystemSingleton extends UniversalSingleton {
   ): Promise<T> {
     const result = await this.makePublicRequest<T>(url, options, cacheKey, customTTL, handle404);
     return this.extractData(result);
+  }
+
+  /**
+   * Invalidate cache (alias for clearCache)
+   */
+  public async invalidateCache(key?: string): Promise<void> {
+    return this.clearCache(key);
   }
 }

@@ -1,10 +1,10 @@
 /**
  * Tenant Order Service
  * Handles tenant order management for merchants
- * Uses AuthenticatedApiSingleton for secure order operations
+ * Uses TenantApiSingleton for tenant-specific order operations
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 export interface TenantOrder {
   orderId: string;
@@ -85,17 +85,19 @@ export interface FulfillmentUpdate {
   cancellationReason?: string;
 }
 
-class TenantOrderService extends AuthenticatedApiSingleton {
+class TenantOrderService extends TenantApiSingleton {
   private static instance: TenantOrderService;
 
-  private constructor() {
-    super('tenant-order-service');
-    this.cacheTTL = 10 * 60 * 1000; // 10 minutes for order data
+  private constructor(singletonKey: string, cacheOptions?: any) {
+    super(singletonKey, {
+      ttl: 10 * 60 * 1000, // 10 minutes cache for order data
+      ...cacheOptions
+    });
   }
 
   static getInstance(): TenantOrderService {
     if (!TenantOrderService.instance) {
-      TenantOrderService.instance = new TenantOrderService();
+      TenantOrderService.instance = new TenantOrderService('tenant-order-service');
     }
     return TenantOrderService.instance;
   }
@@ -406,7 +408,7 @@ class TenantOrderService extends AuthenticatedApiSingleton {
       if (params.page) searchParams.append('page', params.page.toString());
       if (params.limit) searchParams.append('limit', params.limit.toString());
 
-      const response = await this.makeApiRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/orders/buyer?${searchParams.toString()}`,
         {},
         `buyer-orders-${params.email || 'anonymous'}-${params.phone || 'anonymous'}-${params.page || 1}`
@@ -429,7 +431,7 @@ class TenantOrderService extends AuthenticatedApiSingleton {
         throw new Error('Order ID is required');
       }
 
-      await this.makeApiRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/orders/${orderId}/pickup`,
         {
           method: 'PATCH',
@@ -455,7 +457,7 @@ class TenantOrderService extends AuthenticatedApiSingleton {
         throw new Error('Order ID is required');
       }
 
-      await this.makeApiRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/orders/${orderId}/cancel`,
         {
           method: 'PATCH',
@@ -481,7 +483,7 @@ class TenantOrderService extends AuthenticatedApiSingleton {
         throw new Error('Order ID is required');
       }
 
-      const response = await this.makeApiRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/download/orders/${orderId}/downloads`,
         {},
         `order-downloads-${orderId}`

@@ -1,7 +1,8 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { PublicApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { Store } from 'lucide-react';
 
 // ====================
@@ -139,7 +140,7 @@ class StoreSingleton extends PublicApiSingleton {
       
       return storesData;
     } catch (error) {
-      this.handlePublicError(error);
+      console.error('[StoreSingleton] Error fetching stores:', error);
       return [];
     }
   }
@@ -160,7 +161,7 @@ class StoreSingleton extends PublicApiSingleton {
       
       return store;
     } catch (error) {
-      this.handlePublicError(error);
+      console.error('[StoreSingleton] Error fetching stores:', error);
       throw error;
     }
   }
@@ -185,7 +186,7 @@ class StoreSingleton extends PublicApiSingleton {
 
       return categories;
     } catch (error) {
-      this.handlePublicError(error);
+      console.error('[StoreSingleton] Error fetching stores:', error);
       throw error;
     }
   }

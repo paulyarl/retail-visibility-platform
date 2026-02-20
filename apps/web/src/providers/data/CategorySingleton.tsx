@@ -6,7 +6,7 @@
  */
 
 import { createContext, useContext, useReducer, useCallback, useMemo, useRef, ReactNode } from 'react';
-import { PublicApiSingleton } from '../base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 // ====================
 // TYPES & INTERFACES

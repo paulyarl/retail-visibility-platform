@@ -12,7 +12,7 @@
  * - Error handling and logging
  */
 
-import { UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 
 export interface BulkFeaturedTypeOperation {
   variantIds: string[];
@@ -45,7 +45,7 @@ export interface VariantOperationResult {
   details?: any[];
 }
 
-class VariantOperationsSingletonService extends UniversalSingleton {
+class VariantOperationsSingletonService extends AdminApiSingleton {
   private static instance: VariantOperationsSingletonService;
   
   // Different TTLs for different operations
@@ -59,8 +59,10 @@ class VariantOperationsSingletonService extends UniversalSingleton {
     return VariantOperationsSingletonService.instance;
   }
 
-  constructor() {
-    super('VariantOperationsSingletonService');
+  private constructor() {
+    super('variant-operations-service', {
+      ttl: 5 * 60 * 1000 // 5 minutes for variant operations
+    });
   }
 
   /**
@@ -73,7 +75,7 @@ class VariantOperationsSingletonService extends UniversalSingleton {
         throw new Error('Variant IDs are required');
       }
 
-      const response = await this.makeApiRequest<VariantOperationResult>(
+      const response = await this.makeDefaultRequest<VariantOperationResult>(
         '/api/variants/bulk/featured-type',
         {
           method: 'POST',
@@ -115,7 +117,7 @@ class VariantOperationsSingletonService extends UniversalSingleton {
         throw new Error('Variant IDs are required');
       }
 
-      const response = await this.makeApiRequest<VariantOperationResult>(
+      const response = await this.makeDefaultRequest<VariantOperationResult>(
         '/api/variants/bulk/sale-price',
         {
           method: 'POST',
@@ -158,7 +160,7 @@ class VariantOperationsSingletonService extends UniversalSingleton {
         throw new Error('Variant IDs are required');
       }
 
-      const response = await this.makeApiRequest<VariantOperationResult>(
+      const response = await this.makeDefaultRequest<VariantOperationResult>(
         '/api/variants/bulk/inventory',
         {
           method: 'POST',
@@ -200,7 +202,7 @@ class VariantOperationsSingletonService extends UniversalSingleton {
         throw new Error('Variant IDs are required');
       }
 
-      const response = await this.makeApiRequest<VariantOperationResult>(
+      const response = await this.makeDefaultRequest<VariantOperationResult>(
         '/api/variants/bulk/delete',
         {
           method: 'POST',
@@ -237,7 +239,7 @@ class VariantOperationsSingletonService extends UniversalSingleton {
         throw new Error('Variant IDs are required');
       }
 
-      const response = await this.makeApiRequest<VariantOperationResult>(
+      const response = await this.makeDefaultRequest<VariantOperationResult>(
         '/api/variants/bulk/status',
         {
           method: 'POST',

@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '../providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 
 /**
  * Service for managing organization operations
@@ -43,16 +43,19 @@ export interface Tenant {
   // ... other tenant properties
 }
 
-export class OrganizationService extends AuthenticatedApiSingleton {
+export class OrganizationService extends TenantApiSingleton {
   private static instance: OrganizationService;
 
-  private constructor() {
-    super('OrganizationService');
+  private constructor(singletonKey: string, cacheOptions?: any) {
+    super(singletonKey, {
+      ttl: 10 * 60 * 1000, // 10 minutes cache
+      ...cacheOptions
+    });
   }
 
-  static getInstance(): OrganizationService {
+  public static getInstance(): OrganizationService {
     if (!OrganizationService.instance) {
-      OrganizationService.instance = new OrganizationService();
+      OrganizationService.instance = new OrganizationService('organization-service');
     }
     return OrganizationService.instance;
   }
@@ -194,7 +197,8 @@ export class OrganizationService extends AuthenticatedApiSingleton {
       throw new Error('Organization ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    // Use default request type (TENANT) for primary operation
+    const result = await this.makeDefaultRequest<any>(
       `/api/organizations/${organizationId}`,
       {},
       `platform-organization-${organizationId}`,

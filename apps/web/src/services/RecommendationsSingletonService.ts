@@ -1,11 +1,11 @@
 /**
  * Recommendations Singleton Service
  * 
- * Extends UniversalSingletonClient to provide cached recommendations operations
+ * Extends PublicApiSingleton to provide cached recommendations operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface StoreRecommendation {
   id: string;
@@ -99,7 +99,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         '/api/recommendations/for-storefront',
         {},
         'recommendations-all-storefront',
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!result.success) {
@@ -174,7 +174,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         '/api/directory/categories-enhanced',
         {},
         'directory-categories-enhanced',
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -199,7 +199,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         '/api/directory/categories-optimized/counts-by-name',
         {},
         'directory-categories-counts',
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -225,7 +225,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         '/api/directory/store-types',
         {},
         'directory-store-types',
-        this.cacheTTL
+        this.STATIC_TTL
       );
       
       console.log('[RecommendationsSingleton] before check response.data?.data?.storeTypes store types:', response.data?.data?.storeTypes);
@@ -307,7 +307,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         `/api/directory/store-types/${storeTypeSlug}/stores`,
         {},
         `stores-by-store-type-${storeTypeSlug}`,
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -402,7 +402,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         `/api/recommendations/for-product-page/${productId}?${searchParams.toString()}`,
         {},
         `product-page-recommendations-${productId}`,
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -427,7 +427,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         '/api/directory/mv/categories',
         {},
         'directory-mv-categories',
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -452,7 +452,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         '/api/directory/categories',
         {},
         'directory-categories',
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -481,7 +481,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         `/api/directory/mv/categories/${categorySlug}`,
         {},
         `stores-by-category-${categorySlug}`,
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -515,7 +515,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         `/api/directory/search?${searchParams.toString()}`,
         {},
         `search-by-category-${category}-${page || 1}`,
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -550,7 +550,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         `/api/directory/search?${searchParams.toString()}`,
         {},
         `search-by-location-${city}-${state}-${page || 1}`,
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -575,7 +575,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         '/api/directory/locations',
         {},
         'directory-locations',
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -604,7 +604,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         `/api/directory/tenant/${tenantId}`,
         {},
         `tenant-directory-slug-${tenantId}`,
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -633,7 +633,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         `/api/directory/categories/search?q=${encodeURIComponent(query)}`,
         {},
         `search-categories-${query}`,
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -677,7 +677,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         `/api/directory/mv/search?${searchParams.toString()}`,
         {},
         `search-directory-stores-${JSON.stringify(params)}`,
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -717,7 +717,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         `/api/directory/featured-stores?${searchParams.toString()}`,
         {},
         `featured-stores-${JSON.stringify(params)}`,
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {
@@ -746,7 +746,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         `/api/directory/consolidated/${slug}`,
         {},
         `directory-consolidated-${slug}`,
-        this.cacheTTL
+        this.STATIC_TTL
       );
 
       if (!response.success) {

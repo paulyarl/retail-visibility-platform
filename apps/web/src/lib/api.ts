@@ -48,14 +48,14 @@ function getAccessToken(): string | null {
   }
 
   // Debug: Check what auth-related data is actually stored
-  console.log('[API] Token retrieval debug:');
+  /* console.log('[API] Token retrieval debug:');
   console.log('- localStorage access_token:', localStorage.getItem('access_token') ? 'present' : 'missing');
   console.log('- localStorage auth_token:', localStorage.getItem('auth_token') ? 'present' : 'missing');
   console.log('- Cookie auth_token:', getCookie('auth_token') ? 'present' : 'missing');
   console.log('- Cookie csrf:', getCookie('csrf') ? 'present' : 'missing');
   console.log('- All cookies:', document.cookie);
   console.log('- localStorage keys with auth/token:', Object.keys(localStorage).filter(k => k.toLowerCase().includes('auth') || k.toLowerCase().includes('token') || k.toLowerCase().includes('access')));
-
+ */
   return null;
 }
 
@@ -112,11 +112,11 @@ export async function apiRequest(
   if (token && !options.skipAuth) {
     headers['Authorization'] = `Bearer ${token}`;
     // console.log('[API] Adding Authorization header to request:', endpoint);
-  } else if (!token) {
+  } /* else if (!token) {
     console.log('[API] No token available for request:', endpoint);
   } else if (options.skipAuth) {
     console.log('[API] Skipping Authorization header for public request:', endpoint);
-  }
+  } */
 
   // Attach tenant and CSRF headers on write operations
   if (isWrite) {

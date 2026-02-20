@@ -5,7 +5,7 @@
  * Follows platform patterns for authentication, caching, and API communication
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 
 export interface ShopData {
   id: string;
@@ -160,8 +160,8 @@ class RealShopService extends AuthenticatedApiSingleton {
    */
   async getShop(tenantId: string): Promise<ShopData | null> {
     try {
-      // Use makeAuthenticatedRequest for automatic caching and authentication
-      const result = await this.makeAuthenticatedRequest<ShopData>(
+      // Use makeDefaultRequest for automatic caching and authentication
+      const result = await this.makeDefaultRequest<ShopData>(
         `/api/shop-management/${tenantId}`,
         {},
         `shop-${tenantId}`
@@ -182,7 +182,7 @@ class RealShopService extends AuthenticatedApiSingleton {
    */
   async upsertShop(tenantId: string, data: ShopCreateData | ShopUpdateData): Promise<ShopData> {
     try {
-      const result = await this.makeAuthenticatedRequest<ShopData>(
+      const result = await this.makeDefaultRequest<ShopData>(
         `/api/shop-management/${tenantId}`,
         {
           method: 'POST',
@@ -206,7 +206,7 @@ class RealShopService extends AuthenticatedApiSingleton {
    */
   async updateShop(tenantId: string, data: ShopUpdateData): Promise<ShopData> {
     try {
-      const result = await this.makeAuthenticatedRequest<ShopData>(
+      const result = await this.makeDefaultRequest<ShopData>(
         `/api/shop-management/${tenantId}`,
         {
           method: 'PUT',
@@ -230,7 +230,7 @@ class RealShopService extends AuthenticatedApiSingleton {
    */
   async publishShop(tenantId: string): Promise<ShopData> {
     try {
-      const result = await this.makeAuthenticatedRequest<ShopData>(
+      const result = await this.makeDefaultRequest<ShopData>(
         `/api/shop-management/${tenantId}/publish`,
         {
           method: 'POST',
@@ -253,7 +253,7 @@ class RealShopService extends AuthenticatedApiSingleton {
    */
   async unpublishShop(tenantId: string): Promise<ShopData> {
     try {
-      const result = await this.makeAuthenticatedRequest<ShopData>(
+      const result = await this.makeDefaultRequest<ShopData>(
         `/api/shop-management/${tenantId}/unpublish`,
         {
           method: 'POST',
@@ -276,7 +276,7 @@ class RealShopService extends AuthenticatedApiSingleton {
    */
   async updateShopCategory(tenantId: string, categoryId: string): Promise<ShopData> {
     try {
-      const result = await this.makeAuthenticatedRequest<ShopData>(
+      const result = await this.makeDefaultRequest<ShopData>(
         `/api/shop-management/${tenantId}/category`,
         {
           method: 'PUT',
@@ -304,7 +304,7 @@ class RealShopService extends AuthenticatedApiSingleton {
     colors?: Record<string, string>;
   }): Promise<ShopData> {
     try {
-      const result = await this.makeAuthenticatedRequest<ShopData>(
+      const result = await this.makeDefaultRequest<ShopData>(
         `/api/shop-management/${tenantId}/branding`,
         {
           method: 'PUT',
@@ -336,7 +336,7 @@ class RealShopService extends AuthenticatedApiSingleton {
     sunday?: string;
   }, timezone?: string): Promise<ShopData> {
     try {
-      const result = await this.makeAuthenticatedRequest<ShopData>(
+      const result = await this.makeDefaultRequest<ShopData>(
         `/api/shop-management/${tenantId}/hours`,
         {
           method: 'PUT',
@@ -366,7 +366,7 @@ class RealShopService extends AuthenticatedApiSingleton {
     youtube?: string;
   }): Promise<ShopData> {
     try {
-      const result = await this.makeAuthenticatedRequest<ShopData>(
+      const result = await this.makeDefaultRequest<ShopData>(
         `/api/shop-management/${tenantId}/social`,
         {
           method: 'PUT',
@@ -390,7 +390,7 @@ class RealShopService extends AuthenticatedApiSingleton {
    */
   async getShopAnalytics(tenantId: string): Promise<ShopAnalytics> {
     try {
-      const result = await this.makeAuthenticatedRequest<ShopAnalytics>(
+      const result = await this.makeDefaultRequest<ShopAnalytics>(
         `/api/shop-management/${tenantId}/analytics`,
         {},
         `shop-analytics-${tenantId}`
@@ -411,7 +411,7 @@ class RealShopService extends AuthenticatedApiSingleton {
    */
   async checkShopLimits(tenantId: string): Promise<ShopLimitCheck> {
     try {
-      const result = await this.makeAuthenticatedRequest<ShopLimitCheck>(
+      const result = await this.makeDefaultRequest<ShopLimitCheck>(
         `/api/shop-management/${tenantId}/limits`,
         {},
         `shop-limits-${tenantId}`
@@ -432,7 +432,7 @@ class RealShopService extends AuthenticatedApiSingleton {
    */
   async deleteShop(tenantId: string): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/shop-management/${tenantId}`,
         {
           method: 'DELETE',
@@ -450,7 +450,7 @@ class RealShopService extends AuthenticatedApiSingleton {
    */
   async getAvailableCategories(): Promise<GBPCategory[]> {
     try {
-      const result = await this.makeAuthenticatedRequest<GBPCategory[]>(
+      const result = await this.makeDefaultRequest<GBPCategory[]>(
         '/api/shop-management/categories',
         {},
         'shop-categories'
@@ -471,7 +471,7 @@ class RealShopService extends AuthenticatedApiSingleton {
    */
   async setShopCategory(tenantId: string, categoryId: string): Promise<ShopData> {
     try {
-      const result = await this.makeAuthenticatedRequest<ShopData>(
+      const result = await this.makeDefaultRequest<ShopData>(
         `/api/shop-management/${tenantId}/category`,
         {
           method: 'PUT',

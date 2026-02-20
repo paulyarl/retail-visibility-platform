@@ -5,7 +5,8 @@
  * Extends UniversalSingleton for consistent caching and metrics
  */
 
-import { AuthenticatedApiSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { SecurityThreat, SecurityAlert, BlockedIP, SecurityMetrics } from '@/types/security';
 
 // Security Monitoring Data Interfaces
@@ -46,7 +47,7 @@ export interface SecurityMonitoringStats {
  * 
  * Produces security monitoring data and manages threat detection
  */
-class SecurityMonitoringSingleton extends AuthenticatedApiSingleton {
+class SecurityMonitoringSingleton extends AdminApiSingleton {
   private static instance: SecurityMonitoringSingleton;
   private monitoringConfig: SecurityMonitoringConfig;
   private eventBuffer: SecurityEvent[] = [];

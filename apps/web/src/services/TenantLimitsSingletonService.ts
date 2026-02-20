@@ -1,11 +1,11 @@
 /**
  * Tenant Limits Singleton Service
  *
- * Extends UniversalSingletonClient to provide cached tenant limits operations
+ * Extends AuthenticatedApiSingleton to provide cached tenant limits operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 
 export interface TenantLimitsStatus {
   current: number;
@@ -36,8 +36,9 @@ class TenantLimitsSingletonService extends AuthenticatedApiSingleton {
   private static instance: TenantLimitsSingletonService;
 
   private constructor() {
-    super('tenant-limits-singleton');
-    this.cacheTTL = 5 * 60 * 1000; // 5 minutes for tenant limits (moderate change frequency)
+    super('tenant-limits-singleton', {
+      ttl: 5 * 60 * 1000 // 5 minutes for tenant limits (moderate change frequency)
+    });
   }
 
   public static getInstance(): TenantLimitsSingletonService {

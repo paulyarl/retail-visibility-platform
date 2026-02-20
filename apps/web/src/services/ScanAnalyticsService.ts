@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 export interface Analytics {
   totalScanned: number;
@@ -50,20 +50,23 @@ export interface ProductPreview {
  * Handles scan analytics and product preview operations with proper caching
  * Used for tenant insights and product data preview
  */
-class ScanAnalyticsService extends AuthenticatedApiSingleton {
+class ScanAnalyticsService extends TenantApiSingleton {
   private static instance: ScanAnalyticsService;
 
   // TTL for different types of data
   private readonly ANALYTICS_TTL = 5 * 60 * 1000; // 5 minutes for analytics
   private readonly PREVIEW_TTL = 30 * 60 * 1000; // 30 minutes for product previews
 
-  private constructor() {
-    super('scan-analytics-singleton');
+  private constructor(singletonKey: string, cacheOptions?: any) {
+    super(singletonKey, {
+      ttl: 5 * 60 * 1000, // 5 minutes cache for scan analytics
+      ...cacheOptions
+    });
   }
 
   public static getInstance(): ScanAnalyticsService {
     if (!ScanAnalyticsService.instance) {
-      ScanAnalyticsService.instance = new ScanAnalyticsService();
+      ScanAnalyticsService.instance = new ScanAnalyticsService('scan-analytics-service');
     }
     return ScanAnalyticsService.instance;
   }
@@ -74,14 +77,20 @@ class ScanAnalyticsService extends AuthenticatedApiSingleton {
    */
   async getTenantAnalytics(tenantId: string): Promise<Analytics | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<{
+      // Use default request type (TENANT) for primary operation
+      const response = await this.makeDefaultRequest<{
         success: boolean;
         analytics: Analytics;
       }>(
         `/api/scan/tenant/${tenantId}/analytics`,
         {},
         `tenant-analytics-${tenantId}`,
-        this.ANALYTICS_TTL
+        this.ANALYTICS_TTL,
+        {
+          requireTenantContext: true,
+          validateTenantAccess: true,
+          tenantId: tenantId
+        }
       );
 
       return response?.data?.analytics || null;
@@ -101,7 +110,7 @@ class ScanAnalyticsService extends AuthenticatedApiSingleton {
         throw new Error('Barcode is required');
       }
 
-      const response = await this.makeAuthenticatedRequest<{
+      const response = await this.makeDefaultRequest<{
         success: boolean;
         product?: any;
         message?: string;
@@ -156,14 +165,19 @@ class ScanAnalyticsService extends AuthenticatedApiSingleton {
   async getScanSessionStats(tenantId?: string): Promise<{ active: number; total: number } | null> {
     try {
       const url = tenantId 
-        ? `/api/admin/scan-sessions/stats?tenantId=${tenantId}`
-        : '/api/admin/scan-sessions/stats';
+        ? `/api/scan/tenant/${tenantId}/session-stats`
+        : '/api/scan/session-stats';
       
-      const response = await this.makeAuthenticatedRequest<{ active: number; total: number }>(
+      const response = await this.makeTenantRequest<{ active: number; total: number }>(
         url,
         {},
         `scan-session-stats-${tenantId || 'all'}`,
-        this.ANALYTICS_TTL
+        this.ANALYTICS_TTL,
+        {
+          requireTenantContext: tenantId ? true : false,
+          validateTenantAccess: tenantId ? true : false,
+          tenantId: tenantId
+        }
       );
 
       return response.data || null;
@@ -179,14 +193,19 @@ class ScanAnalyticsService extends AuthenticatedApiSingleton {
    */
   async cleanupScanSessions(tenantId?: string): Promise<{ cleaned: number }> {
     try {
-      const response = await this.makeAuthenticatedRequest<{ cleaned: number }>(
-        '/api/admin/scan-sessions/cleanup',
+      const response = await this.makeTenantRequest<{ cleaned: number }>(
+        `/api/scan/tenant/${tenantId || 'current'}/cleanup-sessions`,
         {
           method: 'POST',
           body: JSON.stringify({ tenantId })
         },
         'cleanup-scan-sessions',
-        0 // No caching for write operations
+        0, // No caching for write operations
+        {
+          requireTenantContext: true,
+          validateTenantAccess: true,
+          tenantId: tenantId
+        }
       );
 
       if (!response.data) {

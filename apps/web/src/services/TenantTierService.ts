@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '../providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
 
 export interface DbTier {
   id: string;

@@ -13,7 +13,7 @@
  * - Cache invalidation on updates
  */
 
-import { AuthenticatedApiSingleton, UniversalSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { tenantPublicService } from '@/services/TenantPublicService';
 
 // ====================
@@ -76,7 +76,7 @@ export interface FeaturedProductsLimits {
 // TENANT SETTINGS SINGLETON
 // ====================
 
-class TenantSettingsSingleton extends AuthenticatedApiSingleton {
+class TenantSettingsSingleton extends TenantApiSingleton {
   protected static instances: Map<string, TenantSettingsSingleton> = new Map();
   private readonly CACHE_TTL = 15 * 60 * 1000; // 15 minutes
   private readonly tenantId: string;
@@ -267,6 +267,8 @@ class TenantSettingsSingleton extends AuthenticatedApiSingleton {
       cacheSize: this.cache.size,
       inMemoryCacheSize: this.cache.size,
       persistentCacheSize: 0, // Managed by CacheManager
+      errors: 0, // TODO: Track errors
+      lastUpdated: new Date().toISOString(),
     };
   }
 

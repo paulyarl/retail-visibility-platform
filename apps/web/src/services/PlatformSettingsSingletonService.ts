@@ -5,7 +5,7 @@
  * Uses public requests since platform settings should be accessible to all users
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface PlatformSettings {
   platformName: string;
@@ -59,7 +59,7 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
    */
   async getPlatformSettings(): Promise<PlatformSettings> {
     try {
-      const result = await this.makePublicRequest<PlatformSettings>(
+      const result = await this.makeDefaultRequest<PlatformSettings>(
         '/api/platform-settings',
         {},
         'platform-settings'
@@ -124,7 +124,7 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
    */
   async updatePlatformSettings(settings: Partial<PlatformSettings>): Promise<PlatformSettings | null> {
     try {
-      const result = await this.makePublicRequest<PlatformSettings>(
+      const result = await this.makeDefaultRequest<PlatformSettings>(
         '/api/platform-settings',
         {
           method: 'POST',

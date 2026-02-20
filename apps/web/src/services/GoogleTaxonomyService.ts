@@ -4,7 +4,7 @@
  * Used for category assignment within tenant context
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 
 export interface GoogleTaxonomyCategory {
   id: string;

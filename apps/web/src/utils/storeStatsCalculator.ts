@@ -3,10 +3,11 @@
  * Calculates store-level statistics from storefront_category_counts materialized view
  */
 
-import { UniversalSingleton, SingletonCacheOptions } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 
 // Store Stats Singleton Class
-class StoreStatsSingleton extends UniversalSingleton {
+class StoreStatsSingleton extends PublicApiSingleton {
   private static instance: StoreStatsSingleton;
 
   private constructor() {
@@ -25,7 +26,7 @@ class StoreStatsSingleton extends UniversalSingleton {
   async fetchStoreStats(tenantId: string): Promise<any> {
     // Add cache-busting timestamp to force fresh data
     const timestamp = Date.now();
-    const response = await this.makeApiRequest<any>(
+    const response = await this.makeDefaultRequest<any>(
       `/api/storefront/${tenantId}/storefront/categories-stats?t=${timestamp}`,
       { cache: 'no-store' }, // Disable caching
       `store-stats:${tenantId}`

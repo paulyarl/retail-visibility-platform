@@ -4,7 +4,7 @@
  * Extends UniversalSingleton to provide architecture for automatic authentication and caching
  */
 
-import { TenantApiSingleton } from '@/providers/base/UniversalSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { platformHomeService } from './PlatformHomeSingletonService';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
@@ -78,17 +78,20 @@ export interface PaymentGateway {
 }
 
 class TenantInfoSingletonService extends TenantApiSingleton {
-  private static instance: TenantInfoSingletonService;
+  private static _instance: TenantInfoSingletonService;
 
-  private constructor() {
-    super('tenant-info-service', { encrypt: false });
+  private constructor(singletonKey: string, cacheOptions?: any) {
+    super(singletonKey, {
+      encrypt: false,
+      ...cacheOptions
+    });
   }
 
   public static getInstance(): TenantInfoSingletonService {
-    if (!TenantInfoSingletonService.instance) {
-      TenantInfoSingletonService.instance = new TenantInfoSingletonService();
+    if (!TenantInfoSingletonService._instance) {
+      TenantInfoSingletonService._instance = new TenantInfoSingletonService('tenant-info-service');
     }
-    return TenantInfoSingletonService.instance;
+    return TenantInfoSingletonService._instance;
   }
 
   /**
@@ -189,7 +192,8 @@ class TenantInfoSingletonService extends TenantApiSingleton {
     }
 
     try {
-      const result = await this.makeAuthenticatedRequest<{
+      // Use default request type (TENANT) for primary operation
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         data: {
           periods: Array<{
@@ -200,9 +204,15 @@ class TenantInfoSingletonService extends TenantApiSingleton {
           timezone: string;
         };
       }>(
-        `/api/tenant/${tenantId}/business-hours`,
+        `/api/tenants/${tenantId}/business-hours`,
         {},
-        `tenant-hours-${tenantId}`
+        `tenant-business-hours-${tenantId}`,
+        this.cacheTTL,
+        {
+          requireTenantContext: true,
+          validateTenantAccess: true,
+          tenantId: tenantId
+        }
       );
       if (!result.success){
         console.error('[TenantInfoSingleton] Failed to get business hours:', result.error);
@@ -257,7 +267,8 @@ class TenantInfoSingletonService extends TenantApiSingleton {
     }
 
     try {
-      const response = await this.makeApiRequest<{
+      // Use default request type (TENANT) for primary operation
+      const response = await this.makeDefaultRequest<{
         success: boolean;
         gateways: PaymentGateway[];
       }>(
@@ -297,7 +308,8 @@ class TenantInfoSingletonService extends TenantApiSingleton {
     }
 
     try {
-      const response = await this.makeApiRequest<{
+      // Use default request type (TENANT) for primary operation
+      const response = await this.makeDefaultRequest<{
         success: boolean;
         settings: any;
       }>(
@@ -337,7 +349,8 @@ class TenantInfoSingletonService extends TenantApiSingleton {
     }
 
     try {
-      const response = await this.makeApiRequest<{
+      // Use default request type (TENANT) for primary operation
+      const response = await this.makeDefaultRequest<{
         hasActiveGateway: boolean;
         defaultGatewayType?: string;
       }>(
@@ -902,7 +915,7 @@ class TenantInfoSingletonService extends TenantApiSingleton {
       await platformHomeService.invalidateCache(`platform-tenant-complete-${tenantId}`);
       
       // Invalidate platform dashboard cache since tenant subdomain affects stats
-      await platformDashboardService.invalidateCache('platform-dashboard-complete');
+      await platformDashboardService.invalidateStatsCache();
       
       return result.data!;
     } catch (error) {
@@ -934,7 +947,7 @@ class TenantInfoSingletonService extends TenantApiSingleton {
       await platformHomeService.invalidateCache(`platform-tenant-complete-${tenantId}`);
       
       // Invalidate platform dashboard cache since tenant subdomain affects stats
-      await platformDashboardService.invalidateCache('platform-dashboard-complete');
+      await platformDashboardService.invalidateStatsCache();
       
       return result.data;
     } catch (error) {
@@ -1053,7 +1066,7 @@ class TenantInfoSingletonService extends TenantApiSingleton {
       await platformHomeService.invalidateCache(`platform-tenant-complete-${tenantId}`);
       
       // Invalidate platform dashboard cache since tenant status affects stats
-      await platformDashboardService.invalidateCache('platform-dashboard-complete');
+      await platformDashboardService.invalidateStatsCache();
       
       return result.data;
     } catch (error) {

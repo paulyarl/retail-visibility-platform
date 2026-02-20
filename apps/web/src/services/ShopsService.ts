@@ -1,17 +1,27 @@
 /**
- * Universal Singleton Service for Shop Operations
- * Handles all shop-related API calls and data management
+ * Shops Service - Platform Standard Implementation
+ * 
+ * Extends PublicApiSingleton to provide cached shops operations
+ * Uses the platform's singleton architecture for automatic authentication and caching
+ * Consolidates functionality from both ShopsService and ShopsSingletonService
  */
 
-import { UniversalSingleton, PublicApiSingleton } from '@/providers/base/UniversalSingleton';
-import { CategoryAggregation } from '@/types/scope';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { Shop, ShopIdentifiers, ShopResolution, ShopUrls } from '@/types/shop';
 
-// Shops API Singleton Class
-class ShopsAPISingleton extends PublicApiSingleton {
+// ====================
+// INTERFACES
+// ====================
+
+// Re-export Shop interface for convenience
+export type { Shop, ShopUrls };
+
+// Check if ShopsAPISingleton exists, if not create a placeholder
+export class ShopsAPISingleton extends PublicApiSingleton {
   private static instance: ShopsAPISingleton;
 
   private constructor() {
-    super('shops-service', { encrypt: false });
+    super('shops-api-singleton');
   }
 
   public static getInstance(): ShopsAPISingleton {
@@ -21,111 +31,95 @@ class ShopsAPISingleton extends PublicApiSingleton {
     return ShopsAPISingleton.instance;
   }
 
-  async makeShopsApiRequest<T>(
+  /**
+   * Make shops API request
+   */
+  protected async makeShopsApiRequest<T>(
     url: string,
     options: RequestInit = {},
     cacheKey?: string
-  ): Promise<T> {
-    const result = this.makePublicRequest<T>(url, options, cacheKey);
-    return result.then(r => r.data as T);
-  }
-
-  /**
-   * Resolve shop identifier with priority order
-   */
-  async getShopByIdentifier(identifier: string): Promise<Shop | null> {
-    const cacheKey = `shop:${identifier}`;
-
-    try {
-      const shop = await this.makeShopsApiRequest<Shop>(
-        `/api/shops/resolve?identifier=${encodeURIComponent(identifier)}`,
-        {},
-        cacheKey
-      );
-
-      return shop;
-    } catch (error) {
-      console.error('Error resolving shop identifier:', identifier, error);
-      return null;
-    }
-  }
-
-  /**
-   * Get shop products with filtering and pagination
-   */
-  async getShopProducts(tenantId: string, filters: ShopFilters): Promise<ShopProductsResponse> {
-    try {
-      const params = new URLSearchParams({
-        tenantId,
-        page: filters.page.toString(),
-        limit: filters.limit.toString(),
-        ...(filters.category && { category: filters.category }),
-        ...(filters.search && { search: filters.search }),
-        ...(filters.sort && filters.sort !== 'default' && { sort: filters.sort }),
-      });
-
-      const data = await this.makeShopsApiRequest<any>(
-        `/api/products?${params}`,
-        {},
-        `shop-products:${tenantId}:${JSON.stringify(filters)}`
-      );
-
-      const result: ShopProductsResponse = {
-        products: data.products || [],
-        total: data.total || 0,
-        categories: data.categories || [],
-      };
-
-      return result;
-    } catch (error) {
-      console.error('Error fetching shop products:', error);
-      return { products: [], total: 0, categories: [] };
-    }
+  ): Promise<{ data: T }> {
+    const response = await this.makeDefaultRequest<T>(url, options, cacheKey);
+    return { data: response.data || null as T };
   }
 }
 
-// Export the ShopsAPISingleton class
-export { ShopsAPISingleton };
-
-export interface Shop {
+// Create a compatible Shop interface for components that expect id/logoUrl
+export interface ShopWithId extends Omit<Shop, 'imageUrl'> {
   id: string;
-  tenantId: string;
-  name: string;
-  slug: string;
-  description?: string;
-  bannerUrl?: string;
   logoUrl?: string;
-  tagline?: string;
-  email?: string;
-  phone?: string;
-  website?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  country?: string;
-  postalCode?: string;
-  isVerified: boolean;
-  isActive: boolean;
-  rating?: number;
-  reviewCount?: number;
-  productCount?: number;
-  followerCount?: number;
-  createdAt: Date;
-  updatedAt: Date;
-  // Shop hours
-  monday?: string;
-  tuesday?: string;
-  wednesday?: string;
-  thursday?: string;
-  friday?: string;
-  saturday?: string;
-  sunday?: string;
-  // Social links
-  facebook?: string;
-  instagram?: string;
-  twitter?: string;
-  linkedin?: string;
-  youtube?: string;
+}
+
+export interface ShopDirectoryParams {
+  limit?: number;
+  offset?: number;
+  search?: string;
+  category?: string;
+  region?: string;
+}
+
+export interface ShopDirectoryResponse {
+  shops: Shop[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface TrendingShopsParams {
+  limit?: number;
+  offset?: number;
+  category?: string;
+  region?: string;
+}
+
+export interface ShopCategoriesResponse {
+  categories: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    count?: number;
+  }>;
+}
+
+export interface ShopProductsResponse {
+  products: ShopProduct[];
+  total: number;
+  categories: string[];
+  pagination?: {
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface ShopReviewsResponse {
+  reviews: Array<{
+    id: string;
+    rating: number;
+    comment: string;
+    author: string;
+    date: string;
+    helpful: number;
+  }>;
+  averageRating: number;
+  totalReviews: number;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface ShopFilters {
+  page?: number;
+  limit?: number;
+  category?: string;
+  search?: string;
+  sort?: 'name' | 'rating' | 'created' | 'default';
 }
 
 export interface ShopProduct {
@@ -163,33 +157,17 @@ export interface ShopReview {
   };
 }
 
-export interface ShopFilters {
-  category?: string;
-  search?: string;
-  sort?: string;
-  page: number;
-  limit: number;
-}
-
-export interface ShopProductsResponse {
-  products: ShopProduct[];
-  total: number;
-  categories: string[];
-}
-
-export interface ShopReviewsResponse {
-  reviews: ShopReview[];
-  total: number;
-}
+// ====================
+// MAIN SHOPS SERVICE
+// ====================
 
 class ShopsService extends PublicApiSingleton {
   private static instance: ShopsService;
-  private apiSingleton: ShopsAPISingleton;
-  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
   private constructor() {
-    super('shops-service-main');
-    this.apiSingleton = ShopsAPISingleton.getInstance();
+    super('shops-singleton', {
+      ttl: 5 * 60 * 1000 // 5 minutes for shops data
+    });
   }
 
   static getInstance(): ShopsService {
@@ -199,213 +177,98 @@ class ShopsService extends PublicApiSingleton {
     return ShopsService.instance;
   }
 
-  /**
-   * Resolve shop identifier with priority order
-   */
-  async getShopByIdentifier(identifier: string): Promise<Shop | null> {
-    return this.apiSingleton.getShopByIdentifier(identifier);
-  }
+  // ====================
+  // SHOP DIRECTORY OPERATIONS
+  // ====================
 
   /**
-   * Get shop products with filtering and pagination
+   * Get shop directory with filtering and pagination
    */
-  async getShopProducts(tenantId: string, filters: ShopFilters): Promise<ShopProductsResponse> {
-    return this.apiSingleton.getShopProducts(tenantId, filters);
-  }
+  async getShopDirectory(params: ShopDirectoryParams = {}): Promise<ShopDirectoryResponse> {
+    const queryParams = new URLSearchParams();
+    
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.offset) queryParams.append('offset', params.offset.toString());
+    if (params.search) queryParams.append('search', params.search);
+    if (params.category) queryParams.append('category', params.category);
+    if (params.region) queryParams.append('region', params.region);
 
-  /**
-   * Get shop reviews with filtering and pagination
-   */
-  async getShopReviews(
-    tenantId: string, 
-    page: number = 1, 
-    limit: number = 10,
-    filter: 'all' | '5' | '4' | '3' | '2' | '1' = 'all',
-    sortBy: 'recent' | 'helpful' | 'rating-high' | 'rating-low' = 'recent'
-  ): Promise<ShopReviewsResponse> {
+    const endpoint = `/api/shops/directory?${queryParams.toString()}`;
+    const cacheKey = `shop_directory_${queryParams.toString()}`;
+    
     try {
-      const apiSingleton = ShopsAPISingleton.getInstance();
-      const params = new URLSearchParams({
-        tenantId,
-        page: page.toString(),
-        limit: limit.toString(),
-        filter,
-        sort: sortBy,
-      });
-
-      const response = await apiSingleton.makeShopsApiRequest<any>(
-        `/api/shops/${tenantId}/reviews?${params}`,
+      const response = await this.makeDefaultRequest<Shop[]>(
+        endpoint,
         {},
-        `reviews:${tenantId}:${page}:${limit}:${filter}:${sortBy}`
+        cacheKey,
+        5 * 60 * 1000 // 5 minutes
       );
 
-      const data = response;
-      const result: ShopReviewsResponse = {
-        reviews: data.reviews || [],
-        total: data.total || 0,
+      return {
+        shops: response.data || [],
+        pagination: {
+          page: Math.floor((params.offset || 0) / (params.limit || 10)) + 1,
+          limit: params.limit || 10,
+          total: (response as any).total || 0,
+          totalPages: Math.ceil(((response as any).total || 0) / (params.limit || 10))
+        }
       };
-
-      return result;
     } catch (error) {
-      console.error('Error fetching shop reviews:', error);
-      return { reviews: [], total: 0 };
+      console.error('[ShopsService] Failed to get shop directory:', error);
+      throw error;
     }
   }
 
-  /**
-   * Follow/unfollow a shop
-   */
-  async followShop(tenantId: string, follow: boolean): Promise<boolean> {
-    try {
-      const apiSingleton = ShopsAPISingleton.getInstance();
-      const response = await apiSingleton.makeShopsApiRequest<any>(
-        `/api/shops/${tenantId}/follow`,
-        { method: follow ? 'POST' : 'DELETE' },
-        `follow-shop:${tenantId}`
-      );
-
-      // Cache invalidation handled automatically by makePublicRequest
-      return true;
-    } catch (error) {
-      console.error('Error following/unfollowing shop:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Mark a review as helpful
-   */
-  async markReviewHelpful(reviewId: string): Promise<boolean> {
-    try {
-      const apiSingleton = ShopsAPISingleton.getInstance();
-      const response = await apiSingleton.makeShopsApiRequest<any>(
-        `/api/reviews/${reviewId}/helpful`,
-        { method: 'POST' },
-        `helpful-review:${reviewId}`
-      );
-
-      if (!response.success) {
-        throw new Error(`Failed to mark review as helpful: ${response.error || 'Unknown error'}`);
-      }
-
-      // Cache invalidation handled automatically by makePublicRequest
-      return true;
-    } catch (error) {
-      console.error('Error marking review as helpful:', error);
-      return false;
-    }
-  }
-
-  
   /**
    * Get trending shops
    */
-  async getTrendingShops(limit: number = 10, region?: string): Promise<Shop[]> {
-    try {
-      const apiSingleton = ShopsAPISingleton.getInstance();
-      const params = new URLSearchParams({
-        limit: limit.toString(),
-        ...(region && { region }),
-      });
+  async getTrendingShops(params: TrendingShopsParams = {}): Promise<Shop[]> {
+    const queryParams = new URLSearchParams();
+    
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.offset) queryParams.append('offset', params.offset.toString());
+    if (params.category) queryParams.append('category', params.category);
+    if (params.region) queryParams.append('region', params.region);
 
-      const shops = await apiSingleton.makeShopsApiRequest<Shop[]>(
-        `/api/public/shops/trending?${params}`,
+    const endpoint = `/api/shops/trending?${queryParams.toString()}`;
+    const cacheKey = `trending_shops_${queryParams.toString()}`;
+    
+    try {
+      const response = await this.makeDefaultRequest<Shop[]>(
+        endpoint,
         {},
-        `trending:${limit}:${region || 'all'}`
+        cacheKey,
+        10 * 60 * 1000 // 10 minutes
       );
 
-      return shops;
+      return response.data || [];
     } catch (error) {
-      console.log('Error fetching trending shops:', error);
-      console.error('Error fetching trending shops:', error);
-      return [];
+      console.error('Failed to get trending shops', error);
+      throw error;
     }
   }
 
   /**
-   * Search shops
+   * Get shop categories
    */
-  async searchShops(query: string, limit: number = 20): Promise<Shop[]> {
+  async getShopCategories(): Promise<ShopCategoriesResponse> {
+    const endpoint = '/api/shops/categories';
+    const cacheKey = 'shop_categories';
+    
     try {
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        data: Shop[];
-      }>('/api/shops/search', {
-        method: 'POST',
-        body: JSON.stringify({ query, limit }),
-      }, `search:${query}:${limit}`);
+      const response = await this.makeDefaultRequest<any[]>(
+        endpoint,
+        {},
+        cacheKey,
+        60 * 60 * 1000 // 1 hour
+      );
 
-      return response.data?.data || [];
-    } catch (error) {
-      console.error('Error searching shops:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get shop statistics
-   */
-  async getShopStats(tenantId: string): Promise<{
-    totalVariants: number;
-    activeVariants: number;
-    variantsOnSale: number;
-    averagePrice: number;
-    averageStock: number;
-    parentProductsWithVariants: number;
-  }> {
-    try {
-      const response = await this.makePublicRequest<{
-        totalVariants: number;
-        activeVariants: number;
-        variantsOnSale: number;
-        averagePrice: number;
-        averageStock: number;
-        parentProductsWithVariants: number;
-      }>(`/api/shops/${tenantId}/stats`, {}, `stats:${tenantId}`);
-
-      return response.data || {
-        totalVariants: 0,
-        activeVariants: 0,
-        variantsOnSale: 0,
-        averagePrice: 0,
-        averageStock: 0,
-        parentProductsWithVariants: 0,
-      };
-    } catch (error) {
-      console.error('Error fetching shop stats:', error);
       return {
-        totalVariants: 0,
-        activeVariants: 0,
-        variantsOnSale: 0,
-        averagePrice: 0,
-        averageStock: 0,
-        parentProductsWithVariants: 0,
+        categories: response.data || []
       };
-    }
-  }
-
-  /**
-   * Get shop categories (simple version for dropdowns/filters)
-   * Public endpoint - no authentication required
-   */
-  async getShopCategories(): Promise<Array<{
-    shop_category: string;
-    count?: number;
-  }>> {
-    try {
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        data?: Array<{
-          shop_category: string;
-          count?: number;
-        }>;
-      }>('/api/shops/categories', {}, 'shop-categories');
-
-      const categories = response.data?.data || [];
-      return categories;
     } catch (error) {
-      console.error('Error fetching shop categories:', error);
-      return [];
+      console.error('Failed to get shop categories', error);
+      throw error;
     }
   }
 
@@ -416,89 +279,251 @@ class ShopsService extends PublicApiSingleton {
   async getCategories(params?: {
     limit?: number;
     minProducts?: number;
-  }): Promise<CategoryAggregation[]> {
+  }): Promise<Array<{
+    category_type: 'product' | 'shop';
+    category_name: string;
+    category_slug: string;
+    product_count: number;
+    shop_count: number;
+    avg_trending_score: number;
+    products_in_stock: number;
+  }>> {
+    const endpoint = '/api/shops/categories';
+    const cacheKey = 'shop_categories';
+    
     try {
-      const response = await this.makePublicRequest<{
-        success: boolean;
-        data?: CategoryAggregation[];
-      }>('/api/shops/categories', {
-        method: 'POST',
-        body: JSON.stringify(params),
-      }, `categories:${params?.limit || 100}:${params?.minProducts || 1}`);
+      const response = await this.makeDefaultRequest<any[]>(
+        endpoint,
+        {},
+        cacheKey,
+        60 * 60 * 1000 // 1 hour
+      );
 
-      return response.data?.data || [];
+      return response.data || [];
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error('Error fetching shop categories:', error);
       return [];
     }
   }
 
-  /**
-   * Get shop hours status for public display
-   * Public endpoint - no authentication required
-   */
-  async getShopHoursStatus(tenantId: string): Promise<{
-    isOpen: boolean;
-    hours?: {
-      monday?: string;
-      tuesday?: string;
-      wednesday?: string;
-      thursday?: string;
-      friday?: string;
-      saturday?: string;
-      sunday?: string;
-    };
-    timezone?: string;
-    nextOpenTime?: string;
-    nextCloseTime?: string;
-  }> {
-    try {
-      const response = await this.makePublicRequest<{
-        isOpen: boolean;
-        hours?: {
-          monday?: string;
-          tuesday?: string;
-          wednesday?: string;
-          thursday?: string;
-          friday?: string;
-          saturday?: string;
-          sunday?: string;
-        };
-        timezone?: string;
-        nextOpenTime?: string;
-        nextCloseTime?: string;
-      }>(`/api/shops/${tenantId}/hours-status`, {}, `hours-status-${tenantId}`);
+  // ====================
+  // SHOP IDENTIFICATION OPERATIONS
+  // ====================
 
-      return response.data || {
-        isOpen: false,
+  /**
+   * Get tenant auto ID for a given tenant ID
+   */
+  async getTenantAutoId(tenantId: string): Promise<string> {
+    const cacheKey = `tenant_auto_id_${tenantId}`;
+    
+    try {
+      const response = await this.makeDefaultRequest<{ data: { autoId: string } }>(
+        `/api/tenant-auto-id/${tenantId}`,
+        {},
+        cacheKey,
+        30 * 60 * 1000 // 30 minutes for identifiers
+      );
+
+      const autoId = (response.data as any)?.autoId || '';
+      return autoId;
+    } catch (error) {
+      console.error('[ShopsService] Failed to get tenant auto ID:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all shop identifiers (tenantId, slug, autoId)
+   */
+  async getShopIdentifiers(tenantId: string, slug?: string): Promise<ShopIdentifiers> {
+    const cacheKey = `shop_identifiers_${tenantId}_${slug || 'no-slug'}`;
+    
+    try {
+      const autoId = await this.getTenantAutoId(tenantId);
+      const identifiers: ShopIdentifiers = {
+        tenantId,
+        slug,
+        autoId
+      };
+
+      return identifiers;
+    } catch (error) {
+      console.error('Failed to get shop identifiers', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Resolve shop by any identifier (slug, tenantId, or autoId)
+   */
+  async resolveShop(identifier: string): Promise<ShopResolution> {
+    const cacheKey = `resolve_shop_${identifier}`;
+    
+    try {
+      const response = await this.makeDefaultRequest<{ data: Shop; resolved: any }>(
+        `/api/shops/${identifier}`,
+        {},
+        cacheKey,
+        15 * 60 * 1000 // 15 minutes for resolution
+      );
+
+      // Extract shop data from response, excluding the resolved field
+      const { resolved, ...shopData } = response.data as any;
+      
+      const resolution: ShopResolution = {
+        identifier,
+        type: (resolved?.type as 'tenantId' | 'slug' | 'autoId') || ('tenantId' as const),
+        found: response.success || false,
+        shop: shopData
+      };
+      
+      return resolution;
+    } catch (error) {
+      console.error('[ShopsService] Failed to resolve shop:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get shop details by identifier
+   */
+  async getShopByIdentifier(identifier: string): Promise<Shop | null> {
+    const resolution = await this.resolveShop(identifier);
+    return resolution.shop || null;
+  }
+
+  // ====================
+  // SHOP PRODUCTS OPERATIONS
+  // ====================
+
+  /**
+   * Get shop products with filtering and pagination
+   */
+  async getShopProducts(tenantId: string, filters: ShopFilters): Promise<ShopProductsResponse> {
+    try {
+      const params = new URLSearchParams({
+        tenantId,
+        page: (filters.page || 1).toString(),
+        limit: (filters.limit || 10).toString(),
+        ...(filters.category && { category: filters.category }),
+        ...(filters.search && { search: filters.search }),
+        ...(filters.sort && filters.sort !== 'default' && { sort: filters.sort }),
+      });
+
+      const response = await this.makeDefaultRequest<any>(
+        `/api/products?${params}`,
+        {},
+        `shop-products:${tenantId}:${JSON.stringify(filters)}`
+      );
+
+      return {
+        products: response.data?.products || [],
+        total: response.data?.pagination?.total || 0,
+        categories: response.data?.categories || [],
+        pagination: {
+          page: response.data?.pagination?.page || 1,
+          limit: response.data?.pagination?.limit || 10,
+          totalPages: response.data?.pagination?.totalPages || 0
+        }
       };
     } catch (error) {
-      console.error('Error fetching shop hours status:', error);
-      return {
-        isOpen: false,
-      };
+      console.error('[ShopsService] Failed to get shop products:', error);
+      throw error;
     }
   }
 
+  // ====================
+  // SHOP REVIEWS OPERATIONS
+  // ====================
+
   /**
-   * Generate shop URL based on available identifiers
+   * Get shop reviews with pagination
    */
-  generateShopUrl(shop: Shop): string {
-    // Priority: slug > tenantId with prefix > autoId
-    if (shop.slug) {
-      return `/shops/${shop.slug}`;
+  async getShopReviews(tenantId: string, filters: ShopFilters): Promise<ShopReviewsResponse> {
+    try {
+      const params = new URLSearchParams({
+        tenantId,
+        page: (filters.page || 1).toString(),
+        limit: (filters.limit || 10).toString(),
+        ...(filters.sort && { sort: filters.sort }),
+      });
+
+      const response = await this.makeDefaultRequest<any>(
+        `/api/reviews?${params}`,
+        {},
+        `shop-reviews:${tenantId}:${JSON.stringify(filters)}`
+      );
+
+      return {
+        reviews: response.data?.reviews || [],
+        averageRating: response.data?.averageRating || 0,
+        totalReviews: response.data?.totalReviews || 0,
+        pagination: {
+          page: response.data?.pagination?.page || 1,
+          limit: response.data?.pagination?.limit || 10,
+          total: response.data?.pagination?.total || 0,
+          totalPages: response.data?.pagination?.totalPages || 0
+        }
+      };
+    } catch (error) {
+      console.error('[ShopsService] Failed to get shop reviews:', error);
+      throw error;
     }
-    
-    if (shop.tenantId) {
-      return `/shops/tid-${shop.tenantId}`;
-    }
-    
-    // Fallback to ID (should not happen in normal operation)
-    return `/shops/${shop.id}`;
   }
 
   /**
-   * Get all possible URLs for a shop (for redirects, SEO, etc.)
+   * Mark review as helpful
+   */
+  async markReviewHelpful(reviewId: string, isHelpful: boolean): Promise<boolean> {
+    try {
+      const response = await this.makeDefaultRequest<any>(
+        `/api/reviews/${reviewId}/helpful`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ isHelpful }),
+        },
+        `helpful-review-${reviewId}`
+      );
+
+      return response.success || false;
+    } catch (error) {
+      console.error('[ShopsService] Failed to mark review helpful:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Follow a shop
+   */
+  async followShop(tenantId: string): Promise<boolean> {
+    try {
+      const response = await this.makeDefaultRequest<any>(
+        `/api/shops/${tenantId}/follow`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+        `follow-shop-${tenantId}`
+      );
+
+      return response.success || false;
+    } catch (error) {
+      console.error('[ShopsService] Failed to follow shop:', error);
+      throw error;
+    }
+  }
+
+  // ====================
+  // UTILITY METHODS
+  // ====================
+
+  /**
+   * Get all possible URLs for a shop
    */
   getAllShopUrls(shop: Shop): string[] {
     const urls: string[] = [];
@@ -510,13 +535,44 @@ class ShopsService extends PublicApiSingleton {
     urls.push(`/shops/tid-${shop.tenantId}`);
     
     // Add autoId if available
-    if (shop.id.length <= 8 && /^[A-Z0-9]+$/.test(shop.id)) {
-      urls.push(`/shops/${shop.id}`);
+    if (shop.autoId.length <= 8 && /^[A-Z0-9]+$/.test(shop.autoId)) {
+      urls.push(`/shops/${shop.autoId}`);
     }
     
     return urls;
   }
 
+  /**
+   * Get shop URLs by tenant ID and optional slug
+   */
+  async getShopUrls(tenantId: string, slug?: string): Promise<ShopUrls> {
+    const urls: ShopUrls = {
+      slugUrl: slug ? `/directory/${slug}` : null,
+      tenantIdUrl: `/directory/${tenantId}`,
+      autoIdUrl: `/directory/${tenantId}`, // Fallback to tenantId
+      canonicalUrl: slug ? `/directory/${slug}` : `/directory/${tenantId}`
+    };
+    
+    return urls;
+  }
+
+  /**
+   * Health check for the shops service
+   */
+  async healthCheck(): Promise<boolean> {
+    try {
+       const response = await this.makeDefaultRequest('/api/shops/health',{},"shop-healthcheck");
+      if (!response.success){
+        console.error('Health check failed', response.error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Health check failed', error);
+      return false;
+    }
+  }
 }
 
 // Export singleton instance
@@ -526,3 +582,5 @@ export const shopsService = ShopsService.getInstance();
 if (typeof window !== 'undefined') {
   (window as any).shopsService = shopsService;
 }
+
+export default ShopsService;

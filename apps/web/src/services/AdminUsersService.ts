@@ -5,7 +5,7 @@
  * Extends AdminApiSingleton for admin privilege validation and caching
  */
 
-import { AdminApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 
 export interface AdminUser {
   id: string;
@@ -64,7 +64,7 @@ export interface InvitationRequest {
  * Admin Users Service - Authenticated API Pattern
  * 
  * Manages admin user operations for platform administration
- * Uses AdminApiSingleton for admin privilege validation and caching
+ * Uses AuthenticatedApiSingleton for admin privilege validation and caching
  */
 class AdminUsersService extends AdminApiSingleton {
   private static instance: AdminUsersService;
@@ -73,13 +73,16 @@ class AdminUsersService extends AdminApiSingleton {
   private readonly USERS_TTL = 10 * 60 * 1000; // 10 minutes for users list
   private readonly USER_DETAILS_TTL = 5 * 60 * 1000; // 5 minutes for user details
 
-  private constructor() {
-    super('admin-users-service');
+  private constructor(singletonKey: string, cacheOptions?: any) {
+    super(singletonKey, {
+      ttl: 10 * 60 * 1000, // 10 minutes cache
+      ...cacheOptions
+    });
   }
 
   static getInstance(): AdminUsersService {
     if (!AdminUsersService.instance) {
-      AdminUsersService.instance = new AdminUsersService();
+      AdminUsersService.instance = new AdminUsersService('admin-users-service');
     }
     return AdminUsersService.instance;
   }
@@ -88,7 +91,8 @@ class AdminUsersService extends AdminApiSingleton {
    * Get all admin users
    */
   async getUsers(): Promise<AdminUser[]> {
-    const response = await this.makeAdminRequest<any>(
+    // Use default request type (ADMIN) for primary operation
+    const response = await this.makeDefaultRequest<any>(
       '/api/admin/users',
       {},
       'admin-users-list',

@@ -1,4 +1,4 @@
-import { AdminApiSingleton } from '../providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 
 export interface AdminUser {
   id: string;
@@ -46,7 +46,7 @@ export class AdminUserService extends AdminApiSingleton {
    * Get all admin users
    */
   async getAdminUsers(): Promise<AdminUser[] | null> {
-    const result = await this.makeAdminRequest<{ users: AdminUser[] }>(
+    const result = await this.makeDefaultRequest<{ users: AdminUser[] }>(
       '/api/admin/users',
       {},
       'platform-admin-users',
@@ -69,7 +69,7 @@ export class AdminUserService extends AdminApiSingleton {
       throw new Error('User ID is required');
     }
 
-    const result = await this.makeAdminRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/admin/users/${userId}`,
       { method: 'DELETE' },
       `platform-delete-admin-user-${userId}`
@@ -93,7 +93,7 @@ export class AdminUserService extends AdminApiSingleton {
     role: string;
     permissions?: string[];
   }): Promise<AdminUser | null> {
-    const result = await this.makeAdminRequest<AdminUser>(
+    const result = await this.makeDefaultRequest<AdminUser>(
       '/api/admin/users',
       { 
         method: 'POST',
@@ -121,7 +121,7 @@ export class AdminUserService extends AdminApiSingleton {
       throw new Error('User ID is required');
     }
 
-    const result = await this.makeAdminRequest<AdminUser>(
+    const result = await this.makeDefaultRequest<AdminUser>(
       `/api/admin/users/${userId}/permissions`,
       { 
         method: 'PATCH',

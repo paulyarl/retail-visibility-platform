@@ -5,7 +5,7 @@
  * Uses public API endpoints for visitors and prospective merchants
  */
 
-import { PublicApiSingleton } from '@/providers/base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { PlatformDashboardData, PlatformStats, TenantMetrics, PlatformActivity } from './interfaces/PlatformDashboardInterfaces';
 
 class PublicPlatformDashboardService extends PublicApiSingleton {

@@ -5,7 +5,7 @@
  * Extends UniversalSingleton for consistent caching and metrics
  */
 
-import { PublicApiSingleton } from '../base/UniversalSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { RecentlyViewedItem } from './RecentlyViewedSingleton';
 
 // Recommendations Data Interfaces

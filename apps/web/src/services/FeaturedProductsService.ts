@@ -1,4 +1,4 @@
-import { AdminApiSingleton } from '../providers/base/UniversalSingleton';
+import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 
 export interface FeaturedProduct {
   id: string;
@@ -49,7 +49,7 @@ export class FeaturedProductsService extends AdminApiSingleton {
    * Get featuring statistics
    */
   async getFeaturingStats(): Promise<FeaturingStats | null> {
-    const result = await this.makeAdminRequest<FeaturingStats>(
+    const result = await this.makeDefaultRequest<FeaturingStats>(
       '/api/admin/products/featuring/stats',
       {},
       'platform-featuring-stats',
@@ -68,7 +68,7 @@ export class FeaturedProductsService extends AdminApiSingleton {
    * Get featured products with pagination
    */
   async getFeaturedProducts(limit: number, offset: number): Promise<FeaturedProduct[] | null> {
-    const result = await this.makeAdminRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/products/featured?limit=${limit}&offset=${offset}`,
       {},
       'platform-featured-products',
@@ -93,7 +93,7 @@ export class FeaturedProductsService extends AdminApiSingleton {
       throw new Error('Product ID is required');
     }
 
-    const result = await this.makeAdminRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/admin/products/featured/${productId}`,
       { method: 'DELETE' },
       `platform-unfeature-product-${productId}`
@@ -117,7 +117,7 @@ export class FeaturedProductsService extends AdminApiSingleton {
       throw new Error('Product ID is required');
     }
 
-    const result = await this.makeAdminRequest<FeaturedProduct>(
+    const result = await this.makeDefaultRequest<FeaturedProduct>(
       `/api/admin/products/featured/${productId}/priority`,
       { 
         method: 'PATCH',
@@ -145,7 +145,7 @@ export class FeaturedProductsService extends AdminApiSingleton {
       throw new Error('Product ID is required');
     }
 
-    const result = await this.makeAdminRequest<FeaturedProduct>(
+    const result = await this.makeDefaultRequest<FeaturedProduct>(
       `/api/admin/products/featured`,
       { 
         method: 'POST',
@@ -170,7 +170,7 @@ export class FeaturedProductsService extends AdminApiSingleton {
    * Bulk update product priorities
    */
   async bulkUpdatePriorities(updates: { productId: string; priority: number }[]): Promise<void> {
-    const result = await this.makeAdminRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       '/api/admin/products/featured/bulk-priority',
       { 
         method: 'PATCH',

@@ -92,13 +92,21 @@ function ShopsPageContent() {
     updateUrl(newScope);
   };
 
-  // Multi-bucket data using Universal Singleton System with scope support
-  const { buckets, loading, error, refetch, metrics } = useShopsFeaturedBuckets({
-    tenantId: 'global',
-    shopScope: 'global',
-    enabled: true,
-    scope: scopeParams // NEW: Pass scope params
-  });
+  // Multi-bucket data using modern hook
+  const { 
+    buckets, 
+    loading, 
+    error, 
+    refresh,
+    // Legacy bucket properties for existing page logic
+    trending,
+    new: newShops,
+    sale,
+    seasonal,
+    staff,
+    selection,
+    random
+  } = useShopsFeaturedBuckets();
 
   const handleProductClick = (product: any) => {
     const itemId = product.inventoryItemId || product.inventory_item_id || product.id;
@@ -153,20 +161,20 @@ function ShopsPageContent() {
     
     // Add product categories from all buckets
     const allProductsRaw = [
-      ...buckets.trending,
-      ...buckets.new,
-      ...buckets.sale,
-      ...buckets.seasonal,
-      ...buckets.staff,
-      ...buckets.selection,
-      ...buckets.random
+      ...trending,
+      ...newShops,
+      ...sale,
+      ...seasonal,
+      ...staff,
+      ...selection,
+      ...random
     ];
     
     // Deduplicate products
     const productMap = new Map<string, any>();
     allProductsRaw.forEach(product => {
       const productId = product.id || product.inventory_item_id;
-      if (!productMap.has(productId)) {
+      if (productId && !productMap.has(productId)) {
         productMap.set(productId, product);
       }
     });
@@ -281,20 +289,20 @@ function ShopsPageContent() {
   // Helper function to get all products from all buckets
   const getAllProducts = () => {
     const allProductsRaw = [
-      ...buckets.trending,
-      ...buckets.new,
-      ...buckets.sale,
-      ...buckets.seasonal,
-      ...buckets.staff,
-      ...buckets.selection,
-      ...buckets.random
+      ...trending,
+      ...newShops,
+      ...sale,
+      ...seasonal,
+      ...staff,
+      ...selection,
+      ...random
     ];
     
     // Deduplicate products
     const productMap = new Map<string, any>();
     allProductsRaw.forEach(product => {
       const productId = product.id || product.inventory_item_id;
-      if (!productMap.has(productId)) {
+      if (productId && !productMap.has(productId)) {
         productMap.set(productId, product);
       }
     });
@@ -502,7 +510,7 @@ function ShopsPageContent() {
             {/* Trending Shops Container */}
             <div>
               <TrendingShopsContainer 
-                trendingShops={buckets.trendingShops || []}
+                trendingShops={trending || []}
                 loading={loading}
                 error={error}
               />
@@ -511,7 +519,7 @@ function ShopsPageContent() {
             {/* Trending Products Container */}
             <div>
               <TrendingProductsContainer 
-                trendingProducts={buckets.trending || []}
+                trendingProducts={trending || []}
                 loading={loading}
                 error={error}
               />
@@ -523,7 +531,7 @@ function ShopsPageContent() {
             {/* Mid Page: Conversion Focused */}
             <div className="space-y-12 mb-16">
               <ProductBucket
-                products={filterAndSortProducts(buckets.new)}
+                products={filterAndSortProducts(newShops)}
                 loading={loading}
                 error={error}
                 title="✨ New Arrivals"
@@ -534,7 +542,7 @@ function ShopsPageContent() {
               />
               
               <ProductBucket
-                products={filterAndSortProducts(buckets.random)}
+                products={filterAndSortProducts(random)}
                 loading={loading}
                 error={error}
                 title="🎲 Discover Something New"
@@ -547,7 +555,7 @@ function ShopsPageContent() {
 
             <div className="space-y-12 mb-16">
               <ProductBucket
-                products={filterAndSortProducts(buckets.sale)}
+                products={filterAndSortProducts(sale)}
                 loading={loading}
                 error={error}
                 title="🏷️ Sale & Deals"
@@ -560,7 +568,7 @@ function ShopsPageContent() {
               />
               
               <ProductBucket
-                products={filterAndSortProducts(buckets.seasonal)}
+                products={filterAndSortProducts(seasonal)}
                 loading={loading}
                 error={error}
                 title="🍂 Seasonal Picks"
@@ -571,7 +579,7 @@ function ShopsPageContent() {
               />
               
               <ProductBucket
-                products={filterAndSortProducts(buckets.staff)}
+                products={filterAndSortProducts(staff)}
                 loading={loading}
                 error={error}
                 title="⭐ Staff Picks"
@@ -585,7 +593,7 @@ function ShopsPageContent() {
             {/* Below Fold: Discovery & Exploration */}
             <div className="space-y-12">
               <ProductBucket
-                products={buckets.selection}
+                products={selection}
                 loading={loading}
                 error={error}
                 title="🏪 Store Selections"
@@ -597,24 +605,24 @@ function ShopsPageContent() {
           </div>
 
           {/* Performance Metrics (Development Only) */}
-          {process.env.NODE_ENV === 'development' && metrics && (
+          {process.env.NODE_ENV === 'development' && (
             <div className="mt-16 p-6 bg-gray-100 dark:bg-gray-800 rounded-xl border border-gray-300 dark:border-gray-600">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Performance Metrics</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div className="flex justify-between items-center p-3 bg-white dark:bg-gray-700 rounded-lg">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Total Response Time:</span>
-                  <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">{metrics.totalResponseTime}ms</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-white dark:bg-gray-700 rounded-lg">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Cache Hit Rate:</span>
-                  <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">{metrics.cacheHitRate.toFixed(1)}%</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-white dark:bg-gray-700 rounded-lg">
                   <span className="text-sm text-gray-600 dark:text-gray-400">Buckets Loaded:</span>
-                  <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">{metrics.bucketCount}</span>
+                  <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">{buckets.length}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-white dark:bg-gray-700 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Total Products:</span>
+                  <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">{buckets.reduce((sum, b) => sum + b.products.length, 0)}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-white dark:bg-gray-700 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Status:</span>
+                  <span className="font-mono text-sm font-medium text-gray-900 dark:text-white">{loading ? 'Loading...' : 'Ready'}</span>
                 </div>
               </div>
-              <button onClick={refetch} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+              <button onClick={refresh} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                 🔄 Refetch Buckets
               </button>
             </div>

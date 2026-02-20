@@ -55,9 +55,9 @@ export default function ShopHeader({ shop, variant = 'full' }: ShopHeaderProps) 
                 {/* Logo */}
                 <div className="flex-shrink-0">
                   <div className="w-24 h-24 md:w-32 md:h-32 bg-white rounded-lg shadow-md border-2 border-white overflow-hidden">
-                    {shop.logoUrl ? (
+                    {shop.imageUrl ? (
                       <Image
-                        src={shop.logoUrl}
+                        src={shop.imageUrl}
                         alt={`${shop.name} logo`}
                         width={128}
                         height={128}
@@ -90,8 +90,8 @@ export default function ShopHeader({ shop, variant = 'full' }: ShopHeaderProps) 
                       </div>
 
                       {/* Tagline */}
-                      {shop.tagline && !isCompact && (
-                        <p className="text-gray-600 mb-3">{shop.tagline}</p>
+                      {shop.description && !isCompact && (
+                        <p className="text-gray-600 mb-3">{shop.description}</p>
                       )}
 
                       {/* Rating and Stats */}
@@ -113,10 +113,10 @@ export default function ShopHeader({ shop, variant = 'full' }: ShopHeaderProps) 
                           </div>
                         )}
                         
-                        {shop.followerCount && (
+                        {shop.reviewCount && (
                           <div className="flex items-center gap-1 text-gray-600">
                             <Users className="w-4 h-4" />
-                            <span>{shop.followerCount} followers</span>
+                            <span>{shop.reviewCount} followers</span>
                           </div>
                         )}
                       </div>
@@ -149,27 +149,27 @@ export default function ShopHeader({ shop, variant = 'full' }: ShopHeaderProps) 
                             <span>{shop.address}</span>
                           </div>
                         )}
-                        {shop.phone && (
+                        {shop.contact?.phone && (
                           <div className="flex items-center gap-1">
                             <Phone className="w-4 h-4" />
-                            <a href={`tel:${shop.phone}`} className="hover:text-blue-600">
-                              {shop.phone}
+                            <a href={`tel:${shop.contact?.phone}`} className="hover:text-blue-600">
+                              {shop.contact?.phone}
                             </a>
                           </div>
                         )}
-                        {shop.email && (
+                        {shop.contact?.email && (
                           <div className="flex items-center gap-1">
                             <Mail className="w-4 h-4" />
-                            <a href={`mailto:${shop.email}`} className="hover:text-blue-600">
-                              {shop.email}
+                            <a href={`mailto:${shop.contact?.email}`} className="hover:text-blue-600">
+                              {shop.contact?.email}
                             </a>
                           </div>
                         )}
-                        {shop.website && (
+                        {shop.contact?.website && (
                           <div className="flex items-center gap-1">
                             <Globe className="w-4 h-4" />
                             <a 
-                              href={shop.website} 
+                              href={shop.contact?.website} 
                               target="_blank" 
                               rel="noopener noreferrer"
                               className="hover:text-blue-600"
@@ -196,11 +196,11 @@ export default function ShopHeader({ shop, variant = 'full' }: ShopHeaderProps) 
                           <span>{shop.address}</span>
                         </div>
                       )}
-                      {shop.phone && (
+                      {shop.contact?.phone && (
                         <div className="flex items-center gap-1">
                           <Phone className="w-4 h-4" />
-                          <a href={`tel:${shop.phone}`} className="hover:text-blue-600">
-                            {shop.phone}
+                          <a href={`tel:${shop.contact?.phone}`} className="hover:text-blue-600">
+                            {shop.contact?.phone}
                           </a>
                         </div>
                       )}

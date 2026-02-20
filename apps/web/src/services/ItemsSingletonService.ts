@@ -1,11 +1,11 @@
 /**
  * Items Singleton Service
  *
- * Extends UniversalSingletonClient to provide cached items operations
+ * Extends AuthenticatedApiSingleton to provide cached items operations
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/UniversalSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 
 export interface Item {
@@ -75,8 +75,9 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
   private static instance: ItemsSingletonService;
 
   private constructor() {
-    super('items-singleton');
-    this.cacheTTL = 15 * 60 * 1000; // 15 minutes for items data (moderate cache)
+    super('items-singleton', {
+      ttl: 15 * 60 * 1000 // 15 minutes for items data (moderate cache)
+    });
   }
 
   public static getInstance(): ItemsSingletonService {
@@ -160,7 +161,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
     await this.invalidateCache(`items_complete_tenant_${targetTenantId}*`);
     
     // Invalidate platform dashboard cache since items affect stats
-    await platformDashboardService.invalidateCache('platform-dashboard-complete');
+    await platformDashboardService.invalidateStatsCache();
     
     return result.data || null;
   }
@@ -189,7 +190,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
     await this.invalidateCache(`items_complete_tenant_${targetTenantId}*`);
     
     // Invalidate platform dashboard cache since items affect stats
-    await platformDashboardService.invalidateCache('platform-dashboard-complete');
+    await platformDashboardService.invalidateStatsCache();
     
     return result.data || null;
   }
@@ -266,7 +267,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         `/api/items/${itemId}/photos`,
         {},
         `item-photos-${itemId}`,
-        this.cacheTTL
+        15 * 60 * 1000 // 15 minutes
       );
 
       return result;
@@ -395,7 +396,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         `/api/trash/capacity?tenantId=${tenantId}`,
         {},
         `items-trash-capacity-${tenantId}`,
-        this.cacheTTL
+        5 * 60 * 1000 // 5 minutes for capacity data
       );
 
       return result;
@@ -418,7 +419,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         `/api/items?tenantId=${tenantId}&status=trashed&limit=${limit}`,
         {},
         `items-trashed-${tenantId}-${limit}`,
-        this.cacheTTL
+        5 * 60 * 1000 // 5 minutes for trash data
       );
 
       return result;
@@ -503,7 +504,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         `/api/scan/my-sessions?tenantId=${tenantId}`,
         {},
         `items-my-scan-sessions-${tenantId}`,
-        this.cacheTTL
+        10 * 60 * 1000 // 10 minutes for scan sessions
       );
 
       return result;
@@ -606,7 +607,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
       await this.invalidateCache(`items_complete_tenant_${targetTenantId}*`);
       
       // Invalidate platform dashboard cache since items affect stats
-      await platformDashboardService.invalidateCache('platform-dashboard-complete');
+      await platformDashboardService.invalidateStatsCache();
 
       return result.success || false;
     } catch (error) {

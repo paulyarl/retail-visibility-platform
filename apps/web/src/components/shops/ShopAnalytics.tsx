@@ -250,7 +250,7 @@ export default function ShopAnalytics({ tenantId, shops }: ShopAnalyticsProps) {
           <Select value={selectedShop} onChange={(e) => setSelectedShop(e.target.value)}>
             <option value="all">All Shops</option>
             {shops.map((shop) => (
-              <option key={shop.id} value={shop.id}>
+              <option key={shop.tenantId} value={shop.tenantId}>
                 {shop.name}
               </option>
             ))}
