@@ -27,6 +27,12 @@ export enum RequestType {
   SYSTEM = 'system'
 }
 
+export enum RequestTarget {
+  API = 'api',
+  WEB = 'web',
+  EXTERNAL ='external'
+}
+
 export interface TenantRequestOptions {
   requireTenantContext?: boolean;
   validateTenantAccess?: boolean;
@@ -79,6 +85,7 @@ export interface SystemApiResponse<T> extends ApiResult<T> {
 export abstract class FlexibleApiSingleton extends UniversalSingleton {
   // Default request type for this service (can be overridden)
   protected abstract defaultRequestType: RequestType;
+  protected abstract defaultRequestTarget: RequestTarget;
   
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     super(singletonKey, cacheOptions);
@@ -336,6 +343,189 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
   }
 
   // ====================
+  // EXPLICIT TARGET METHODS
+  // ====================
+
+  /**
+   * Make request to API server (port 4000) explicitly
+   */
+  protected async makeApiRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    ttl?: number
+  ): Promise<ApiResult<T>> {
+    // Temporarily override target for this request
+    const originalTarget = this.defaultRequestTarget;
+    this.defaultRequestTarget = RequestTarget.API;
+    
+    try {
+      return await this.makeDefaultRequest<T>(url, options, cacheKey, ttl);
+    } finally {
+      // Restore original target
+      this.defaultRequestTarget = originalTarget;
+    }
+  }
+
+  /**
+   * Make request to web server (port 3000) explicitly
+   */
+  protected async makeWebRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    ttl?: number
+  ): Promise<ApiResult<T>> {
+    // Temporarily override target for this request
+    const originalTarget = this.defaultRequestTarget;
+    this.defaultRequestTarget = RequestTarget.WEB;
+    
+    try {
+      return await this.makeDefaultRequest<T>(url, options, cacheKey, ttl);
+    } finally {
+      // Restore original target
+      this.defaultRequestTarget = originalTarget;
+    }
+  }
+
+  /**
+   * Make request to external service explicitly
+   */
+  protected async makeExternalRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    ttl?: number
+  ): Promise<ApiResult<T>> {
+    // Temporarily override target for this request
+    const originalTarget = this.defaultRequestTarget;
+    this.defaultRequestTarget = RequestTarget.EXTERNAL;
+    
+    try {
+      return await this.makeDefaultRequest<T>(url, options, cacheKey, ttl);
+    } finally {
+      // Restore original target
+      this.defaultRequestTarget = originalTarget;
+    }
+  }
+
+  /**
+   * Make request with custom target override
+   */
+  protected async makeTargetedRequest<T>(
+    url: string,
+    target: RequestTarget,
+    options: RequestInit = {},
+    cacheKey?: string,
+    ttl?: number
+  ): Promise<ApiResult<T>> {
+    // Temporarily override target for this request
+    const originalTarget = this.defaultRequestTarget;
+    this.defaultRequestTarget = target;
+    
+    try {
+      return await this.makeDefaultRequest<T>(url, options, cacheKey, ttl);
+    } finally {
+      // Restore original target
+      this.defaultRequestTarget = originalTarget;
+    }
+  }
+
+  /**
+   * Make request with custom type AND target override
+   * Perfect for cross-type, cross-target scenarios
+   */
+  protected async makeHybridRequest<T>(
+    url: string,
+    type: RequestType,
+    target: RequestTarget,
+    options: RequestInit = {},
+    cacheKey?: string,
+    ttl?: number,
+    requestOptions?: any
+  ): Promise<ApiResult<T>> {
+    // Temporarily override both type and target
+    const originalType = this.defaultRequestType;
+    const originalTarget = this.defaultRequestTarget;
+    this.defaultRequestType = type;
+    this.defaultRequestTarget = target;
+    
+    try {
+      switch (type) {
+        case RequestType.PUBLIC:
+          return await this.makePublicRequest<T>(url, options, cacheKey, ttl);
+        case RequestType.AUTHENTICATED:
+          return await this.makeAuthenticatedRequest<T>(url, options, cacheKey, ttl);
+        case RequestType.TENANT:
+          return await this.makeTenantRequest<T>(url, options, cacheKey, ttl, requestOptions);
+        case RequestType.ADMIN:
+          return await this.makeAdminRequest<T>(url, options, cacheKey, ttl, requestOptions);
+        case RequestType.SYSTEM:
+          return await this.makeSystemRequest<T>(url, options, cacheKey, ttl, requestOptions);
+        default:
+          throw new Error(`Unsupported request type: ${type}`);
+      }
+    } finally {
+      // Restore original type and target
+      this.defaultRequestType = originalType;
+      this.defaultRequestTarget = originalTarget;
+    }
+  }
+
+  // ====================
+  // CONVENIENCE HYBRID METHODS
+  // ====================
+
+  /**
+   * Make PUBLIC request to WEB server
+   */
+  protected async makePublicWebRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    ttl?: number
+  ): Promise<ApiResult<T>> {
+    return this.makeHybridRequest<T>(url, RequestType.PUBLIC, RequestTarget.WEB, options, cacheKey, ttl);
+  }
+
+  /**
+   * Make AUTHENTICATED request to WEB server
+   */
+  protected async makeAuthWebRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    ttl?: number
+  ): Promise<ApiResult<T>> {
+    return this.makeHybridRequest<T>(url, RequestType.AUTHENTICATED, RequestTarget.WEB, options, cacheKey, ttl);
+  }
+
+  /**
+   * Make PUBLIC request to API server
+   */
+  protected async makePublicApiRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    ttl?: number
+  ): Promise<ApiResult<T>> {
+    return this.makeHybridRequest<T>(url, RequestType.PUBLIC, RequestTarget.API, options, cacheKey, ttl);
+  }
+
+  /**
+   * Make TENANT request to WEB server
+   */
+  protected async makeTenantWebRequest<T>(
+    url: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    ttl?: number,
+    requestOptions?: any
+  ): Promise<ApiResult<T>> {
+    return this.makeHybridRequest<T>(url, RequestType.TENANT, RequestTarget.WEB, options, cacheKey, ttl, requestOptions);
+  }
+
+  // ====================
   // DEFAULT REQUEST METHOD
   // ====================
 
@@ -370,7 +560,7 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
   // HELPER METHODS
   // ====================
 
-  private async getAuthToken(): Promise<string> {
+  protected async getAuthToken(): Promise<string> {
     // Implementation would get auth token from storage or refresh
     return localStorage.getItem('authToken') || '';
   }
@@ -444,7 +634,42 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     cacheKey?: string,
     ttl?: number
   ): Promise<Response> {
+    // Construct full URL based on defaultRequestTarget
+    let fullUrl: string;
+    
+    if (url.startsWith('http')) {
+      // Already absolute URL
+      fullUrl = url;
+    } else {
+      // Build URL based on target
+      switch (this.defaultRequestTarget) {
+        case RequestTarget.API:
+          const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+          fullUrl = `${apiUrl}${url}`;
+          break;
+          
+        case RequestTarget.WEB:
+          const webUrl = process.env.NEXT_PUBLIC_WEB_URL || 
+                       process.env.FRONTEND_URL || 
+                       process.env.WEB_URL || 
+                       'http://localhost:3000';
+          fullUrl = `${webUrl}${url}`;
+          break;
+          
+        case RequestTarget.EXTERNAL:
+          // For external requests, use URL as-is
+          fullUrl = url;
+          break;
+          
+        default:
+          // Fallback to API
+          const fallbackUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+          fullUrl = `${fallbackUrl}${url}`;
+          break;
+      }
+    }
+    
     // Implementation would use cache manager
-    return fetch(url, options);
+    return fetch(fullUrl, options);
   }
 }

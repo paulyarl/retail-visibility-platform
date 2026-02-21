@@ -72,7 +72,7 @@ export class PlatformCategoriesService extends AdminApiSingleton {
     );
 
     // Invalidate categories cache
-    this.invalidateAdminCache('platform-categories');
+    this.invalidateCache('platform-categories');
 
     return response?.data || null;
   }
@@ -96,7 +96,7 @@ export class PlatformCategoriesService extends AdminApiSingleton {
     );
 
     // Invalidate categories cache
-    this.invalidateAdminCache('platform-categories');
+    this.invalidateCache('platform-categories');
 
     return response?.data || null;
   }
@@ -119,7 +119,7 @@ export class PlatformCategoriesService extends AdminApiSingleton {
     );
 
     // Invalidate categories cache
-    this.invalidateAdminCache('platform-categories');
+    this.invalidateCache('platform-categories');
   }
 
   /**
@@ -137,7 +137,7 @@ export class PlatformCategoriesService extends AdminApiSingleton {
     );
 
     // Invalidate categories cache
-    this.invalidateAdminCache('platform-categories');
+    this.invalidateCache('platform-categories');
   }
 
   /**
@@ -155,7 +155,7 @@ export class PlatformCategoriesService extends AdminApiSingleton {
     );
 
     // Invalidate categories cache
-    this.invalidateAdminCache('platform-categories');
+    this.invalidateCache('platform-categories');
 
     return response;
   }
@@ -180,7 +180,7 @@ export class PlatformCategoriesService extends AdminApiSingleton {
     );
 
     // Invalidate categories cache
-    this.invalidateAdminCache('platform-categories');
+    this.invalidateCache('platform-categories');
 
     return response?.data || null;
   }

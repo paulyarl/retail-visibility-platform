@@ -92,7 +92,7 @@ export class TierSystemService extends AdminApiSingleton {
     );
 
     // Invalidate tier cache
-    this.invalidateAdminCache('tier-system-tiers');
+    this.invalidateCache('tier-system-tiers');
 
     return response?.data || null;
   }
@@ -116,7 +116,7 @@ export class TierSystemService extends AdminApiSingleton {
     );
 
     // Invalidate tier cache
-    this.invalidateAdminCache('tier-system-tiers');
+    this.invalidateCache('tier-system-tiers');
 
     return response?.data || null;
   }
@@ -140,7 +140,7 @@ export class TierSystemService extends AdminApiSingleton {
     );
 
     // Invalidate tier cache
-    this.invalidateAdminCache('tier-system-tiers');
+    this.invalidateCache('tier-system-tiers');
   }
 
   /**
@@ -158,7 +158,7 @@ export class TierSystemService extends AdminApiSingleton {
     );
 
     // Invalidate tier cache
-    this.invalidateAdminCache('tier-system-tiers');
+    this.invalidateCache('tier-system-tiers');
 
     return response?.data || null;
   }
@@ -181,7 +181,7 @@ export class TierSystemService extends AdminApiSingleton {
     );
 
     // Invalidate tier cache
-    this.invalidateAdminCache('tier-system-tiers');
+    this.invalidateCache('tier-system-tiers');
   }
 
   /**
@@ -227,7 +227,7 @@ export class TierSystemService extends AdminApiSingleton {
     );
 
     // Invalidate tier cache
-    this.invalidateAdminCache('tier-system-tiers');
+    this.invalidateCache('tier-system-tiers');
   }
 
   /**
@@ -249,7 +249,7 @@ export class TierSystemService extends AdminApiSingleton {
     );
 
     // Invalidate tier cache
-    this.invalidateAdminCache('tier-system-tiers');
+    this.invalidateCache('tier-system-tiers');
 
     return response?.data || null;
   }

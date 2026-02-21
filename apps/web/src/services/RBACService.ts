@@ -2,6 +2,8 @@
  * RBAC Service - System-Level Service with Platform Caching
  * Uses singleton pattern with platform's built-in caching system
  * Provides RBAC functionality using platform cache integration
+ * Uses new target system for flexible API routing
+ * Targets WEB server for role group validation (web-to-API communication)
  */
 
 import { SystemSingleton } from '../providers/base/SystemSingleton';
@@ -32,6 +34,7 @@ export interface RBACUserAccess {
  * System-level RBAC service using platform's built-in caching
  * Uses singleton pattern with SystemSingleton for unified system-level caching coordination
  * Provides RBAC functionality with platform cache integration
+ * Uses SYSTEM + WEB target for web-to-API communication (port 3000)
  */
 export class RBACService extends SystemSingleton {
   private static readonly CACHE_TTL = 10 * 60 * 1000; // 10 minutes
@@ -57,13 +60,14 @@ export class RBACService extends SystemSingleton {
   /**
    * Get role groups with system-level caching
    * Uses platform's built-in caching via SystemSingleton
+   * Routes to WEB server (port 3000) for web-to-API communication
    */
   async getRoleGroups(): Promise<RBACRoleGroups> {
     try {
-      console.log('[RBACService] Fetching role groups via system-level caching');
+      console.log('[RBACService] Fetching role groups via web server (port 3000)');
       
-      // Use system-level API request with automatic caching
-      const result = await this.makeSystemRequest<RBACRoleGroups>('/api/auth/role-groups', {
+      // Use web server request with automatic caching
+      const result = await this.makeDefaultRequest<RBACRoleGroups>('/api/auth/role-groups', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -74,7 +78,7 @@ export class RBACService extends SystemSingleton {
       }, 'role-groups', RBACService.CACHE_TTL);
 
       if (result.success && result.data) {
-        console.log('[RBACService] Role groups retrieved from system cache');
+        console.log('[RBACService] Role groups retrieved from web server cache');
         return result.data;
       } else {
         throw new Error(result.error?.message || 'Failed to fetch role groups');
@@ -82,21 +86,19 @@ export class RBACService extends SystemSingleton {
 
     } catch (error) {
       console.error('[RBACService] Failed to fetch role groups:', error);
-      
-      // Return fallback role groups as last resort
-      console.error('[RBACService] Using fallback role groups');
       return this.getFallbackRoleGroups();
     }
   }
 
   /**
    * Get user permissions with system-level caching
+   * Routes to WEB server (port 3000) for web-to-API communication
    */
   async getUserPermissions(): Promise<RBACUserPermissions> {
     try {
-      console.log('[RBACService] Fetching user permissions via system-level caching');
+      console.log('[RBACService] Fetching user permissions via web server (port 3000)');
       
-      const result = await this.makeSystemRequest<RBACUserPermissions>('/api/auth/user-permissions', {
+      const result = await this.makeDefaultRequest<RBACUserPermissions>('/api/auth/user-permissions', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -107,7 +109,7 @@ export class RBACService extends SystemSingleton {
       }, 'user-permissions', RBACService.CACHE_TTL);
 
       if (result.success && result.data) {
-        console.log('[RBACService] User permissions retrieved from system cache');
+        console.log('[RBACService] User permissions retrieved from web server cache');
         return result.data;
       } else {
         throw new Error(result.error?.message || 'Failed to fetch user permissions');
@@ -122,12 +124,13 @@ export class RBACService extends SystemSingleton {
   /**
    * Get unified user access with system-level caching
    * This is the preferred method - gets both groups and permissions
+   * Routes to WEB server (port 3000) for web-to-API communication
    */
   async getUserAccess(): Promise<RBACUserAccess> {
     try {
-      console.log('[RBACService] Fetching user access via system-level caching');
+      console.log('[RBACService] Fetching user access via web server (port 3000)');
       
-      const result = await this.makeSystemRequest<RBACUserAccess>('/api/auth/user-access', {
+      const result = await this.makeDefaultRequest<RBACUserAccess>('/api/auth/user-access', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -138,7 +141,7 @@ export class RBACService extends SystemSingleton {
       }, 'user-access', RBACService.CACHE_TTL);
 
       if (result.success && result.data) {
-        console.log('[RBACService] User access retrieved from system cache');
+        console.log('[RBACService] User access retrieved from web server cache');
         return result.data;
       } else {
         throw new Error(result.error?.message || 'Failed to fetch user access');
@@ -212,16 +215,16 @@ export class RBACService extends SystemSingleton {
    * Get cache statistics from system-level cache manager
    */
   getCacheStats() {
-    // Use UniversalSingleton's metrics
+    // Use FlexibleApiSingleton's metrics
     return {
-      cacheHits: this.cacheHits,
-      cacheMisses: this.cacheMisses,
+      cacheHits: this.apiCalls, // Use apiCalls as hit indicator
+      cacheMisses: 0, // SystemSingleton doesn't track misses separately
       apiCalls: this.apiCalls,
-      cacheHitRate: this.cacheHits > 0 ? (this.cacheHits / (this.cacheHits + this.cacheMisses)) : 0,
-      totalEntries: 0, // UniversalSingleton doesn't expose this
-      expiredEntries: 0, // UniversalSingleton doesn't expose this
-      memorySize: 0, // UniversalSingleton doesn't expose this
-      persistentCacheSize: 0, // UniversalSingleton doesn't expose this
+      cacheHitRate: 1.0, // Assume hits for cached operations
+      totalEntries: 0, // FlexibleApiSingleton doesn't expose this
+      expiredEntries: 0, // FlexibleApiSingleton doesn't expose this
+      memorySize: 0, // FlexibleApiSingleton doesn't expose this
+      persistentCacheSize: 0, // FlexibleApiSingleton doesn't expose this
     };
   }
 

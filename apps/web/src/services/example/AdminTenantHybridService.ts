@@ -7,7 +7,7 @@
  * - Example: Admin allowing tenant owners to call within their context
  */
 
-import { FlexibleApiSingleton, RequestType, SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
+import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 
 export interface TenantAnalytics {
   totalScans: number;
@@ -30,6 +30,7 @@ class AdminTenantHybridService extends FlexibleApiSingleton {
   
   // Default to admin-level access
   protected defaultRequestType: RequestType.ADMIN = RequestType.ADMIN;
+  protected defaultRequestTarget: RequestTarget = RequestTarget.API;
 
   private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     super(singletonKey, {

@@ -10,14 +10,15 @@
  * - Optimized for user-specific data
  */
 
-import { FlexibleApiSingleton, RequestType, SingletonCacheOptions, AuthenticatedApiResponse, ApiResult } from './FlexibleApiSingleton';
+import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, AuthenticatedApiResponse, ApiResult } from './FlexibleApiSingleton';
 
 // ====================
 // AUTHENTICATED API SINGLETON
 // ====================
 
 export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
-  protected defaultRequestType: RequestType.AUTHENTICATED = RequestType.AUTHENTICATED;
+  protected defaultRequestType: RequestType = RequestType.AUTHENTICATED;
+  protected defaultRequestTarget: RequestTarget = RequestTarget.API;
   protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for authenticated data
   
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {

@@ -166,8 +166,8 @@ export class DirectoryService extends AdminApiSingleton {
     );
 
     // Invalidate directory cache
-    this.invalidateAdminCache('directory-stats');
-    this.invalidateAdminCache('directory-listings');
+    this.invalidateCache('directory-stats');
+    this.invalidateCache('directory-listings');
   }
 
   /**
@@ -188,8 +188,8 @@ export class DirectoryService extends AdminApiSingleton {
     );
 
     // Invalidate directory cache
-    this.invalidateAdminCache('directory-stats');
-    this.invalidateAdminCache('directory-listings');
+    this.invalidateCache('directory-stats');
+    this.invalidateCache('directory-listings');
   }
 
   /**
@@ -211,8 +211,8 @@ export class DirectoryService extends AdminApiSingleton {
     );
 
     // Invalidate directory cache
-    this.invalidateAdminCache('directory-stats');
-    this.invalidateAdminCache('directory-listings');
+    this.invalidateCache('directory-stats');
+    this.invalidateCache('directory-listings');
   }
 
   /**
@@ -255,9 +255,9 @@ export class DirectoryService extends AdminApiSingleton {
     );
 
     // Invalidate directory cache
-    this.invalidateAdminCache('directory-stats');
-    this.invalidateAdminCache('directory-listings');
-    this.invalidateAdminCache(`directory-listing-${tenantId}`);
+    this.invalidateCache('directory-stats');
+    this.invalidateCache('directory-listings');
+    this.invalidateCache(`directory-listing-${tenantId}`);
 
     return response?.data || null;
   }
@@ -280,8 +280,8 @@ export class DirectoryService extends AdminApiSingleton {
     );
 
     // Invalidate directory cache
-    this.invalidateAdminCache('directory-stats');
-    this.invalidateAdminCache('directory-listings');
+    this.invalidateCache('directory-stats');
+    this.invalidateCache('directory-listings');
   }
 
   /**
@@ -312,7 +312,7 @@ export class DirectoryService extends AdminApiSingleton {
     );
 
     // Invalidate directory cache
-    this.invalidateAdminCache('directory-listings');
+    this.invalidateCache('directory-listings');
   }
 }
 

@@ -5,7 +5,7 @@
  * and when to use explicit vs default request methods
  */
 
-import { FlexibleApiSingleton, RequestType, SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
+import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 
 export interface TenantData {
   id: string;
@@ -26,6 +26,7 @@ class AdminServiceExample extends FlexibleApiSingleton {
   
   // STEP 1: Define default request type for this service
   protected defaultRequestType: RequestType.ADMIN = RequestType.ADMIN;
+  protected defaultRequestTarget: RequestTarget = RequestTarget.API;
 
   private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     super(singletonKey, {

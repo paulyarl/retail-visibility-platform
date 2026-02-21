@@ -333,7 +333,7 @@ export class AnalyticsService extends AdminApiSingleton {
     );
 
     // Invalidate enrichment analytics cache
-    this.invalidateAdminCache('enrichment-analytics');
+    this.invalidateCache('enrichment-analytics');
 
     return response?.data || null;
   }

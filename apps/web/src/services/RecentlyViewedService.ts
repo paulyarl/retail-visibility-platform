@@ -1,8 +1,9 @@
 /**
- * Recently Viewed Service - Public API Pattern
+ * Recently Viewed Service - Real-Time Behavior Tracking
  * 
- * Manages recently viewed items for users and public pages
- * Extends PublicApiSingleton for consistent caching and metrics
+ * Manages recently viewed items for real-time behavior display
+ * NO CACHE for instant behavior updates and live user tracking
+ * Extends PublicApiSingleton for consistent metrics and targeting
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
@@ -47,10 +48,11 @@ export interface RecentlyViewedStats {
 }
 
 /**
- * Recently Viewed Service - Public API Pattern
+ * Recently Viewed Service - Real-Time Behavior Tracking
  * 
- * Manages recently viewed items for personalization and user tracking
- * Uses PublicApiSingleton for consistent caching and metrics
+ * Manages recently viewed items for real-time behavior display
+ * Uses NO CACHE for instant updates and live user tracking
+ * Optimized for real-time dashboards and behavior monitoring
  */
 class RecentlyViewedService extends PublicApiSingleton {
   private static instance: RecentlyViewedService;
@@ -58,16 +60,14 @@ class RecentlyViewedService extends PublicApiSingleton {
   private currentViewStart: string | null = null;
   private currentItemId: string | null = null;
 
-  // TTL constants for different data types
-  private readonly RECENT_ITEMS_TTL = 2 * 60 * 1000; // 2 minutes for recent items
-  private readonly STATS_TTL = 10 * 60 * 1000; // 10 minutes for stats
-  private readonly TRENDS_TTL = 15 * 60 * 1000; // 15 minutes for trends
-  private readonly RECOMMENDATIONS_TTL = 5 * 60 * 1000; // 5 minutes for recommendations
+  // ⚡ NO CACHE - Real-time behavior tracking
+  // All operations use TTL = 0 for instant data
+  private readonly NO_CACHE = 0;
 
   private constructor() {
     super('recently-viewed-service');
     
-    // Default configuration
+    // Default configuration optimized for real-time tracking
     this.recentlyViewedConfig = {
       maxItems: 50,
       retentionDays: 30,
@@ -86,7 +86,8 @@ class RecentlyViewedService extends PublicApiSingleton {
   }
 
   /**
-   * Track a recently viewed item
+   * Track a recently viewed item (REAL-TIME)
+   * No cache - instant behavior tracking
    */
   async trackItem(item: Omit<RecentlyViewedItem, 'viewedAt'>): Promise<void> {
     const recentlyViewedItem: RecentlyViewedItem = {
@@ -95,7 +96,7 @@ class RecentlyViewedService extends PublicApiSingleton {
     };
 
     try {
-      // Send to API
+      // ⚡ REAL-TIME: No cache for instant tracking
       await this.makeDefaultRequest<void>(
         '/api/user/recently-viewed',
         {
@@ -103,10 +104,10 @@ class RecentlyViewedService extends PublicApiSingleton {
           body: JSON.stringify(recentlyViewedItem)
         },
         `track-item-${item.id}-${item.sessionId}`,
-        0 // No caching for write operations
+        this.NO_CACHE // ⚡ NO CACHE - Real-time tracking
       );
 
-      console.log('[RecentlyViewedService] Item tracked successfully:', recentlyViewedItem.id);
+      console.log('[RecentlyViewedService] ⚡ Item tracked in real-time:', recentlyViewedItem.id);
     } catch (error) {
       console.error('[RecentlyViewedService] Failed to track item:', error);
     }
@@ -121,7 +122,7 @@ class RecentlyViewedService extends PublicApiSingleton {
   }
 
   /**
-   * End tracking view duration and record it
+   * End tracking view duration and record it (REAL-TIME)
    */
   async endView(): Promise<void> {
     if (!this.currentItemId || !this.currentViewStart) {
@@ -131,6 +132,7 @@ class RecentlyViewedService extends PublicApiSingleton {
     const duration = Math.floor((Date.now() - new Date(this.currentViewStart).getTime()) / 1000);
 
     try {
+      // ⚡ REAL-TIME: No cache for instant duration tracking
       await this.makeDefaultRequest<void>(
         `/api/user/recently-viewed/${this.currentItemId}/duration`,
         {
@@ -138,10 +140,10 @@ class RecentlyViewedService extends PublicApiSingleton {
           body: JSON.stringify({ duration })
         },
         `view-duration-${this.currentItemId}`,
-        0 // No caching for write operations
+        this.NO_CACHE // ⚡ NO CACHE - Real-time duration
       );
 
-      console.log('[RecentlyViewedService] View duration recorded:', duration);
+      console.log('[RecentlyViewedService] ⚡ View duration recorded in real-time:', duration);
     } catch (error) {
       console.error('[RecentlyViewedService] Failed to record view duration:', error);
     } finally {
@@ -151,7 +153,8 @@ class RecentlyViewedService extends PublicApiSingleton {
   }
 
   /**
-   * Get recently viewed items for a user or session
+   * Get recently viewed items (REAL-TIME)
+   * No cache - always show latest behavior
    */
   async getRecentlyViewed(options: {
     userId?: string;
@@ -173,11 +176,12 @@ class RecentlyViewedService extends PublicApiSingleton {
       const queryString = params.toString();
       const endpoint = `/api/user/recently-viewed${queryString ? `?${queryString}` : ''}`;
 
+      // ⚡ REAL-TIME: No cache for latest behavior data
       const items = await this.makeDefaultRequest<RecentlyViewedItem[]>(
         endpoint,
         {},
         cacheKey,
-        this.RECENT_ITEMS_TTL
+        this.NO_CACHE // ⚡ NO CACHE - Real-time data
       );
 
       return items.data || [];
@@ -188,7 +192,7 @@ class RecentlyViewedService extends PublicApiSingleton {
   }
 
   /**
-   * Remove a specific item from recently viewed
+   * Remove a specific item from recently viewed (REAL-TIME)
    */
   async removeItem(itemId: string, userId?: string): Promise<void> {
     try {
@@ -199,17 +203,17 @@ class RecentlyViewedService extends PublicApiSingleton {
         `/api/user/recently-viewed/${itemId}${params ? `?${params}` : ''}`,
         { method: 'DELETE' },
         `remove-item-${itemId}-${userId || 'anonymous'}`,
-        0 // No caching for write operations
+        this.NO_CACHE // ⚡ NO CACHE - Real-time removal
       );
 
-      console.log('[RecentlyViewedService] Item removed:', itemId);
+      console.log('[RecentlyViewedService] ⚡ Item removed in real-time:', itemId);
     } catch (error) {
       console.error('[RecentlyViewedService] Failed to remove item:', error);
     }
   }
 
   /**
-   * Clear all recently viewed items for a user
+   * Clear all recently viewed items for a user (REAL-TIME)
    */
   async clearRecentlyViewed(userId?: string): Promise<void> {
     try {
@@ -220,17 +224,18 @@ class RecentlyViewedService extends PublicApiSingleton {
         `/api/user/recently-viewed${params ? `?${params}` : ''}`,
         { method: 'DELETE' },
         `clear-recently-viewed-${userId || 'anonymous'}`,
-        0 // No caching for write operations
+        this.NO_CACHE // ⚡ NO CACHE - Real-time clearing
       );
 
-      console.log('[RecentlyViewedService] Recently viewed cleared for user:', userId || 'anonymous');
+      console.log('[RecentlyViewedService] ⚡ Recently viewed cleared in real-time for user:', userId || 'anonymous');
     } catch (error) {
       console.error('[RecentlyViewedService] Failed to clear recently viewed:', error);
     }
   }
 
   /**
-   * Get recently viewed statistics
+   * Get recently viewed statistics (REAL-TIME)
+   * No cache - always show latest behavior stats
    */
   async getStats(userId?: string, days: number = 30): Promise<RecentlyViewedStats> {
     const cacheKey = `recently-viewed-stats-${userId || 'anonymous'}-${days}`;
@@ -243,11 +248,12 @@ class RecentlyViewedService extends PublicApiSingleton {
       const queryString = params.toString();
       const endpoint = `/api/user/recently-viewed/stats?${queryString}`;
 
+      // ⚡ REAL-TIME: No cache for latest statistics
       const stats = await this.makeDefaultRequest<RecentlyViewedStats>(
         endpoint,
         {},
         cacheKey,
-        this.STATS_TTL
+        this.NO_CACHE // ⚡ NO CACHE - Real-time stats
       );
 
       return stats.data || {
@@ -272,7 +278,8 @@ class RecentlyViewedService extends PublicApiSingleton {
   }
 
   /**
-   * Get viewing trends over time
+   * Get viewing trends over time (REAL-TIME)
+   * No cache - always show latest trends
    */
   async getTrends(userId?: string, days: number = 30): Promise<Array<{ date: string; views: number }>> {
     const cacheKey = `recently-viewed-trends-${userId || 'anonymous'}-${days}`;
@@ -285,11 +292,12 @@ class RecentlyViewedService extends PublicApiSingleton {
       const queryString = params.toString();
       const endpoint = `/api/user/recently-viewed/trends?${queryString}`;
 
+      // ⚡ REAL-TIME: No cache for latest trends
       const trends = await this.makeDefaultRequest<Array<{ date: string; views: number }>>(
         endpoint,
         {},
         cacheKey,
-        this.TRENDS_TTL
+        this.NO_CACHE // ⚡ NO CACHE - Real-time trends
       );
 
       return trends.data || [];
@@ -300,7 +308,8 @@ class RecentlyViewedService extends PublicApiSingleton {
   }
 
   /**
-   * Get personalized recommendations based on recently viewed items
+   * Get personalized recommendations (REAL-TIME)
+   * No cache - always show latest recommendations based on current behavior
    */
   async getRecommendations(userId?: string, limit: number = 10): Promise<RecentlyViewedItem[]> {
     const cacheKey = `recently-viewed-recommendations-${userId || 'anonymous'}-${limit}`;
@@ -313,11 +322,12 @@ class RecentlyViewedService extends PublicApiSingleton {
       const queryString = params.toString();
       const endpoint = `/api/user/recently-viewed/recommendations?${queryString}`;
 
+      // ⚡ REAL-TIME: No cache for latest recommendations
       const recommendations = await this.makeDefaultRequest<RecentlyViewedItem[]>(
         endpoint,
         {},
         cacheKey,
-        this.RECOMMENDATIONS_TTL
+        this.NO_CACHE // ⚡ NO CACHE - Real-time recommendations
       );
 
       return recommendations.data || [];
@@ -328,23 +338,68 @@ class RecentlyViewedService extends PublicApiSingleton {
   }
 
   /**
-   * Get similar items based on a recently viewed item
+   * Get similar items based on a recently viewed item (REAL-TIME)
+   * No cache - always show latest similar items
    */
   async getSimilarItems(itemId: string, limit: number = 5): Promise<RecentlyViewedItem[]> {
     const cacheKey = `similar-items-${itemId}-${limit}`;
 
     try {
+      // ⚡ REAL-TIME: No cache for latest similar items
       const similarItems = await this.makeDefaultRequest<RecentlyViewedItem[]>(
         `/api/user/recently-viewed/${itemId}/similar?limit=${limit}`,
         {},
         cacheKey,
-        this.RECOMMENDATIONS_TTL
+        this.NO_CACHE // ⚡ NO CACHE - Real-time similar items
       );
 
       return similarItems.data || [];
     } catch (error) {
       console.error('[RecentlyViewedService] Error fetching similar items:', error);
       return [];
+    }
+  }
+
+  /**
+   * ⚡ REAL-TIME BEHAVIOR MONITORING
+   * Get live behavior data for dashboards
+   */
+  async getLiveBehavior(options: {
+    userId?: string;
+    sessionId?: string;
+    tenantId?: string;
+  } = {}): Promise<{
+    currentView?: RecentlyViewedItem;
+    recentViews: RecentlyViewedItem[];
+    stats: RecentlyViewedStats;
+    trends: Array<{ date: string; views: number }>;
+  }> {
+    try {
+      // ⚡ ALL REAL-TIME: No cache anywhere
+      const [recentViews, stats, trends] = await Promise.all([
+        this.getRecentlyViewed({ ...options, limit: 10 }),
+        this.getStats(options.userId),
+        this.getTrends(options.userId, 7) // 7 days for live trends
+      ]);
+
+      return {
+        recentViews,
+        stats,
+        trends
+      };
+    } catch (error) {
+      console.error('[RecentlyViewedService] Error fetching live behavior:', error);
+      return {
+        recentViews: [],
+        stats: {
+          totalViews: 0,
+          uniqueItems: 0,
+          averageViewDuration: 0,
+          topViewedTypes: [],
+          viewTrends: []
+        },
+        trends: []
+      };
     }
   }
 
