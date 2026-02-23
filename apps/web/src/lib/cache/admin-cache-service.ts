@@ -75,6 +75,12 @@ export class AdminCacheService {
    * Fetches all admin data in parallel and caches results
    */
   static async getConsolidatedAdminData(useCache = true, userId?: string): Promise<ConsolidatedAdminData> {
+    // Early return for non-authenticated users
+    if (!userId) {
+      console.log('[AdminCacheService] No user ID provided, returning empty admin data');
+      return this.getEmptyAdminData();
+    }
+
     const cacheKey = 'admin-consolidated-data';
 
     // Try to get from cache first
@@ -108,21 +114,15 @@ export class AdminCacheService {
         this.getFailedLogins(false, userId)
       ]);
 
-      // Build consolidated data object
+      // Build consolidated data object with proper error handling
       const consolidatedData: ConsolidatedAdminData = {
         tenants: tenantsData.status === 'fulfilled' ? tenantsData.value : { tenants: [], total: 0 },
-        syncStats: syncStatsData.status === 'fulfilled' ? syncStatsData.value : {
-          totalRuns: 0, successRate: 0, outOfSyncCount: 0, failedRuns: 0
-        },
-        securitySessions: securitySessionsData.status === 'fulfilled' ? securitySessionsData.value : { data: [], total: 0 },
-        securityStats: securityStatsData.status === 'fulfilled' ? securityStatsData.value : {
-          activeSessions: 0, activeUsers: 0, sessionsLast24h: 0, revokedSessions: 0, deviceBreakdown: []
-        },
-        securityAlerts: securityAlertsData.status === 'fulfilled' ? securityAlertsData.value : { data: [], total: 0 },
-        securityAlertStats: securityAlertStatsData.status === 'fulfilled' ? securityAlertStatsData.value : {
-          totalAlerts: 0, unreadAlerts: 0, alertsLast24h: 0, criticalAlerts: 0, warningAlerts: 0, typeBreakdown: []
-        },
-        failedLogins: failedLoginsData.status === 'fulfilled' ? failedLoginsData.value : { data: [] },
+        syncStats: syncStatsData.status === 'fulfilled' ? syncStatsData.value : this.getEmptyAdminData().syncStats,
+        securitySessions: securitySessionsData.status === 'fulfilled' ? securitySessionsData.value : this.getEmptyAdminData().securitySessions,
+        securityStats: securityStatsData.status === 'fulfilled' ? securityStatsData.value : this.getEmptyAdminData().securityStats,
+        securityAlerts: securityAlertsData.status === 'fulfilled' ? securityAlertsData.value : this.getEmptyAdminData().securityAlerts,
+        securityAlertStats: securityAlertStatsData.status === 'fulfilled' ? securityAlertStatsData.value : this.getEmptyAdminData().securityAlertStats,
+        failedLogins: failedLoginsData.status === 'fulfilled' ? failedLoginsData.value : this.getEmptyAdminData().failedLogins,
         _timestamp: new Date().toISOString(),
         _cacheVersion: this.CACHE_VERSION
       };
@@ -348,6 +348,49 @@ export class AdminCacheService {
         }
       });
     });
+  }
+
+  /**
+   * Get empty admin data structure for non-authenticated users
+   */
+  private static getEmptyAdminData(): ConsolidatedAdminData {
+    return {
+      tenants: { tenants: [], total: 0 },
+      syncStats: {
+        totalRuns: 0,
+        successRate: 0,
+        outOfSyncCount: 0,
+        failedRuns: 0
+      },
+      securitySessions: {
+        data: [],
+        total: 0
+      },
+      securityStats: {
+        activeSessions: 0,
+        activeUsers: 0,
+        sessionsLast24h: 0,
+        revokedSessions: 0,
+        deviceBreakdown: []
+      },
+      securityAlerts: {
+        data: [],
+        total: 0
+      },
+      securityAlertStats: {
+        totalAlerts: 0,
+        unreadAlerts: 0,
+        alertsLast24h: 0,
+        criticalAlerts: 0,
+        warningAlerts: 0,
+        typeBreakdown: []
+      },
+      failedLogins: {
+        data: []
+      },
+      _timestamp: new Date().toISOString(),
+      _cacheVersion: this.CACHE_VERSION
+    };
   }
 
   /**

@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 
 export interface TickerMessage {
   id: string;
@@ -33,7 +33,7 @@ export interface TickerConfig {
   createdBy?: string;
 }
 
-class TickerConfigService extends AuthenticatedApiSingleton {
+class TickerConfigService extends AdminApiSingleton {
   private static _instance: TickerConfigService;
 
   protected constructor() {
@@ -71,6 +71,16 @@ class TickerConfigService extends AuthenticatedApiSingleton {
 
       return this.createResponse(true, result.data);
     } catch (error) {
+      // Handle authentication errors specifically
+      if (error instanceof Error && error.message === 'No authentication token available') {
+        console.warn('[TickerConfigService] User not authenticated, skipping ticker config load');
+        return this.createResponse(false, undefined, {
+          code: 'AUTH_REQUIRED',
+          message: 'Authentication required',
+          status: 401
+        }, 'Please log in to access ticker settings');
+      }
+      
       this.logError('Failed to get ticker config', error);
       return this.createResponse(false, undefined, error, 'Failed to load ticker configuration');
     }
@@ -88,7 +98,7 @@ class TickerConfigService extends AuthenticatedApiSingleton {
     try {
       const params = new URLSearchParams();
       if (tenantId) params.append('tenantId', tenantId);
-      if (tenantTier) params.append('tenantTier', tenantTier);
+      if (tenantTier) params.append('tier', tenantTier);
 
       const result = await this.makeDefaultRequest<TickerMessage[]>(
         `/api/admin/ticker-messages/active?${params.toString()}`,

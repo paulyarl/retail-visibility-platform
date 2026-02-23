@@ -24,6 +24,10 @@ export interface UseAdminDataReturn {
  */
 export function useAdminData(): UseAdminDataReturn {
   const { user } = useAuth();
+  
+  // Check if user is authenticated and has admin privileges
+  const isAdmin = user && (user.role === 'PLATFORM_ADMIN' || user.role === 'ADMIN' || user.role === 'PLATFORM_SUPPORT');
+  
   // Use React Query for admin data fetching with caching
   const { data: adminData, isLoading: adminLoading, error: adminError, refetch } = useQuery({
     queryKey: ['admin', 'consolidated-data'],
@@ -38,6 +42,9 @@ export function useAdminData(): UseAdminDataReturn {
     },
     staleTime: 2 * 60 * 1000, // 2 minutes - admin data changes moderately frequently
     gcTime: 10 * 60 * 1000, // 10 minutes cache
+    enabled: !!isAdmin, // Only run query if user is admin
+    retry: isAdmin ? 3 : 0, // Only retry if user is admin
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
     refetchOnWindowFocus: false, // Don't refetch on window focus for admin data
     refetchOnReconnect: true, // Refetch when connection is restored
   });

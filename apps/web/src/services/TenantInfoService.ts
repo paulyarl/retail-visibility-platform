@@ -260,6 +260,75 @@ class TenantInfoService extends TenantApiSingleton {
   }
 
   /**
+   * Get tenant business hours with caching
+   * Uses the /api/tenants/:tenantId/business-hours endpoint (authenticated)
+   * For tenant dashboard and management pages
+   */
+  async getBusinessHours(tenantId: string): Promise<BusinessHours | null> {
+    try {
+      if (!tenantId) {
+        console.error('[TenantInfoService] getBusinessHours: tenantId is required');
+        return null;
+      }
+
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        data: {
+          periods: Array<{
+            day: string;
+            open: string;
+            close: string;
+          }>;
+          timezone: string;
+        };
+      }>(
+        `/api/tenant/${tenantId}/business-hours`,
+        {},
+        `tenant-business-hours-${tenantId}`,
+        this.cacheTTL
+      );
+      
+      if (!result.success) {
+        console.error('[TenantInfoService] Failed to get business hours:', result.error);
+        return null;
+      }
+
+      if (result && result.data && result.data.success && result.data.data) {
+        const { periods, timezone } = result.data.data;
+        const hours: BusinessHours = { timezone };
+
+        // Convert periods to day-based format for BusinessHoursDisplay
+        periods.forEach((period: any) => {
+          // Convert API day format (MONDAY) to title case (Monday) for display
+          const dayMap: Record<string, string> = {
+            'MONDAY': 'Monday',
+            'TUESDAY': 'Tuesday',
+            'WEDNESDAY': 'Wednesday',
+            'THURSDAY': 'Thursday',
+            'FRIDAY': 'Friday',
+            'SATURDAY': 'Saturday',
+            'SUNDAY': 'Sunday'
+          };
+          const titleCaseDay = dayMap[period.day] || period.day;
+          if (titleCaseDay && !hours[titleCaseDay]) {
+            hours[titleCaseDay] = {
+              open: period.open,
+              close: period.close
+            };
+          }
+        });
+
+        return hours;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get business hours:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get tenant tier information
    * Uses the /api/tenants/:tenantId/tier endpoint
    */
@@ -309,19 +378,41 @@ class TenantInfoService extends TenantApiSingleton {
         };
       }
 
-      // Get data from multiple endpoints in parallel
-      const [tenantData, organizationResult, businessHoursData, paymentGatewaysData] = await Promise.all([
-        this.getTenantDataWithCacheBusting(tenantId),
-        this.getOrganization(tenantId), // Using getOrganization as a fallback for business profile
-        Promise.resolve(null), // Business hours not available in this service
-        this.getPaymentGateways(tenantId)
-      ]);
+      // Get tenant data independently - this is the core requirement
+      const tenant = await this.getTenantDataWithCacheBusting(tenantId);
+
+      // Get optional data independently - failures don't affect core tenant data
+      let businessProfile = null;
+      let businessHours = null;
+      let paymentGateways: any[] = [];
+
+      try {
+        const orgResult = await this.getOrganization(tenantId);
+        businessProfile = orgResult?.success ? orgResult.data : null;
+      } catch (error) {
+        // Organization failure doesn't break the entire operation
+        console.warn('[TenantInfoService] Organization data unavailable:', error);
+      }
+
+      try {
+        businessHours = await this.getBusinessHours(tenantId);
+      } catch (error) {
+        // Business hours failure doesn't break the entire operation
+        console.warn('[TenantInfoService] Business hours unavailable:', error);
+      }
+
+      try {
+        paymentGateways = await this.getPaymentGateways(tenantId);
+      } catch (error) {
+        // Payment gateways failure doesn't break the entire operation
+        console.warn('[TenantInfoService] Payment gateways unavailable:', error);
+      }
 
       return {
-        tenant: tenantData,
-        businessProfile: organizationResult?.success ? organizationResult.data : null,
-        businessHours: businessHoursData,
-        paymentGateways: paymentGatewaysData
+        tenant: tenant,
+        businessProfile: businessProfile,
+        businessHours: businessHours,
+        paymentGateways: paymentGateways
       };
     } catch (error) {
       console.error('[TenantInfoService] Failed to get complete tenant info:', error);

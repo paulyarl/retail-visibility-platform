@@ -69,4 +69,38 @@ router.get('/', requirePlatformAdmin, async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/admin/tenants/list
+ * Simple list of tenants for ticker targeting
+ * Permission: Platform admin only
+ */
+router.get('/list', requirePlatformAdmin, async (req: Request, res: Response) => {
+  try {
+    console.log('[ADMIN TENANTS LIST] Request received from platform admin');
+
+    const tenants = await prisma.tenants.findMany({
+      select: {
+        id: true,
+        name: true,
+        subscription_tier: true,
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    const simplifiedList = tenants.map(tenant => ({
+      id: tenant.id,
+      name: tenant.name,
+      tier: tenant.subscription_tier
+    }));
+
+    res.json(simplifiedList);
+  } catch (error: any) {
+    console.error('[ADMIN TENANTS LIST] Error fetching tenant list:', error);
+    res.status(500).json({
+      error: 'internal_error',
+      message: 'Failed to fetch tenant list',
+    });
+  }
+});
+
 export default router;

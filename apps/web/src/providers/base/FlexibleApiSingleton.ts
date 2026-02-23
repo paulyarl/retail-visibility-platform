@@ -693,9 +693,13 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
       // Check multiple sources for auth token
       const token = localStorage.getItem('access_token') || 
                    sessionStorage.getItem('access_token') ||
-                   document.cookie.split(';').find(c => c.trim().startsWith('access_token='))?.split('=')[1];
+                   document.cookie.split(';').find(c => c.trim().startsWith('access_token='))?.split('=')[1] ||
+                   localStorage.getItem('authToken') ||
+                   sessionStorage.getItem('authToken') ||
+                   document.cookie.split(';').find(c => c.trim().startsWith('authToken='))?.split('=')[1];
       
       if (!token) {
+        console.warn('[FlexibleApiSingleton] No auth token found in any storage');
         return null;
       }
       

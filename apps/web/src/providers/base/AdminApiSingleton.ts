@@ -103,6 +103,8 @@ export abstract class AdminApiSingleton extends FlexibleApiSingleton {
       };
     } else {
       console.warn('[AdminApiSingleton] No auth token available for admin request');
+      // Return early if no token - don't make the request
+      throw new Error('No authentication token available');
     }
 
     // Add admin context headers

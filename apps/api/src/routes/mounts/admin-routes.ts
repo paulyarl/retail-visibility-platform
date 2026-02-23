@@ -16,6 +16,9 @@ import platformCategoriesRoutes from '../admin/platform-categories';
 import gbpCategoriesSyncRoutes from '../admin/gbp-categories-sync';
 import securityRoutes from '../security';
 import platformSettingsRoutes from '../admin/platform-settings';
+import tickerConfigRoutes from '../admin/ticker-config';
+import tickerMessagesRoutes from '../admin/ticker-messages';
+import tiersRoutes from '../admin/tiers';
 
 /**
  * Mount admin routes
@@ -38,6 +41,9 @@ export function mountAdminRoutes(app: Express) {
   app.use('/api/admin/tier-management', authenticateToken, requireAdmin, tierManagementRoutes);
   app.use('/api/admin/tier-system', authenticateToken, requireAdmin, tierSystemRoutes);
   app.use('/api/admin/tenants', authenticateToken, requireAdmin, adminTenantsRoutes);
+  app.use('/api/admin/ticker-config', authenticateToken, requireAdmin, tickerConfigRoutes);
+  app.use('/api/admin/ticker-messages', authenticateToken, requireAdmin, tickerMessagesRoutes);
+  app.use('/api/admin/tiers', authenticateToken, requireAdmin, tiersRoutes);
   
   // Tenant flags: accessible by platform admins OR store owners of that specific tenant
   app.use('/admin', authenticateToken, tenantFlagsRoutes);

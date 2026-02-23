@@ -12,6 +12,7 @@ import { GlobalAlertBar } from "@/components/ui/GlobalAlertProvider";
 import { Settings, LogOut, ArrowLeft, Store, Menu, X } from "lucide-react";
 import SidebarLayout from "@/components/navigation/SidebarLayout";
 import TenantSwitcher from "@/components/app-shell/TenantSwitcher";
+import ShellWithTicker from "@/components/layout/ShellWithTicker";
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -108,8 +109,7 @@ export default function TenantAppShell({ children, navItems }: TenantAppShellPro
   };
 
   return (
-    <div className="min-h-dvh flex flex-col bg-neutral-50">
-      {/* Fixed Header */}
+    <ShellWithTicker shellHeader={
       <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
         {/* Main Header Row */}
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 h-14 flex items-center justify-between">
@@ -261,10 +261,7 @@ export default function TenantAppShell({ children, navItems }: TenantAppShellPro
           </div>
         )}
       </header>
-
-      {/* Global Alert Bar */}
-      <GlobalAlertBar />
-
+    }>
       {/* Main Content with Sidebar */}
       <div className="flex flex-1">
         {/* Sidebar Overlay for Mobile */}
@@ -297,6 +294,6 @@ export default function TenantAppShell({ children, navItems }: TenantAppShellPro
           {children}
         </main>
       </div>
-    </div>
+    </ShellWithTicker>
   );
 }

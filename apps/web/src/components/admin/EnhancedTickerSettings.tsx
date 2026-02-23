@@ -38,6 +38,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { TickerMessage, TickerConfig, tickerConfigService } from '@/services/TickerConfigService';
 import { DateTimePicker } from '@mantine/dates';
+import PlatformTicker from '@/components/notifications/PlatformTicker';
 
 interface EnhancedTickerSettingsProps {
   onSave?: (config: TickerConfig) => void;
@@ -74,22 +75,62 @@ export default function EnhancedTickerSettings({
 
   const loadConfig = async () => {
     try {
+      console.log('[EnhancedTickerSettings] Loading config from API...');
       const result = await tickerConfigService.getTickerConfig();
+      console.log('[EnhancedTickerSettings] Page load API response:', result);
+      
       if (result.success && result.data) {
-        setConfig(result.data);
+        // Extract the actual ticker config from the nested response
+        console.log('[EnhancedTickerSettings] Raw API response data:', result.data);
+        console.log('[EnhancedTickerSettings] Data type:', typeof result.data);
+        console.log('[EnhancedTickerSettings] Data keys:', Object.keys(result.data));
+        
+        // The actual ticker config is nested in result.data.data
+        const actualData = (result.data as any).data;
+        console.log('[EnhancedTickerSettings] Actual ticker config data:', actualData);
+        console.log('[EnhancedTickerSettings] Messages in config:', actualData?.messages);
+        console.log('[EnhancedTickerSettings] Messages length:', actualData?.messages?.length);
+        
+        setConfig(actualData);
+      } else {
+        console.log('[EnhancedTickerSettings] Page load - API response failed or no data:', result);
       }
     } catch (error) {
-      console.error('Failed to load ticker config:', error);
+      console.error('[EnhancedTickerSettings] Failed to load ticker config:', error);
     }
   };
 
   const handleSave = async () => {
     setLoading(true);
     try {
-      const result = await tickerConfigService.updateGlobalSettings(config.globalSettings);
+      // Send both enabled and globalSettings to the settings endpoint
+      const settingsPayload = {
+        enabled: config?.enabled,
+        ...config.globalSettings
+      };
+      
+      const result = await tickerConfigService.updateGlobalSettings(settingsPayload);
       
       if (result.success) {
-        onSave?.(config);
+        console.log('[EnhancedTickerSettings] Save successful, API response:', result);
+        console.log('[EnhancedTickerSettings] Current config enabled state:', config.enabled);
+        // Update local config with the response data, preserving existing messages
+        if (result.data) {
+          // Extract only the TickerConfig data from the API response
+          const apiResponseData = (result.data as any).data as TickerConfig;
+          console.log('[EnhancedTickerSettings] API response data:', apiResponseData);
+          console.log('[EnhancedTickerSettings] API enabled state:', apiResponseData.enabled);
+          const tickerConfigData = {
+            enabled: apiResponseData.enabled,
+            messages: config.messages, // Preserve existing messages
+            globalSettings: apiResponseData.globalSettings
+          };
+          console.log('[EnhancedTickerSettings] New config data:', tickerConfigData);
+          
+          setConfig(tickerConfigData);
+          onSave?.(tickerConfigData);
+        }
+        
         notifications.show({
           title: 'Settings Saved',
           message: 'Platform ticker settings have been updated successfully.',
@@ -110,9 +151,10 @@ export default function EnhancedTickerSettings({
   const handleAddMessage = async (message: Omit<TickerMessage, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => {
     const result = await tickerConfigService.addMessage(message);
     if (result.success) {
+      const newMessage = { ...message, ...result.data! };
       setConfig(prev => ({
         ...prev,
-        messages: [...prev.messages, result.data!]
+        messages: [...prev.messages, newMessage]
       }));
       setMessageModal({ open: false, mode: 'create' });
       notifications.show({
@@ -141,6 +183,23 @@ export default function EnhancedTickerSettings({
     }
   };
 
+  const handleActivateMessage = async (messageId: string) => {
+    const result = await tickerConfigService.updateMessage(messageId, { isActive: true });
+    if (result.success) {
+      setConfig(prev => ({
+        ...prev,
+        messages: prev.messages.map(msg => 
+          msg.id === messageId ? { ...msg, isActive: true } : msg
+        )
+      }));
+      notifications.show({
+        title: 'Message Activated',
+        message: 'Ticker message has been activated and will appear in the ticker.',
+        color: 'green',
+      });
+    }
+  };
+
   const handleDeleteMessage = async (messageId: string) => {
     const result = await tickerConfigService.deleteMessage(messageId);
     if (result.success) {
@@ -148,6 +207,7 @@ export default function EnhancedTickerSettings({
         ...prev,
         messages: prev.messages.filter(msg => msg.id !== messageId)
       }));
+      setMessageModal({ open: false, mode: 'create' });
       notifications.show({
         title: 'Message Deleted',
         message: 'Ticker message has been deleted successfully.',
@@ -158,9 +218,9 @@ export default function EnhancedTickerSettings({
 
   const updateGlobalSettings = (key: keyof TickerConfig['globalSettings'], value: any) => {
     setConfig(prev => ({
-      ...prev,
+      ...(prev || {}),
       globalSettings: {
-        ...prev.globalSettings,
+        ...(prev?.globalSettings || {}),
         [key]: value
       }
     }));
@@ -206,8 +266,8 @@ export default function EnhancedTickerSettings({
               </Text>
             </div>
             <Switch
-              checked={config.enabled}
-              onChange={(e) => setConfig(prev => ({ ...prev, enabled: e.currentTarget.checked }))}
+              checked={config?.enabled || false}
+              onChange={(e) => setConfig(prev => ({ ...prev, enabled: e?.currentTarget?.checked || false }))}
             />
           </Group>
 
@@ -222,7 +282,7 @@ export default function EnhancedTickerSettings({
                 label="Maximum Messages"
                 min={1}
                 max={10}
-                value={config.globalSettings.maxMessages}
+                value={config.globalSettings?.maxMessages || 3}
                 onChange={(value) => updateGlobalSettings('maxMessages', Number(value) || 3)}
                 disabled={!config.enabled}
               />
@@ -234,7 +294,7 @@ export default function EnhancedTickerSettings({
                   { value: 'medium', label: 'Medium' },
                   { value: 'fast', label: 'Fast' }
                 ]}
-                value={config.globalSettings.scrollSpeed}
+                value={config.globalSettings?.scrollSpeed || 'medium'}
                 onChange={(value) => updateGlobalSettings('scrollSpeed', value)}
                 disabled={!config.enabled}
               />
@@ -243,8 +303,8 @@ export default function EnhancedTickerSettings({
             <Group grow>
               <Switch
                 label="Auto-rotate messages"
-                checked={config.globalSettings.autoRotate}
-                onChange={(e) => updateGlobalSettings('autoRotate', e.currentTarget.checked)}
+                checked={config.globalSettings?.autoRotate !== false}
+                onChange={(e) => updateGlobalSettings('autoRotate', e?.currentTarget?.checked || false)}
                 disabled={!config.enabled}
               />
 
@@ -252,30 +312,16 @@ export default function EnhancedTickerSettings({
                 label="Rotation Interval (seconds)"
                 min={3}
                 max={60}
-                value={config.globalSettings.rotationInterval}
+                value={config.globalSettings?.rotationInterval || 5}
                 onChange={(value) => updateGlobalSettings('rotationInterval', Number(value) || 5)}
-                disabled={!config.enabled || !config.globalSettings.autoRotate}
+                disabled={!config.enabled || config.globalSettings?.autoRotate === false}
               />
             </Group>
           </Stack>
 
           <Divider />
 
-          {/* Messages Management */}
-          <Stack gap="sm">
-            <Group justify="space-between">
-              <Text fw={500}>Messages</Text>
-              <Button
-                size="sm"
-                leftSection={<IconPlus size={14} />}
-                onClick={() => setMessageModal({ open: true, mode: 'create' })}
-                disabled={!config.enabled}
-              >
-                Add Message
-              </Button>
-            </Group>
-
-            {config.messages.length === 0 ? (
+            {(config.messages || []).length === 0 ? (
               <Alert color="gray" variant="light">
                 <Text size="sm">No messages configured. Click "Add Message" to create one.</Text>
               </Alert>
@@ -292,83 +338,117 @@ export default function EnhancedTickerSettings({
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {config.messages.map((message) => (
-                    <Table.Tr key={message.id}>
-                      <Table.Td>
-                        <Text size="sm" lineClamp={1} title={message.message}>
-                          {message.message}
-                        </Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge 
-                          size="sm" 
-                          color={
-                            message.type === 'info' ? 'blue' :
-                            message.type === 'warning' ? 'yellow' :
-                            message.type === 'success' ? 'green' : 'red'
-                          }
-                        >
-                          {message.type}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge size="sm" variant="light">
-                          {message.priority}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text size="sm">
-                          {message.targetAudience === 'all' ? 'All' :
-                           message.targetAudience === 'specific_tiers' ? 
-                           `${message.targetTiers?.length || 0} tiers` :
-                           `${message.targetTenants?.length || 0} tenants`}
-                        </Text>
-                      </Table.Td>
-                      <Table.Td>
-                        {message.startDate && message.endDate ? (
+                  {(config.messages || []).map((message, index) => {
+                    const uniqueKey = message.id ||
+                      `${message.message}-${index}` ||
+                      `message-${index}-${Date.now()}`;
+                    return (
+                      <Table.Tr key={uniqueKey}>
+                        <Table.Td>
+                          <Text size="sm" lineClamp={1} title={message.message}>
+                            {message.message}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge
+                            size="sm"
+                            color={
+                              message.type === 'info' ? 'blue' :
+                              message.type === 'warning' ? 'yellow' :
+                              message.type === 'success' ? 'green' : 'red'
+                            }
+                          >
+                            {message.type}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge size="sm" variant="light">
+                            {message.priority}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">
+                            {message.targetAudience === 'all' ? 'All' :
+                             message.targetAudience === 'specific_tiers' ?
+                             `${message.targetTiers?.length || 0} tiers` :
+                             `${message.targetTenants?.length || 0} tenants`}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          {message.startDate && message.endDate ? (
+                            <Group gap={4}>
+                              <IconCalendar size={12} />
+                              <Text size="xs">
+                                {new Date(message.startDate).toLocaleDateString()} - {new Date(message.endDate).toLocaleDateString()}
+                              </Text>
+                            </Group>
+                          ) : (
+                            <Text size="xs" c="dimmed">No schedule</Text>
+                          )}
+                        </Table.Td>
+                        <Table.Td>
                           <Group gap={4}>
-                            <IconCalendar size={12} />
-                            <Text size="xs">
-                              {new Date(message.startDate).toLocaleDateString()} - {new Date(message.endDate).toLocaleDateString()}
-                            </Text>
+                            {!message.isActive && (
+                              <ActionIcon
+                                size="sm"
+                                variant="subtle"
+                                color="green"
+                                onClick={() => handleActivateMessage(message.id)}
+                                title="Activate message"
+                              >
+                                <IconCheck size={12} />
+                              </ActionIcon>
+                            )}
+                            <ActionIcon
+                              size="sm"
+                              variant="subtle"
+                              onClick={() => {
+                                console.log('[EnhancedTickerSettings] Editing message:', message);
+                                setMessageModal({ open: true, message, mode: 'edit' });
+                              }}
+                            >
+                              <IconEdit size={12} />
+                            </ActionIcon>
+                            <ActionIcon
+                              size="sm"
+                              variant="subtle"
+                              color="red"
+                              onClick={() => handleDeleteMessage(message.id)}
+                            >
+                              <IconTrash size={12} />
+                            </ActionIcon>
                           </Group>
-                        ) : (
-                          <Text size="xs" c="dimmed">No schedule</Text>
-                        )}
-                      </Table.Td>
-                      <Table.Td>
-                        <Group gap={4}>
-                          <ActionIcon
-                            size="sm"
-                            variant="subtle"
-                            onClick={() => setMessageModal({ open: true, message, mode: 'edit' })}
-                          >
-                            <IconEdit size={12} />
-                          </ActionIcon>
-                          <ActionIcon
-                            size="sm"
-                            variant="subtle"
-                            color="red"
-                            onClick={() => handleDeleteMessage(message.id)}
-                          >
-                            <IconTrash size={12} />
-                          </ActionIcon>
-                        </Group>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
+                        </Table.Td>
+                      </Table.Tr>
+                    );
+                  })}
                 </Table.Tbody>
               </Table>
             )}
-          </Stack>
+          
 
           <Group justify="flex-end" mt="md">
-            <Button onClick={handleSave} loading={loading} disabled={!config.enabled}>
+            <Button variant="light" onClick={() => setMessageModal({ open: true, mode: 'create' })}>
+              Add Message
+            </Button>
+            <Button onClick={handleSave} loading={loading}>
               Save Settings
             </Button>
           </Group>
         </Stack>
+        
       </Card>
+
+      {preview && (
+        <Box style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000 }}>
+          <PlatformTicker
+            messages={config.messages || []}
+            maxMessages={config.globalSettings?.maxMessages || 3}
+            autoRotate={config.globalSettings?.autoRotate !== false}
+            rotationInterval={config.globalSettings?.rotationInterval || 5}
+          />
+        </Box>
+      )}
 
       {/* Message Modal */}
       <Modal
@@ -416,6 +496,27 @@ function MessageForm({ message, availableTiers, availableTenants, onSubmit, onCa
     isActive: message?.isActive !== false
   });
 
+  // Update form data when message prop changes (for edit mode)
+  useEffect(() => {
+    if (message) {
+      console.log('[MessageForm] Updating form data for message:', message);
+      setFormData({
+        message: message.message || '',
+        type: message.type || 'info' as const,
+        icon: message.icon || 'info' as const,
+        scrolling: message.scrolling || false,
+        dismissible: message.dismissible !== false,
+        targetAudience: message.targetAudience || 'all' as const,
+        targetTiers: message.targetTiers || [],
+        targetTenants: message.targetTenants || [],
+        startDate: message.startDate || null,
+        endDate: message.endDate || null,
+        priority: message.priority || 1,
+        isActive: message.isActive !== false
+      });
+    }
+  }, [message]);
+
   const handleSubmit = () => {
     onSubmit({
       ...formData,
@@ -430,7 +531,7 @@ function MessageForm({ message, availableTiers, availableTenants, onSubmit, onCa
         label="Message"
         placeholder="Enter your notification message..."
         value={formData.message}
-        onChange={(e) => setFormData(prev => ({ ...prev, message: e.currentTarget.value }))}
+        onChange={(e) => setFormData(prev => ({ ...prev, message: e?.currentTarget?.value || '' }))}
         required
       />
 
@@ -472,13 +573,13 @@ function MessageForm({ message, availableTiers, availableTenants, onSubmit, onCa
         <Switch
           label="Enable scrolling"
           checked={formData.scrolling}
-          onChange={(e) => setFormData(prev => ({ ...prev, scrolling: e.currentTarget.checked }))}
+          onChange={(e) => setFormData(prev => ({ ...prev, scrolling: e?.currentTarget?.checked || false }))}
         />
 
         <Switch
           label="Allow dismissal"
           checked={formData.dismissible}
-          onChange={(e) => setFormData(prev => ({ ...prev, dismissible: e.currentTarget.checked }))}
+          onChange={(e) => setFormData(prev => ({ ...prev, dismissible: e?.currentTarget?.checked || false }))}
         />
       </Group>
 
@@ -543,11 +644,10 @@ function MessageForm({ message, availableTiers, availableTenants, onSubmit, onCa
               <IconClock size={14} />
               <Text>
                 {formData.startDate && formData.endDate 
-                  ? `Message will show from ${formData.startDate.toLocaleString()} to ${formData.endDate.toLocaleString()}`
+                  ? `Message will show from ${new Date(formData.startDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })} to ${new Date(formData.endDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}`
                   : formData.startDate 
-                  ? `Message will start showing at ${formData.startDate.toLocaleString()}`
-                  : `Message will stop showing at ${formData.endDate?.toLocaleString()}`
-                }
+                  ? `Message will start showing at ${new Date(formData.startDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}`
+                  : `Message will stop showing at ${new Date(formData.endDate!).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}`}
               </Text>
             </Group>
           </Alert>
@@ -557,7 +657,7 @@ function MessageForm({ message, availableTiers, availableTenants, onSubmit, onCa
       <Switch
         label="Active"
         checked={formData.isActive}
-        onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.currentTarget.checked }))}
+        onChange={(e) => setFormData(prev => ({ ...prev, isActive: e?.currentTarget?.checked || false }))}
       />
 
       <Group justify="flex-end">

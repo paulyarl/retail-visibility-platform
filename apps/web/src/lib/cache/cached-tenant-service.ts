@@ -3,10 +3,10 @@
  * Consolidates tenant info, tier, and usage calls with local storage caching
  */
 
-import { publicTenantInfoService, type TenantInfo } from '@/services/PublicTenantInfoService';
+import { tenantInfoService } from '@/services/TenantInfoService';
 import { tenantManagementService, type TenantUsage } from '@/services/TenantManagementService';
 import { LocalStorageCache } from './local-storage-cache';
-import type { TenantTier } from '@/services/PublicTenantInfoService';
+import type { TenantInfo, TenantTier } from '@/services/PublicTenantInfoService';
 
 export interface CachedTenantData {
   tenant: TenantInfo | null;
@@ -41,15 +41,15 @@ export class CachedTenantService {
     console.log(`[CachedTenantService] Cache miss for tenant ${tenantId}, fetching fresh data`);
 
     try {
-      // Get tenant info and usage separately
+      // Get tenant info and usage separately using tenant-scoped service
       const [tenantData, usageData] = await Promise.all([
-        publicTenantInfoService.getCompleteTenantInfo(tenantId),
+        tenantInfoService.getCompleteTenantInfo(tenantId),
         tenantManagementService.getTenantUsage(tenantId)
       ]);
 
       const cachedData: CachedTenantData = {
         tenant: tenantData.tenant,
-        tier: null, // Would need to get from TenantInfoSingletonService.getTenantTier if needed
+        tier: null, // Would need to get from TenantInfoService.getTenantTier if needed
         usage: usageData,
         _timestamp: new Date().toISOString(),
         _cacheVersion: this.CACHE_VERSION
@@ -81,7 +81,7 @@ export class CachedTenantService {
       }
     }
 
-    const tenant = await publicTenantInfoService.getTenantInfo(tenantId);
+    const tenant = await tenantInfoService.getTenantInfo(tenantId);
     
     if (!tenant) {
       throw new Error(`Tenant not found: ${tenantId}`);
@@ -105,7 +105,7 @@ export class CachedTenantService {
       }
     }
 
-    const data = await publicTenantInfoService.getTenantTier(tenantId);
+    const data = await tenantInfoService.getTenantTier(tenantId);
     
     if (!data) {
       throw new Error(`Tier data not found for tenant: ${tenantId}`);
