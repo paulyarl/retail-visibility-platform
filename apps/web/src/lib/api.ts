@@ -127,10 +127,11 @@ export async function apiRequest(
   // Handle relative URLs (Next.js API routes) and absolute URLs
   // - Absolute http(s): use as-is
   // - /api/*: backend API calls (prefix with API_BASE_URL)
+  // - /public/*: backend API calls (prefix with API_BASE_URL)
   // - Other / paths: Next.js API routes (use as-is)
   const url = endpoint.startsWith('http')
     ? endpoint
-    : endpoint.startsWith('/api/')
+    : endpoint.startsWith('/api/') || endpoint.startsWith('/public/')
     ? `${API_BASE_URL}${endpoint}`
     : endpoint;
   

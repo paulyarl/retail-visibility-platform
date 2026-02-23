@@ -29,7 +29,7 @@ class PublicPlatformDashboardService extends PublicApiSingleton {
    * Returns platform information suitable for visitors and prospective merchants
    */
   async getPublicPlatformDashboard(): Promise<PlatformDashboardData | null> {
-    const result = await this.makePublicRequest<PlatformDashboardData>(
+    const result = await this.makeDefaultRequest<PlatformDashboardData>(
       '/api/public/platform/dashboard',
       {},
       'public-platform-dashboard'
@@ -49,7 +49,7 @@ class PublicPlatformDashboardService extends PublicApiSingleton {
    * Returns basic platform metrics for public display
    */
   async getPublicPlatformStats(): Promise<PlatformStats | null> {
-    const result = await this.makePublicRequest<PlatformStats>(
+    const result = await this.makeDefaultRequest<PlatformStats>(
       '/api/public/platform/stats',
       {},
       'public-platform-stats'

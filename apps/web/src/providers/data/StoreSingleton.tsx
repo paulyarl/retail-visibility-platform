@@ -116,14 +116,14 @@ class StoreSingleton extends PublicApiSingleton {
       }
       params.append('limit', limit.toString());
       
-      const response = await this.makePublicRequest<any>(`/api/directory/featured-stores?${params}`, {}, cacheKey);
+      const response = await this.makeDefaultRequest<any>(`/api/directory/featured-stores?${params}`, {}, cacheKey);
       if (!response.success){
         throw new Error('Failed to fetch featured stores');
       }
       
       // Extract stores from response
       // API returns: { success: true, data: { stores: [...] } }
-      // makePublicRequest wraps this, so we need response.data.data.stores
+      // makeDefaultRequest wraps this, so we need response.data.data.stores
       const storesData = response.data?.data?.stores || new Array<Store>();
       
       // Update internal state
@@ -149,7 +149,7 @@ class StoreSingleton extends PublicApiSingleton {
     const cacheKey = `store-${storeId}`;
     
     try {
-      const response = await this.makePublicRequest<any>(`/api/directory/stores/${storeId}`, {}, cacheKey);
+      const response = await this.makeDefaultRequest<any>(`/api/directory/stores/${storeId}`, {}, cacheKey);
 
       if (!response.success || !response.data) {
         throw new Error('Store not found');
@@ -170,7 +170,7 @@ class StoreSingleton extends PublicApiSingleton {
     const cacheKey = 'store-categories';
     
     try {
-      const response = await this.makePublicRequest<any>('/api/directory/categories', {}, cacheKey);
+      const response = await this.makeDefaultRequest<any>('/api/directory/categories', {}, cacheKey);
 
       if (!response.success || !response.data) {
         throw new Error('Failed to fetch categories');

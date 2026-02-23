@@ -5,20 +5,21 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, MapPin, Star, Phone, Globe, Clock, Filter, Grid, List, ChevronDown, Store, ShoppingBag, TrendingUp, Sparkles, Tag, Users, Calendar, ArrowLeft, X } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '../../components/ui/Button';
 import { Container, Grid as MantineGrid, SimpleGrid } from '@mantine/core';
-import StorefrontActions from '@/components/storefront/StorefrontActions';
-import { useShopsFeaturedBuckets } from '@/hooks/shops/useShopsFeaturedBuckets';
-import { BucketSection, ProductBucket, ShopBucket } from '@/components/shops/BucketSection';
-import { TrendingShopsContainer } from '@/components/shops/TrendingShopsContainer';
-import { TrendingProductsContainer } from '@/components/shops/TrendingProductsContainer';
-import ScopeFilterBar from '@/components/shops/ScopeFilterBar';
-import { useScopeUrlState } from '@/hooks/shops/useScopeUrlState';
-import { ScopeParams } from '@/types/scope';
-import TroubleshootingToggle from '@/components/debug/TroubleshootingToggle';
-import { trackBehaviorClient } from '@/utils/behaviorTracking';
-import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
-import { directorySingletonService } from '@/services/DirectorySingletonService';
+import StorefrontActions from '../../components/storefront/StorefrontActions';
+import { useShopsFeaturedBuckets } from '../../hooks/shops/useShopsFeaturedBuckets';
+import { BucketSection, ProductBucket } from '../../components/shops/BucketSection';
+import { TrendingShopsContainer } from '../../components/shops/TrendingShopsContainer';
+import { TrendingProductsContainer } from '../../components/shops/TrendingProductsContainer';
+import ScopeFilterBar from '../../components/shops/ScopeFilterBar';
+import { useScopeUrlState } from '../../hooks/shops/useScopeUrlState';
+import { ScopeParams } from '../../types/scope';
+import TroubleshootingToggle from '../../components/debug/TroubleshootingToggle';
+import { trackBehaviorClient } from '../../utils/behaviorTracking';
+import { ShopViewTracker } from '../../components/tracking/ShopViewTracker';
+import { directorySingletonService } from '../../services/DirectorySingletonService';
+import { shopsService } from '../../services/ShopsService';
 
 interface Shop {
   id: string;
@@ -72,7 +73,7 @@ function ShopsPageContent() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<'name' | 'rating' | 'products' | 'newest'>('name');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [categories, setCategories] = useState<{name: string, count: number}[]>([]);
+  const [categories, setCategories] = useState<{name: string, count: number, type: 'shop' | 'product'}[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
   const [shopsLoading, setShopsLoading] = useState(false);
   const [shopsError, setShopsError] = useState<string | null>(null);
@@ -93,11 +94,10 @@ function ShopsPageContent() {
   };
 
   // Multi-bucket data using modern hook
-  const { 
-    buckets, 
-    loading, 
-    error, 
+  const {
     refresh,
+    loading,
+    error,
     // Legacy bucket properties for existing page logic
     trending,
     new: newShops,
@@ -105,7 +105,8 @@ function ShopsPageContent() {
     seasonal,
     staff,
     selection,
-    random
+    random,
+    buckets
   } = useShopsFeaturedBuckets();
 
   const handleProductClick = (product: any) => {
@@ -142,9 +143,11 @@ function ShopsPageContent() {
     router.push(`/shops/${shop.id}`);
   };
 
-  // Extract categories from both shops and products for comprehensive search
+  // Extract categories from both shops, products, and API
   useEffect(() => {
     const categoryMap = new Map<string, { count: number; type: 'shop' | 'product' }>();
+    
+    console.log('[ShopsPage] Extracting categories - shops.length:', shops.length);
     
     // Add shop categories
     if (shops.length) {
@@ -157,6 +160,7 @@ function ShopsPageContent() {
           categoryMap.set(category, { count: 1, type: 'shop' });
         }
       });
+      console.log('[ShopsPage] Shop categories added:', Array.from(categoryMap.keys()));
     }
     
     // Add product categories from all buckets
@@ -170,6 +174,16 @@ function ShopsPageContent() {
       ...random
     ];
     
+    console.log('[ShopsPage] Product buckets sizes:', {
+      trending: trending.length,
+      newShops: newShops.length,
+      sale: sale.length,
+      seasonal: seasonal.length,
+      staff: staff.length,
+      selection: selection.length,
+      random: random.length
+    });
+    
     // Deduplicate products
     const productMap = new Map<string, any>();
     allProductsRaw.forEach(product => {
@@ -180,9 +194,18 @@ function ShopsPageContent() {
     });
     const allProducts = Array.from(productMap.values());
     
+    console.log('[ShopsPage] Unique products for categories:', allProducts.length);
+    
     // Add product categories
     allProducts.forEach(product => {
-      const category = product.categoryName || product.category_name || product.product_category;
+      console.log('[ShopsPage] Processing product for category:', product.name, 'category fields:', {
+        categoryName: product.categoryName,
+        category_name: product.category_name,
+        product_category: product.product_category,
+        category: product.category
+      });
+      
+      const category = product.categoryName || product.category_name || product.product_category || product.category;
       if (category) {
         const existing = categoryMap.get(category);
         if (existing) {
@@ -193,13 +216,62 @@ function ShopsPageContent() {
       }
     });
     
-    const categoryList = Array.from(categoryMap.entries()).map(([name, data]) => ({ 
-      name, 
-      count: data.count,
-      type: data.type
-    }));
-    setCategories(categoryList.sort((a, b) => a.name.localeCompare(b.name)));
-  }, [shops, buckets]);
+    console.log('[ShopsPage] Product categories extracted:', Array.from(categoryMap.entries()).filter(([name, data]) => data.type === 'product'));
+    
+    console.log('[ShopsPage] Categories before API call:', Array.from(categoryMap.entries()));
+    
+    // Fetch categories from API to ensure we have all available categories
+    const fetchApiCategories = async () => {
+      try {
+        const response = await shopsService.getCategories();
+        console.log('[ShopsPage] API categories response:', response);
+        
+        // Handle the response structure: { success: true, data: [...] }
+        let categoriesData = [];
+        if (response && (response as any).categories && (response as any).categories.data) {
+          // Triple-wrapped: { categories: { data: [...] } }
+          categoriesData = (response as any).categories.data;
+          console.log('[ShopsPage] Using triple-wrapped structure');
+        } else if (response && (response as any).data) {
+          // Double-wrapped: { data: [...] }
+          categoriesData = (response as any).data;
+          console.log('[ShopsPage] Using double-wrapped structure');
+        } else if (Array.isArray(response)) {
+          // Direct array
+          categoriesData = response;
+          console.log('[ShopsPage] Using direct array structure');
+        } else {
+          console.log('[ShopsPage] No matching structure found, response keys:', Object.keys(response || {}));
+        }
+        
+        console.log('[ShopsPage] Extracted categories data:', categoriesData);
+        
+        if (categoriesData && Array.isArray(categoriesData)) {
+          categoriesData.forEach((apiCategory: any) => {
+            const existing = categoryMap.get(apiCategory.name);
+            if (existing) {
+              existing.count += apiCategory.count;
+            } else {
+              categoryMap.set(apiCategory.name, { count: apiCategory.count, type: 'shop' });
+            }
+          });
+          console.log('[ShopsPage] Categories after API call:', Array.from(categoryMap.entries()));
+        }
+      } catch (error) {
+        console.error('[ShopsPage] Failed to fetch API categories:', error);
+      }
+    };
+    
+    fetchApiCategories().then(() => {
+      const categoryList = Array.from(categoryMap.entries()).map(([name, data]) => ({ 
+        name, 
+        count: data.count,
+        type: data.type
+      }));
+      console.log('[ShopsPage] Final categories list:', categoryList);
+      setCategories(categoryList.sort((a, b) => a.name.localeCompare(b.name)));
+    });
+  }, [shops.length]); // Only depend on shops.length to prevent infinite loops
 
   // Filter and sort shops
   const filterAndSortShops = (shopsList: any[]) => {
@@ -218,9 +290,12 @@ function ShopsPageContent() {
     
     // Apply category filter
     if (selectedCategory) {
+      console.log('[ShopsPage] Filtering shops by category:', selectedCategory);
+      console.log('[ShopsPage] Shops before filter:', shops.map(s => ({ name: s.name, primary_category: s.primary_category })));
       filtered = filtered.filter(shop => 
         shop.primary_category === selectedCategory
       );
+      console.log('[ShopsPage] Shops after filter:', filtered.map(s => ({ name: s.name, primary_category: s.primary_category })));
     }
     
     // Apply sorting
@@ -260,11 +335,12 @@ function ShopsPageContent() {
     
     // Apply category filter
     if (selectedCategory) {
+      console.log('[ShopsPage] Filtering products by category:', selectedCategory);
+      console.log('[ShopsPage] Products before filter:', products.slice(0, 3).map(p => ({ name: p.name, categoryFields: { categoryName: p.categoryName, category_name: p.category_name, product_category: p.product_category, category: p.category } })));
       filtered = filtered.filter(p => 
-        p.categoryName === selectedCategory || 
-        p.category_name === selectedCategory ||
-        p.product_category === selectedCategory
+        p.category === selectedCategory // Use the correct field that has data
       );
+      console.log('[ShopsPage] Products after filter:', filtered.length, 'products found');
     }
     
     // Apply sorting
@@ -391,6 +467,7 @@ function ShopsPageContent() {
           <ScopeFilterBar
             onScopeChange={handleScopeChange}
             initialScope={scopeParams}
+            categories={categories}
           />
         </div>
 
@@ -465,11 +542,14 @@ function ShopsPageContent() {
                 className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
               >
                 <option value="">All Categories</option>
-                {categories.map((category) => (
-                  <option key={category.name} value={category.name}>
-                    {category.name} ({category.count})
-                  </option>
-                ))}
+                {categories.map((category) => {
+                  console.log('[ShopsPage] Rendering category option:', category);
+                  return (
+                    <option key={category.name} value={category.name}>
+                      {category.name} ({category.count})
+                    </option>
+                  );
+                })}
               </select>
               
               <select
@@ -509,17 +589,21 @@ function ShopsPageContent() {
           <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="xl" mb="xl">
             {/* Trending Shops Container */}
             <div>
-              <TrendingShopsContainer 
-                trendingShops={trending || []}
+              <ProductBucket
+                products={trending}
                 loading={loading}
                 error={error}
+                title="Featured Shops"
+                subtitle="Trending and popular shops in your area"
+                maxItems={8}
+                onShopClick={handleShopClick}
               />
             </div>
             
             {/* Trending Products Container */}
             <div>
               <TrendingProductsContainer 
-                trendingProducts={trending || []}
+                trendingProducts={trending}
                 loading={loading}
                 error={error}
               />
@@ -537,8 +621,7 @@ function ShopsPageContent() {
                 title="✨ New Arrivals"
                 subtitle="Fresh products just added to our marketplace"
                 maxItems={8}
-                onProductClick={handleProductClick}
-                viewMode={viewMode}
+                onShopClick={handleShopClick}
               />
               
               <ProductBucket
@@ -548,8 +631,7 @@ function ShopsPageContent() {
                 title="🎲 Discover Something New"
                 subtitle="Randomly selected gems from our curated collection"
                 maxItems={8}
-                onProductClick={handleProductClick}
-                viewMode={viewMode}
+                onShopClick={handleShopClick}
               />
             </div>
 
@@ -563,8 +645,7 @@ function ShopsPageContent() {
                 maxItems={8}
                 showViewAll={true}
                 viewAllUrl="/shops?filter=sale"
-                onProductClick={handleProductClick}
-                viewMode={viewMode}
+                onShopClick={handleShopClick}
               />
               
               <ProductBucket
@@ -574,8 +655,7 @@ function ShopsPageContent() {
                 title="🍂 Seasonal Picks"
                 subtitle="Perfect products for the current season"
                 maxItems={8}
-                onProductClick={handleProductClick}
-                viewMode={viewMode}
+                onShopClick={handleShopClick}
               />
               
               <ProductBucket
@@ -585,8 +665,7 @@ function ShopsPageContent() {
                 title="⭐ Staff Picks"
                 subtitle="Hand-picked favorites from our team"
                 maxItems={8}
-                onProductClick={handleProductClick}
-                viewMode={viewMode}
+                onShopClick={handleShopClick}
               />
             </div>
 
@@ -599,7 +678,7 @@ function ShopsPageContent() {
                 title="🏪 Store Selections"
                 subtitle="Curated collections from individual shops"
                 maxItems={8}
-                onProductClick={handleProductClick}
+                onShopClick={handleShopClick}
               />
             </div>
           </div>
@@ -750,8 +829,7 @@ function ShopsPageContent() {
                 title=""
                 subtitle=""
                 maxItems={undefined}
-                onProductClick={handleProductClick}
-                viewMode={viewMode}
+                onShopClick={handleShopClick}
               />
             )}
           </div>

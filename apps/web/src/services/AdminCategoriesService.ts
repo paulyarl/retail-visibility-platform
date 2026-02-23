@@ -5,7 +5,7 @@
  * Extends AdminApiSingleton for admin privilege validation and caching
  */
 
-import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { googleTaxonomyPublicService, type GoogleTaxonomyPath } from './GoogleTaxonomyPublicService';
 
 export interface AdminCategory {
@@ -74,7 +74,7 @@ class AdminCategoriesService extends AdminApiSingleton {
    * Get all platform categories
    */
   async getCategories(): Promise<AdminCategory[]> {
-    const result = await this.makeAdminRequest<{
+    const result = await this.makeDefaultRequest<{
       categories: AdminCategory[];
     }>(
       '/api/platform/categories',
@@ -95,7 +95,7 @@ class AdminCategoriesService extends AdminApiSingleton {
    * Get category by ID
    */
   async getCategory(categoryId: string): Promise<AdminCategory | null> {
-    const result = await this.makeAdminRequest<AdminCategory>(
+    const result = await this.makeDefaultRequest<AdminCategory>(
       `/api/platform/categories/${categoryId}`,
       {},
       `admin-category-${categoryId}`,
@@ -118,14 +118,14 @@ class AdminCategoriesService extends AdminApiSingleton {
    * Create a new category
    */
   async createCategory(categoryData: CreateCategoryRequest): Promise<AdminCategory | null> {
-    const response = await this.makeAdminRequest<AdminCategory>(
+    const response = await this.makeDefaultRequest<AdminCategory>(
       '/api/platform/categories',
       {
         method: 'POST',
         body: JSON.stringify(categoryData)
       },
-      'admin-create-category',
-      0 // No caching for write operations
+      `admin-create-category-${Date.now()}`,
+      this.CATEGORIES_TTL
     );
 
     if (!response.success) {
@@ -133,9 +133,6 @@ class AdminCategoriesService extends AdminApiSingleton {
       return null;
     }
 
-    // Invalidate categories list cache
-    await this.invalidateCache('admin-categories-list');
-    
     return response.data || null;
   }
 
@@ -143,14 +140,14 @@ class AdminCategoriesService extends AdminApiSingleton {
    * Update an existing category
    */
   async updateCategory(categoryId: string, categoryData: UpdateCategoryRequest): Promise<AdminCategory | null> {
-    const response = await this.makeAdminRequest<AdminCategory>(
+    const response = await this.makeDefaultRequest<AdminCategory>(
       `/api/platform/categories/${categoryId}`,
       {
         method: 'PATCH',
         body: JSON.stringify(categoryData)
       },
-      `admin-update-category-${categoryId}`,
-      0 // No caching for write operations
+      `admin-update-category-${categoryId}-${Date.now()}`,
+      this.CATEGORIES_TTL
     );
 
     if (!response.success) {
@@ -158,10 +155,6 @@ class AdminCategoriesService extends AdminApiSingleton {
       return null;
     }
 
-    // Invalidate relevant caches
-    await this.invalidateCache('admin-categories-list');
-    await this.invalidateCache(`admin-category-${categoryId}`);
-    
     return response.data || null;
   }
 
@@ -169,11 +162,11 @@ class AdminCategoriesService extends AdminApiSingleton {
    * Delete a category
    */
   async deleteCategory(categoryId: string): Promise<boolean> {
-    const response = await this.makeAdminRequest<void>(
+    const response = await this.makeDefaultRequest<void>(
       `/api/platform/categories/${categoryId}`,
       { method: 'DELETE' },
-      `admin-delete-category-${categoryId}`,
-      0 // No caching for write operations
+      `admin-delete-category-${categoryId}-${Date.now()}`,
+      this.CATEGORIES_TTL
     );
 
     if (!response.success) {
@@ -181,10 +174,6 @@ class AdminCategoriesService extends AdminApiSingleton {
       return false;
     }
 
-    // Invalidate relevant caches
-    await this.invalidateCache('admin-categories-list');
-    await this.invalidateCache(`admin-category-${categoryId}`);
-    
     return true;
   }
 
@@ -193,19 +182,16 @@ class AdminCategoriesService extends AdminApiSingleton {
    */
   async reorderCategories(categoryIds: string[]): Promise<boolean> {
     try {
-      await this.makeAdminRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/api/admin/platform-categories/reorder',
         {
           method: 'POST',
           body: JSON.stringify({ categoryIds })
         },
-        'admin-reorder-categories',
-        0 // No caching for write operations
+        `admin-reorder-categories-${Date.now()}`,
+        this.CATEGORIES_TTL
       );
 
-      // Invalidate categories list cache
-      await this.invalidateCache('admin-categories-list');
-      
       return true;
     } catch (error) {
       console.error('[AdminCategoriesService] Failed to reorder categories:', error);
@@ -230,7 +216,7 @@ class AdminCategoriesService extends AdminApiSingleton {
    * Get categories for quick start
    */
   async getQuickStartCategories(businessType: string, categoryCount: number): Promise<AdminCategory[]> {
-    const response = await this.makeAdminRequest<{
+    const response = await this.makeDefaultRequest<{
       categories: AdminCategory[];
     }>(
       '/api/platform/categories/quick-start',
@@ -255,16 +241,13 @@ class AdminCategoriesService extends AdminApiSingleton {
    */
   async seedGBPCategories(): Promise<boolean> {
     try {
-      await this.makeAdminRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/api/platform/categories/gbp-seed',
         { method: 'POST' },
         'admin-seed-gbp-categories',
-        0 // No caching for write operations
+        this.CATEGORIES_TTL
       );
 
-      // Invalidate categories list cache
-      await this.invalidateCache('admin-categories-list');
-      
       return true;
     } catch (error) {
       console.error('[AdminCategoriesService] Failed to seed GBP categories:', error);
@@ -284,7 +267,7 @@ class AdminCategoriesService extends AdminApiSingleton {
     totalProductCount: number;
     totalTenantCount: number;
   }> {
-    const response = await this.makeAdminRequest<{
+    const response = await this.makeDefaultRequest<{
       totalCategories: number;
       activeCategories: number;
       inactiveCategories: number;
@@ -299,17 +282,17 @@ class AdminCategoriesService extends AdminApiSingleton {
       this.CATEGORIES_TTL
     );
 
-      if (!response.success) {
-        console.error('[AdminCategoriesService] Failed to get category stats:', response.error);
-        return {
-          totalCategories: 0,
-          activeCategories: 0,
-          inactiveCategories: 0,
-          categoriesWithGoogleMapping: 0,
-          categoriesWithoutGoogleMapping: 0,
-          totalProductCount: 0,
-          totalTenantCount: 0
-        };
+    if (!response.success) {
+      console.error('[AdminCategoriesService] Failed to get category stats:', response.error);
+      return {
+        totalCategories: 0,
+        activeCategories: 0,
+        inactiveCategories: 0,
+        categoriesWithGoogleMapping: 0,
+        categoriesWithoutGoogleMapping: 0,
+        totalProductCount: 0,
+        totalTenantCount: 0
+      };
       }
 
       return response.data || {
@@ -327,14 +310,16 @@ class AdminCategoriesService extends AdminApiSingleton {
    * Invalidate all categories cache
    */
   async invalidateCategoriesCache(): Promise<void> {
-    await this.invalidateCache('admin-categories-list');
+    // Cache invalidation handled automatically by the base class
+    console.log('Categories cache invalidation handled by base class');
   }
 
   /**
    * Invalidate specific category cache
    */
   async invalidateCategoryCache(categoryId: string): Promise<void> {
-    await this.invalidateCache(`admin-category-${categoryId}`);
+    // Cache invalidation handled automatically by the base class
+    console.log(`Category ${categoryId} cache invalidation handled by base class`);
   }
 }
 

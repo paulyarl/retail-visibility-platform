@@ -1,4 +1,4 @@
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
 
 export interface ProductReviewSummary {
   rating_avg: number;
@@ -33,10 +33,10 @@ export interface ProductReview {
 
 class ProductReviewsSingletonService extends PublicApiSingleton {
   private static instance: ProductReviewsSingletonService;
+  protected cacheTTL: number = 10 * 60 * 1000; // 10 minutes for reviews data
 
-  private constructor() {
+  protected constructor() {
     super('product-reviews-service');
-    this.cacheTTL = 10 * 60 * 1000; // 10 minutes for reviews data
   }
 
   static getInstance(): ProductReviewsSingletonService {
@@ -51,6 +51,8 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
    * Public endpoint for product browsing
    */
   async getProductReviewSummary(tenantId: string, productId: string): Promise<ProductReviewSummary | null> {
+    console.log('[ProductReviewsSingleton] getProductReviewSummary called with:', { tenantId, productId });
+    
     try {
       if (!tenantId || !productId) {
         throw new Error('Tenant ID and Product ID are required');
@@ -62,7 +64,18 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
         `product-review-summary-${tenantId}-${productId}`
       );
 
-      return result?.data || null;
+      console.log('[ProductReviewsSingleton] Debug - makeDefaultRequest result:', {
+        success: result?.success,
+        hasData: !!result?.data,
+        defaultRequestType: this.defaultRequestType,
+        defaultRequestTarget: this.defaultRequestTarget,
+        fullResult: result
+      });
+
+      const data = result?.data;
+      console.log('[ProductReviewsSingleton] Extracted data:', data);
+
+      return data || null;
     } catch (error) {
       console.error('[ProductReviewsSingleton] Failed to get product review summary:', error);
       return null;
@@ -92,7 +105,7 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
         };
         timestamp: string;
       }>(
-        `/api/reviews-singleton/product/${productId}`,
+        `/api/stores/${tenantId}/products/${productId}/reviews`,
         {},
         `product-reviews-${tenantId}-${productId}-${options?.limit || 'default'}`
       );
@@ -174,7 +187,7 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
       await this.makeDefaultRequest<void>(
         `/api/stores/${tenantId}/products/${productId}/reviews/${reviewId}/helpful`,
         {
-          method: 'PUT'
+          method: 'PUT',
         },
         `review-helpful-${reviewId}`
       );

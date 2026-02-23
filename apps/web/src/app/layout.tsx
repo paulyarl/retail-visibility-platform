@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 // import { Analytics } from "@vercel/analytics/react"; // Disabled - not configured in Vercel
 import "./globals.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { PlatformSettingsProvider } from "@/contexts/PlatformSettingsContext";
 import { AuthProvider as CustomAuthProvider } from "@/contexts/AuthContext";
 import { CartWidgetProvider } from "@/contexts/CartWidgetContext";
 import { ProductLayoutProvider } from "@/contexts/ProductLayoutContext";
@@ -49,22 +48,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <QueryClientWrapper>
           <ThemeProvider>
             <PlatformThemeProvider>
-              <PlatformSettingsProvider>
-                <CustomAuthProvider>
-                  <CartWidgetProvider>
-                    <ProductLayoutProvider>
-                      <GlobalAlertProvider>
-                        <UniversalProvider>
-                          <ErrorBoundary>
-                            {children}
-                          </ErrorBoundary>
-                          <FloatingCartWidget />
-                        </UniversalProvider>
-                      </GlobalAlertProvider>
-                    </ProductLayoutProvider>
-                  </CartWidgetProvider>
-                </CustomAuthProvider>
-              </PlatformSettingsProvider>
+              <CustomAuthProvider>
+                <CartWidgetProvider>
+                  <ProductLayoutProvider>
+                    <GlobalAlertProvider>
+                      <UniversalProvider>
+                        <ErrorBoundary>
+                          {children}
+                        </ErrorBoundary>
+                        <FloatingCartWidget />
+                      </UniversalProvider>
+                    </GlobalAlertProvider>
+                  </ProductLayoutProvider>
+                </CartWidgetProvider>
+              </CustomAuthProvider>
             </PlatformThemeProvider>
           </ThemeProvider>
         </QueryClientWrapper>

@@ -10,8 +10,8 @@
  * - Error handling and logging
  */
 
-import { CacheManager } from '@/utils/cacheManager';
-import { AutoUserCacheOptions } from '@/utils/userIdentification';
+import cacheManager, { CacheManager } from '../../utils/cacheManager';
+import { AutoUserCacheOptions } from '../../utils/userIdentification';
 
 // ====================
 // INTERFACES

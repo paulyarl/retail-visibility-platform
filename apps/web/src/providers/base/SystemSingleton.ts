@@ -6,7 +6,7 @@
  * Default: SYSTEM type + WEB target (port 3000)
  */
 
-import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, SystemApiResponse } from './FlexibleApiSingleton';
+import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, SystemApiResponse, PublicRequestOptions, PublicApiResponse } from './FlexibleApiSingleton';
 
 export interface SystemSingletonCacheOptions {
   encrypt?: boolean;
@@ -51,7 +51,7 @@ export abstract class SystemSingleton extends FlexibleApiSingleton {
     };
 
     // Use the new target-aware request system (defaults to WEB)
-    return this.makeDefaultRequest(url, webOptions, cacheKey, customTTL, handle404);
+    return this.makeDefaultRequest(url, webOptions, cacheKey, customTTL);
   }
 
   /**
@@ -68,21 +68,7 @@ export abstract class SystemSingleton extends FlexibleApiSingleton {
     // Use the inherited API target override from FlexibleApiSingleton
     return super.makeApiRequest(url, options, cacheKey, customTTL);
   }
-
-  /**
-   * Make public request to web server
-   * Uses convenience method for PUBLIC + WEB combination
-   */
-  protected async makePublicRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    customTTL?: number,
-    handle404: boolean = true
-  ): Promise<SystemApiResponse<T>> {
-    // Use the new PUBLIC + WEB convenience method
-    return this.makePublicWebRequest(url, options, cacheKey, customTTL);
-  }
+ 
 
   /**
    * Get custom metrics for system operations

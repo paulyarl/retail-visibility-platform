@@ -5,7 +5,7 @@
  * Handles upgrade request processing, approval, and tracking
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
 
 export interface UpgradeRequest {
   id: string;
@@ -81,13 +81,13 @@ export interface UpgradeRequestFilters {
 export class UpgradeRequestsService extends AuthenticatedApiSingleton {
   private static instance: UpgradeRequestsService;
 
-  private constructor() {
+  protected constructor() {
     super('upgrade-requests-service', {
       ttl: 10 * 60 * 1000 // 10 minutes for upgrade requests
     });
   }
 
-  static getInstance(): UpgradeRequestsService {
+  public static getInstance(): UpgradeRequestsService {
     if (!UpgradeRequestsService.instance) {
       UpgradeRequestsService.instance = new UpgradeRequestsService();
     }
@@ -102,7 +102,7 @@ export class UpgradeRequestsService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makeAuthenticatedRequest<PendingRequest>(
+    const response = await this.makeDefaultRequest<PendingRequest>(
       `/api/upgrade-requests/pending/${tenantId}`,
       {},
       `pending-upgrade-${tenantId}`,
@@ -133,7 +133,7 @@ export class UpgradeRequestsService extends AuthenticatedApiSingleton {
     const queryString = queryParams.toString();
     const endpoint = `/api/upgrade-requests${queryString ? `?${queryString}` : ''}`;
 
-    const response = await this.makeAuthenticatedRequest<UpgradeRequestsResponse>(
+    const response = await this.makeDefaultRequest<UpgradeRequestsResponse>(
       endpoint,
       {},
       `upgrade-requests-${JSON.stringify(filters)}`,
@@ -153,7 +153,7 @@ export class UpgradeRequestsService extends AuthenticatedApiSingleton {
     notes?: string;
     costAgreed?: boolean;
   }): Promise<UpgradeRequest | null> {
-    const response = await this.makeAuthenticatedRequest<UpgradeRequest>(
+    const response = await this.makeDefaultRequest<UpgradeRequest>(
       '/api/upgrade-requests',
       {
         method: 'POST',
@@ -181,7 +181,7 @@ export class UpgradeRequestsService extends AuthenticatedApiSingleton {
       throw new Error('Request ID is required');
     }
 
-    const response = await this.makeAuthenticatedRequest<UpgradeRequest>(
+    const response = await this.makeDefaultRequest<UpgradeRequest>(
       `/api/upgrade-requests/${requestId}/process`,
       {
         method: 'POST',
@@ -205,7 +205,7 @@ export class UpgradeRequestsService extends AuthenticatedApiSingleton {
       throw new Error('Request ID is required');
     }
 
-    const response = await this.makeAuthenticatedRequest<UpgradeRequest>(
+    const response = await this.makeDefaultRequest<UpgradeRequest>(
       `/api/upgrade-requests/${requestId}`,
       {},
       `upgrade-request-${requestId}`,
@@ -226,7 +226,7 @@ export class UpgradeRequestsService extends AuthenticatedApiSingleton {
       throw new Error('Request ID is required');
     }
 
-    const response = await this.makeAuthenticatedRequest<UpgradeRequest>(
+    const response = await this.makeDefaultRequest<UpgradeRequest>(
       `/api/upgrade-requests/${requestId}`,
       {
         method: 'PUT',
@@ -250,7 +250,7 @@ export class UpgradeRequestsService extends AuthenticatedApiSingleton {
       throw new Error('Request ID is required');
     }
 
-    await this.makeAuthenticatedRequest<void>(
+    await this.makeDefaultRequest<void>(
       `/api/upgrade-requests/${requestId}`,
       {
         method: 'DELETE',
@@ -289,7 +289,7 @@ export class UpgradeRequestsService extends AuthenticatedApiSingleton {
       rejected: number;
     }>;
   } | null> {
-    const response = await this.makeAuthenticatedRequest<{
+    const response = await this.makeDefaultRequest<{
       total: number;
       pending: number;
       approved: number;
@@ -333,7 +333,7 @@ export class UpgradeRequestsService extends AuthenticatedApiSingleton {
     failed: number;
     errors: string[];
   }> {
-    const response = await this.makeAuthenticatedRequest<{
+    const response = await this.makeDefaultRequest<{
       processed: number;
       failed: number;
       errors: string[];
@@ -371,7 +371,7 @@ export class UpgradeRequestsService extends AuthenticatedApiSingleton {
     // Add organization filter
     const enhancedFilters = { ...filters, organizationId };
 
-    const response = await this.makeAuthenticatedRequest<UpgradeRequestsResponse>(
+    const response = await this.makeDefaultRequest<UpgradeRequestsResponse>(
       `/api/organizations/${organizationId}/upgrade-requests`,
       {
         method: 'POST',
@@ -394,7 +394,7 @@ export class UpgradeRequestsService extends AuthenticatedApiSingleton {
     downloadUrl: string;
     expiresAt: string;
   }> {
-    const response = await this.makeAuthenticatedRequest<{
+    const response = await this.makeDefaultRequest<{
       downloadUrl: string;
       expiresAt: string;
     }>(

@@ -6,8 +6,8 @@
  * Consolidates functionality from both ShopsService and ShopsSingletonService
  */
 
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
-import { Shop, ShopIdentifiers, ShopResolution, ShopUrls } from '@/types/shop';
+import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { Shop, ShopIdentifiers, ShopResolution, ShopUrls } from '../types/shop';
 
 // ====================
 // INTERFACES
@@ -164,7 +164,7 @@ export interface ShopReview {
 class ShopsService extends PublicApiSingleton {
   private static instance: ShopsService;
 
-  private constructor() {
+  protected constructor() {
     super('shops-singleton', {
       ttl: 5 * 60 * 1000 // 5 minutes for shops data
     });
@@ -241,7 +241,61 @@ class ShopsService extends PublicApiSingleton {
         10 * 60 * 1000 // 10 minutes
       );
 
-      return response.data || [];
+      // Debug: Log the response structure
+      console.log('[ShopsService] getTrendingShops response structure:', {
+        response,
+        responseType: typeof response,
+        hasData: 'data' in response,
+        dataIsArray: 'data' in response && Array.isArray(response.data),
+        isArray: Array.isArray(response),
+        dataValue: response?.data,
+        dataType: typeof response?.data,
+        dataKeys: response?.data ? Object.keys(response.data) : 'no data property',
+        // Check if data is a string that needs parsing
+        dataIsString: typeof response?.data === 'string',
+        dataAsString: typeof response?.data === 'string' ? (response.data as string).substring(0, 100) + '...' : 'not string',
+        // Expand the data object to see its structure
+        dataExpanded: response?.data ? JSON.stringify(response.data, null, 2) : 'no data'
+      });
+      
+      // Handle the correct API response structure
+      let shops: Shop[] = [];
+      if (response?.success && response?.data) {
+        const responseData = response.data as any; // Type assertion for dynamic structure
+        // Check if data is a string that needs parsing
+        if (typeof responseData === 'string') {
+          try {
+            const parsedData = JSON.parse(responseData);
+            if (Array.isArray(parsedData)) {
+              shops = parsedData;
+              console.log('[ShopsService] Parsed response.data string to array, length:', shops.length);
+            } else {
+              console.warn('[ShopsService] Parsed data is not an array:', parsedData);
+            }
+          } catch (parseError) {
+            console.error('[ShopsService] Failed to parse response.data string:', parseError);
+          }
+        } else if (Array.isArray(responseData)) {
+          shops = responseData;
+          console.log('[ShopsService] Using response.data array, length:', shops.length);
+        } else if (responseData?.data && Array.isArray(responseData.data)) {
+          // Handle double-wrapped response: { success: true, data: { data: [...] } }
+          shops = responseData.data;
+          console.log('[ShopsService] Using double-wrapped response.data.data array, length:', shops.length);
+        } else if (responseData?.shops && Array.isArray(responseData.shops)) {
+          // Handle shops-wrapped response: { success: true, data: { shops: [...] } }
+          shops = responseData.shops;
+          console.log('[ShopsService] Using response.data.shops array, length:', shops.length);
+        } else {
+          console.warn('[ShopsService] response.data is neither array nor string:', typeof responseData);
+          console.log('[ShopsService] Available data properties:', responseData ? Object.keys(responseData) : 'no data');
+        }
+      } else {
+        console.warn('[ShopsService] Unexpected response structure:', response);
+        shops = [];
+      }
+
+      return shops;
     } catch (error) {
       console.error('Failed to get trending shops', error);
       throw error;

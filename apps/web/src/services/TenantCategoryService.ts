@@ -63,7 +63,7 @@ export class TenantCategoryService extends TenantApiSingleton {
       throw new Error('Tenant ID and Category ID are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/v1/tenants/${tenantId}/categories/${categoryId}`,
       {},
       `platform-tenant-category-${tenantId}-${categoryId}`,
@@ -86,7 +86,7 @@ export class TenantCategoryService extends TenantApiSingleton {
       throw new Error('Tenant ID and Category ID are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/v1/tenants/${tenantId}/categories/${categoryId}`,
       {
         method: 'PATCH',
@@ -114,7 +114,7 @@ export class TenantCategoryService extends TenantApiSingleton {
       throw new Error('Tenant ID and Category ID are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/v1/tenants/${tenantId}/categories/${categoryId}`,
       {
         method: 'DELETE'
@@ -141,7 +141,7 @@ export class TenantCategoryService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/v1/tenants/${tenantId}/categories`,
       {
         method: 'POST',
@@ -169,7 +169,7 @@ export class TenantCategoryService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any[]>(
+    const result = await this.makeDefaultRequest<any[]>(
       `/api/v1/tenants/${tenantId}/categories`,
       {},
       `platform-tenant-categories-${tenantId}`,
@@ -192,7 +192,7 @@ export class TenantCategoryService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/v1/tenants/${tenantId}/categories/reorder`,
       {
         method: 'PATCH',
@@ -219,7 +219,7 @@ export class TenantCategoryService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/v1/tenants/${tenantId}/categories/bulk-import`,
       {
         method: 'POST',
@@ -252,7 +252,7 @@ export class TenantCategoryService extends TenantApiSingleton {
       ? `/api/v1/tenants/${tenantId}/categories/${categoryId}/analytics`
       : `/api/v1/tenants/${tenantId}/categories/analytics`;
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       url,
       {},
       `platform-tenant-category-analytics-${tenantId}-${categoryId || 'all'}`,
@@ -275,7 +275,7 @@ export class TenantCategoryService extends TenantApiSingleton {
       throw new Error('Tenant ID and Category ID are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/v1/tenants/${tenantId}/categories/${categoryId}/archive`,
       { method: 'POST' },
       `platform-archive-tenant-category-${tenantId}-${categoryId}`
@@ -301,7 +301,7 @@ export class TenantCategoryService extends TenantApiSingleton {
       throw new Error('Tenant ID and Category ID are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/v1/tenants/${tenantId}/categories/${categoryId}/restore`,
       { method: 'POST' },
       `platform-restore-tenant-category-${tenantId}-${categoryId}`

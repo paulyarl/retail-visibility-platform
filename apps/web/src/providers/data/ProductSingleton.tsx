@@ -142,7 +142,7 @@ export class ProductSingleton extends PublicApiSingleton {
       }
       
       // Use makeDefaultRequest for public endpoint
-      const result = await this.makeDefaultRequest<{ products: any[] }>(url, {}, cacheKey);
+      const result = await super.makeDefaultRequest<{ products: any[] }>(url, {}, cacheKey);
       
       if (!result.success) {
         console.error('[ProductSingleton] Error fetching featured products:', result.error);
@@ -150,7 +150,7 @@ export class ProductSingleton extends PublicApiSingleton {
       }
       
       // API returns: { products: [...] }
-      // makePublicRequest wraps this, so we need result.data.products
+      // makeDefaultRequest wraps this, so we need result.data.products
       const products: PublicProduct[] = result.data?.products || [];
       
       // Store in cache
@@ -200,7 +200,7 @@ export class ProductSingleton extends PublicApiSingleton {
       
       // Use the correct Public API endpoint
       const url = `/api/public/products${params.toString() ? `?${params.toString()}` : ''}`;
-      const result = await this.makeDefaultRequest<{ products: any[] }>(url);
+      const result = await super.makeDefaultRequest<{ products: any[] }>(url,{},cacheKey);
       
       if (!result.success) {
         console.error('[ProductSingleton] Error fetching products:', result.error);
@@ -269,7 +269,7 @@ export class ProductSingleton extends PublicApiSingleton {
     try {
       // Use the correct Public API endpoint
       const url = `/api/public/products/${productId}`;
-      const data = await this.makeDefaultRequest(url);
+      const data = await super.makeDefaultRequest(url,{},cacheKey);
       const product = (data as any)?.product || (data as any) || null;
       
       // Handle null product case
@@ -330,7 +330,7 @@ export class ProductSingleton extends PublicApiSingleton {
     }
     
     try {
-      const data = await this.makeDefaultRequest('/api/products/categories');
+      const data = await super.makeDefaultRequest('/api/products/categories',{},cacheKey);
       const categories: ProductCategory[] = Array.isArray(data) ? data : (data as any)?.categories || [];
       
       // Store in cache

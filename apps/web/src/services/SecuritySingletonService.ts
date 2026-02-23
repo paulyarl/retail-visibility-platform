@@ -30,7 +30,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async getActiveSessions(): Promise<LoginSession[]> {
     try {
-      const result = await this.makeAdminRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         '/api/auth/sessions',
         {},
         'security-active-sessions'
@@ -97,7 +97,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async revokeSession(sessionId: string): Promise<void> {
     try {
-      await this.makeAdminRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/auth/sessions/${sessionId}`,
         { method: 'DELETE' },
         `security-revoke-session-${sessionId}`
@@ -116,7 +116,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async revokeAllSessions(): Promise<void> {
     try {
-      await this.makeAdminRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/api/auth/sessions/revoke-all',
         { method: 'POST' },
         'security-revoke-all-sessions'
@@ -135,7 +135,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async getSecurityAlerts(): Promise<SecurityAlert[]> {
     try {
-      const result = await this.makeAdminRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         '/api/security/security-alerts',
         {},
         'security-alerts'
@@ -180,7 +180,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async markAlertAsRead(alertId: string): Promise<void> {
     try {
-      await this.makeAdminRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/security/security-alerts/${alertId}/read`,
         { method: 'PUT' },
         `security-mark-alert-read-${alertId}`
@@ -199,7 +199,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async dismissAlert(alertId: string): Promise<void> {
     try {
-      await this.makeAdminRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/security/security-alerts/${alertId}`,
         { method: 'DELETE' },
         `security-dismiss-alert-${alertId}`
@@ -218,7 +218,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async getAlertPreferences(): Promise<Record<string, boolean>> {
     try {
-      const result = await this.makeAdminRequest<Record<string, boolean>>(
+      const result = await this.makeDefaultRequest<Record<string, boolean>>(
         '/api/security/security-alerts/preferences',
         {},
         'security-alert-preferences'
@@ -236,7 +236,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async updateAlertPreferences(preferences: any): Promise<void> {
     try {
-      await this.makeAdminRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/api/security/security-alerts/preferences',
         { 
           method: 'PUT',
@@ -258,7 +258,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async getMFAStatus(): Promise<MFAStatus> {
     try {
-      const result = await this.makeAdminRequest<ApiResponse<MFAStatus>>(
+      const result = await this.makeDefaultRequest<ApiResponse<MFAStatus>>(
         '/api/auth/mfa/status',
         {},
         'security-mfa-status',
@@ -281,7 +281,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async setupMFA(): Promise<MFASetupData> {
     try {
-      const result = await this.makeAdminRequest<ApiResponse<MFASetupData>>(
+      const result = await this.makeDefaultRequest<ApiResponse<MFASetupData>>(
         '/api/auth/mfa/setup',
         { method: 'POST' },
         'security-mfa-setup'
@@ -303,7 +303,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async verifyMFASetup(data: MFASetupFormData): Promise<boolean> {
     try {
-      const result = await this.makeAuthenticatedRequest<ApiResponse<{ verified: boolean }>>(
+      const result = await this.makeDefaultRequest<ApiResponse<{ verified: boolean }>>(
         '/api/auth/mfa/verify',
         { 
           method: 'POST',
@@ -324,7 +324,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async verifyMFALogin(token: string, userId: string): Promise<MFAVerificationResult> {
     try {
-      const result = await this.makeAuthenticatedRequest<ApiResponse<MFAVerificationResult>>(
+      const result = await this.makeDefaultRequest<ApiResponse<MFAVerificationResult>>(
         '/api/auth/mfa/verify-login',
         { 
           method: 'POST',
@@ -349,7 +349,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async disableMFA(): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/api/auth/mfa/disable',
         { method: 'POST' },
         'security-mfa-disable'
@@ -365,7 +365,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async regenerateBackupCodes(verificationCode: string): Promise<string[]> {
     try {
-      const result = await this.makeAuthenticatedRequest<ApiResponse<{ backupCodes: string[] }>>(
+      const result = await this.makeDefaultRequest<ApiResponse<{ backupCodes: string[] }>>(
         '/api/auth/mfa/regenerate-backup',
         { 
           method: 'POST',
@@ -393,7 +393,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async getAdminStabilityInsights(timeframe: string): Promise<any> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/admin/security/stability-insights?timeframe=${timeframe}`,
         {},
         `security-admin-stability-insights-${timeframe}`,
@@ -412,7 +412,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async getAdminTenants(): Promise<any> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         '/api/tenants',
         {},
         'security-admin-tenants',
@@ -431,7 +431,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async getAdminSyncStats(): Promise<any> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         '/api/admin/sync-stats',
         {},
         'security-admin-sync-stats',
@@ -454,7 +454,7 @@ class SecuritySingletonService extends AdminApiSingleton {
       if (params?.limit) queryParams.set('limit', params.limit.toString());
       if (params?.offset) queryParams.set('offset', params.offset.toString());
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/admin/security/sessions?${queryParams}`,
         {},
         'security-admin-sessions',
@@ -473,7 +473,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async getAdminSecuritySessionsStats(): Promise<any> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         '/api/admin/security/sessions/stats',
         {},
         'security-admin-sessions-stats',
@@ -492,7 +492,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async getAdminSecurityAlerts(): Promise<any> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         '/api/admin/security/alerts',
         {},
         'security-admin-alerts',
@@ -511,7 +511,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async getAdminSecurityAlertsStats(): Promise<any> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         '/api/admin/security/alerts/stats',
         {},
         'security-admin-alerts-stats',
@@ -530,7 +530,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async getAdminFailedLogins(): Promise<any> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         '/api/admin/security/failed-logins?limit=20',
         {},
         'security-admin-failed-logins',
@@ -549,7 +549,7 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async getPerformanceMetrics(): Promise<any> {
     try {
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         '/api/admin/performance/metrics',
         {},
         'security-admin-performance-metrics',

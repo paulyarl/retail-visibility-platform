@@ -41,7 +41,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
    * Request a data export
    */
   async requestDataExport(data: DataExportFormData): Promise<DataExport> {
-    const result = await this.makeAuthenticatedRequest<DataExport>(
+    const result = await this.makeDefaultRequest<DataExport>(
       '/api/gdpr/export',
       { 
         method: 'POST',
@@ -69,7 +69,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
    * Get export status
    */
   async getExportStatus(exportId: string): Promise<DataExport> {
-    const result = await this.makeAuthenticatedRequest<DataExport>(
+    const result = await this.makeDefaultRequest<DataExport>(
       `/api/gdpr/export/${exportId}`,
       {},
       `gdpr-export-status-${exportId}`
@@ -87,7 +87,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
    * Download export data
    */
   async downloadExport(exportId: string): Promise<Blob> {
-    const response = await this.makeAuthenticatedRequest<Response>(
+    const response = await this.makeDefaultRequest<Response>(
       `/api/gdpr/export/${exportId}/download`,
       {},
       `gdpr-download-export-${exportId}`
@@ -109,7 +109,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
    * Get all exports for the user
    */
   async getExports(): Promise<DataExport[]> {
-    const result = await this.makeAuthenticatedRequest<DataExport[]>(
+    const result = await this.makeDefaultRequest<DataExport[]>(
       '/api/gdpr/exports',
       {},
       'gdpr-exports'
@@ -127,7 +127,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
    * Request account deletion
    */
   async requestAccountDeletion(data: AccountDeletionFormData): Promise<AccountDeletionRequest> {
-    const result = await this.makeAuthenticatedRequest<AccountDeletionRequest>(
+    const result = await this.makeDefaultRequest<AccountDeletionRequest>(
       '/api/gdpr/delete',
       { 
         method: 'POST',
@@ -155,7 +155,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
    * Get deletion request status
    */
   async getDeletionStatus(): Promise<AccountDeletionRequest> {
-    const result = await this.makeAuthenticatedRequest<AccountDeletionRequest>(
+    const result = await this.makeDefaultRequest<AccountDeletionRequest>(
       '/api/gdpr/delete/status',
       {},
       'gdpr-deletion-status'
@@ -175,7 +175,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
    * Get user consent records
    */
   async getConsents(): Promise<ConsentRecord[]> {
-    const result = await this.makeAuthenticatedRequest<ConsentRecord[]>(
+    const result = await this.makeDefaultRequest<ConsentRecord[]>(
       '/api/gdpr/consents',
       {},
       'gdpr-consents'
@@ -193,7 +193,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
    * Get consent history
    */
   async getConsentHistory(): Promise<ConsentHistoryEntry[]> {
-    const result = await this.makeAuthenticatedRequest<ConsentHistoryEntry[]>(
+    const result = await this.makeDefaultRequest<ConsentHistoryEntry[]>(
       '/api/gdpr/consents/history',
       {},
       'gdpr-consent-history'
@@ -212,7 +212,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
    */
   async updateConsent(data: ConsentUpdateData): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/api/gdpr/consents',
         { 
           method: 'PUT',
@@ -234,7 +234,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
    */
   async bulkUpdateConsents(data: BulkConsentUpdateData): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/api/gdpr/consents/bulk',
         { 
           method: 'PUT',
@@ -255,7 +255,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
    * Get user preferences
    */
   async getUserPreferences(): Promise<UserPreference[]> {
-    const result = await this.makeAuthenticatedRequest<UserPreference[]>(
+    const result = await this.makeDefaultRequest<UserPreference[]>(
       '/api/user/preferences',
       {},
       'gdpr-user-preferences'
@@ -274,7 +274,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
    */
   async updateUserPreference(data: PreferenceUpdateData): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/api/user/preferences',
         { 
           method: 'PUT',
@@ -295,7 +295,7 @@ class GDPRSingletonService extends AuthenticatedApiSingleton {
    * Export user preferences
    */
   async exportUserPreferences(): Promise<Blob> {
-    const response = await this.makeAuthenticatedRequest<Response>(
+    const response = await this.makeDefaultRequest<Response>(
       '/api/user/preferences/export',
       {},
       'gdpr-export-preferences'

@@ -40,7 +40,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   const { user } = useAuth();
   
   // Consolidated data fetching - replaces 3 separate API calls with 1
-  const { tenant: tenantData, tier, usage, loading: completeLoading, error: completeError } = useTenantComplete(tenantId);
+  const { tenant: tenantData, tier, usage, loading: completeLoading, error: completeError, refresh: refreshTenantData } = useTenantComplete(tenantId);
   
   // User profile (still separate since it's user-specific, not tenant-specific)
   const { profile, loading: profileLoading } = useUserProfile();
@@ -163,13 +163,25 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
         />
 
         {/* Tenant ID Display */}
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-100 rounded-lg border border-neutral-200">
             <span className="text-xs text-neutral-500 font-medium">Platform ID:</span>
             <code className="text-xs font-mono text-neutral-700 bg-white px-2 py-0.5 rounded border select-all">
               {tenantId}
             </code>
           </div>
+          
+          {/* Debug Refresh Button */}
+          <button
+            onClick={() => refreshTenantData()}
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg border border-blue-200 hover:bg-blue-200 transition-colors text-xs font-medium"
+            title="Clear cache and refresh all dashboard data"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh Data
+          </button>
         </div>
 
         {/* Tier Gains Welcome - Celebrate what they unlocked */}

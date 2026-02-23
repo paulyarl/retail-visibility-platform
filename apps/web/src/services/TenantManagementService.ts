@@ -1,4 +1,4 @@
-import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 
 export interface TenantUsage {
   items: number;
@@ -82,7 +82,7 @@ class TenantManagementService extends TenantApiSingleton {
   private readonly LIMITS_TTL = 10 * 60 * 1000; // 10 minutes for limits
   private readonly MEDIA_TTL = 30 * 60 * 1000; // 30 minutes for media
 
-  private constructor() {
+  protected constructor() {
     super('tenant-management-singleton');
   }
 
@@ -168,23 +168,28 @@ class TenantManagementService extends TenantApiSingleton {
 
   /**
    * Get tenant usage statistics
-   * Uses the /api/tenants/[id]/usage endpoint (authenticated)
+   * Uses the /api/tenants/[id]/complete endpoint and extracts usage data
    */
   async getTenantUsage(tenantId?: string): Promise<TenantUsage | null> {
     try {
-      const endpoint = tenantId ? `/api/tenants/${tenantId}/usage` : '/api/tenant-limits/status';
-      const cacheKey = tenantId ? `tenant-usage-${tenantId}` : 'current-tenant-usage';
+      const endpoint = tenantId ? `/api/tenants/${tenantId}/complete` : '/api/tenant-limits/status';
+      const cacheKey = tenantId ? `tenant-complete-${tenantId}` : 'current-tenant-usage';
 
-      const response = await this.makeDefaultRequest<TenantUsage>(
+      const response = await this.makeDefaultRequest<any>(
         endpoint,
         {},
         cacheKey,
         this.USAGE_TTL
       );
 
+      // Extract usage data from the complete response
+      if (response.data?.usage) {
+        return response.data.usage;
+      }
+
       return response.data || null;
     } catch (error) {
-      console.error('[TenantManagementService] Failed to get tenant usage:', error);
+      this.logError('Failed to get tenant usage', error);
       return null;
     }
   }

@@ -39,7 +39,7 @@ class ProductLikesSingletonService extends PublicApiSingleton {
         throw new Error('Product ID is required');
       }
 
-      const response = await this.makePublicRequest<ProductLike>(
+      const response = await this.makeDefaultRequest<ProductLike>(
         `/api/products/${productId}/like`,
         {
           method: 'POST',
@@ -72,7 +72,7 @@ class ProductLikesSingletonService extends PublicApiSingleton {
         throw new Error('Product ID is required');
       }
 
-      const response = await this.makePublicRequest<void>(
+      const response = await this.makeDefaultRequest<void>(
         `/api/products/${productId}/like`,
         {
           method: 'DELETE',
@@ -109,7 +109,7 @@ class ProductLikesSingletonService extends PublicApiSingleton {
       if (userId) params.append('userId', userId);
       if (sessionId) params.append('sessionId', sessionId);
 
-      const response = await this.makePublicRequest<ProductLikeStatus>(
+      const response = await this.makeDefaultRequest<ProductLikeStatus>(
         `/api/products/${productId}/likes?${params.toString()}`,
         {},
         `product-like-status-${productId}-${userId || 'anonymous'}-${sessionId || 'anonymous'}`

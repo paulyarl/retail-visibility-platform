@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
 
 export interface TenantLimitsStatus {
   current: number;
@@ -34,10 +34,11 @@ export interface FeaturedProductsLimits {
 
 class TenantLimitsSingletonService extends AuthenticatedApiSingleton {
   private static instance: TenantLimitsSingletonService;
+  protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for tenant limits
 
-  private constructor() {
+  protected constructor() {
     super('tenant-limits-singleton', {
-      ttl: 5 * 60 * 1000 // 5 minutes for tenant limits (moderate change frequency)
+      ttl: 5 * 60 * 1000 // 5 minutes for tenant limits
     });
   }
 
@@ -59,10 +60,11 @@ class TenantLimitsSingletonService extends AuthenticatedApiSingleton {
     }
 
     try {
-      const result = await this.makeAuthenticatedRequest<FeaturedProductsLimits>(
+      const result = await this.makeDefaultRequest<FeaturedProductsLimits>(
         `/api/tenant-limits/featured-products?tenantId=${tenantId}`,
         {},
-        `featured-products-limits-${tenantId}`
+        `featured-products-limits-${tenantId}`,
+        this.cacheTTL
       );
       if (!result.success){
         console.error('[TenantLimitsSingleton] Failed to get featured products limits:', result.error);
@@ -82,10 +84,11 @@ class TenantLimitsSingletonService extends AuthenticatedApiSingleton {
    */
   async getTenantLimitsStatus(): Promise<TenantLimitsStatus | null> {
     try {
-      const result = await this.makeAuthenticatedRequest<TenantLimitsStatus>(
+      const result = await this.makeDefaultRequest<TenantLimitsStatus>(
         '/api/tenant-limits/status',
         {},
-        'tenant-limits-status'
+        'tenant-limits-status',
+        this.cacheTTL
       );
       if (!result.success){
         console.error('[TenantLimitsSingleton] Failed to get tenant limits status:', result.error);

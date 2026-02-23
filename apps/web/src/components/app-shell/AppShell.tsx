@@ -12,7 +12,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui";
 import MobileCapacityIndicator from "@/components/capacity/MobileCapacityIndicator";
 import { GlobalAlertBar } from "@/components/ui/GlobalAlertProvider";
-
+import ShellWithTicker from "@/components/layout/ShellWithTicker";
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -51,142 +51,150 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
 
   return (
-    <div className="min-h-dvh flex flex-col bg-neutral-50">
+    <ShellWithTicker shellHeader={
       <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
         {/* Main Header Row */}
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-            {settings?.logoUrl && (
-              <Link href="/" title={settings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }} ><img 
-                src={settings.logoUrl} 
-                alt={settings.platformName || 'Platform Logo'} 
-                className="h-8 w-auto object-contain"
-                loading="lazy"
-                decoding="async"
-                width="32"
-                height="32"
-                style={{ aspectRatio: 'auto' }}
-                onError={(e) => {
-                  // Hide broken images
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              /></Link>
-            )}
-            <span className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">
-              <Link href="/" title={settings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }} >{settings?.platformName || 'Visible Shelf'}</Link>
-            </span>
-            {/* Visual separator between branding and navigation */}
-            <div className="hidden md:block w-px h-4 bg-neutral-300 mx-2" />
-            {hydrated && (
-              <NavLinks
-                links={links}
-                tenantScopedLinksOn={tenantScopedLinksOn}
-                className="hidden md:flex items-center gap-3 lg:gap-4 text-xs lg:text-sm text-neutral-600"
-                itemClassName="hover:text-neutral-900 whitespace-nowrap"
-              />
-            )}
-          </div>
-          
-          {/* Desktop Actions */}
-          <div className="hidden md:flex items-center gap-2 lg:gap-3">
-            {hydrated && user ? (
-              <>
-                <Link href="/settings">
-                  <Button variant="ghost" size="sm">Account</Button>
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Branding & Navigation */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              {/* Logo */}
+              {settings?.logoUrl && (
+                <Link href="/" title={settings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }} >
+                  <img 
+                    src={settings.logoUrl} 
+                    alt={settings.platformName || 'Platform Logo'} 
+                    className="h-8 w-auto object-contain"
+                    loading="lazy"
+                    decoding="async"
+                    width="32"
+                    height="32"
+                    style={{ aspectRatio: 'auto' }}
+                    onError={(e) => {
+                      // Hide broken images
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
                 </Link>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={async () => {
-                    try { await logout(); } catch {}
-                    if (typeof window !== 'undefined') window.location.href = '/';
-                  }}
-                >
-                  Sign Out
-                </Button>
-              </>
-            ) : (
-              <Link href="/login">
-                <Button variant="secondary" size="sm">Sign In</Button>
-              </Link>
-            )}
-          </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2 rounded-lg hover:bg-neutral-100 transition-colors shrink-0"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
-          >
-            <svg className="h-6 w-6 text-neutral-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              {mobileMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               )}
-            </svg>
-          </button>
-        </div>
-
-        {/* Switcher Row - All Screen Sizes */}
-        {hydrated && user && (
-          <div className="border-t border-neutral-200 bg-neutral-50">
-            <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-2 flex items-center justify-end gap-3 overflow-x-auto">
-              <TenantSwitcher />
-              <SettingsSwitcher />
-            </div>
-          </div>
-        )}
-
-        {/* Mobile Menu Dropdown */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-neutral-200 bg-white">
-            <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 space-y-2">
-              {/* Mobile Navigation */}
+              <span className="text-xs sm:text-sm font-semibold text-neutral-900 truncate">
+                <Link href="/" title={settings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }} >
+                  {settings?.platformName || 'Visible Shelf'}
+                </Link>
+              </span>
+              {/* Visual separator between branding and navigation */}
+              <div className="hidden md:block w-px h-4 bg-neutral-300 mx-2" />
               {hydrated && (
                 <NavLinks
                   links={links}
                   tenantScopedLinksOn={tenantScopedLinksOn}
-                  className="space-y-1"
-                  itemClassName="block px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-900 font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
+                  className="hidden md:flex items-center gap-3 lg:gap-4 text-xs lg:text-sm text-neutral-600"
+                  itemClassName="hover:text-neutral-900 whitespace-nowrap"
                 />
               )}
-
-              {/* Mobile Actions */}
-              <div className="pt-2 border-t border-neutral-200 space-y-2">
-                {hydrated && user ? (
-                  <>
-                    <Link href="/settings" className="block" onClick={() => setMobileMenuOpen(false)}>
-                      <Button variant="ghost" className="w-full justify-start" size="md">Account</Button>
-                    </Link>
-                    <Button
-                      variant="secondary"
-                      className="w-full"
-                      size="md"
-                      onClick={async () => {
-                        setMobileMenuOpen(false);
-                        try { await logout(); } catch {}
-                        if (typeof window !== 'undefined') window.location.href = '/';
-                      }}
-                    >
-                      Sign Out
-                    </Button>
-                  </>
-                ) : (
-                  <Link href="/login" className="block" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="secondary" className="w-full" size="md">Sign In</Button>
+            </div>
+          
+            {/* Desktop Actions */}
+            <div className="hidden md:flex items-center gap-2 lg:gap-3">
+              {hydrated && user ? (
+                <>
+                  <Link href="/settings">
+                    <Button variant="ghost" size="sm">Account</Button>
                   </Link>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={async () => {
+                      try { await logout(); } catch {}
+                      if (typeof window !== 'undefined') window.location.href = '/';
+                    }}
+                  >
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <Link href="/login">
+                  <Button variant="secondary" size="sm">Sign In</Button>
+                </Link>
+              )}
+            </div>
+
+            {/* Mobile Menu Button */}
+            <button
+              className="md:hidden p-2 rounded-lg hover:bg-neutral-100 transition-colors shrink-0"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              <svg className="h-6 w-6 text-neutral-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {mobileMenuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 )}
+              </svg>
+            </button>
+          </div>
+
+          {/* Switcher Row - All Screen Sizes */}
+          {hydrated && user && (
+            <div className="border-t border-neutral-200 bg-neutral-50">
+              <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-2 flex items-center justify-end gap-3 overflow-x-auto">
+                <TenantSwitcher />
+                <SettingsSwitcher />
               </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Mobile Menu Dropdown */}
+          {mobileMenuOpen && (
+            <div className="md:hidden border-t border-neutral-200 bg-white">
+              <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 space-y-2">
+                {/* Mobile Navigation */}
+                {hydrated && (
+                  <NavLinks
+                    links={links}
+                    tenantScopedLinksOn={tenantScopedLinksOn}
+                    className="space-y-1"
+                    itemClassName="block px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-900 font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  />
+                )}
+
+                {/* Mobile Actions */}
+                <div className="pt-2 border-t border-neutral-200 space-y-2">
+                  {hydrated && user ? (
+                    <>
+                      <Link href="/settings" className="block" onClick={() => setMobileMenuOpen(false)}>
+                        <Button variant="ghost" className="w-full justify-start" size="md">Account</Button>
+                      </Link>
+                      <Button
+                        variant="secondary"
+                        className="w-full"
+                        size="md"
+                        onClick={async () => {
+                          setMobileMenuOpen(false);
+                          try { await logout(); } catch {}
+                          if (typeof window !== 'undefined') window.location.href = '/';
+                        }}
+                      >
+                        Sign Out
+                      </Button>
+                    </>
+                  ) : (
+                    <Link href="/login" className="block" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="secondary" className="w-full" size="md">Sign In</Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Global Alert Bar - Shows rate limit and other important alerts */}
+        <GlobalAlertBar />
       </header>
-
-      {/* Global Alert Bar - Shows rate limit and other important alerts */}
-      <GlobalAlertBar />
-
+    }>
       <main className="flex-1">
         {children}
       </main>
@@ -197,6 +205,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
-    </div>
+    </ShellWithTicker>
   );
 }

@@ -6,7 +6,7 @@
  * Provides tenant-specific caching and header management
  */
 
-import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, TenantRequestOptions, TenantApiResponse } from './FlexibleApiSingleton';
+import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, TenantRequestOptions, TenantApiResponse, PublicRequestOptions } from './FlexibleApiSingleton';
 
 // ====================
 // TENANT API SINGLETON
@@ -67,23 +67,44 @@ export abstract class TenantApiSingleton extends FlexibleApiSingleton {
     customTTL?: number,
     handle404: boolean = true
   ): Promise<TenantApiResponse<T>> {
-    // Use the inherited WEB target override from FlexibleApiSingleton
-    return super.makeWebRequest(url, options, cacheKey, customTTL);
+    // Use the inherited makeDefaultRequest from FlexibleApiSingleton
+    const modifiedOptions = await this.onTenantRequest(url, options);
+    return super.makeDefaultRequest(url, modifiedOptions, cacheKey, customTTL);
   }
+ 
 
   /**
-   * Make public tenant request to API server
-   * Uses convenience method for PUBLIC + API combination
+   * Override hook for tenant request behavior
    */
-  protected async makePublicRequest<T>(
+  protected async onTenantRequest<T>(
     url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    customTTL?: number,
-    handle404: boolean = true
-  ): Promise<TenantApiResponse<T>> {
-    // Use the new PUBLIC + API convenience method
-    return this.makePublicApiRequest(url, options, cacheKey, customTTL);
+    options: RequestInit,
+    requestOptions?: TenantRequestOptions
+  ): Promise<RequestInit> {
+    const modifiedOptions = { ...options };
+
+    // Add Authorization header with bearer token
+    const token = await this.getAuthToken();
+    if (token) {
+      modifiedOptions.headers = {
+        ...modifiedOptions.headers,
+        'Authorization': `Bearer ${token}`,
+      };
+    } else {
+      console.warn('[TenantApiSingleton] No auth token available for tenant request');
+    }
+
+    // Add tenant context headers
+    const tenantId = requestOptions?.tenantId || this.currentTenantId || await this.getCurrentTenantId();
+    if (tenantId) {
+      modifiedOptions.headers = {
+        ...modifiedOptions.headers,
+        'X-Tenant-ID': tenantId,
+        'X-Request-Context': 'tenant',
+      };
+    }
+
+    return modifiedOptions;
   }
 
   /**

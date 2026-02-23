@@ -61,7 +61,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
       if (params?.category) searchParams.append('category', params.category);
       if (params?.limit) searchParams.append('limit', params.limit.toString());
 
-      const result = await this.makePublicRequest<{
+      const result = await this.makeDefaultRequest<{
         recommendations: RecommendationGroup[];
       }>(
         `/api/recommendations/for-storefront/${tenantId}?${searchParams.toString()}`,
@@ -93,7 +93,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
    */
   async getAllStorefrontRecommendations(): Promise<StoreRecommendation[]> {
     try {
-      const result = await this.makePublicRequest<{
+      const result = await this.makeDefaultRequest<{
         recommendations: RecommendationGroup[];
       }>(
         '/api/recommendations/for-storefront',
@@ -125,7 +125,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
    */
   async trackBehaviorBatch(batchData: any): Promise<void> {
     try {
-      await this.makePublicRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/api/recommendations/track-batch',
         {
           method: 'POST',
@@ -145,7 +145,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
    */
   async getDirectoryRecommendations(): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/recommendations/for-directory',
         {},
         'display:directory-recommendations',
@@ -170,7 +170,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
    */
   async getDirectoryCategoriesEnhanced(): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/directory/categories-enhanced',
         {},
         'directory-categories-enhanced',
@@ -195,7 +195,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
    */
   async getDirectoryCategoriesCounts(): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/directory/categories-optimized/counts-by-name',
         {},
         'directory-categories-counts',
@@ -221,7 +221,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
   async getDirectoryStoreTypes(): Promise<any> {
     try {
       console.log('[RecommendationsSingleton] before request');
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/directory/store-types',
         {},
         'directory-store-types',
@@ -237,7 +237,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
       }
 
       // API returns: { success: true, data: { storeTypes: [...] } }
-      // makePublicRequest wraps this, so we need response.data.data.storeTypes
+      // makeDefaultRequest wraps this, so we need response.data.data.storeTypes
       console.log('[RecommendationsSingleton] response.data?.data?.storeTypes store types:', response.data?.data?.storeTypes);
       console.log('[RecommendationsSingleton] response.data?.storeTypes store types:', response.data?.storeTypes);
       return response.data?.data?.storeTypes || null;
@@ -253,7 +253,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
    */
   async getStoreTypeRecommendations(storeTypeSlug: string): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/recommendations/for-directory?storeType=${storeTypeSlug}`,
         {},
         `display:store-type-recommendations-${storeTypeSlug}`,
@@ -278,7 +278,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
    */
   async getStoreTypeDetails(storeTypeSlug: string): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/directory/store-types/${storeTypeSlug}`,
         {},
         `display:store-type-details-${storeTypeSlug}`,
@@ -303,7 +303,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
    */
   async getStoresByStoreType(storeTypeSlug: string): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/directory/store-types/${storeTypeSlug}/stores`,
         {},
         `stores-by-store-type-${storeTypeSlug}`,
@@ -328,7 +328,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
    */
   async trackRecommendations(trackData: any): Promise<boolean> {
     try {
-      await this.makePublicRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/api/recommendations/track',
         {
           method: 'POST',
@@ -366,7 +366,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
       if (params?.userId) searchParams.append('userId', params.userId);
       if (params?.limit) searchParams.append('limit', params.limit.toString());
 
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/recommendations/last-viewed?${searchParams.toString()}`,
         {},
         `display:last-viewed-recommendations:${params.sessionId || params.userId || 'anonymous'}`,
@@ -398,7 +398,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
       const searchParams = new URLSearchParams();
       if (limit) searchParams.append('limit', limit.toString());
 
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/recommendations/for-product-page/${productId}?${searchParams.toString()}`,
         {},
         `product-page-recommendations-${productId}`,
@@ -423,7 +423,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
    */
   async getDirectoryMVCategories(): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/directory/mv/categories',
         {},
         'directory-mv-categories',
@@ -448,7 +448,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
    */
   async getDirectoryCategories(): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/directory/categories',
         {},
         'directory-categories',
@@ -477,7 +477,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         throw new Error('Category slug is required');
       }
 
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/directory/mv/categories/${categorySlug}`,
         {},
         `stores-by-category-${categorySlug}`,
@@ -511,7 +511,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
       if (page) searchParams.append('page', page.toString());
       if (limit) searchParams.append('limit', limit.toString());
 
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/directory/search?${searchParams.toString()}`,
         {},
         `search-by-category-${category}-${page || 1}`,
@@ -546,7 +546,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
       if (page) searchParams.append('page', page.toString());
       if (limit) searchParams.append('limit', limit.toString());
 
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/directory/search?${searchParams.toString()}`,
         {},
         `search-by-location-${city}-${state}-${page || 1}`,
@@ -571,7 +571,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
    */
   async getLocations(): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/directory/locations',
         {},
         'directory-locations',
@@ -600,7 +600,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/directory/tenant/${tenantId}`,
         {},
         `tenant-directory-slug-${tenantId}`,
@@ -629,7 +629,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         throw new Error('Query is required');
       }
 
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/directory/categories/search?q=${encodeURIComponent(query)}`,
         {},
         `search-categories-${query}`,
@@ -673,7 +673,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
       searchParams.append('page', (params.page || 1).toString());
       searchParams.append('limit', (params.limit || 20).toString());
 
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/directory/mv/search?${searchParams.toString()}`,
         {},
         `search-directory-stores-${JSON.stringify(params)}`,
@@ -713,7 +713,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         searchParams.append('maxDistance', '50'); // 50km radius
       }
 
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/directory/featured-stores?${searchParams.toString()}`,
         {},
         `featured-stores-${JSON.stringify(params)}`,
@@ -742,7 +742,7 @@ class RecommendationsSingletonService extends PublicApiSingleton {
         throw new Error('Slug is required');
       }
 
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/directory/consolidated/${slug}`,
         {},
         `directory-consolidated-${slug}`,

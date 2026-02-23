@@ -67,7 +67,7 @@ class PhotoService extends AuthenticatedApiSingleton {
    * Uses the /api/photos/item/:itemId endpoint
    */
   async fetchItemPhotos(itemId: string): Promise<Photo[]> {
-    const response = await this.makeAuthenticatedRequest<{ photos: Photo[] }>(
+    const response = await this.makeDefaultRequest<{ photos: Photo[] }>(
       `/photos/item/${itemId}`,
       {},
       `item-photos-${itemId}`,
@@ -87,7 +87,7 @@ class PhotoService extends AuthenticatedApiSingleton {
    * Uses the /api/photos/variant/:variantId endpoint
    */
   async fetchVariantPhotos(variantId: string): Promise<Photo[]> {
-    const response = await this.makeAuthenticatedRequest<{ photos: Photo[] }>(
+    const response = await this.makeDefaultRequest<{ photos: Photo[] }>(
       `/photos/variant/${variantId}`,
       {},
       `variant-photos-${variantId}`,
@@ -112,7 +112,7 @@ class PhotoService extends AuthenticatedApiSingleton {
     formData.append('photo', file);
     formData.append('isPrimary', isPrimary.toString());
 
-    const response = await this.makeAuthenticatedRequest<PhotoUploadResult>(
+    const response = await this.makeDefaultRequest<PhotoUploadResult>(
       `/photos/upload/item/${itemId}`,
       {
         method: 'POST',
@@ -145,7 +145,7 @@ class PhotoService extends AuthenticatedApiSingleton {
     formData.append('photo', file);
     formData.append('isPrimary', isPrimary.toString());
 
-    const response = await this.makeAuthenticatedRequest<PhotoUploadResult>(
+    const response = await this.makeDefaultRequest<PhotoUploadResult>(
       `/photos/upload/variant/${variantId}`,
       {
         method: 'POST',
@@ -173,7 +173,7 @@ class PhotoService extends AuthenticatedApiSingleton {
    * Uses the /api/photos/:photoId endpoint
    */
   async deletePhoto(photoId: string, itemId: string): Promise<PhotoDeleteResult> {
-    const response = await this.makeAuthenticatedRequest<PhotoDeleteResult>(
+    const response = await this.makeDefaultRequest<PhotoDeleteResult>(
       `/photos/${photoId}`,
       {
         method: 'DELETE',
@@ -200,7 +200,7 @@ class PhotoService extends AuthenticatedApiSingleton {
    * Uses the /api/photos/reorder/:itemId endpoint
    */
   async reorderPhotos(itemId: string, photoIds: string[]): Promise<PhotoReorderResult> {
-    const response = await this.makeAuthenticatedRequest<PhotoReorderResult>(
+    const response = await this.makeDefaultRequest<PhotoReorderResult>(
       `/photos/reorder/${itemId}`,
       {
         method: 'POST',
@@ -228,7 +228,7 @@ class PhotoService extends AuthenticatedApiSingleton {
    * Uses the /api/photos/:photoId/primary endpoint
    */
   async setPrimaryPhoto(photoId: string, itemId: string): Promise<PhotoReorderResult> {
-    const response = await this.makeAuthenticatedRequest<PhotoReorderResult>(
+    const response = await this.makeDefaultRequest<PhotoReorderResult>(
       `/photos/${photoId}/primary`,
       {
         method: 'PATCH',
@@ -255,7 +255,7 @@ class PhotoService extends AuthenticatedApiSingleton {
    * Uses the /api/photos/:photoId endpoint
    */
   async getPhotoById(photoId: string): Promise<Photo | null> {
-    const response = await this.makeAuthenticatedRequest<Photo>(
+    const response = await this.makeDefaultRequest<Photo>(
       `/photos/${photoId}`,
       {},
       `photo-${photoId}`,

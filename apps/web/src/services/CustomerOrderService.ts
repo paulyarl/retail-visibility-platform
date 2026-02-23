@@ -127,7 +127,7 @@ class CustomerOrderService extends PublicApiSingleton {
    * Get available payment gateways for a tenant
    */
   async getPaymentGateways(tenantId: string): Promise<PaymentGateway[]> {
-    const response = await this.makePublicRequest<{
+    const response = await this.makeDefaultRequest<{
       success: boolean;
       gateways: PaymentGateway[];
     }>(
@@ -149,7 +149,7 @@ class CustomerOrderService extends PublicApiSingleton {
    * Public endpoint for customer checkout
    */
   async createOrder(orderRequest: OrderRequest): Promise<CustomerOrder | null> {
-    const response = await this.makePublicRequest<{
+    const response = await this.makeDefaultRequest<{
       success: boolean;
       order: CustomerOrder;
     }>(
@@ -178,7 +178,7 @@ class CustomerOrderService extends PublicApiSingleton {
       ? `/api/orders/${orderId}?email=${encodeURIComponent(email)}`
       : `/api/orders/${orderId}`;
     
-    const response = await this.makePublicRequest<{
+    const response = await this.makeDefaultRequest<{
       success: boolean;
       order: CustomerOrder;
     }>(url, {}, `order-${orderId}`);
@@ -204,7 +204,7 @@ class CustomerOrderService extends PublicApiSingleton {
       totalPages: number;
     };
   }> {
-    const response = await this.makePublicRequest<{
+    const response = await this.makeDefaultRequest<{
       success: boolean;
       orders: CustomerOrder[];
       pagination: {
@@ -253,7 +253,7 @@ class CustomerOrderService extends PublicApiSingleton {
     amount: number;
   }): Promise<boolean> {
     try {
-      await this.makePublicRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/orders/${orderId}/payment`,
         {
           method: 'PUT',
@@ -279,7 +279,7 @@ class CustomerOrderService extends PublicApiSingleton {
         throw new Error('Order ID is required');
       }
 
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/download/orders/${orderId}/downloads`,
         {},
         `order-downloads-${orderId}`
@@ -302,7 +302,7 @@ class CustomerOrderService extends PublicApiSingleton {
         throw new Error('Payment ID is required');
       }
 
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/checkout/payments/${paymentId}`,
         {},
         `payment-details-${paymentId}`
@@ -328,7 +328,7 @@ class CustomerOrderService extends PublicApiSingleton {
     cartItems: any[];
   }): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/checkout/paypal/create-order',
         {
           method: 'POST',
@@ -354,7 +354,7 @@ class CustomerOrderService extends PublicApiSingleton {
     paypalOrderId: string;
   }): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/checkout/paypal/capture-order',
         {
           method: 'POST',
@@ -382,7 +382,7 @@ class CustomerOrderService extends PublicApiSingleton {
     paymentMethod: string;
   }): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/checkout/orders',
         {
           method: 'POST',
@@ -412,7 +412,7 @@ class CustomerOrderService extends PublicApiSingleton {
     cartItems: any[];
   }): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/checkout/square/process-payment',
         {
           method: 'POST',
@@ -442,7 +442,7 @@ class CustomerOrderService extends PublicApiSingleton {
     cartItems: any[];
   }): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/checkout/payments/charge',
         {
           method: 'POST',

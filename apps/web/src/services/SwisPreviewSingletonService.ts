@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
 
 interface SwisPreviewItem {
   sku: string;
@@ -44,10 +44,10 @@ interface SwisPreviewResponse {
 
 class SwisPreviewSingletonService extends AuthenticatedApiSingleton {
   private static instance: SwisPreviewSingletonService;
+  protected cacheTTL: number = 3 * 60 * 1000; // 3 minutes for preview data
 
-  private constructor() {
+  protected constructor() {
     super('swis-preview-singleton');
-    this.cacheTTL = 3 * 60 * 1000; // 3 minutes for preview data (changes frequently)
   }
 
   public static getInstance(): SwisPreviewSingletonService {
@@ -71,7 +71,7 @@ class SwisPreviewSingletonService extends AuthenticatedApiSingleton {
         sort: sortOrder,
       });
 
-      const result = await this.makeAuthenticatedRequest<SwisPreviewResponse>(
+      const result = await this.makeDefaultRequest<SwisPreviewResponse>(
         `/api/tenant/${tenantId}/swis/preview?${params}`,
         {},
         `swis-preview-${tenantId}-${limit}-${sortOrder}`

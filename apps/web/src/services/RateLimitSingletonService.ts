@@ -40,7 +40,7 @@ class RateLimitSingletonService extends AuthenticatedApiSingleton {
    */
   async getRateLimitConfigurations(): Promise<RateLimitConfig[]> {
     try {
-      const response = await this.makeAuthenticatedRequest<RateLimitConfig[]>(
+      const response = await this.makeDefaultRequest<RateLimitConfig[]>(
         '/api/rate-limit-configs',
         {},
         'rate-limit-configs'
@@ -85,7 +85,7 @@ class RateLimitSingletonService extends AuthenticatedApiSingleton {
    */
   async isRateLimitingEnabled(): Promise<boolean> {
     try {
-      const response = await this.makeAuthenticatedRequest<{ features?: { rateLimitingEnabled?: boolean } }>(
+      const response = await this.makeDefaultRequest<{ features?: { rateLimitingEnabled?: boolean } }>(
         '/api/platform-settings',
         {},
         'platform-settings-rate-limiting'
@@ -110,7 +110,7 @@ class RateLimitSingletonService extends AuthenticatedApiSingleton {
   async logRateLimitWarning(warning: RateLimitWarning): Promise<void> {
     try {
       // Fire and forget - don't await or block
-      this.makeAuthenticatedRequest<void>(
+      this.makeDefaultRequest<void>(
         '/api/rate-limit-warnings',
         {
           method: 'POST',

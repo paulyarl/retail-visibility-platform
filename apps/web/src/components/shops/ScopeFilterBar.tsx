@@ -16,12 +16,14 @@ interface ScopeFilterBarProps {
   onScopeChange: (scope: ScopeParams) => void;
   initialScope?: ScopeParams;
   className?: string;
+  categories?: { name: string; count: number; type: 'shop' | 'product' }[];
 }
 
 export default function ScopeFilterBar({ 
   onScopeChange, 
   initialScope,
-  className = '' 
+  className = '',
+  categories = []
 }: ScopeFilterBarProps) {
   const [activeTab, setActiveTab] = useState<ScopeType>(initialScope?.scope || 'global');
   const [scopeParams, setScopeParams] = useState<ScopeParams>(
@@ -122,6 +124,7 @@ export default function ScopeFilterBar({
           <CategorySelector
             value={scopeParams.category}
             onChange={handleCategoryChange}
+            categories={categories}
           />
         )}
 

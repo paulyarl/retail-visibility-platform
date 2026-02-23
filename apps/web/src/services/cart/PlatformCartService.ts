@@ -63,7 +63,7 @@ class PlatformCartService extends PublicApiSingleton implements ShopCartService 
   async addToCart(shopId: string, productId: string, quantity: number): Promise<void> {
     try {
       // Sync with server first
-      await this.makePublicRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/carts/${shopId}/items`,
         {
           method: 'POST',

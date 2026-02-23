@@ -1,10 +1,9 @@
 'use client';
 
+import PublicApiSingleton from '../providers/base/PublicApiSingleton';
 // ====================
 // STOREFRONT SERVICE - PLATFORM-ALIGNED
 // ====================
-
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 // Service interfaces
 interface ProductFilters {
@@ -103,7 +102,7 @@ class StorefrontService extends PublicApiSingleton {
     const cacheKey = `products:${tenantId}:${queryString}`;
 
     try {
-      const result = await this.makeDefaultRequest<ProductResponse>(endpoint, {}, cacheKey, this.PRODUCTS_TTL);
+      const result = await super.makeDefaultRequest<ProductResponse>(endpoint, {}, cacheKey, this.PRODUCTS_TTL);
       return result.data || { items: [], pagination: { page: 1, limit: 10, totalItems: 0, totalPages: 0, hasMore: false } };
     } catch (error) {
       console.error('[StorefrontService] Failed to get products:', error);
@@ -113,7 +112,7 @@ class StorefrontService extends PublicApiSingleton {
 
   async getCategories(tenantId: string): Promise<Category[]> {
     try {
-      const data = await this.makeDefaultRequest<{ categories: Category[] }>(
+      const data = await super.makeDefaultRequest<{ categories: Category[] }>(
         `/api/storefront/${tenantId}/categories`,
         {},
         `categories:${tenantId}`,
@@ -136,7 +135,7 @@ class StorefrontService extends PublicApiSingleton {
       const endpoint = `/api/storefront/${tenantId}/featured-products${queryString ? `?${queryString}` : ''}`;
       const cacheKey = `featured-products:${tenantId}:${queryString}`;
 
-      const data = await this.makeDefaultRequest<{
+      const data = await super.makeDefaultRequest<{
         success: boolean;
         items: CatalogProduct[];
         totalCount: number;
@@ -165,7 +164,7 @@ class StorefrontService extends PublicApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeDefaultRequest<any>(
+      const result = await super.makeDefaultRequest<any>(
         `/api/tenants/${tenantId}/tier/public`,
         {},
         `public-tier-${tenantId}`,
@@ -189,7 +188,7 @@ class StorefrontService extends PublicApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const response = await this.makeDefaultRequest<any>(
+      const response = await super.makeDefaultRequest<any>(
         `/public/tenant/${tenantId}/profile`,
         {},
         `public-tenant-profile-${tenantId}`,
@@ -213,7 +212,7 @@ class StorefrontService extends PublicApiSingleton {
         return [];
       }
 
-      const response = await this.makeDefaultRequest<any[]>(
+      const response = await super.makeDefaultRequest<any[]>(
         '/stores/batch',
         {
           method: 'POST',
@@ -242,7 +241,7 @@ class StorefrontService extends PublicApiSingleton {
 
       // Fetch stats for all stores in parallel
       const promises = storeIds.map(async (storeId) => {
-        return await this.makeDefaultRequest<any>(
+        return await super.makeDefaultRequest<any>(
           `/storefront/${tenantId}/storefront/categories-stats`,
           {},
           `categories-stats-${storeId}`,

@@ -84,13 +84,7 @@ class ScanAnalyticsService extends TenantApiSingleton {
       }>(
         `/api/scan/tenant/${tenantId}/analytics`,
         {},
-        `tenant-analytics-${tenantId}`,
-        this.ANALYTICS_TTL,
-        {
-          requireTenantContext: true,
-          validateTenantAccess: true,
-          tenantId: tenantId
-        }
+        `tenant-analytics-${tenantId}`
       );
 
       return response?.data?.analytics || null;
@@ -168,16 +162,10 @@ class ScanAnalyticsService extends TenantApiSingleton {
         ? `/api/scan/tenant/${tenantId}/session-stats`
         : '/api/scan/session-stats';
       
-      const response = await this.makeTenantRequest<{ active: number; total: number }>(
+      const response = await this.makeDefaultRequest<{ active: number; total: number }>(
         url,
         {},
-        `scan-session-stats-${tenantId || 'all'}`,
-        this.ANALYTICS_TTL,
-        {
-          requireTenantContext: tenantId ? true : false,
-          validateTenantAccess: tenantId ? true : false,
-          tenantId: tenantId
-        }
+        `scan-session-stats-${tenantId || 'all'}`
       );
 
       return response.data || null;
@@ -193,19 +181,13 @@ class ScanAnalyticsService extends TenantApiSingleton {
    */
   async cleanupScanSessions(tenantId?: string): Promise<{ cleaned: number }> {
     try {
-      const response = await this.makeTenantRequest<{ cleaned: number }>(
+      const response = await this.makeDefaultRequest<{ cleaned: number }>(
         `/api/scan/tenant/${tenantId || 'current'}/cleanup-sessions`,
         {
           method: 'POST',
           body: JSON.stringify({ tenantId })
         },
-        'cleanup-scan-sessions',
-        0, // No caching for write operations
-        {
-          requireTenantContext: true,
-          validateTenantAccess: true,
-          tenantId: tenantId
-        }
+        'cleanup-scan-sessions'
       );
 
       if (!response.data) {

@@ -1,4 +1,4 @@
-import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 import { googleTaxonomyPublicService, type GoogleTaxonomyPath } from './GoogleTaxonomyPublicService';
 
 export interface Category {
@@ -40,7 +40,7 @@ class TenantCategoriesService extends TenantApiSingleton {
   private readonly ALIGNMENT_TTL = 2 * 60 * 1000; // 2 minutes for alignment status
   private readonly TAXONOMY_TTL = 30 * 60 * 1000; // 30 minutes for taxonomy (static)
 
-  private constructor() {
+  protected constructor() {
     super('tenant-categories-singleton');
   }
 

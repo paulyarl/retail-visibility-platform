@@ -120,7 +120,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
       offset: offset.toString(),
     });
 
-    const result = await this.makeAdminRequest<{
+    const result = await this.makeDefaultRequest<{
       sessions: AdminSession[];
       total: number;
       hasMore: boolean;
@@ -142,7 +142,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
    * Get session statistics
    */
   async getSessionStats(): Promise<SessionStats | null> {
-    const result = await this.makeAdminRequest<SessionStats>(
+    const result = await this.makeDefaultRequest<SessionStats>(
       '/api/admin/security/sessions/stats',
       {},
       'admin-security-session-stats'
@@ -160,7 +160,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
    * Get admin security alerts
    */
   async getSecurityAlerts(): Promise<AdminAlert[] | null> {
-    const result = await this.makeAdminRequest<{
+    const result = await this.makeDefaultRequest<{
       data: AdminAlert[];
     }>(
       '/api/admin/security/alerts',
@@ -180,7 +180,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
    * Get alert statistics
    */
   async getAlertStats(): Promise<AlertStats | null> {
-    const result = await this.makeAdminRequest<AlertStats>(
+    const result = await this.makeDefaultRequest<AlertStats>(
       '/api/admin/security/alerts/stats',
       {},
       'admin-security-alert-stats'
@@ -198,7 +198,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
    * Get failed login attempts
    */
   async getFailedLogins(limit: number = 20): Promise<FailedLogin[] | null> {
-    const result = await this.makeAdminRequest<FailedLogin[]>(
+    const result = await this.makeDefaultRequest<FailedLogin[]>(
       `/api/admin/security/failed-logins?limit=${limit}`,
       {},
       `admin-security-failed-logins-${limit}`
@@ -244,7 +244,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
 
     // Add cache-busting timestamp to ensure fresh data
     const timestamp = Date.now();
-    const result = await this.makeAdminRequest<any[]>(
+    const result = await this.makeDefaultRequest<any[]>(
       `/api/admin/users/${userId}/tenants?t=${timestamp}`,
       {},
       `admin-user-tenants-${userId}-${timestamp}`
@@ -263,7 +263,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
    * Uses the /api/admin/tenants endpoint
    */
   async getAvailableTenants(): Promise<any[]> {
-    const result = await this.makeAdminRequest<any[]>(
+    const result = await this.makeDefaultRequest<any[]>(
       '/api/admin/tenants',
       {},
       'admin-available-tenants',
@@ -291,7 +291,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
         throw new Error('User ID is required');
       }
 
-      const result = await this.makeAdminRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/admin/users/${userId}/tenants`,
         {
           method: 'POST',
@@ -317,7 +317,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
         throw new Error('User ID and Tenant ID are required');
       }
 
-      const result = await this.makeAdminRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/admin/users/${userId}/tenants/${tenantId}`,
         {
           method: 'DELETE'
@@ -344,7 +344,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
         throw new Error('User ID and Tenant ID are required');
       }
 
-      const result = await this.makeAdminRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/admin/users/${userId}/tenants/${tenantId}`,
         {
           method: 'PATCH',
@@ -366,7 +366,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
    * Get tier system features
    */
   async getTierSystemFeatures(): Promise<any[]> {
-    const result = await this.makeAdminRequest<{
+    const result = await this.makeDefaultRequest<{
       features: any[];
     }>(
       '/api/admin/tier-system/features',
@@ -395,7 +395,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
     limits: any;
   }): Promise<any> {
     try {
-      const result = await this.makeAdminRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         '/api/admin/tier-system/tiers',
         {
           method: 'POST',
@@ -423,7 +423,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
     limits?: any;
   }): Promise<any> {
     try {
-      const result = await this.makeAdminRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/admin/tier-system/tiers/${tierId}`,
         {
           method: 'PUT',
@@ -445,7 +445,7 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
    */
   async deleteTier(tierId: string): Promise<any> {
     try {
-      const result = await this.makeAdminRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/admin/tier-system/tiers/${tierId}`,
         {
           method: 'DELETE'

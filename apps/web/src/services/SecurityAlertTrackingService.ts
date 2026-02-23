@@ -67,7 +67,7 @@ class SecurityAlertTrackingService extends AdminApiSingleton {
    */
   async sendAlertEvents(events: SecurityAlertEvent[]): Promise<void> {
     try {
-      await this.makePublicRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/security/alerts',
         {
           method: 'POST',
@@ -88,7 +88,7 @@ class SecurityAlertTrackingService extends AdminApiSingleton {
    */
   async sendTelemetry(type: string, data: SecurityTelemetryData): Promise<void> {
     try {
-      await this.makePublicRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/security/telemetry/${type}`,
         {
           method: 'POST',
@@ -125,7 +125,7 @@ class SecurityAlertTrackingService extends AdminApiSingleton {
    */
   async getSecurityMetrics(hours: number = 24): Promise<SecurityAlertMetrics> {
     try {
-      const response = await this.makePublicRequest<SecurityAlertMetrics>(
+      const response = await this.makeDefaultRequest<SecurityAlertMetrics>(
         `/security/metrics?hours=${hours}`,
         {},
         `security-metrics-${hours}`,
@@ -159,7 +159,7 @@ class SecurityAlertTrackingService extends AdminApiSingleton {
    */
   async getAlertsByType(type: string, hours: number = 24): Promise<SecurityAlertEvent[]> {
     try {
-      const response = await this.makePublicRequest<SecurityAlertEvent[]>(
+      const response = await this.makeDefaultRequest<SecurityAlertEvent[]>(
         `/security/alerts/${type}?hours=${hours}`,
         {},
         `alerts-by-type-${type}-${hours}`,
@@ -179,7 +179,7 @@ class SecurityAlertTrackingService extends AdminApiSingleton {
    */
   async getAlertsBySeverity(severity: string, hours: number = 24): Promise<SecurityAlertEvent[]> {
     try {
-      const response = await this.makePublicRequest<SecurityAlertEvent[]>(
+      const response = await this.makeDefaultRequest<SecurityAlertEvent[]>(
         `/security/alerts/severity/${severity}?hours=${hours}`,
         {},
         `alerts-by-severity-${severity}-${hours}`,

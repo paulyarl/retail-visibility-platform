@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { ExternalLink, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 interface OAuthConnectButtonProps {
   tenantId: string;

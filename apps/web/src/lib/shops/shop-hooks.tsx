@@ -31,27 +31,53 @@ export function useShopDirectory(params: {
 
   const fetchShops = useCallback(async () => {
     try {
-      // Only show loading if we don't have data yet
-      if (shops.length === 0) {
-        setLoading(true);
-      }
+      setLoading(true);
       setError(null);
       
       const result = await shopService.getShopDirectory(params);
-      if (result && Array.isArray(result)) {
+      console.log('[useShopDirectory] API response:', result);
+      console.log('[useShopDirectory] Response type:', typeof result);
+      console.log('[useShopDirectory] Has shops property:', result && 'shops' in result);
+      console.log('[useShopDirectory] Has data property:', result && 'data' in result);
+      console.log('[useShopDirectory] Is array:', Array.isArray(result));
+      
+      // Extract shops from the response structure
+      if (result && result.shops && (result.shops as any).data && Array.isArray((result.shops as any).data)) {
+        // Handle double-wrapped response: { shops: { data: [...] } }
+        setShops((result.shops as any).data);
+        setHasMore((result.shops as any).data.length >= (params.limit || 10));
+        console.log('[useShopDirectory] Shops loaded from result.shops.data:', (result.shops as any).data.length);
+      } else if (result && result.shops && Array.isArray(result.shops)) {
+        // Handle direct shops array: { shops: [...] }
+        setShops(result.shops);
+        setHasMore(result.shops.length >= (params.limit || 10));
+        console.log('[useShopDirectory] Shops loaded from result.shops:', result.shops.length);
+      } else if (result && (result as any).data && Array.isArray((result as any).data)) {
+        // Handle response structure with data property
+        setShops((result as any).data);
+        setHasMore((result as any).data.length >= (params.limit || 10));
+        console.log('[useShopDirectory] Shops loaded from result.data:', (result as any).data.length);
+      } else if (result && Array.isArray(result)) {
+        // Fallback for different response structure
         setShops(result);
         setHasMore(result.length >= (params.limit || 10));
+        console.log('[useShopDirectory] Shops loaded (fallback):', result.length);
+      } else {
+        console.warn('[useShopDirectory] Unexpected response structure:', result);
+        setShops([]);
+        setHasMore(false);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch shops');
+      console.error('[useShopDirectory] Error:', err);
     } finally {
       setLoading(false);
     }
-  }, [shopService, params, shops.length]);
+  }, [shopService, params]); // Remove shops.length to prevent infinite loop
 
   useEffect(() => {
     fetchShops();
-  }, [fetchShops]);
+  }, [shopService, JSON.stringify(params)]); // Use stable dependencies
 
   const loadMore = useCallback(async () => {
     if (!hasMore || loading) return;
@@ -74,8 +100,40 @@ export function useShopDirectory(params: {
   const refresh = useCallback(() => {
     setShops([]);
     setHasMore(true);
-    fetchShops();
-  }, [fetchShops]);
+    // Call fetchShops directly without depending on it
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const result = await shopService.getShopDirectory(params);
+        console.log('[useShopDirectory] API response:', result);
+        
+        // Extract shops from the response structure
+        if (result && result.shops && Array.isArray(result.shops)) {
+          setShops(result.shops);
+          setHasMore(result.shops.length >= (params.limit || 10));
+          console.log('[useShopDirectory] Shops loaded:', result.shops.length);
+        } else if (result && Array.isArray(result)) {
+          // Fallback for different response structure
+          setShops(result);
+          setHasMore(result.length >= (params.limit || 10));
+          console.log('[useShopDirectory] Shops loaded (fallback):', result.length);
+        } else {
+          console.warn('[useShopDirectory] Unexpected response structure:', result);
+          setShops([]);
+          setHasMore(false);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch shops');
+        console.error('[useShopDirectory] Error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [shopService, JSON.stringify(params)]);
 
   return {
     shops,
@@ -151,11 +209,30 @@ export function useShopCategories() {
 
     try {
       const response = await shopService.getShopCategories();
-      if (response && Array.isArray(response)) {
+      console.log('[useShopCategories] API response:', response);
+      console.log('[useShopCategories] Response type:', typeof response);
+      console.log('[useShopCategories] Has data property:', response && 'data' in response);
+      console.log('[useShopCategories] Is array:', Array.isArray(response));
+      
+      // Handle response structure: { categories: { data: [...] } }
+      if (response && (response as any).categories && (response as any).categories.data && Array.isArray((response as any).categories.data)) {
+        setData((response as any).categories.data);
+        console.log('[useShopCategories] Categories loaded from response.categories.data:', (response as any).categories.data.length);
+      } else if (response && (response as any).data && Array.isArray((response as any).data)) {
+        // Handle double-wrapped response: { data: [...] }
+        setData((response as any).data);
+        console.log('[useShopCategories] Categories loaded from response.data:', (response as any).data.length);
+      } else if (response && Array.isArray(response)) {
+        // Fallback for direct array response
         setData(response);
+        console.log('[useShopCategories] Categories loaded (fallback):', response.length);
+      } else {
+        console.warn('[useShopCategories] Unexpected response structure:', response);
+        setData([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch categories');
+      console.error('[useShopCategories] Error:', err);
     } finally {
       setLoading(false);
     }
@@ -163,7 +240,7 @@ export function useShopCategories() {
 
   useEffect(() => {
     fetchCategories();
-  }, [fetchCategories]);
+  }, [shopService]); // Remove fetchCategories dependency to prevent infinite loop
 
   return { data, loading, error, refetch: fetchCategories };
 }

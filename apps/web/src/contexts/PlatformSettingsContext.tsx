@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { brandingSettingsService } from '@/services/BrandingSettingsSingletonService';
 import { publicBrandingService } from '@/services/PublicBrandingService';
 
 interface PlatformSettings {
@@ -30,22 +29,9 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
       setLoading(true);
       setError(null);
       
-      // Try public service first (works for everyone)
-      let settingsData = await publicBrandingService.getPublicBrandingSettings();
-      
-      // If public service fails (404 or other error), try authenticated service
-      if (!settingsData) {
-        try {
-          settingsData = await brandingSettingsService.getBrandingSettings();
-          console.log('[PlatformSettingsProvider] Using authenticated service as fallback');
-        } catch (authError) {
-          // Auth service also failed, use defaults
-          console.warn('[PlatformSettingsProvider] Both services failed, using defaults');
-          settingsData = null;
-        }
-      } /* else {
-        console.log('[PlatformSettingsProvider] Using public branding service');
-      } */
+      // Only use public branding service for platform settings
+      const settingsData = await publicBrandingService.getPublicBrandingSettings();
+      console.log('[PlatformSettingsProvider] Using public branding service');
 
       // Map PlatformSettings to the context's PlatformSettings interface
       if (settingsData) {
@@ -57,23 +43,13 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
         };
         setSettings(mappedSettings);
       } else {
-        // Use default settings when both services fail
-        setSettings({
-          platformName: 'Visible Shelf',
-          platformDescription: 'Manage your retail operations with ease',
-          logoUrl: null,
-          faviconUrl: null,
-        });
+        console.warn('[PlatformSettingsProvider] No public branding settings found, using defaults');
+        setSettings(null);
       }
-    } catch (err) {
-      console.error('Error fetching platform settings:', err);
-      // Use default settings on error
-      setSettings({
-        platformName: 'Visible Shelf',
-        platformDescription: 'Manage your retail operations with ease',
-        logoUrl: null,
-        faviconUrl: null,
-      });
+    } catch (error) {
+      console.error('[PlatformSettingsProvider] Failed to load public branding settings:', error);
+      setError('Failed to load platform settings');
+      setSettings(null);
     } finally {
       setLoading(false);
     }

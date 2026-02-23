@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 
 export interface Tenant {
@@ -497,12 +497,16 @@ export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
   private static instance: PlatformHomeSingletonService;
   protected readonly cacheTTL = 10 * 60 * 1000; // 10 minutes
 
+  protected constructor() {
+    super('platform-home-singleton');
+  }
+
   /**
    * Get singleton instance
    */
   static getInstance(): PlatformHomeSingletonService {
     if (!PlatformHomeSingletonService.instance) {
-      PlatformHomeSingletonService.instance = new PlatformHomeSingletonService('platform-home');
+      PlatformHomeSingletonService.instance = new PlatformHomeSingletonService();
     }
     return PlatformHomeSingletonService.instance;
   }

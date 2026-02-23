@@ -54,7 +54,7 @@ class PlatformPublicService extends PublicApiSingleton {
    */
   async getPlatformStats(): Promise<PlatformStats> {
     try {
-      const response = await this.makePublicRequest<PlatformStats>(
+      const response = await this.makeDefaultRequest<PlatformStats>(
         '/api/public/platform/stats',
         {},
         'platform-stats',
@@ -104,7 +104,7 @@ class PlatformPublicService extends PublicApiSingleton {
    */
   async getFeaturesShowcaseConfig(): Promise<FeaturesShowcaseConfig> {
     try {
-      const response = await this.makePublicRequest<FeaturesShowcaseConfig>(
+      const response = await this.makeDefaultRequest<FeaturesShowcaseConfig>(
         '/api/public/features-showcase-config',
         {},
         'features-showcase-config',

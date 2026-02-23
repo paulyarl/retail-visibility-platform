@@ -58,7 +58,7 @@ export class TenantTierService extends AuthenticatedApiSingleton {
    * Get admin tier system tiers
    */
   async getAdminTiers(): Promise<DbTier[] | null> {
-    const result = await this.makeAuthenticatedRequest<{ individual: DbTier[], organization: DbTier[] }>(
+    const result = await this.makeDefaultRequest<{ individual: DbTier[], organization: DbTier[] }>(
       '/api/admin/tiers/tiers',
       {},
       'platform-admin-tiers',
@@ -82,7 +82,7 @@ export class TenantTierService extends AuthenticatedApiSingleton {
    * Get admin tier tenants
    */
   async getAdminTierTenants(): Promise<Tenant[] | null> {
-    const result = await this.makeAuthenticatedRequest<{ tenants: Tenant[] }>(
+    const result = await this.makeDefaultRequest<{ tenants: Tenant[] }>(
       '/api/admin/tiers/tenants',
       {},
       'platform-admin-tier-tenants',
@@ -109,7 +109,7 @@ export class TenantTierService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<Tenant>(
+    const result = await this.makeDefaultRequest<Tenant>(
       `/api/tenants/${tenantId}/tier`,
       { 
         method: 'PATCH',
@@ -135,7 +135,7 @@ export class TenantTierService extends AuthenticatedApiSingleton {
    * Get tier system tiers
    */
   async getTierSystemTiers(): Promise<Tier[] | null> {
-    const result = await this.makeAuthenticatedRequest<{ individual: any[], organization: any[] }>(
+    const result = await this.makeDefaultRequest<{ individual: any[], organization: any[] }>(
       '/api/admin/tiers/tiers',
       {},
       'platform-tier-system-tiers',
@@ -179,7 +179,7 @@ export class TenantTierService extends AuthenticatedApiSingleton {
       throw new Error('Tier ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<Tier>(
+    const result = await this.makeDefaultRequest<Tier>(
       `/api/admin/tier-system/tiers/${tierId}`,
       { 
         method: 'PATCH',
@@ -207,7 +207,7 @@ export class TenantTierService extends AuthenticatedApiSingleton {
       throw new Error('Tier ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<Tier>(
+    const result = await this.makeDefaultRequest<Tier>(
       `/api/admin/tier-system/tiers/${tierId}`,
       { 
         method: 'PUT',
@@ -235,7 +235,7 @@ export class TenantTierService extends AuthenticatedApiSingleton {
       throw new Error('Tier ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/admin/tier-system/tiers/${tierId}/sort-order`,
       { 
         method: 'PATCH',
@@ -257,7 +257,7 @@ export class TenantTierService extends AuthenticatedApiSingleton {
    * Create tier
    */
   async createTier(tierData: Omit<Tier, 'id' | 'createdAt' | 'updatedAt'>): Promise<Tier | null> {
-    const result = await this.makeAuthenticatedRequest<Tier>(
+    const result = await this.makeDefaultRequest<Tier>(
       '/api/admin/tier-system/tiers',
       { 
         method: 'POST',
@@ -290,7 +290,7 @@ export class TenantTierService extends AuthenticatedApiSingleton {
       throw new Error('Tier ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/admin/tier-system/tiers/${tierId}`,
       { method: 'DELETE' },
       `platform-delete-tier-${tierId}`
@@ -313,7 +313,7 @@ export class TenantTierService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/tier`,
       {},
       `platform-tenant-tier-${tenantId}`,

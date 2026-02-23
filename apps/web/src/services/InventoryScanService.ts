@@ -51,7 +51,7 @@ export class InventoryScanService extends TenantApiSingleton {
       throw new Error('Session ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<ScanSession>(
+    const result = await this.makeDefaultRequest<ScanSession>(
       `/api/scan/sessions/${sessionId}`,
       {},
       `platform-scan-session-${sessionId}`,
@@ -74,7 +74,7 @@ export class InventoryScanService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<ScanSession>(
+    const result = await this.makeDefaultRequest<ScanSession>(
       '/api/scan/sessions',
       { 
         method: 'POST',
@@ -99,7 +99,7 @@ export class InventoryScanService extends TenantApiSingleton {
       throw new Error('Tenant ID and barcode are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/scan/lookup?tenantId=${tenantId}&barcode=${encodeURIComponent(barcode)}`,
       {},
       `platform-barcode-lookup-${barcode}`,
@@ -122,7 +122,7 @@ export class InventoryScanService extends TenantApiSingleton {
       throw new Error('Session ID and Result ID are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/scan/sessions/${sessionId}/results/${resultId}`,
       { method: 'DELETE' },
       `platform-delete-scan-result-${resultId}`
@@ -145,7 +145,7 @@ export class InventoryScanService extends TenantApiSingleton {
       throw new Error('Session ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/scan/sessions/${sessionId}/commit`,
       { method: 'POST' },
       `platform-commit-scan-session-${sessionId}`
@@ -168,7 +168,7 @@ export class InventoryScanService extends TenantApiSingleton {
       throw new Error('Session ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/scan/sessions/${sessionId}`,
       { method: 'DELETE' },
       `platform-delete-scan-session-${sessionId}`
@@ -191,7 +191,7 @@ export class InventoryScanService extends TenantApiSingleton {
       throw new Error('Session ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/scan/sessions/${sessionId}/end`,
       { method: 'POST' },
       `platform-end-scan-session-${sessionId}`
@@ -219,7 +219,7 @@ export class InventoryScanService extends TenantApiSingleton {
       throw new Error('Session ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<ScanResult>(
+    const result = await this.makeDefaultRequest<ScanResult>(
       `/api/scan/sessions/${sessionId}/results`,
       { 
         method: 'POST',
@@ -247,7 +247,7 @@ export class InventoryScanService extends TenantApiSingleton {
       throw new Error('Session ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<ScanResult[]>(
+    const result = await this.makeDefaultRequest<ScanResult[]>(
       `/api/scan/sessions/${sessionId}/results`,
       {},
       `platform-scan-results-${sessionId}`,
@@ -270,7 +270,7 @@ export class InventoryScanService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<ScanSession[]>(
+    const result = await this.makeDefaultRequest<ScanSession[]>(
       `/api/scan/sessions/active?tenantId=${tenantId}`,
       {},
       `platform-active-scan-sessions-${tenantId}`,

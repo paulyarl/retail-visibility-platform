@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { navigateToTenant } from '@/lib/tenant-navigation'
-import { tenantInfoService } from '@/services/TenantInfoSingletonService'
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 export type TenantOption = { id: string; name: string }
 

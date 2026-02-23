@@ -31,7 +31,7 @@ class BrandingSettingsSingletonService extends AuthenticatedApiSingleton {
   }
 
   async getBrandingSettings(): Promise<PlatformSettings | null> {
-    const result = await this.makeAuthenticatedRequest<PlatformSettings>(
+    const result = await this.makeDefaultRequest<PlatformSettings>(
       '/api/platform-settings',
       {},
       'branding-settings'
@@ -46,7 +46,7 @@ class BrandingSettingsSingletonService extends AuthenticatedApiSingleton {
   }
 
   async updateBrandingSettings(settings: Partial<PlatformSettings>): Promise<PlatformSettings | null> {
-    const result = await this.makeAuthenticatedRequest<PlatformSettings>(
+    const result = await this.makeDefaultRequest<PlatformSettings>(
       '/api/platform-settings',
       {
         method: 'POST',

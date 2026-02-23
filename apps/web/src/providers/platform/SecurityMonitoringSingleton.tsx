@@ -308,7 +308,7 @@ class SecurityMonitoringSingleton extends AdminApiSingleton {
    * Get monitoring statistics
    */
   async getMonitoringStats(): Promise<SecurityMonitoringStats> {
-    const result = await this.makeAuthenticatedRequest<SecurityMonitoringStats>('/api/security/monitoring/stats', {}, 'monitoring-stats');
+    const result = await this.makeDefaultRequest<SecurityMonitoringStats>('/api/security/monitoring/stats', {}, 'monitoring-stats');
     
     if (!result.success) {
       console.error('Error fetching monitoring stats:', result.error);
@@ -399,7 +399,7 @@ class SecurityMonitoringSingleton extends AdminApiSingleton {
   // ====================
 
   private async sendThreatToAPI(threat: SecurityThreat): Promise<void> {
-    const result = await this.makeAuthenticatedRequest('/api/security/threats', {
+    const result = await this.makeDefaultRequest('/api/security/threats', {
       method: 'POST',
       body: JSON.stringify(threat)
     });
@@ -410,7 +410,7 @@ class SecurityMonitoringSingleton extends AdminApiSingleton {
   }
 
   private async sendAlertToAPI(alert: SecurityAlert): Promise<void> {
-    const result = await this.makeAuthenticatedRequest('/api/security/alerts', {
+    const result = await this.makeDefaultRequest('/api/security/alerts', {
       method: 'POST',
       body: JSON.stringify(alert)
     });
@@ -421,7 +421,7 @@ class SecurityMonitoringSingleton extends AdminApiSingleton {
   }
 
   private async sendIPBlockToAPI(blockedIP: BlockedIP): Promise<void> {
-    const result = await this.makeAuthenticatedRequest('/api/security/blocked-ips', {
+    const result = await this.makeDefaultRequest('/api/security/blocked-ips', {
       method: 'POST',
       body: JSON.stringify(blockedIP)
     });

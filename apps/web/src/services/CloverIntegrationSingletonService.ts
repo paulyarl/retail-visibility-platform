@@ -51,7 +51,7 @@ class CloverIntegrationSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<CloverIntegrationData>(
+    const result = await this.makeDefaultRequest<CloverIntegrationData>(
       `/api/integrations/${tenantId}/clover/status`,
       {},
       `clover-status-${tenantId}`
@@ -73,7 +73,7 @@ class CloverIntegrationSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<CloverOAuthData>(
+    const result = await this.makeDefaultRequest<CloverOAuthData>(
       `/api/integrations/${tenantId}/clover/oauth/authorize`,
       {},
       `clover-oauth-${tenantId}`
@@ -95,7 +95,7 @@ class CloverIntegrationSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/integrations/${tenantId}/clover/demo/enable`,
       { method: 'POST' },
       `clover-demo-enable-${tenantId}`
@@ -118,7 +118,7 @@ class CloverIntegrationSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/integrations/${tenantId}/clover/demo/disable`,
       { method: 'POST' },
       `clover-demo-disable-${tenantId}`
@@ -141,7 +141,7 @@ class CloverIntegrationSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/integrations/${tenantId}/clover/disconnect`,
       { method: 'POST' },
       `clover-disconnect-${tenantId}`
@@ -164,7 +164,7 @@ class CloverIntegrationSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/integrations/${tenantId}/clover/sync`,
       { method: 'POST' },
       `clover-sync-${tenantId}`

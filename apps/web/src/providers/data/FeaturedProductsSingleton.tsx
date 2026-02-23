@@ -8,7 +8,8 @@
 import { CacheManager } from '@/utils/cacheManager';
 import { AutoUserCacheOptions } from '@/utils/userIdentification';
 import { useAuthAwareCache } from '@/utils/authAwareCacheManager';
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { PublicApiSingleton } from '../base/PublicApiSingleton';
+import {SingletonCacheOptions} from '../base/FlexibleApiSingleton';
 
 // Import existing ProductSingleton for universal product integration
 import { PublicProduct } from '@/providers/data/ProductSingleton';
@@ -103,7 +104,7 @@ export interface FeaturedProduct {
   ratingCount?: number;
 }
 
-export class FeaturedProductsSingleton extends UniversalSingleton {
+export class FeaturedProductsSingleton extends PublicApiSingleton {
   private static instance: FeaturedProductsSingleton;
   private productSingleton: any;
 

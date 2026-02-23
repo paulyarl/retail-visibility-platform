@@ -69,7 +69,7 @@ class ReviewsSingletonService extends PublicApiSingleton {
     }
 
     try {
-      const result = await this.makePublicRequest<any>(
+      const result = await super.makeDefaultRequest<any>(
         `/api/stores/${tenantId}/reviews/summary`,
         {},
         `reviews-summary-${tenantId}`
@@ -115,7 +115,7 @@ class ReviewsSingletonService extends PublicApiSingleton {
     }
 
     try {
-      const result = await this.makePublicRequest<{ data: { reviews: Review[] } }>(
+      const result = await super.makeDefaultRequest<{ data: { reviews: Review[] } }>(
         `/api/stores/${tenantId}/reviews?limit=${limit}`,
         {},
         `reviews-${tenantId}-${limit}`
@@ -145,7 +145,7 @@ class ReviewsSingletonService extends PublicApiSingleton {
     }
 
     try {
-      const result = await this.makePublicRequest<Review>(
+      const result = await super.makeDefaultRequest<Review>(
         `/api/stores/${tenantId}/reviews/user`,
         {},
         `user-review-${tenantId}`
@@ -175,7 +175,7 @@ class ReviewsSingletonService extends PublicApiSingleton {
     }
 
     try {
-      await this.makePublicRequest<void>(
+      await super.makeDefaultRequest<void>(
         `/api/reviews/${reviewId}/helpful`,
         {
           method: 'POST',
@@ -211,7 +211,7 @@ class ReviewsSingletonService extends PublicApiSingleton {
     }
 
     try {
-      const response = await this.makePublicRequest<{
+      const response = await super.makeDefaultRequest<{
         success: boolean;
         data: Review;
       }>(
@@ -258,7 +258,7 @@ class ReviewsSingletonService extends PublicApiSingleton {
     }
 
     try {
-      const result = await this.makePublicRequest<{
+      const result = await super.makeDefaultRequest<{
         success: boolean;
         data: Review[];
       }>(
@@ -291,7 +291,7 @@ class ReviewsSingletonService extends PublicApiSingleton {
     }
 
     try {
-      const result = await this.makePublicRequest<{
+      const result = await super.makeDefaultRequest<{
         success: boolean;
         message: string;
       }>(
@@ -323,7 +323,7 @@ class ReviewsSingletonService extends PublicApiSingleton {
     }
 
     try {
-      const result = await this.makePublicRequest<{
+      const result = await super.makeDefaultRequest<{
         success: boolean;
         message: string;
       }>(

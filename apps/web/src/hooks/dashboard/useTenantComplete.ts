@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { tenantInfoService } from '@/services/TenantInfoService';
 import { tenantManagementService } from '@/services/TenantManagementService';
 import {
   resolveTier,
@@ -111,6 +111,14 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
   const { user } = useAuth();
   const authUser = user;
 
+  // Clear cache function for debugging
+  const clearCacheAndRefresh = async () => {
+    console.log('[useTenantComplete] Refreshing data...');
+    
+    // Refetch the query (cache clearing handled by staleTime: 0)
+    await refetch();
+  };
+
   // Single consolidated query - replaces 3 separate calls
   const { data: completeData, isLoading, error, refetch } = useQuery({
     queryKey: ['tenant', 'complete', tenantId],
@@ -119,60 +127,71 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
         throw new Error('Tenant ID is required');
       }
 
-//      console.log('[useTenantComplete] Fetching consolidated tenant data for:', tenantId);
+      console.log('[useTenantComplete] Fetching consolidated tenant data for:', tenantId);
 
-      // Get data from multiple services
-      const [tenantData, tierData, usageData] = await Promise.all([
-        tenantInfoService.getCompleteTenantInfo(tenantId),
-        tenantInfoService.getTenantTier(tenantId),
-        tenantManagementService.getTenantUsage(tenantId)
-      ]);
+      try {
+        // Get data from multiple services
+        const [tenantData, tierData, usageData] = await Promise.all([
+          tenantInfoService.getCompleteTenantInfo(tenantId),
+          tenantInfoService.getTenantTier(tenantId),
+          tenantManagementService.getTenantUsage(tenantId)
+        ]);
 
-      // Combine data into expected format
-      const data: TenantCompleteResponse = {
-        tenant: {
-          id: tenantData.tenant?.id || tenantId,
-          name: tenantData.tenant?.name || 'Unknown',
-          organizationId: null, // Not available in new structure
-          subscriptionTier: tierData?.name || 'basic',
-          subscriptionStatus: 'active', // Not available in new structure
-          locationStatus: 'active',
-          subdomain: null, // Not available in new structure
-          createdAt: new Date().toISOString(),
-          statusInfo: null,
-          stats: {
-            productCount: usageData?.items || 0,
-            userCount: 0 // Not available in new structure
-          }
-        },
-        tier: tierData ? {
-          tier: tierData.name,
-          status: 'active'
-        } : null,
-        usage: usageData ? {
-          products: usageData.items,
-          locations: 0, // Not available in new structure
-          users: 0, // Not available in new structure
-          apiCalls: 0, // Not available in new structure
-          storageGB: usageData.storage,
-          totalItems: usageData.items,
-          activeItems: usageData.items, // Not available in new structure
-          categories: 0, // Not available in new structure
-          orders: usageData.orders
-        } : null,
-        _timestamp: new Date().toISOString()
-      };
-      console.log('[useTenantComplete] Received consolidated data:', {
-        tenant: data.tenant?.id,
-        hasTier: !!data.tier,
-        hasUsage: !!data.usage,
-        usageData: data.usage
-      });
+        console.log('[useTenantComplete] Raw API responses:', {
+          tenantData: tenantData?.tenant?.id,
+          tierData: tierData?.name,
+          usageData: usageData
+        });
 
-      return data;
+        // Combine data into expected format
+        const data: TenantCompleteResponse = {
+          tenant: {
+            id: tenantData.tenant?.id || tenantId,
+            name: tenantData.tenant?.name || 'Unknown',
+            organizationId: null, // Not available in new structure
+            subscriptionTier: tierData?.name || 'basic',
+            subscriptionStatus: 'active', // Not available in new structure
+            locationStatus: 'active',
+            subdomain: null, // Not available in new structure
+            createdAt: new Date().toISOString(),
+            statusInfo: null,
+            stats: {
+              productCount: usageData?.items || 0,
+              userCount: 0 // Not available in new structure
+            }
+          },
+          tier: tierData ? {
+            tier: tierData.name,
+            status: 'active'
+          } : null,
+          usage: usageData ? {
+            products: (usageData as any).data?.usage?.activeItems || (usageData as any).data?.usage?.totalItems || (usageData as any).currentItems || usageData.items || 0,
+            locations: (usageData as any).data?.usage?.locations || 0, // Not available in new structure
+            users: (usageData as any).data?.usage?.users || 0,
+            apiCalls: 0, // Not available in new structure
+            storageGB: (usageData as any).data?.usage?.storage || 0,
+            totalItems: (usageData as any).data?.usage?.totalItems || (usageData as any).data?.usage?.activeItems || (usageData as any).currentItems || usageData.items || 0,
+            activeItems: (usageData as any).data?.usage?.activeItems || (usageData as any).data?.usage?.totalItems || (usageData as any).currentItems || usageData.items || 0,
+            categories: (usageData as any).data?.usage?.categories || 0,
+            orders: (usageData as any).data?.usage?.orders || 0
+          } : null,
+          _timestamp: new Date().toISOString()
+        };
+        console.log('[useTenantComplete] Received consolidated data:', {
+          tenant: data.tenant?.id,
+          hasTier: !!data.tier,
+          hasUsage: !!data.usage,
+          usageData: data.usage
+        });
+
+        return data;
+      } catch (apiError) {
+        console.error('[useTenantComplete] API calls failed:', apiError);
+        throw apiError;
+      }
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes - balanced between fresh data and performance
-    gcTime: 15 * 60 * 1000, // 15 minutes cache
+    staleTime: 0, // Force fresh data
+    gcTime: 0, // No cache to ensure fresh data
     enabled: !!tenantId && !!authUser, // Only run when authenticated and tenantId available
     retry: 2,
   });
@@ -289,7 +308,7 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
     usage,
     loading,
     error: queryError,
-    refresh: async () => { await refetch(); },
+    refresh: clearCacheAndRefresh,
 
     // Level 1: Legacy tier-only checks
     hasFeature: hasTierFeature,

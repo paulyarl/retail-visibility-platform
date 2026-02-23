@@ -138,7 +138,7 @@ class AdminUsersService extends AdminApiSingleton {
    * Get user by ID
    */
   async getUser(userId: string): Promise<AdminUser | null> {
-    const response = await this.makeAdminRequest<AdminUser>(
+    const response = await this.makeDefaultRequest<AdminUser>(
       `/api/admin/users/${userId}`,
       {},
       `admin-user-${userId}`,
@@ -157,7 +157,7 @@ class AdminUsersService extends AdminApiSingleton {
    * Create a new admin user
    */
   async createUser(userData: CreateUserRequest): Promise<AdminUser | null> {
-    const response = await this.makeAdminRequest<AdminUser>(
+    const response = await this.makeDefaultRequest<AdminUser>(
       '/api/admin/users/create',
       {
         method: 'POST',
@@ -182,7 +182,7 @@ class AdminUsersService extends AdminApiSingleton {
    * Update an admin user
    */
   async updateUser(userId: string, userData: UpdateUserRequest): Promise<AdminUser | null> {
-    const response = await this.makeAdminRequest<AdminUser>(
+    const response = await this.makeDefaultRequest<AdminUser>(
       `/api/admin/users/${userId}`,
       {
         method: 'PUT',
@@ -208,7 +208,7 @@ class AdminUsersService extends AdminApiSingleton {
    * Delete an admin user
    */
   async deleteUser(userId: string): Promise<boolean> {
-    const response = await this.makeAdminRequest<void>(
+    const response = await this.makeDefaultRequest<void>(
       `/api/admin/users/${userId}`,
       { method: 'DELETE' },
       `admin-delete-user-${userId}`,
@@ -231,7 +231,7 @@ class AdminUsersService extends AdminApiSingleton {
    * Send invitation to a user
    */
   async sendInvitation(invitationData: InvitationRequest): Promise<boolean> {
-    const response = await this.makeAdminRequest<void>(
+    const response = await this.makeDefaultRequest<void>(
       '/api/admin/users/invite-by-email',
       {
         method: 'POST',
@@ -253,7 +253,7 @@ class AdminUsersService extends AdminApiSingleton {
    * Reset user password
    */
   async resetPassword(userId: string): Promise<boolean> {
-    const response = await this.makeAdminRequest<void>(
+    const response = await this.makeDefaultRequest<void>(
       `/api/admin/users/${userId}/reset-password`,
       { method: 'POST' },
       `admin-reset-password-${userId}`,
@@ -279,7 +279,7 @@ class AdminUsersService extends AdminApiSingleton {
       const usersWithTenants = await Promise.all(
         users.map(async (user: AdminUser) => {
           try {
-            const tenantsResponse = await this.makeAdminRequest<{
+            const tenantsResponse = await this.makeDefaultRequest<{
               tenant?: any[];
               tenants?: any[];
             }>(
@@ -327,7 +327,7 @@ class AdminUsersService extends AdminApiSingleton {
     unverifiedUsers: number;
   }> {
     try {
-      const response = await this.makeAdminRequest<{
+      const response = await this.makeDefaultRequest<{
         totalUsers: number;
         activeUsers: number;
         inactiveUsers: number;
@@ -372,7 +372,7 @@ class AdminUsersService extends AdminApiSingleton {
     generateImages?: boolean;
   }): Promise<any> {
     try {
-      const response = await this.makeAdminRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/admin/tools/tenants',
         {
           method: 'POST',
@@ -401,7 +401,7 @@ class AdminUsersService extends AdminApiSingleton {
     generateImages?: boolean;
   }): Promise<any> {
     try {
-      const response = await this.makeAdminRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/admin/tools/test-chains',
         {
           method: 'POST',
@@ -423,7 +423,7 @@ class AdminUsersService extends AdminApiSingleton {
    */
   async deleteTestChain(organizationId: string): Promise<any> {
     try {
-      const response = await this.makeAdminRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/admin/tools/test-chains/${organizationId}?confirm=true`,
         { method: 'DELETE' },
         'delete-test-chain',
@@ -442,7 +442,7 @@ class AdminUsersService extends AdminApiSingleton {
    */
   async deleteTestTenant(tenantId: string): Promise<any> {
     try {
-      const response = await this.makeAdminRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/admin/tools/tenants/${tenantId}?confirm=true`,
         { method: 'DELETE' },
         'delete-test-tenant',
@@ -461,7 +461,7 @@ class AdminUsersService extends AdminApiSingleton {
    */
   async getUserTenants(userId: string): Promise<any[]> {
     try {
-      const response = await this.makeAdminRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/admin/users/${userId}/tenants`,
         {},
         `user-tenants-${userId}`,
@@ -483,7 +483,7 @@ class AdminUsersService extends AdminApiSingleton {
    */
   async getAllTenants(): Promise<any[]> {
     try {
-      const response = await this.makeAdminRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/admin/tenants/all',
         {},
         'admin-all-tenants',
@@ -505,7 +505,7 @@ class AdminUsersService extends AdminApiSingleton {
    */
   async assignTenantToUser(userId: string, tenantId: string, role: string): Promise<any> {
     try {
-      const response = await this.makeAdminRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/admin/users/${userId}/tenants`,
         {
           method: 'POST',
@@ -530,7 +530,7 @@ class AdminUsersService extends AdminApiSingleton {
    */
   async removeTenantFromUser(userId: string, tenantId: string): Promise<any> {
     try {
-      const response = await this.makeAdminRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/admin/users/${userId}/tenants/${tenantId}`,
         { method: 'DELETE' },
         'remove-tenant-from-user',
@@ -568,7 +568,7 @@ class AdminUsersService extends AdminApiSingleton {
    */
   async updateUserStatus(userId: string, isActive: boolean, emailVerified?: boolean): Promise<any> {
     try {
-      const response = await this.makeAdminRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/admin/users/${userId}`,
         {
           method: 'PUT',
@@ -596,7 +596,7 @@ class AdminUsersService extends AdminApiSingleton {
    */
   async sendVerificationEmail(userId: string): Promise<any> {
     try {
-      const response = await this.makeAdminRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/admin/users/${userId}/send-verification`,
         { method: 'POST' },
         'send-verification-email',
@@ -615,7 +615,7 @@ class AdminUsersService extends AdminApiSingleton {
    */
   async updateUserVerificationStatus(userId: string, emailVerified: boolean): Promise<any> {
     try {
-      const response = await this.makeAdminRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/admin/users/${userId}`,
         {
           method: 'PUT',

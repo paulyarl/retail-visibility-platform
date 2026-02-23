@@ -3,10 +3,10 @@
  * Consolidates tenant info, tier, and usage calls with local storage caching
  */
 
-import { tenantInfoService, type TenantInfo } from '@/services/TenantInfoSingletonService';
+import { publicTenantInfoService, type TenantInfo } from '@/services/PublicTenantInfoService';
 import { tenantManagementService, type TenantUsage } from '@/services/TenantManagementService';
 import { LocalStorageCache } from './local-storage-cache';
-import type { TenantTier } from '@/services/TenantInfoSingletonService';
+import type { TenantTier } from '@/services/PublicTenantInfoService';
 
 export interface CachedTenantData {
   tenant: TenantInfo | null;
@@ -43,7 +43,7 @@ export class CachedTenantService {
     try {
       // Get tenant info and usage separately
       const [tenantData, usageData] = await Promise.all([
-        tenantInfoService.getCompleteTenantInfo(tenantId),
+        publicTenantInfoService.getCompleteTenantInfo(tenantId),
         tenantManagementService.getTenantUsage(tenantId)
       ]);
 
@@ -81,7 +81,7 @@ export class CachedTenantService {
       }
     }
 
-    const tenant = await tenantInfoService.getTenantInfo(tenantId);
+    const tenant = await publicTenantInfoService.getTenantInfo(tenantId);
     
     if (!tenant) {
       throw new Error(`Tenant not found: ${tenantId}`);
@@ -105,7 +105,7 @@ export class CachedTenantService {
       }
     }
 
-    const data = await tenantInfoService.getTenantTier(tenantId);
+    const data = await publicTenantInfoService.getTenantTier(tenantId);
     
     if (!data) {
       throw new Error(`Tier data not found for tenant: ${tenantId}`);

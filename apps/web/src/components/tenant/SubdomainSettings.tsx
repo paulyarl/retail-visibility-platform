@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Loader2, CheckCircle, AlertCircle, Info, Eye, Globe, ExternalLink, RefreshCw } from 'lucide-react';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 interface SubdomainSettingsProps {
   tenantId: string;

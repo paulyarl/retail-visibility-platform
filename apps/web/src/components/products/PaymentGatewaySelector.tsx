@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react';
 import { CreditCard, AlertCircle } from 'lucide-react';
 import { Label } from '@/components/ui/Label';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 
 interface Gateway {
   id: string;
@@ -54,7 +54,7 @@ export default function PaymentGatewaySelector({
       try {
         setLoading(true);
         
-        const gateways = await tenantInfoService.getPaymentGateways(tenantId);
+        const gateways = await publicTenantInfoService.getPaymentGateways(tenantId);
         
         if (!gateways) {
           throw new Error('Failed to load payment gateways');

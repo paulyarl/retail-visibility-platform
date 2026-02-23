@@ -74,7 +74,7 @@ class AuthenticatedReviewService extends AuthenticatedApiSingleton {
       
       const url = `/api/stores/${tenantId}/reviews/pending${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       
-      const result = await this.makeAuthenticatedRequest<{
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         data: any[];
       }>(
@@ -113,7 +113,7 @@ class AuthenticatedReviewService extends AuthenticatedApiSingleton {
     }
 
     try {
-      const result = await this.makeAuthenticatedRequest<{
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         message?: string;
       }>(
@@ -150,7 +150,7 @@ class AuthenticatedReviewService extends AuthenticatedApiSingleton {
     }
 
     try {
-      const result = await this.makeAuthenticatedRequest<{
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         message?: string;
       }>(
@@ -187,7 +187,7 @@ class AuthenticatedReviewService extends AuthenticatedApiSingleton {
     }
 
     try {
-      const result = await this.makeAuthenticatedRequest<{
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         message?: string;
       }>(
@@ -225,7 +225,7 @@ class AuthenticatedReviewService extends AuthenticatedApiSingleton {
     }
 
     try {
-      const result = await this.makeAuthenticatedRequest<{
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         message?: string;
       }>(

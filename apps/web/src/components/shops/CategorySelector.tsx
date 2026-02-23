@@ -14,42 +14,29 @@ import { shopsService } from '@/services/ShopsService';
 interface CategorySelectorProps {
   value?: CategoryParams;
   onChange: (category: CategoryParams) => void;
+  categories?: { name: string; count: number; type: 'shop' | 'product' }[];
 }
 
-export default function CategorySelector({ value, onChange }: CategorySelectorProps) {
+export default function CategorySelector({ value, onChange, categories = [] }: CategorySelectorProps) {
   const [categoryType, setCategoryType] = useState<CategoryType>(value?.categoryType || 'product');
-  const [categories, setCategories] = useState<CategoryAggregation[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch categories from API using ShopsService
+  // Use provided categories instead of fetching from API
   useEffect(() => {
-    const fetchCategories = async () => {
-      setLoading(true);
-      try {
-        const categories = await shopsService.getCategories({
-          limit: 100,
-          minProducts: 1,
-        });
-        setCategories(categories);
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCategories();
-  }, []);
+    if (categories.length > 0) {
+      setLoading(false);
+    }
+  }, [categories]);
 
   // Filter categories by type and search query
-  const filteredCategories = categories
-    .filter(cat => cat.category_type === categoryType)
+  const filteredCategories = (Array.isArray(categories) ? categories : [])
+    .filter(cat => cat.type === categoryType)
     .filter(cat => 
       searchQuery === '' || 
-      cat.category_name.toLowerCase().includes(searchQuery.toLowerCase())
+      cat.name.toLowerCase().includes(searchQuery.toLowerCase())
     )
-    .sort((a, b) => b.product_count - a.product_count);
+    .sort((a, b) => b.count - a.count);
 
   const handleCategoryTypeChange = (type: CategoryType) => {
     setCategoryType(type);
@@ -59,16 +46,16 @@ export default function CategorySelector({ value, onChange }: CategorySelectorPr
     });
   };
 
-  const handleCategorySelect = (category: CategoryAggregation) => {
+  const handleCategorySelect = (category: any) => {
     if (categoryType === 'product') {
       onChange({
-        productName: category.category_name,
-        productSlug: category.category_slug,
+        productName: category.name,
+        productSlug: category.name,
         categoryType: 'product'
       });
     } else {
       onChange({
-        shopCategoryName: category.category_name,
+        shopCategoryName: category.name,
         categoryType: 'shop'
       });
     }
@@ -125,46 +112,34 @@ export default function CategorySelector({ value, onChange }: CategorySelectorPr
       </div>
 
       {/* Category List */}
-      <div className="max-h-64 overflow-y-auto space-y-1">
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Loading categories...</p>
-          </div>
-        ) : filteredCategories.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {searchQuery ? 'No categories found' : 'No categories available'}
-            </p>
-          </div>
-        ) : (
-          filteredCategories.map((category) => {
-            const isSelected = selectedCategoryName === category.category_name;
-            
-            return (
-              <button
-                key={`${category.category_type}-${category.category_slug}`}
-                onClick={() => handleCategorySelect(category)}
-                className={`
-                  w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm
-                  transition-colors text-left
-                  ${isSelected
-                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                  }
-                `}
-              >
-                <span className="font-medium">{category.category_name}</span>
-                <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                  <span>{category.product_count} products</span>
-                  {category.shop_count > 0 && (
-                    <span>{category.shop_count} shops</span>
-                  )}
+      <div className="space-y-2 max-h-60 overflow-y-auto">
+        {filteredCategories.map((category, index) => (
+          <div
+            key={category.name}
+            onClick={() => handleCategorySelect(category)}
+            className={`
+              p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-lg transition-all duration-200 cursor-pointer
+              ${selectedCategoryName === category.name
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                : 'bg-white dark:bg-gray-800'
+              }
+            `}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium text-gray-900 dark:text-white">
+                  {category.name}
                 </div>
-              </button>
-            );
-          })
-        )}
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {category.count} items
+                </div>
+              </div>
+              {selectedCategoryName === category.name && (
+                <div className="w-2 h-2 bg-blue-500 rounded-full" />
+              )}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Selected Category Info */}

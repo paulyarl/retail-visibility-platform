@@ -78,7 +78,7 @@ export class CacheEncryption {
       combined.set(new Uint8Array(encrypted), salt.length + iv.length);
 
       // Return as base64 string
-      return btoa(String.fromCharCode(...combined));
+      return btoa(String.fromCharCode(...Array.from(combined)));
     } catch (error) {
       console.warn('[CacheEncryption] Encryption failed:', error);
       // Fallback to plain data if encryption fails (for development/debugging)

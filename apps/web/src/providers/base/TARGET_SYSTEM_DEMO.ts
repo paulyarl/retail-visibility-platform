@@ -62,7 +62,7 @@ class BackendSystemService extends ApiSystemSingleton {
    */
   async getPublicInfo() {
     console.log('🔓 API System: Getting public info from API server (port 4000)');
-    return this.makePublicApiRequest('/public/system/info');
+    return this.makePublicRequest('/public/system/info');
   }
 }
 
@@ -117,7 +117,7 @@ class WebSystemService extends SystemSingleton {
    */
   async getPublicInfo() {
     console.log('🔓 Web System: Getting public info from WEB server (port 3000)');
-    return this.makePublicWebRequest('/public/system/info');
+    return this.makePublicRequest('/public/system/info');
   }
 }
 

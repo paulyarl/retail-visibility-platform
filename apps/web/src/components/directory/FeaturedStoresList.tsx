@@ -90,7 +90,7 @@ export default function FeaturedStoresList({
       return (
         <Link
           key={store.id}
-          href={`/directory/stores/${store.slug}`}
+          href={`/directory/${store.slug}`}
           className="group block bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
         >
           <div className="p-6">
@@ -291,7 +291,7 @@ export default function FeaturedStoresList({
       {stores.map((store) => (
         <Link
           key={store.id}
-          href={`/directory/stores/${store.slug}`}
+          href={`/directory/${store.slug}`}
           className="group flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all duration-200"
         >
           <div className="flex items-center space-x-4">

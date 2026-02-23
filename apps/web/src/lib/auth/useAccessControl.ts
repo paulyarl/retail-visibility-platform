@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { tenantInfoService } from '@/services/TenantInfoService';
 import {
   UserData,
   TenantData,
@@ -91,8 +91,8 @@ export function useAccessControl(
         if (fetchOrganization) {
           const organizationId = tenant.metadata?.organizationId;
           if (organizationId) {
-            const org = await tenantInfoService.getOrganization(organizationId);
-            setOrganizationData(org);
+            const orgResult = await tenantInfoService.getOrganization(organizationId);
+            setOrganizationData(orgResult.success ? orgResult.data : null);
           } else {
             // Try to find organization by searching organizations that contain this tenant
             try {
@@ -111,8 +111,8 @@ export function useAccessControl(
 
               if (matchingOrg) {
                 // Now fetch the full organization data
-                const org = await tenantInfoService.getOrganization(matchingOrg.id);
-                setOrganizationData(org);
+                const orgResult = await tenantInfoService.getOrganization(matchingOrg.id);
+                setOrganizationData(orgResult.success ? orgResult.data : null);
               } else {
                 setOrganizationData(null);
               }

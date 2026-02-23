@@ -5,7 +5,7 @@
  * Extends UniversalSingleton for proper caching and error handling
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
 
 export interface SlugPattern {
   pattern: string;
@@ -26,15 +26,15 @@ export interface SlugPatternParams {
 class TenantSlugService extends AuthenticatedApiSingleton {
   private static instance: TenantSlugService;
 
+  protected constructor() {
+    super('tenant-slug-service');
+  }
+
   static getInstance(): TenantSlugService {
     if (!TenantSlugService.instance) {
       TenantSlugService.instance = new TenantSlugService();
     }
     return TenantSlugService.instance;
-  }
-
-  constructor() {
-    super('TenantSlugService');
   }
 
   /**
@@ -47,7 +47,7 @@ class TenantSlugService extends AuthenticatedApiSingleton {
         throw new Error('Business name is required');
       }
 
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/slugs/patterns',
         {
           method: 'POST',

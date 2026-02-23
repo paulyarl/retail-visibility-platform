@@ -11,6 +11,14 @@ interface ContactInformationCollapsibleProps {
             address?: string;
         };
     };
+    contactData?: {
+        phone?: string;
+        email?: string;
+        address?: string;
+        city?: string;
+        state?: string;
+        zipCode?: string;
+    };
 }
 
 // Force edge runtime to prevent prerendering issues
@@ -21,14 +29,23 @@ export const dynamic = 'force-dynamic';
 
 export default function ContactInformationCollapsible({
     tenant,
+    contactData,
 }: ContactInformationCollapsibleProps) {
     const [isExpanded, setIsExpanded] = useState(false);
 
+    // Use contactData if available, fallback to tenant metadata
+    const phone = contactData?.phone || tenant.metadata?.phone;
+    const email = contactData?.email || tenant.metadata?.email;
+    const address = contactData?.address || tenant.metadata?.address;
+    const city = contactData?.city;
+    const state = contactData?.state;
+    const zipCode = contactData?.zipCode;
+
     // Count available contact methods
     const contactCount = [
-        tenant.metadata?.phone,
-        tenant.metadata?.email,
-        tenant.metadata?.address
+        phone,
+        email,
+        address,
     ].filter(Boolean).length;
 
     return (
@@ -59,37 +76,37 @@ export default function ContactInformationCollapsible({
                     <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Phone */}
-                            {tenant.metadata?.phone && (
+                            {phone && (
                                 <div className="flex items-center gap-3 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
                                     <svg className="h-6 w-6 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                                     </svg>
                                     <div>
                                         <p className="text-sm font-medium text-neutral-900 dark:text-white">Phone</p>
-                                        <a href={`tel:${tenant.metadata.phone}`} className="text-lg text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-                                            {tenant.metadata.phone}
+                                        <a href={`tel:${phone}`} className="text-lg text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                                            {phone}
                                         </a>
                                     </div>
                                 </div>
                             )}
 
                             {/* Email */}
-                            {tenant.metadata?.email && (
+                            {email && (
                                 <div className="flex items-center gap-3 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
                                     <svg className="h-6 w-6 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                     </svg>
                                     <div>
                                         <p className="text-sm font-medium text-neutral-900 dark:text-white">Email</p>
-                                        <a href={`mailto:${tenant.metadata.email}`} className="text-lg text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 break-words">
-                                            {tenant.metadata.email}
+                                        <a href={`mailto:${email}`} className="text-lg text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 break-words">
+                                            {email}
                                         </a>
                                     </div>
                                 </div>
                             )}
 
                             {/* Address */}
-                            {tenant.metadata?.address && (
+                            {address && (
                                 <div className="flex items-start gap-3 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700 md:col-span-2">
                                     <svg className="h-6 w-6 text-neutral-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -97,7 +114,16 @@ export default function ContactInformationCollapsible({
                                     </svg>
                                     <div>
                                         <p className="text-sm font-medium text-neutral-900 dark:text-white">Address</p>
-                                        <p className="text-lg text-neutral-700 dark:text-neutral-300">{tenant.metadata.address}</p>
+                                        <p className="text-lg text-neutral-700 dark:text-neutral-300">
+                                            {address}
+                                            {city && state && (
+                                                <span>
+                                                    {city && `, ${city}`}
+                                                    {state && ` ${state}`}
+                                                    {zipCode && ` ${zipCode}`}
+                                                </span>
+                                            )}
+                                        </p>
                                     </div>
                                 </div>
                             )}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 // User type
 
@@ -182,6 +182,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Only make API call if no valid cache or force refresh requested
       console.log('[AuthContext] Fetching fresh user data from API');
       const data = await tenantInfoService.getCurrentUser();
+
+      // Handle case where user is not authenticated (data is null)
+      if (!data) {
+        console.log('[AuthContext] User not authenticated - no token available');
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
 
       // Check if user data exists
       if (!data.user) {

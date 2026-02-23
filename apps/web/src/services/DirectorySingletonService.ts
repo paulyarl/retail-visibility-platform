@@ -159,7 +159,7 @@ class DirectorySingletonService extends PublicApiSingleton {
         throw new Error('Slug is required');
       }
 
-      const response = await this.makePublicRequest<any>(
+      const response = await super.makeDefaultRequest<any>(
         `/api/directory/consolidated/${slug}`,
         {},
         `directory-consolidated-${slug}`,
@@ -178,7 +178,7 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Optimized for category browsing
    */
   async getDirectoryMVCategories(): Promise<DirectoryCategory[] | null> {
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       '/api/directory/mv/categories',
       {},
       'directory-mv-categories',
@@ -197,7 +197,7 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Get all directory categories with full hierarchy
    */
   async getDirectoryCategories(): Promise<DirectoryCategory[] | null> {
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       '/api/directory/mv/categories',
       {},
       'directory-categories',
@@ -220,7 +220,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('Category slug is required');
     }
 
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       `/api/directory/mv/categories/${categorySlug}`,
       {},
       `stores-by-category-${categorySlug}`,
@@ -243,7 +243,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('Category is required');
     }
 
-    const response = await this.makePublicRequest<DirectorySearchResult>(
+    const response = await super.makeDefaultRequest<DirectorySearchResult>(
       `/api/directory/search?category=${encodeURIComponent(category)}&page=${page}&limit=${limit}`,
       {},
       `search-by-category-${category}-${page}-${limit}`,
@@ -266,7 +266,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('City and state are required');
     }
 
-    const response = await this.makePublicRequest<DirectorySearchResult>(
+    const response = await super.makeDefaultRequest<DirectorySearchResult>(
       `/api/directory/search?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&page=${page}&limit=${limit}`,
       {},
       `search-by-location-${city}-${state}-${page}-${limit}`,
@@ -286,7 +286,7 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Used for shops page and public shop listings
    */
   async getPublicShops(): Promise<any[]> {
-    const response = await this.makePublicRequest<{
+    const response = await super.makeDefaultRequest<{
       success: boolean;
       shops: any[];
     }>(
@@ -327,7 +327,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     if (filters.q) params.append('q', filters.q);
     params.append('limit', (filters.limit || 100).toString());
 
-    const response = await this.makePublicRequest<{
+    const response = await super.makeDefaultRequest<{
       data: {
         listings: any[];
       };
@@ -356,7 +356,7 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Get all available locations
    */
   async getLocations(): Promise<DirectoryLocation[] | null> {
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       '/api/directory/locations',
       {},
       'directory-locations',
@@ -376,7 +376,7 @@ class DirectorySingletonService extends PublicApiSingleton {
    */
   async getDirectoryStoreTypes(): Promise<any[] | null> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await super.makeDefaultRequest<any>(
         '/api/directory/store-types',
         {},
         'directory-store-types',
@@ -388,7 +388,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       }
       
       // API returns: { success: true, data: { storeTypes: [...] } }
-      // makePublicRequest wraps this, so we need response.data.data.storeTypes
+      // makeDefaultRequest wraps this, so we need response.data.data.storeTypes
       return response.data?.data?.storeTypes || [];
     } catch (error) {
       console.error('[DirectorySingleton] Failed to get directory store types:', error);
@@ -404,7 +404,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makePublicRequest<{ slug: string }>(
+    const response = await super.makeDefaultRequest<{ slug: string }>(
       `/api/directory/tenant/${tenantId}`,
       {},
       `tenant-directory-slug-${tenantId}`,
@@ -427,7 +427,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('Query is required');
     }
 
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       `/api/directory/categories/search?q=${encodeURIComponent(query)}`,
       {},
       `search-categories-${query}`,
@@ -465,7 +465,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     searchParams.append('page', (params.page || 1).toString());
     searchParams.append('limit', (params.limit || 20).toString());
 
-    const response = await this.makePublicRequest<DirectorySearchResult>(
+    const response = await super.makeDefaultRequest<DirectorySearchResult>(
       `/api/directory/mv/search?${searchParams.toString()}`,
       {},
       `search-directory-stores-${JSON.stringify(params)}`,
@@ -499,7 +499,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       searchParams.append('maxDistance', '50'); // 50km radius
     }
 
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       `/api/directory/featured-stores?${searchParams.toString()}`,
       {},
       `featured-stores-${JSON.stringify(params)}`,
@@ -522,7 +522,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('Slug is required');
     }
 
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       `/api/directory/${slug}/related?limit=${limit}`,
       {},
       `related-stores-${slug}-${limit}`,
@@ -542,7 +542,7 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Get directory sitemap data
    */
   async getDirectorySitemap(limit: number = 1000): Promise<any> {
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       `/api/directory/search?limit=${limit}`,
       {},
       'directory-sitemap',
@@ -566,7 +566,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       `/api/storefront/${tenantId}/categories`,
       {},
       `storefront-categories-${tenantId}`,
@@ -593,7 +593,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       `/api/storefront/${tenantId}/products?limit=1`,
       {},
       `storefront-product-count-${tenantId}`,
@@ -617,7 +617,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       `/api/public/tenant/${tenantId}/profile`,
       {},
       `business-profile-${tenantId}`,
@@ -641,7 +641,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       `/api/tenant/${tenantId}/business-hours`,
       {},
       `business-hours-${tenantId}`,
@@ -665,7 +665,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       `/api/storefront/${tenantId}/featured-products?type=store_selection&limit=${limit}`,
       {},
       `featured-products-${tenantId}-${limit}`,
@@ -689,7 +689,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('Category slug is required');
     }
 
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       `/api/directory/mv/search?category=${categorySlug}&limit=${limit}`,
       {},
       `stores-by-category-products-${categorySlug}-${limit}`,
@@ -713,7 +713,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makePublicRequest<any>(
+    const response = await super.makeDefaultRequest<any>(
       `/api/storefront/${tenantId}/products?limit=${limit}`,
       {},
       `storefront-products-${tenantId}-${limit}`,

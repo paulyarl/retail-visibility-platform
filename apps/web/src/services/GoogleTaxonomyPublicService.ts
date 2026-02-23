@@ -4,7 +4,7 @@
  * Used for Google taxonomy lookups that don't require authentication
  */
 
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
 
 export interface GoogleTaxonomyPath {
   id: string;
@@ -24,7 +24,7 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
   // TTL for Google taxonomy data (changes very infrequently)
   private readonly TAXONOMY_TTL = 24 * 60 * 60 * 1000; // 24 hours for taxonomy data
 
-  private constructor() {
+  protected constructor() {
     super('google-taxonomy-public-singleton');
   }
 
@@ -45,7 +45,7 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
       return null;
     }
 
-    const response = await this.makePublicRequest<GoogleTaxonomyPath>(
+    const response = await this.makeDefaultRequest<GoogleTaxonomyPath>(
       `/public/google-taxonomy/${googleCategoryId}`,
       {},
       `google-taxonomy-${googleCategoryId}`,
@@ -65,10 +65,10 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
    * Uses the /public/google-taxonomy/popular endpoint
    */
   async getPopularGoogleCategories(limit: number = 50): Promise<GoogleTaxonomyPath[] | null> {
-    const response = await this.makePublicRequest<GoogleTaxonomyPath[]>(
-      `/public/google-taxonomy/popular?limit=${limit}`,
+    const response = await this.makeDefaultRequest<GoogleTaxonomyPath[]>(
+      `/public/google-taxonomy/popular`,
       {},
-      'google-taxonomy-popular',
+      `google-taxonomy-popular`,
       this.TAXONOMY_TTL
     );
 
@@ -90,9 +90,9 @@ class GoogleTaxonomyPublicService extends PublicApiSingleton {
       return null;
     }
 
-    const response = await this.makePublicRequest<GoogleTaxonomyPath[]>(
-      `/public/google-taxonomy/search?q=${encodeURIComponent(query)}&limit=${limit}`,
-      {},
+    const response = await this.makeDefaultRequest<GoogleTaxonomyPath[]>(
+      `/public/google-taxonomy/search`,
+      { method: 'POST', body: JSON.stringify({ query }) },
       `google-taxonomy-search-${query}`,
       this.TAXONOMY_TTL
     );

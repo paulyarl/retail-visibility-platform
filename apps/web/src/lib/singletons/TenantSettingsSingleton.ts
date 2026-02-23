@@ -106,7 +106,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
    * Fetch tenant info with caching
    */
   async fetchTenantInfo(): Promise<TenantInfo> {
-    const result = await this.makeAuthenticatedRequest<TenantInfo>(
+    const result = await this.makeDefaultRequest<TenantInfo>(
       `/api/tenants/${this.tenantId}`,
       { method: 'GET' },
       `tenant-info-${this.tenantId}`
@@ -125,7 +125,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
    * Fetch tenant profile with caching
    */
   async fetchTenantProfile(): Promise<TenantProfile> {
-    const result = await this.makeAuthenticatedRequest<TenantProfile>(
+    const result = await this.makeDefaultRequest<TenantProfile>(
       `/api/tenant/profile?tenant_id=${this.tenantId}`,
       { method: 'GET' },
       `tenant-profile-${this.tenantId}`
@@ -160,7 +160,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
    * Fetch featured products limits with caching
    */
   async fetchFeaturedProductsLimits(): Promise<FeaturedProductsLimits> {
-    const result = await this.makeAuthenticatedRequest<FeaturedProductsLimits>(
+    const result = await this.makeDefaultRequest<FeaturedProductsLimits>(
       `/api/tenant-limits/featured-products?tenantId=${this.tenantId}`,
       { method: 'GET' },
       `featured-limits-${this.tenantId}`
@@ -209,7 +209,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
    * Automatically invalidates cache
    */
   async updateTenantProfile(updates: Partial<TenantProfile>): Promise<TenantProfile> {
-    const result = await this.makeAuthenticatedRequest<TenantProfile>(
+    const result = await this.makeDefaultRequest<TenantProfile>(
       `/api/tenant/profile?tenant_id=${this.tenantId}`,
       {
         method: 'PUT',

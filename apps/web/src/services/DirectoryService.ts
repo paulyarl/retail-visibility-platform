@@ -100,7 +100,7 @@ export class DirectoryService extends AdminApiSingleton {
    * Get admin directory stats
    */
   async getAdminDirectoryStats(): Promise<DirectoryStats | null> {
-    const response = await this.makeAdminRequest<DirectoryStats>(
+    const response = await this.makeDefaultRequest<DirectoryStats>(
       '/api/admin/directory/stats',
       {},
       'directory-stats',
@@ -130,7 +130,7 @@ export class DirectoryService extends AdminApiSingleton {
     const queryString = queryParams.toString();
     const endpoint = `/api/admin/directory/listings${queryString ? `?${queryString}` : ''}`;
 
-    const response = await this.makeAdminRequest<DirectoryListingsResponse>(
+    const response = await this.makeDefaultRequest<DirectoryListingsResponse>(
       endpoint,
       {},
       `directory-listings-${JSON.stringify(filters)}`,
@@ -152,7 +152,7 @@ export class DirectoryService extends AdminApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    await this.makeAdminRequest<void>(
+    await this.makeDefaultRequest<void>(
       `/api/admin/directory/listings/${tenantId}/feature`,
       {
         method: 'POST',
@@ -178,7 +178,7 @@ export class DirectoryService extends AdminApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    await this.makeAdminRequest<void>(
+    await this.makeDefaultRequest<void>(
       `/api/admin/directory/listings/${tenantId}/unfeature`,
       {
         method: 'POST',
@@ -200,7 +200,7 @@ export class DirectoryService extends AdminApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    await this.makeAdminRequest<void>(
+    await this.makeDefaultRequest<void>(
       `/api/admin/directory/listings/${tenantId}/status`,
       {
         method: 'PUT',
@@ -223,7 +223,7 @@ export class DirectoryService extends AdminApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makeAdminRequest<AdminDirectoryListing>(
+    const response = await this.makeDefaultRequest<AdminDirectoryListing>(
       `/api/admin/directory/listings/${tenantId}`,
       {},
       `directory-listing-${tenantId}`,
@@ -244,7 +244,7 @@ export class DirectoryService extends AdminApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const response = await this.makeAdminRequest<AdminDirectoryListing>(
+    const response = await this.makeDefaultRequest<AdminDirectoryListing>(
       `/api/admin/directory/listings/${tenantId}`,
       {
         method: 'PUT',
@@ -269,7 +269,7 @@ export class DirectoryService extends AdminApiSingleton {
     tenantIds: string[], 
     status: 'active' | 'pending' | 'inactive'
   ): Promise<void> {
-    await this.makeAdminRequest<void>(
+    await this.makeDefaultRequest<void>(
       '/api/admin/directory/listings/bulk-status',
       {
         method: 'PUT',
@@ -288,7 +288,7 @@ export class DirectoryService extends AdminApiSingleton {
    * Get featured listings that are expiring soon
    */
   async getExpiringFeaturedListings(daysAhead: number = 7): Promise<AdminDirectoryListing[] | null> {
-    const response = await this.makeAdminRequest<{ listings: AdminDirectoryListing[] }>(
+    const response = await this.makeDefaultRequest<{ listings: AdminDirectoryListing[] }>(
       `/api/admin/directory/featured/expiring?days=${daysAhead}`,
       {},
       `expiring-featured-${daysAhead}`,
@@ -302,7 +302,7 @@ export class DirectoryService extends AdminApiSingleton {
    * Refresh directory search index
    */
   async refreshSearchIndex(): Promise<void> {
-    await this.makeAdminRequest<void>(
+    await this.makeDefaultRequest<void>(
       '/api/admin/directory/search/refresh',
       {
         method: 'POST',

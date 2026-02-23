@@ -135,10 +135,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
 
     const cacheKey = `recommendations-${userId || 'anonymous'}-${JSON.stringify(options)}`;
     
-    const cached = await this.getFromCache<Recommendation[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    // makeDefaultRequest handles caching automatically
 
     try {
       const params = new URLSearchParams();
@@ -149,10 +146,10 @@ class RecommendationsSingleton extends PublicApiSingleton {
       if (options.minScore) params.append('minScore', options.minScore.toString());
       if (options.tenantId) params.append('tenantId', options.tenantId);
 
-      const result = await this.makePublicRequest<Recommendation[]>(
+      const result = await this.makeDefaultRequest<Recommendation[]>(
         `/api/recommendations/personalized?${params}`,
         {},
-        `recommendations-personalized-${userId}-${options.type}-${options.tenantId}`,
+        cacheKey,
         this.cacheTTL
       );
       
@@ -165,7 +162,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
       const filteredRecommendations = result.data?.filter((rec: Recommendation) => 
         rec.score >= (options.minScore || this.recommendationConfig.minScore)
       ) || [];
-
+      
       return filteredRecommendations;
     } catch (error) {
       console.error('Error fetching personalized recommendations:', error);
@@ -181,15 +178,12 @@ class RecommendationsSingleton extends PublicApiSingleton {
       type?: string;
       limit?: number;
       tenantId?: string;
-      timeRange?: number; // hours
+      timeRange?: number;
     } = {}
   ): Promise<Recommendation[]> {
     const cacheKey = `popular-recommendations-${JSON.stringify(options)}`;
     
-    const cached = await this.getFromCache<Recommendation[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    // makeDefaultRequest handles caching automatically
 
     try {
       const params = new URLSearchParams();
@@ -198,10 +192,10 @@ class RecommendationsSingleton extends PublicApiSingleton {
       if (options.tenantId) params.append('tenantId', options.tenantId);
       if (options.timeRange) params.append('timeRange', options.timeRange.toString());
 
-      const result = await this.makePublicRequest<Recommendation[]>(
+      const result = await this.makeDefaultRequest<Recommendation[]>(
         `/api/recommendations/popular?${params}`,
         {},
-        `recommendations-popular-${options.type}-${options.tenantId}`,
+        cacheKey,
         this.cacheTTL
       );
       
@@ -222,7 +216,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
    */
   async getSimilarItemRecommendations(
     itemId: string,
-    itemType: string,
+    itemType: 'product' | 'store' | 'category',
     options: {
       limit?: number;
       userId?: string;
@@ -231,10 +225,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
   ): Promise<Recommendation[]> {
     const cacheKey = `similar-recommendations-${itemId}-${itemType}-${JSON.stringify(options)}`;
     
-    const cached = await this.getFromCache<Recommendation[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    // makeDefaultRequest handles caching automatically
 
     try {
       const params = new URLSearchParams();
@@ -244,10 +235,10 @@ class RecommendationsSingleton extends PublicApiSingleton {
       if (options.userId) params.append('userId', options.userId);
       if (options.tenantId) params.append('tenantId', options.tenantId);
 
-      const result = await this.makePublicRequest<Recommendation[]>(
+      const result = await this.makeDefaultRequest<Recommendation[]>(
         `/api/recommendations/similar?${params}`,
         {},
-        `recommendations-similar-${itemId}-${itemType}-${options.tenantId}`,
+        cacheKey,
         this.cacheTTL
       );
       
@@ -271,8 +262,12 @@ class RecommendationsSingleton extends PublicApiSingleton {
     userId?: string,
     limit: number = 10
   ): Promise<Recommendation[]> {
+    const cacheKey = `recommendations-recently-viewed-${userId}`;
+    
+    // makeDefaultRequest handles caching automatically
+
     try {
-      const result = await this.makePublicRequest<Recommendation[]>(
+      const result = await this.makeDefaultRequest<Recommendation[]>(
         '/api/recommendations/from-recently-viewed',
         {
           method: 'POST',
@@ -282,7 +277,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
             limit
           })
         },
-        `recommendations-recently-viewed-${userId}`,
+        cacheKey,
         this.cacheTTL
       );
       
@@ -313,13 +308,10 @@ class RecommendationsSingleton extends PublicApiSingleton {
   ): Promise<Recommendation[]> {
     const cacheKey = `contextual-recommendations-${JSON.stringify(context)}-${userId || 'anonymous'}-${limit}`;
     
-    const cached = await this.getFromCache<Recommendation[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    // makeDefaultRequest handles caching automatically
 
     try {
-      const result = await this.makePublicRequest<Recommendation[]>(
+      const result = await this.makeDefaultRequest<Recommendation[]>(
         '/api/recommendations/contextual',
         {
           method: 'POST',
@@ -329,7 +321,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
             limit
           })
         },
-        `recommendations-contextual-${userId}`,
+        cacheKey,
         this.cacheTTL
       );
       
@@ -399,13 +391,14 @@ class RecommendationsSingleton extends PublicApiSingleton {
    * Send single feedback to API
    */
   private async sendFeedback(feedback: RecommendationFeedback): Promise<void> {
-    const result = await this.makePublicRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       '/api/recommendations/feedback',
       {
         method: 'POST',
         body: JSON.stringify(feedback)
       },
-      `recommendations-feedback-${feedback.recommendationId}`
+      `recommendations-feedback-${feedback.recommendationId}`,
+      this.cacheTTL
     );
     
     if (!result.success) {
@@ -418,13 +411,14 @@ class RecommendationsSingleton extends PublicApiSingleton {
    * Send feedback batch to API
    */
   private async sendFeedbackBatch(feedbacks: RecommendationFeedback[]): Promise<void> {
-    const result = await this.makePublicRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       '/api/recommendations/feedback/batch',
       {
         method: 'POST',
         body: JSON.stringify({ feedbacks })
       },
-      `recommendations-feedback-batch`
+      `recommendations-feedback-batch`,
+      this.cacheTTL
     );
     
     if (!result.success) {
@@ -443,16 +437,13 @@ class RecommendationsSingleton extends PublicApiSingleton {
   async getRecommendationAnalytics(days: number = 30): Promise<RecommendationAnalytics> {
     const cacheKey = `recommendation-analytics-${days}`;
     
-    const cached = await this.getFromCache<RecommendationAnalytics>(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    // makeDefaultRequest handles caching automatically
 
     try {
-      const result = await this.makePublicRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/recommendations/analytics?days=${days}`,
         {},
-        `recommendations-analytics-${days}`,
+        cacheKey,
         this.cacheTTL
       );
       
@@ -471,7 +462,6 @@ class RecommendationsSingleton extends PublicApiSingleton {
         };
       }
       
-      await this.setCache(cacheKey, result.data);
       return result.data;
     } catch (error) {
       console.error('Error fetching recommendation analytics:', error);
@@ -495,7 +485,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
   async getRecommendationPerformance(
     source?: string,
     type?: string,
-    days: number = 7
+    days: number = 30
   ): Promise<{
     impressions: number;
     clicks: number;
@@ -506,17 +496,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
   }> {
     const cacheKey = `recommendation-performance-${source || 'all'}-${type || 'all'}-${days}`;
     
-    const cached = await this.getFromCache<{
-      impressions: number;
-      clicks: number;
-      conversions: number;
-      ctr: number;
-      conversionRate: number;
-      averageScore: number;
-    }>(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    // makeDefaultRequest handles caching automatically
 
     try {
       const params = new URLSearchParams();
@@ -524,10 +504,10 @@ class RecommendationsSingleton extends PublicApiSingleton {
       if (type) params.append('type', type);
       params.append('days', days.toString());
 
-      const result = await this.makePublicRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/recommendations/performance?${params}`,
         {},
-        `recommendations-performance-${type}-${days}`,
+        cacheKey,
         this.cacheTTL
       );
       
@@ -545,7 +525,6 @@ class RecommendationsSingleton extends PublicApiSingleton {
         };
       }
       
-      await this.setCache(cacheKey, result.data);
       return result.data;
     } catch (error) {
       console.error('Error fetching recommendation performance:', error);
@@ -572,23 +551,14 @@ class RecommendationsSingleton extends PublicApiSingleton {
   async updateRecommendationConfig(config: Partial<RecommendationConfig>): Promise<void> {
     this.recommendationConfig = { ...this.recommendationConfig, ...config };
     
-    // Cache configuration
-    await this.setCache('recommendation-config', this.recommendationConfig);
-
-    // Clear recommendation cache to apply new config
-    await this.clearCache();
+    // Configuration is stored in memory, no persistent caching needed
   }
 
   /**
    * Get recommendation configuration
    */
   async getRecommendationConfig(): Promise<RecommendationConfig> {
-    const cached = await this.getFromCache<RecommendationConfig>('recommendation-config');
-    if (cached) {
-      return cached;
-    }
-
-    await this.setCache('recommendation-config', this.recommendationConfig);
+    // Configuration is stored in memory
     return this.recommendationConfig;
   }
 

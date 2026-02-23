@@ -5,7 +5,7 @@
  * Handles tier CRUD, status management, and sorting operations with admin privileges
  */
 
-import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 
 export interface Tier {
   id: string;
@@ -37,7 +37,7 @@ export interface Tier {
 export class TierSystemService extends AdminApiSingleton {
   private static instance: TierSystemService;
 
-  private constructor() {
+  protected constructor() {
     super('tier-system-service', {
       ttl: 60 * 60 * 1000 // 1 hour for tier data (changes infrequently)
     });
@@ -54,7 +54,7 @@ export class TierSystemService extends AdminApiSingleton {
    * Get tier system tiers
    */
   async getTierSystemTiers(): Promise<Tier[] | null> {
-    const response = await this.makeAdminRequest<{ 
+    const response = await this.makeDefaultRequest<{ 
       individual: Tier[];
       organization: Tier[];
     }>(
@@ -81,14 +81,17 @@ export class TierSystemService extends AdminApiSingleton {
       throw new Error('Tier ID is required');
     }
 
-    const response = await this.makeAdminRequest<Tier>(
+    const response = await this.makeDefaultRequest<Tier>(
       `/api/admin/tiers/${tierId}/status`,
       {
         method: 'PUT',
-        body: JSON.stringify({ isActive }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: isActive })
       },
-      `tier-status-${tierId}`,
-      0 // No cache for status updates
+      `update-tier-status-${tierId}`,
+      0 // No cache for admin operations
     );
 
     // Invalidate tier cache
@@ -105,14 +108,17 @@ export class TierSystemService extends AdminApiSingleton {
       throw new Error('Tier ID is required');
     }
 
-    const response = await this.makeAdminRequest<Tier>(
+    const response = await this.makeDefaultRequest<Tier>(
       `/api/admin/tiers/${tierId}`,
       {
         method: 'PUT',
-        body: JSON.stringify(tierData),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(tierData)
       },
-      `tier-${tierId}`,
-      0 // No cache for updates
+      `update-tier-${tierId}`,
+      0 // No cache for admin operations
     );
 
     // Invalidate tier cache
@@ -129,14 +135,14 @@ export class TierSystemService extends AdminApiSingleton {
       throw new Error('Tier ID is required');
     }
 
-    await this.makeAdminRequest<void>(
+    await this.makeDefaultRequest<void>(
       `/api/admin/tiers/${tierId}/sort-order`,
       {
         method: 'PUT',
         body: JSON.stringify({ sortOrder }),
       },
       `tier-sort-${tierId}`,
-      0 // No cache for sorting updates
+      0
     );
 
     // Invalidate tier cache
@@ -147,14 +153,34 @@ export class TierSystemService extends AdminApiSingleton {
    * Create tier
    */
   async createTier(tierData: Omit<Tier, 'id' | 'createdAt' | 'updatedAt'>): Promise<Tier | null> {
-    const response = await this.makeAdminRequest<Tier>(
-      '/api/admin/tier-system/tiers',
+    const response = await this.makeDefaultRequest<Tier>(
+      `/api/admin/tiers`,
       {
         method: 'POST',
-        body: JSON.stringify(tierData),
+        body: JSON.stringify(tierData)
       },
-      'create-tier',
-      0 // No cache for creation
+      'tier-system-tiers',
+      0
+    );
+
+    // Invalidate tier cache
+    this.invalidateCache('tier-system-tiers');
+
+    return response?.data || null;
+  }
+
+  /**
+   * Create tier from template
+   */
+  async createTierFromTemplate(templateId: string, newTierData: Partial<Tier>): Promise<Tier | null> {
+    const response = await this.makeDefaultRequest<Tier>(
+      `/api/admin/tiers/from-template/${templateId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(newTierData)
+      },
+      'tier-system-tiers',
+      0
     );
 
     // Invalidate tier cache
@@ -171,13 +197,11 @@ export class TierSystemService extends AdminApiSingleton {
       throw new Error('Tier ID is required');
     }
 
-    await this.makeAdminRequest<void>(
+    await this.makeDefaultRequest<void>(
       `/api/admin/tiers/${tierId}`,
-      {
-        method: 'DELETE',
-      },
-      `delete-tier-${tierId}`,
-      0 // No cache for deletion
+      { method: 'DELETE' },
+      'tier-system-tiers',
+      0
     );
 
     // Invalidate tier cache
@@ -188,11 +212,11 @@ export class TierSystemService extends AdminApiSingleton {
    * Get individual tiers only
    */
   async getIndividualTiers(): Promise<Tier[] | null> {
-    const response = await this.makeAdminRequest<{ individual: Tier[] }>(
-      '/api/admin/tiers/individual',
+    const response = await this.makeDefaultRequest<{ individual: Tier[] }>(
+      `/api/admin/tiers/individual`,
       {},
-      'individual-tiers',
-      60 * 60 * 1000 // 1 hour cache
+      'tier-system-tiers',
+      60 * 60 * 1000
     );
 
     return response?.data?.individual || null;
@@ -202,11 +226,11 @@ export class TierSystemService extends AdminApiSingleton {
    * Get organization tiers only
    */
   async getOrganizationTiers(): Promise<Tier[] | null> {
-    const response = await this.makeAdminRequest<{ organization: Tier[] }>(
-      '/api/admin/tiers/organization',
+    const response = await this.makeDefaultRequest<{ organization: Tier[] }>(
+      `/api/admin/tiers/organization`,
       {},
-      'organization-tiers',
-      60 * 60 * 1000 // 1 hour cache
+      'tier-system-tiers',
+      60 * 60 * 1000
     );
 
     return response?.data?.organization || null;
@@ -216,14 +240,14 @@ export class TierSystemService extends AdminApiSingleton {
    * Bulk update tier sort orders
    */
   async bulkUpdateSortOrders(tierUpdates: Array<{ id: string; sortOrder: number }>): Promise<void> {
-    await this.makeAdminRequest<void>(
-      '/api/admin/tiers/bulk-sort-order',
+    await this.makeDefaultRequest<void>(
+      `/api/admin/tiers/bulk-update-sort`,
       {
-        method: 'PUT',
-        body: JSON.stringify({ tiers: tierUpdates }),
+        method: 'POST',
+        body: JSON.stringify({ updates: tierUpdates })
       },
-      'bulk-sort-orders',
-      0 // No cache for bulk updates
+      'tier-system-tiers',
+      0
     );
 
     // Invalidate tier cache
@@ -238,14 +262,14 @@ export class TierSystemService extends AdminApiSingleton {
       throw new Error('Tier ID is required');
     }
 
-    const response = await this.makeAdminRequest<Tier>(
+    const response = await this.makeDefaultRequest<Tier>(
       `/api/admin/tiers/${tierId}/clone`,
       {
         method: 'POST',
-        body: JSON.stringify(newTierData),
+        body: JSON.stringify(newTierData)
       },
-      `clone-tier-${tierId}`,
-      0 // No cache for cloning
+      'tier-system-tiers',
+      0
     );
 
     // Invalidate tier cache

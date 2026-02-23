@@ -2400,6 +2400,43 @@ model account_deletion_requests {
   @@ignore
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model ticker_configs {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  is_enabled        Boolean?  @default(false)
+  max_messages      Int?      @default(3)
+  scroll_speed      String?   @default("medium") @db.VarChar(10)
+  is_auto_rotate    Boolean?  @default(true)
+  rotation_interval Int?      @default(5)
+  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime? @default(now()) @db.Timestamptz(6)
+  created_by        String?
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model ticker_messages {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  message         String
+  type            String    @db.VarChar(20)
+  icon            String    @db.VarChar(20)
+  is_scrolling    Boolean?  @default(false)
+  is_dismissible  Boolean?  @default(true)
+  target_audience String    @db.VarChar(20)
+  target_tiers    String[]
+  target_tenants  String[]
+  start_date      DateTime? @db.Timestamptz(6)
+  end_date        DateTime? @db.Timestamptz(6)
+  priority        Int?      @default(1)
+  is_active       Boolean?  @default(true)
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
+  created_by      String?
+
+  @@index([type], map: "idx_ticker_messages_type")
+}
+
 enum action {
   create
   update

@@ -51,7 +51,7 @@ class DirectoryListingSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<DirectoryListing>(
+    const result = await this.makeDefaultRequest<DirectoryListing>(
       `/api/tenants/${tenantId}/directory/listing`,
       {},
       `directory-listing-${tenantId}`
@@ -74,7 +74,7 @@ class DirectoryListingSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/tenants/${tenantId}/directory/listing/publish`,
         { method: 'POST' },
         `directory-publish-${tenantId}`
@@ -97,7 +97,7 @@ class DirectoryListingSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/tenants/${tenantId}/directory/listing/unpublish`,
         { method: 'POST' },
         `directory-unpublish-${tenantId}`
@@ -119,7 +119,7 @@ class DirectoryListingSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<DirectoryListing>(
+    const result = await this.makeDefaultRequest<DirectoryListing>(
       `/api/tenants/${tenantId}/directory/listing`,
       { 
         method: 'PUT',
@@ -163,7 +163,7 @@ class DirectoryListingSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Listing ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/directory/${listingId}/photos`,
         {},
         `directory-photos-${listingId}`,
@@ -203,7 +203,7 @@ class DirectoryListingSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Listing ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/directory/${listingId}/photos`,
         {
           method: 'POST',
@@ -233,7 +233,7 @@ class DirectoryListingSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Listing ID and Photo ID are required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/directory/${listingId}/photos/${photoId}`,
         {
           method: 'PUT',
@@ -259,7 +259,7 @@ class DirectoryListingSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Listing ID and Photo ID are required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/directory/${listingId}/photos/${photoId}`,
         {
           method: 'DELETE'

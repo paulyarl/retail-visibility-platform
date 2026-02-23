@@ -1,4 +1,4 @@
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
 
 export interface TenantProfile {
   id: string;
@@ -58,7 +58,7 @@ class TenantPublicService extends PublicApiSingleton {
   private readonly PROFILE_TTL = 15 * 60 * 1000; // 15 minutes for public profiles
   private readonly HOURS_TTL = 10 * 60 * 1000; // 10 minutes for business hours
 
-  private constructor() {
+  protected constructor() {
     super('tenant-public-singleton');
   }
 
@@ -75,7 +75,7 @@ class TenantPublicService extends PublicApiSingleton {
    */
   async getPublicTenantInfo(tenantId: string): Promise<any | null> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/public/tenant/${tenantId}`,
         {},
         `public-tenant-info-${tenantId}`,
@@ -100,7 +100,7 @@ class TenantPublicService extends PublicApiSingleton {
    */
   async getTenantLogo(tenantId: string): Promise<any | null> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/public/tenant/${encodeURIComponent(tenantId)}/logo`,
         {},
         `public-tenant-logo-${tenantId}`,
@@ -125,7 +125,7 @@ class TenantPublicService extends PublicApiSingleton {
    */
   async getPublicTenantTier(tenantId: string): Promise<any | null> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/tenants/${tenantId}/tier/public`,
         {},
         `public-tenant-tier-${tenantId}`,
@@ -150,7 +150,7 @@ class TenantPublicService extends PublicApiSingleton {
    */
   async getPublicTenantProfile(tenantId: string): Promise<TenantProfile | null> {
     try {
-      const response = await this.makePublicRequest<TenantProfile>(
+      const response = await this.makeDefaultRequest<TenantProfile>(
         `/api/public/tenant/${tenantId}/profile`,
         {},
         `public-tenant-profile-${tenantId}`,
@@ -174,7 +174,7 @@ class TenantPublicService extends PublicApiSingleton {
    */
   async getTenantBusinessHours(tenantId: string): Promise<any | null> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/public/tenant/${tenantId}/business-hours/status`,
         {},
         `tenant-hours-${tenantId}`,

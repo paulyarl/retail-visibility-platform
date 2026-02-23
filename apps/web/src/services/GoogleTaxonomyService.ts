@@ -44,7 +44,7 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
       ? `/api/google/taxonomy/browse?parent=${encodeURIComponent(parentPath)}`
       : '/api/google/taxonomy/browse';
     
-    const response = await this.makeAuthenticatedRequest<{
+    const response = await this.makeDefaultRequest<{
       success: boolean;
       categories: GoogleTaxonomyCategory[];
     }>(
@@ -72,7 +72,7 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    const response = await this.makeAuthenticatedRequest<{
+    const response = await this.makeDefaultRequest<{
       success: boolean;
       categories: GoogleTaxonomyCategory[];
     }>(

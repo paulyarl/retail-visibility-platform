@@ -47,7 +47,7 @@ class BusinessProfileSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<ApiBusinessProfile>(
+    const result = await this.makeDefaultRequest<ApiBusinessProfile>(
       `/api/tenants/${tenantId}/profile`,
       {},
       `business-profile-${tenantId}`
@@ -78,7 +78,7 @@ class BusinessProfileSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<ApiBusinessProfile>(
+    const result = await this.makeDefaultRequest<ApiBusinessProfile>(
       `/api/tenants/${tenantId}/profile`,
       { 
         method: 'PUT',

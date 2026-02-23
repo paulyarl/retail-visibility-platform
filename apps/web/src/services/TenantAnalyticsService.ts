@@ -96,7 +96,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
       throw new Error('Tenant ID and Category ID are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/v1/tenants/${tenantId}/categories/${categoryId}`,
       {},
       `platform-tenant-category-${tenantId}-${categoryId}`,
@@ -119,7 +119,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/analytics/performance?timeframe=${timeframe}`,
       {},
       `platform-tenant-performance-${tenantId}-${timeframe}`,
@@ -142,7 +142,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/analytics/products?timeframe=${timeframe}`,
       {},
       `platform-tenant-product-analytics-${tenantId}-${timeframe}`,
@@ -165,7 +165,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/analytics/customers?timeframe=${timeframe}`,
       {},
       `platform-tenant-customer-analytics-${tenantId}-${timeframe}`,
@@ -188,7 +188,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/analytics/sales?timeframe=${timeframe}`,
       {},
       `platform-tenant-sales-analytics-${tenantId}-${timeframe}`,
@@ -211,7 +211,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/analytics/inventory`,
       {},
       `platform-tenant-inventory-analytics-${tenantId}`,
@@ -234,7 +234,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/analytics/engagement?timeframe=${timeframe}`,
       {},
       `platform-tenant-engagement-${tenantId}-${timeframe}`,
@@ -257,7 +257,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/analytics/api-usage?timeframe=${timeframe}`,
       {},
       `platform-tenant-api-usage-${tenantId}-${timeframe}`,
@@ -280,7 +280,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/analytics/errors?timeframe=${timeframe}`,
       {},
       `platform-tenant-error-analytics-${tenantId}-${timeframe}`,
@@ -303,7 +303,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/analytics/storage`,
       {},
       `platform-tenant-storage-analytics-${tenantId}`,
@@ -326,7 +326,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/analytics/bandwidth?timeframe=${timeframe}`,
       {},
       `platform-tenant-bandwidth-analytics-${tenantId}-${timeframe}`,
@@ -350,7 +350,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
     }
 
     const queryParams = new URLSearchParams({ format, ...params });
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/analytics/export/${type}?${queryParams}`,
       {},
       `platform-export-tenant-analytics-${tenantId}-${type}`,
@@ -373,7 +373,7 @@ export class TenantAnalyticsService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/dashboard/summary`,
       {},
       `platform-tenant-dashboard-${tenantId}`,

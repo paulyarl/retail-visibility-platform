@@ -163,7 +163,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
     });
 
     if (!organization) {
-      return res.status(404).json({ error: 'organization_not_found' });
+      return res.status(400).json({ 
+        error: 'organization_not_found',
+        message: 'Organization not found'
+      });
     }
 
     res.json(organization);
@@ -367,7 +370,10 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
     });
 
     if (!organization) {
-      return res.status(404).json({ error: 'organization_not_found' });
+      return res.status(400).json({ 
+        error: 'organization_not_found',
+        message: 'Organization not found'
+      });
     }
 
     // Verify all target tenants belong to this organization
@@ -390,7 +396,10 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
     });
 
     if (!sourceItem) {
-      return res.status(404).json({ error: 'source_item_not_found' });
+      return res.status(400).json({ 
+        error: 'source_item_not_found',
+        message: 'Source item not found'
+      });
     }
 
     // Verify source item's tenant is in this organization
@@ -620,7 +629,10 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
     });
 
     if (!organization) {
-      return res.status(404).json({ error: 'organization_not_found' });
+      return res.status(400).json({ 
+        error: 'organization_not_found',
+        message: 'Organization not found'
+      });
     }
 
     // Verify all target tenants belong to this organization
@@ -645,7 +657,10 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
     });
 
     if (sourceItems.length === 0) {
-      return res.status(404).json({ error: 'no_source_items_found' });
+      return res.status(400).json({ 
+        error: 'no_source_items_found',
+        message: 'No source items found'
+      });
     }
 
     // Verify all source items belong to this organization
@@ -813,7 +828,10 @@ router.put('/:id/hero-location', authenticateToken, requireSupportActions, async
     });
 
     if (!organization) {
-      return res.status(404).json({ error: 'organization_not_found' });
+      return res.status(400).json({ 
+        error: 'organization_not_found',
+        message: 'Organization not found'
+      });
     }
 
     // Verify tenant belongs to this organization
@@ -870,7 +888,10 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
     });
 
     if (!organization) {
-      return res.status(404).json({ error: 'organization_not_found' });
+      return res.status(400).json({ 
+        error: 'organization_not_found',
+        message: 'Organization not found'
+      });
     }
 
     // Find hero location

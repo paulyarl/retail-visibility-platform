@@ -109,7 +109,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
 
     const endpoint = `/api/items/complete?${queryString}`;
     
-    const result = await this.makeAuthenticatedRequest<ItemsCompleteResponse>(endpoint, {}, cacheKey);
+    const result = await this.makeDefaultRequest<ItemsCompleteResponse>(endpoint, {}, cacheKey);
 
     if (!result.success) {
       console.error('[ItemsSingleton] Failed to get items complete:', result.error);
@@ -123,7 +123,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
    * Get items by ID with caching
    */
   async getItem(itemId: string): Promise<Item | null> {
-    const result = await this.makeAuthenticatedRequest<Item>(
+    const result = await this.makeDefaultRequest<Item>(
       `/api/items/${itemId}`,
       {},
       `item-${itemId}`
@@ -142,7 +142,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
    * Note: This will invalidate relevant cache entries
    */
   async createItem(itemData: Partial<Item>, tenantId?: string): Promise<Item | null> {
-    const result = await this.makeAuthenticatedRequest<Item>(
+    const result = await this.makeDefaultRequest<Item>(
       '/api/items',
       {
         method: 'POST',
@@ -171,7 +171,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
    * Note: This will invalidate relevant cache entries
    */
   async updateItem(itemId: string, itemData: Partial<Item>, tenantId?: string): Promise<Item | null> {
-    const result = await this.makeAuthenticatedRequest<Item>(
+    const result = await this.makeDefaultRequest<Item>(
       `/api/items/${itemId}`,
       {
         method: 'PUT',
@@ -209,7 +209,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
       throw new Error('Item ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/items/${itemId}/photos`,
       {
         method: 'POST',
@@ -234,7 +234,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
     const formData = new FormData();
     files.forEach((file) => formData.append('photos', file));
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/items/${itemId}/photos`,
       {
         method: 'POST',
@@ -263,7 +263,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Item ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/items/${itemId}/photos`,
         {},
         `item-photos-${itemId}`,
@@ -287,7 +287,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Item ID and Photo ID are required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/items/${itemId}/photos/${photoId}`,
         {
           method: 'PUT',
@@ -313,7 +313,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Item ID and Photo ID are required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/items/${itemId}/photos/${photoId}`,
         {
           method: 'DELETE'
@@ -338,7 +338,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Item ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/items/${itemId}/photos/migrate-legacy`,
         {
           method: 'POST',
@@ -367,7 +367,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Item ID and Photo ID are required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/items/${itemId}/photos/${photoId}`,
         {
           method: 'PUT',
@@ -392,7 +392,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/trash/capacity?tenantId=${tenantId}`,
         {},
         `items-trash-capacity-${tenantId}`,
@@ -415,7 +415,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/items?tenantId=${tenantId}&status=trashed&limit=${limit}`,
         {},
         `items-trashed-${tenantId}-${limit}`,
@@ -438,7 +438,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Item ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<void>(
+      const result = await this.makeDefaultRequest<void>(
         `/api/items/${itemId}/restore`,
         { method: 'PATCH' },
         `item-restore-${itemId}`
@@ -458,7 +458,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Item ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<void>(
+      const result = await this.makeDefaultRequest<void>(
         `/api/items/${itemId}/purge`,
         { method: 'DELETE' },
         `item-purge-${itemId}`
@@ -479,7 +479,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
       }
 
       await Promise.all(itemIds.map(itemId => 
-        this.makeAuthenticatedRequest<void>(
+        this.makeDefaultRequest<void>(
           `/api/items/${itemId}/purge`,
           { method: 'DELETE' },
           `item-purge-${itemId}`
@@ -500,7 +500,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         `/api/scan/my-sessions?tenantId=${tenantId}`,
         {},
         `items-my-scan-sessions-${tenantId}`,
@@ -523,7 +523,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await this.makeDefaultRequest<any>(
         '/api/scan/start',
         { 
           method: 'POST',
@@ -551,7 +551,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Session ID is required');
       }
 
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/scan/${sessionId}`,
         { method: 'DELETE' },
         `items-cancel-scan-session-${sessionId}`
@@ -571,7 +571,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/api/scan/cleanup-my-sessions',
         { 
           method: 'POST',
@@ -595,7 +595,7 @@ class ItemsSingletonService extends AuthenticatedApiSingleton {
       const item = await this.getItem(itemId);
       const targetTenantId = tenantId || item?.tenantCategoryId || 'unknown';
 
-      const result = await this.makeAuthenticatedRequest<{ success: boolean }>(
+      const result = await this.makeDefaultRequest<{ success: boolean }>(
         `/api/items/${itemId}`,
         {
           method: 'DELETE',

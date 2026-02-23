@@ -68,7 +68,7 @@ class BehaviorTrackingService extends PublicApiSingleton {
    */
   async sendEvent(event: TrackingEvent): Promise<void> {
     try {
-      await this.makePublicRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/analytics/events',
         {
           method: 'POST',
@@ -89,7 +89,7 @@ class BehaviorTrackingService extends PublicApiSingleton {
    */
   async sendBatch(events: TrackingEvent[]): Promise<void> {
     try {
-      await this.makePublicRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/analytics/events/batch',
         {
           method: 'POST',
@@ -110,7 +110,7 @@ class BehaviorTrackingService extends PublicApiSingleton {
    */
   async sendSession(session: TrackingSession): Promise<void> {
     try {
-      await this.makePublicRequest<void>(
+      await this.makeDefaultRequest<void>(
         '/analytics/sessions',
         {
           method: 'POST',
@@ -130,7 +130,7 @@ class BehaviorTrackingService extends PublicApiSingleton {
    * Uses the /api/analytics/behavior endpoint
    */
   async getBehaviorAnalytics(hours: number = 24): Promise<BehaviorAnalytics> {
-    const response = await this.makePublicRequest<BehaviorAnalytics>(
+    const response = await this.makeDefaultRequest<BehaviorAnalytics>(
       `/analytics/behavior?hours=${hours}`,
       {},
       `behavior-analytics-${hours}`,
@@ -162,7 +162,7 @@ class BehaviorTrackingService extends PublicApiSingleton {
    * Uses the /api/analytics/users/:userId/behavior endpoint
    */
   async getUserBehaviorPatterns(userId: string, days: number = 30): Promise<any> {
-    const response = await this.makePublicRequest<any>(
+    const response = await this.makeDefaultRequest<any>(
       `/analytics/users/${userId}/behavior?days=${days}`,
       {},
       `user-behavior-${userId}-${days}`,

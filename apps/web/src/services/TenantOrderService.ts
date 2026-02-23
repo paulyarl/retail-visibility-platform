@@ -4,7 +4,7 @@
  * Uses TenantApiSingleton for tenant-specific order operations
  */
 
-import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 
 export interface TenantOrder {
   orderId: string;
@@ -87,8 +87,9 @@ export interface FulfillmentUpdate {
 
 class TenantOrderService extends TenantApiSingleton {
   private static instance: TenantOrderService;
+  protected cacheTTL: number = 10 * 60 * 1000; // 10 minutes cache for order data
 
-  private constructor(singletonKey: string, cacheOptions?: any) {
+  protected constructor(singletonKey: string, cacheOptions?: any) {
     super(singletonKey, {
       ttl: 10 * 60 * 1000, // 10 minutes cache for order data
       ...cacheOptions
@@ -131,7 +132,7 @@ class TenantOrderService extends TenantApiSingleton {
       const endpoint = `/api/tenants/${tenantId}/orders${queryString ? `?${queryString}` : ''}`;
       const cacheKey = `tenant-orders-${tenantId}-${queryString}`;
 
-      const response = await this.makeAuthenticatedRequest<{
+      const response = await this.makeDefaultRequest<{
         success: boolean;
         data: {
           orders: TenantOrder[];
@@ -142,7 +143,7 @@ class TenantOrderService extends TenantApiSingleton {
             totalPages: number;
           };
         };
-      }>(endpoint, {}, cacheKey);
+      }>(endpoint, {}, cacheKey, this.cacheTTL);
 
       console.log('[TenantOrderService] API Response:', response);
 
@@ -170,13 +171,14 @@ class TenantOrderService extends TenantApiSingleton {
    */
   async getOrder(tenantId: string, orderId: string): Promise<TenantOrder | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<{
+      const response = await this.makeDefaultRequest<{
         success: boolean;
         order: TenantOrder;
       }>(
         `/api/tenants/${tenantId}/orders/${orderId}`,
         {},
-        `tenant-order-${tenantId}-${orderId}`
+        `tenant-order-${tenantId}-${orderId}`,
+        this.cacheTTL
       );
 
       return response.data?.order || null;
@@ -192,16 +194,20 @@ class TenantOrderService extends TenantApiSingleton {
    */
   async updateFulfillment(tenantId: string, orderId: string, update: FulfillmentUpdate): Promise<TenantOrder | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<{
+      const response = await this.makeDefaultRequest<{
         success: boolean;
         order: TenantOrder;
       }>(
         `/api/tenants/${tenantId}/orders/${orderId}/fulfillment`,
         {
           method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify(update)
         },
-        `fulfillment-update-${tenantId}-${orderId}`
+        `update-fulfillment-${tenantId}-${orderId}`,
+        this.cacheTTL / 2
       );
 
       return response.data?.order || null;
@@ -217,13 +223,14 @@ class TenantOrderService extends TenantApiSingleton {
    */
   async archiveOrder(tenantId: string, orderId: string, archived: boolean): Promise<boolean> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/tenants/${tenantId}/orders/${orderId}/archive`,
         {
           method: 'PUT',
           body: JSON.stringify({ archived })
         },
-        `archive-order-${tenantId}-${orderId}`
+        `archive-order-${tenantId}-${orderId}`,
+        0 // No cache for state changes
       );
 
       return true;
@@ -240,7 +247,7 @@ class TenantOrderService extends TenantApiSingleton {
   async getOrderStats(tenantId: string, period?: '7d' | '30d' | '90d' | '1y'): Promise<OrderStats> {
     try {
       const periodParam = period ? `?period=${period}` : '';
-      const response = await this.makeAuthenticatedRequest<{
+      const response = await this.makeDefaultRequest<{
         success: boolean;
         stats: OrderStats;
       }>(
@@ -280,7 +287,7 @@ class TenantOrderService extends TenantApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const response = await this.makeAuthenticatedRequest<{
+      const response = await this.makeDefaultRequest<{
         success: boolean;
         settings: any;
       }>(
@@ -312,7 +319,7 @@ class TenantOrderService extends TenantApiSingleton {
         throw new Error('Tenant ID and Order ID are required');
       }
 
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/tenants/${tenantId}/orders/${orderId}/fulfillment`,
         {
           method: 'PUT',
@@ -342,7 +349,7 @@ class TenantOrderService extends TenantApiSingleton {
     }>;
   }): Promise<boolean> {
     try {
-      await this.makeAuthenticatedRequest<void>(
+      await this.makeDefaultRequest<void>(
         `/api/tenants/${tenantId}/orders/${orderId}/refund`,
         {
           method: 'POST',
@@ -379,7 +386,7 @@ class TenantOrderService extends TenantApiSingleton {
 
       const endpoint = `/api/tenants/${tenantId}/orders/export${params.toString() ? '?' + params.toString() : ''}`;
 
-      const response = await this.makeAuthenticatedRequest<{
+      const response = await this.makeDefaultRequest<{
         success: boolean;
         downloadUrl: string;
       }>(endpoint, {}, `export-orders-${tenantId}-${Date.now()}`);

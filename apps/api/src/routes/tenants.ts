@@ -675,8 +675,10 @@ router.get('/:id/complete', authenticateToken, checkTenantAccess, async (req: Re
       // Calculate usage counts directly from database
       const [productCount, locationCount, userCount] = await Promise.all([
         prisma.inventory_items.count({ where: { tenant_id: id } }),
-        // For now, assume single location per tenant - adjust based on your location model
-        Promise.resolve(1), // Placeholder for location count
+        // Count actual locations for this tenant
+        prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM locations WHERE tenant_id = $1`, [id])
+          .then((result: any) => Number(result[0]?.count || 1))
+          .catch(() => 1), // Fallback to 1 if no locations table or error
         prisma.user_tenants.count({ where: { tenant_id: id } }),
       ]);
 

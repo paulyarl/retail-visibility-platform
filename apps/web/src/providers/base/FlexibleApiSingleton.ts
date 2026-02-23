@@ -11,9 +11,9 @@
  * Default request type can be overridden per service
  */
 
-import { UniversalSingleton, SingletonCacheOptions, ApiResult } from './UniversalSingleton';
+import { UniversalSingleton, SingletonCacheOptions, ApiResult, SingletonMetrics } from './UniversalSingleton';
 
-export type { SingletonCacheOptions, ApiResult } from './UniversalSingleton';
+export type { SingletonCacheOptions, ApiResult, SingletonMetrics } from './UniversalSingleton';
 
 // ====================
 // REQUEST TYPE ENUMS
@@ -30,7 +30,20 @@ export enum RequestType {
 export enum RequestTarget {
   API = 'api',
   WEB = 'web',
-  EXTERNAL ='external'
+  EXTERNAL = 'external'
+}
+
+export interface PublicRequestOptions {
+  cacheKey?: string;
+  ttl?: number;
+  requestTarget?: RequestTarget;
+}
+
+export interface AuthenticatedRequestOptions {
+  cacheKey?: string;
+  ttl?: number;
+  requestTarget?: RequestTarget;
+  isAdminRequest?: boolean;
 }
 
 export interface TenantRequestOptions {
@@ -38,51 +51,49 @@ export interface TenantRequestOptions {
   validateTenantAccess?: boolean;
   tenantId?: string;
   bypassCache?: boolean;
+  cacheKey?: string;
+  ttl?: number;
+  requestTarget?: RequestTarget;
 }
 
 export interface AdminRequestOptions {
   requireAdminContext?: boolean;
   validateAdminAccess?: boolean;
   bypassCache?: boolean;
+  cacheKey?: string;
+  ttl?: number;
+  requestTarget?: RequestTarget;
 }
 
 export interface SystemRequestOptions {
-  requireSystemContext?: boolean;
+  requireSystemAccess?: boolean;
   validateSystemAccess?: boolean;
-  systemKey?: string;
   bypassCache?: boolean;
+  cacheKey?: string;
+  ttl?: number;
+  requestTarget?: RequestTarget;
+  systemKey?: string;
 }
 
-// ====================
-// RESPONSE TYPES
-// ====================
-
-export interface PublicApiResponse<T> extends ApiResult<T> {
-  // Public API response structure
+export interface RequestOptions {
+  requestType?: RequestType;
+  requestTarget?: RequestTarget;
 }
 
-export interface AuthenticatedApiResponse<T> extends ApiResult<T> {
-  // Authenticated API response structure
-}
-
-export interface TenantApiResponse<T> extends ApiResult<T> {
-  // Tenant API response structure
-  tenantId?: string;
-}
-
-export interface AdminApiResponse<T> extends ApiResult<T> {
-  // Admin API response structure
-}
-
-export interface SystemApiResponse<T> extends ApiResult<T> {
-  // System API response structure
-}
+// Response interfaces
+export interface PublicApiResponse<T> extends ApiResult<T> {}
+export interface AuthenticatedApiResponse<T> extends ApiResult<T> {}
+export interface TenantApiResponse<T> extends ApiResult<T> {}
+export interface AdminApiResponse<T> extends ApiResult<T> {}
+export interface SystemApiResponse<T> extends ApiResult<T> {}
 
 // ====================
 // FLEXIBLE API SINGLETON
 // ====================
 
 export abstract class FlexibleApiSingleton extends UniversalSingleton {
+  protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes default
+  
   // Default request type for this service (can be overridden)
   protected abstract defaultRequestType: RequestType;
   protected abstract defaultRequestTarget: RequestTarget;
@@ -92,557 +103,519 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
   }
 
   // ====================
-  // PUBLIC REQUEST METHOD
+  // CORE UTILITY METHODS
   // ====================
 
   /**
-   * Make public API request (no authentication)
+   * Generate a unique key for the current request context
+   */
+  private getRequestKey(method: string, url: string, requestType?: RequestType): string {
+    return `${method}:${requestType || this.defaultRequestType}:${url}`;
+  }
+
+  /**
+   * Unified execution method - single source of truth for all requests
+   */
+  private async executeUnifiedRequest<T>(
+    url: string,
+    setupResult: { options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }
+  ): Promise<ApiResult<T>> {
+    try {
+      const response = await this.fetchWithCache(
+        url,
+        setupResult.options,
+        setupResult.cacheKey,
+        setupResult.ttl,
+        setupResult.target
+      );
+
+      // Check if response is successful
+      if (!response.ok) {
+        // Try to parse error response from API
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        let errorCode = 'HTTP_ERROR';
+        
+        try {
+          const errorData = await response.json();
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+          if (errorData.error) {
+            errorCode = errorData.error;
+          }
+        } catch (parseError) {
+          // If we can't parse JSON, use default message
+          console.warn('[FlexibleApiSingleton] Could not parse error response:', parseError);
+        }
+        
+        return {
+          success: false,
+          error: {
+            status: response.status,
+            message: errorMessage,
+            code: errorCode
+          }
+        } as ApiResult<T>;
+      }
+
+      const data = await response.json();
+      
+      return {
+        success: true,
+        data: data
+      } as ApiResult<T>;
+    } catch (error) {
+      console.error(`[FlexibleApiSingleton] Request failed:`, error);
+      this.errors++;
+      
+      return {
+        success: false,
+        error: {
+          status: 500,
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'REQUEST_ERROR'
+        }
+      } as ApiResult<T>;
+    }
+  }
+
+  // ====================
+  // ERROR HANDLING UTILITIES
+  // ====================
+
+  /**
+   * Helper function to log errors without triggering Next.js error overlay
+   * Uses warn for expected HTTP errors (4xx) and error for unexpected issues (5xx, network, etc.)
+   */
+  protected logError(context: string, error: any): void {
+    // Handle both structured error objects and raw errors
+    const status = error?.status || error?.response?.status;
+    const message = error?.message || error?.error || error?.toString();
+    
+    if (status >= 400 && status < 500) {
+      // Expected client errors - use warn to avoid error overlay
+      console.warn(`[${this.constructor.name}] ${context} (HTTP ${status}):`, message);
+    } else {
+      // Unexpected server errors, network issues, etc. - use error
+      console.error(`[${this.constructor.name}] ${context}:`, error);
+    }
+  }
+
+  /**
+   * Create a user-friendly response object that includes error information
+   * Instead of returning null, services can return this for better UX
+   */
+  protected createResponse<T>(
+    success: boolean,
+    data?: T,
+    error?: any,
+    userMessage?: string
+  ): {
+    success: boolean;
+    data?: T;
+    error?: {
+      code: string;
+      message: string;
+      status?: number;
+    };
+    userMessage?: string;
+  } {
+    return {
+      success,
+      data,
+      error: error ? {
+        code: error.code || 'UNKNOWN_ERROR',
+        message: error.message || 'An error occurred',
+        status: error.status
+      } : undefined,
+      userMessage: userMessage || (error?.message) || undefined
+    };
+  }
+
+  // ====================
+  // REQUEST SETUP METHODS
+  // ====================
+
+  /**
+   * Setup options for public requests
+   */
+  private async setupPublicRequestOptions<T>(
+    url: string, 
+    options: RequestInit, 
+    cacheKey?: string, 
+    ttl?: number
+  ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
+    const modifiedOptions = await this.onPublicRequest<T>(url, options, cacheKey, ttl);
+    return {
+      options: {
+        ...modifiedOptions,
+        headers: {
+          'Content-Type': 'application/json',
+          ...modifiedOptions.headers,
+        },
+      },
+      cacheKey,
+      ttl: ttl || this.cacheTTL,
+      target: this.defaultRequestTarget
+    };
+  }
+
+  /**
+   * Setup options for authenticated requests
+   */
+  private async setupAuthenticatedRequestOptions<T>(
+    url: string, 
+    options: RequestInit, 
+    cacheKey?: string, 
+    ttl?: number
+  ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
+    const modifiedOptions = await this.onAuthenticatedRequest<T>(url, options, cacheKey, ttl);
+    return {
+      options: {
+        ...modifiedOptions,
+        headers: {
+          'Content-Type': 'application/json',
+          ...modifiedOptions.headers,
+        },
+      },
+      cacheKey,
+      ttl: ttl || this.cacheTTL,
+      target: this.defaultRequestTarget
+    };
+  }
+
+  /**
+   * Setup options for tenant requests
+   */
+  private async setupTenantRequestOptions<T>(
+    url: string, 
+    options: RequestInit, 
+    requestOptions?: TenantRequestOptions
+  ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
+    const modifiedOptions = await this.onTenantRequest<T>(url, options, requestOptions);
+    return {
+      options: {
+        ...modifiedOptions,
+        headers: {
+          'Content-Type': 'application/json',
+          ...modifiedOptions.headers,
+        },
+      },
+      cacheKey: requestOptions?.cacheKey,
+      ttl: requestOptions?.ttl || this.cacheTTL,
+      target: requestOptions?.requestTarget || this.defaultRequestTarget
+    };
+  }
+
+  /**
+   * Setup options for admin requests
+   */
+  private async setupAdminRequestOptions<T>(
+    url: string, 
+    options: RequestInit, 
+    requestOptions?: AdminRequestOptions
+  ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
+    const modifiedOptions = await this.onAdminRequest<T>(url, options, requestOptions);
+    return {
+      options: {
+        ...modifiedOptions,
+        headers: {
+          'Content-Type': 'application/json',
+          ...modifiedOptions.headers,
+        },
+      },
+      cacheKey: requestOptions?.cacheKey,
+      ttl: requestOptions?.ttl || this.cacheTTL,
+      target: requestOptions?.requestTarget || this.defaultRequestTarget
+    };
+  }
+
+  /**
+   * Setup options for system requests
+   */
+  private async setupSystemRequestOptions<T>(
+    url: string, 
+    options: RequestInit, 
+    requestOptions?: SystemRequestOptions
+  ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
+    const modifiedOptions = await this.onSystemRequest<T>(url, options, requestOptions);
+    return {
+      options: {
+        ...modifiedOptions,
+        headers: {
+          'Content-Type': 'application/json',
+          ...modifiedOptions.headers,
+        },
+      },
+      cacheKey: requestOptions?.cacheKey,
+      ttl: requestOptions?.ttl || this.cacheTTL,
+      target: requestOptions?.requestTarget || this.defaultRequestTarget
+    };
+  }
+
+  // ====================
+  // REQUEST TYPE METHODS
+  // ====================
+
+  /**
+   * Public request method
    */
   protected async makePublicRequest<T>(
     url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    ttl?: number
+    options?: RequestInit,
+    requestOptions?: PublicRequestOptions
   ): Promise<PublicApiResponse<T>> {
-    const startTime = Date.now();
-    const effectiveTTL = ttl || this.cacheTTL;
-
-    try {
-      // Public request implementation
-      const response = await this.fetchWithCache(
-        url,
-        {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            ...options.headers,
-          },
-        },
-        cacheKey,
-        effectiveTTL
-      );
-
-      return await response.json() as PublicApiResponse<T>;
-    } catch (error) {
-      console.error(`[FlexibleApiSingleton] Public request failed:`, error);
-      throw error;
+    const requestKey = this.getRequestKey('makePublicRequest', url, RequestType.PUBLIC);
+    
+    // Delegate to setup method
+    const setupResult = await this.setupPublicRequestOptions<T>(
+      url, 
+      options || {}, 
+      requestOptions?.cacheKey, 
+      requestOptions?.ttl
+    );
+    
+    // Override target if provided in requestOptions
+    if (requestOptions?.requestTarget) {
+      setupResult.target = requestOptions.requestTarget;
     }
+    
+    // Delegate to unified execution
+    const result = await this.executeUnifiedRequest<T>(url, setupResult);
+    
+    // Convert to PublicApiResponse format
+    return result as PublicApiResponse<T>;
   }
 
-  // ====================
-  // AUTHENTICATED REQUEST METHOD
-  // ====================
-
   /**
-   * Make authenticated API request (user-level)
+   * Authenticated request method
    */
   protected async makeAuthenticatedRequest<T>(
     url: string,
-    options: RequestInit = {},
+    options?: RequestInit,
     cacheKey?: string,
-    ttl?: number
+    ttl?: number,
+    isAdminRequest: boolean = false
   ): Promise<AuthenticatedApiResponse<T>> {
-    const startTime = Date.now();
-    const effectiveTTL = ttl || this.cacheTTL;
-
-    try {
-      // Get auth token
-      const token = await this.getAuthToken();
-      
-      const response = await this.fetchWithCache(
-        url,
-        {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            ...options.headers,
-          },
-        },
-        cacheKey,
-        effectiveTTL
-      );
-
-      return await response.json() as AuthenticatedApiResponse<T>;
-    } catch (error) {
-      console.error(`[FlexibleApiSingleton] Authenticated request failed:`, error);
-      throw error;
-    }
+    const requestKey = this.getRequestKey('makeAuthenticatedRequest', url, RequestType.AUTHENTICATED);
+    
+    // Delegate to setup method
+    const setupResult = await this.setupAuthenticatedRequestOptions<T>(
+      url, 
+      options || {}, 
+      cacheKey, 
+      ttl
+    );
+    
+    // Delegate to unified execution
+    const result = await this.executeUnifiedRequest<T>(url, setupResult);
+    
+    // Convert to AuthenticatedApiResponse format
+    return result as AuthenticatedApiResponse<T>;
   }
 
-  // ====================
-  // TENANT REQUEST METHOD
-  // ====================
-
   /**
-   * Make tenant API request with context validation
+   * Tenant request method
    */
   protected async makeTenantRequest<T>(
     url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    ttl?: number,
-    tenantOptions: TenantRequestOptions = {}
+    options?: RequestInit,
+    requestOptions?: TenantRequestOptions
   ): Promise<TenantApiResponse<T>> {
-    const startTime = Date.now();
-    const effectiveTTL = ttl || this.cacheTTL;
+    const requestKey = this.getRequestKey('makeTenantRequest', url, RequestType.TENANT);
     
-    const {
-      requireTenantContext = true,
-      validateTenantAccess = false,
-      tenantId: overrideTenantId,
-      bypassCache = false
-    } = tenantOptions;
-
-    try {
-      // Tenant context validation
-      const effectiveTenantId = overrideTenantId || this.getCurrentTenantId();
-      
-      if (requireTenantContext && !effectiveTenantId) {
-        throw new Error('Tenant context required but not provided');
-      }
-
-      // Get auth token
-      const token = await this.getAuthToken();
-      
-      const response = await this.fetchWithCache(
-        url,
-        {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            'X-Tenant-ID': effectiveTenantId || '',
-            'X-Request-Context': 'tenant',
-            ...options.headers,
-          },
-        },
-        bypassCache ? undefined : cacheKey,
-        bypassCache ? undefined : effectiveTTL
-      );
-
-      return await response.json() as TenantApiResponse<T>;
-    } catch (error) {
-      console.error(`[FlexibleApiSingleton] Tenant request failed:`, error);
-      throw error;
-    }
+    // Delegate to setup method
+    const setupResult = await this.setupTenantRequestOptions<T>(url, options || {}, requestOptions);
+    
+    // Delegate to unified execution
+    const result = await this.executeUnifiedRequest<T>(url, setupResult);
+    
+    // Convert to TenantApiResponse format
+    return result as TenantApiResponse<T>;
   }
 
-  // ====================
-  // ADMIN REQUEST METHOD
-  // ====================
-
   /**
-   * Make admin API request with admin privileges
+   * Admin request method
    */
   protected async makeAdminRequest<T>(
     url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    ttl?: number,
-    adminOptions: AdminRequestOptions = {}
+    options?: RequestInit,
+    requestOptions?: AdminRequestOptions
   ): Promise<AdminApiResponse<T>> {
-    const startTime = Date.now();
-    const effectiveTTL = ttl || this.cacheTTL;
+    const requestKey = this.getRequestKey('makeAdminRequest', url, RequestType.ADMIN);
     
-    const {
-      requireAdminContext = true,
-      validateAdminAccess = true,
-      bypassCache = false
-    } = adminOptions;
-
-    try {
-      // Admin context validation
-      if (requireAdminContext) {
-        const isAdmin = await this.validateAdminAccess();
-        if (!isAdmin) {
-          throw new Error('Admin context required but user lacks admin privileges');
-        }
-      }
-
-      // Get admin token
-      const token = await this.getAuthToken();
-      
-      const response = await this.fetchWithCache(
-        url,
-        {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            'X-Request-Context': 'admin',
-            'X-Admin-Access': validateAdminAccess ? 'required' : 'optional',
-            ...options.headers,
-          },
-        },
-        bypassCache ? undefined : cacheKey,
-        bypassCache ? undefined : effectiveTTL
-      );
-
-      return await response.json() as AdminApiResponse<T>;
-    } catch (error) {
-      console.error(`[FlexibleApiSingleton] Admin request failed:`, error);
-      throw error;
-    }
+    // Delegate to setup method
+    const setupResult = await this.setupAdminRequestOptions<T>(url, options || {}, requestOptions);
+    
+    // Delegate to unified execution
+    const result = await this.executeUnifiedRequest<T>(url, setupResult);
+    
+    // Convert to AdminApiResponse format
+    return result as AdminApiResponse<T>;
   }
 
-  // ====================
-  // SYSTEM REQUEST METHOD
-  // ====================
-
   /**
-   * Make system API request (background processing)
+   * System request method
    */
   protected async makeSystemRequest<T>(
     url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    ttl?: number,
-    systemOptions: SystemRequestOptions = {}
+    options?: RequestInit,
+    requestOptions?: SystemRequestOptions
   ): Promise<SystemApiResponse<T>> {
-    const startTime = Date.now();
-    const effectiveTTL = ttl || this.cacheTTL;
-    const {
-      requireSystemContext = true,
-      validateSystemAccess = true,
-      systemKey,
-      bypassCache = false
-    } = systemOptions;
-
-    try {
-      // System context validation
-      if (requireSystemContext) {
-        const isValidSystem = await this.validateSystemAccess(systemKey);
-        if (!isValidSystem) {
-          throw new Error('System context required but access denied');
-        }
-      }
-
-      // System request implementation
-      const response = await this.fetchWithCache(
-        url,
-        {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Request-Context': 'system',
-            'X-System-Key': systemKey || '',
-            'X-System-Access': validateSystemAccess ? 'required' : 'optional',
-            ...options.headers,
-          },
-        },
-        bypassCache ? undefined : cacheKey,
-        bypassCache ? undefined : effectiveTTL
-      );
-
-      return await response.json() as SystemApiResponse<T>;
-    } catch (error) {
-      console.error(`[FlexibleApiSingleton] System request failed:`, error);
-      throw error;
-    }
-  }
-
-  // ====================
-  // EXPLICIT TARGET METHODS
-  // ====================
-
-  /**
-   * Make request to API server (port 4000) explicitly
-   */
-  protected async makeApiRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    ttl?: number
-  ): Promise<ApiResult<T>> {
-    // Temporarily override target for this request
-    const originalTarget = this.defaultRequestTarget;
-    this.defaultRequestTarget = RequestTarget.API;
+    const requestKey = this.getRequestKey('makeSystemRequest', url, RequestType.SYSTEM);
     
-    try {
-      return await this.makeDefaultRequest<T>(url, options, cacheKey, ttl);
-    } finally {
-      // Restore original target
-      this.defaultRequestTarget = originalTarget;
-    }
-  }
-
-  /**
-   * Make request to web server (port 3000) explicitly
-   */
-  protected async makeWebRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    ttl?: number
-  ): Promise<ApiResult<T>> {
-    // Temporarily override target for this request
-    const originalTarget = this.defaultRequestTarget;
-    this.defaultRequestTarget = RequestTarget.WEB;
+    // Delegate to setup method
+    const setupResult = await this.setupSystemRequestOptions<T>(url, options || {}, requestOptions);
     
-    try {
-      return await this.makeDefaultRequest<T>(url, options, cacheKey, ttl);
-    } finally {
-      // Restore original target
-      this.defaultRequestTarget = originalTarget;
-    }
-  }
-
-  /**
-   * Make request to external service explicitly
-   */
-  protected async makeExternalRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    ttl?: number
-  ): Promise<ApiResult<T>> {
-    // Temporarily override target for this request
-    const originalTarget = this.defaultRequestTarget;
-    this.defaultRequestTarget = RequestTarget.EXTERNAL;
+    // Delegate to unified execution
+    const result = await this.executeUnifiedRequest<T>(url, setupResult);
     
-    try {
-      return await this.makeDefaultRequest<T>(url, options, cacheKey, ttl);
-    } finally {
-      // Restore original target
-      this.defaultRequestTarget = originalTarget;
-    }
+    // Convert to SystemApiResponse format
+    return result as SystemApiResponse<T>;
   }
 
   /**
-   * Make request with custom target override
-   */
-  protected async makeTargetedRequest<T>(
-    url: string,
-    target: RequestTarget,
-    options: RequestInit = {},
-    cacheKey?: string,
-    ttl?: number
-  ): Promise<ApiResult<T>> {
-    // Temporarily override target for this request
-    const originalTarget = this.defaultRequestTarget;
-    this.defaultRequestTarget = target;
-    
-    try {
-      return await this.makeDefaultRequest<T>(url, options, cacheKey, ttl);
-    } finally {
-      // Restore original target
-      this.defaultRequestTarget = originalTarget;
-    }
-  }
-
-  /**
-   * Make request with custom type AND target override
-   * Perfect for cross-type, cross-target scenarios
-   */
-  protected async makeHybridRequest<T>(
-    url: string,
-    type: RequestType,
-    target: RequestTarget,
-    options: RequestInit = {},
-    cacheKey?: string,
-    ttl?: number,
-    requestOptions?: any
-  ): Promise<ApiResult<T>> {
-    // Temporarily override both type and target
-    const originalType = this.defaultRequestType;
-    const originalTarget = this.defaultRequestTarget;
-    this.defaultRequestType = type;
-    this.defaultRequestTarget = target;
-    
-    try {
-      switch (type) {
-        case RequestType.PUBLIC:
-          return await this.makePublicRequest<T>(url, options, cacheKey, ttl);
-        case RequestType.AUTHENTICATED:
-          return await this.makeAuthenticatedRequest<T>(url, options, cacheKey, ttl);
-        case RequestType.TENANT:
-          return await this.makeTenantRequest<T>(url, options, cacheKey, ttl, requestOptions);
-        case RequestType.ADMIN:
-          return await this.makeAdminRequest<T>(url, options, cacheKey, ttl, requestOptions);
-        case RequestType.SYSTEM:
-          return await this.makeSystemRequest<T>(url, options, cacheKey, ttl, requestOptions);
-        default:
-          throw new Error(`Unsupported request type: ${type}`);
-      }
-    } finally {
-      // Restore original type and target
-      this.defaultRequestType = originalType;
-      this.defaultRequestTarget = originalTarget;
-    }
-  }
-
-  // ====================
-  // CONVENIENCE HYBRID METHODS
-  // ====================
-
-  /**
-   * Make PUBLIC request to WEB server
-   */
-  protected async makePublicWebRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    ttl?: number
-  ): Promise<ApiResult<T>> {
-    return this.makeHybridRequest<T>(url, RequestType.PUBLIC, RequestTarget.WEB, options, cacheKey, ttl);
-  }
-
-  /**
-   * Make AUTHENTICATED request to WEB server
-   */
-  protected async makeAuthWebRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    ttl?: number
-  ): Promise<ApiResult<T>> {
-    return this.makeHybridRequest<T>(url, RequestType.AUTHENTICATED, RequestTarget.WEB, options, cacheKey, ttl);
-  }
-
-  /**
-   * Make PUBLIC request to API server
-   */
-  protected async makePublicApiRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    ttl?: number
-  ): Promise<ApiResult<T>> {
-    return this.makeHybridRequest<T>(url, RequestType.PUBLIC, RequestTarget.API, options, cacheKey, ttl);
-  }
-
-  /**
-   * Make TENANT request to WEB server
-   */
-  protected async makeTenantWebRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    ttl?: number,
-    requestOptions?: any
-  ): Promise<ApiResult<T>> {
-    return this.makeHybridRequest<T>(url, RequestType.TENANT, RequestTarget.WEB, options, cacheKey, ttl, requestOptions);
-  }
-
-  // ====================
-  // DEFAULT REQUEST METHOD
-  // ====================
-
-  /**
-   * Make request using service's default method
-   * Can be overridden for specific operations
+   * Default request method with delegation pattern
    */
   protected async makeDefaultRequest<T>(
     url: string,
-    options: RequestInit = {},
+    options?: RequestInit,
     cacheKey?: string,
     ttl?: number,
-    requestOptions?: any
+    requestOptions?: RequestOptions
   ): Promise<ApiResult<T>> {
-    switch (this.defaultRequestType) {
+    const requestType = requestOptions?.requestType || this.defaultRequestType;
+    const requestTarget = requestOptions?.requestTarget || this.defaultRequestTarget;
+
+    console.log(`[FlexibleApiSingleton] --------------------------  `);
+    console.log(`[FlexibleApiSingleton] effective url           :  ${url}`);
+    console.log(`[FlexibleApiSingleton] effective cacheKey      :  ${cacheKey}`);
+    console.log(`[FlexibleApiSingleton] effective requestType   :  ${requestType}`);
+    console.log(`[FlexibleApiSingleton] effective requestTarget :  ${requestTarget}`);
+    
+    let setupResult: { options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget };
+    
+    // Delegate to appropriate setup method based on request type
+    switch (requestType) {
       case RequestType.PUBLIC:
-        return await this.makePublicRequest<T>(url, options, cacheKey, ttl);
+        setupResult = await this.setupPublicRequestOptions<T>(url, options || {}, cacheKey, ttl);
+        break;
       case RequestType.AUTHENTICATED:
-        return await this.makeAuthenticatedRequest<T>(url, options, cacheKey, ttl);
+        setupResult = await this.setupAuthenticatedRequestOptions<T>(url, options || {}, cacheKey, ttl);
+        break;
       case RequestType.TENANT:
-        return await this.makeTenantRequest<T>(url, options, cacheKey, ttl, requestOptions);
+        const tenantOptions = { cacheKey, ttl, requestTarget } as TenantRequestOptions;
+        setupResult = await this.setupTenantRequestOptions<T>(url, options || {}, tenantOptions);
+        break;
       case RequestType.ADMIN:
-        return await this.makeAdminRequest<T>(url, options, cacheKey, ttl, requestOptions);
+        const adminOptions = { cacheKey, ttl, requestTarget } as AdminRequestOptions;
+        setupResult = await this.setupAdminRequestOptions<T>(url, options || {}, adminOptions);
+        break;
       case RequestType.SYSTEM:
-        return await this.makeSystemRequest<T>(url, options, cacheKey, ttl, requestOptions);
+        const systemOptions = { cacheKey, ttl, requestTarget } as SystemRequestOptions;
+        setupResult = await this.setupSystemRequestOptions<T>(url, options || {}, systemOptions);
+        break;
       default:
-        throw new Error(`Unsupported default request type: ${this.defaultRequestType}`);
+        throw new Error(`Unsupported request type: ${requestType}`);
     }
+    
+    // Apply target override if provided
+    if (requestTarget && requestTarget !== setupResult.target) {
+      setupResult.target = requestTarget;
+    }
+    
+    // Delegate to unified execution - single source of truth
+    return await this.executeUnifiedRequest<T>(url, setupResult);
   }
 
   // ====================
-  // HELPER METHODS
+  // HOOK METHODS FOR CUSTOMIZATION
   // ====================
 
-  protected async getAuthToken(): Promise<string> {
-    // Implementation would get auth token from storage or refresh
-    return localStorage.getItem('authToken') || '';
-  }
-
-  private getCurrentTenantId(): string | undefined {
-    // Implementation would get current tenant context
-    return localStorage.getItem('currentTenantId') || undefined;
-  }
-
-  private async validateAdminAccess(): Promise<boolean> {
-    // Implementation would validate admin privileges
-    const token = await this.getAuthToken();
-    // Would decode token or make validation call
-    return true; // Simplified for example
-  }
-
   /**
-   * Get current user information
-   * Available to all derived classes for user context validation
+   * Override hook for subclasses to customize public request behavior
    */
-  protected async getCurrentUser(): Promise<any> {
-    try {
-      // This would typically get user info from auth context or decode token
-      // For now, return a placeholder that concrete classes can override
-      const token = await this.getAuthToken();
-      if (!token) {
-        return null;
-      }
-
-      // Decode JWT payload (simplified)
-      const payload = this.decodeJWT(token);
-      return payload;
-
-    } catch (error) {
-      console.error('Failed to get current user:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Decode JWT token (simplified implementation)
-   */
-  private decodeJWT(token: string): any {
-    try {
-      const parts = token.split('.');
-      if (parts.length !== 3) {
-        throw new Error('Invalid JWT format');
-      }
-      
-      const payload = JSON.parse(atob(parts[1]));
-      return payload;
-    } catch (error) {
-      console.error('Failed to decode JWT:', error);
-      return null;
-    }
-  }
-
-  private async validateSystemAccess(systemKey?: string): Promise<boolean> {
-    // Implementation would validate system access
-    if (systemKey) {
-      // Validate system key against stored/system keys
-      return systemKey === process.env.SYSTEM_API_KEY || systemKey === localStorage.getItem('systemKey');
-    }
-    // Fallback to other system validation methods
-    return true; // Simplified for example
-  }
-
-  private async fetchWithCache(
+  protected async onPublicRequest<T>(
     url: string,
     options: RequestInit,
     cacheKey?: string,
     ttl?: number
+  ): Promise<RequestInit> {
+    return options;
+  }
+
+  /**
+   * Override hook for subclasses to customize authenticated request behavior
+   */
+  protected async onAuthenticatedRequest<T>(
+    url: string,
+    options: RequestInit,
+    cacheKey?: string,
+    ttl?: number,
+    isAdminRequest?: boolean
+  ): Promise<RequestInit> {
+    return options;
+  }
+
+  /**
+   * Override hook for subclasses to customize tenant request behavior
+   */
+  protected async onTenantRequest<T>(
+    url: string,
+    options: RequestInit,
+    requestOptions?: TenantRequestOptions
+  ): Promise<RequestInit> {
+    return options;
+  }
+
+  /**
+   * Override hook for subclasses to customize admin request behavior
+   */
+  protected async onAdminRequest<T>(
+    url: string,
+    options: RequestInit,
+    requestOptions?: AdminRequestOptions
+  ): Promise<RequestInit> {
+    return options;
+  }
+
+  /**
+   * Override hook for subclasses to customize system request behavior
+   */
+  protected async onSystemRequest<T>(
+    url: string,
+    options: RequestInit,
+    requestOptions?: SystemRequestOptions
+  ): Promise<RequestInit> {
+    return options;
+  }
+
+  // ====================
+  // UTILITY METHODS
+  // ====================
+
+  /**
+   * Fetch with cache - delegated to base class caching system
+   */
+  protected async fetchWithCache(
+    url: string,
+    options: RequestInit,
+    cacheKey?: string,
+    ttl?: number,
+    requestTarget?: RequestTarget
   ): Promise<Response> {
-    // Construct full URL based on defaultRequestTarget
+    // Construct full URL based on requestTarget parameter
     let fullUrl: string;
+    
+    // Use provided requestTarget or fall back to default
+    const target = requestTarget || this.defaultRequestTarget;
     
     if (url.startsWith('http')) {
       // Already absolute URL
       fullUrl = url;
     } else {
       // Build URL based on target
-      switch (this.defaultRequestTarget) {
+      switch (target) {
         case RequestTarget.API:
           const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
           fullUrl = `${apiUrl}${url}`;
@@ -669,7 +642,155 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
       }
     }
     
-    // Implementation would use cache manager
-    return fetch(fullUrl, options);
+    // Check cache first (delegated to base class)
+    if (cacheKey) {
+      const cachedResponse = await this.getFromCache<string>(cacheKey);
+      if (cachedResponse) {
+        // Return cached response as a Response object
+        return new Response(cachedResponse, {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    
+    // Increment API calls counter
+    this.apiCalls++;
+    
+    // Fetch from network
+    const response = await fetch(fullUrl, options);
+    
+    // Auto-invalidate cache for non-GET requests
+    const method = (options.method || 'GET').toUpperCase();
+    if (method !== 'GET' && cacheKey) {
+      await this.clearCache(cacheKey);
+    }
+    
+    // Cache successful responses (delegated to base class)
+    if (response.ok && cacheKey) {
+      const responseText = await response.text();
+      await this.setCache(cacheKey, responseText, { useAutoUser: true });
+      
+      // Return new Response from cached text
+      return new Response(responseText, {
+        status: response.status,
+        headers: response.headers
+      });
+    }
+    
+    return response;
+  }
+
+  // ====================
+  // AUTHENTICATION & VALIDATION METHODS
+  // ====================
+
+  /**
+   * Get authentication token
+   */
+  protected async getAuthToken(): Promise<string | null> {
+    try {
+      // Check multiple sources for auth token
+      const token = localStorage.getItem('access_token') || 
+                   sessionStorage.getItem('access_token') ||
+                   document.cookie.split(';').find(c => c.trim().startsWith('access_token='))?.split('=')[1];
+      
+      if (!token) {
+        return null;
+      }
+      
+      // Validate token format (basic JWT validation)
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        console.warn('[FlexibleApiSingleton] Invalid token format');
+        return null;
+      }
+      
+      return token;
+    } catch (error) {
+      console.error('[FlexibleApiSingleton] Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get current tenant ID
+   */
+  protected async getCurrentTenantId(): Promise<string | null> {
+    try {
+      // Check multiple sources for tenant ID
+      const tenantId = localStorage.getItem('currentTenantId') || 
+                      sessionStorage.getItem('currentTenantId') ||
+                      document.cookie.split(';').find(c => c.trim().startsWith('tenantId='))?.split('=')[1];
+      
+      return tenantId || null;
+    } catch (error) {
+      console.error('[FlexibleApiSingleton] Error getting tenant ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Validate admin access
+   */
+  protected async validateAdminAccess(): Promise<boolean> {
+    try {
+      const token = await this.getAuthToken();
+      if (!token) {
+        return false;
+      }
+      
+      // Decode JWT to check admin role
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.role === 'admin' || payload.isAdmin === true;
+    } catch (error) {
+      console.error('[FlexibleApiSingleton] Error validating admin access:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Validate system access
+   */
+  protected async validateSystemAccess(systemKey?: string): Promise<boolean> {
+    try {
+      // Check system key if provided
+      if (systemKey) {
+        return systemKey === process.env.SYSTEM_API_KEY || 
+               systemKey === localStorage.getItem('systemKey');
+      }
+      
+      // Check if current user has system access
+      const token = await this.getAuthToken();
+      if (!token) {
+        return false;
+      }
+      
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.role === 'system' || payload.hasSystemAccess === true;
+    } catch (error) {
+      console.error('[FlexibleApiSingleton] Error validating system access:', error);
+      return false;
+    }
+  }
+
+  // ====================
+  // LEGACY COMPATIBILITY METHODS
+  // ====================
+
+  /**
+   * Legacy method for backward compatibility
+   * @deprecated Use makeDefaultRequest instead
+   */
+  protected async makeApiRequest<T>(
+    url: string,
+    options?: RequestInit,
+    cacheKey?: string,
+    ttl?: number
+  ): Promise<ApiResult<T>> {
+    return this.makeDefaultRequest<T>(url, options, cacheKey, ttl, {
+      requestType: this.defaultRequestType,
+      requestTarget: this.defaultRequestTarget
+    });
   }
 }

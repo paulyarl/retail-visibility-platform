@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface TenantSlugResponse {
   slug: string;
@@ -48,7 +48,7 @@ export interface TenantDirectoryListing {
   publishedAt?: string;
 }
 
-class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
+class TenantDirectorySingletonService extends PublicApiSingleton {
   private static instance: TenantDirectorySingletonService;
 
   private constructor() {
@@ -90,7 +90,7 @@ class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const result = await this.makeAuthenticatedRequest<TenantSlugResponse>(
+        const result = await super.makeDefaultRequest<TenantSlugResponse>(
           `/api/directory/tenant/${tenantId}`,
           {},
           `tenant-slug-${tenantId}`
@@ -197,7 +197,7 @@ class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
         return null;
       }
 
-      const result = await this.makeAuthenticatedRequest<TenantDirectoryListing>(
+      const result = await super.makeDefaultRequest<TenantDirectoryListing>(
         `/api/tenants/${tenantId}/directory/listing`,
         {},
         `directory-listing-${tenantId}`
@@ -221,7 +221,7 @@ class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
         return null;
       }
 
-      const result = await this.makeAuthenticatedRequest<TenantDirectoryListing>(
+      const result = await super.makeDefaultRequest<TenantDirectoryListing>(
         `/api/tenants/${tenantId}/directory/listing`,
         {
           method: 'POST',
@@ -251,7 +251,7 @@ class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
         return null;
       }
 
-      const result = await this.makeAuthenticatedRequest<TenantDirectoryListing>(
+      const result = await super.makeDefaultRequest<TenantDirectoryListing>(
         `/api/tenants/${tenantId}/directory/listing`,
         {
           method: 'PUT',
@@ -281,7 +281,7 @@ class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
         return null;
       }
 
-      const result = await this.makeAuthenticatedRequest<TenantDirectoryListing>(
+      const result = await super.makeDefaultRequest<TenantDirectoryListing>(
         `/api/tenants/${tenantId}/directory/listing`,
         {
           method: 'PATCH',
@@ -311,7 +311,7 @@ class TenantDirectorySingletonService extends AuthenticatedApiSingleton {
         return false;
       }
 
-      const result = await this.makeAuthenticatedRequest<any>(
+      const result = await super.makeDefaultRequest<any>(
         `/api/tenants/${tenantId}/directory/listing`,
         {
           method: 'DELETE'

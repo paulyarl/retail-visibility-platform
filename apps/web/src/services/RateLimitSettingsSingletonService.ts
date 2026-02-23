@@ -34,7 +34,7 @@ class RateLimitSettingsSingletonService extends AuthenticatedApiSingleton {
    */
   async getRateLimitSettings(): Promise<RateLimitSettings | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<RateLimitSettings>(
+      const response = await this.makeDefaultRequest<RateLimitSettings>(
         '/api/admin/platform-settings',
         { method: 'GET' },
         'rate_limit_settings'
@@ -57,7 +57,7 @@ class RateLimitSettingsSingletonService extends AuthenticatedApiSingleton {
    */
   async updateRateLimitSettings(settings: Partial<RateLimitSettings>): Promise<RateLimitSettings | null> {
     try {
-      const response = await this.makeAuthenticatedRequest<RateLimitSettings>(
+      const response = await this.makeDefaultRequest<RateLimitSettings>(
         '/api/admin/platform-settings',
         {
           method: 'PUT',

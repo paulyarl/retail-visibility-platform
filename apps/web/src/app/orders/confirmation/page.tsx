@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { CheckCircle, ArrowLeft } from 'lucide-react';
 import { customerOrderService } from '@/services/CustomerOrderService';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 
 function OrderConfirmationContent() {
   const searchParams = useSearchParams();
@@ -38,12 +38,12 @@ function OrderConfirmationContent() {
       // Fetch tenant information if we have the tenant_id
       if (payment?.tenant_id) {
         console.log('Fetching tenant info for:', payment.tenant_id);
-        const tenantData = await tenantInfoService.getTenantInfo(payment.tenant_id);
+        const tenantData = await publicTenantInfoService.getTenantInfo(payment.tenant_id);
         console.log('Tenant data received:', tenantData);
         setTenantInfo(tenantData);
         
         // Also fetch business profile for complete branding info
-        const profileData = await tenantInfoService.getBusinessProfile(payment.tenant_id);
+        const profileData = await publicTenantInfoService.getBusinessProfile(payment.tenant_id);
         console.log('Business profile data received:', profileData);
         
         // Merge business profile data with tenant info

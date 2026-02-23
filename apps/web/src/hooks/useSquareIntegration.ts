@@ -64,7 +64,12 @@ export function useSquareIntegration(tenantId: string): UseSquareIntegrationResu
         throw new Error('Failed to fetch integration status');
       }
       
-      setData(responseData);
+      if (responseData.success && responseData.data) {
+        setData(responseData.data);
+      } else {
+        setData(null);
+        setError(responseData?.userMessage || 'Failed to load Square status');
+      }
     } catch (err: any) {
       console.error('Failed to fetch Square status:', err);
       setError(err.message);

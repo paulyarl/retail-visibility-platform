@@ -5,7 +5,7 @@
  * Handles TTL, size limits, encryption, and graceful degradation.
  */
 
-import { CacheEncryption } from '@/lib/cache/cache-encryption';
+import { CacheEncryption } from '../lib/cache/cache-encryption';
 import { resolveCacheOptions, AutoUserCacheOptions } from './userIdentification';
 
 interface CacheEntry<T> {
@@ -178,29 +178,6 @@ class CacheManager {
     }
   }
 
-  private async cleanupIndexedDB(): Promise<void> {
-    if (!this.db || !this.indexedDBSupported) return;
-
-    try {
-      const transaction = this.db!.transaction([this.storeName], 'readwrite');
-      const store = transaction.objectStore(this.storeName);
-      const request = store.openCursor();
-
-      request.onsuccess = (event) => {
-        const cursor = (event.target as IDBRequest).result;
-        if (cursor) {
-          const entry = cursor.value as CacheEntry<any>;
-          if (Date.now() - entry.timestamp >= entry.ttl) {
-            cursor.delete();
-          }
-          cursor.continue();
-        }
-      };
-    } catch (error) {
-      console.warn('[CacheManager] IndexedDB cleanup failed:', error);
-    }
-  }
-
   private getFromLocalStorage<T>(key: string): CacheEntry<T> | null {
     if (!this.localStorageSupported) return null;
 
@@ -247,19 +224,34 @@ class CacheManager {
 
   private cleanupMemory(): void {
     const now = Date.now();
-    for (const [key, entry] of this.memoryCache.entries()) {
+    for (const [key, entry] of Array.from(this.memoryCache.entries())) {
       if (now - entry.timestamp >= entry.ttl) {
         this.memoryCache.delete(key);
       }
     }
+  }
 
-    // Remove oldest entries if over size limit
-    if (this.memoryCache.size > this.maxSize) {
-      const entries = Array.from(this.memoryCache.entries())
-        .sort((a, b) => a[1].timestamp - b[1].timestamp);
+  private async cleanupIndexedDB(): Promise<void> {
+    if (!this.db || !this.indexedDBSupported) return;
+
+    try {
+      const transaction = this.db!.transaction([this.storeName], 'readwrite');
+      const store = transaction.objectStore(this.storeName);
+      const request = store.openCursor();
       
-      const toRemove = entries.slice(0, this.memoryCache.size - this.maxSize);
-      toRemove.forEach(([key]) => this.memoryCache.delete(key));
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (cursor) {
+          const entry = cursor.value;
+          const now = Date.now();
+          if (now - entry.timestamp >= entry.ttl) {
+            cursor.delete();
+          }
+          cursor.continue();
+        }
+      };
+    } catch (error) {
+      console.warn('[CacheManager] IndexedDB cleanup failed:', error);
     }
   }
 
@@ -272,7 +264,7 @@ class CacheManager {
     // Try memory cache first (fastest)
     const memoryEntry = this.memoryCache.get(key);
     if (memoryEntry && Date.now() - memoryEntry.timestamp < memoryEntry.ttl) {
-      console.log('[CacheManager] Memory cache HIT:', key);
+      // console.log('[CacheManager] Memory cache HIT:', key);
       // Decrypt if needed
       return await this.decryptData(memoryEntry.data, memoryEntry.encrypted, userId);
     }
@@ -281,7 +273,7 @@ class CacheManager {
     if (this.indexedDBSupported) {
       const indexedDBEntry = await this.getFromIndexedDB<T>(key);
       if (indexedDBEntry) {
-        console.log('[CacheManager] IndexedDB cache HIT:', key);
+        // console.log('[CacheManager] IndexedDB cache HIT:', key);
         // Cache in memory for faster access
         this.memoryCache.set(key, indexedDBEntry);
         // Decrypt if needed
@@ -292,14 +284,14 @@ class CacheManager {
     // Try localStorage fallback
     const localStorageEntry = this.getFromLocalStorage<T>(key);
     if (localStorageEntry) {
-      console.log('[CacheManager] localStorage cache HIT:', key);
+      // console.log('[CacheManager] localStorage cache HIT:', key);
       // Cache in memory for faster access
       this.memoryCache.set(key, localStorageEntry);
       // Decrypt if needed
       return await this.decryptData(localStorageEntry.data, localStorageEntry.encrypted, userId);
     }
 
-    console.log('[CacheManager] Cache MISS:', key);
+    // console.log('[CacheManager] Cache MISS:', key);
     return null;
   }
 
@@ -352,14 +344,14 @@ class CacheManager {
           request.onerror = () => reject(request.error);
           request.onsuccess = () => resolve();
         });
-        console.log('[CacheManager] Removed from IndexedDB:', key);
+        // console.log('[CacheManager] Removed from IndexedDB:', key);
       } catch (error) {
         console.warn('[CacheManager] IndexedDB remove failed:', error);
       }
     }
 
     this.removeFromLocalStorage(key);
-    console.log('[CacheManager] Removed from all storage:', key);
+    // console.log('[CacheManager] Removed from all storage:', key);
   }
 
   async clear(): Promise<void> {
@@ -377,7 +369,7 @@ class CacheManager {
           request.onerror = () => reject(request.error);
           request.onsuccess = () => resolve();
         });
-        console.log('[CacheManager] Cleared IndexedDB');
+        // console.log('[CacheManager] Cleared IndexedDB');
       } catch (error) {
         console.warn('[CacheManager] IndexedDB clear failed:', error);
       }
@@ -393,13 +385,13 @@ class CacheManager {
             localStorage.removeItem(key);
           }
         });
-        console.log('[CacheManager] Cleared localStorage');
+        // console.log('[CacheManager] Cleared localStorage');
       } catch (error) {
         console.warn('[CacheManager] localStorage clear failed:', error);
       }
     }
 
-    console.log('[CacheManager] Cleared all storage');
+    // console.log('[CacheManager] Cleared all storage');
   }
 
   getStats(): {

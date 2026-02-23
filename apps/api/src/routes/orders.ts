@@ -59,7 +59,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     });
 
     if (!tenant) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
         error: 'tenant_not_found',
         message: 'Tenant not found',
@@ -357,7 +357,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
     });
 
     if (!order) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
         error: 'order_not_found',
         message: 'Order not found',
@@ -395,7 +395,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response) => {
     });
 
     if (!currentOrder) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
         error: 'order_not_found',
         message: 'Order not found',

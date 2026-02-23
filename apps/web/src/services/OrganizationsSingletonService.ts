@@ -48,7 +48,7 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
    * Uses the /organizations endpoint
    */
   async getOrganizations(page: number = 1, limit: number = 50): Promise<Organization[]> {
-    const result = await this.makeAuthenticatedRequest<Organization[]>(
+    const result = await this.makeDefaultRequest<Organization[]>(
       `/api/organizations?page=${page}&limit=${limit}`,
       {},
       `organizations-${page}-${limit}`
@@ -72,7 +72,7 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    const result = await this.makeAuthenticatedRequest<Organization>(
+    const result = await this.makeDefaultRequest<Organization>(
       `/api/organizations/${id}`,
       {},
       `organization-${id}`
@@ -96,7 +96,7 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    const result = await this.makeAuthenticatedRequest<Organization>(
+    const result = await this.makeDefaultRequest<Organization>(
       `/api/organizations/slug/${slug}`,
       {},
       `organization-slug-${slug}`
@@ -120,7 +120,7 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
       return [];
     }
 
-    const result = await this.makeAuthenticatedRequest<OrganizationsResponse>(
+    const result = await this.makeDefaultRequest<OrganizationsResponse>(
       `/api/organizations/search?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
       {},
       `organizations-search-${query}-${page}-${limit}`
@@ -144,7 +144,7 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/organizations/${organizationId}/hero-location`,
       {
         method: 'PUT',
@@ -187,7 +187,7 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       '/api/categories/mirror',
       {
         method: 'POST',
@@ -214,7 +214,7 @@ class OrganizationsSingletonService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/organizations/${organizationId}/sync-from-hero`,
       {
         method: 'POST',

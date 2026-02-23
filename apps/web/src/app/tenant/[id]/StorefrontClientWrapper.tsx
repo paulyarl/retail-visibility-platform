@@ -17,6 +17,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Pagination } from '@/components/ui';
 import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
+import { useStoreContactData } from '@/hooks/useStoreContactData';
 
 interface StorefrontClientWrapperProps {
   tenantId: string;
@@ -24,7 +25,6 @@ interface StorefrontClientWrapperProps {
   platformSettings: any;
   mapLocation: any;
   hasBranding: boolean;
-  businessHours: any;
   storeStatus: any;
   categories: any[];
   productCategories: any[];
@@ -50,7 +50,6 @@ interface StorefrontClientWrapperProps {
   currentPage?: number;
   totalPages?: number;
   totalItems?: number;
-  directoryData?: any;
 }
 
 export default function StorefrontClientWrapper({
@@ -59,7 +58,6 @@ export default function StorefrontClientWrapper({
   platformSettings,
   mapLocation,
   hasBranding,
-  businessHours,
   storeStatus,
   categories,
   productCategories,
@@ -85,10 +83,11 @@ export default function StorefrontClientWrapper({
   currentPage = 1,
   totalPages = 1,
   totalItems = 0,
-  directoryData,
 }: StorefrontClientWrapperProps) {
-  // Debug: Log directory data for contact info troubleshooting
-  console.log('[StorefrontClientWrapper] Directory data:', directoryData);
+  // Simple hook for contact data (shared with directory page)
+  const contactData = useStoreContactData({ tenantId });
+  
+  console.log('[StorefrontClientWrapper] Contact data:', contactData.listing);
   console.log('[StorefrontClientWrapper] Tenant metadata phone:', tenant.metadata?.phone);
   console.log('[StorefrontClientWrapper] Tenant metadata email:', tenant.metadata?.email);
   
@@ -574,23 +573,26 @@ export default function StorefrontClientWrapper({
       {/* Contact Information - Prominent Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div id="contact-section" className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-          <ContactInformationCollapsible tenant={tenant} />
+          <ContactInformationCollapsible 
+            tenant={tenant} 
+            contactData={contactData.listing || undefined}
+          />
         </div>
       </div>
 
       {/* Business Hours */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div id="hours-section" className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-          <BusinessHoursCollapsible businessHours={businessHours} />
+          <BusinessHoursCollapsible businessHours={contactData.listing?.businessHours} />
         </div>
       </div>
 
       {/* Map Section - How to Get There */}
-      {tenant.metadata?.address && (
+      {contactData.listing && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
             <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-6">Find Us</h2>
-            <GoogleMapEmbed address={tenant.metadata.address} height="h-64 sm:h-80" />
+            <GoogleMapEmbed address={contactData.listing.address} height="h-64 sm:h-80" />
           </div>
         </div>
       )}

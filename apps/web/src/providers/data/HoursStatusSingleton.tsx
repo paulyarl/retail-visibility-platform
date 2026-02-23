@@ -1,4 +1,5 @@
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { PublicApiSingleton } from '../base/PublicApiSingleton';
+import { SingletonCacheOptions } from '../base/FlexibleApiSingleton';
 import { hoursStatusService } from '@/services/HoursStatusService';
 
 // TypeScript interfaces for hours status
@@ -16,7 +17,7 @@ export interface HoursStatusData {
  * Hours Status Singleton - Manages business hours status for all stores
  * Now extends UniversalSingleton for unified caching and metrics
  */
-class HoursStatusSingleton extends UniversalSingleton {
+class HoursStatusSingleton extends PublicApiSingleton {
   private static instance: HoursStatusSingleton;
   
   // Hours status cache
@@ -36,26 +37,7 @@ class HoursStatusSingleton extends UniversalSingleton {
   // ====================
   // API METHODS
   // ====================
-  
-  private async makePublicRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
-    this.apiCalls++;
-    
-    const publicOptions: RequestInit = {
-      ...options,
-      headers: {
-        ...options.headers,
-        'Content-Type': 'application/json',
-      }
-    };
-    
-    const response = await fetch(url, publicOptions);
-    
-    if (!response.ok) {
-      throw new Error(`Public API request failed: ${response.statusText}`);
-    }
-    
-    return response.json();
-  }
+   
   
   private handlePublicError(error: any): void {
     console.error('Public API error:', error);

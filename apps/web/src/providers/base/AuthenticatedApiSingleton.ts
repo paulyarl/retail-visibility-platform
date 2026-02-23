@@ -26,19 +26,45 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
   }
   
   /**
-   * Make authenticated API request with automatic token handling
-   * Uses makeDefaultRequest() for primary authenticated operations
+   * Custom hook for authenticated request behavior
+   * SAFER: Override this hook instead of makeAuthenticatedRequest to prevent recursion
    */
-  protected async makeAuthenticatedRequest<T>(
+  protected async onAuthenticatedRequest<T>(
     url: string,
-    options: RequestInit = {},
+    options: RequestInit,
     cacheKey?: string,
-    customTTL?: number,
-    handle404: boolean = true,
+    ttl?: number,
     isAdminRequest: boolean = false
-  ): Promise<ApiResult<T>> {
-    // Use makeDefaultRequest() which routes to makeAuthenticatedRequest
-    return this.makeDefaultRequest<T>(url, options, cacheKey, customTTL, handle404);
+  ): Promise<RequestInit> {
+    // Add authentication-specific headers and validation
+    const modifiedOptions = { ...options };
+
+    // Add Authorization header with bearer token
+    const token = await this.getAuthToken();
+    if (token) {
+      modifiedOptions.headers = {
+        ...modifiedOptions.headers,
+        'Authorization': `Bearer ${token}`,
+      };
+    } else {
+      console.warn('[AuthenticatedApiSingleton] No auth token available for request');
+    }
+
+    // Add admin-specific headers if needed
+    if (isAdminRequest) {
+      modifiedOptions.headers = {
+        ...modifiedOptions.headers,
+        'X-Admin-Request': 'true',
+      };
+    }
+
+    // Could add other custom logic here like:
+    // - Request signing
+    // - Custom retry logic
+    // - Request logging
+    // - Header validation
+
+    return modifiedOptions;
   }
 
   /**
@@ -63,7 +89,7 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
         console.log(`[AuthenticatedApiSingleton] Token refreshed, retrying request: ${url}`);
         
         // Retry the request with new token
-        return this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, handle404, isAdminRequest);
+        return this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, isAdminRequest);
       } else {
         console.warn(`[AuthenticatedApiSingleton] Token refresh failed for ${url}`);
         
@@ -123,7 +149,7 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
     // Clear all cache entries that might contain user-specific data
     const keysToDelete: string[] = [];
     
-    for (const [key] of this.cache) {
+    for (const [key] of Array.from(this.cache.entries())) {
       // Clear keys that might be user-specific
       if (key.includes('user') || key.includes('auth') || key.includes('profile')) {
         keysToDelete.push(key);
@@ -143,38 +169,6 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
     }
     
     console.log(`[AuthenticatedApiSingleton] Cleared ${keysToDelete.length} auth-related cache entries`);
-  }
-
-  /**
-   * Parse error response from API to extract structured error information
-   */
-  protected async parseErrorResponse(response: Response): Promise<{
-    status: number;
-    message: string;
-    code: string;
-  }> {
-    let message = `API request failed: ${response.status} ${response.statusText}`;
-    let code = 'HTTP_ERROR';
-    
-    // Try to extract actual error message from API response
-    try {
-      const errorData = await response.clone().json();
-      if (errorData.error) {
-        message = errorData.error;
-        code = errorData.error;
-      } else if (errorData.message) {
-        message = errorData.message;
-        code = 'API_ERROR';
-      }
-    } catch (parseError) {
-      // If we can't parse JSON, use default message
-    }
-    
-    return {
-      status: response.status,
-      message,
-      code
-    };
   }
 
   /**

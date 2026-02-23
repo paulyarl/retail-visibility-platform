@@ -48,7 +48,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/square/status`,
       {},
       `platform-square-status-${tenantId}`,
@@ -71,7 +71,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/square/oauth/authorize`,
       {},
       `platform-square-oauth-authorize-${tenantId}`,
@@ -94,7 +94,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/square/disconnect`,
       { 
         method: 'POST',
@@ -122,7 +122,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/square/sync`,
       { 
         method: 'POST',
@@ -147,7 +147,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/clover/status`,
       {},
       `platform-clover-status-${tenantId}`,
@@ -170,7 +170,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/clover/demo`,
       { 
         method: 'POST',
@@ -198,7 +198,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/clover/demo/disable`,
       { 
         method: 'POST',
@@ -226,7 +226,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/clover/oauth/authorize`,
       {},
       `platform-clover-oauth-${tenantId}`,
@@ -249,7 +249,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/clover/disconnect`,
       { method: 'POST' },
       `platform-clover-disconnect-${tenantId}`
@@ -271,7 +271,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/clover/sync`,
       { method: 'POST' },
       `platform-clover-sync-${tenantId}`
@@ -293,7 +293,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/clover/demo/scenarios`,
       {},
       `platform-clover-demo-scenarios-${tenantId}`,
@@ -320,7 +320,7 @@ export class IntegrationService extends TenantApiSingleton {
       ? `/api/integrations/${tenantId}/clover/demo/mappings`
       : `/api/integrations/${tenantId}/clover/mappings`;
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       endpoint,
       {},
       `platform-clover-mappings-${tenantId}-${isDemo ? 'demo' : 'prod'}`,
@@ -347,7 +347,7 @@ export class IntegrationService extends TenantApiSingleton {
       ? `/api/integrations/${tenantId}/clover/demo/sync-history`
       : `/api/integrations/${tenantId}/clover/sync-history`;
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       endpoint,
       {},
       `platform-clover-sync-history-${tenantId}-${isDemo ? 'demo' : 'prod'}`,
@@ -370,7 +370,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/clover/category-mappings`,
       {},
       `platform-clover-category-mappings-${tenantId}`,
@@ -393,7 +393,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/clover/demo/simulate`,
       { 
         method: 'POST',
@@ -418,7 +418,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/clover/demo/simulate/${simulationId}/execute`,
       { method: 'POST' },
       `platform-clover-simulation-execute-${tenantId}-${simulationId}`
@@ -440,7 +440,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/clover/demo/simulate/${simulationId}/cancel`,
       { method: 'POST' },
       `platform-clover-simulation-cancel-${tenantId}-${simulationId}`
@@ -466,7 +466,7 @@ export class IntegrationService extends TenantApiSingleton {
       ? `/api/integrations/${tenantId}/clover/demo/mappings/${mappingId}/resolve`
       : `/api/integrations/${tenantId}/clover/mappings/${mappingId}/resolve`;
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       endpoint,
       { 
         method: 'POST',
@@ -491,7 +491,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID and integration type are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/${integration}/sync/status`,
       {},
       `platform-${integration}-sync-status-${tenantId}`,
@@ -514,7 +514,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/statuses`,
       {},
       `platform-all-integration-statuses-${tenantId}`,
@@ -537,7 +537,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID and integration type are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/${integration}/configure`,
       { 
         method: 'PATCH',
@@ -565,7 +565,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID and integration type are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/integrations/${tenantId}/${integration}/test`,
       { method: 'POST' },
       `platform-test-${integration}-${tenantId}`
@@ -587,7 +587,7 @@ export class IntegrationService extends TenantApiSingleton {
       throw new Error('Tenant ID and integration type are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any[]>(
+    const result = await this.makeDefaultRequest<any[]>(
       `/api/integrations/${tenantId}/${integration}/logs?limit=${limit}`,
       {},
       `platform-${integration}-logs-${tenantId}`,

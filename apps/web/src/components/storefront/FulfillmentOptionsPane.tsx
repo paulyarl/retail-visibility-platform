@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Package, Truck, MapPin, CreditCard, CheckCircle2 } from 'lucide-react';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 
 interface FulfillmentSettings {
   pickup_enabled: boolean;
@@ -51,7 +51,7 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
     
     try {
       // Fetch fulfillment settings only
-      const fulfillmentSettings = await tenantInfoService.getFulfillmentSettings(tenantId);
+      const fulfillmentSettings = await publicTenantInfoService.getFulfillmentSettings(tenantId);
       if (fulfillmentSettings) {
         setFulfillmentSettings(fulfillmentSettings);
       }
@@ -67,13 +67,13 @@ export default function FulfillmentOptionsPane({ tenantId, compact = false, paym
       setLoading(true);
 
       // Fetch fulfillment settings
-      const fulfillmentSettings = await tenantInfoService.getFulfillmentSettings(tenantId);
+      const fulfillmentSettings = await publicTenantInfoService.getFulfillmentSettings(tenantId);
       if (fulfillmentSettings) {
         setFulfillmentSettings(fulfillmentSettings);
       }
 
       // Fetch payment gateways
-      const paymentGateways = await tenantInfoService.getPaymentGateways(tenantId);
+      const paymentGateways = await publicTenantInfoService.getPaymentGateways(tenantId);
       if (paymentGateways) {
         setPaymentGateways(paymentGateways.filter((g: PaymentGateway) => g.is_active));
       }

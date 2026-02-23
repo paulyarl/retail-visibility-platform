@@ -177,7 +177,7 @@ class StorePublishSingleton extends PublicApiSingleton {
       const cacheKey = `store-publish-${params.toString()}`;
 
       // Fetch published stores
-      const result = await this.makePublicRequest<StorePublishData>(
+      const result = await this.makeDefaultRequest<StorePublishData>(
         `/api/stores/published?${params}`,
         {},
         cacheKey
@@ -203,7 +203,7 @@ class StorePublishSingleton extends PublicApiSingleton {
   // Get a single published store by ID
   async getPublishedStore(storeId: string): Promise<PublishedStore | null> {
     try {
-      const result = await this.makePublicRequest<PublishedStore>(
+      const result = await this.makeDefaultRequest<PublishedStore>(
         `/api/stores/published/${storeId}`,
         {},
         `store-publish-single-${storeId}`
@@ -223,14 +223,11 @@ class StorePublishSingleton extends PublicApiSingleton {
 
   // Publish a store (for store owners and admins)
   async publishStore(storeId: string, storeData: Partial<PublishedStore>): Promise<PublishedStore | null> {
-    const result = await this.makePublicRequest<PublishedStore>(
+    const result = await this.makeDefaultRequest<PublishedStore>(
       '/api/stores/publish',
       {
         method: 'POST',
-        body: JSON.stringify({
-          storeId,
-          ...storeData
-        })
+        body: JSON.stringify({ storeId, ...storeData })
       },
       `store-publish-${storeId}`
     );
@@ -245,7 +242,7 @@ class StorePublishSingleton extends PublicApiSingleton {
 
   // Unpublish a store
   async unpublishStore(storeId: string): Promise<boolean> {
-    const result = await this.makePublicRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/stores/publish/${storeId}`,
       {
         method: 'DELETE'
@@ -263,7 +260,7 @@ class StorePublishSingleton extends PublicApiSingleton {
 
   // Update published store
   async updatePublishedStore(storeId: string, updates: Partial<PublishedStore>): Promise<PublishedStore | null> {
-    const result = await this.makePublicRequest<PublishedStore>(
+    const result = await this.makeDefaultRequest<PublishedStore>(
       `/api/stores/published/${storeId}`,
       {
         method: 'PATCH',
@@ -282,7 +279,7 @@ class StorePublishSingleton extends PublicApiSingleton {
 
   // Get available directory categories
   async getDirectoryCategories(): Promise<DirectoryCategory[]> {
-    const result = await this.makePublicRequest<DirectoryCategory[]>(
+    const result = await this.makeDefaultRequest<DirectoryCategory[]>(
       '/api/directory/categories',
       {},
       'directory-categories'
@@ -346,7 +343,7 @@ class StorePublishSingleton extends PublicApiSingleton {
     canPublishAny: boolean;
     reason?: string;
   }> {
-    const result = await this.makePublicRequest<{
+    const result = await this.makeDefaultRequest<{
       canPublish: boolean;
       canPublishAny: boolean;
       reason?: string;

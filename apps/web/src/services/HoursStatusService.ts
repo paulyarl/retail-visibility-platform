@@ -54,7 +54,7 @@ class HoursStatusService extends PublicApiSingleton {
 
     const cacheKey = `hours-status-${tenantId}`;
     
-    const response = await this.makePublicRequest<StoreStatus>(
+    const response = await this.makeDefaultRequest<StoreStatus>(
       `/api/public/tenant/${tenantId}/business-hours/status`,
       {},
       cacheKey,

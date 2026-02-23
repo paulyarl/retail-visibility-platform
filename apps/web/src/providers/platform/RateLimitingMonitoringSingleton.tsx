@@ -110,7 +110,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
    * Get rate limiting configuration
    */
   async getRateLimitConfig(): Promise<RateLimitConfig> {
-    const result = await this.makeAuthenticatedRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {}, 'rate-limit-config');
+    const result = await this.makeDefaultRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {}, 'rate-limit-config');
     
     if (!result.success) {
       console.error('Error fetching rate limit config:', result.error);
@@ -140,7 +140,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
    * Get rate limiting rules
    */
   async getRateLimitRules(): Promise<RateLimitRule[]> {
-    const result = await this.makeAuthenticatedRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
+    const result = await this.makeDefaultRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
     
     if (!result.success) {
       console.error('Error fetching rate limit rules:', result.error);
@@ -154,7 +154,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
    * Get rate limiting metrics
    */
   async getRateLimitMetrics(hours: number = 24): Promise<RateLimitMetrics> {
-    const result = await this.makeAuthenticatedRequest<RateLimitMetrics>(`/api/admin/rate-limiting/metrics?hours=${hours}`, {}, `rate-limit-metrics-${hours}`);
+    const result = await this.makeDefaultRequest<RateLimitMetrics>(`/api/admin/rate-limiting/metrics?hours=${hours}`, {}, `rate-limit-metrics-${hours}`);
     
     if (!result.success) {
       console.error('Error fetching rate limit metrics:', result.error);
@@ -189,7 +189,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     blockedAt: string;
     expiresAt: string;
   }>> {
-    const result = await this.makeAuthenticatedRequest<Array<{
+    const result = await this.makeDefaultRequest<Array<{
       ip: string;
       reason: string;
       blockedAt: string;
@@ -212,7 +212,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     violations: number;
     lastViolation: string;
   }>> {
-    const result = await this.makeAuthenticatedRequest<Array<{
+    const result = await this.makeDefaultRequest<Array<{
       ip: string;
       violations: number;
       lastViolation: string;
@@ -234,7 +234,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
    * Get rate limit status for a specific IP
    */
   async getIPStatus(ip: string): Promise<RateLimitStatus> {
-    const result = await this.makeAuthenticatedRequest<RateLimitStatus>(`/api/admin/rate-limiting/status?ip=${ip}`, {}, `ip-status-${ip}`);
+    const result = await this.makeDefaultRequest<RateLimitStatus>(`/api/admin/rate-limiting/status?ip=${ip}`, {}, `ip-status-${ip}`);
     
     if (!result.success) {
       console.error('Error getting IP status:', result.error);
@@ -265,7 +265,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     action: string;
     details: Record<string, any>;
   }>> {
-    const result = await this.makeAuthenticatedRequest<Array<{
+    const result = await this.makeDefaultRequest<Array<{
       timestamp: string;
       action: string;
       details: Record<string, any>;
@@ -297,7 +297,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
       blocks: number;
     }>;
   }> {
-    const result = await this.makeAuthenticatedRequest<{
+    const result = await this.makeDefaultRequest<{
       requests: number;
       blocks: number;
       uniqueIPs: number;
@@ -345,7 +345,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
       blocks: number;
     }>;
   }>> {
-    const result = await this.makeAuthenticatedRequest<Record<string, {
+    const result = await this.makeDefaultRequest<Record<string, {
       requests: number;
       blocks: number;
       uniqueIPs: number;
@@ -374,7 +374,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
    */
   async blockIP(ip: string, durationMinutes: number = 60, reason: string = 'Manual block'): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest('/api/admin/rate-limiting/block', {
+      await this.makeDefaultRequest('/api/admin/rate-limiting/block', {
         method: 'POST',
         body: JSON.stringify({ ip, durationMinutes, reason })
       });
@@ -393,7 +393,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
    */
   async unblockIP(ip: string): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest(`/api/admin/rate-limiting/unblock/${ip}`, {
+      await this.makeDefaultRequest(`/api/admin/rate-limiting/unblock/${ip}`, {
         method: 'POST'
       });
 
@@ -411,7 +411,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
    */
   async resetIPLimit(ip: string): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest(`/api/admin/rate-limiting/reset?ip=${ip}`, {
+      await this.makeDefaultRequest(`/api/admin/rate-limiting/reset?ip=${ip}`, {
         method: 'POST'
       });
 
@@ -457,7 +457,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     issues: string[];
     recommendations: string[];
   }> {
-    const result = await this.makeAuthenticatedRequest<{
+    const result = await this.makeDefaultRequest<{
       status: 'healthy' | 'warning' | 'critical';
       score: number;
       issues: string[];
@@ -492,7 +492,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
     uniqueIPs: number;
     blockRate: number;
   }>> {
-    const result = await this.makeAuthenticatedRequest<Array<{
+    const result = await this.makeDefaultRequest<Array<{
       date: string;
       requests: number;
       blocks: number;

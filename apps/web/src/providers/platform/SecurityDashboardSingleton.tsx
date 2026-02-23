@@ -109,7 +109,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
     }
 
     try {
-      const result = await this.makeAuthenticatedRequest<{ data: LoginSession[] }>('/api/auth/sessions', {}, 'active_sessions_raw');
+      const result = await this.makeDefaultRequest<{ data: LoginSession[] }>('/api/auth/sessions', {}, 'active_sessions_raw');
       
       if (!result.success) {
         console.error('Error fetching active sessions:', result.error);
@@ -145,7 +145,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
    * Get security metrics
    */
   async getSecurityMetrics(hours: number = 24): Promise<SecurityMetrics> {
-    const result = await this.makeAuthenticatedRequest<SecurityMetrics>(`/api/security/metrics?hours=${hours}`, {}, `security-metrics-${hours}`);
+    const result = await this.makeDefaultRequest<SecurityMetrics>(`/api/security/metrics?hours=${hours}`, {}, `security-metrics-${hours}`);
     
     if (!result.success) {
       console.error('Error fetching security metrics:', result.error);
@@ -187,7 +187,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
         page: '1'
       });
 
-      const result = await this.makeAuthenticatedRequest<{ threats: SecurityThreat[] }>(`/api/security/threats?${params}`, {}, `recent-threats-${threatStatus}-${hours}`);
+      const result = await this.makeDefaultRequest<{ threats: SecurityThreat[] }>(`/api/security/threats?${params}`, {}, `recent-threats-${threatStatus}-${hours}`);
       
       if (!result.success) {
         console.error('Error fetching security threats:', result.error);
@@ -207,7 +207,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
    * Get blocked IPs
    */
   async getBlockedIPs(hours: number = 24): Promise<BlockedIP[]> {
-    const result = await this.makeAuthenticatedRequest<{ data: BlockedIP[] }>(`/api/security/blocked-ips?hours=${hours}`, {}, `blocked-ips-${hours}`);
+    const result = await this.makeDefaultRequest<{ data: BlockedIP[] }>(`/api/security/blocked-ips?hours=${hours}`, {}, `blocked-ips-${hours}`);
     
     if (!result.success) {
       console.error('Error fetching blocked IPs:', result.error);
@@ -232,7 +232,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
         level: alertLevel === 'all' ? '' : alertLevel
       });
 
-      const result = await this.makeAuthenticatedRequest<{ data: SecurityAlert[] }>(`/api/security/alerts?${params}`, {}, `security-alerts-${alertLevel}-${hours}`);
+      const result = await this.makeDefaultRequest<{ data: SecurityAlert[] }>(`/api/security/alerts?${params}`, {}, `security-alerts-${alertLevel}-${hours}`);
       
       if (!result.success) {
         console.error('Error fetching security alerts:', result.error);
@@ -256,7 +256,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
    * Revoke a specific session
    */
   async revokeSession(sessionId: string): Promise<void> {
-    const result = await this.makeAuthenticatedRequest(`/api/auth/sessions/${sessionId}`, {
+    const result = await this.makeDefaultRequest(`/api/auth/sessions/${sessionId}`, {
       method: 'DELETE'
     });
     
@@ -273,7 +273,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
    * Revoke all sessions except current
    */
   async revokeAllSessions(): Promise<void> {
-    const result = await this.makeAuthenticatedRequest('/api/auth/sessions/revoke-all', {
+    const result = await this.makeDefaultRequest('/api/auth/sessions/revoke-all', {
       method: 'POST'
     });
     
@@ -319,7 +319,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
     score: number;
     issues: string[];
   }> {
-    const result = await this.makeAuthenticatedRequest<{
+    const result = await this.makeDefaultRequest<{
       status: 'healthy' | 'warning' | 'critical';
       score: number;
       issues: string[];

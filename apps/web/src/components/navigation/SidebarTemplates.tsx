@@ -274,6 +274,14 @@ export const AdminSidebarTemplate = () => {
           href: '/settings/admin/settings'
         },
         {
+          label: 'Platform Ticker',
+          href: '/settings/admin/ticker',
+          badge: {
+            text: 'NEW',
+            variant: 'success'
+          }
+        },
+        {
           label: 'Feature Flags',
           href: '/settings/admin/features'
         },
@@ -463,7 +471,29 @@ export const PlatformSidebarTemplate = () => {
         {
           label: 'Admin Panel',
           href: '/settings/admin',
-          accessLevel: 'admin'
+          accessLevel: 'admin',
+          children: [
+            {
+              label: 'Platform Ticker',
+              href: '/settings/admin/ticker',
+              badge: {
+                text: 'NEW',
+                variant: 'success'
+              }
+            },
+            {
+              label: 'User Management',
+              href: '/settings/admin/users'
+            },
+            {
+              label: 'Tenant Management',
+              href: '/settings/admin/tenants'
+            },
+            {
+              label: 'System Settings',
+              href: '/settings/admin/system'
+            }
+          ]
         }
       ]
     }

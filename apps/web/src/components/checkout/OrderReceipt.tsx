@@ -5,7 +5,7 @@ import { Button } from '@mantine/core';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Printer, Download, Mail, Phone, MapPin, Store, CheckCircle2, Package } from 'lucide-react';
 import QRCode from 'qrcode';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { tenantOrderService } from '@/services/TenantOrderService';
 
 interface OrderReceiptProps {
@@ -103,12 +103,12 @@ export default function OrderReceipt({ cart, onPrint, className = "" }: OrderRec
       setIsLoadingProfile(true);
       try {
         // Fetch tenant profile
-        const profile = await tenantInfoService.getBusinessProfile(cart.tenantId);
+        const profile = await publicTenantInfoService.getBusinessProfile(cart.tenantId);
         console.log('[OrderReceipt] Fetched tenant profile:', profile);
         setTenantProfile(profile);
 
         // Fetch business hours for all orders (important for multi-store orders)
-        const hours = await tenantInfoService.getBusinessHours(cart.tenantId);
+        const hours = await publicTenantInfoService.getBusinessHours(cart.tenantId);
         if (hours) {
           console.log('[OrderReceipt] Fetched business hours:', hours);
           setBusinessHours(hours);

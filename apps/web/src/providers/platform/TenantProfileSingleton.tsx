@@ -197,7 +197,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
    * Get tenant profile
    */
   async getTenantProfile(tenantId: string): Promise<TenantProfile | null> {
-    const result = await this.makeAuthenticatedRequest<TenantProfile>(`/api/tenants/${tenantId}/profile`, {}, `tenant-profile-${tenantId}`);
+    const result = await this.makeDefaultRequest<TenantProfile>(`/api/tenants/${tenantId}/profile`, {}, `tenant-profile-${tenantId}`);
     
     if (!result.success) {
       if (result.status === 404) {
@@ -231,7 +231,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
       lastActivityAt: new Date().toISOString()
     };
 
-    const result = await this.makeAuthenticatedRequest<TenantProfile>(`/api/tenants/${tenantId}/profile`, {
+    const result = await this.makeDefaultRequest<TenantProfile>(`/api/tenants/${tenantId}/profile`, {
       method: 'POST',
       body: JSON.stringify(newProfile)
     }, `create-tenant-profile-${tenantId}`);
@@ -290,7 +290,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
    * Process profile update
    */
   private async processProfileUpdate(tenantId: string, updates: TenantProfileUpdate): Promise<void> {
-    const result = await this.makeAuthenticatedRequest(`/api/tenants/${tenantId}/profile`, {
+    const result = await this.makeDefaultRequest(`/api/tenants/${tenantId}/profile`, {
       method: 'PUT',
       body: JSON.stringify({
         ...updates,
@@ -348,7 +348,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
    * Get tenant profile statistics
    */
   async getTenantProfileStats(tenantId: string): Promise<TenantProfileStats> {
-    const result = await this.makeAuthenticatedRequest<TenantProfileStats>(`/api/tenants/${tenantId}/profile/stats`, {}, `tenant-profile-stats-${tenantId}`);
+    const result = await this.makeDefaultRequest<TenantProfileStats>(`/api/tenants/${tenantId}/profile/stats`, {}, `tenant-profile-stats-${tenantId}`);
     
     if (!result.success) {
       console.error('Error fetching tenant profile stats:', result.error);
@@ -380,7 +380,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
     tenantId: string,
     analytics: Partial<TenantProfile['analytics']>
   ): Promise<void> {
-    const result = await this.makeAuthenticatedRequest(`/api/tenants/${tenantId}/analytics`, {
+    const result = await this.makeDefaultRequest(`/api/tenants/${tenantId}/analytics`, {
       method: 'PUT',
       body: JSON.stringify({
         ...analytics,
@@ -408,7 +408,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
       metadata?: Record<string, any>;
     }
   ): Promise<void> {
-    const result = await this.makeAuthenticatedRequest(`/api/tenants/${tenantId}/activity`, {
+    const result = await this.makeDefaultRequest(`/api/tenants/${tenantId}/activity`, {
       method: 'POST',
       body: JSON.stringify({
         ...activity,
@@ -473,7 +473,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
       if (filters.plan) params.append('plan', filters.plan);
       params.append('limit', limit.toString());
 
-      const result = await this.makeAuthenticatedRequest<TenantProfile[]>(`/api/tenants/search?${params}`, {}, `tenant-profile-search-${JSON.stringify({ query, filters, limit })}`);
+      const result = await this.makeDefaultRequest<TenantProfile[]>(`/api/tenants/search?${params}`, {}, `tenant-profile-search-${JSON.stringify({ query, filters, limit })}`);
       
       if (!result.success) {
         console.error('Error searching tenant profiles:', result.error);
@@ -491,7 +491,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
    * Get featured tenant profiles
    */
   async getFeaturedTenantProfiles(limit: number = 10): Promise<TenantProfile[]> {
-    const result = await this.makeAuthenticatedRequest<TenantProfile[]>(`/api/tenants/featured?limit=${limit}`, {}, `featured-tenant-profiles-${limit}`);
+    const result = await this.makeDefaultRequest<TenantProfile[]>(`/api/tenants/featured?limit=${limit}`, {}, `featured-tenant-profiles-${limit}`);
     
     if (!result.success) {
       console.error('Error fetching featured tenant profiles:', result.error);

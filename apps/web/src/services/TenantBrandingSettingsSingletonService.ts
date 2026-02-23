@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
 
 export interface TenantBrandingSettings {
   shopName: string;
@@ -38,7 +38,7 @@ export interface TenantBrandingSettings {
 class TenantBrandingSettingsSingletonService extends AuthenticatedApiSingleton {
   private static instance: TenantBrandingSettingsSingletonService;
 
-  private constructor() {
+  protected constructor() {
     super('tenant-branding-settings-singleton', {
       ttl: 10 * 60 * 1000 // 10 minutes for tenant branding (moderate cache)
     });
@@ -57,13 +57,13 @@ class TenantBrandingSettingsSingletonService extends AuthenticatedApiSingleton {
    */
   async getTenantBrandingSettings(tenantId: string): Promise<TenantBrandingSettings | null> {
     try {
-      const result = await this.makeAuthenticatedRequest<TenantBrandingSettings>(
+      const result = await this.makeDefaultRequest<TenantBrandingSettings>(
         `/api/branding/${tenantId}`,
         {},
         `tenant-branding-${tenantId}`
       );
 
-      // makeAuthenticatedRequest returns data directly
+      // makeDefaultRequest returns data directly
       return result.data || null;
     } catch (error) {
       console.error('[TenantBrandingSettingsSingleton] Failed to get branding settings:', error);
@@ -77,7 +77,7 @@ class TenantBrandingSettingsSingletonService extends AuthenticatedApiSingleton {
    */
   async updateTenantBrandingSettings(tenantId: string, settings: Partial<TenantBrandingSettings>): Promise<TenantBrandingSettings | null> {
     try {
-      const result = await this.makeAuthenticatedRequest<TenantBrandingSettings>(
+      const result = await this.makeDefaultRequest<TenantBrandingSettings>(
         `/api/branding/${tenantId}`,
         {
           method: 'PUT',
@@ -86,7 +86,7 @@ class TenantBrandingSettingsSingletonService extends AuthenticatedApiSingleton {
         `tenant-branding-${tenantId}`
       );
 
-      // makeAuthenticatedRequest returns data directly
+      // makeDefaultRequest returns data directly
       return result.data || null;
     } catch (error) {
       console.error('[TenantBrandingSettingsSingleton] Failed to update branding settings:', error);

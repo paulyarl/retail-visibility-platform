@@ -7,7 +7,7 @@ import { Button } from '@mantine/core';
 import { Input } from '@/components/ui/Input';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { CreditCard, Lock, AlertCircle, CheckCircle, Trash2, ShoppingBag, Package } from 'lucide-react';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { tenantInfoService } from '@/services/TenantInfoService';
 import Link from 'next/link';
 import OAuthConnectButton from '@/components/payment-gateways/OAuthConnectButton';
 

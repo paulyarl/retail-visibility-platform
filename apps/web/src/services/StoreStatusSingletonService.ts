@@ -37,10 +37,11 @@ class StoreStatusSingletonService extends PublicApiSingleton {
         throw new Error('Tenant ID is required');
       }
 
-      const result = await this.makePublicRequest<StoreStatus>(
+      const result = await this.makeDefaultRequest<StoreStatus>(
         `/api/public/tenant/${tenantId}/business-hours/status`,
         {},
-        `store-status-${tenantId}`
+        `store-status-${tenantId}`,
+        this.cacheTTL
       );
       if (!result.success){
         console.error('[StoreStatusSingleton] Failed to get store status:', result.error);

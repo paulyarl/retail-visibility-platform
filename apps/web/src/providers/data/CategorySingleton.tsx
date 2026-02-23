@@ -88,18 +88,18 @@ class CategoryService extends PublicApiSingleton {
       
       if (tenantId) {
         // Use tenant-specific endpoint for inventory management
-        response = await this.makePublicRequest<{
+        response = await this.makeDefaultRequest<{
           categories: Category[];
-        }>(`/api/categories/product-level/${tenantId}`, {}, cacheKey);
+        }>(`/api/categories/product-level/${tenantId}`, {});
       } else {
         // Use public directory endpoint for public browsing
         const params = new URLSearchParams();
         if (includeChildren) params.append('includeChildren', 'true');
         if (includeProductCount) params.append('includeProductCount', 'true');
         
-        response = await this.makePublicRequest<{
+        response = await this.makeDefaultRequest<{
           categories: Category[];
-        }>(`/api/directory/categories?${params}`, {}, cacheKey);
+        }>(`/api/directory/categories?${params}`, {});
       }
 
       if (!response.success || !response.data) {
@@ -108,7 +108,7 @@ class CategoryService extends PublicApiSingleton {
 
       // Handle different response structures:
       // - Public endpoint: response.data.categories
-      // - Tenant endpoint: response.data.categories (direct from makeAuthenticatedRequest)
+      // - Tenant endpoint: response.data.categories (direct from makeDefaultRequest)
       const categories = response.data?.categories || [];
       
       if (!Array.isArray(categories)) {

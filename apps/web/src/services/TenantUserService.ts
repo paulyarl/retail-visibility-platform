@@ -36,7 +36,7 @@ export class TenantUserService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<{ users: User[] }>(
+    const result = await this.makeDefaultRequest<{ users: User[] }>(
       `/api/tenants/${tenantId}/users`,
       {},
       `platform-tenant-users-${tenantId}`,
@@ -63,7 +63,7 @@ export class TenantUserService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<User>(
+    const result = await this.makeDefaultRequest<User>(
       `/api/tenants/${tenantId}/users`,
       { 
         method: 'POST',
@@ -91,7 +91,7 @@ export class TenantUserService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID and User ID are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<User>(
+    const result = await this.makeDefaultRequest<User>(
       `/api/tenants/${tenantId}/users/${userId}`,
       { 
         method: 'PATCH',
@@ -119,7 +119,7 @@ export class TenantUserService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID and User ID are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/tenants/${tenantId}/users/${userId}`,
       { method: 'DELETE' },
       `platform-remove-tenant-user-${userId}`

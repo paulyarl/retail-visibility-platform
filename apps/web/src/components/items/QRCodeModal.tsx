@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui';
 import { QRCodeGenerator } from './QRCodeGenerator';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 
 interface QRCodeModalProps {
   isOpen: boolean;
@@ -30,8 +30,8 @@ export function QRCodeModal(props: QRCodeModalProps) {
         
         // Fetch tier and profile via new service (cached)
         const [tier, profile] = await Promise.all([
-          tenantInfoService.getTenantTier(actualTenantId),
-          tenantInfoService.getTenantProfile(actualTenantId)
+          publicTenantInfoService.getTenantTier(actualTenantId),
+          publicTenantInfoService.getTenantProfile(actualTenantId)
         ]);
         
         if (tier) {

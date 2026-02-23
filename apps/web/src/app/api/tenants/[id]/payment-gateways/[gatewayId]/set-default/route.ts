@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 export async function POST(
   request: NextRequest,

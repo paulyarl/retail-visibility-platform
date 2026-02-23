@@ -67,13 +67,14 @@ class StorefrontSingletonService extends PublicApiSingleton {
     }
 
     try {
-      const result = await this.makePublicRequest<{
+      const result = await this.makeDefaultRequest<{
         categories: StorefrontCategory[];
         uncategorizedCount: number;
       }>(
         `/api/storefront/${tenantId}/categories`,
         {},
-        `storefront-categories-${tenantId}`
+        `storefront-categories-${tenantId}`,
+        this.cacheTTL
       );
       
       return {
@@ -102,8 +103,6 @@ class StorefrontSingletonService extends PublicApiSingleton {
     items: StorefrontProduct[];
     pagination?: {
       totalItems: number;
-      currentPage: number;
-      totalPages: number;
     };
     total?: number;
   }> {
@@ -121,17 +120,18 @@ class StorefrontSingletonService extends PublicApiSingleton {
 
       const endpoint = `/api/storefront/${tenantId}/products?${queryParams.toString()}`;
       
-      const result = await this.makePublicRequest<{
+      const result = await this.makeDefaultRequest<{
         items: StorefrontProduct[];
         pagination?: {
           totalItems: number;
-          currentPage: number;
-          totalPages: number;
         };
-        total?: number;
-      }>(endpoint, {}, `storefront-products-${tenantId}-${options.page || 1}-${options.limit || 10}-${options.search || ''}-${options.category || ''}`);
+      }>(endpoint, {}, `storefront-products-${tenantId}-${queryParams.toString()}`, this.cacheTTL);
       
-      return result.data || { items: [] };
+      return {
+        items: result.data?.items || [],
+        pagination: result.data?.pagination,
+        total: result.data?.pagination?.totalItems
+      };
     } catch (error) {
       console.error('[StorefrontSingleton] Failed to get storefront products:', error);
       return { items: [] };
@@ -164,10 +164,10 @@ class StorefrontSingletonService extends PublicApiSingleton {
 
       const endpoint = `/api/storefront/${tenantId}/featured-products?${queryParams.toString()}`;
       
-      const result = await this.makePublicRequest<{
+      const result = await this.makeDefaultRequest<{
         items: StorefrontProduct[];
         count?: number;
-      }>(endpoint, {}, `featured-products-${tenantId}-${options.limit || 10}-${options.search || ''}`);
+      }>(endpoint, {}, `featured-products-${tenantId}-${options.limit || 10}-${options.search || ''}`, this.cacheTTL);
       
       return result.data || { items: [] };
     } catch (error) {
@@ -187,10 +187,11 @@ class StorefrontSingletonService extends PublicApiSingleton {
     }
 
     try {
-      const result = await this.makePublicRequest<DirectoryListing>(
+      const result = await this.makeDefaultRequest<DirectoryListing>(
         `/api/directory/${tenantId}`,
         {},
-        `directory-listing-${tenantId}`
+        `directory-listing-${tenantId}`,
+        this.cacheTTL
       );
       
       return result || null;
@@ -211,14 +212,15 @@ class StorefrontSingletonService extends PublicApiSingleton {
     }
 
     try {
-      const result = await this.makePublicRequest<{
+      const result = await this.makeDefaultRequest<{
         pagination?: {
           totalItems: number;
         };
       }>(
         `/api/storefront/${tenantId}/products?page=1&limit=1`,
         {},
-        `total-product-count-${tenantId}`
+        `total-product-count-${tenantId}`,
+        this.cacheTTL
       );
       
       return result.data?.pagination?.totalItems || 0;

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import TenantShell from './TenantShell';
 import { TenantOption } from './TenantSwitcher';
-import { tenantInfoService } from '@/services/TenantInfoSingletonService';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 
 interface ClientTenantShellProps {
   tenantId: string;
@@ -29,7 +29,7 @@ export default function ClientTenantShell({
   useEffect(() => {
     const fetchTenantData = async () => {
       try {
-        const tenantData = await tenantInfoService.getTenantInfo(tenantId);
+        const tenantData = await publicTenantInfoService.getTenantInfo(tenantId);
         
         if (tenantData) {
           setTenantName(tenantData.name || tenantId);

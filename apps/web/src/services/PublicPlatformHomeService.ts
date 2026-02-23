@@ -64,7 +64,7 @@ class PublicPlatformHomeService extends PublicApiSingleton {
    */
   async getPublicPlatformHomeData(): Promise<PublicPlatformHomeData | null> {
     try {
-      const response = await this.makePublicRequest<PublicPlatformHomeData>(
+      const response = await this.makeDefaultRequest<PublicPlatformHomeData>(
         '/public/platform/home',
         {},
         'public-platform-home'
@@ -88,7 +88,7 @@ class PublicPlatformHomeService extends PublicApiSingleton {
    */
   async getPublicFeaturedTenants(limit: number = 10): Promise<PublicTenant[] | null> {
     try {
-      const response = await this.makePublicRequest<PublicTenant[]>(
+      const response = await this.makeDefaultRequest<PublicTenant[]>(
         `/public/platform/featured-tenants?limit=${limit}`,
         {},
         'public-featured-tenants'

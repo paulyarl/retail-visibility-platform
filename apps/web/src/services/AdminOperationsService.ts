@@ -88,7 +88,7 @@ class AdminOperationsService extends AdminApiSingleton {
    * Get admin dashboard statistics
    */
   async getAdminStats(): Promise<AdminStats | null> {
-    const result = await this.makeAdminRequest<AdminStats>(
+    const result = await this.makeDefaultRequest<AdminStats>(
       '/api/admin/stats',
       {},
       'admin-stats',
@@ -120,7 +120,7 @@ class AdminOperationsService extends AdminApiSingleton {
     if (filters?.status) params.append('status', filters.status);
     if (filters?.search) params.append('search', filters.search);
 
-    const result = await this.makeAdminRequest<{ users: AdminUser[]; pagination: any }>(
+    const result = await this.makeDefaultRequest<{ users: AdminUser[]; pagination: any }>(
       `/api/admin/users?${params.toString()}`,
       {},
       `admin-users-${page}-${limit}-${JSON.stringify(filters)}`,
@@ -153,7 +153,7 @@ class AdminOperationsService extends AdminApiSingleton {
       if (filters?.plan) params.append('plan', filters.plan);
       if (filters?.search) params.append('search', filters.search);
 
-      const result = await this.makeAdminRequest<{ tenants: AdminTenant[]; pagination: any }>(
+      const result = await this.makeDefaultRequest<{ tenants: AdminTenant[]; pagination: any }>(
         `/api/admin/tenants?${params.toString()}`,
         {},
         `admin-tenants-${page}-${limit}-${JSON.stringify(filters)}`,
@@ -177,7 +177,7 @@ class AdminOperationsService extends AdminApiSingleton {
    */
   async getSystemAlerts(resolved: boolean = false, page: number = 1, limit: number = 50): Promise<{ alerts: SystemAlert[]; pagination: any }> {
     try {
-      const result = await this.makeAdminRequest<{ alerts: SystemAlert[]; pagination: any }>(
+      const result = await this.makeDefaultRequest<{ alerts: SystemAlert[]; pagination: any }>(
         `/api/admin/alerts?resolved=${resolved}&page=${page}&limit=${limit}`,
         {},
         `admin-alerts-${resolved}-${page}-${limit}`,
@@ -200,7 +200,7 @@ class AdminOperationsService extends AdminApiSingleton {
    * Get security metrics
    */
   async getSecurityMetrics(): Promise<SecurityMetrics | null> {
-    const result = await this.makeAdminRequest<SecurityMetrics>(
+    const result = await this.makeDefaultRequest<SecurityMetrics>(
       '/api/admin/security/metrics',
       {},
       'admin-security-metrics',
@@ -219,7 +219,7 @@ class AdminOperationsService extends AdminApiSingleton {
    * Resolve system alert
    */
   async resolveAlert(alertId: string, resolution: string): Promise<boolean> {
-    const result = await this.makeAdminRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/admin/alerts/${alertId}/resolve`,
       {
         method: 'PUT',
@@ -244,7 +244,7 @@ class AdminOperationsService extends AdminApiSingleton {
    * Suspend/unsuspend user
    */
   async updateUserStatus(userId: string, isActive: boolean, reason?: string): Promise<boolean> {
-    const result = await this.makeAdminRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/admin/users/${userId}/status`,
       {
         method: 'PUT',
@@ -270,7 +270,7 @@ class AdminOperationsService extends AdminApiSingleton {
    * Suspend/unsuspend tenant
    */
   async updateTenantStatus(tenantId: string, status: 'active' | 'inactive' | 'suspended', reason?: string): Promise<boolean> {
-    const result = await this.makeAdminRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/admin/tenants/${tenantId}/status`,
       {
         method: 'PUT',
@@ -312,7 +312,7 @@ class AdminOperationsService extends AdminApiSingleton {
       if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
       if (filters?.dateTo) params.append('dateTo', filters.dateTo);
 
-      const result = await this.makeAdminRequest<{ logs: any[]; pagination: any }>(
+      const result = await this.makeDefaultRequest<{ logs: any[]; pagination: any }>(
         `/api/admin/activity-logs?${params.toString()}`,
         {},
         `admin-activity-logs-${page}-${limit}-${JSON.stringify(filters)}`,
@@ -341,7 +341,7 @@ class AdminOperationsService extends AdminApiSingleton {
         ...(filters || {})
       });
 
-      const result = await this.makeAdminRequest<Blob>(
+      const result = await this.makeDefaultRequest<Blob>(
         `/api/admin/export/${type}?${params.toString()}`,
         {},
         `admin-export-${type}-${format}`,

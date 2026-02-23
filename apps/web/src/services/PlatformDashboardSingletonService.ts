@@ -5,15 +5,15 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
 import { PlatformDashboardData, PlatformStats, TenantMetrics, PlatformActivity } from './interfaces/PlatformDashboardInterfaces';
 
 class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
   private static instance: PlatformDashboardSingletonService;
+  protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for dashboard data
 
-  private constructor() {
+  protected constructor() {
     super('platform-dashboard-singleton');
-    this.cacheTTL = 5 * 60 * 1000; // 5 minutes for dashboard data (refreshes frequently)
   }
 
   public static getInstance(): PlatformDashboardSingletonService {

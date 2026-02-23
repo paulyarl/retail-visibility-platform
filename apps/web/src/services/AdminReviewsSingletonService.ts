@@ -92,7 +92,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
 
       const url = `/api/reviews-singleton${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       
-      const result = await this.makeAdminRequest<{
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         data: {
           reviews: AdminReview[];
@@ -124,7 +124,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
    */
   async getAdminReviewStats(): Promise<AdminReviewStats | null> {
     try {
-      const result = await this.makeAdminRequest<{
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         data: {
           stats: AdminReviewStats;
@@ -160,7 +160,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
     }
 
     try {
-      const result = await this.makeAdminRequest<{
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         message: string;
       }>(
@@ -188,7 +188,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
     }
 
     try {
-      const result = await this.makeAdminRequest<{
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         message: string;
       }>(
@@ -215,7 +215,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
     }
 
     try {
-      const result = await this.makeAdminRequest<{
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         message: string;
       }>(
@@ -245,7 +245,7 @@ class AdminReviewsSingletonService extends AdminApiSingleton {
     }
 
     try {
-      const result = await this.makeAdminRequest<{
+      const result = await this.makeDefaultRequest<{
         success: boolean;
         message: string;
       }>(

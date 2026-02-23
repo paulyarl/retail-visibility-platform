@@ -365,6 +365,124 @@ router.get('/stores/:identifier', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/public/stores/:identifier/profile
+ * Get rich store profile data from mv_global view
+ */
+router.get('/stores/:identifier/profile', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+
+    console.log(`[Public API] Store profile request for identifier: ${identifier}`);
+
+    // Use the existing database connection pattern
+    const { getDirectPool } = await import('../utils/db-pool');
+    const pool = getDirectPool();
+
+    // Query mv_global for rich store data and product count
+    const storeQuery = `
+      SELECT DISTINCT
+        tenant_id,
+        tenant_name,
+        tenant_slug,
+        tenant_logo_url,
+        tenant_city,
+        tenant_state,
+        tenant_country,
+        tenant_zip,
+        tenant_address,
+        tenant_latitude,
+        tenant_longitude,
+        subscription_tier,
+        shop_category,
+        store_average_rating,
+        store_review_count,
+        business_type,
+        business_category,
+        created_at,
+        updated_at,
+        mv_refreshed_at,
+        -- Get product count
+        (SELECT COUNT(DISTINCT inventory_item_id)
+         FROM mv_global_discovery 
+         WHERE tenant_id = $1 
+           AND item_status = 'active' 
+           AND visibility = 'public') as product_count,
+        -- Check if any products are featured
+        (SELECT BOOL_OR(is_actively_featured)
+         FROM mv_global_discovery 
+         WHERE tenant_id = $1 
+           AND item_status = 'active' 
+           AND visibility = 'public') as has_featured_products
+      FROM mv_global_discovery
+      WHERE tenant_id = $1
+        AND item_status = 'active'
+        AND visibility = 'public'
+      LIMIT 1
+    `;
+
+    const result = await pool.query(storeQuery, [identifier]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Store profile not found'
+      });
+    }
+
+    const storeData = result.rows[0];
+
+    // Transform data to match expected format
+    const transformedStore = {
+      id: storeData.tenant_id,
+      name: storeData.tenant_name,
+      slug: storeData.tenant_slug,
+      logo_url: storeData.tenant_logo_url,
+      city: storeData.tenant_city,
+      state: storeData.tenant_state,
+      country: storeData.tenant_country,
+      zip: storeData.tenant_zip,
+      address: storeData.tenant_address,
+      latitude: storeData.tenant_latitude,
+      longitude: storeData.tenant_longitude,
+      subscription_tier: storeData.subscription_tier,
+      shop_category: storeData.shop_category,
+      average_rating: storeData.store_average_rating,
+      review_count: storeData.store_review_count,
+      business_type: storeData.business_type,
+      business_category: storeData.business_category,
+      created_at: storeData.created_at,
+      updated_at: storeData.updated_at,
+      mv_refreshed_at: storeData.mv_refreshed_at,
+      // Additional fields
+      product_count: parseInt(storeData.product_count || '0'),
+      has_featured_products: storeData.has_featured_products || false,
+      // TODO: Add phone, payment methods, delivery options when available in mv_global
+      phone: null,
+      payment_methods: [],
+      delivery_options: []
+    };
+
+    res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
+    res.setHeader('X-Service-Source', 'mv_global');
+
+    res.json({
+      success: true,
+      data: transformedStore,
+      metadata: {
+        identifier,
+        cacheTTL: 15 * 60 * 1000 // 15 minutes
+      }
+    });
+  } catch (error) {
+    console.error('[PUBLIC API] Store profile error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 
 // ====================
 // SHOPS ENDPOINTS

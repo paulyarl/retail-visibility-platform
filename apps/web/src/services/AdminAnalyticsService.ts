@@ -81,8 +81,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     const result = await this.makeDefaultRequest<any>(
       '/api/admin/directory/stats',
       {},
-      'platform-admin-directory-stats',
-      this.cacheTTL
+      'platform-admin-directory-stats'
     );
 
     if (!result.success) {
@@ -120,7 +119,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     if (filters.page) params.append('page', filters.page.toString());
     if (filters.limit) params.append('limit', filters.limit.toString());
 
-    const result = await this.makeAdminRequest<{
+    const result = await this.makeDefaultRequest<{
       listings: any[];
       pagination: {
         page: number;
@@ -131,8 +130,7 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     }>(
       `/api/admin/directory/listings?${params}`,
       {},
-      'platform-admin-directory-listings',
-      this.cacheTTL
+      'platform-admin-directory-listings'
     );
 
     if (!result.success) {
@@ -147,11 +145,10 @@ export class AdminAnalyticsService extends AdminApiSingleton {
    * Get admin enrichment analytics
    */
   async getAdminEnrichmentAnalytics(): Promise<EnrichmentAnalytics | null> {
-    const result = await this.makeAdminRequest<EnrichmentAnalytics>(
+    const result = await this.makeDefaultRequest<EnrichmentAnalytics>(
       `/api/admin/enrichment/analytics?_t=${Date.now()}`,
       {},
-      'platform-admin-enrichment-analytics',
-      this.cacheTTL
+      'platform-admin-enrichment-analytics'
     );
 
     if (!result.success) {
@@ -177,11 +174,10 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     if (params.limit) queryParams.append('limit', params.limit.toString());
     if (params.offset) queryParams.append('offset', params.offset.toString());
 
-    const result = await this.makeAdminRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/enrichment/products/search?${queryParams}`,
       {},
-      'platform-admin-enrichment-search',
-      this.cacheTTL
+      'platform-admin-enrichment-search'
     );
 
     if (!result.success) {
@@ -196,11 +192,10 @@ export class AdminAnalyticsService extends AdminApiSingleton {
    * Get admin subdomain statistics
    */
   async getAdminSubdomainStats(): Promise<any> {
-    const result = await this.makeAdminRequest<{ data: any }>(
+    const result = await this.makeDefaultRequest<any>(
       '/api/analytics/subdomain-stats',
       {},
-      'platform-admin-subdomain-stats',
-      this.cacheTTL
+      'platform-admin-subdomain-stats'
     );
 
     if (!result.success) {
@@ -215,11 +210,10 @@ export class AdminAnalyticsService extends AdminApiSingleton {
    * Get platform overview analytics
    */
   async getPlatformOverview(): Promise<any> {
-    const result = await this.makeAdminRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       '/api/admin/analytics/overview',
       {},
-      'platform-admin-overview',
-      this.cacheTTL
+      'platform-admin-overview'
     );
 
     if (!result.success) {
@@ -238,11 +232,10 @@ export class AdminAnalyticsService extends AdminApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeAdminRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/analytics/tenant/${tenantId}/usage`,
       {},
-      `platform-tenant-usage-stats-${tenantId}`,
-      this.cacheTTL
+      `platform-tenant-usage-stats-${tenantId}`
     );
 
     if (!result.success) {
@@ -257,11 +250,10 @@ export class AdminAnalyticsService extends AdminApiSingleton {
    * Get feature adoption metrics
    */
   async getFeatureAdoptionMetrics(timeframe: string = '30d'): Promise<any> {
-    const result = await this.makeAdminRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/analytics/feature-adoption?timeframe=${timeframe}`,
       {},
-      'platform-feature-adoption-metrics',
-      this.cacheTTL
+      'platform-feature-adoption-metrics'
     );
 
     if (!result.success) {
@@ -276,11 +268,10 @@ export class AdminAnalyticsService extends AdminApiSingleton {
    * Get performance metrics
    */
   async getPerformanceMetrics(timeframe: string = '24h'): Promise<any> {
-    const result = await this.makeAdminRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/analytics/performance?timeframe=${timeframe}`,
       {},
-      'platform-performance-metrics',
-      this.cacheTTL
+      'platform-performance-metrics'
     );
 
     if (!result.success) {
@@ -295,11 +286,10 @@ export class AdminAnalyticsService extends AdminApiSingleton {
    * Get user activity analytics
    */
   async getUserActivityAnalytics(timeframe: string = '7d'): Promise<any> {
-    const result = await this.makeAdminRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/analytics/user-activity?timeframe=${timeframe}`,
       {},
-      'platform-user-activity-analytics',
-      this.cacheTTL
+      'platform-user-activity-analytics'
     );
 
     if (!result.success) {
@@ -314,11 +304,10 @@ export class AdminAnalyticsService extends AdminApiSingleton {
    * Get revenue analytics
    */
   async getRevenueAnalytics(timeframe: string = '30d'): Promise<any> {
-    const result = await this.makeAdminRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/analytics/revenue?timeframe=${timeframe}`,
       {},
-      'platform-revenue-analytics',
-      this.cacheTTL
+      'platform-revenue-analytics'
     );
 
     if (!result.success) {
@@ -335,11 +324,10 @@ export class AdminAnalyticsService extends AdminApiSingleton {
   async exportAnalyticsData(type: string, format: string = 'csv', params: any = {}): Promise<any> {
     const queryParams = new URLSearchParams({ format, ...params });
     
-    const result = await this.makeAdminRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/analytics/export/${type}?${queryParams}`,
       {},
-      `platform-export-analytics-${type}`,
-      this.cacheTTL
+      `platform-export-analytics-${type}`
     );
 
     if (!result.success) {
@@ -359,11 +347,10 @@ export class AdminAnalyticsService extends AdminApiSingleton {
     }
 
     const queryParams = new URLSearchParams(params);
-    const result = await this.makeAdminRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/admin/reports/${reportId}?${queryParams}`,
       {},
-      `platform-custom-report-${reportId}`,
-      this.cacheTTL
+      `platform-custom-report-${reportId}`
     );
 
     if (!result.success) {

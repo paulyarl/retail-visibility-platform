@@ -70,7 +70,7 @@ export class OrganizationService extends TenantApiSingleton {
     notes?: string;
     requestType?: string;
   }): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       '/api/organization-requests',
       { 
         method: 'POST',
@@ -98,7 +98,7 @@ export class OrganizationService extends TenantApiSingleton {
       throw new Error('Organization ID and Tenant ID are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/organizations/${organizationId}/tenants/${tenantId}`,
       { method: 'POST' },
       `platform-assign-tenant-${tenantId}-to-org-${organizationId}`
@@ -122,7 +122,7 @@ export class OrganizationService extends TenantApiSingleton {
       throw new Error('Organization ID and Tenant ID are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/organizations/${organizationId}/tenants/${tenantId}`,
       { method: 'DELETE' },
       `platform-remove-tenant-${tenantId}-from-org-${organizationId}`
@@ -146,7 +146,7 @@ export class OrganizationService extends TenantApiSingleton {
       throw new Error('Request ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/organization-requests/${requestId}`,
       { method: 'DELETE' },
       `platform-delete-pending-request-${requestId}`
@@ -169,7 +169,7 @@ export class OrganizationService extends TenantApiSingleton {
       throw new Error('Request ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/organization-requests/${requestId}`,
       {
         method: 'PATCH',
@@ -226,7 +226,7 @@ export class OrganizationService extends TenantApiSingleton {
     if (filters.page) params.append('page', filters.page.toString());
     if (filters.limit) params.append('limit', filters.limit.toString());
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/organizations?${params}`,
       {},
       'platform-organizations',
@@ -250,7 +250,7 @@ export class OrganizationService extends TenantApiSingleton {
     domain?: string;
     settings?: any;
   }): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       '/api/organizations',
       { 
         method: 'POST',
@@ -278,7 +278,7 @@ export class OrganizationService extends TenantApiSingleton {
       throw new Error('Organization ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/organizations/${organizationId}`,
       { 
         method: 'PATCH',
@@ -307,7 +307,7 @@ export class OrganizationService extends TenantApiSingleton {
       throw new Error('Organization ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/organizations/${organizationId}`,
       { method: 'DELETE' },
       `platform-delete-organization-${organizationId}`
@@ -331,7 +331,7 @@ export class OrganizationService extends TenantApiSingleton {
       throw new Error('Organization ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any[]>(
+    const result = await this.makeDefaultRequest<any[]>(
       `/api/organizations/${organizationId}/members`,
       {},
       `platform-org-members-${organizationId}`,
@@ -357,7 +357,7 @@ export class OrganizationService extends TenantApiSingleton {
       throw new Error('Organization ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/organizations/${organizationId}/members`,
       { 
         method: 'POST',
@@ -385,7 +385,7 @@ export class OrganizationService extends TenantApiSingleton {
       throw new Error('Organization ID and User ID are required');
     }
 
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/organizations/${organizationId}/members/${userId}`,
       { method: 'DELETE' },
       `platform-remove-org-member-${organizationId}-${userId}`
@@ -408,7 +408,7 @@ export class OrganizationService extends TenantApiSingleton {
       throw new Error('Organization ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/organizations/${organizationId}/settings`,
       {},
       `platform-org-settings-${organizationId}`,
@@ -431,7 +431,7 @@ export class OrganizationService extends TenantApiSingleton {
       throw new Error('Organization ID is required');
     }
 
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/organizations/${organizationId}/settings`,
       { 
         method: 'PATCH',

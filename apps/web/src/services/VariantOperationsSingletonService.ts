@@ -12,7 +12,7 @@
  * - Error handling and logging
  */
 
-import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 
 export interface BulkFeaturedTypeOperation {
   variantIds: string[];
@@ -59,7 +59,7 @@ class VariantOperationsSingletonService extends AdminApiSingleton {
     return VariantOperationsSingletonService.instance;
   }
 
-  private constructor() {
+  protected constructor() {
     super('variant-operations-service', {
       ttl: 5 * 60 * 1000 // 5 minutes for variant operations
     });

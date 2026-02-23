@@ -44,10 +44,15 @@ class SquareIntegrationSingletonService extends AuthenticatedApiSingleton {
   /**
    * Get Square integration status
    */
-  async getSquareStatus(tenantId: string): Promise<SquareIntegrationData | null> {
+  async getSquareStatus(tenantId: string): Promise<{
+    success: boolean;
+    data?: SquareIntegrationData;
+    error?: { code: string; message: string; status?: number };
+    userMessage?: string;
+  }> {
     try {
       if (!tenantId) {
-        throw new Error('Tenant ID is required');
+        return this.createResponse(false, undefined, undefined, 'Tenant ID is required');
       }
 
       const result = await this.makeDefaultRequest<SquareIntegrationData>(
@@ -55,15 +60,16 @@ class SquareIntegrationSingletonService extends AuthenticatedApiSingleton {
         {},
         `square-status-${tenantId}`
       );
-      if (!result.success){
-        console.error('[SquareIntegrationSingleton] Failed to get Square status:', result.error);
-        return null;
+      
+      if (!result.success) {
+        this.logError('Failed to get Square status', result.error);
+        return this.createResponse(false, undefined, result.error);
       }
 
-      return result.data || null;
+      return this.createResponse(true, result.data);
     } catch (error) {
-      console.error('[SquareIntegrationSingleton] Failed to get Square status:', error);
-      return null;
+      this.logError('Failed to get Square status', error);
+      return this.createResponse(false, undefined, error, 'Failed to connect to Square service');
     }
   }
 

@@ -136,6 +136,7 @@ export interface ProductBucketProps {
   showViewAll?: boolean;
   viewAllUrl?: string;
   onProductClick?: (product: any) => void;
+  onShopClick?: (shop: any) => void;
   viewMode?: 'grid' | 'list';
   className?: string;
 }
@@ -148,6 +149,7 @@ export function ProductBucket({
   subtitle,
   maxItems = 8,
   onProductClick,
+  onShopClick,
   viewMode = 'grid',
   showViewAll = false,
   viewAllUrl,

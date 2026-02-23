@@ -96,7 +96,7 @@ export function validateInput(req: Request, res: Response, next: NextFunction) {
           if (pattern.test(value)) {
             console.error(`[SECURITY] Blocked dangerous pattern in query param "${key}": ${value} from ${clientIP}`);
             return res.status(400).json({
-              error: 'Bad Request',
+              error: 'dangerous_input_detected',
               message: 'Invalid input detected'
             });
           }
@@ -132,7 +132,7 @@ export function validateInput(req: Request, res: Response, next: NextFunction) {
           if (pattern.test(value)) {
             console.error(`[SECURITY] Blocked dangerous pattern in URL param "${key}": ${value} from ${clientIP}`);
             return res.status(400).json({
-              error: 'Bad Request',
+              error: 'dangerous_input_detected',
               message: 'Invalid input detected'
             });
           }
@@ -190,7 +190,7 @@ export function validateInput(req: Request, res: Response, next: NextFunction) {
 
       if (!checkObject(req.body)) {
         return res.status(400).json({
-          error: 'Bad Request',
+          error: 'dangerous_input_detected',
           message: 'Invalid input detected'
         });
       }
@@ -203,7 +203,7 @@ export function validateInput(req: Request, res: Response, next: NextFunction) {
           if (pattern.test(value)) {
             console.error(`[SECURITY] Blocked dangerous pattern in header "${key}": ${value} from ${clientIP}`);
             return res.status(400).json({
-              error: 'Bad Request',
+              error: 'dangerous_input_detected',
               message: 'Invalid input detected'
             });
           }

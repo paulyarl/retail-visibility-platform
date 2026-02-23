@@ -47,7 +47,7 @@ class CategoriesSingletonService extends PublicApiSingleton {
    * Uses the /directory/categories endpoint
    */
   async getCategories(includeChildren: boolean = true): Promise<Category[]> {
-    const result = await this.makePublicRequest<{ categories: Category[] }>(
+    const result = await this.makeDefaultRequest<{ categories: Category[] }>(
       `/api/directory/categories?includeChildren=${includeChildren}`,
       {},
       `categories-${includeChildren}`
@@ -71,7 +71,7 @@ class CategoriesSingletonService extends PublicApiSingleton {
       return null;
     }
 
-    const result = await this.makePublicRequest<{ category: Category }>(
+    const result = await this.makeDefaultRequest<{ category: Category }>(
       `/api/directory/categories/${slug}`,
       {},
       `category-${slug}`
@@ -95,7 +95,7 @@ class CategoriesSingletonService extends PublicApiSingleton {
       return [];
     }
 
-    const result = await this.makePublicRequest<{ categories: Category[] }>(
+    const result = await this.makeDefaultRequest<{ categories: Category[] }>(
       `/api/directory/categories?tenantId=${tenantId}&includeChildren=${includeChildren}`,
       {},
       `categories-tenant-${tenantId}-${includeChildren}`

@@ -41,7 +41,7 @@ export interface OnboardingData {
 export class UserManagementService extends AuthenticatedApiSingleton {
   private static instance: UserManagementService;
 
-  private constructor() {
+  protected constructor() {
     super('UserManagementService');
   }
 
@@ -56,7 +56,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
    * Get current user information
    */
   async getUser(): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       '/auth/me',
       {},
       'platform-user-info',
@@ -75,7 +75,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
    * Get user preferences
    */
   async getUserPreferences(): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       '/api/user/preferences',
       {},
       'platform-user-preferences',
@@ -94,13 +94,17 @@ export class UserManagementService extends AuthenticatedApiSingleton {
    * Update user preferences
    */
   async updateUserPreferences(preferences: any): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       '/api/user/preferences',
       { 
         method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(preferences)
       },
-      'platform-update-user-preferences'
+      'platform-update-preferences',
+      this.cacheTTL / 2 // Shorter cache for updates
     );
 
     if (!result.success) {
@@ -153,13 +157,14 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     avatar?: string;
     bio?: string;
   }): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       '/api/user/profile',
       { 
         method: 'PATCH',
         body: JSON.stringify(profileData)
       },
-      'platform-update-user-profile'
+      'platform-update-profile',
+      this.cacheTTL / 2
     );
 
     if (!result.success) {
@@ -180,13 +185,14 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     currentPassword: string;
     newPassword: string;
   }): Promise<void> {
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       '/api/auth/change-password',
       { 
         method: 'POST',
         body: JSON.stringify(passwordData)
       },
-      'platform-change-password'
+      'platform-change-password',
+      0 // No cache for security operations
     );
 
     if (!result.success) {
@@ -199,10 +205,11 @@ export class UserManagementService extends AuthenticatedApiSingleton {
    * Enable two-factor authentication
    */
   async enable2FA(): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       '/api/auth/2fa/enable',
       { method: 'POST' },
-      'platform-enable-2fa'
+      'platform-enable-2fa',
+      this.cacheTTL
     );
 
     if (!result.success) {
@@ -217,7 +224,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
    * Verify two-factor authentication
    */
   async verify2FA(token: string): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       '/api/auth/2fa/verify',
       { 
         method: 'POST',
@@ -238,7 +245,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
    * Disable two-factor authentication
    */
   async disable2FA(password: string): Promise<void> {
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       '/api/auth/2fa/disable',
       { 
         method: 'POST',
@@ -257,7 +264,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
    * Get user activity log
    */
   async getUserActivity(limit: number = 50): Promise<any[]> {
-    const result = await this.makeAuthenticatedRequest<any[]>(
+    const result = await this.makeDefaultRequest<any[]>(
       `/api/user/activity?limit=${limit}`,
       {},
       'platform-user-activity',
@@ -276,7 +283,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
    * Delete user account
    */
   async deleteAccount(password: string): Promise<void> {
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       '/api/user/delete-account',
       { 
         method: 'DELETE',
@@ -296,7 +303,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
 
   // Helper methods for onboarding data
   private async getTenantById(tenantId: string): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}`,
       {},
       `platform-tenant-${tenantId}`,
@@ -307,7 +314,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
   }
 
   private async getTenantProfile(tenantId: string): Promise<any> {
-    const result = await this.makeAuthenticatedRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenant/profile?tenant_id=${encodeURIComponent(tenantId)}`,
       {},
       `platform-tenant-profile-${tenantId}`,

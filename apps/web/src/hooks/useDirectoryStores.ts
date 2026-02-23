@@ -115,7 +115,7 @@ export const useDirectoryStores = (
       });
       
       // Use the directory API endpoint through singleton service
-      // Service handles caching automatically through makePublicRequest
+      // Service handles caching automatically through makeDefaultRequest
       const result = await recommendationsService.searchDirectoryStores({
         search,
         category,
@@ -157,30 +157,16 @@ export const useDirectoryStores = (
       const endTime = Date.now();
       const responseTime = endTime - startTime;
 
-      // Update metrics for cache miss
-      console.log('[useDirectoryStores] Updating metrics for cache miss:', {
-        before: { cacheMisses: localMetrics.cacheMisses, totalRequests: localMetrics.totalRequests },
-        responseTime
-      });
+      // Get actual service metrics instead of manual tracking
+      const serviceMetrics = recommendationsService.getMetrics();
+      console.log('[useDirectoryStores] Service metrics:', serviceMetrics);
       
-      setLocalMetrics(prev => {
-        const newMetrics = {
-          ...prev,
-          totalRequests: prev.totalRequests + 1,
-          cacheMisses: prev.cacheMisses + 1,
-          averageResponseTime: (prev.averageResponseTime * prev.totalRequests + responseTime) / (prev.totalRequests + 1),
-        };
-        console.log('[useDirectoryStores] Updated metrics for cache miss:', newMetrics);
-        console.log('[useDirectoryStores] Metrics comparison:', {
-          before: prev,
-          after: newMetrics,
-          diff: {
-            cacheMisses: newMetrics.cacheMisses - prev.cacheMisses,
-            totalRequests: newMetrics.totalRequests - prev.totalRequests,
-            averageResponseTime: newMetrics.averageResponseTime - prev.averageResponseTime,
-          },
-        });
-        return newMetrics;
+      // Update local metrics to match service metrics
+      setLocalMetrics({
+        cacheHits: serviceMetrics.cacheHits,
+        cacheMisses: serviceMetrics.cacheMisses,
+        totalRequests: serviceMetrics.cacheHits + serviceMetrics.cacheMisses,
+        averageResponseTime: responseTime
       });
 
     } catch (err) {

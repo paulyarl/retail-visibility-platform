@@ -10,7 +10,7 @@
  * - Cross-target support (can call web server when needed)
  */
 
-import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, SystemRequestOptions, SystemApiResponse, ApiResult } from './FlexibleApiSingleton';
+import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, SystemRequestOptions, SystemApiResponse, ApiResult, PublicRequestOptions, PublicApiResponse } from './FlexibleApiSingleton';
 
 // ====================
 // UNIFIED SYSTEM API SINGLETON
@@ -31,60 +31,7 @@ export abstract class ApiSystemSingleton extends FlexibleApiSingleton {
   // ====================
   // CORE SYSTEM METHODS
   // ====================
-
-  /**
-   * Make API request to backend (port 4000)
-   * Now uses the new target system - no manual URL construction needed
-   */
-  protected async makeApiRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    customTTL?: number,
-    handle404: boolean = true
-  ): Promise<ApiResult<T>> {
-    // Add API-specific headers
-    const apiOptions: RequestInit = {
-      ...options,
-      headers: {
-        ...options.headers,
-        'X-API-Request': 'true', // Mark as API request for backend validation
-      }
-    };
-
-    // Use the new target-aware request system
-    return this.makeDefaultRequest(url, apiOptions, cacheKey, customTTL, handle404);
-  }
-
-  /**
-   * Make authenticated API request
-   * Now uses inherited makeApiRequest which handles API target automatically
-   */
-  protected async makeAuthenticatedApiRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    customTTL?: number,
-    handle404: boolean = true
-  ): Promise<ApiResult<T>> {
-    return this.makeApiRequest(url, options, cacheKey, customTTL, handle404);
-  }
-
-  /**
-   * Make public API request
-   * Uses convenience method for PUBLIC + API combination
-   */
-  protected async makePublicRequest<T>(
-    url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    customTTL?: number,
-    handle404: boolean = true
-  ): Promise<ApiResult<T>> {
-    // Use the new PUBLIC + API convenience method
-    return this.makePublicApiRequest(url, options, cacheKey, customTTL);
-  }
-
+   
   /**
    * Make request to web server when needed
    * Demonstrates cross-target capability
@@ -96,8 +43,8 @@ export abstract class ApiSystemSingleton extends FlexibleApiSingleton {
     customTTL?: number,
     handle404: boolean = true
   ): Promise<ApiResult<T>> {
-    // Use the inherited WEB target override from FlexibleApiSingleton
-    return super.makeWebRequest(url, options, cacheKey, customTTL);
+    // Use the inherited makeDefaultRequest from FlexibleApiSingleton
+    return super.makeDefaultRequest(url, options, cacheKey, customTTL);
   }
 
   // ====================
@@ -115,7 +62,6 @@ export abstract class ApiSystemSingleton extends FlexibleApiSingleton {
     systemOptions: Partial<SystemRequestOptions> = {}
   ) {
     const defaults: SystemRequestOptions = {
-      requireSystemContext: true,
       validateSystemAccess: true,
       bypassCache: false // Configurable (was true in SystemApiSingleton)
     };
@@ -123,9 +69,11 @@ export abstract class ApiSystemSingleton extends FlexibleApiSingleton {
     return await this.makeSystemRequest<T>(
       url,
       options,
-      cacheKey,
-      ttl,
-      { ...defaults, ...systemOptions }
+      {
+        cacheKey,
+        ttl,
+        ...{ ...defaults, ...systemOptions }
+      }
     );
   }
 
@@ -142,10 +90,9 @@ export abstract class ApiSystemSingleton extends FlexibleApiSingleton {
     return await this.makeSystemRequest<T>(
       url,
       options,
-      cacheKey,
-      ttl,
       {
-        requireSystemContext: true,
+        cacheKey,
+        ttl,
         validateSystemAccess: true,
         systemKey: systemKey,
         bypassCache: false // Configurable
@@ -167,11 +114,9 @@ export abstract class ApiSystemSingleton extends FlexibleApiSingleton {
     return await this.makeSystemRequest<T>(
       url,
       options,
-      cacheKey,
-      ttl,
       {
-        requireSystemContext: false,
-        validateSystemAccess: false,
+        cacheKey,
+        ttl,
         bypassCache: bypassCache // Configurable
       }
     );
@@ -191,11 +136,11 @@ export abstract class ApiSystemSingleton extends FlexibleApiSingleton {
     return await this.makeAdminRequest<T>(
       url,
       options,
-      cacheKey,
-      ttl,
       {
+        cacheKey,
+        ttl,
         requireAdminContext: false, // System bypasses admin validation
-        validateAdminAccess: false
+        bypassCache: false // Configurable
       }
     );
   }
@@ -210,7 +155,10 @@ export abstract class ApiSystemSingleton extends FlexibleApiSingleton {
     cacheKey?: string,
     ttl?: number
   ) {
-    return await this.makePublicRequest<T>(url, options, cacheKey, ttl);
+    return await this.makePublicRequest<T>(url, options, {
+      cacheKey,
+      ttl
+    });
   }
 
   /**

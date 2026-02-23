@@ -6,7 +6,7 @@
  * Provides admin-specific caching and error handling
  */
 
-import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, AdminRequestOptions, AdminApiResponse } from './FlexibleApiSingleton';
+import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, AdminRequestOptions, AdminApiResponse, PublicRequestOptions, PublicApiResponse } from './FlexibleApiSingleton';
 
 // ====================
 // ADMIN API SINGLETON
@@ -80,23 +80,43 @@ export abstract class AdminApiSingleton extends FlexibleApiSingleton {
     customTTL?: number,
     handle404: boolean = true
   ): Promise<AdminApiResponse<T>> {
-    // Use the inherited WEB target override from FlexibleApiSingleton
-    return super.makeWebRequest(url, options, cacheKey, customTTL);
+    // Use the inherited makeDefaultRequest from FlexibleApiSingleton
+    return super.makeDefaultRequest(url, options, cacheKey, customTTL);
   }
 
   /**
-   * Make public admin request to API server
-   * Uses convenience method for PUBLIC + API combination
+   * Override hook for admin request behavior
    */
-  protected async makePublicRequest<T>(
+  protected async onAdminRequest<T>(
     url: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    customTTL?: number,
-    handle404: boolean = true
-  ): Promise<AdminApiResponse<T>> {
-    // Use the new PUBLIC + API convenience method
-    return this.makePublicApiRequest(url, options, cacheKey, customTTL);
+    options: RequestInit,
+    requestOptions?: AdminRequestOptions
+  ): Promise<RequestInit> {
+    const modifiedOptions = { ...options };
+
+    // Add Authorization header with bearer token
+    const token = await this.getAuthToken();
+    if (token) {
+      modifiedOptions.headers = {
+        ...modifiedOptions.headers,
+        'Authorization': `Bearer ${token}`,
+      };
+    } else {
+      console.warn('[AdminApiSingleton] No auth token available for admin request');
+    }
+
+    // Add admin context headers
+    modifiedOptions.headers = {
+      ...modifiedOptions.headers,
+      'X-Request-Context': 'admin',
+      'X-Admin-Roles': 'PLATFORM_ADMIN', // Could be dynamic based on token
+    };
+
+    // Add audit tracking
+    const auditId = this.generateAuditId();
+    (modifiedOptions.headers as Record<string, string>)['X-Audit-ID'] = auditId;
+
+    return modifiedOptions;
   }
 
   /**

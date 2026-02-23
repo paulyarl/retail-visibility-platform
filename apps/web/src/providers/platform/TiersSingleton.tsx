@@ -127,7 +127,7 @@ class TiersSingleton extends TenantApiSingleton {
    * Get tier by ID
    */
   async getTier(tierId: string): Promise<Tier | null> {
-    const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
+    const result = await this.makeDefaultRequest<{ tier: Tier }>(
       `/api/tiers-singleton/${tierId}`,
       {},
       `tier-${tierId}`
@@ -148,7 +148,7 @@ class TiersSingleton extends TenantApiSingleton {
    * Get tier by slug
    */
   async getTierBySlug(slug: string): Promise<Tier | null> {
-    const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
+    const result = await this.makeDefaultRequest<{ tier: Tier }>(
       `/api/tiers-singleton/slug/${slug}`,
       {},
       `tier-slug-${slug}`
@@ -169,7 +169,7 @@ class TiersSingleton extends TenantApiSingleton {
    * Create new tier
    */
   async createTier(request: CreateTierRequest): Promise<Tier> {
-    const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
+    const result = await this.makeDefaultRequest<{ tier: Tier }>(
       '/api/tiers-singleton',
       {
         method: 'POST',
@@ -193,7 +193,7 @@ class TiersSingleton extends TenantApiSingleton {
    * Update tier
    */
   async updateTier(tierId: string, updates: UpdateTierRequest): Promise<Tier> {
-    const result = await this.makeAuthenticatedRequest<{ tier: Tier }>(
+    const result = await this.makeDefaultRequest<{ tier: Tier }>(
       `/api/tiers-singleton/${tierId}`,
       {
         method: 'PUT',
@@ -217,7 +217,7 @@ class TiersSingleton extends TenantApiSingleton {
    * Delete tier
    */
   async deleteTier(tierId: string): Promise<void> {
-    const result = await this.makeAuthenticatedRequest<void>(
+    const result = await this.makeDefaultRequest<void>(
       `/api/tiers-singleton/${tierId}`,
       {
         method: 'DELETE'
@@ -251,7 +251,7 @@ class TiersSingleton extends TenantApiSingleton {
 
       const cacheKey = `tiers-list-${params.toString()}`;
 
-      const result = await this.makeAuthenticatedRequest<{ tiers: Tier[] }>(
+      const result = await this.makeDefaultRequest<{ tiers: Tier[] }>(
         `/api/tiers-singleton?${params}`,
         {},
         cacheKey
@@ -277,7 +277,7 @@ class TiersSingleton extends TenantApiSingleton {
    * Get tier statistics
    */
   async getTierStats(): Promise<TierStats> {
-    const result = await this.makeAuthenticatedRequest<{ stats: TierStats }>(
+    const result = await this.makeDefaultRequest<{ stats: TierStats }>(
       '/api/tiers-singleton/stats',
       {},
       'tier-stats'
@@ -297,7 +297,7 @@ class TiersSingleton extends TenantApiSingleton {
    * Check if tenant can upgrade to tier
    */
   async canUpgradeToTier(tenantId: string, targetTierId: string): Promise<UpgradeEligibility> {
-    const result = await this.makeAuthenticatedRequest<UpgradeEligibility>(
+    const result = await this.makeDefaultRequest<UpgradeEligibility>(
       `/api/tiers-singleton/${targetTierId}/can-upgrade/${tenantId}`,
       {},
       `upgrade-check-${tenantId}-${targetTierId}`
@@ -321,7 +321,7 @@ class TiersSingleton extends TenantApiSingleton {
    * Get tier limits
    */
   async getTierLimits(tierId: string): Promise<Tier['limits'] | null> {
-    const result = await this.makeAuthenticatedRequest<{ limits: Tier['limits'] }>(
+    const result = await this.makeDefaultRequest<{ limits: Tier['limits'] }>(
       `/api/tiers-singleton/${tierId}/limits`,
       {},
       `tier-limits-${tierId}`
@@ -342,7 +342,7 @@ class TiersSingleton extends TenantApiSingleton {
    * Check if tier has feature
    */
   async hasFeature(tierId: string, feature: keyof Tier['features']): Promise<boolean> {
-    const result = await this.makeAuthenticatedRequest<{ hasFeature: boolean }>(
+    const result = await this.makeDefaultRequest<{ hasFeature: boolean }>(
       `/api/tiers-singleton/${tierId}/has-feature/${feature}`,
       {},
       `tier-feature-${tierId}-${feature}`

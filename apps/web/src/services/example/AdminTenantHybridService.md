@@ -7,7 +7,8 @@
  * - Example: Admin allowing tenant owners to call within their context
  */
 
-import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
+import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { RequestType, RequestTarget, SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 
 export interface TenantAnalytics {
   totalScans: number;
@@ -25,7 +26,7 @@ export interface PlatformStats {
  * Admin service that can make tenant-context requests
  * Perfect example of the flexible architecture
  */
-class AdminTenantHybridService extends FlexibleApiSingleton {
+class AdminTenantHybridService extends AdminApiSingleton {
   private static instance: AdminTenantHybridService;
   
   // Default to admin-level access
@@ -75,12 +76,10 @@ class AdminTenantHybridService extends FlexibleApiSingleton {
    */
   async getSystemHealth(): Promise<any> {
     try {
-      const response = await this.makeAdminRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/admin/system/health',
         {},
-        'system-health',
-        this.cacheTTL,
-        { requireAdminContext: true, validateAdminAccess: true }
+        'system-health' 
       );
 
       return response.data;
@@ -105,16 +104,10 @@ class AdminTenantHybridService extends FlexibleApiSingleton {
     try {
       // Use tenant request method but with admin privileges
       // This allows admin to access tenant data while maintaining tenant context
-      const response = await this.makeTenantRequest<TenantAnalytics>(
+      const response = await this.makeDefaultRequest<TenantAnalytics>(
         `/api/tenant/${tenantId}/analytics`,
         {},
-        `tenant-analytics-${tenantId}`,
-        this.cacheTTL,
-        {
-          requireTenantContext: true,
-          validateTenantAccess: false, // Admin bypasses tenant validation
-          tenantId: tenantId
-        }
+        `tenant-analytics-${tenantId}`
       );
 
       return response.data || null;
@@ -133,19 +126,13 @@ class AdminTenantHybridService extends FlexibleApiSingleton {
     maintenanceType: string
   ): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await this.makeTenantRequest<{ success: boolean; message: string }>(
+      const response = await this.makeDefaultRequest<{ success: boolean; message: string }>(
         `/api/tenant/${tenantId}/maintenance`,
         {
           method: 'POST',
           body: JSON.stringify({ maintenanceType, initiatedBy: 'admin' })
         },
-        `tenant-maintenance-${tenantId}`,
-        0, // No caching for write operations
-        {
-          requireTenantContext: true,
-          validateTenantAccess: false, // Admin bypass
-          tenantId: tenantId
-        }
+        `tenant-maintenance-${tenantId}` 
       );
 
       return response.data || { success: false, message: 'No data returned' };
@@ -165,7 +152,7 @@ class AdminTenantHybridService extends FlexibleApiSingleton {
    */
   async getPublicConfig(): Promise<any> {
     try {
-      const response = await this.makePublicRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         '/api/public/config',
         {},
         'public-config',
@@ -189,7 +176,7 @@ class AdminTenantHybridService extends FlexibleApiSingleton {
    */
   async getUserProfile(userId: string): Promise<any> {
     try {
-      const response = await this.makeAuthenticatedRequest<any>(
+      const response = await this.makeDefaultRequest<any>(
         `/api/users/${userId}/profile`,
         {},
         `user-profile-${userId}`,

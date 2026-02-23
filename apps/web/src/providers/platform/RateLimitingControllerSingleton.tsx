@@ -103,7 +103,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
    * Load rate limit rules from database
    */
   private async loadRateLimitRules(): Promise<void> {
-    const result = await this.makeAuthenticatedRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
+    const result = await this.makeDefaultRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
     
     if (!result.success) {
       console.error('Error loading rate limit rules:', result.error);
@@ -134,7 +134,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
       updatedAt: new Date().toISOString()
     };
 
-    const result = await this.makeAuthenticatedRequest<RateLimitRule>('/api/admin/rate-limiting/rules', {
+    const result = await this.makeDefaultRequest<RateLimitRule>('/api/admin/rate-limiting/rules', {
       method: 'POST',
       body: JSON.stringify(newRule)
     });
@@ -170,7 +170,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
       updatedAt: new Date().toISOString()
     };
 
-    const result = await this.makeAuthenticatedRequest<RateLimitRule>(`/api/admin/rate-limiting/rules/${routeType}`, {
+    const result = await this.makeDefaultRequest<RateLimitRule>(`/api/admin/rate-limiting/rules/${routeType}`, {
       method: 'PUT',
       body: JSON.stringify(updatedRule)
     });
@@ -195,7 +195,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
    * Delete a rate limit rule
    */
   async deleteRateLimitRule(routeType: string): Promise<void> {
-    const result = await this.makeAuthenticatedRequest<void>(`/api/admin/rate-limiting/rules/${routeType}`, {
+    const result = await this.makeDefaultRequest<void>(`/api/admin/rate-limiting/rules/${routeType}`, {
       method: 'DELETE'
     });
 
@@ -215,7 +215,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
    * Get all rate limit rules
    */
   async getRateLimitRules(): Promise<RateLimitRule[]> {
-    const result = await this.makeAuthenticatedRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
+    const result = await this.makeDefaultRequest<RateLimitRule[]>('/api/admin/rate-limiting/rules', {}, 'rate-limit-rules');
     
     if (!result.success) {
       console.error('Error fetching rate limit rules:', result.error);
@@ -247,7 +247,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
    * Check rate limit status for an IP
    */
   async checkRateLimitStatus(ip: string, routeType: string): Promise<RateLimitStatus> {
-    const result = await this.makeAuthenticatedRequest<RateLimitStatus>(`/api/admin/rate-limiting/status?ip=${ip}&routeType=${routeType}`, {}, `rate-limit-status-${ip}-${routeType}`);
+    const result = await this.makeDefaultRequest<RateLimitStatus>(`/api/admin/rate-limiting/status?ip=${ip}&routeType=${routeType}`, {}, `rate-limit-status-${ip}-${routeType}`);
     
     if (!result.success) {
       console.error('Error checking rate limit status:', result.error);
@@ -285,7 +285,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
         params.append('routeType', routeType);
       }
 
-      await this.makeAuthenticatedRequest(`/api/admin/rate-limiting/reset?${params}`, {
+      await this.makeDefaultRequest(`/api/admin/rate-limiting/reset?${params}`, {
         method: 'POST'
       });
 
@@ -311,7 +311,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
    */
   async blockIPAddress(ip: string, durationMinutes: number = 60, reason: string = 'Manual block'): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest('/api/admin/rate-limiting/block', {
+      await this.makeDefaultRequest('/api/admin/rate-limiting/block', {
         method: 'POST',
         body: JSON.stringify({ ip, durationMinutes, reason })
       });
@@ -333,7 +333,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
    */
   async unblockIPAddress(ip: string): Promise<void> {
     try {
-      await this.makeAuthenticatedRequest(`/api/admin/rate-limiting/unblock/${ip}`, {
+      await this.makeDefaultRequest(`/api/admin/rate-limiting/unblock/${ip}`, {
         method: 'POST'
       });
 
@@ -357,7 +357,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
    * Get rate limiting configuration
    */
   async getRateLimitConfig(): Promise<RateLimitConfig> {
-    const result = await this.makeAuthenticatedRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {}, 'rate-limit-config');
+    const result = await this.makeDefaultRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {}, 'rate-limit-config');
     
     if (!result.success) {
       console.error('Error fetching rate limit config:', result.error);
@@ -381,7 +381,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
    * Update rate limiting configuration
    */
   async updateRateLimitConfig(config: Partial<RateLimitConfig>): Promise<RateLimitConfig> {
-    const result = await this.makeAuthenticatedRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {
+    const result = await this.makeDefaultRequest<RateLimitConfig>('/api/admin/rate-limiting/config', {
       method: 'PUT',
       body: JSON.stringify(config)
     });
@@ -409,7 +409,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
    * Get rate limiting metrics
    */
   async getRateLimitMetrics(hours: number = 24): Promise<RateLimitMetrics> {
-    const result = await this.makeAuthenticatedRequest<RateLimitMetrics>(`/api/admin/rate-limiting/metrics?hours=${hours}`, {}, `rate-limit-metrics-${hours}`);
+    const result = await this.makeDefaultRequest<RateLimitMetrics>(`/api/admin/rate-limiting/metrics?hours=${hours}`, {}, `rate-limit-metrics-${hours}`);
     
     if (!result.success) {
       console.error('Error fetching rate limit metrics:', result.error);

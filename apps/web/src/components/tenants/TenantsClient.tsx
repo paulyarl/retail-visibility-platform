@@ -97,16 +97,16 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   const filteredTenants = useMemo(() => {
     let filtered = tenants;
     
-    console.log('[TenantsClient] Filtering tenants:', { 
+    /* console.log('[TenantsClient] Filtering tenants:', { 
       totalTenants: tenants.length, 
       isViewingSpecificTenant, 
       specificTenantId 
-    });
+    }); */
     
     // If viewing a specific tenant, filter to just that one
     if (isViewingSpecificTenant && specificTenantId) {
       filtered = tenants.filter(t => t.id === specificTenantId);
-      console.log('[TenantsClient] After specific tenant filter:', filtered.length);
+      //console.log('[TenantsClient] After specific tenant filter:', filtered.length);
     }
     
     // Apply existing filters
@@ -121,7 +121,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       return matchesSearch && matchesChain && matchesStatus;
     });
     
-    console.log('[TenantsClient] Final filtered tenants count:', filtered.length);
+    //console.log('[TenantsClient] Final filtered tenants count:', filtered.length);
     return filtered;
   }, [tenants, searchQuery, chainFilter, statusFilter, isViewingSpecificTenant, specificTenantId]);
 
@@ -148,21 +148,21 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   }, []);
 
   const fetchTenants = async (includeArchived = false, statusParam?: string) => {
-    console.log('[TenantsClient] fetchTenants called', { includeArchived, statusParam });
+    //console.log('[TenantsClient] fetchTenants called', { includeArchived, statusParam });
     setLoading(true);
     setError(null);
     try {
       const tenants = await platformHomeService.getTenants();
-      console.log('[TenantsClient] Raw tenants data:', tenants);
+      //console.log('[TenantsClient] Raw tenants data:', tenants);
       
       // Filter tenants based on parameters
       let filteredTenants = tenants || [];
-      console.log('[TenantsClient] Initial filtered tenants:', filteredTenants);
+      //console.log('[TenantsClient] Initial filtered tenants:', filteredTenants);
       
       if (tenants) {
         filteredTenants = tenants.filter(tenant => {
           const tenantStatus = tenant.status || tenant.subscriptionStatus || 'active';
-          console.log('[TenantsClient] tenant status:', tenantStatus);
+          //console.log('[TenantsClient] tenant status:', tenantStatus);
           
           // Include archived if requested
           if (includeArchived && tenantStatus === 'archived') {
@@ -180,7 +180,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
         });
       }
       
-      console.log('[TenantsClient] Final filtered tenants:', filteredTenants);
+      //console.log('[TenantsClient] Final filtered tenants:', filteredTenants);
       setTenants(filteredTenants);
     } catch (_e) {
       setError("Failed to load tenants");
@@ -190,7 +190,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   };
 
   const refresh = async () => {
-    console.log('[TenantsClient] refresh called, statusFilter:', statusFilter);
+    //console.log('[TenantsClient] refresh called, statusFilter:', statusFilter);
     if (statusFilter === 'all') {
       // 'all' filter: include archived tenants but no specific status filter
       await fetchTenants(true);
@@ -221,12 +221,12 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       }
       
       const newTenant = responseData as Tenant;
-      console.log('[TenantsClient] Tenant created:', newTenant.id);
+      //console.log('[TenantsClient] Tenant created:', newTenant.id);
       
       // Refresh tenant list to get the new tenant
       await refresh();
       
-      console.log('[TenantsClient] Tenant created successfully:', newTenant.id);
+      //console.log('[TenantsClient] Tenant created successfully:', newTenant.id);
     } catch (err) {
       console.error('[TenantsClient] Create error:', err);
       setError(err instanceof Error ? err.message : "Failed to create tenant");

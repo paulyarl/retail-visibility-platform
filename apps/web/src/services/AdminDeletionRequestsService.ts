@@ -72,8 +72,7 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
     const response = await this.makeDefaultRequest<DeletionRequestsResponse>(
       `/api/admin/deletion-requests?status=${status}&page=${page}&limit=${limit}`,
       {},
-      `admin-deletion-requests-${status}-${page}-${limit}`,
-      this.cacheTTL
+      `admin-deletion-requests-${status}-${page}-${limit}` 
     );
 
     if (!response.success) {
@@ -100,11 +99,10 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
    * Get deletion requests statistics
    */
   async getDeletionStats(): Promise<DeletionStats | null> {
-    const response = await this.makeAdminRequest<{ success: boolean; data: DeletionStats }>(
+    const response = await this.makeDefaultRequest<{ success: boolean; data: DeletionStats }>(
       '/api/admin/deletion-requests/stats',
       {},
-      'admin-deletion-stats',
-      this.cacheTTL
+      'admin-deletion-stats'
     );
 
     if (!response.success) {
@@ -128,7 +126,7 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
    * Update deletion request (cancel/approve)
    */
   async updateDeletionRequest(requestId: string, action: 'cancel' | 'approve', adminNotes?: string): Promise<DeletionRequest | null> {
-    const response = await this.makeAdminRequest<DeletionRequest>(
+    const response = await this.makeDefaultRequest<DeletionRequest>(
       `/api/admin/deletion-requests/${requestId}`,
       {
         method: 'PUT',
@@ -137,8 +135,7 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
           adminNotes: adminNotes || (action === 'cancel' ? 'Cancelled by admin' : 'Approved by admin')
         })
       },
-      `admin-deletion-request-${requestId}`,
-      0 // No cache for updates
+      `admin-deletion-request-${requestId}`
     );
 
     if (!response.success) {
@@ -171,11 +168,10 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
    * Get single deletion request by ID
    */
   async getDeletionRequest(requestId: string): Promise<DeletionRequest | null> {
-    const response = await this.makeAdminRequest<DeletionRequest>(
+    const response = await this.makeDefaultRequest<DeletionRequest>(
       `/api/admin/deletion-requests/${requestId}`,
       {},
-      `admin-deletion-request-${requestId}`,
-      this.cacheTTL
+      `admin-deletion-request-${requestId}`
     );
 
     if (!response.success) {
@@ -197,11 +193,10 @@ class AdminDeletionRequestsService extends AdminApiSingleton {
    * Search deletion requests
    */
   async searchDeletionRequests(query: string, page: number = 1, limit: number = 50): Promise<DeletionRequestsResponse> {
-    const response = await this.makeAdminRequest<DeletionRequestsResponse>(
+    const response = await this.makeDefaultRequest<DeletionRequestsResponse>(
       `/api/admin/deletion-requests/search?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`,
       {},
-      `admin-deletion-requests-search-${query}-${page}-${limit}`,
-      this.cacheTTL
+      `admin-deletion-requests-search-${query}-${page}-${limit}`
     );
 
     if (!response.success) {
