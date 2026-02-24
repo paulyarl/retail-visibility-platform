@@ -107,69 +107,145 @@ router.get('/', authenticateToken, requireSupportActions, async (req, res) => {
 
 // GET /organizations/:id - Get single organization
 // Permission: Organization members can read their own organization data
+// Supports both organization IDs and tenant IDs (with fallback)
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const user = (req as any).user;
-    const organizationId = req.params.id;
+    const id = req.params.id;
+    
+    let organization = null;
+    let isTenantLookup = false;
 
-    // Verify user is a member of this organization
-    const userTenants = await prisma.tenants.findMany({
-      where: {
-        organization_id: organizationId,
-        user_tenants: {
-          some: {
-            user_id: user.userId,
-            role: {
-              in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+    // First try to find as organization ID (traditional approach)
+    organization = await prisma.organizations_list.findUnique({
+      where: { id: id },
+      include: {
+        tenants: true
+      }
+    });
+
+    // If not found as organization, try as tenant ID
+    if (!organization) {
+      isTenantLookup = true;
+      
+      // First verify user has access to this tenant
+      const tenant = await prisma.tenants.findFirst({
+        where: {
+          id: id,
+          OR: [
+            {
+              user_tenants: {
+                some: {
+                  user_id: user.userId,
+                  role: {
+                    in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+                  }
+                }
+              }
+            },
+            {
+              created_by: user.userId
+            }
+          ]
+        },
+        select: {
+          id: true,
+          name: true,
+          organization_id: true
+        }
+      });
+
+      if (!tenant) {
+        return res.status(404).json({ 
+          error: 'not_found',
+          message: 'Organization or tenant not found, or access denied' 
+        });
+      }
+
+      // If tenant has no organization, return appropriate response
+      if (!tenant.organization_id) {
+        return res.json({
+          message: 'Tenant is not part of an organization',
+          tenant: {
+            id: tenant.id,
+            name: tenant.name
+          },
+          organization: null
+        });
+      }
+
+      // Get the organization using the tenant's organization_id
+      organization = await prisma.organizations_list.findUnique({
+        where: { id: tenant.organization_id },
+        include: {
+          tenants: {
+            where: {
+              user_tenants: {
+                some: {
+                  user_id: user.userId,
+                  role: {
+                    in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+                  }
+                }
+              }
             }
           }
         }
-      },
-      select: { id: true }
-    });
-
-    // Also check if user created any tenants in this organization
-    const userCreatedTenants = await prisma.tenants.findMany({
-      where: {
-        organization_id: organizationId,
-        created_by: user.userId
-      },
-      select: { id: true }
-    });
-
-    if (userTenants.length === 0 && userCreatedTenants.length === 0 && !isPlatformAdmin(user)) {
-      return res.status(403).json({ 
-        error: 'Forbidden', 
-        message: 'You must be a member of this organization to view its data' 
       });
     }
 
-    const organization = await prisma.organizations_list.findUnique({
-      where: { id: organizationId },
-      include: {
-        tenants: {
-          select: {
-            id: true,
-            name: true,
-            metadata: true,
-            _count: {
-              select: {
-                inventory_items: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
     if (!organization) {
-      return res.status(400).json({ 
+      return res.status(404).json({ 
         error: 'organization_not_found',
         message: 'Organization not found'
       });
     }
 
-    res.json(organization);
+    // Verify user access (skip for tenant lookup since we already verified)
+    if (!isTenantLookup) {
+      // Verify user is a member of this organization
+      const userTenants = await prisma.tenants.findMany({
+        where: {
+          organization_id: organization.id,
+          user_tenants: {
+            some: {
+              user_id: user.userId,
+              role: {
+                in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+              }
+            }
+          }
+        },
+        select: { id: true }
+      });
+
+      // Also check if user created any tenants in this organization
+      const userCreatedTenants = await prisma.tenants.findMany({
+        where: {
+          organization_id: organization.id,
+          created_by: user.userId
+        },
+        select: { id: true }
+      });
+
+      if (userTenants.length === 0 && userCreatedTenants.length === 0 && !isPlatformAdmin(user)) {
+        return res.status(403).json({ 
+          error: 'Forbidden', 
+          message: 'You must be a member of this organization to view its data' 
+        });
+      }
+    }
+
+    // Add context about how the organization was found
+    const response = {
+      ...organization,
+      _lookup: {
+        type: isTenantLookup ? 'tenant_id' : 'organization_id',
+        originalId: id
+      }
+    };
+
+    res.json(response);
   } catch (error: any) {
     // If the database is temporarily unreachable (e.g., Supabase paused), return a helpful error
     if (error?.code === 'P1001' || (typeof error?.message === 'string' && error.message.includes("Can't reach database server"))) {

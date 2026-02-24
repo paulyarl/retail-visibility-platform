@@ -18,6 +18,8 @@ interface ItemsGridProps {
   bulkMode?: boolean;
   selectedItems?: Set<string>;
   onToggleSelection?: (itemId: string) => void;
+  hasOrganizationAccess?: boolean;
+  organizationData?: any;
 }
 
 /**
@@ -40,6 +42,8 @@ export default function ItemsGrid({
   bulkMode = false,
   selectedItems = new Set(),
   onToggleSelection,
+  hasOrganizationAccess,
+  organizationData,
 }: ItemsGridProps) {
   if (items.length === 0) {
     return (
@@ -77,6 +81,8 @@ export default function ItemsGrid({
           bulkMode={bulkMode}
           selectedItems={selectedItems}
           onToggleSelection={onToggleSelection}
+          hasOrganizationAccess={hasOrganizationAccess}
+          organizationData={organizationData}
           // Mock analytics data for now - will be replaced with real data
           analytics={{
             views: Math.floor(Math.random() * 100),

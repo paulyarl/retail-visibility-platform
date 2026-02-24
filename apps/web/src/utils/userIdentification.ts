@@ -145,11 +145,11 @@ export function resolveCacheOptions(options: AutoUserCacheOptions = {}) {
       resolved.userId = getEncryptionUserId();
     }
     
-    console.log('[UserIdentification] Auto-detected:', {
+    /* console.log('[UserIdentification] Auto-detected:', {
       method: identification.identificationMethod,
       userId: resolved.userId,
       isAuthenticated: identification.isAuthenticated
-    });
+    }); */
   }
 
   // Remove our internal flags

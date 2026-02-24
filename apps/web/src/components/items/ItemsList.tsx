@@ -21,6 +21,8 @@ interface ItemsListProps {
   bulkMode?: boolean;
   selectedItems?: Set<string>;
   onToggleSelection?: (itemId: string) => void;
+  hasOrganizationAccess?: boolean;
+  organizationData?: any;
 }
 
 /**
@@ -43,6 +45,8 @@ export default function ItemsList({
   bulkMode = false,
   selectedItems = new Set(),
   onToggleSelection,
+  hasOrganizationAccess,
+  organizationData,
 }: ItemsListProps) {
   // Stock status helper function
   const getStockStatus = (stock: number) => {
@@ -316,16 +320,28 @@ export default function ItemsList({
                 size="sm" 
                 variant="ghost"
                 onClick={() => onPropagate?.(item)}
-                disabled={!onPropagate}
-                title={onPropagate ? "Push this product to all your other locations (Starter+ with 2+ locations)" : "Propagate to other locations - Available on Starter tier with 2+ locations"}
-                className={`bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white border-0 ${!onPropagate ? 'opacity-60 cursor-not-allowed' : ''}`}
+                disabled={!hasOrganizationAccess || !organizationData || organizationData.tenants.length <= 1}
+                title={
+                  hasOrganizationAccess && organizationData && organizationData.tenants.length > 1
+                    ? "Push this product to all your other locations (Starter+ with 2+ locations)"
+                    : !hasOrganizationAccess
+                    ? "Propagation requires organization membership"
+                    : organizationData?.tenants.length <= 1
+                    ? "Propagation requires multiple locations in your organization"
+                    : "Loading organization data..."
+                }
+                className={`bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white border-0 ${
+                  (!hasOrganizationAccess || !organizationData || organizationData.tenants.length <= 1) ? 'opacity-60 cursor-not-allowed' : ''
+                }`}
               >
                 <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
                 Propagate
-                {!onPropagate && (
-                  <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-white/20 font-semibold">ORG</span>
+                {(!hasOrganizationAccess || !organizationData || organizationData.tenants.length <= 1) && (
+                  <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-white/20 font-semibold">
+                    {!hasOrganizationAccess ? 'ORG' : organizationData?.tenants.length <= 1 ? '1 LOC' : 'LOAD'}
+                  </span>
                 )}
               </Button>
 

@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
+import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 
 export interface TenantLimitsStatus {
   current: number;
@@ -32,7 +32,7 @@ export interface FeaturedProductsLimits {
   displayNames: Record<string, string>;
 }
 
-class TenantLimitsSingletonService extends AuthenticatedApiSingleton {
+class TenantLimitsSingletonService extends TenantApiSingleton {
   private static instance: TenantLimitsSingletonService;
   protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for tenant limits
 

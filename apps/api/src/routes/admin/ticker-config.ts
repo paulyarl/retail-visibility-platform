@@ -32,8 +32,8 @@ router.get('/', async (req: Request, res: Response) => {
       ]
     });
 
-    console.log('[ADMIN TICKER CONFIG GET] Database config:', config);
-    console.log('[ADMIN TICKER CONFIG GET] Database messages:', messages);
+    /* console.log('[ADMIN TICKER CONFIG GET] Database config:', config);
+    console.log('[ADMIN TICKER CONFIG GET] Database messages:', messages); */
 
     if (!config) {
       // Return default configuration if none exists
@@ -64,7 +64,7 @@ router.get('/', async (req: Request, res: Response) => {
           showDismissButton: true
         }
       };
-      console.log('[ADMIN TICKER CONFIG GET] Returning default config with messages:', defaultConfig);
+      //console.log('[ADMIN TICKER CONFIG GET] Returning default config with messages:', defaultConfig);
       return res.json({
         success: true,
         data: defaultConfig
@@ -99,11 +99,11 @@ router.get('/', async (req: Request, res: Response) => {
       }
     };
 
-    console.log('[ADMIN TICKER CONFIG GET] Returning response data:', responseData);
+   /*  console.log('[ADMIN TICKER CONFIG GET] Returning response data:', responseData);
     return res.json({
       success: true,
       data: responseData
-    });
+    }); */
   } catch (error) {
     console.error('Error fetching ticker config:', error);
     return res.status(500).json({
@@ -185,7 +185,7 @@ router.put('/', async (req: Request, res: Response) => {
  */
 router.put('/settings', requireAdmin, async (req: Request, res: Response) => {
   try {
-    console.log('[ADMIN TICKER CONFIG SETTINGS] Request received from platform admin');
+    //console.log('[ADMIN TICKER CONFIG SETTINGS] Request received from platform admin');
 
     const settings = req.body;
 

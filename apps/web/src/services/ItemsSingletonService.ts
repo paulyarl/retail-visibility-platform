@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 
 export interface Item {
@@ -71,7 +71,7 @@ export interface ItemsCompleteParams {
   categoryFilter?: 'assigned' | 'unassigned';
 }
 
-class ItemsSingletonService extends AuthenticatedApiSingleton {
+class ItemsSingletonService extends TenantApiSingleton {
   private static instance: ItemsSingletonService;
 
   private constructor() {

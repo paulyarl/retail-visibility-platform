@@ -49,6 +49,8 @@ interface EnhancedProductCardProps {
   bulkMode?: boolean;
   selectedItems?: Set<string>;
   onToggleSelection?: (itemId: string) => void;
+  hasOrganizationAccess?: boolean;
+  organizationData?: any;
   analytics?: {
     views?: number;
     clicks?: number;
@@ -76,6 +78,8 @@ export default function EnhancedProductCard({
   bulkMode = false,
   selectedItems = new Set(),
   onToggleSelection,
+  hasOrganizationAccess,
+  organizationData,
   analytics,
 }: EnhancedProductCardProps) {
   const [showMoreActions, setShowMoreActions] = useState(false);
@@ -352,6 +356,43 @@ export default function EnhancedProductCard({
                       <Copy className="w-3 h-3 mr-2" />
                       Clone Product
                     </Button>
+                  )}
+                  
+                  {onPropagate && (
+                    <>
+                      <hr className="my-1 border-gray-200 dark:border-gray-700" />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          onPropagate(item);
+                          setShowMoreActions(false);
+                        }}
+                        disabled={!hasOrganizationAccess || !organizationData || organizationData.tenants.length <= 1}
+                        className={`w-full justify-start text-xs ${
+                          hasOrganizationAccess && organizationData && organizationData.tenants.length > 1
+                            ? 'text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20'
+                            : 'text-gray-400 cursor-not-allowed'
+                        }`}
+                        title={
+                          hasOrganizationAccess && organizationData && organizationData.tenants.length > 1
+                            ? 'Propagate to other locations in your organization'
+                            : !hasOrganizationAccess
+                            ? 'Propagation requires organization membership'
+                            : organizationData?.tenants.length <= 1
+                            ? 'Propagation requires multiple locations in your organization'
+                            : 'Loading organization data...'
+                        }
+                      >
+                        <Package className="w-3 h-3 mr-2" />
+                        Propagate to Locations
+                        {(!hasOrganizationAccess || !organizationData || organizationData.tenants.length <= 1) && (
+                          <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-semibold">
+                            {!hasOrganizationAccess ? 'ORG' : organizationData?.tenants.length <= 1 ? '1 LOC' : 'LOAD'}
+                          </span>
+                        )}
+                      </Button>
+                    </>
                   )}
                   
                   <Button

@@ -1,8 +1,8 @@
-import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { OrganizationApiSingleton, AuthorizationGroup, type OrganizationRequestOptions } from '../providers/base/OrganizationApiSingleton';
 
 /**
  * Service for managing organization operations
- * Handles organization requests, assignments, and management
+ * Handles organization requests, assignments, and management with next-level security
  */
 export interface Organization {
   id: string;
@@ -43,19 +43,28 @@ export interface Tenant {
   // ... other tenant properties
 }
 
-export class OrganizationService extends TenantApiSingleton {
+export class OrganizationService extends OrganizationApiSingleton {
   private static instance: OrganizationService;
 
-  private constructor(singletonKey: string, cacheOptions?: any) {
-    super(singletonKey, {
-      ttl: 10 * 60 * 1000, // 10 minutes cache
-      ...cacheOptions
+  private constructor() {
+    super('organization-service', {
+      defaultOrganizationValidation: {
+        // Basic organization access
+        requireAuthorizationGroups: [AuthorizationGroup.CAN_VIEW_ORGANIZATION],
+        platformUsersBypassMembership: true,
+        allowSupportOverride: true
+      },
+      autoValidateOrganization: true,
+      cacheEnabled: true,
+      cacheTTL: 10 * 60 * 1000, // 10 minutes cache
+      defaultRetryAttempts: 2,
+      retryDelay: 1000
     });
   }
 
   public static getInstance(): OrganizationService {
     if (!OrganizationService.instance) {
-      OrganizationService.instance = new OrganizationService('organization-service');
+      OrganizationService.instance = new OrganizationService();
     }
     return OrganizationService.instance;
   }
@@ -74,7 +83,12 @@ export class OrganizationService extends TenantApiSingleton {
       '/api/organization-requests',
       { 
         method: 'POST',
-        body: JSON.stringify(requestData)
+        body: JSON.stringify(requestData),
+        organizationValidation: {
+          // Use basic organization validation for this request
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_VIEW_ORGANIZATION],
+          platformUsersBypassMembership: true
+        }
       },
       `platform-create-org-request-${requestData.tenantId}`
     );
@@ -100,7 +114,13 @@ export class OrganizationService extends TenantApiSingleton {
 
     const result = await this.makeDefaultRequest<void>(
       `/api/organizations/${organizationId}/tenants/${tenantId}`,
-      { method: 'POST' },
+      { 
+        method: 'POST',
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_MANAGE_ORGANIZATION],
+          platformUsersBypassMembership: true
+        }
+      },
       `platform-assign-tenant-${tenantId}-to-org-${organizationId}`
     );
 
@@ -124,7 +144,13 @@ export class OrganizationService extends TenantApiSingleton {
 
     const result = await this.makeDefaultRequest<void>(
       `/api/organizations/${organizationId}/tenants/${tenantId}`,
-      { method: 'DELETE' },
+      { 
+        method: 'DELETE',
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_MANAGE_ORGANIZATION],
+          platformUsersBypassMembership: true
+        }
+      },
       `platform-remove-tenant-${tenantId}-from-org-${organizationId}`
     );
 
@@ -141,15 +167,22 @@ export class OrganizationService extends TenantApiSingleton {
   /**
    * Delete pending request
    */
-  async deletePendingRequest(requestId: string): Promise<void> {
+  async deletePendingRequest(requestId: string, options: OrganizationRequestOptions = {}): Promise<void> {
     if (!requestId) {
       throw new Error('Request ID is required');
     }
 
     const result = await this.makeDefaultRequest<void>(
       `/api/organization-requests/${requestId}`,
-      { method: 'DELETE' },
-      `platform-delete-pending-request-${requestId}`
+      {
+        method: 'DELETE',
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_MANAGE_ORGANIZATION],
+          platformUsersBypassMembership: true,
+          ...options.organizationValidation
+        }
+      },
+      `platform-delete-request-${requestId}`
     );
 
     if (!result.success) {
@@ -164,7 +197,7 @@ export class OrganizationService extends TenantApiSingleton {
   /**
    * Update pending request
    */
-  async updatePendingRequest(requestId: string, updates: Partial<any>): Promise<any> {
+  async updatePendingRequest(requestId: string, updateData: Partial<any>, options: OrganizationRequestOptions = {}): Promise<any> {
     if (!requestId) {
       throw new Error('Request ID is required');
     }
@@ -172,10 +205,15 @@ export class OrganizationService extends TenantApiSingleton {
     const result = await this.makeDefaultRequest<any>(
       `/api/organization-requests/${requestId}`,
       {
-        method: 'PATCH',
-        body: JSON.stringify(updates)
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_MANAGE_ORGANIZATION],
+          platformUsersBypassMembership: true,
+          ...options.organizationValidation
+        }
       },
-      `platform-pending-request-${requestId}`
+      `platform-update-request-${requestId}`
     );
 
     if (!result.success) {
@@ -200,9 +238,14 @@ export class OrganizationService extends TenantApiSingleton {
     // Use default request type (TENANT) for primary operation
     const result = await this.makeDefaultRequest<any>(
       `/api/organizations/${organizationId}`,
-      {},
+      {
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_VIEW_ORGANIZATION],
+          platformUsersBypassMembership: true
+        }
+      },
       `platform-organization-${organizationId}`,
-      this.cacheTTL
+      this.options.cacheTTL || 10 * 60 * 1000
     );
 
     if (!result.success) {
@@ -228,9 +271,14 @@ export class OrganizationService extends TenantApiSingleton {
 
     const result = await this.makeDefaultRequest<any>(
       `/api/organizations?${params}`,
-      {},
+      {
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_VIEW_ORGANIZATION],
+          platformUsersBypassMembership: true
+        }
+      },
       'platform-organizations',
-      this.cacheTTL
+      this.options.cacheTTL || 10 * 60 * 1000
     );
 
     if (!result.success) {
@@ -254,7 +302,11 @@ export class OrganizationService extends TenantApiSingleton {
       '/api/organizations',
       { 
         method: 'POST',
-        body: JSON.stringify(orgData)
+        body: JSON.stringify(orgData),
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_MANAGE_ORGANIZATION],
+          platformUsersBypassMembership: true
+        }
       },
       'platform-create-organization'
     );
@@ -273,7 +325,7 @@ export class OrganizationService extends TenantApiSingleton {
   /**
    * Update organization
    */
-  async updateOrganization(organizationId: string, updates: Partial<any>): Promise<any> {
+  async updateOrganization(organizationId: string, updateData: Partial<any>): Promise<any> {
     if (!organizationId) {
       throw new Error('Organization ID is required');
     }
@@ -282,7 +334,11 @@ export class OrganizationService extends TenantApiSingleton {
       `/api/organizations/${organizationId}`,
       { 
         method: 'PATCH',
-        body: JSON.stringify(updates)
+        body: JSON.stringify(updateData),
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_MANAGE_ORGANIZATION],
+          platformUsersBypassMembership: true
+        }
       },
       `platform-update-organization-${organizationId}`
     );
@@ -309,7 +365,13 @@ export class OrganizationService extends TenantApiSingleton {
 
     const result = await this.makeDefaultRequest<void>(
       `/api/organizations/${organizationId}`,
-      { method: 'DELETE' },
+      { 
+        method: 'DELETE',
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_MANAGE_ORGANIZATION],
+          platformUsersBypassMembership: true
+        }
+      },
       `platform-delete-organization-${organizationId}`
     );
 
@@ -333,9 +395,14 @@ export class OrganizationService extends TenantApiSingleton {
 
     const result = await this.makeDefaultRequest<any[]>(
       `/api/organizations/${organizationId}/members`,
-      {},
+      {
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_VIEW_ORGANIZATION],
+          platformUsersBypassMembership: true
+        }
+      },
       `platform-org-members-${organizationId}`,
-      this.cacheTTL
+      this.options.cacheTTL || 10 * 60 * 1000
     );
 
     if (!result.success) {
@@ -361,7 +428,11 @@ export class OrganizationService extends TenantApiSingleton {
       `/api/organizations/${organizationId}/members`,
       { 
         method: 'POST',
-        body: JSON.stringify(memberData)
+        body: JSON.stringify(memberData),
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_MANAGE_ORGANIZATION],
+          platformUsersBypassMembership: true
+        }
       },
       `platform-add-org-member-${organizationId}`
     );
@@ -387,7 +458,13 @@ export class OrganizationService extends TenantApiSingleton {
 
     const result = await this.makeDefaultRequest<void>(
       `/api/organizations/${organizationId}/members/${userId}`,
-      { method: 'DELETE' },
+      { 
+        method: 'DELETE',
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_MANAGE_ORGANIZATION],
+          platformUsersBypassMembership: true
+        }
+      },
       `platform-remove-org-member-${organizationId}-${userId}`
     );
 
@@ -410,9 +487,14 @@ export class OrganizationService extends TenantApiSingleton {
 
     const result = await this.makeDefaultRequest<any>(
       `/api/organizations/${organizationId}/settings`,
-      {},
+      {
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_VIEW_ORGANIZATION],
+          platformUsersBypassMembership: true
+        }
+      },
       `platform-org-settings-${organizationId}`,
-      this.cacheTTL
+      this.options.cacheTTL || 10 * 60 * 1000
     );
 
     if (!result.success) {
@@ -435,7 +517,11 @@ export class OrganizationService extends TenantApiSingleton {
       `/api/organizations/${organizationId}/settings`,
       { 
         method: 'PATCH',
-        body: JSON.stringify(settings)
+        body: JSON.stringify(settings),
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_MANAGE_ORGANIZATION],
+          platformUsersBypassMembership: true
+        }
       },
       `platform-update-org-settings-${organizationId}`
     );

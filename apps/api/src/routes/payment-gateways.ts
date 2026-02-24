@@ -116,14 +116,14 @@ router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Respo
  * List all payment gateways for a tenant (authenticated)
  */
 router.get('/:tenantId/payment-gateways', requireAuth, checkTenantAccess, async (req: Request, res: Response) => {
-  console.log('[PaymentGateways] Request received:', {
+  /* console.log('[PaymentGateways] Request received:', {
     tenantId: req.params.tenantId,
     user: req.user ? { id: req.user.userId, email: req.user.email, role: req.user.role } : null,
     headers: {
       authorization: req.headers.authorization ? 'present' : 'missing',
       'content-type': req.headers['content-type']
     }
-  });
+  }); */
 
   try {
     const { tenantId } = req.params;

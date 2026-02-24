@@ -17,7 +17,7 @@ import { QRCodeModal } from "@/components/items/QRCodeModal";
 import ItemPhotoGallery from "@/components/items/ItemPhotoGallery";
 import CategoryAssignmentModal from "@/components/items/CategoryAssignmentModal";
 import BulkUploadModal from "@/components/items/BulkUploadModal";
-import PropagateItemModal from "@/components/items/PropagateItemModal";
+import PropagationModal from '@/components/items/PropagationModal';
 import QuickStartEmptyState from "@/components/items/QuickStartEmptyState";
 import ItemsGuide from "@/components/items/ItemsGuide";
 import { Item } from "@/services/itemsDataService";
@@ -117,7 +117,17 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const locationsPerPage = 5;
 
-  // Organization access control for propagation
+  // Tenant access control for item operations
+  const {
+    hasAccess: hasTenantAccess,
+    loading: tenantAccessLoading,
+  } = useAccessControl(
+    tenantId,
+    AccessPresets.TENANT_MEMBER,
+    false // Don't fetch organization data for tenant-level operations
+  );
+
+  // Organization access control for propagation (enabled to check button state)
   const {
     hasAccess: hasOrganizationAccess,
     organizationData,
@@ -125,7 +135,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
   } = useAccessControl(
     tenantId,
     AccessPresets.ORGANIZATION_MEMBER,
-    true // Fetch organization data to check membership
+    true // Enable organization data loading to check button state
   );
 
   const [propagateItem, setPropagateItem] = useState<Item | null>(null);
@@ -437,13 +447,24 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       tenantId,
     });
 
-    if (!hasOrganizationAccess || !organizationData) {
-      console.log('[handlePropagate] Access denied:', {
-        hasOrganizationAccess,
-        organizationData: !!organizationData,
-        orgAccessLoading,
-      });
-      alert('Propagation is only available for organization members with multiple locations.');
+    // Check if user has organization access
+    if (!hasOrganizationAccess) {
+      console.log('[handlePropagate] Access denied - not an organization member');
+      alert('Propagation is only available for organization members. Upgrade to an organization plan to enable multi-location management.');
+      return;
+    }
+
+    // Check if organization data is loaded
+    if (!organizationData) {
+      console.log('[handlePropagate] Organization data not loaded yet');
+      alert('Organization data is still loading. Please try again in a moment.');
+      return;
+    }
+
+    // Check if organization has multiple locations
+    if (organizationData.tenants.length <= 1) {
+      console.log('[handlePropagate] No other tenants to propagate to');
+      alert('Propagation requires multiple locations. Your organization currently has only one location.');
       return;
     }
 
@@ -994,7 +1015,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                 onPhotos={openPhotoGallery}
                 onCategory={openCategoryModal}
                 onClone={handleClone}
-                onPropagate={hasOrganizationAccess && organizationData && organizationData.tenants.length > 1 ? handlePropagate : undefined}
+                onPropagate={handlePropagate}
                 onVisibilityToggle={handleVisibilityToggle}
                 onStatusToggle={handleStatusToggle}
                 onStockUpdate={handleStockUpdate}
@@ -1002,6 +1023,8 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                 bulkMode={bulkMode}
                 selectedItems={selectedItems}
                 onToggleSelection={toggleItemSelection}
+                hasOrganizationAccess={hasOrganizationAccess}
+                organizationData={organizationData}
               />
             ) : (
               <ItemsList
@@ -1012,7 +1035,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                 onPhotos={openPhotoGallery}
                 onCategory={openCategoryModal}
                 onClone={handleClone}
-                onPropagate={hasOrganizationAccess && organizationData && organizationData.tenants.length > 1 ? handlePropagate : undefined}
+                onPropagate={handlePropagate}
                 onVisibilityToggle={handleVisibilityToggle}
                 onStatusToggle={handleStatusToggle}
                 onStockUpdate={handleStockUpdate}
@@ -1020,6 +1043,8 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                 bulkMode={bulkMode}
                 selectedItems={selectedItems}
                 onToggleSelection={toggleItemSelection}
+                hasOrganizationAccess={hasOrganizationAccess}
+                organizationData={organizationData}
               />
             )}
 
@@ -1126,7 +1151,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       )}
 
       {showPropagateModal && propagateItem && organizationData && (
-        <PropagateItemModal
+        <PropagationModal
           isOpen={showPropagateModal}
           onClose={() => {
             setShowPropagateModal(false);
@@ -1136,7 +1161,10 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
           itemName={propagateItem.name}
           currentTenantId={tenantId}
           organizationId={organizationData.id}
-          onSuccess={refresh}
+          onSuccess={() => {
+            console.log('[ItemsPageClient] Item propagated successfully');
+            refresh();
+          }}
         />
       )}
 
