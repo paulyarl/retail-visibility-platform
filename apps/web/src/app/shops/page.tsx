@@ -147,20 +147,20 @@ function ShopsPageContent() {
   useEffect(() => {
     const categoryMap = new Map<string, { count: number; type: 'shop' | 'product' }>();
     
-    console.log('[ShopsPage] Extracting categories - shops.length:', shops.length);
+//    console.log('[ShopsPage] Extracting categories - shops.length:', shops.length);
     
     // Add shop categories
     if (shops.length) {
       shops.forEach(shop => {
-        const category = shop.primary_category || 'General';
-        const existing = categoryMap.get(category);
+        const category = shop.primary_category || null;
+        const existing = category? categoryMap.get(category) : null;
         if (existing) {
           existing.count += 1;
         } else {
-          categoryMap.set(category, { count: 1, type: 'shop' });
+          category? categoryMap.set(category, { count: 1, type: 'shop' }) : null;
         }
       });
-      console.log('[ShopsPage] Shop categories added:', Array.from(categoryMap.keys()));
+//      console.log('[ShopsPage] Shop categories added:', Array.from(categoryMap.keys()));
     }
     
     // Add product categories from all buckets
@@ -174,7 +174,7 @@ function ShopsPageContent() {
       ...random
     ];
     
-    console.log('[ShopsPage] Product buckets sizes:', {
+   /*  console.log('[ShopsPage] Product buckets sizes:', {
       trending: trending.length,
       newShops: newShops.length,
       sale: sale.length,
@@ -182,7 +182,7 @@ function ShopsPageContent() {
       staff: staff.length,
       selection: selection.length,
       random: random.length
-    });
+    }); */
     
     // Deduplicate products
     const productMap = new Map<string, any>();
@@ -194,57 +194,57 @@ function ShopsPageContent() {
     });
     const allProducts = Array.from(productMap.values());
     
-    console.log('[ShopsPage] Unique products for categories:', allProducts.length);
+//    console.log('[ShopsPage] Unique products for categories:', allProducts.length);
     
     // Add product categories
     allProducts.forEach(product => {
-      console.log('[ShopsPage] Processing product for category:', product.name, 'category fields:', {
+    /*   console.log('[ShopsPage] Processing product for category:', product.name, 'category fields:', {
         categoryName: product.categoryName,
         category_name: product.category_name,
         product_category: product.product_category,
         category: product.category
-      });
+      }); */
       
-      const category = product.categoryName || product.category_name || product.product_category || product.category;
+      const category = product.categoryName || product.category_name || product.product_category || product.category || null;
       if (category) {
         const existing = categoryMap.get(category);
         if (existing) {
           existing.count += 1;
         } else {
-          categoryMap.set(category, { count: 1, type: 'product' });
+          category? categoryMap.set(category, { count: 1, type: 'product' }) : null;
         }
       }
     });
     
-    console.log('[ShopsPage] Product categories extracted:', Array.from(categoryMap.entries()).filter(([name, data]) => data.type === 'product'));
+//    console.log('[ShopsPage] Product categories extracted:', Array.from(categoryMap.entries()).filter(([name, data]) => data.type === 'product'));
     
-    console.log('[ShopsPage] Categories before API call:', Array.from(categoryMap.entries()));
+//    console.log('[ShopsPage] Categories before API call:', Array.from(categoryMap.entries()));
     
     // Fetch categories from API to ensure we have all available categories
     const fetchApiCategories = async () => {
       try {
         const response = await shopsService.getCategories();
-        console.log('[ShopsPage] API categories response:', response);
+       // console.log('[ShopsPage] API categories response:', response);
         
         // Handle the response structure: { success: true, data: [...] }
         let categoriesData = [];
         if (response && (response as any).categories && (response as any).categories.data) {
           // Triple-wrapped: { categories: { data: [...] } }
           categoriesData = (response as any).categories.data;
-          console.log('[ShopsPage] Using triple-wrapped structure');
+       //   console.log('[ShopsPage] Using triple-wrapped structure');
         } else if (response && (response as any).data) {
           // Double-wrapped: { data: [...] }
           categoriesData = (response as any).data;
-          console.log('[ShopsPage] Using double-wrapped structure');
+       //   console.log('[ShopsPage] Using double-wrapped structure');
         } else if (Array.isArray(response)) {
           // Direct array
           categoriesData = response;
-          console.log('[ShopsPage] Using direct array structure');
+       //   console.log('[ShopsPage] Using direct array structure');
         } else {
           console.log('[ShopsPage] No matching structure found, response keys:', Object.keys(response || {}));
         }
         
-        console.log('[ShopsPage] Extracted categories data:', categoriesData);
+//        console.log('[ShopsPage] Extracted categories data:', categoriesData);
         
         if (categoriesData && Array.isArray(categoriesData)) {
           categoriesData.forEach((apiCategory: any) => {
@@ -255,7 +255,7 @@ function ShopsPageContent() {
               categoryMap.set(apiCategory.name, { count: apiCategory.count, type: 'shop' });
             }
           });
-          console.log('[ShopsPage] Categories after API call:', Array.from(categoryMap.entries()));
+       //   console.log('[ShopsPage] Categories after API call:', Array.from(categoryMap.entries()));
         }
       } catch (error) {
         console.error('[ShopsPage] Failed to fetch API categories:', error);
@@ -268,7 +268,7 @@ function ShopsPageContent() {
         count: data.count,
         type: data.type
       }));
-      console.log('[ShopsPage] Final categories list:', categoryList);
+//      console.log('[ShopsPage] Final categories list:', categoryList);
       setCategories(categoryList.sort((a, b) => a.name.localeCompare(b.name)));
     });
   }, [shops.length]); // Only depend on shops.length to prevent infinite loops
@@ -290,12 +290,12 @@ function ShopsPageContent() {
     
     // Apply category filter
     if (selectedCategory) {
-      console.log('[ShopsPage] Filtering shops by category:', selectedCategory);
+   /*    console.log('[ShopsPage] Filtering shops by category:', selectedCategory);
       console.log('[ShopsPage] Shops before filter:', shops.map(s => ({ name: s.name, primary_category: s.primary_category })));
-      filtered = filtered.filter(shop => 
+    */   filtered = filtered.filter(shop => 
         shop.primary_category === selectedCategory
       );
-      console.log('[ShopsPage] Shops after filter:', filtered.map(s => ({ name: s.name, primary_category: s.primary_category })));
+  //    console.log('[ShopsPage] Shops after filter:', filtered.map(s => ({ name: s.name, primary_category: s.primary_category })));
     }
     
     // Apply sorting
@@ -335,12 +335,12 @@ function ShopsPageContent() {
     
     // Apply category filter
     if (selectedCategory) {
-      console.log('[ShopsPage] Filtering products by category:', selectedCategory);
+   /*    console.log('[ShopsPage] Filtering products by category:', selectedCategory);
       console.log('[ShopsPage] Products before filter:', products.slice(0, 3).map(p => ({ name: p.name, categoryFields: { categoryName: p.categoryName, category_name: p.category_name, product_category: p.product_category, category: p.category } })));
-      filtered = filtered.filter(p => 
+  */     filtered = filtered.filter(p => 
         p.category === selectedCategory // Use the correct field that has data
       );
-      console.log('[ShopsPage] Products after filter:', filtered.length, 'products found');
+    //  console.log('[ShopsPage] Products after filter:', filtered.length, 'products found');
     }
     
     // Apply sorting
@@ -543,7 +543,7 @@ function ShopsPageContent() {
               >
                 <option value="">All Categories</option>
                 {categories.map((category) => {
-                  console.log('[ShopsPage] Rendering category option:', category);
+//                  console.log('[ShopsPage] Rendering category option:', category);
                   return (
                     <option key={category.name} value={category.name}>
                       {category.name} ({category.count})

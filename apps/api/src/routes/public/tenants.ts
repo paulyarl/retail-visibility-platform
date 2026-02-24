@@ -49,4 +49,64 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/public/tenant/:tenantId/slug - Get tenant slug by ID
+router.get('/tenant/:tenantId/slug', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID is required' });
+    }
+
+    const query = `
+      SELECT slug 
+      FROM tenants 
+      WHERE id = $1 AND is_active = true
+      LIMIT 1
+    `;
+    
+    const result = await getDirectPool().query(query, [tenantId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+    
+    res.json({ slug: result.rows[0].slug });
+    
+  } catch (error) {
+    console.error('Tenant slug error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/public/slug/:slug/tenant - Get tenant ID by slug
+router.get('/slug/:slug/tenant', async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+    
+    if (!slug) {
+      return res.status(400).json({ error: 'Slug is required' });
+    }
+
+    const query = `
+      SELECT id 
+      FROM tenants 
+      WHERE slug = $1 AND is_active = true
+      LIMIT 1
+    `;
+    
+    const result = await getDirectPool().query(query, [slug]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+    
+    res.json({ tenantId: result.rows[0].id });
+    
+  } catch (error) {
+    console.error('Slug tenant error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

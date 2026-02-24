@@ -10,8 +10,9 @@ import ShopProfileClient from './ShopProfileClient';
 import { ShopsAPISingleton, shopsService } from '@/services/ShopsService';
 
 // Types
-interface Shop {
+interface ShopData {
   id: string;
+  tenantId: string;
   name: string;
   slug: string;
   business_name?: string;
@@ -34,6 +35,19 @@ interface Shop {
   longitude?: number;
 }
 
+interface Shop {
+  success: boolean;
+  data: ShopData;
+}
+
+interface ShopResponse {
+  success: boolean;
+  data: {
+    success: boolean;
+    data: ShopData;
+  };
+}
+
 interface ShopProfilePageProps {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ 
@@ -46,13 +60,24 @@ interface ShopProfilePageProps {
 }
 
 // Shop data fetching function
-export async function getShopBySlug(identifier: string): Promise<Shop | null> {
+export async function getShopBySlug(identifier: string): Promise<ShopResponse | null> {
   try {
     // Use shopsService for consistent API communication and caching
     const response = await shopsService.getShopByIdentifier(identifier);
     
+    console.log('[Page] API Response from getShopByIdentifier:', response);
+    console.log('[Page] Response type:', typeof response);
+    console.log('[Page] Response keys:', response ? Object.keys(response) : 'null');
+    
     if (response) {
-      return response as unknown as Shop;
+      // Wrap the shop data in the expected triple-nested ShopResponse structure
+      return {
+        success: true,
+        data: {
+          success: true,
+          data: response as unknown as ShopData
+        }
+      };
     }
     
     return null;

@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
+import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 
 export interface Tenant {
@@ -493,7 +493,7 @@ export interface SquareSyncLog {
  * - Scan sessions
  * - Upgrade requests
  */
-export class PlatformHomeSingletonService extends AuthenticatedApiSingleton {
+export class PlatformHomeSingletonService extends TenantApiSingleton {
   private static instance: PlatformHomeSingletonService;
   protected readonly cacheTTL = 10 * 60 * 1000; // 10 minutes
 

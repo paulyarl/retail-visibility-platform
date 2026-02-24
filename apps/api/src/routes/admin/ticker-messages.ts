@@ -261,6 +261,9 @@ router.post('/', async (req: Request, res: Response) => {
 
 // PUT /api/admin/ticker-messages/:id - Update ticker message
 router.put('/:id', async (req: Request, res: Response) => {
+  console.log('[ADMIN TICKER MESSAGES PUT] Request received for ID:', req.params.id);
+  console.log('[ADMIN TICKER MESSAGES PUT] Update data:', req.body);
+
   try {
     const { id } = req.params;
     const updateData = req.body;
@@ -350,12 +353,14 @@ router.put('/:id', async (req: Request, res: Response) => {
             break;
           case 'isActive':
             filteredData.is_active = updateData[field];
+            console.log('[ADMIN TICKER MESSAGES PUT] Filtered data:', filteredData);
             break;
         }
       }
     }
 
     // Update the message
+    console.log('[ADMIN TICKER MESSAGES PUT] About to update message in database');
     const updatedMessage = await prisma.ticker_messages.update({
       where: { id },
       data: {
@@ -363,6 +368,8 @@ router.put('/:id', async (req: Request, res: Response) => {
         updated_at: new Date()
       }
     });
+
+    console.log('[ADMIN TICKER MESSAGES PUT] Updated message from database:', updatedMessage);
 
     return res.json({
       success: true,

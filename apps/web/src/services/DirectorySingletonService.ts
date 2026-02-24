@@ -174,6 +174,54 @@ class DirectorySingletonService extends PublicApiSingleton {
   }
 
   /**
+   * Get tenant slug by tenant ID
+   * Utility function to resolve tenant ID to slug
+   */
+  async getTenantSlug(tenantId: string): Promise<string | null> {
+    try {
+      if (!tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      const response = await super.makeDefaultRequest<any>(
+        `/api/public/tenant/${tenantId}/slug`,
+        {},
+        `tenant-slug-${tenantId}`,
+        this.CACHE_TTL_LONG
+      );
+
+      return response?.data?.slug || response?.data?.slug || null;
+    } catch (error) {
+      console.error('[DirectorySingleton] Failed to get tenant slug:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get tenant ID by slug
+   * Utility function to resolve slug to tenant ID
+   */
+  async getTenantId(slug: string): Promise<string | null> {
+    try {
+      if (!slug) {
+        throw new Error('Slug is required');
+      }
+
+      const response = await super.makeDefaultRequest<any>(
+        `/api/public/slug/${slug}/tenant`,
+        {},
+        `slug-tenant-${slug}`,
+        this.CACHE_TTL_LONG
+      );
+
+      return response?.data?.tenantId || response?.data?.tenantId || null;
+    } catch (error) {
+      console.error('[DirectorySingleton] Failed to get tenant ID:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get directory categories for MV (Most Valuable)
    * Optimized for category browsing
    */

@@ -487,11 +487,11 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     const requestType = requestOptions?.requestType || this.defaultRequestType;
     const requestTarget = requestOptions?.requestTarget || this.defaultRequestTarget;
 
-    console.log(`[FlexibleApiSingleton] --------------------------  `);
-    console.log(`[FlexibleApiSingleton] effective url           :  ${url}`);
-    console.log(`[FlexibleApiSingleton] effective cacheKey      :  ${cacheKey}`);
-    console.log(`[FlexibleApiSingleton] effective requestType   :  ${requestType}`);
-    console.log(`[FlexibleApiSingleton] effective requestTarget :  ${requestTarget}`);
+    console.log(`[${this.constructor.name}] ----------------------------------------`);
+    console.log(`[${this.constructor.name}] start         : ${requestType}`);
+    console.log(`[${this.constructor.name}] url           : ${url}`);
+    console.log(`[${this.constructor.name}] cacheKey      : ${cacheKey}`);
+    console.log(`[${this.constructor.name}] end           : ${requestTarget}  `);
     
     let setupResult: { options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget };
     

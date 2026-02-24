@@ -127,7 +127,7 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
         throw new Error('Tenant ID is required');
       }
 
-      console.log('[useTenantComplete] Fetching consolidated tenant data for:', tenantId);
+      //console.log('[useTenantComplete] Fetching consolidated tenant data for:', tenantId);
 
       try {
         // Get data from multiple services
@@ -137,11 +137,11 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
           tenantManagementService.getTenantUsage(tenantId)
         ]);
 
-        console.log('[useTenantComplete] Raw API responses:', {
-          tenantData: tenantData?.tenant?.id,
-          tierData: tierData?.name,
-          usageData: usageData
-        });
+        //console.log('[useTenantComplete] Raw API responses:', {
+        //  tenantData: tenantData?.tenant?.id,
+        //  tierData: tierData?.name,
+        //  usageData: usageData
+        //});
 
         // Combine data into expected format
         const data: TenantCompleteResponse = {
@@ -177,12 +177,12 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
           } : null,
           _timestamp: new Date().toISOString()
         };
-        console.log('[useTenantComplete] Received consolidated data:', {
+        /* console.log('[useTenantComplete] Received consolidated data:', {
           tenant: data.tenant?.id,
           hasTier: !!data.tier,
           hasUsage: !!data.usage,
           usageData: data.usage
-        });
+        }); */
 
         return data;
       } catch (apiError) {
@@ -239,7 +239,7 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
   }, [rawTier, tenant]);
 
   // Transform usage data to expected format
-  console.log('[useTenantComplete] Transforming usage data:', { rawUsage });
+  //console.log('[useTenantComplete] Transforming usage data:', { rawUsage });
   const usage: TenantUsage | null = rawUsage ? {
     products: rawUsage.products,
     locations: rawUsage.locations,
@@ -251,7 +251,7 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
     categories: rawUsage.categories,
     orders: rawUsage.orders
   } : null;
-  console.log('[useTenantComplete] Transformed usage data:', { usage });
+  // console.log('[useTenantComplete] Transformed usage data:', { usage });
 
   // Helper functions (copied from useTenantTier for backward compatibility)
   const hasTierFeature = (featureId: string): boolean => {

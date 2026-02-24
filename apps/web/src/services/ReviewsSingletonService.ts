@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 export interface ReviewSummary {
   rating_avg: number;
@@ -32,6 +32,8 @@ export interface Review {
   last_name: string | null;
   email: string;
   user_vote?: boolean | null;
+  product_id?: string | null; // For product reviews
+  approval_status?: 'pending' | 'approved' | 'rejected'; // Review status
 }
 
 export interface ReviewsResponse {
@@ -42,7 +44,7 @@ export interface HelpfulVoteRequest {
   isHelpful: boolean;
 }
 
-class ReviewsSingletonService extends PublicApiSingleton {
+class ReviewsSingletonService extends TenantApiSingleton {
   private static instance: ReviewsSingletonService;
 
   private constructor() {
@@ -247,34 +249,59 @@ class ReviewsSingletonService extends PublicApiSingleton {
   }
 
   /**
-   * Get pending reviews for a store (requires authentication)
-   * Uses the /api/stores/:tenantId/reviews/pending endpoint
-   * Note: Only store owners and platform admins can access this
+   * Get approved reviews for a store with caching
+   * Uses the /api/stores/:tenantId/reviews/approved endpoint
    */
-  async getPendingReviews(tenantId: string): Promise<Review[] | null> {
+  async getApprovedReviews(tenantId: string, options?: {
+    limit?: number;
+    page?: number;
+    sort?: 'newest' | 'rating_high' | 'rating_low' | 'helpful';
+    reviewType?: 'store' | 'product' | 'all';
+  }): Promise<{ reviews: Review[]; summary: any; pagination: any } | null> {
     if (!tenantId) {
-      console.error('[ReviewsSingleton] getPendingReviews: tenantId is required');
+      console.error('[ReviewsSingleton] getApprovedReviews: tenantId is required');
       return null;
     }
 
-    try {
-      const result = await super.makeDefaultRequest<{
-        success: boolean;
-        data: Review[];
-      }>(
-        `/api/stores/${tenantId}/reviews/pending`,
-        {},
-        `pending-reviews-${tenantId}`
-      );
+    const limit = options?.limit || 20;
+    const page = options?.page || 1;
+    const sort = options?.sort || 'newest';
+    const reviewType = options?.reviewType || 'all';
+    const offset = (page - 1) * limit;
 
-      // Handle the response structure - if success, return the data array
-      if (result && typeof result === 'object' && 'data' in result && Array.isArray(result.data)) {
-        return result.data;
+    try {
+      // Build query string with reviewType
+      const queryParams = new URLSearchParams({
+        limit: limit.toString(),
+        page: page.toString(),
+        sort: sort
+      });
+      
+      if (reviewType !== 'all') {
+        queryParams.append('reviewType', reviewType);
       }
 
-      return null;
+      const result = await super.makeDefaultRequest<{
+        success: boolean;
+        data: {
+          reviews: Review[];
+          summary: any;
+          pagination: any;
+        };
+      }>(
+        `/api/stores/${tenantId}/reviews/approved?${queryParams.toString()}`,
+        {},
+        `approved-reviews-${tenantId}-${limit}-${page}-${sort}-${reviewType}`
+      );
+
+      if (!result.success) {
+        console.error('[ReviewsSingleton] Failed to get approved reviews:', result.error);
+        return null;
+      }
+
+      return result.data?.data || null;
     } catch (error) {
-      console.error('[ReviewsSingleton] Failed to get pending reviews:', error);
+      console.error('[ReviewsSingleton] Failed to get approved reviews:', error);
       return null;
     }
   }
@@ -339,6 +366,150 @@ class ReviewsSingletonService extends PublicApiSingleton {
       return result?.success || false;
     } catch (error) {
       console.error('[ReviewsSingleton] Failed to reject review:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get approved product reviews
+   * Uses the /api/products/:productId/reviews/approved endpoint
+   */
+  async getProductApprovedReviews(productId: string, options?: {
+    limit?: number;
+    page?: number;
+    sort?: 'newest' | 'rating_high' | 'rating_low' | 'helpful';
+  }): Promise<{ reviews: Review[]; summary: any; pagination: any } | null> {
+    if (!productId) {
+      console.error('[ReviewsSingleton] getProductApprovedReviews: productId is required');
+      return null;
+    }
+
+    const limit = options?.limit || 10;
+    const page = options?.page || 1;
+    const sort = options?.sort || 'newest';
+
+    try {
+      const result = await super.makeDefaultRequest<{
+        success: boolean;
+        data: {
+          reviews: Review[];
+          summary: any;
+          pagination: any;
+        };
+      }>(
+        `/api/products/${productId}/reviews/approved?limit=${limit}&page=${page}&sort=${sort}`,
+        {},
+        `product-approved-reviews-${productId}-${limit}-${page}-${sort}`
+      );
+
+      if (!result.success) {
+        console.error('[ReviewsSingleton] Failed to get product approved reviews:', result.error);
+        return null;
+      }
+
+      return result.data?.data || null;
+    } catch (error) {
+      console.error('[ReviewsSingleton] Failed to get product approved reviews:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get pending product reviews (requires authentication)
+   * Uses the /api/products/:productId/reviews/pending endpoint
+   * Note: Only store owners and platform admins can access this
+   */
+  async getProductPendingReviews(productId: string, options?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<{ reviews: Review[]; pagination: any } | null> {
+    if (!productId) {
+      console.error('[ReviewsSingleton] getProductPendingReviews: productId is required');
+      return null;
+    }
+
+    const limit = options?.limit || 20;
+    const offset = options?.offset || 0;
+
+    try {
+      const result = await super.makeDefaultRequest<{
+        success: boolean;
+        data: {
+          reviews: Review[];
+          pagination: any;
+        };
+      }>(
+        `/api/products/${productId}/reviews/pending?limit=${limit}&offset=${offset}`,
+        {},
+        `product-pending-reviews-${productId}-${limit}-${offset}`
+      );
+
+      if (!result.success) {
+        console.error('[ReviewsSingleton] Failed to get product pending reviews:', result.error);
+        return null;
+      }
+
+      return result.data?.data || null;
+    } catch (error) {
+      console.error('[ReviewsSingleton] Failed to get product pending reviews:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Approve a product review (requires authentication)
+   * Uses the /api/products/:productId/reviews/:reviewId/approve endpoint
+   */
+  async approveProductReview(productId: string, reviewId: string): Promise<boolean> {
+    if (!productId || !reviewId) {
+      console.error('[ReviewsSingleton] approveProductReview: productId and reviewId are required');
+      return false;
+    }
+
+    try {
+      const result = await super.makeDefaultRequest<{
+        success: boolean;
+        message: string;
+      }>(
+        `/api/products/${productId}/reviews/${reviewId}/approve`,
+        { method: 'POST' },
+        `approve-product-review-${reviewId}`
+      );
+
+      return result?.success || false;
+    } catch (error) {
+      console.error('[ReviewsSingleton] Failed to approve product review:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Reject a product review (requires authentication)
+   * Uses the /api/products/:productId/reviews/:reviewId/reject endpoint
+   */
+  async rejectProductReview(productId: string, reviewId: string, reason?: string): Promise<boolean> {
+    if (!productId || !reviewId) {
+      console.error('[ReviewsSingleton] rejectProductReview: productId and reviewId are required');
+      return false;
+    }
+
+    try {
+      const result = await super.makeDefaultRequest<{
+        success: boolean;
+        message: string;
+      }>(
+        `/api/products/${productId}/reviews/${reviewId}/reject`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason })
+        },
+        `reject-product-review-${reviewId}`
+      );
+
+      return result?.success || false;
+    } catch (error) {
+      console.error('[ReviewsSingleton] Failed to reject product review:', error);
       return false;
     }
   }

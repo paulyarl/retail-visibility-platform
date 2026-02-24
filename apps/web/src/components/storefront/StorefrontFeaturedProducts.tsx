@@ -686,6 +686,12 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
 
     const fetchAllProducts = async () => {
       try {
+        // Safety check: only proceed if tenantId is available
+        if (!tenantId) {
+          console.warn('[StorefrontFeaturedProducts] No tenantId available, skipping featured products fetch');
+          return;
+        }
+        
         // Use StorefrontSingletonService for backend API call with caching
         const data = await storefrontService.getFeaturedProducts(tenantId, { limit: 50 });
         

@@ -253,7 +253,7 @@ export function useShopsFeaturedBuckets() {
         });
       }
 
-      console.log('[useShopsFeaturedBuckets] Buckets created:', buckets.length, buckets.map(b => `${b.id}: ${b.products.length} products`));
+//      console.log('[useShopsFeaturedBuckets] Buckets created:', buckets.length, buckets.map(b => `${b.id}: ${b.products.length} products`));
 
       setBuckets(buckets);
     } catch (err) {
@@ -285,12 +285,12 @@ export function useShopsFeaturedBuckets() {
     }, {} as Record<string, FeaturedProduct[]>);
 
     // Debug: Log the bucketMap structure
-    console.log('[useShopsFeaturedBuckets] bucketMap created:', {
+    /* console.log('[useShopsFeaturedBuckets] bucketMap created:', {
       bucketMap: map,
       bucketsLength: buckets.length,
       featuredShopsProducts: map['featured-shops'],
       featuredShopsLength: map['featured-shops']?.length || 0
-    });
+    }); */
 
     return map;
   }, [buckets]);

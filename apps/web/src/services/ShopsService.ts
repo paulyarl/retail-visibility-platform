@@ -242,7 +242,7 @@ class ShopsService extends PublicApiSingleton {
       );
 
       // Debug: Log the response structure
-      console.log('[ShopsService] getTrendingShops response structure:', {
+     /*  console.log('[ShopsService] getTrendingShops response structure:', {
         response,
         responseType: typeof response,
         hasData: 'data' in response,
@@ -256,7 +256,7 @@ class ShopsService extends PublicApiSingleton {
         dataAsString: typeof response?.data === 'string' ? (response.data as string).substring(0, 100) + '...' : 'not string',
         // Expand the data object to see its structure
         dataExpanded: response?.data ? JSON.stringify(response.data, null, 2) : 'no data'
-      });
+      }); */
       
       // Handle the correct API response structure
       let shops: Shop[] = [];
@@ -277,15 +277,15 @@ class ShopsService extends PublicApiSingleton {
           }
         } else if (Array.isArray(responseData)) {
           shops = responseData;
-          console.log('[ShopsService] Using response.data array, length:', shops.length);
+//          console.log('[ShopsService] Using response.data array, length:', shops.length);
         } else if (responseData?.data && Array.isArray(responseData.data)) {
           // Handle double-wrapped response: { success: true, data: { data: [...] } }
           shops = responseData.data;
-          console.log('[ShopsService] Using double-wrapped response.data.data array, length:', shops.length);
+//          console.log('[ShopsService] Using double-wrapped response.data.data array, length:', shops.length);
         } else if (responseData?.shops && Array.isArray(responseData.shops)) {
           // Handle shops-wrapped response: { success: true, data: { shops: [...] } }
           shops = responseData.shops;
-          console.log('[ShopsService] Using response.data.shops array, length:', shops.length);
+//          console.log('[ShopsService] Using response.data.shops array, length:', shops.length);
         } else {
           console.warn('[ShopsService] response.data is neither array nor string:', typeof responseData);
           console.log('[ShopsService] Available data properties:', responseData ? Object.keys(responseData) : 'no data');

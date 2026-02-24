@@ -178,8 +178,8 @@ class DirectoryListingSingletonService extends AuthenticatedApiSingleton {
         return []; // Return empty array for missing records
       }
 
-      // Ensure we have an array
-      const photosArray = Array.isArray(result) ? result : [];
+      // Ensure we have an array - extract from the API response structure
+      const photosArray = Array.isArray(result?.data) ? result.data : [];
       console.log('[DirectoryListing] Extracted photos array:', photosArray);
 
       return photosArray;

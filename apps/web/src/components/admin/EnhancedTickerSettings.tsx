@@ -39,6 +39,7 @@ import { notifications } from '@mantine/notifications';
 import { TickerMessage, TickerConfig, tickerConfigService } from '@/services/TickerConfigService';
 import { DateTimePicker } from '@mantine/dates';
 import PlatformTicker from '@/components/notifications/PlatformTicker';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface EnhancedTickerSettingsProps {
   onSave?: (config: TickerConfig) => void;
@@ -51,6 +52,7 @@ export default function EnhancedTickerSettings({
   availableTiers = ['Free', 'Basic', 'Premium', 'Enterprise'],
   availableTenants = []
 }: EnhancedTickerSettingsProps) {
+  const queryClient = useQueryClient();
   const [config, setConfig] = useState<TickerConfig>({
     enabled: false,
     messages: [],
@@ -80,18 +82,20 @@ export default function EnhancedTickerSettings({
       console.log('[EnhancedTickerSettings] Page load API response:', result);
       
       if (result.success && result.data) {
-        // Extract the actual ticker config from the nested response
-        console.log('[EnhancedTickerSettings] Raw API response data:', result.data);
-        console.log('[EnhancedTickerSettings] Data type:', typeof result.data);
-        console.log('[EnhancedTickerSettings] Data keys:', Object.keys(result.data));
+        // The API response is double-wrapped: { success: true, data: { success: true, data: TickerConfig } }
+        // We need to access result.data.data to get the actual TickerConfig
+        const actualConfig = (result.data as any).data;
+        console.log('[EnhancedTickerSettings] Actual ticker config:', actualConfig);
+        console.log('[EnhancedTickerSettings] Messages in config:', actualConfig?.messages);
+        console.log('[EnhancedTickerSettings] Messages length:', actualConfig?.messages?.length);
+        console.log('[EnhancedTickerSettings] Config enabled:', actualConfig?.enabled);
         
-        // The actual ticker config is nested in result.data.data
-        const actualData = (result.data as any).data;
-        console.log('[EnhancedTickerSettings] Actual ticker config data:', actualData);
-        console.log('[EnhancedTickerSettings] Messages in config:', actualData?.messages);
-        console.log('[EnhancedTickerSettings] Messages length:', actualData?.messages?.length);
+        // Set the actual config data
+        setConfig(actualConfig);
         
-        setConfig(actualData);
+        // Log what we just set
+        console.log('[EnhancedTickerSettings] Config set to:', actualConfig);
+        console.log('[EnhancedTickerSettings] Current config state after set:', config);
       } else {
         console.log('[EnhancedTickerSettings] Page load - API response failed or no data:', result);
       }
@@ -136,6 +140,11 @@ export default function EnhancedTickerSettings({
           message: 'Platform ticker settings have been updated successfully.',
           color: 'green',
         });
+
+        // Invalidate ticker config cache so ShellWithTicker gets updated immediately
+        console.log('[EnhancedTickerSettings] Invalidating ticker config cache');
+        queryClient.invalidateQueries({ queryKey: ['ticker-config'] });
+        queryClient.invalidateQueries({ queryKey: ['ticker-messages'] });
       }
     } catch (error) {
       notifications.show({
@@ -166,12 +175,34 @@ export default function EnhancedTickerSettings({
   };
 
   const handleUpdateMessage = async (messageId: string, updates: Partial<TickerMessage>) => {
+    console.log('[EnhancedTickerSettings] Updating message:', { messageId, updates });
+    console.log('[EnhancedTickerSettings] Updates targetAudience:', updates.targetAudience);
+    console.log('[EnhancedTickerSettings] Updates targetTiers:', updates.targetTiers);
+    console.log('[EnhancedTickerSettings] Updates targetTiers length:', updates.targetTiers?.length);
+
+    if (!messageId) {
+      console.error('[EnhancedTickerSettings] Cannot update message: missing ID');
+      notifications.show({
+        title: 'Error',
+        message: 'Cannot update message: missing message ID.',
+        color: 'red',
+      });
+      return;
+    }
+
     const result = await tickerConfigService.updateMessage(messageId, updates);
     if (result.success) {
+      console.log('[EnhancedTickerSettings] Message updated successfully:', result.data);
+      // The response is double-wrapped, so we need to access result.data.data
+      const updatedMessage = (result.data as any).data;
+      console.log('[EnhancedTickerSettings] Updated message targetAudience:', updatedMessage?.targetAudience);
+      console.log('[EnhancedTickerSettings] Updated message targetTiers:', updatedMessage?.targetTiers);
+      console.log('[EnhancedTickerSettings] Updated message targetTiers length:', updatedMessage?.targetTiers?.length);
+      
       setConfig(prev => ({
         ...prev,
         messages: prev.messages.map(msg => 
-          msg.id === messageId ? result.data! : msg
+          msg.id === messageId ? updatedMessage : msg
         )
       }));
       setMessageModal({ open: false, mode: 'create' });
@@ -180,10 +211,28 @@ export default function EnhancedTickerSettings({
         message: 'Ticker message has been updated successfully.',
         color: 'green',
       });
+    } else {
+      console.error('[EnhancedTickerSettings] Failed to update message:', result.error);
+      notifications.show({
+        title: 'Error',
+        message: result.userMessage || 'Failed to update message.',
+        color: 'red',
+      });
     }
   };
 
   const handleActivateMessage = async (messageId: string) => {
+    if (!messageId) {
+      console.error('[EnhancedTickerSettings] Cannot activate message: missing ID');
+      notifications.show({
+        title: 'Error',
+        message: 'Cannot activate message: missing message ID.',
+        color: 'red',
+      });
+      return;
+    }
+
+    console.log('[EnhancedTickerSettings] Activating message:', messageId);
     const result = await tickerConfigService.updateMessage(messageId, { isActive: true });
     if (result.success) {
       setConfig(prev => ({
@@ -197,21 +246,45 @@ export default function EnhancedTickerSettings({
         message: 'Ticker message has been activated and will appear in the ticker.',
         color: 'green',
       });
+    } else {
+      console.error('[EnhancedTickerSettings] Failed to activate message:', result.error);
+      notifications.show({
+        title: 'Error',
+        message: result.userMessage || 'Failed to activate message.',
+        color: 'red',
+      });
     }
   };
 
   const handleDeleteMessage = async (messageId: string) => {
+    if (!messageId) {
+      console.error('[EnhancedTickerSettings] Cannot delete message: missing ID');
+      notifications.show({
+        title: 'Error',
+        message: 'Cannot delete message: missing message ID.',
+        color: 'red',
+      });
+      return;
+    }
+
+    console.log('[EnhancedTickerSettings] Deleting message:', messageId);
     const result = await tickerConfigService.deleteMessage(messageId);
     if (result.success) {
       setConfig(prev => ({
         ...prev,
         messages: prev.messages.filter(msg => msg.id !== messageId)
       }));
-      setMessageModal({ open: false, mode: 'create' });
       notifications.show({
         title: 'Message Deleted',
         message: 'Ticker message has been deleted successfully.',
         color: 'green',
+      });
+    } else {
+      console.error('[EnhancedTickerSettings] Failed to delete message:', result.error);
+      notifications.show({
+        title: 'Error',
+        message: result.userMessage || 'Failed to delete message.',
+        color: 'red',
       });
     }
   };
@@ -461,9 +534,19 @@ export default function EnhancedTickerSettings({
           message={messageModal.message}
           availableTiers={tierOptions}
           availableTenants={tenantOptions}
-          onSubmit={messageModal.mode === 'create' ? handleAddMessage : (msg) => 
-            handleUpdateMessage(messageModal.message!.id, msg)
-          }
+          onSubmit={messageModal.mode === 'create' ? handleAddMessage : (msg) => {
+            const messageId = messageModal.message?.id;
+            if (!messageId) {
+              console.error('[EnhancedTickerSettings] Cannot update message: missing ID', messageModal.message);
+              notifications.show({
+                title: 'Error',
+                message: 'Cannot update message: missing message ID.',
+                color: 'red',
+              });
+              return;
+            }
+            handleUpdateMessage(messageId, msg);
+          }}
           onCancel={() => setMessageModal({ open: false, mode: 'create' })}
         />
       </Modal>

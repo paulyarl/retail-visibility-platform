@@ -34,6 +34,20 @@ interface ShopCardProps {
 export function ShopCard({ shop, variant = 'default', showUrls = false, className, showTrendingBadge, trendingRank, trackingContext }: ShopCardProps) {
   const [imageError, setImageError] = useState(false);
 
+  // Get the best available logo/image URL
+  const getLogoUrl = () => {
+    // Prioritize consolidated data logo fields
+    if ((shop as any).logoUrl) return (shop as any).logoUrl;
+    if ((shop as any).logo_url) return (shop as any).logo_url;
+    if ((shop as any).bannerUrl) return (shop as any).bannerUrl;
+    if ((shop as any).tenantLogoUrl) return (shop as any).tenantLogoUrl;
+    // Fallback to basic imageUrl
+    if (shop.imageUrl) return shop.imageUrl;
+    return null;
+  };
+
+  const logoUrl = getLogoUrl();
+
   const handleImageError = () => {
     setImageError(true);
   };
@@ -108,9 +122,9 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
           <div className="flex items-start gap-3">
             {/* Shop Image */}
             <div className="relative w-16 h-16 flex-shrink-0 overflow-hidden rounded-lg group">
-              {!imageError && shop.imageUrl ? (
+              {!imageError && logoUrl ? (
                 <Image
-                  src={shop.imageUrl}
+                  src={logoUrl}
                   alt={shop.name}
                   fill
                   className="object-cover transition-transform duration-300 group-hover:scale-110"
@@ -189,9 +203,9 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
         <CardContent className="p-4">
           {/* Shop Image */}
           <div className="relative h-48 mb-4 overflow-hidden rounded-lg group">
-            {!imageError && shop.imageUrl ? (
+            {!imageError && logoUrl ? (
               <Image
-                src={shop.imageUrl}
+                src={logoUrl}
                 alt={shop.name}
                 fill
                 className="object-cover transition-transform duration-300 group-hover:scale-110"
@@ -324,9 +338,9 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
       <CardContent className="p-4">
         {/* Shop Image */}
         <div className="relative h-40 mb-4 overflow-hidden rounded-lg group">
-          {!imageError && shop.imageUrl ? (
+          {!imageError && logoUrl ? (
             <Image
-              src={shop.imageUrl}
+              src={logoUrl}
               alt={shop.name}
               fill
               className="object-cover transition-transform duration-300 group-hover:scale-110"

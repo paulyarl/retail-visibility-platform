@@ -17,6 +17,15 @@ router.use(requireAdmin);
 
 // GET /api/admin/ticker-config - Get ticker configuration
 router.get('/', async (req: Request, res: Response) => {
+  console.log('[ADMIN TICKER CONFIG GET] Request received at:', new Date().toISOString());
+  console.log('[ADMIN TICKER CONFIG GET] Headers:', {
+    authorization: req.headers.authorization ? 'present' : 'missing',
+    'user-agent': req.headers['user-agent'],
+    'content-type': req.headers['content-type'],
+    'x-requested-with': req.headers['x-requested-with']
+  });
+  console.log('[ADMIN TICKER CONFIG GET] User:', req.user ? { id: req.user.userId, email: req.user.email } : 'no user');
+
   try {
     // Get ticker configuration from database
     const config = await prisma.ticker_configs.findFirst({
@@ -32,8 +41,8 @@ router.get('/', async (req: Request, res: Response) => {
       ]
     });
 
-    /* console.log('[ADMIN TICKER CONFIG GET] Database config:', config);
-    console.log('[ADMIN TICKER CONFIG GET] Database messages:', messages); */
+    console.log('[ADMIN TICKER CONFIG GET] Database config:', config);
+    console.log('[ADMIN TICKER CONFIG GET] Database messages:', messages);
 
     if (!config) {
       // Return default configuration if none exists
@@ -99,11 +108,11 @@ router.get('/', async (req: Request, res: Response) => {
       }
     };
 
-   /*  console.log('[ADMIN TICKER CONFIG GET] Returning response data:', responseData);
+    console.log('[ADMIN TICKER CONFIG GET] About to send response');
     return res.json({
       success: true,
       data: responseData
-    }); */
+    });
   } catch (error) {
     console.error('Error fetching ticker config:', error);
     return res.status(500).json({
@@ -185,7 +194,8 @@ router.put('/', async (req: Request, res: Response) => {
  */
 router.put('/settings', requireAdmin, async (req: Request, res: Response) => {
   try {
-    //console.log('[ADMIN TICKER CONFIG SETTINGS] Request received from platform admin');
+    console.log('[ADMIN TICKER CONFIG SETTINGS] Request received from platform admin');
+    console.log('[ADMIN TICKER CONFIG SETTINGS] Request body:', req.body);
 
     const settings = req.body;
 
@@ -201,9 +211,11 @@ router.put('/settings', requireAdmin, async (req: Request, res: Response) => {
 
     // Get or create ticker config
     let config = await prisma.ticker_configs.findFirst();
+    console.log('[ADMIN TICKER CONFIG SETTINGS] Existing config:', config);
     
     if (!config) {
       // Create new config if none exists
+      console.log('[ADMIN TICKER CONFIG SETTINGS] Creating new config with enabled:', settings.enabled);
       config = await prisma.ticker_configs.create({
         data: {
           is_enabled: settings.enabled !== undefined ? settings.enabled : true,
@@ -213,8 +225,10 @@ router.put('/settings', requireAdmin, async (req: Request, res: Response) => {
           created_by: req.user?.id || 'system'
         }
       });
+      console.log('[ADMIN TICKER CONFIG SETTINGS] Created config:', config);
     } else {
       // Update existing config
+      console.log('[ADMIN TICKER CONFIG SETTINGS] Updating existing config, current enabled:', config.is_enabled, 'new enabled:', settings.enabled);
       config = await prisma.ticker_configs.update({
         where: { id: config.id },
         data: {
@@ -224,6 +238,7 @@ router.put('/settings', requireAdmin, async (req: Request, res: Response) => {
           rotation_interval: settings.rotationInterval !== undefined ? settings.rotationInterval : config.rotation_interval
         }
       });
+      console.log('[ADMIN TICKER CONFIG SETTINGS] Updated config:', config);
     }
 
     // Return updated config

@@ -5,7 +5,7 @@
  * Extends AuthenticatedApiSingleton for proper token handling
  */
 
-import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
+import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 
 export interface Review {
   id: string;
@@ -21,6 +21,23 @@ export interface Review {
   first_name: string;
   last_name: string;
   email: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  // Product information (optional, populated when product_id is present)
+  product_name?: string;
+  product_title?: string;
+  product_description?: string;
+  image_url?: string;
+  image_urls?: string[];
+  thumbnail_url?: string;
+  featured_image_url?: string;
+  product_category?: string;
+  product_category_slug?: string;
+  brand?: string;
+  price?: string;
+  current_price_cents?: number;
+  currency?: string;
+  product_metadata?: any;
+  product_url?: string;
 }
 
 /**
@@ -28,7 +45,7 @@ export interface Review {
  * Handles admin review operations that require authentication
  * Extends AuthenticatedApiSingleton for proper token handling
  */
-class AuthenticatedReviewService extends AuthenticatedApiSingleton {
+class AuthenticatedReviewService extends TenantApiSingleton {
   private static instance: AuthenticatedReviewService;
 
   private constructor() {
@@ -51,32 +68,36 @@ class AuthenticatedReviewService extends AuthenticatedApiSingleton {
     limit?: number;
     offset?: number;
     reviewType?: 'store' | 'product' | 'all';
-  }): Promise<Review[] | null> {
+    status?: 'pending' | 'approved' | 'all';
+  }): Promise<{ reviews: Review[]; pagination: any } | null> {
     if (!tenantId) {
       console.error('[AuthenticatedReviewService] getPendingReviews: tenantId is required');
       return null;
     }
 
     try {
-      console.log('[AuthenticatedReviewService] Fetching pending reviews for tenant:', tenantId);
-      
+      console.log('[AuthenticatedReviewService] Fetching reviews for tenant:', tenantId, 'with options:', options);
+
       // Build query parameters
       const queryParams = new URLSearchParams();
       if (options?.limit) {
         queryParams.append('limit', options.limit.toString());
       }
-      if (options?.offset) {
+      if (options?.offset !== undefined) {
         queryParams.append('offset', options.offset.toString());
       }
       if (options?.reviewType && options.reviewType !== 'all') {
         queryParams.append('reviewType', options.reviewType);
       }
-      
+
       const url = `/api/stores/${tenantId}/reviews/pending${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      
+
       const result = await this.makeDefaultRequest<{
         success: boolean;
-        data: any[];
+        data: {
+          reviews: Review[];
+          pagination: any;
+        };
       }>(
         url,
         {},
@@ -91,11 +112,11 @@ class AuthenticatedReviewService extends AuthenticatedApiSingleton {
         return null;
       }
 
-      const reviews = (result.data?.data as unknown as Review[]) || [];
-      console.log('[AuthenticatedReviewService] Extracted reviews:', reviews);
-      console.log('[AuthenticatedReviewService] Reviews count:', reviews.length);
-      
-      return reviews;
+      const responseData = result.data?.data;
+      console.log('[AuthenticatedReviewService] Extracted response data:', responseData);
+      console.log('[AuthenticatedReviewService] Reviews count:', responseData?.reviews?.length || 0);
+
+      return responseData || null;
     } catch (error) {
       console.error('[AuthenticatedReviewService] Failed to get pending reviews:', error);
       return null;
@@ -248,6 +269,220 @@ class AuthenticatedReviewService extends AuthenticatedApiSingleton {
       return true;
     } catch (error) {
       console.error('[AuthenticatedReviewService] Failed to bulk reject reviews:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get approved reviews for a store (admin only)
+   * Uses authenticated endpoint: /api/stores/:tenantId/reviews/approved
+   */
+  async getApprovedReviews(tenantId: string, options?: {
+    limit?: number;
+    page?: number;
+    sort?: 'newest' | 'rating_high' | 'rating_low' | 'helpful';
+    reviewType?: 'store' | 'product' | 'all';
+  }): Promise<{ reviews: Review[]; summary: any; pagination: any } | null> {
+    if (!tenantId) {
+      console.error('[AuthenticatedReviewService] getApprovedReviews: tenantId is required');
+      return null;
+    }
+
+    try {
+      const limit = options?.limit || 20;
+      const page = options?.page || 1;
+      const sort = options?.sort || 'newest';
+
+      // Build query parameters
+      let queryParams = `limit=${limit}&page=${page}&sort=${sort}`;
+      if (options?.reviewType && options.reviewType !== 'all') {
+        queryParams += `&reviewType=${options.reviewType}`;
+      }
+
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        data: {
+          reviews: Review[];
+          summary: any;
+          pagination: any;
+        };
+      }>(
+        `/api/stores/${tenantId}/reviews/approved?${queryParams}`,
+        {},
+        `approved-reviews-${tenantId}-${limit}-${page}-${sort}-${options?.reviewType || 'all'}`,
+        this.cacheTTL
+      );
+
+      if (!result.success) {
+        console.error('[AuthenticatedReviewService] Failed to get approved reviews:', result.error);
+        return null;
+      }
+
+      return result.data?.data || null;
+    } catch (error) {
+      console.error('[AuthenticatedReviewService] Failed to get approved reviews:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get pending product reviews for approval (admin only)
+   * Uses authenticated endpoint: /api/products/:productId/reviews/pending
+   */
+  async getProductPendingReviews(productId: string, options?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<{ reviews: Review[]; pagination: any } | null> {
+    if (!productId) {
+      console.error('[AuthenticatedReviewService] getProductPendingReviews: productId is required');
+      return null;
+    }
+
+    try {
+      const limit = options?.limit || 20;
+      const offset = options?.offset || 0;
+
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        data: {
+          reviews: Review[];
+          pagination: any;
+        };
+      }>(
+        `/api/products/${productId}/reviews/pending?limit=${limit}&offset=${offset}`,
+        {},
+        `product-pending-reviews-${productId}-${limit}-${offset}`,
+        this.cacheTTL
+      );
+
+      if (!result.success) {
+        console.error('[AuthenticatedReviewService] Failed to get product pending reviews:', result.error);
+        return null;
+      }
+
+      return result.data?.data || null;
+    } catch (error) {
+      console.error('[AuthenticatedReviewService] Failed to get product pending reviews:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get approved product reviews (admin only)
+   * Uses authenticated endpoint: /api/products/:productId/reviews/approved
+   */
+  async getProductApprovedReviews(productId: string, options?: {
+    limit?: number;
+    page?: number;
+    sort?: 'newest' | 'rating_high' | 'rating_low' | 'helpful';
+  }): Promise<{ reviews: Review[]; summary: any; pagination: any } | null> {
+    if (!productId) {
+      console.error('[AuthenticatedReviewService] getProductApprovedReviews: productId is required');
+      return null;
+    }
+
+    try {
+      const limit = options?.limit || 10;
+      const page = options?.page || 1;
+      const sort = options?.sort || 'newest';
+
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        data: {
+          reviews: Review[];
+          summary: any;
+          pagination: any;
+        };
+      }>(
+        `/api/products/${productId}/reviews/approved?limit=${limit}&page=${page}&sort=${sort}`,
+        {},
+        `product-approved-reviews-${productId}-${limit}-${page}-${sort}`,
+        this.cacheTTL
+      );
+
+      if (!result.success) {
+        console.error('[AuthenticatedReviewService] Failed to get product approved reviews:', result.error);
+        return null;
+      }
+
+      return result.data?.data || null;
+    } catch (error) {
+      console.error('[AuthenticatedReviewService] Failed to get product approved reviews:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Approve a product review (admin only)
+   * Uses authenticated endpoint: /api/products/:productId/reviews/:reviewId/approve
+   */
+  async approveProductReview(productId: string, reviewId: string): Promise<boolean> {
+    if (!productId || !reviewId) {
+      console.error('[AuthenticatedReviewService] approveProductReview: productId and reviewId are required');
+      return false;
+    }
+
+    try {
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        message?: string;
+      }>(
+        `/api/products/${productId}/reviews/${reviewId}/approve`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        },
+        `approve-product-review-${reviewId}`,
+        0 // Don't cache this operation
+      );
+
+      if (!result.success) {
+        console.error('[AuthenticatedReviewService] Failed to approve product review:', result.error);
+        return false;
+      }
+
+      console.log('[AuthenticatedReviewService] Product review approved successfully:', reviewId);
+      return true;
+    } catch (error) {
+      console.error('[AuthenticatedReviewService] Failed to approve product review:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Reject a product review (admin only)
+   * Uses authenticated endpoint: /api/products/:productId/reviews/:reviewId/reject
+   */
+  async rejectProductReview(productId: string, reviewId: string, reason?: string): Promise<boolean> {
+    if (!productId || !reviewId) {
+      console.error('[AuthenticatedReviewService] rejectProductReview: productId and reviewId are required');
+      return false;
+    }
+
+    try {
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        message?: string;
+      }>(
+        `/api/products/${productId}/reviews/${reviewId}/reject`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason })
+        },
+        `reject-product-review-${reviewId}`,
+        0 // Don't cache this operation
+      );
+
+      if (!result.success) {
+        console.error('[AuthenticatedReviewService] Failed to reject product review:', result.error);
+        return false;
+      }
+
+      console.log('[AuthenticatedReviewService] Product review rejected successfully:', reviewId);
+      return true;
+    } catch (error) {
+      console.error('[AuthenticatedReviewService] Failed to reject product review:', error);
       return false;
     }
   }

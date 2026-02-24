@@ -38,7 +38,8 @@ export function getUserIdentification(): UserIdentification {
   try {
     // Get user information from localStorage (set by auth context)
     // This matches the behavior tracking pattern exactly
-    const authUser = localStorage.getItem('auth_user_cache');
+    // Only access localStorage on client side
+    const authUser = typeof window !== 'undefined' ? localStorage.getItem('auth_user_cache') : null;
     
     if (authUser) {
       const decrypted = decrypt(authUser);
@@ -51,12 +52,14 @@ export function getUserIdentification(): UserIdentification {
     
     // For anonymous users, get or create session ID
     if (!userId) {
-      let lastViewedSession = localStorage.getItem('lastViewedSessionId');
+      let lastViewedSession = typeof window !== 'undefined' ? localStorage.getItem('lastViewedSessionId') : null;
       if (!lastViewedSession) {
         // Create new session ID if it doesn't exist
         // Matches behavior tracking session ID format
         lastViewedSession = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        localStorage.setItem('lastViewedSessionId', lastViewedSession);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('lastViewedSessionId', lastViewedSession);
+        }
         console.log('[UserIdentification] Created new session ID:', lastViewedSession);
       }
       sessionId = lastViewedSession;
@@ -66,7 +69,9 @@ export function getUserIdentification(): UserIdentification {
     console.error('[UserIdentification] Error getting user data:', error);
     // Fallback to anonymous with new session
     sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    localStorage.setItem('lastViewedSessionId', sessionId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lastViewedSessionId', sessionId);
+    }
   }
 
   return {

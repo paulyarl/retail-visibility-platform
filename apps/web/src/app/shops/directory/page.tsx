@@ -6,7 +6,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, use } from 'react';
-import { useShopDirectory, useShopCategories, useTrendingShops } from '@/lib/shops/shop-hooks';
+import { useShopDirectory, useStoreTypes, useTrendingShops } from '@/lib/shops/shop-hooks';
 import { Shop, ShopCategory } from '@/types/shop';
 import { SHOP_UI_CONFIG } from '@/constants/shop';
 import { ShopCard } from '@/components/shops/ShopCard';
@@ -69,7 +69,7 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
   const [cardVariant, setCardVariant] = useState<'default' | 'compact' | 'featured' | 'grid'>('default');
 
   // Fetch data
-  const { shops, loading: shopsLoading, error: shopsError, refresh: refetchShops } = useShopDirectory({
+  const { shops, loading, error, hasMore, loadMore, refresh } = useShopDirectory({
     limit: pagination.limit,
     offset: (pagination.page - 1) * pagination.limit,
     search: filters.search || undefined,
@@ -77,12 +77,13 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
     location: filters.region || undefined
   });
 
+  const { data: storeTypes, loading: categoriesLoading } = useStoreTypes();
+
   const { data: trendingShops, loading: trendingLoading } = useTrendingShops({
     limit: 8,
     region: filters.region || undefined
   });
 
-  const { data: categories, loading: categoriesLoading } = useShopCategories();
 
   // Derived state
   const hasFilters = useMemo(() => {
@@ -90,12 +91,12 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
   }, [filters]);
 
   const filteredCategories = useMemo(() => {
-    if (!categories) return [];
-    return categories.map(cat => ({
+    if (!storeTypes) return [];
+    return storeTypes.map((cat: any) => ({
       ...cat,
-      icon: '🏪' // Default icon for all categories
+      count: cat.count || 0
     }));
-  }, [categories]);
+  }, [storeTypes]);
 
   // Event handlers
   const handleFilterChange = (newFilters: Partial<typeof filters>) => {
@@ -134,10 +135,10 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
   };
 
   // Loading state
-  const isLoading = shopsLoading || trendingLoading || categoriesLoading;
+  const isLoading = loading || trendingLoading || categoriesLoading;
 
   // Error state
-  const hasError = shopsError;
+  const hasError = error;
 
   if (hasError) {
     return (
@@ -145,7 +146,7 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
         <ErrorMessage
           title="Unable to load shops"
           message="We're having trouble loading the shop directory. Please try again later."
-          onRetry={refetchShops}
+          onRetry={refresh}
         />
       </div>
     );
@@ -406,7 +407,7 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
       {/* Shop Grid */}
       {!isLoading && shops && shops.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-          {shops.map((shop, index) => (
+          {shops.map((shop: any, index: number) => (
             <ShopCard
               key={shop.id}
               shop={shop}

@@ -160,6 +160,7 @@ router.get('/:identifier', async (req, res) => {
       reviewCount: 42,
       imageUrl: null,
       bannerUrl: null,
+      logo_url: 'https://via.placeholder.com/400x400/3B82F6/FFFFFF?text=Baraka+Logo', // Added logo URL
       isVerified: true,
       isActive: true,
       createdAt: '2025-01-15T00:00:00Z',

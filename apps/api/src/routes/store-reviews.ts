@@ -15,6 +15,7 @@ const createReviewSchema = z.object({
   userName: z.string().optional(), // For anonymous reviews
   userEmail: z.string().optional(), // For anonymous reviews
   sessionId: z.string().optional(), // For anonymous reviews
+  productId: z.string().optional(), // For product reviews
 });
 
 const updateReviewSchema = z.object({
@@ -113,8 +114,12 @@ async function updateDirectoryListingRatings(pool: any, tenantId: string) {
 // GET /api/stores/:tenantId/reviews - Get all reviews for a store
 router.get('/:tenantId/reviews', async (req: Request, res: Response) => {
   try {
+    // Add cache-busting timestamp to force fresh execution
+    const timestamp = Date.now();
+    //console.log(`[${timestamp}] [DEBUG] Approved reviews request - NEW EXECUTION`);
+    
     const { tenantId } = req.params;
-    const { page = '1', limit = '10', sort = 'newest' } = req.query;
+    const { page = '1', limit = '10', sort = 'newest', reviewType = 'all' } = req.query;
 
     const pageNum = Math.max(1, Number(page));
     const limitNum = Math.min(50, Math.max(1, Number(limit)));
@@ -140,7 +145,22 @@ router.get('/:tenantId/reviews', async (req: Request, res: Response) => {
         break;
     }
 
-    // Get reviews with user info (only approved reviews for public)
+    // Get reviews with user info and product info (only approved reviews for public)
+    let whereClause = `WHERE sr.tenant_id = $1 AND sr.approval_status = 'approved'`;
+    const queryParams: any[] = [tenantId];
+    
+    // Add review type filter
+    if (reviewType === 'store') {
+      whereClause += ` AND sr.product_id IS NULL`;
+    } else if (reviewType === 'product') {
+      whereClause += ` AND sr.product_id IS NOT NULL`;
+    }
+    
+    // Add pagination
+    const limitClause = ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+    queryParams.push(limitNum, offset);
+
+    // Simplified approach: get all approved reviews and filter in code
     const reviewsQuery = `
       SELECT 
         sr.id,
@@ -152,30 +172,85 @@ router.get('/:tenantId/reviews', async (req: Request, res: Response) => {
         sr.updated_at,
         sr.user_id,
         sr.session_id,
+        sr.product_id,
+        sr.approval_status,
         u.first_name,
         u.last_name,
-        u.email
+        u.email,
+        mgd.product_name,
+        mgd.product_title,
+        mgd.product_description,
+        mgd.image_url,
+        mgd.image_urls,
+        mgd.thumbnail_url,
+        mgd.featured_image_url,
+        mgd.product_category,
+        mgd.product_category_slug,
+        mgd.brand,
+        mgd.price,
+        mgd.current_price_cents,
+        mgd.currency,
+        mgd.product_metadata
       FROM store_reviews sr
       LEFT JOIN users u ON sr.user_id = u.id
-      WHERE sr.tenant_id = $1 AND sr.approval_status = 'approved'
+      LEFT JOIN mv_global_discovery mgd ON sr.product_id = mgd.inventory_item_id AND mgd.tenant_id = sr.tenant_id
+      ${whereClause}
       ${orderByClause}
-      LIMIT $2 OFFSET $3
+      ${limitClause}
     `;
 
-    const reviewsResult = await pool.query(reviewsQuery, [
-      tenantId,
-      limitNum,
-      offset
-    ]);
+   /*  console.log('[DEBUG] Approved reviews request:', { tenantId, reviewType, pageNum, limitNum, offset });
+    console.log('[DEBUG] whereClause:', whereClause);
+    console.log('[DEBUG] queryParams:', queryParams);
+    console.log('[DEBUG] reviewsQuery:', reviewsQuery); */
 
-    // Get total count for pagination
+    const reviewsResult = await pool.query(reviewsQuery, queryParams);
+
+   /*  console.log('[DEBUG] Raw query result count:', reviewsResult.rows.length);
+    console.log('[DEBUG] First row product_id:', reviewsResult.rows[0]?.product_id);
+    console.log('[DEBUG] All product_ids:', reviewsResult.rows.map(r => r.product_id)); */
+
+    // Filter results in JavaScript based on reviewType
+    let filteredReviews = reviewsResult.rows;
+    if (reviewType === 'store') {
+      filteredReviews = reviewsResult.rows.filter(review => review.product_id === null);
+    } else if (reviewType === 'product') {
+      filteredReviews = reviewsResult.rows.filter(review => review.product_id !== null);
+    }
+    // For 'all' or other values, return all reviews
+
+   /*  console.log('[DEBUG] Filtered reviews count:', filteredReviews.length);
+    console.log('[DEBUG] Response first review product_id:', filteredReviews[0]?.product_id);
+ */
+    // Get total count for pagination (filtered)
     const countQuery = `
       SELECT COUNT(*) as total
       FROM store_reviews
-      WHERE tenant_id = $1
+      WHERE tenant_id = $1 AND approval_status = 'approved'
     `;
     const countResult = await pool.query(countQuery, [tenantId]);
-    const totalReviews = parseInt(countResult.rows[0].total);
+    let totalReviews = parseInt(countResult.rows[0].total);
+
+    // Adjust count based on reviewType
+    if (reviewType === 'store') {
+      // Count only store reviews (product_id IS NULL)
+      const storeCountQuery = `
+        SELECT COUNT(*) as total
+        FROM store_reviews
+        WHERE tenant_id = $1 AND approval_status = 'approved' AND product_id IS NULL
+      `;
+      const storeCountResult = await pool.query(storeCountQuery, [tenantId]);
+      totalReviews = parseInt(storeCountResult.rows[0].total);
+    } else if (reviewType === 'product') {
+      // Count only product reviews (product_id IS NOT NULL)
+      const productCountQuery = `
+        SELECT COUNT(*) as total
+        FROM store_reviews
+        WHERE tenant_id = $1 AND approval_status = 'approved' AND product_id IS NOT NULL
+      `;
+      const productCountResult = await pool.query(productCountQuery, [tenantId]);
+      totalReviews = parseInt(productCountResult.rows[0].total);
+    }
 
     // Get rating summary
     const summaryQuery = `
@@ -206,7 +281,7 @@ router.get('/:tenantId/reviews', async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        reviews: reviewsResult.rows,
+        reviews: filteredReviews,
         summary,
         pagination: {
           page: pageNum,
@@ -233,7 +308,7 @@ router.post('/:tenantId/reviews/anonymous', async (req: Request, res: Response) 
     
     // Validate request body
     const validatedData = createReviewSchema.parse(req.body);
-    const { rating, reviewText, verifiedPurchase, locationLat, locationLng, userName, userEmail, sessionId } = validatedData;
+    const { rating, reviewText, verifiedPurchase, locationLat, locationLng, userName, userEmail, sessionId, productId } = validatedData;
 
     // Require userName and userEmail for anonymous reviews
     if (!userName || !userEmail) {
@@ -265,15 +340,16 @@ router.post('/:tenantId/reviews/anonymous', async (req: Request, res: Response) 
     // Create the anonymous review (pending approval)
     const insertQuery = `
       INSERT INTO store_reviews (
-        tenant_id, session_id, rating, review_text, verified_purchase,
+        tenant_id, session_id, product_id, rating, review_text, verified_purchase,
         location_lat, location_lng, approval_status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', NOW(), NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', NOW(), NOW())
       RETURNING id, rating, review_text, helpful_count, verified_purchase, created_at, approval_status
     `;
 
     const result = await pool.query(insertQuery, [
       tenantId,
       finalSessionId,
+      productId || null,
       rating,
       reviewText || null,
       verifiedPurchase,
@@ -696,14 +772,15 @@ router.get('/:tenantId/reviews/user', authenticateToken, async (req: Request, re
     });
   }
 });
-
-// GET /api/stores/:tenantId/reviews/pending - Get pending reviews for approval (store owners/admins only)
 router.get('/:tenantId/reviews/pending', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
-    const { limit, offset, reviewType } = req.query;
+    const { limit = '20', offset = '0', reviewType = 'all' } = req.query;
     const userId = req.user?.userId || req.user?.user_id;
     const userRole = req.user?.role;
+
+    const limitNum = Math.min(100, Math.max(1, Number(limit)));
+    const offsetNum = Math.max(0, Number(offset));
 
     const pool = getDirectPool();
 
@@ -737,17 +814,12 @@ router.get('/:tenantId/reviews/pending', authenticateToken, async (req: Request,
     }
     
     // Add pagination
-    let limitClause = '';
-    if (limit) {
-      limitClause += ` LIMIT ${parseInt(limit as string)}`;
-    }
-    if (offset) {
-      limitClause += ` OFFSET ${parseInt(offset as string)}`;
-    }
+    const limitClause = ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+    queryParams.push(limitNum, offsetNum);
 
     // Get pending reviews with product information
     const pendingReviewsQuery = `
-      SELECT 
+      SELECT
         sr.id,
         sr.rating,
         sr.review_text,
@@ -758,11 +830,27 @@ router.get('/:tenantId/reviews/pending', authenticateToken, async (req: Request,
         sr.session_id,
         sr.user_id,
         sr.product_id,
+        sr.approval_status,
         u.first_name,
         u.last_name,
-        u.email
+        u.email,
+        mgd.product_name,
+        mgd.product_title,
+        mgd.product_description,
+        mgd.image_url,
+        mgd.image_urls,
+        mgd.thumbnail_url,
+        mgd.featured_image_url,
+        mgd.product_category,
+        mgd.product_category_slug,
+        mgd.brand,
+        mgd.price,
+        mgd.current_price_cents,
+        mgd.currency,
+        mgd.product_metadata
       FROM store_reviews sr
       LEFT JOIN users u ON sr.user_id = u.id
+      LEFT JOIN mv_global_discovery mgd ON sr.product_id = mgd.inventory_item_id AND mgd.tenant_id = sr.tenant_id
       ${whereClause}
       ORDER BY sr.created_at ASC
       ${limitClause}
@@ -770,9 +858,26 @@ router.get('/:tenantId/reviews/pending', authenticateToken, async (req: Request,
 
     const result = await pool.query(pendingReviewsQuery, queryParams);
 
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM store_reviews sr
+      ${whereClause.replace('sr.', '')}
+    `;
+    const countResult = await pool.query(countQuery, [tenantId]);
+    const totalReviews = parseInt(countResult.rows[0].total);
+
     res.json({
       success: true,
-      data: result.rows
+      data: {
+        reviews: result.rows,
+        pagination: {
+          limit: limitNum,
+          offset: offsetNum,
+          total: totalReviews,
+          hasMore: offsetNum + limitNum < totalReviews
+        }
+      }
     });
 
   } catch (error) {
@@ -1396,6 +1501,568 @@ router.get('/:tenantId/products/:productId/reviews/user', authenticateToken, asy
     res.status(500).json({
       success: false,
       error: 'Failed to fetch user product review'
+    });
+  }
+});
+
+// GET /api/stores/:tenantId/reviews/approved - Get approved store reviews (for admin management)
+router.get('/:tenantId/reviews/approved', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const { page = '1', limit = '20', sort = 'newest', reviewType = 'all' } = req.query;
+    const userId = req.user?.userId || req.user?.user_id;
+    const userRole = req.user?.role;
+
+//    console.log(`[${Date.now()}] [DEBUG] /reviews/approved route hit! reviewType=${reviewType}`);
+
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.min(100, Math.max(1, Number(limit)));
+    const offset = (pageNum - 1) * limitNum;
+
+    const pool = getDirectPool();
+
+    // Check if user has permission to view approved reviews
+    if (userRole !== 'PLATFORM_ADMIN' && userRole !== 'PLATFORM_SUPPORT') {
+      const tenantCheckQuery = `
+        SELECT role FROM user_tenants
+        WHERE user_id = $1 AND tenant_id = $2 AND role IN ('OWNER', 'ADMIN')
+      `;
+      const tenantCheckResult = await pool.query(tenantCheckQuery, [userId, tenantId]);
+
+      if (tenantCheckResult.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'You do not have permission to view approved reviews for this store'
+        });
+      }
+    }
+
+    // Determine order by clause
+    let orderByClause = 'ORDER BY ';
+    switch (sort) {
+      case 'rating_high':
+        orderByClause += 'sr.rating DESC, sr.created_at DESC';
+        break;
+      case 'rating_low':
+        orderByClause += 'sr.rating ASC, sr.created_at DESC';
+        break;
+      case 'helpful':
+        orderByClause += 'sr.helpful_count DESC, sr.created_at DESC';
+        break;
+      case 'newest':
+      default:
+        orderByClause += 'sr.created_at DESC';
+        break;
+    }
+
+    // Build WHERE clause based on reviewType
+    let whereClause = `WHERE sr.tenant_id = $1 AND sr.approval_status = 'approved'`;
+    let queryParams: any[] = [tenantId];
+    
+    if (reviewType === 'store') {
+      whereClause += ` AND sr.product_id IS NULL`;
+    } else if (reviewType === 'product') {
+      whereClause += ` AND sr.product_id IS NOT NULL`;
+    }
+    // For 'all', don't filter by product_id
+
+    // Get approved reviews with user info and product info
+    const reviewsQuery = `
+      SELECT
+        sr.id,
+        sr.rating,
+        sr.review_text,
+        sr.helpful_count,
+        sr.verified_purchase,
+        sr.created_at,
+        sr.updated_at,
+        sr.session_id,
+        sr.user_id,
+        sr.product_id,
+        sr.approval_status,
+        u.first_name,
+        u.last_name,
+        u.email,
+        mgd.product_name,
+        mgd.product_title,
+        mgd.product_description,
+        mgd.image_url,
+        mgd.image_urls,
+        mgd.thumbnail_url,
+        mgd.featured_image_url,
+        mgd.product_category,
+        mgd.product_category_slug,
+        mgd.brand,
+        mgd.price,
+        mgd.current_price_cents,
+        mgd.currency,
+        mgd.product_metadata,
+        CASE 
+          WHEN mgd.inventory_item_id IS NOT NULL THEN 
+            CONCAT('/products/', mgd.inventory_item_id)
+          ELSE NULL 
+        END as product_url
+      FROM store_reviews sr
+      LEFT JOIN users u ON sr.user_id = u.id
+      LEFT JOIN mv_global_discovery mgd ON sr.product_id = mgd.inventory_item_id AND mgd.tenant_id = sr.tenant_id
+      ${whereClause}
+      ${orderByClause}
+      LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}
+    `;
+
+    queryParams.push(limitNum, offset);
+/* 
+    console.log('[DEBUG] /reviews/approved query:', reviewsQuery);
+    console.log('[DEBUG] /reviews/approved params:', queryParams);
+ */
+    const reviewsResult = await pool.query(reviewsQuery, queryParams);
+
+   /*  console.log('[DEBUG] /reviews/approved raw result count:', reviewsResult.rows.length);
+    console.log('[DEBUG] /reviews/approved first row product_id:', reviewsResult.rows[0]?.product_id); */
+    
+    // Check if product exists in mv_global_discovery
+    if (reviewsResult.rows.length > 0 && reviewsResult.rows[0]?.product_id) {
+      const productCheckQuery = `
+        SELECT inventory_item_id, product_name, tenant_id 
+        FROM mv_global_discovery 
+        WHERE inventory_item_id = $1 AND tenant_id = $2
+        LIMIT 1
+      `;
+      const productCheckResult = await pool.query(productCheckQuery, [
+        reviewsResult.rows[0].product_id, 
+        tenantId
+      ]);
+     /*  console.log('[DEBUG] Product exists in mv_global_discovery:', productCheckResult.rows.length > 0);
+      if (productCheckResult.rows.length > 0) {
+        console.log('[DEBUG] Found product:', productCheckResult.rows[0]);
+      } else {
+        console.log('[DEBUG] Product NOT found in mv_global_discovery for:', {
+          product_id: reviewsResult.rows[0].product_id,
+          tenant_id: tenantId
+        });
+      } */
+    }
+
+    // Get total count for pagination (matching the reviewType filter)
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM store_reviews sr
+      ${whereClause.replace('sr.', '')}
+    `;
+    const countResult = await pool.query(countQuery, queryParams.filter((_, index) => index < 1)); // Only tenantId for count
+    const totalReviews = parseInt(countResult.rows[0].total);
+
+    // Get rating summary
+    const summaryQuery = `
+      SELECT
+        rating_avg,
+        rating_count,
+        rating_1_count,
+        rating_2_count,
+        rating_3_count,
+        rating_4_count,
+        rating_5_count,
+        verified_purchase_count
+      FROM store_rating_summary
+      WHERE tenant_id = $1
+    `;
+    const summaryResult = await pool.query(summaryQuery, [tenantId]);
+    const summary = summaryResult.rows[0] || {
+      rating_avg: 0,
+      rating_count: 0,
+      rating_1_count: 0,
+      rating_2_count: 0,
+      rating_3_count: 0,
+      rating_4_count: 0,
+      rating_5_count: 0,
+      verified_purchase_count: 0
+    };
+
+    const filteredReviews = reviewsResult.rows.filter(review => review.approval_status === 'approved');
+
+    res.json({
+      success: true,
+      data: {
+        reviews: filteredReviews,
+        summary,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: totalReviews,
+          totalPages: Math.ceil(totalReviews / limitNum)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching approved store reviews:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch approved store reviews'
+    });
+  }
+});
+
+// GET /api/products/:productId/reviews/pending - Get pending product reviews for approval
+router.get('/products/:productId/reviews/pending', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { productId } = req.params;
+    const { page = '1', limit = '20' } = req.query;
+    const userId = req.user?.userId || req.user?.user_id;
+    const userRole = req.user?.role;
+
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.min(100, Math.max(1, Number(limit)));
+    const offset = (pageNum - 1) * limitNum;
+
+    const pool = getDirectPool();
+
+    // Get tenant_id for this product to check permissions
+    const productQuery = `
+      SELECT tenant_id FROM inventory_items WHERE id = $1
+    `;
+    const productResult = await pool.query(productQuery, [productId]);
+
+    if (productResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found'
+      });
+    }
+
+    const tenantId = productResult.rows[0].tenant_id;
+
+    // Check if user has permission to view pending reviews
+    if (userRole !== 'PLATFORM_ADMIN' && userRole !== 'PLATFORM_SUPPORT') {
+      const tenantCheckQuery = `
+        SELECT role FROM user_tenants
+        WHERE user_id = $1 AND tenant_id = $2 AND role IN ('OWNER', 'ADMIN')
+      `;
+      const tenantCheckResult = await pool.query(tenantCheckQuery, [userId, tenantId]);
+
+      if (tenantCheckResult.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'You do not have permission to view pending reviews for this product'
+        });
+      }
+    }
+
+    // Get pending product reviews
+    const reviewsQuery = `
+      SELECT
+        sr.id,
+        sr.rating,
+        sr.review_text,
+        sr.helpful_count,
+        sr.verified_purchase,
+        sr.created_at,
+        sr.updated_at,
+        sr.session_id,
+        sr.user_id,
+        sr.product_id,
+        sr.approval_status,
+        u.first_name,
+        u.last_name,
+        u.email
+      FROM store_reviews sr
+      LEFT JOIN users u ON sr.user_id = u.id
+      WHERE sr.product_id = $1 AND sr.approval_status = 'pending'
+      ORDER BY sr.created_at ASC
+      LIMIT $2 OFFSET $3
+    `;
+
+    const reviewsResult = await pool.query(reviewsQuery, [
+      productId,
+      limitNum,
+      offset
+    ]);
+
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM store_reviews
+      WHERE product_id = $1 AND approval_status = 'pending'
+    `;
+    const countResult = await pool.query(countQuery, [productId]);
+    const totalReviews = parseInt(countResult.rows[0].total);
+
+    res.json({
+      success: true,
+      data: {
+        reviews: reviewsResult.rows,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: totalReviews,
+          totalPages: Math.ceil(totalReviews / limitNum)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching pending product reviews:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch pending product reviews'
+    });
+  }
+});
+
+// GET /api/products/:productId/reviews/approved - Get approved product reviews
+router.get('/products/:productId/reviews/approved', async (req: Request, res: Response) => {
+  try {
+    const { productId } = req.params;
+    const { page = '1', limit = '10', sort = 'newest' } = req.query;
+
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.min(50, Math.max(1, Number(limit)));
+    const offset = (pageNum - 1) * limitNum;
+
+    const pool = getDirectPool();
+
+    // Determine order by clause
+    let orderByClause = 'ORDER BY ';
+    switch (sort) {
+      case 'rating_high':
+        orderByClause += 'sr.rating DESC, sr.created_at DESC';
+        break;
+      case 'rating_low':
+        orderByClause += 'sr.rating ASC, sr.created_at DESC';
+        break;
+      case 'helpful':
+        orderByClause += 'sr.helpful_count DESC, sr.created_at DESC';
+        break;
+      case 'newest':
+      default:
+        orderByClause += 'sr.created_at DESC';
+        break;
+    }
+
+    // Get approved product reviews with user info
+    const reviewsQuery = `
+      SELECT
+        sr.id,
+        sr.rating,
+        sr.review_text,
+        sr.helpful_count,
+        sr.verified_purchase,
+        sr.created_at,
+        sr.updated_at,
+        sr.session_id,
+        sr.user_id,
+        sr.product_id,
+        sr.approval_status,
+        u.first_name,
+        u.last_name,
+        u.email
+      FROM store_reviews sr
+      LEFT JOIN users u ON sr.user_id = u.id
+      WHERE sr.product_id = $1 AND sr.approval_status = 'approved'
+      ${orderByClause}
+      LIMIT $2 OFFSET $3
+    `;
+
+    const reviewsResult = await pool.query(reviewsQuery, [
+      productId,
+      limitNum,
+      offset
+    ]);
+
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM store_reviews
+      WHERE product_id = $1 AND approval_status = 'approved'
+    `;
+    const countResult = await pool.query(countQuery, [productId]);
+    const totalReviews = parseInt(countResult.rows[0].total);
+
+    // Get product rating summary
+    const summaryQuery = `
+      SELECT
+        COALESCE(AVG(rating), 0) as rating_avg,
+        COUNT(*) as rating_count,
+        COUNT(*) FILTER (WHERE rating = 1) as rating_1_count,
+        COUNT(*) FILTER (WHERE rating = 2) as rating_2_count,
+        COUNT(*) FILTER (WHERE rating = 3) as rating_3_count,
+        COUNT(*) FILTER (WHERE rating = 4) as rating_4_count,
+        COUNT(*) FILTER (WHERE rating = 5) as rating_5_count,
+        COALESCE(SUM(helpful_count), 0) as helpful_count_total,
+        COUNT(*) FILTER (WHERE verified_purchase = true) as verified_purchase_count
+      FROM store_reviews
+      WHERE product_id = $1 AND approval_status = 'approved'
+    `;
+    const summaryResult = await pool.query(summaryQuery, [productId]);
+    const summary = summaryResult.rows[0];
+
+    res.json({
+      success: true,
+      data: {
+        reviews: reviewsResult.rows,
+        summary,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: totalReviews,
+          totalPages: Math.ceil(totalReviews / limitNum)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching approved product reviews:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch approved product reviews'
+    });
+  }
+});
+
+// POST /api/products/:productId/reviews/:reviewId/approve - Approve a pending product review
+router.post('/products/:productId/reviews/:reviewId/approve', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { productId, reviewId } = req.params;
+    const userId = req.user?.userId || req.user?.user_id;
+    const userRole = req.user?.role;
+
+    const pool = getDirectPool();
+
+    // Get tenant_id for this product to check permissions
+    const productQuery = `
+      SELECT tenant_id FROM inventory_items WHERE id = $1
+    `;
+    const productResult = await pool.query(productQuery, [productId]);
+
+    if (productResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found'
+      });
+    }
+
+    const tenantId = productResult.rows[0].tenant_id;
+
+    // Check permissions
+    if (userRole !== 'PLATFORM_ADMIN' && userRole !== 'PLATFORM_SUPPORT') {
+      const tenantCheckQuery = `
+        SELECT role FROM user_tenants
+        WHERE user_id = $1 AND tenant_id = $2 AND role IN ('OWNER', 'ADMIN')
+      `;
+      const tenantCheckResult = await pool.query(tenantCheckQuery, [userId, tenantId]);
+
+      if (tenantCheckResult.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'You do not have permission to approve reviews for this product'
+        });
+      }
+    }
+
+    // Approve the review
+    const approveQuery = `
+      UPDATE store_reviews
+      SET approval_status = 'approved', approved_by = $1, approved_at = NOW(), updated_at = NOW()
+      WHERE id = $2 AND product_id = $3 AND approval_status = 'pending'
+      RETURNING id, rating, review_text, helpful_count, verified_purchase, created_at, approval_status
+    `;
+
+    const result = await pool.query(approveQuery, [userId, reviewId, productId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Review not found or already processed'
+      });
+    }
+
+    // Update rating summary after approval
+    await updateRatingSummary(pool, tenantId);
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+      message: 'Product review approved successfully'
+    });
+
+  } catch (error) {
+    console.error('Error approving product review:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to approve product review'
+    });
+  }
+});
+
+// POST /api/products/:productId/reviews/:reviewId/reject - Reject a pending product review
+router.post('/products/:productId/reviews/:reviewId/reject', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { productId, reviewId } = req.params;
+    const { reason } = req.body;
+    const userId = req.user?.userId || req.user?.user_id;
+    const userRole = req.user?.role;
+
+    const pool = getDirectPool();
+
+    // Get tenant_id for this product to check permissions
+    const productQuery = `
+      SELECT tenant_id FROM inventory_items WHERE id = $1
+    `;
+    const productResult = await pool.query(productQuery, [productId]);
+
+    if (productResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found'
+      });
+    }
+
+    const tenantId = productResult.rows[0].tenant_id;
+
+    // Check permissions
+    if (userRole !== 'PLATFORM_ADMIN' && userRole !== 'PLATFORM_SUPPORT') {
+      const tenantCheckQuery = `
+        SELECT role FROM user_tenants
+        WHERE user_id = $1 AND tenant_id = $2 AND role IN ('OWNER', 'ADMIN')
+      `;
+      const tenantCheckResult = await pool.query(tenantCheckQuery, [userId, tenantId]);
+
+      if (tenantCheckResult.rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'You do not have permission to reject reviews for this product'
+        });
+      }
+    }
+
+    // Reject the review
+    const rejectQuery = `
+      UPDATE store_reviews
+      SET approval_status = 'rejected', approved_by = $1, approved_at = NOW(), rejection_reason = $2, updated_at = NOW()
+      WHERE id = $3 AND product_id = $4 AND approval_status = 'pending'
+      RETURNING id, rating, review_text, helpful_count, verified_purchase, created_at, approval_status
+    `;
+
+    const result = await pool.query(rejectQuery, [userId, reason || null, reviewId, productId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Review not found or already processed'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+      message: 'Product review rejected successfully'
+    });
+
+  } catch (error) {
+    console.error('Error rejecting product review:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to reject product review'
     });
   }
 });
