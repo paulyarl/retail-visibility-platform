@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Input, Select, Alert } from '@/components/ui';
-import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput } from '@/lib/validation/businessProfile';
+import { BusinessProfile, onboardingProfileSchema, countries, normalizePhoneInput } from '@/lib/validation/businessProfile';
 import { addressParser } from '@/lib/address-parser';
 import { z } from 'zod';
 import SlugPatternSelector from '@/components/tenants/SlugPatternSelector';
@@ -73,14 +73,11 @@ export default function StoreIdentityStep({
       
       // Validate the sanitized data (not the original initialData)
       // This ensures HTTP->HTTPS conversion is validated correctly
+      // Use onboardingProfileSchema which only validates fields on the form
       try {
-        // Create a lenient schema that accepts pre-populated phone numbers
-        const lenientSchema = businessProfileSchema.extend({
-          phone_number: z.string().min(1, 'Phone number is required').trim(),
-        });
-        lenientSchema.parse(sanitized);
+        onboardingProfileSchema.parse(sanitized);
         onValidationChange(true);
-        console.log('[StoreIdentityStep] Pre-populated data is valid (lenient validation)');
+        console.log('[StoreIdentityStep] Pre-populated data is valid');
       } catch (error) {
         // Pre-populated data is incomplete - this is expected for new tenants
         // User will be prompted to fill in missing fields
@@ -95,7 +92,7 @@ export default function StoreIdentityStep({
 
   const validateField = (name: string, value: any) => {
     try {
-      const fieldSchema = (businessProfileSchema.shape as any)[name];
+      const fieldSchema = (onboardingProfileSchema.shape as any)[name];
       if (fieldSchema) {
         fieldSchema.parse(value);
         setErrors(prev => {
@@ -130,17 +127,9 @@ export default function StoreIdentityStep({
       validateField(name, value);
     }
 
-    // Check overall validity with lenient phone validation if phone hasn't been touched
+    // Check overall validity using onboardingProfileSchema
     try {
-      // Use lenient validation for phone if it hasn't been modified by user
-      if (!touched.phone_number && name !== 'phone_number') {
-        const lenientSchema = businessProfileSchema.extend({
-          phone_number: z.string().min(1, 'Phone number is required').trim(),
-        });
-        lenientSchema.parse(newData);
-      } else {
-        businessProfileSchema.parse(newData);
-      }
+      onboardingProfileSchema.parse(newData);
       onValidationChange(true);
       console.log('[StoreIdentityStep] Form is valid:', newData);
     } catch (error) {
@@ -198,7 +187,7 @@ export default function StoreIdentityStep({
       
       // Check overall validity
       try {
-        businessProfileSchema.parse(newData);
+        onboardingProfileSchema.parse(newData);
         onValidationChange(true);
       } catch (error) {
         onValidationChange(false);

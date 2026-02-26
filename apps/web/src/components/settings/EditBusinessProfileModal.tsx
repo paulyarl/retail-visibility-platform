@@ -311,8 +311,8 @@ export default function EditBusinessProfileModal({
         website: formData.website ? formData.website : undefined,
         contact_person: formData.contact_person ? formData.contact_person : undefined,
         admin_email: (formData as any).admin_email ? (formData as any).admin_email : undefined,
-        logo_url: formData.logo_url !== undefined ? formData.logo_url : undefined,
-        business_description: formData.business_description ? formData.business_description : undefined,
+        logo_url: formData.logo_url || undefined,
+        business_description: formData.business_description || undefined,
         phone_number: formData.phone_number ? formData.phone_number : undefined,
         email: formData.email ? formData.email : undefined,
         // Include social links if they exist

@@ -81,15 +81,17 @@ export const businessProfileSchema = z.object({
     .or(z.literal('')),
   
   logo_url: z.string()
-    .url('Logo must be a valid URL')
     .trim()
+    .refine((val) => val === '' || val.startsWith('http'), 'Logo must be a valid URL')
     .optional()
+    .or(z.null().transform(() => ''))
     .or(z.literal('')),
   
   business_description: z.string()
     .max(1000, 'Business description must be less than 1000 characters')
     .trim()
     .optional()
+    .or(z.null().transform(() => ''))
     .or(z.literal('')),
   
   hours: z.record(z.string(), z.string()).optional().nullable(),
@@ -102,6 +104,71 @@ export const businessProfileSchema = z.object({
 });
 
 export type BusinessProfile = z.infer<typeof businessProfileSchema>;
+
+// Onboarding schema - only validates fields shown on the StoreIdentityStep form
+// This excludes optional fields like logo_url, business_description that may be null
+export const onboardingProfileSchema = z.object({
+  business_name: z.string()
+    .min(2, 'Business name must be at least 2 characters')
+    .max(100, 'Business name must be less than 100 characters')
+    .trim(),
+  
+  address_line1: z.string()
+    .min(5, 'Address must be at least 5 characters')
+    .max(200, 'Address must be less than 200 characters')
+    .trim(),
+  
+  address_line2: z.string()
+    .max(200, 'Address line 2 must be less than 200 characters')
+    .trim()
+    .optional()
+    .or(z.literal('')),
+  
+  city: z.string()
+    .min(2, 'City must be at least 2 characters')
+    .max(100, 'City must be less than 100 characters')
+    .trim(),
+  
+  state: z.string()
+    .max(100, 'State must be less than 100 characters')
+    .trim()
+    .optional()
+    .or(z.literal('')),
+  
+  postal_code: z.string()
+    .min(3, 'Postal code must be at least 3 characters')
+    .max(20, 'Postal code must be less than 20 characters')
+    .trim(),
+  
+  country_code: z.string()
+    .length(2, 'Country code must be 2 characters (ISO 3166)')
+    .toUpperCase(),
+  
+  phone_number: z.string()
+    .min(1, 'Phone number is required')
+    .trim(),
+  
+  email: z.string()
+    .regex(emailRegex, 'Please enter a valid email address')
+    .toLowerCase()
+    .trim()
+    .optional()
+    .or(z.literal('')),
+  
+  website: z.string()
+    .regex(websiteRegex, 'Website must use HTTPS (e.g., https://www.example.com)')
+    .toLowerCase()
+    .trim()
+    .optional()
+    .or(z.literal('')),
+  
+  contact_person: z.string()
+    .min(2, 'Contact person name must be at least 2 characters')
+    .max(100, 'Contact person name must be less than 100 characters')
+    .trim()
+    .optional()
+    .or(z.literal('')),
+});
 
 // Helper to geocode an address using Google Geocoding API
 export async function geocodeAddress(address: {

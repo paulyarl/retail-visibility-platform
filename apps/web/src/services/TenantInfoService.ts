@@ -174,7 +174,7 @@ class TenantInfoService extends TenantApiSingleton {
 
   /**
    * Get GBP (Google Business Profile) linked location
-   * Uses the /api/tenants/:tenantId/gbp/location endpoint
+   * Uses the /google/business/linked-location endpoint
    */
   async getGBPLinkedLocation(tenantId: string): Promise<any> {
     try {
@@ -184,7 +184,7 @@ class TenantInfoService extends TenantApiSingleton {
       }
 
       const result = await this.makeDefaultRequest<any>(
-        `/api/tenants/${tenantId}/gbp/location`,
+        `/api/google/business/linked-location?tenantId=${tenantId}`,
         {},
         `tenant-gbp-location-${tenantId}`,
         this.cacheTTL
@@ -203,7 +203,7 @@ class TenantInfoService extends TenantApiSingleton {
 
   /**
    * Get GBP (Google Business Profile) connection status
-   * Uses the /api/tenants/:tenantId/gbp/status endpoint
+   * Uses the /google/business/status endpoint
    */
   async getGBPConnectionStatus(tenantId: string): Promise<any> {
     try {
@@ -213,7 +213,7 @@ class TenantInfoService extends TenantApiSingleton {
       }
 
       const result = await this.makeDefaultRequest<any>(
-        `/api/tenants/${tenantId}/gbp/status`,
+        `/api/google/business/status?tenantId=${tenantId}`,
         {},
         `tenant-gbp-status-${tenantId}`,
         this.cacheTTL
