@@ -77,25 +77,25 @@ export default function EnhancedTickerSettings({
 
   const loadConfig = async () => {
     try {
-      console.log('[EnhancedTickerSettings] Loading config from API...');
+      //console.log('[EnhancedTickerSettings] Loading config from API...');
       const result = await tickerConfigService.getTickerConfig();
-      console.log('[EnhancedTickerSettings] Page load API response:', result);
+      //console.log('[EnhancedTickerSettings] Page load API response:', result);
       
       if (result.success && result.data) {
         // The API response is double-wrapped: { success: true, data: { success: true, data: TickerConfig } }
         // We need to access result.data.data to get the actual TickerConfig
         const actualConfig = (result.data as any).data;
-        console.log('[EnhancedTickerSettings] Actual ticker config:', actualConfig);
-        console.log('[EnhancedTickerSettings] Messages in config:', actualConfig?.messages);
-        console.log('[EnhancedTickerSettings] Messages length:', actualConfig?.messages?.length);
-        console.log('[EnhancedTickerSettings] Config enabled:', actualConfig?.enabled);
+        //console.log('[EnhancedTickerSettings] Actual ticker config:', actualConfig);
+        //console.log('[EnhancedTickerSettings] Messages in config:', actualConfig?.messages);
+        //console.log('[EnhancedTickerSettings] Messages length:', actualConfig?.messages?.length);
+        //console.log('[EnhancedTickerSettings] Config enabled:', actualConfig?.enabled);
         
         // Set the actual config data
         setConfig(actualConfig);
         
         // Log what we just set
-        console.log('[EnhancedTickerSettings] Config set to:', actualConfig);
-        console.log('[EnhancedTickerSettings] Current config state after set:', config);
+        //console.log('[EnhancedTickerSettings] Config set to:', actualConfig);
+        //console.log('[EnhancedTickerSettings] Current config state after set:', config);
       } else {
         console.log('[EnhancedTickerSettings] Page load - API response failed or no data:', result);
       }
@@ -116,20 +116,20 @@ export default function EnhancedTickerSettings({
       const result = await tickerConfigService.updateGlobalSettings(settingsPayload);
       
       if (result.success) {
-        console.log('[EnhancedTickerSettings] Save successful, API response:', result);
-        console.log('[EnhancedTickerSettings] Current config enabled state:', config.enabled);
+       /*  console.log('[EnhancedTickerSettings] Save successful, API response:', result);
+        console.log('[EnhancedTickerSettings] Current config enabled state:', config.enabled); */
         // Update local config with the response data, preserving existing messages
         if (result.data) {
           // Extract only the TickerConfig data from the API response
           const apiResponseData = (result.data as any).data as TickerConfig;
-          console.log('[EnhancedTickerSettings] API response data:', apiResponseData);
-          console.log('[EnhancedTickerSettings] API enabled state:', apiResponseData.enabled);
+         /*  console.log('[EnhancedTickerSettings] API response data:', apiResponseData);
+          console.log('[EnhancedTickerSettings] API enabled state:', apiResponseData.enabled); */
           const tickerConfigData = {
             enabled: apiResponseData.enabled,
             messages: config.messages, // Preserve existing messages
             globalSettings: apiResponseData.globalSettings
           };
-          console.log('[EnhancedTickerSettings] New config data:', tickerConfigData);
+         // console.log('[EnhancedTickerSettings] New config data:', tickerConfigData);
           
           setConfig(tickerConfigData);
           onSave?.(tickerConfigData);
@@ -142,7 +142,7 @@ export default function EnhancedTickerSettings({
         });
 
         // Invalidate ticker config cache so ShellWithTicker gets updated immediately
-        console.log('[EnhancedTickerSettings] Invalidating ticker config cache');
+       // console.log('[EnhancedTickerSettings] Invalidating ticker config cache');
         queryClient.invalidateQueries({ queryKey: ['ticker-config'] });
         queryClient.invalidateQueries({ queryKey: ['ticker-messages'] });
       }
@@ -175,10 +175,10 @@ export default function EnhancedTickerSettings({
   };
 
   const handleUpdateMessage = async (messageId: string, updates: Partial<TickerMessage>) => {
-    console.log('[EnhancedTickerSettings] Updating message:', { messageId, updates });
+   /*  console.log('[EnhancedTickerSettings] Updating message:', { messageId, updates });
     console.log('[EnhancedTickerSettings] Updates targetAudience:', updates.targetAudience);
     console.log('[EnhancedTickerSettings] Updates targetTiers:', updates.targetTiers);
-    console.log('[EnhancedTickerSettings] Updates targetTiers length:', updates.targetTiers?.length);
+    console.log('[EnhancedTickerSettings] Updates targetTiers length:', updates.targetTiers?.length); */
 
     if (!messageId) {
       console.error('[EnhancedTickerSettings] Cannot update message: missing ID');
@@ -195,10 +195,10 @@ export default function EnhancedTickerSettings({
       console.log('[EnhancedTickerSettings] Message updated successfully:', result.data);
       // The response is double-wrapped, so we need to access result.data.data
       const updatedMessage = (result.data as any).data;
-      console.log('[EnhancedTickerSettings] Updated message targetAudience:', updatedMessage?.targetAudience);
+     /*  console.log('[EnhancedTickerSettings] Updated message targetAudience:', updatedMessage?.targetAudience);
       console.log('[EnhancedTickerSettings] Updated message targetTiers:', updatedMessage?.targetTiers);
       console.log('[EnhancedTickerSettings] Updated message targetTiers length:', updatedMessage?.targetTiers?.length);
-      
+       */
       setConfig(prev => ({
         ...prev,
         messages: prev.messages.map(msg => 
