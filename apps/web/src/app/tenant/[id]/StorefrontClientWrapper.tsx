@@ -566,7 +566,7 @@ export default function StorefrontClientWrapper({
       {/* Store Ratings and Reviews - Social Proof */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div id="reviews-section" className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-          <StoreRatingDisplay tenantId={tenantId} showWriteReview={true} />
+          <StoreRatingDisplay tenantId={tenantId} showWriteReview={true} isPublic={true} />
         </div>
       </div>
 

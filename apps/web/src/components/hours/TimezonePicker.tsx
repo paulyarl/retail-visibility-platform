@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { apiRequest } from "@/lib/api";
+import { tenantManagementService } from "@/services/TenantManagementService";
 
 
 // Force edge runtime to prevent prerendering issues
@@ -10,7 +10,7 @@ export const runtime = 'edge';
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
-export default function TimezonePicker({ tenantId, apiBase, onTimezoneChange }: { tenantId: string; apiBase: string; onTimezoneChange?: (timezone: string) => void }) {
+export default function TimezonePicker({ tenantId, onTimezoneChange }: { tenantId: string; onTimezoneChange?: (timezone: string) => void }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,22 +21,12 @@ export default function TimezonePicker({ tenantId, apiBase, onTimezoneChange }: 
     const load = async () => {
       try {
         setLoading(true);
-        const { apiRequest } = await import('@/lib/api');
-        const res = await apiRequest(`/public/tenant/${tenantId}/profile`, { 
-          skipAuth: true,
-          cache: "no-store" 
-        });
-        if (res.ok) {
-          const prof = await res.json();
-          const tz = prof?.hours?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-          setTimezone(tz);
-          // Store existing hours without timezone (timezone is managed separately)
-          const { timezone: _, ...hoursWithoutTimezone } = prof?.hours || {};
-          setExistingHours(hoursWithoutTimezone);
-        } else {
-          setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
-          setExistingHours({});
-        }
+        const profile = await tenantManagementService.getCurrentTenantProfile(tenantId);
+        const tz = profile?.hours?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+        setTimezone(tz);
+        // Store existing hours without timezone (timezone is managed separately)
+        const { timezone: _, ...hoursWithoutTimezone } = profile?.hours || {};
+        setExistingHours(hoursWithoutTimezone);
       } catch (e) {
         setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
         setExistingHours({});
@@ -45,22 +35,13 @@ export default function TimezonePicker({ tenantId, apiBase, onTimezoneChange }: 
       }
     };
     load();
-  }, [tenantId, apiBase]);
+  }, [tenantId]);
 
   const save = async () => {
     try {
       setSaving(true);
       setError(null);
-      const res = await apiRequest("/api/tenant/profile", {
-        method: "POST",
-        body: JSON.stringify({
-          tenant_id: tenantId,
-          hours: { ...(existingHours || {}), timezone },
-        }),
-      });
-      if (!res.ok) {
-        throw new Error("Failed to save timezone");
-      }
+      await tenantManagementService.updateTimezone(tenantId, timezone, existingHours);
       // Notify parent of timezone change
       onTimezoneChange?.(timezone);
     } catch (e) {

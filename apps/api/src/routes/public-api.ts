@@ -8,6 +8,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import shopsRoutes from './shops';
+import tenantsRoutes from './tenants';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 
@@ -2908,5 +2909,8 @@ router.get('/platform/branding', async (_req, res) => {
 
 // Mount shops routes under /shops
 router.use('/shops', shopsRoutes);
+
+// Mount tenants routes under /tenants
+router.use('/tenants', tenantsRoutes);
 
 export default router;

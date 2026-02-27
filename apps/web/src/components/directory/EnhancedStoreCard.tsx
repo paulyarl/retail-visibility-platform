@@ -46,7 +46,7 @@ interface EnhancedStoreCardProps {
 
 export default function EnhancedStoreCard({ store, showCategories = false, maxCategories = 3 }: EnhancedStoreCardProps) {
   // Get business hours status
-  const { status: hoursStatus } = useStoreStatus(store.tenantId);
+  const { status: hoursStatus } = useStoreStatus(store.tenantId, true); // Public scope
   
   // Rating display logic
   const shouldShowRating = store.ratingAvg !== undefined && store.ratingAvg !== null && (store.ratingCount || 0) > 0;

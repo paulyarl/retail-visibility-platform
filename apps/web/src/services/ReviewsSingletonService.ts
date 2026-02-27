@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface ReviewSummary {
   rating_avg: number;
@@ -44,7 +44,7 @@ export interface HelpfulVoteRequest {
   isHelpful: boolean;
 }
 
-class ReviewsSingletonService extends TenantApiSingleton {
+class ReviewsSingletonService extends PublicApiSingleton {
   private static instance: ReviewsSingletonService;
 
   private constructor() {

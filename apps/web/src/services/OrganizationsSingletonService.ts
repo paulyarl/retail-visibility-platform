@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 export interface Organization {
   id: string;
@@ -16,6 +16,11 @@ export interface Organization {
   website?: string;
   isActive: boolean;
   metadata?: Record<string, any>;
+  tenants?: Array<{
+    id: string;
+    name: string;
+    metadata?: Record<string, any>;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,7 +32,7 @@ export interface OrganizationsResponse {
   limit: number;
 }
 
-class OrganizationsSingletonService extends AuthenticatedApiSingleton {
+class OrganizationsSingletonService extends TenantApiSingleton {
   private static instance: OrganizationsSingletonService;
 
   private constructor() {

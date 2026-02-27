@@ -29,8 +29,7 @@ import {
 
 // Re-export for convenience
 export { AccessPresets } from './access-control';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+ 
 
 export interface UseAccessControlResult {
   user: UserData | null;

@@ -1,5 +1,8 @@
 import { Router, Request, Response } from 'express';
+import { prisma } from '../../prisma';
+import { Prisma } from '@prisma/client';
 import { getDirectPool } from '../../utils/db-pool';
+const tenantReviewsRoutes = require('./[tenantId]/reviews').default;
 
 const router = Router();
 
@@ -108,5 +111,8 @@ router.get('/slug/:slug/tenant', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Mount individual tenant routes
+router.use('/:tenantId/reviews', tenantReviewsRoutes);
 
 export default router;

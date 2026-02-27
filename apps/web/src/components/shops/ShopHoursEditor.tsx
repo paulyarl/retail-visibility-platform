@@ -54,7 +54,7 @@ export default function ShopHoursEditor({ tenantId, shop, onUpdate, onCancel }: 
   const [msg, setMsg] = useState<string | null>(null);
 
   // Use centralized status hook
-  const { status: currentStatus } = useStoreStatus(tenantId);
+  const { status: currentStatus } = useStoreStatus(tenantId, false); // Private scope for admin
 
   useEffect(() => {
     const load = async () => {

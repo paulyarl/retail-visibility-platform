@@ -546,6 +546,7 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
 
   /**
    * Override hook for subclasses to customize authenticated request behavior
+   * Base implementation adds authentication headers
    */
   protected async onAuthenticatedRequest<T>(
     url: string,
@@ -554,7 +555,20 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     ttl?: number,
     isAdminRequest?: boolean
   ): Promise<RequestInit> {
-    return options;
+    const modifiedOptions = { ...options };
+
+    // Add Authorization header with bearer token
+    const token = await this.getAuthToken();
+    if (token) {
+      modifiedOptions.headers = {
+        ...modifiedOptions.headers,
+        'Authorization': `Bearer ${token}`,
+      };
+    } else {
+      console.warn('[FlexibleApiSingleton] No auth token available for authenticated request');
+    }
+
+    return modifiedOptions;
   }
 
   /**
@@ -642,8 +656,9 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
       }
     }
     
-    // Check cache first (delegated to base class)
-    if (cacheKey) {
+    // Check cache first ONLY for GET requests (delegated to base class)
+    const method = (options.method || 'GET').toUpperCase();
+    if (cacheKey && method === 'GET') {
       const cachedResponse = await this.getFromCache<string>(cacheKey);
       if (cachedResponse) {
         // Return cached response as a Response object
@@ -661,13 +676,12 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     const response = await fetch(fullUrl, options);
     
     // Auto-invalidate cache for non-GET requests
-    const method = (options.method || 'GET').toUpperCase();
     if (method !== 'GET' && cacheKey) {
       await this.clearCache(cacheKey);
     }
     
-    // Cache successful responses (delegated to base class)
-    if (response.ok && cacheKey) {
+    // Cache successful responses ONLY for GET requests
+    if (response.ok && cacheKey && method === 'GET') {
       const responseText = await response.text();
       await this.setCache(cacheKey, responseText, { useAutoUser: true });
       

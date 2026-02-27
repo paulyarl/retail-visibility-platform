@@ -12,6 +12,7 @@ interface SlugPattern {
   pattern: string;
   slug: string;
   isAvailable: boolean;
+  isOwnSlug: boolean;
   description: string;
 }
 
@@ -54,6 +55,7 @@ export default function SlugPatternSelector({
         const patterns = await tenantSlugService.getSlugPatterns({
           businessName: businessName.trim(),
           location: location || {},
+          tenantId,
         });
 
         setPatterns(patterns);
@@ -63,6 +65,15 @@ export default function SlugPatternSelector({
           const firstAvailable = patterns.find((p: SlugPattern) => p.isAvailable);
           if (firstAvailable) {
             onSlugSelect(firstAvailable.slug);
+          }
+        } else if (selectedSlug && patterns) {
+          // If current selection is no longer available (taken by another), select first available
+          const currentPattern = patterns.find((p: SlugPattern) => p.slug === selectedSlug);
+          if (!currentPattern?.isAvailable) {
+            const firstAvailable = patterns.find((p: SlugPattern) => p.isAvailable);
+            if (firstAvailable) {
+              onSlugSelect(firstAvailable.slug);
+            }
           }
         }
       } catch (err) {
@@ -123,7 +134,7 @@ export default function SlugPatternSelector({
     return null;
   }
 
-  const recommendedPattern = patterns.find(p => p.isAvailable);
+  const recommendedPattern = patterns.find(p => p.isAvailable && !p.isOwnSlug);
 
   return (
     <div className={className}>
@@ -136,6 +147,7 @@ export default function SlugPatternSelector({
           {patterns.map((pattern, index) => {
             const isRecommended = recommendedPattern?.slug === pattern.slug;
             const isSelected = selectedSlug === pattern.slug;
+            const isOwnSlug = pattern.isOwnSlug;
 
             return (
               <div
@@ -146,7 +158,7 @@ export default function SlugPatternSelector({
                     ? 'border-blue-500 bg-blue-50' 
                     : pattern.isAvailable 
                       ? 'border-gray-200 hover:border-gray-300 bg-white' 
-                      : 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
+                      : 'border-red-200 bg-red-50 opacity-70 cursor-not-allowed'
                   }
                 `}
                 onClick={() => pattern.isAvailable && onSlugSelect(pattern.slug)}
@@ -180,7 +192,12 @@ export default function SlugPatternSelector({
                         </Badge>
                       )}
                       
-                      {pattern.isAvailable ? (
+                      {isOwnSlug ? (
+                        <Badge variant="success" className="text-xs bg-purple-600">
+                          <Check className="h-3 w-3 mr-1" />
+                          Yours
+                        </Badge>
+                      ) : pattern.isAvailable ? (
                         <Badge variant="success" className="text-xs bg-green-600">
                           <Check className="h-3 w-3 mr-1" />
                           Available

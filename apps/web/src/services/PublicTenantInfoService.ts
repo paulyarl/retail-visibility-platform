@@ -7,6 +7,7 @@
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { tenantPublicService } from '@/services/TenantPublicService';
+import { BusinessProfile } from '@/lib/validation/businessProfile';
 
 export interface TenantInfo {
   id: string;
@@ -24,23 +25,6 @@ export interface TenantInfo {
     storefront?: boolean;
     [key: string]: any;
   };
-}
-
-export interface BusinessProfile {
-  business_name: string;
-  phone_number?: string;
-  email?: string;
-  website?: string;
-  address_line1?: string;
-  address_line2?: string;
-  city?: string;
-  state?: string;
-  postal_code?: string;
-  logo_url?: string;
-  business_description?: string;
-  social_links?: Record<string, string>;
-  metadata?: Record<string, any>;
-  hours?: any;
 }
 
 export interface TenantTier {

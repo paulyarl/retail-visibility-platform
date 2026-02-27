@@ -74,7 +74,8 @@ export default function TenantBusinessProfilePage() {
 
   const mergeProfileData = async (profileData: BusinessProfile | null) => {
     const onboardingData = await loadOnboardingData();
-    
+    console.log('[TenantSettings] Onboarding data:', onboardingData);
+    console.log('[TenantSettings] Profile data:', profileData);
     if (!profileData) {
       // If no profile exists, use onboarding data as base
       setMergedProfile(onboardingData as BusinessProfile);
@@ -100,6 +101,7 @@ export default function TenantBusinessProfilePage() {
       social_links: profileData.social_links || onboardingData.social_links || {},
       latitude: profileData.latitude || onboardingData.latitude,
       longitude: profileData.longitude || onboardingData.longitude,
+      slug: (profileData as any).slug || (onboardingData as any).slug || '',
     };
     
     console.log('[TenantSettings] Merged profile data:', merged);
@@ -140,12 +142,17 @@ export default function TenantBusinessProfilePage() {
   };
 
   const handleUpdate = async (updatedProfile: BusinessProfile) => {
+    console.log('[TenantSettings] handleUpdate called with:', updatedProfile);
     try {
       const data = await platformHomeService.updateTenantProfile(tenantId, updatedProfile as any);
       
       if (data) {
         setProfile(data as BusinessProfile);
         setMergedProfile(data as BusinessProfile); // Update merged profile with saved data
+        
+        // Update localStorage to keep it in sync with database changes
+        await onboardingStorageService.updateBusinessData(tenantId, data as BusinessProfile);
+        
         // Reload the profile data to ensure we have the latest from server
         loadProfile();
       } else {

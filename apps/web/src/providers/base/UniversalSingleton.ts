@@ -203,6 +203,7 @@ export abstract class UniversalSingleton {
 
     try {
       const cached = await this.cacheManager.get(key, options);
+      //console.log(`[${this.constructor.name}] Cache get for ${key}:`, cached);
       if (cached) {
         this.cacheHits++;
         return cached as T;
@@ -240,15 +241,18 @@ export abstract class UniversalSingleton {
       // Clear memory cache
       if (key) {
         this.cache.delete(key);
+      //   console.log(`[${this.constructor.name}] Cache memory cache cleared for ${key ? key : 'all'}`);
       } else {
         this.cache.clear();
       }
-      
+     
       // Clear persistent cache
       if (key) {
         await this.cacheManager.remove(key);
+    //    console.log(`[${this.constructor.name}] Cache persistent cache cleared for ${key ? key : 'all'}`);
       } else {
         await this.cacheManager.clear();
+   //     console.log(`[${this.constructor.name}] Cache persistent cache cleared for ${key ? key : 'all'}`);
       }
     } catch (error) {
       console.warn(`[${this.constructor.name}] Cache clear failed:`, error);

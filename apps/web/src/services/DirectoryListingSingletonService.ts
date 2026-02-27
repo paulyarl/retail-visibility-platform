@@ -1,11 +1,12 @@
 /**
  * Directory Listing Singleton Service
  * 
- * Extends AuthenticatedApiSingleton to provide cached directory listing operations
- * Uses the platform's singleton architecture for automatic authentication and caching
+ * Extends PublicApiSingleton to provide cached directory listing operations
+ * Uses the platform's singleton architecture for automatic caching
+ * Supports both public directory access and authenticated management operations
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 export interface DirectoryListing {
   id: string;
@@ -28,7 +29,7 @@ export interface DirectoryListing {
   };
 }
 
-class DirectoryListingSingletonService extends AuthenticatedApiSingleton {
+export class DirectoryListingSingletonService extends PublicApiSingleton {
   private static instance: DirectoryListingSingletonService;
 
   private constructor() {

@@ -152,7 +152,7 @@ export class OnboardingStorageService {
       const encryptionKey = await this.getEncryptionKey(tenantId);
       const decryptedJson = await this.decryptData(saved, encryptionKey);
       const data = JSON.parse(decryptedJson);
-
+      console.log('[OnboardingStorageService] Decrypted data:', data);
       return {
         currentStep: data.currentStep || 1,
         businessData: data.businessData || {},
@@ -193,6 +193,35 @@ export class OnboardingStorageService {
       localStorage.removeItem(this.getKey(tenantId));
     } catch (error) {
       console.error('[OnboardingStorageService] Failed to clear progress:', error);
+    }
+  }
+
+  /**
+   * Update business data in stored progress (e.g., when slug changes in settings)
+   */
+  async updateBusinessData(tenantId: string, updates: Partial<BusinessProfile>): Promise<void> {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const existing = await this.load(tenantId);
+      if (!existing) {
+        console.log('[OnboardingStorageService] No existing progress to update');
+        return;
+      }
+
+      // Merge updates into existing business data
+      const updatedProgress: OnboardingProgress = {
+        ...existing,
+        businessData: {
+          ...existing.businessData,
+          ...updates,
+        },
+      };
+
+      console.log('[OnboardingStorageService] Updating business data with:', updates);
+      await this.save(tenantId, updatedProgress);
+    } catch (error) {
+      console.error('[OnboardingStorageService] Failed to update business data:', error);
     }
   }
 }

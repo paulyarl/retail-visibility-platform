@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { api, API_BASE_URL } from '@/lib/api'
+import { API_BASE_URL } from '@/lib/api'
 import { Button } from '@mantine/core';
 import { Pagination } from '@/components/ui'
 import { ContextBadges } from '@/components/ContextBadges'
@@ -11,6 +11,7 @@ import { QuickStartCategoryModal } from '@/components/quick-start'
 import { CategoryEditModal, type CategoryFormData } from '@/components/categories'
 import { tenantCategoriesService } from '@/services/TenantCategoriesService'
 import { tenantManagementService } from '@/services/TenantManagementService'
+import { organizationsService } from '@/services/OrganizationsSingletonService'
 
 interface Category {
   id: string
@@ -83,15 +84,11 @@ function GoogleCategoryLookup({ googleCategoryId }: { googleCategoryId: string }
   useEffect(() => {
     async function fetchPath() {
       try {
-        // Use the public Google taxonomy endpoint (no auth required)
-        const res = await fetch(`${API_BASE_URL}/public/google-taxonomy/${googleCategoryId}`)
-        if (res.ok) {
-          const data = await res.json()
-          // data.path is an array like ["Food", "Bakery", "Bread"]
-          if (data.path) {
-            const pathString = Array.isArray(data.path) ? data.path.join(' > ') : data.path
-            setPath(pathString)
-          }
+        // Use the TenantCategoriesService for Google taxonomy path
+        const taxonomyData = await tenantCategoriesService.getGoogleTaxonomyPath(googleCategoryId)
+        if (taxonomyData && taxonomyData.path) {
+          const pathString = Array.isArray(taxonomyData.path) ? taxonomyData.path.join(' > ') : taxonomyData.path
+          setPath(pathString)
         }
       } catch (error) {
         console.error('Failed to fetch Google category path:', error)
@@ -231,7 +228,7 @@ export default function CategoriesPage() {
         setAlignmentStatus(alignmentStatus)
 
         // Get tenant info using TenantManagementService
-        const tenantData = await tenantManagementService.getCurrentTenantProfile()
+        const tenantData = await tenantManagementService.getCurrentTenantProfile(tenantId)
         if (tenantData) {
           const metadata = tenantData.metadata || {}
           const isHero = metadata.isHeroLocation === true
@@ -239,9 +236,8 @@ export default function CategoriesPage() {
           
           // If tenant has an organization, fetch organization details
           if (tenantData.organizationId) {
-            const orgRes = await api.get(`${API_BASE_URL}/organizations/${tenantData.organizationId}`)
-            if (orgRes.ok) {
-              const orgData = await orgRes.json()
+            const orgData = await organizationsService.getOrganizationById(tenantData.organizationId)
+            if (orgData) {
               const tenantsWithHeroFlag = orgData.tenants?.map((t: any) => ({
                 id: t.id,
                 name: t.name,

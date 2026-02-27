@@ -110,8 +110,8 @@ export default function GBPSyncStatusPage() {
 
         // Determine if we have local business info data
         const hasBusinessInfo = !!(
-          profile?.businessName || profile?.description ||
-          profile?.addressLine1 || profile?.phone ||
+          profile?.business_name || profile?.business_description ||
+          profile?.address_line1 || profile?.phone_number ||
           profile?.website || profile?.hours
         );
 

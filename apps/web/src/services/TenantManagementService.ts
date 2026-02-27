@@ -97,12 +97,12 @@ class TenantManagementService extends TenantApiSingleton {
    * Get current user's tenant profile
    * Uses the /api/tenant endpoint (authenticated)
    */
-  async getCurrentTenantProfile(): Promise<TenantProfile | null> {
+  async getCurrentTenantProfile(tenantId: string): Promise<TenantProfile | null> {
     try {
       const response = await this.makeDefaultRequest<TenantProfile>(
-        '/api/tenant',
+        `/api/tenant/profile?tenant_id=${encodeURIComponent(tenantId)}`,
         {},
-        'current-tenant',
+        `current-tenant-${tenantId}`,
         this.PROFILE_TTL
       );
 
@@ -125,12 +125,12 @@ class TenantManagementService extends TenantApiSingleton {
    * Get tenant profile for management
    * Uses the /api/tenant/profile endpoint (authenticated)
    */
-  async getTenantProfile(): Promise<TenantProfile | null> {
+  async getTenantProfile(tenantId: string): Promise<TenantProfile | null> {
     try {
       const response = await this.makeDefaultRequest<TenantProfile>(
-        '/api/tenant/profile',
+        `/api/tenant/profile?tenant_id=${encodeURIComponent(tenantId)}`,
         {},
-        'tenant-profile',
+        `tenant-profile-${tenantId}`,
         this.PROFILE_TTL
       );
 
@@ -319,6 +319,263 @@ class TenantManagementService extends TenantApiSingleton {
     for (const pattern of patterns) {
       await this.invalidateCache(pattern);
     }
+  }
+
+  /**
+   * Get business hours for a tenant
+   */
+  async getBusinessHours(tenantId: string): Promise<any> {
+    // Get business hours from tenant profile (includes hours data)
+    const profile = await this.getTenantProfile(tenantId);
+    return profile?.hours || null;
+  }
+
+  /**
+   * Get special business hours for a tenant
+   */
+  async getSpecialBusinessHours(tenantId: string): Promise<any> {
+    // Get special hours from tenant profile (included in hours data)
+    const profile = await this.getTenantProfile(tenantId);
+    return profile?.hours?.overrides || profile?.hours || null;
+  }
+
+  /**
+   * Update business hours for a tenant
+   */
+  async updateBusinessHours(tenantId: string, hours: any): Promise<any> {
+    const result = await this.makeDefaultRequest(
+      '/api/tenant/profile',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          hours: hours
+        })
+      },
+      `tenant-business-hours-${tenantId}`
+    );
+    
+    // Invalidate related caches (base cache handles store status automatically)
+    await this.invalidateCache(`tenant-profile-${tenantId}`);
+    await this.invalidateCache(`tenant-special-hours-${tenantId}`);
+    await this.invalidateCache(`tenant-store-status-${tenantId}`);
+    
+    return result.data;
+  }
+
+  /**
+   * Update special business hours for a tenant
+   */
+  async updateSpecialBusinessHours(tenantId: string, specialHours: any): Promise<any> {
+    // Get current profile to preserve existing hours data
+    const currentProfile = await this.getCurrentTenantProfile(tenantId);
+    const currentHours = currentProfile?.hours || {};
+    
+    // Merge special hours into the hours object
+    const updatedHours = {
+      ...currentHours,
+      overrides: specialHours.overrides || specialHours
+    };
+
+    const result = await this.makeDefaultRequest(
+      '/api/tenant/profile',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          hours: updatedHours
+        })
+      },
+      `tenant-special-hours-${tenantId}`
+    );
+    
+    // Invalidate related caches (base cache handles store status automatically)
+    await this.invalidateCache(`tenant-profile-${tenantId}`);
+    await this.invalidateCache(`tenant-special-hours-${tenantId}`);
+    await this.invalidateCache(`tenant-store-status-${tenantId}`);
+    
+    return result.data;
+  }
+
+  /**
+   * Get store status for tenant (private endpoint)
+   * Uses inherited base cache for automatic deduplication
+   */
+  async getStoreStatus(tenantId: string): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      `/api/tenant/${tenantId}/business-hours/status`,
+      {},
+      `tenant-store-status-${tenantId}`,
+      5 * 60 * 1000 // 5 minutes for status
+    );
+    
+    // The API returns { success: true, data: { statusObject } }
+    // We need to extract the actual status object from the nested data
+    const responseData = result.data as any;
+    const statusData = (result.success && responseData && typeof responseData === 'object' && 'data' in responseData) 
+      ? responseData.data 
+      : result.data;
+    
+    return statusData;
+  }
+
+  /**
+   * Get GBP hours sync status
+   */
+  async getGBPHoursStatus(tenantId: string): Promise<any> {
+    const result = await this.makeDefaultRequest(
+      `/api/tenant/${tenantId}/gbp/hours/status`,
+      {},
+      `tenant-gbp-hours-status-${tenantId}`,
+      60 * 1000 // 1 minute TTL for sync status
+    );
+    return result.data;
+  }
+
+  /**
+   * Trigger GBP hours mirroring
+   */
+  async triggerGBPHoursMirror(tenantId: string): Promise<any> {
+    const result = await this.makeDefaultRequest(
+      `/api/tenant/${tenantId}/gbp/hours/mirror`,
+      {
+        method: 'POST'
+      },
+      `tenant-gbp-hours-mirror-${tenantId}`
+    );
+    
+    // Invalidate status cache to force refresh
+    await this.invalidateCache(`tenant-gbp-hours-status-${tenantId}`);
+    
+    return result.data;
+  }
+
+  /**
+   * Update tenant timezone
+   */
+  async updateTimezone(tenantId: string, timezone: string, existingHours?: any): Promise<any> {
+    const result = await this.makeDefaultRequest(
+      '/api/tenant/profile',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          hours: { ...(existingHours || {}), timezone }
+        })
+      },
+      `tenant-profile-${tenantId}`
+    );
+    
+    // Invalidate related caches (base cache handles store status automatically)
+    await this.invalidateCache(`tenant-profile-${tenantId}`);
+    await this.invalidateCache(`tenant-business-hours-${tenantId}`);
+    await this.invalidateCache(`tenant-store-status-${tenantId}`);
+    
+    return result.data;
+  }
+
+  /**
+   * Propagate business hours to organization locations
+   */
+  async propagateBusinessHours(tenantId: string, includeSpecialHours: boolean = false): Promise<any> {
+    const result = await this.makeDefaultRequest(
+      `/api/v1/tenants/${tenantId}/business-hours/propagate`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ includeSpecialHours })
+      },
+      `propagation-business-hours-${tenantId}`
+    );
+    
+    // Invalidate related caches
+    await this.invalidateCache(`tenant-business-hours-*`);
+    
+    return result.data;
+  }
+
+  /**
+   * Propagate feature flags to organization locations
+   */
+  async propagateFeatureFlags(tenantId: string, mode: string = 'all'): Promise<any> {
+    const result = await this.makeDefaultRequest(
+      `/api/v1/tenants/${tenantId}/feature-flags/propagate`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ mode })
+      },
+      `propagation-feature-flags-${tenantId}`
+    );
+    
+    return result.data;
+  }
+
+  /**
+   * Propagate user roles to organization locations
+   */
+  async propagateUserRoles(tenantId: string, mode: string = 'all'): Promise<any> {
+    const result = await this.makeDefaultRequest(
+      `/api/v1/tenants/${tenantId}/user-roles/propagate`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ mode })
+      },
+      `propagation-user-roles-${tenantId}`
+    );
+    
+    return result.data;
+  }
+
+  /**
+   * Propagate brand assets to organization locations
+   */
+  async propagateBrandAssets(tenantId: string): Promise<any> {
+    const result = await this.makeDefaultRequest(
+      `/api/v1/tenants/${tenantId}/brand-assets/propagate`,
+      {
+        method: 'POST'
+      },
+      `propagation-brand-assets-${tenantId}`
+    );
+    
+    return result.data;
+  }
+
+  /**
+   * Propagate business profile to organization locations
+   */
+  async propagateBusinessProfile(tenantId: string): Promise<any> {
+    const result = await this.makeDefaultRequest(
+      `/api/v1/tenants/${tenantId}/business-profile/propagate`,
+      {
+        method: 'POST'
+      },
+      `propagation-business-profile-${tenantId}`
+    );
+    
+    // Invalidate related caches
+    await this.invalidateCache(`tenant-profile-*`);
+    
+    return result.data;
+  }
+
+  /**
+   * Update organization hero location
+   */
+  async updateOrganizationHeroLocation(organizationId: string, tenantId: string): Promise<any> {
+    const result = await this.makeDefaultRequest(
+      `/organizations/${organizationId}/hero-location`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ tenantId })
+      },
+      `org-hero-location-${organizationId}`
+    );
+    
+    // Invalidate organization caches
+    await this.invalidateCache(`organization-${organizationId}`);
+    await this.invalidateCache(`tenant-profile-${tenantId}`);
+    
+    return result.data;
   }
 }
 

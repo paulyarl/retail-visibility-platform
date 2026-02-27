@@ -320,6 +320,8 @@ export default function EditBusinessProfileModal({
         // Explicitly include coordinates if they exist
         latitude: formData.latitude !== undefined && formData.latitude !== null ? formData.latitude : undefined,
         longitude: formData.longitude !== undefined && formData.longitude !== null ? formData.longitude : undefined,
+        // Include slug if selected
+        slug: (formData as any).slug || undefined,
       };
       const validatedData = businessProfileSchema.parse(normalized);
       

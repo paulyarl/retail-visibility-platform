@@ -688,6 +688,14 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
     });
     if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
     
+    // Fetch current slug from directory_settings_list (source of truth)
+    const { basePrisma } = await import('./prisma');
+    const slugResult = await basePrisma.$queryRaw`
+      SELECT slug FROM "directory_settings_list" WHERE tenant_id = ${tenant.id}
+    `;
+    const currentSlug = (slugResult as any[])[0]?.slug || tenant.slug;
+    console.log('[GET /tenants/:id] Slug from directory_settings_list:', currentSlug, 'tenant.slug:', tenant.slug);
+    
     const now = new Date();
     
     // Auto-set trial expiration date if missing for trial users
@@ -733,6 +741,7 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
     
     res.json({
       ...tenant,
+      slug: currentSlug, // Use slug from directory_settings_list (source of truth)
       statusInfo,
     });
   } catch (e: any) {
@@ -1391,6 +1400,7 @@ const HTTPS_URL = /^https:\/\//i;
 const tenantProfileSchema = z.object({
   tenant_id: z.string().min(1),
   business_name: z.string().min(1).optional(),
+  slug: z.string().optional(),
   address_line1: z.string().optional(),
   address_line2: z.string().optional(),
   city: z.string().optional(),
@@ -1415,14 +1425,14 @@ const tenantProfileSchema = z.object({
     }, { message: "Invalid URL" })
     .optional(),
   contact_person: z.string().optional(),
-  logo_url: z.string().url().optional().or(z.literal('')),
-  banner_url: z.string().url().optional().or(z.literal('')),
-  business_description: z.string().optional(),
+  logo_url: z.string().url().optional().or(z.literal('')).nullable().transform(v => v || undefined),
+  banner_url: z.string().url().optional().or(z.literal('')).nullable().transform(v => v || undefined),
+  business_description: z.string().optional().nullable().transform(v => v || undefined),
   hours: z.any().optional(),
   social_links: z.any().optional(),
   seo_tags: z.any().optional(),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
+  latitude: z.number().optional().nullable().transform(v => v ?? undefined),
+  longitude: z.number().optional().nullable().transform(v => v ?? undefined),
   display_map: z.boolean().optional(),
   map_privacy_mode: z.enum(["precise","neighborhood"]).optional(),
 });
@@ -1464,6 +1474,8 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
       const values = [];
 
       Object.entries(profileData).forEach(([key, value]) => {
+        // Skip slug - it's stored in directory_settings_list, not tenant_business_profiles_list
+        if (key === 'slug') return;
         if (value !== undefined) {
           updateParts.push(`"${key}" = $${values.length + 1}`);
           values.push(value === '' ? null : value);
@@ -1556,8 +1568,21 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
     if (profileData.business_name) {
       console.log('[POST /tenant/profile] Updating tenant name to:', profileData.business_name);
       await prisma.tenants.update({ where: { id: tenant_id }, data: { name: profileData.business_name } });
-      
-      // Auto-regenerate slug when business name changes
+    }
+
+    // Update slug in directory_settings_list if explicitly provided
+    if ((profileData as any).slug) {
+      console.log('[POST /tenant/profile] Updating slug to:', (profileData as any).slug);
+      try {
+        const slugSingletonService = (await import('./services/SlugSingletonService')).default;
+        await slugSingletonService.updateSlug(tenant_id, (profileData as any).slug);
+        console.log('[POST /tenant/profile] Slug updated successfully');
+      } catch (slugError) {
+        console.error('[POST /tenant/profile] Failed to update slug:', slugError);
+        // Don't fail the entire request if slug update fails
+      }
+    } else if (profileData.business_name) {
+      // Auto-regenerate slug when business name changes (only if slug not explicitly provided)
       try {
         const slugSingletonService = (await import('./services/SlugSingletonService')).default;
         await slugSingletonService.regenerateSlugFromBusinessName(tenant_id, false);
@@ -1569,7 +1594,19 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
     }
 
     console.log('[POST /tenant/profile] Success, returning result:', (result as any)[0] || result);
-    res.json((result as any)[0] || result);
+    
+    // Fetch slug from directory_settings_list and include in response
+    const slugResult = await basePrisma.$queryRaw`
+      SELECT slug FROM "directory_settings_list" WHERE tenant_id = ${tenant_id}
+    `;
+    const slug = (slugResult as any[])[0]?.slug || null;
+    
+    const responseWithSlug = {
+      ...(result as any)[0] || result,
+      slug
+    };
+    
+    res.json(responseWithSlug);
   } catch (e: any) {
     console.error("[POST /tenant/profile] Full error details:", {
       message: e?.message,
@@ -1597,6 +1634,12 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
       SELECT tenant_id, business_name, address_line1, address_line2, city, state, postal_code, country_code, phone_number, email, website, contact_person, logo_url, banner_url, business_description, hours, social_links, seo_tags, latitude, longitude, display_map, map_privacy_mode, gbp_category_id, gbp_category_name, gbp_category_last_mirrored, gbp_category_sync_status, updated_at FROM "tenant_business_profiles_list" WHERE tenant_id = ${tenant_id}
     `;
     const bp = (bpResults as any[])[0] || null;
+    
+    // Fetch slug from directory_settings_list
+    const slugResults = await basePrisma.$queryRaw`
+      SELECT slug FROM "directory_settings_list" WHERE tenant_id = ${tenant_id}
+    `;
+    const slug = (slugResults as any[])[0]?.slug || tenant.slug || null;
     
     // Fetch business hours from BusinessHours table (optional - tables may not exist)
     let businessHours = null;
@@ -1647,6 +1690,8 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
       gbpCategorySyncStatus: bp?.gbp_category_sync_status || null,
       // Secondary categories from metadata
       gbpSecondaryCategories: md?.gbp_categories?.secondary || [],
+      // Slug from directory_settings_list
+      slug,
     };
     return res.json(profile);
   } catch (e: any) {
@@ -2865,8 +2910,10 @@ app.get("/api/public/features-showcase-config", async (req, res) => {
 // PATCH /api/tenant/profile - partial update
 const tenantProfileUpdateSchema = tenantProfileSchema.partial().extend({ tenant_id: z.string().min(1) });
 app.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
+  console.log('[PATCH /tenant/profile] Request body:', JSON.stringify(req.body, null, 2));
   const parsed = tenantProfileUpdateSchema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  console.log('[PATCH /tenant/profile] Parsed data:', JSON.stringify(parsed.data, null, 2));
   try {
     const { tenant_id, ...delta } = parsed.data;
     const existingTenant = await prisma.tenants.findUnique({ where: { id: tenant_id } });
@@ -2891,6 +2938,8 @@ app.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
       const values = [];
 
       Object.entries(delta).forEach(([key, value]) => {
+        // Skip slug - it's stored in directory_settings_list, not tenant_business_profiles_list
+        if (key === 'slug') return;
         if (value !== undefined) {
           updateParts.push(`"${key}" = $${values.length + 1}`);
           values.push(value === '' ? null : value);
@@ -2971,8 +3020,21 @@ app.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
     // Update tenant name if business_name changed
     if (delta.business_name && typeof delta.business_name === 'string' && delta.business_name.trim()) {
       await prisma.tenants.update({ where: { id: tenant_id }, data: { name: delta.business_name } });
-      
-      // Auto-regenerate slug when business name changes
+    }
+
+    // Update slug in directory_settings_list if explicitly provided
+    if ((delta as any).slug) {
+      console.log('[PATCH /tenant/profile] Updating slug to:', (delta as any).slug);
+      try {
+        const slugSingletonService = (await import('./services/SlugSingletonService')).default;
+        await slugSingletonService.updateSlug(tenant_id, (delta as any).slug);
+        console.log('[PATCH /tenant/profile] Slug updated successfully');
+      } catch (slugError) {
+        console.error('[PATCH /tenant/profile] Failed to update slug:', slugError);
+        // Don't fail the entire request if slug update fails
+      }
+    } else if (delta.business_name) {
+      // Auto-regenerate slug when business name changes (only if slug not explicitly provided)
       try {
         const slugSingletonService = (await import('./services/SlugSingletonService')).default;
         await slugSingletonService.regenerateSlugFromBusinessName(tenant_id, false);
@@ -2996,7 +3058,19 @@ app.patch("/api/tenant/profile", authenticateToken, async (req, res) => {
     }
 
     console.log(`[PATCH /tenant/profile] Final result to return:`, (result as any)[0] || result);
-    return res.json((result as any)[0] || result);
+    
+    // Fetch current slug to include in response
+    const slugResult = await basePrisma.$queryRaw`
+      SELECT slug FROM "directory_settings_list" WHERE tenant_id = ${tenant_id}
+    `;
+    const currentSlug = (slugResult as any[])[0]?.slug || null;
+    
+    const responseProfile = {
+      ...((result as any)[0] || result),
+      slug: currentSlug,
+    };
+    
+    return res.json(responseProfile);
   } catch (e: any) {
     console.error("[PATCH /tenant/profile] Error:", e);
     return res.status(500).json({ error: "failed_to_update_profile" });

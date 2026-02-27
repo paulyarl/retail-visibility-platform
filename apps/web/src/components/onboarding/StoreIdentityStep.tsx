@@ -9,6 +9,7 @@ import { z } from 'zod';
 import SlugPatternSelector from '@/components/tenants/SlugPatternSelector';
 
 interface StoreIdentityStepProps {
+  tenantId: string;
   initialData?: Partial<BusinessProfile>;
   onDataChange: (data: Partial<BusinessProfile>) => void;
   onValidationChange: (isValid: boolean) => void;
@@ -34,10 +35,11 @@ export const runtime = 'edge';
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
-export default function StoreIdentityStep({ 
-  initialData = {}, 
+export default function StoreIdentityStep({
+  tenantId,
+  initialData = {},
   onDataChange,
-  onValidationChange 
+  onValidationChange
 }: StoreIdentityStepProps) {
   // Sanitize initial data to prevent hydration mismatches
   const sanitizedInitialData = sanitizeData(initialData);
@@ -278,7 +280,7 @@ export default function StoreIdentityStep({
             state: formData.state,
             country: formData.country_code,
           }}
-          tenantId={undefined}
+          tenantId={tenantId}
           selectedSlug={(formData as any).slug || ''}
           onSlugSelect={(slug) => handleChange('slug' as any, slug)}
         />

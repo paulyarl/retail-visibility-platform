@@ -7,6 +7,7 @@
 
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
+import { BusinessProfile } from '../lib/validation/businessProfile';
 
 export interface Tenant {
   id: string;
@@ -54,39 +55,6 @@ export interface PendingRequest {
     id: string;
     name: string;
   };
-}
-
-export interface BusinessProfile {
-  businessName?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  country?: string;
-  postalCode?: string;
-  phone?: string;
-  website?: string;
-  email?: string;
-  description?: string;
-  logoUrl?: string;
-  hours?: {
-    monday?: { open: string; close: string; };
-    tuesday?: { open: string; close: string; };
-    wednesday?: { open: string; close: string; };
-    thursday?: { open: string; close: string; };
-    friday?: { open: string; close: string; };
-    saturday?: { open: string; close: string; };
-    sunday?: { userPreference: string; };
-  };
-  addressLine1?: string;
-  addressLine2?: string;
-  countryCode?: string;
-  contactPerson?: string;
-  socialLinks?: Record<string, any>;
-  seoTags?: Record<string, any>;
-  latitude?: number;
-  longitude?: number;
-  displayMap?: boolean;
-  mapPrivacyMode?: string;
 }
 
 export interface UpgradeRequest {
@@ -622,6 +590,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
    * Update tenant profile
    */
   async updateTenantProfile(tenantId: string, profileData: Partial<BusinessProfile>): Promise<BusinessProfile | null> {
+    console.log('[PlatformHomeSingleton] updateTenantProfile called with tenantId:', tenantId, 'profileData:', profileData);
     if (!tenantId) {
       throw new Error('Tenant ID is required');
     }
@@ -635,6 +604,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       `platform-tenant-profile-${tenantId}`
     );
 
+    console.log('[PlatformHomeSingleton] updateTenantProfile result:', result);
     if (!result.success) {
       console.error('[PlatformHomeSingleton] Failed to update tenant profile:', result.error);
       throw result.error;
@@ -643,8 +613,11 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     // Invalidate tenant complete cache for this tenant
     await this.invalidateCache(`platform-tenant-complete-${tenantId}`);
     
-    // Invalidate tenant profile cache
-    await this.invalidateCache(`platform-tenant-profile-${tenantId}*`);
+    // Invalidate tenant profile cache (exact key, no wildcard)
+    await this.invalidateCache(`platform-tenant-profile-${tenantId}`);
+    
+    // Invalidate tenant cache (slug is stored on tenant record)
+    await this.invalidateCache(`platform-tenant-${tenantId}`);
 
     return result.data || null;
   }
@@ -712,6 +685,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     
     // Invalidate tenant cache
     await this.invalidateCache(`platform-tenant-${tenantId}*`);
+    await this.invalidateCache(`platform-tenant-profile-${tenantId}*`);
     await this.invalidateCache('platform-tenants*');
     
     // Invalidate platform dashboard cache since tenants affect stats
@@ -2243,11 +2217,11 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     const mergedData = {
       ...tenant,
       ...tenant?.metadata,
-      business_name: profile?.businessName || tenant?.name || '',
-      phone: profile?.phone || tenant?.metadata?.phone || '',
+      business_name: profile?.business_name || tenant?.name || '',
+      phone_number: profile?.phone_number || tenant?.metadata?.phone_number || '',
       email: profile?.email || tenant?.metadata?.email || '',
       website: profile?.website || tenant?.metadata?.website || '',
-      contact_person: profile?.contactPerson || tenant?.metadata?.contact_person || '',
+      contact_person: profile?.contact_person || tenant?.metadata?.contact_person || '',
       ...profile,
     };
 
@@ -2257,7 +2231,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   /**
    * Save onboarding business profile
    */
-  async saveOnboardingProfile(tenantId: string, data: any): Promise<void> {
+  async saveOnboardingProfile(tenantId: string, data: any): Promise<any> {
     if (!tenantId) {
       throw new Error('Tenant ID is required');
     }
@@ -2285,6 +2259,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       
       throw new Error(error?.message || 'Failed to save business profile');
     }
+    
+    return result.data;
   }
 
   /**

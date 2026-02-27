@@ -5,12 +5,13 @@
  * Extends UniversalSingleton for proper caching and error handling
  */
 
-import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
+import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 
 export interface SlugPattern {
   pattern: string;
   slug: string;
   isAvailable: boolean;
+  isOwnSlug: boolean;
   description: string;
 }
 
@@ -21,9 +22,10 @@ export interface SlugPatternParams {
     state?: string;
     country?: string;
   };
+  tenantId?: string;
 }
 
-class TenantSlugService extends AuthenticatedApiSingleton {
+class TenantSlugService extends TenantApiSingleton {
   private static instance: TenantSlugService;
 
   protected constructor() {
@@ -51,9 +53,13 @@ class TenantSlugService extends AuthenticatedApiSingleton {
         '/api/slugs/patterns',
         {
           method: 'POST',
-          body: JSON.stringify(params),
+          body: JSON.stringify({
+            businessName: params.businessName,
+            location: params.location || {},
+            tenantId: params.tenantId,
+          }),
         },
-        `slug-patterns:${params.businessName}:${params.location?.city || ''}:${params.location?.state || ''}`
+        `slug-patterns:${params.businessName}:${params.location?.city || ''}:${params.location?.state || ''}:${params.tenantId || ''}`
       );
 
       console.log('[TenantSlugService] Slug patterns API response:', response);

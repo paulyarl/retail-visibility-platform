@@ -65,11 +65,11 @@ export async function checkTenantOnboarding(tenantId: string): Promise<Onboardin
     const p = await platformHomeService.getTenantProfile(tenantId);
     
     if (p) {
-      const nameOk = !!(p.businessName && String(p.businessName).trim().length >= 2);
-      const addrOk = !!(p.addressLine1 && String(p.addressLine1).trim().length >= 3);
+      const nameOk = !!(p.business_name && String(p.business_name).trim().length >= 2);
+      const addrOk = !!(p.address_line1 && String(p.address_line1).trim().length >= 3);
       const cityOk = !!(p.city && String(p.city).trim().length >= 2);
-      const postalOk = !!(p.postalCode && String(p.postalCode).trim().length >= 3);
-      const countryOk = !!(p.countryCode && String(p.countryCode).trim().length === 2);
+      const postalOk = !!(p.postal_code && String(p.postal_code).trim().length >= 3);
+      const countryOk = !!(p.country_code && String(p.country_code).trim().length === 2);
       const emailOk = !!(p.email && String(p.email).includes('@'));
 
       const needsOnboarding = !(nameOk && addrOk && cityOk && postalOk && countryOk && emailOk);

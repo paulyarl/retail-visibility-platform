@@ -82,8 +82,8 @@ export default function TenantBrandingPage() {
       try {
         const profileData = await platformHomeService.getTenantProfile(tenantId);
         if (profileData) {
-          // Use tenant name if no businessName is set, otherwise use businessName
-          businessName = profileData?.businessName || tenantName || '';
+          // Use tenant name if no business_name is set, otherwise use business_name
+          businessName = profileData?.business_name || tenantName || '';
           businessDescription = profileData?.website || '';
           
           // Also check for logo and banner in the profile (these might be custom fields)

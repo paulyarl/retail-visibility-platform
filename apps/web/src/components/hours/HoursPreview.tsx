@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import { getTodaySpecialHours } from "@/lib/hours-utils";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
-import { api } from "@/lib/api";
+import { tenantManagementService } from "@/services/TenantManagementService";
 
 interface HoursPreviewProps {
-  apiBase: string;
   tenantId: string;
 }
 
@@ -16,31 +15,29 @@ export const runtime = 'edge';
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
-export default function HoursPreview({ apiBase, tenantId }: HoursPreviewProps) {
-  const { status, loading } = useStoreStatus(tenantId, apiBase);
+export default function HoursPreview({ tenantId }: HoursPreviewProps) {
+  const { status, loading } = useStoreStatus(tenantId, false); // Private scope
   const [specialHours, setSpecialHours] = useState<any[]>([]);
 
-  // Fetch special hours separately since the hook only handles status
+  // Fetch special hours using TenantManagementService
   useEffect(() => {
     const fetchSpecialHours = async () => {
       try {
-        const response = await api.get(`${apiBase}/api/tenant/${tenantId}/business-hours/special`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.data?.overrides) {
-            // Create a mock hours object for getTodaySpecialHours
-            const mockHours = {
-              special: data.data.overrides.map((override: any) => ({
-                date: override.date,
-                open: override.open,
-                close: override.close,
-                isClosed: override.isClosed,
-                note: override.note
-              }))
-            };
-            const todaySpecial = getTodaySpecialHours(mockHours);
-            setSpecialHours(todaySpecial);
-          }
+        const data = await tenantManagementService.getSpecialBusinessHours(tenantId);
+        //console.log(`${HoursPreview.name}: Special hours for tenant ${tenantId}:`, data);
+        if (data) {
+          // Create a mock hours object for getTodaySpecialHours
+          const mockHours = {
+            special: data.map((override: any) => ({
+              date: override.date,
+              open: override.open,
+              close: override.close,
+              isClosed: override.isClosed,
+              note: override.note
+            }))
+          };
+          const todaySpecial = getTodaySpecialHours(mockHours);
+          setSpecialHours(todaySpecial);
         }
       } catch (error) {
         console.error('Failed to fetch special hours:', error);
@@ -48,7 +45,7 @@ export default function HoursPreview({ apiBase, tenantId }: HoursPreviewProps) {
     };
 
     fetchSpecialHours();
-  }, [apiBase, tenantId]);
+  }, [tenantId]);
 
   if (loading) {
     return (

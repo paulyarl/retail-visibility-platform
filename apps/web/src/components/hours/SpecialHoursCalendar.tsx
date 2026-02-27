@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import TimeInput from "./TimeInput";
-import { apiRequest } from "@/lib/api";
+import { tenantManagementService } from "@/services/TenantManagementService";
 
 type Override = { date: string; open?: string; close?: string; note?: string; isClosed?: boolean };
 
@@ -26,14 +26,13 @@ function to24Hour(time12: string): string {
   return `${hour.toString().padStart(2, "0")}:${m}`;
 }
 
-
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
-export default function SpecialHoursCalendar({ apiBase, tenantId }: { apiBase: string; tenantId: string }) {
+export default function SpecialHoursCalendar({ tenantId }: { tenantId: string }) {
   const [overrides, setOverrides] = useState<Override[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -41,11 +40,8 @@ export default function SpecialHoursCalendar({ apiBase, tenantId }: { apiBase: s
   useEffect(() => {
     const load = async () => {
       try {
-        const r = await apiRequest(`/api/tenant/${tenantId}/business-hours/special`);
-        if (r.ok) {
-          const j = await r.json();
-          setOverrides(Array.isArray(j?.data?.overrides) ? j.data.overrides : []);
-        }
+        const data = await tenantManagementService.getSpecialBusinessHours(tenantId);
+        setOverrides(Array.isArray(data?.overrides) ? data.overrides : []);
       } catch (error) {
         console.error('Failed to load special hours:', error);
       }
@@ -112,12 +108,9 @@ export default function SpecialHoursCalendar({ apiBase, tenantId }: { apiBase: s
     setSaving(true);
     setMsg(null);
     try {
-      const r = await apiRequest(`/api/tenant/${tenantId}/business-hours/special`, {
-        method: "PUT",
-        body: JSON.stringify({ overrides }),
-      });
+      await tenantManagementService.updateSpecialBusinessHours(tenantId, { overrides });
       setSaving(false);
-      setMsg(r.ok ? "✓ Saved" : "✗ Failed");
+      setMsg("✓ Saved");
       setTimeout(() => setMsg(null), 2000);
     } catch (error) {
       console.error('Failed to save special hours:', error);

@@ -87,7 +87,7 @@ export function UnifiedStoreCard({
   enhancedStats
 }: UnifiedStoreCardProps) {
   // Use centralized status hook instead of complex local logic
-  const { status: hoursStatus } = useStoreStatus(listing.tenantId);
+  const { status: hoursStatus } = useStoreStatus(listing.tenantId, true); // Public scope
   
   // Use enhanced stats if available, otherwise fall back to basic listing data
   const ratingAvg = enhancedStats?.ratingAvg || (typeof listing.ratingAvg === 'number' ? listing.ratingAvg : parseFloat(listing.ratingAvg || '0')) || 0;

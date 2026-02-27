@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRateLimitErrorHandler } from './useRateLimitErrorHandler';
-import { useAuth } from '@/contexts/AuthContext';
 import { hoursStatusService } from '@/services/HoursStatusService';
+import { tenantManagementService } from '@/services/TenantManagementService';
 
 export interface StoreStatus {
   isOpen: boolean;
@@ -11,13 +11,12 @@ export interface StoreStatus {
   label: string;
 }
 
-export function useStoreStatus(tenantId?: string, apiBase?: string) {
+export function useStoreStatus(tenantId?: string, isPublic: boolean = false) {
   const [status, setStatus] = useState<StoreStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const { handleRateLimitError } = useRateLimitErrorHandler();
-  const { user } = useAuth();
 
   // Memoize the rate limit error handler to prevent fetchStatus recreation
   const memoizedHandleRateLimitError = useCallback(handleRateLimitError, []);
@@ -33,8 +32,16 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
         return;
       }
 
-      // Use HoursStatusService for consistent caching and metrics
-      const responseData = await hoursStatusService.getStoreStatus(tenantId);
+      let responseData: StoreStatus | null = null;
+
+      // Use service based on scope prop instead of auth context
+      if (isPublic) {
+        // Public scope - use public endpoint via HoursStatusService
+        responseData = await hoursStatusService.getStoreStatus(tenantId);
+      } else {
+        // Private scope - use private endpoint via TenantManagementService
+        responseData = await tenantManagementService.getStoreStatus(tenantId);
+      }
 
       if (!responseData) {
         setStatus(null);
@@ -50,7 +57,7 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
     } finally {
       setLoading(false);
     }
-  }, [tenantId, memoizedHandleRateLimitError]);
+  }, [tenantId, isPublic, memoizedHandleRateLimitError]);
 
   useEffect(() => {
     if (tenantId) {
@@ -58,18 +65,18 @@ export function useStoreStatus(tenantId?: string, apiBase?: string) {
     }
   }, [tenantId, fetchStatus]);
 
-  // Only enable refresh for authenticated users - anonymous users get static status
+  // Only enable refresh for private scope (tenant settings)
   useEffect(() => {
-    if (!tenantId || !user) return; // No refresh for anonymous users
+    if (!tenantId || isPublic) return; // No refresh for public scope
 
-    const interval = setInterval(fetchStatus, 900000); // 15 minutes for authenticated users
+    const interval = setInterval(fetchStatus, 900000); // 15 minutes for private scope
     return () => clearInterval(interval);
-  }, [tenantId, user, fetchStatus]);
+  }, [tenantId, isPublic, fetchStatus]);
 
   return {
     status,
     loading,
     error,
-    refetch: fetchStatus
+    refresh: fetchStatus
   };
 }

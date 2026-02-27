@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import TimeInput from "./TimeInput";
-import { apiRequest } from "@/lib/api";
+import { tenantManagementService } from "@/services/TenantManagementService";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 
 type Period = { day: string; open: string; close: string };
@@ -46,7 +46,7 @@ export const runtime = 'edge';
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
-export default function HoursEditor({ apiBase, tenantId, timezone: externalTimezone }: { apiBase: string; tenantId: string; timezone?: string }) {
+export default function HoursEditor({ tenantId, timezone: externalTimezone }: { tenantId: string; timezone?: string }) {
   const [timezone, setTimezone] = useState("America/New_York");
   const [periods, setPeriods] = useState<Period[]>([]);
   const [specialHours, setSpecialHours] = useState<SpecialHour[]>([]);
@@ -57,7 +57,7 @@ export default function HoursEditor({ apiBase, tenantId, timezone: externalTimez
   const currentTimezone = externalTimezone || timezone;
 
   // Use centralized status hook instead of local calculation
-  const { status: currentStatus } = useStoreStatus(tenantId, apiBase);
+  const { status: currentStatus } = useStoreStatus(tenantId, false); // Private scope
 
   // Sync with external timezone changes
   useEffect(() => {
@@ -70,19 +70,13 @@ export default function HoursEditor({ apiBase, tenantId, timezone: externalTimez
     const load = async () => {
       try {
         // Load regular business hours
-        const r = await apiRequest(`/api/tenant/${tenantId}/business-hours`);
-        if (r.ok) {
-          const j = await r.json();
-          setTimezone(j?.data?.timezone || "America/New_York");
-          setPeriods(Array.isArray(j?.data?.periods) ? j.data.periods : []);
-        }
+        const hoursData = await tenantManagementService.getBusinessHours(tenantId);
+        setTimezone(hoursData?.timezone || "America/New_York");
+        setPeriods(Array.isArray(hoursData?.periods) ? hoursData.periods : []);
         
         // Load special hours
-        const specialRes = await apiRequest(`/api/tenant/${tenantId}/business-hours/special`);
-        if (specialRes.ok) {
-          const specialData = await specialRes.json();
-          setSpecialHours(Array.isArray(specialData?.data?.overrides) ? specialData.data.overrides : []);
-        }
+        const specialData = await tenantManagementService.getSpecialBusinessHours(tenantId);
+        setSpecialHours(Array.isArray(specialData?.overrides) ? specialData.overrides : []);
       } catch (error) {
         console.error('Failed to load business hours:', error);
       }
@@ -143,12 +137,9 @@ export default function HoursEditor({ apiBase, tenantId, timezone: externalTimez
     setSaving(true);
     setMsg(null);
     try {
-      const r = await apiRequest(`/api/tenant/${tenantId}/business-hours`, {
-        method: "PUT",
-        body: JSON.stringify({ timezone, periods }),
-      });
+      await tenantManagementService.updateBusinessHours(tenantId, { timezone, periods });
       setSaving(false);
-      setMsg(r.ok ? "✓ Saved" : "✗ Failed");
+      setMsg("✓ Saved");
       setTimeout(() => setMsg(null), 2000);
     } catch (error) {
       console.error('Failed to save business hours:', error);

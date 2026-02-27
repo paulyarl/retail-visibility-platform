@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Star, ThumbsUp, User, MapPin, Shield } from 'lucide-react';
 import ReviewForm from './ReviewForm';
-import { useAuth } from '@/contexts/AuthContext';
-import { reviewsService, type ReviewSummary, type Review } from '@/services/ReviewsSingletonService';
+import { useReviews } from '@/hooks/useReviews';
+import { type ReviewSummary, type Review } from '@/services/ReviewsSingletonService';
 
 interface StoreRatingDisplayProps {
   tenantId: string;
   showWriteReview?: boolean;
   compact?: boolean;
+  isPublic?: boolean; // New prop to determine service scope
   className?: string;
 }
 
@@ -17,107 +18,30 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
   tenantId,
   showWriteReview = true,
   compact = false,
+  isPublic = true, // Default to public for public pages
   className = ''
 }) => {
-  const { isAuthenticated, getAccessToken } = useAuth();
-  const [summary, setSummary] = useState<ReviewSummary | null>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showReviews, setShowReviews] = useState(false);
-  const [userReview, setUserReview] = useState<Review | null>(null);
-  const [showReviewForm, setShowReviewForm] = useState(false);
-  
-  console.log('[StoreRatingDisplay] RENDER - showReviewForm:', showReviewForm, 'isAuthenticated:', isAuthenticated);
+  const {
+    summary,
+    reviews,
+    userReview,
+    loading,
+    showReviews,
+    showReviewForm,
+    setShowReviews,
+    setShowReviewForm,
+    fetchRatingSummary,
+    fetchReviews,
+    fetchUserReview,
+    handleHelpfulVote,
+    handleReviewSubmit
+  } = useReviews({ tenantId, isPublic, showReviews: false });
+
+  console.log('[StoreRatingDisplay] RENDER - showReviewForm:', showReviewForm, 'isPublic:', isPublic);
 
   useEffect(() => {
     console.log('[StoreRatingDisplay] showReviewForm changed to:', showReviewForm);
   }, [showReviewForm]);
-
-  useEffect(() => {
-    fetchRatingSummary();
-    if (showReviews) {
-      fetchReviews();
-    }
-    if (isAuthenticated) {
-      fetchUserReview();
-    }
-  }, [tenantId, showReviews, isAuthenticated]);
-
-  const fetchRatingSummary = async () => {
-    try {
-      const summary = await reviewsService.getRatingSummary(tenantId);
-      setSummary(summary);
-    } catch (error) {
-      console.error('Error fetching rating summary:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchReviews = async () => {
-    try {
-      const reviews = await reviewsService.getReviews(tenantId, 10);
-      setReviews(reviews);
-    } catch (error) {
-      console.error('Error fetching reviews:', error);
-    }
-  };
-
-  const fetchUserReview = async () => {
-    try {
-      const userReview = await reviewsService.getUserReview(tenantId);
-      setUserReview(userReview);
-    } catch (error) {
-      console.error('Error fetching user review:', error);
-    }
-  };
-
-  const handleHelpfulVote = async (reviewId: string, isHelpful: boolean) => {
-    try {
-      const success = await reviewsService.submitHelpfulVote(reviewId, isHelpful);
-      
-      if (success) {
-        // Refresh reviews to update vote counts
-        fetchReviews();
-        if (isAuthenticated) {
-          fetchUserReview();
-        }
-      }
-    } catch (error) {
-      console.error('Error submitting helpful vote:', error);
-    }
-  };
-
-  const handleReviewSubmit = async (reviewData: {
-    rating: number;
-    title: string;
-    content: string;
-    userName: string;
-    userEmail: string;
-    sessionId?: string;
-  }) => {
-    try {
-      const response = await reviewsService.submitReview(tenantId, {
-        rating: reviewData.rating,
-        content: reviewData.content,
-        locationLat: null,
-        locationLng: null,
-        sessionId: reviewData.sessionId,
-        userName: reviewData.userName,
-        userEmail: reviewData.userEmail
-      });
-      
-      if (response) {
-        // Refresh reviews
-        await fetchReviews();
-        setShowReviewForm(false);
-      } else {
-        throw new Error('Failed to submit review');
-      }
-    } catch (error) {
-      console.error('Error submitting review:', error);
-    }
-  };
 
   const renderStars = (rating: number, size: 'sm' | 'md' | 'lg' = 'md') => {
     const sizeClasses = {
@@ -193,14 +117,14 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
         {showReviewForm && (
           <>
             {(() => {
-              console.log('[StoreRatingDisplay] Rendering ReviewForm modal, isAnonymous:', !isAuthenticated);
+              console.log('[StoreRatingDisplay] Rendering ReviewForm modal, isAnonymous:', isPublic);
               return null;
             })()}
             <ReviewForm
               tenantId={tenantId}
               onClose={() => setShowReviewForm(false)}
               onSubmit={handleReviewSubmit}
-              isAnonymous={!isAuthenticated}
+              isAnonymous={isPublic}
             />
           </>
         )}
@@ -234,7 +158,8 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
           {/* Rating Distribution */}
           <div className="space-y-1">
             {[5, 4, 3, 2, 1].map((rating) => {
-              const count = summary[`rating_${rating}_count` as keyof ReviewSummary] as number;
+              const countKey = `rating_${rating}_count` as keyof ReviewSummary;
+              const count = summary[countKey] as number;
               const percentage = summary.rating_count > 0 ? (count / summary.rating_count) * 100 : 0;
               
               return (
@@ -313,7 +238,7 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
                   )}
                   
                   <div className="flex items-center gap-4">
-                    {isAuthenticated ? (
+                    {!isPublic ? (
                       <button
                         onClick={() => handleHelpfulVote(review.id, true)}
                         className={`flex items-center gap-1 text-sm ${
@@ -350,14 +275,14 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
       {showReviewForm && (
         <>
           {(() => {
-            console.log('[StoreRatingDisplay] Rendering ReviewForm modal, isAnonymous:', !isAuthenticated);
+            console.log('[StoreRatingDisplay] Rendering ReviewForm modal, isAnonymous:', isPublic);
             return null;
           })()}
           <ReviewForm
             tenantId={tenantId}
             onClose={() => setShowReviewForm(false)}
             onSubmit={handleReviewSubmit}
-            isAnonymous={!isAuthenticated}
+            isAnonymous={isPublic}
             initialValues={userReview ? {
               rating: userReview.rating,
               reviewText: userReview.review_text || ''

@@ -83,9 +83,10 @@ export class OnboardingDataService {
   /**
    * Save business profile
    */
-  async saveProfile(tenantId: string, data: Partial<BusinessProfile>): Promise<void> {
+  async saveProfile(tenantId: string, data: Partial<BusinessProfile>): Promise<Partial<BusinessProfile>> {
     try {
-      await platformHomeService.saveOnboardingProfile(tenantId, data);
+      const result = await platformHomeService.saveOnboardingProfile(tenantId, data);
+      return result as Partial<BusinessProfile>;
     } catch (error) {
       // Error will be caught and displayed in UI
       throw error;

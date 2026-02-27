@@ -18,7 +18,6 @@ export const dynamic = 'force-dynamic';
 
 export default function HoursSettingsPage({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = use(params);
-  const clientApiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
   const [currentTimezone, setCurrentTimezone] = useState<string | undefined>();
 
   return (
@@ -38,7 +37,7 @@ export default function HoursSettingsPage({ params }: { params: Promise<{ tenant
             >
               Business Profile
             </a>
-            <SyncStateBadge apiBase={clientApiBase} tenantId={tenantId} />
+            <SyncStateBadge tenantId={tenantId} />
           </div>
         </div>
       </div>
@@ -46,7 +45,6 @@ export default function HoursSettingsPage({ params }: { params: Promise<{ tenant
       {/* Timezone */}
       <TimezonePicker 
         tenantId={tenantId} 
-        apiBase={clientApiBase} 
         onTimezoneChange={setCurrentTimezone}
       />
 
@@ -74,7 +72,6 @@ export default function HoursSettingsPage({ params }: { params: Promise<{ tenant
             </div>
             <div className="p-6">
               <HoursEditor 
-                apiBase={clientApiBase} 
                 tenantId={tenantId} 
                 timezone={currentTimezone}
               />
@@ -88,14 +85,14 @@ export default function HoursSettingsPage({ params }: { params: Promise<{ tenant
               <p className="text-sm text-gray-600 mt-1">Manage holiday and exception hours</p>
             </div>
             <div className="p-6">
-              <SpecialHoursCalendar apiBase={clientApiBase} tenantId={tenantId} />
+              <SpecialHoursCalendar tenantId={tenantId} />
             </div>
           </div>
         </div>
 
         {/* Right Column: Live Preview (1/3 width, sticky) */}
         <div className="lg:col-span-1">
-          <HoursPreview apiBase={clientApiBase} tenantId={tenantId} />
+          <HoursPreview tenantId={tenantId} />
         </div>
       </div>
     </div>

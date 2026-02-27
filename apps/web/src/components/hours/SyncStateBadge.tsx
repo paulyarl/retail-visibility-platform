@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { apiRequest } from "@/lib/api";
+import { tenantManagementService } from "@/services/TenantManagementService";
 
 
 // Force edge runtime to prevent prerendering issues
@@ -9,32 +9,27 @@ export const runtime = 'edge';
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
-export default function SyncStateBadge({ apiBase, tenantId }: { apiBase: string; tenantId: string }) {
+export default function SyncStateBadge({ tenantId }: { tenantId: string }) {
   const [status, setStatus] = useState<{ in_sync: boolean; last_synced_at?: string; attempts?: number } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
     try {
-      const r = await apiRequest(`/api/tenant/${tenantId}/gbp/hours/status`);
-      if (r.ok) {
-        const j = await r.json();
-        setStatus(j?.data || null);
-      }
+      const data = await tenantManagementService.getGBPHoursStatus(tenantId);
+      setStatus(data || null);
     } catch (error) {
       console.error('Failed to load GBP hours status:', error);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [tenantId]);
 
   const mirrorNow = async () => {
     setBusy(true);
     const prevLast = status?.last_synced_at;
     const prevAttempts = status?.attempts || 0;
     try {
-      await apiRequest(`/api/tenant/${tenantId}/gbp/hours/mirror`, {
-        method: "POST",
-      });
+      await tenantManagementService.triggerGBPHoursMirror(tenantId);
     } catch (error) {
       console.error('Failed to trigger GBP hours mirroring:', error);
     }

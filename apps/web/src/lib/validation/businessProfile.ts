@@ -101,9 +101,37 @@ export const businessProfileSchema = z.object({
   // Geocoding fields for map display
   latitude: z.number().min(-90).max(90).optional().nullable(),
   longitude: z.number().min(-180).max(180).optional().nullable(),
+  
+  // Slug field for URL customization
+  slug: z.string()
+    .min(2, 'Slug must be at least 2 characters')
+    .max(100, 'Slug must be less than 100 characters')
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase letters, numbers, and hyphens only')
+    .optional(),
 });
 
-export type BusinessProfile = z.infer<typeof businessProfileSchema>;
+export type BusinessProfile = {
+  business_name: string;
+  address_line1: string;
+  address_line2?: string;
+  city: string;
+  state?: string;
+  postal_code: string;
+  country_code: string;
+  phone_number?: string;
+  email?: string;
+  website?: string;
+  contact_person?: string;
+  admin_email?: string;
+  logo_url?: string;
+  business_description?: string;
+  hours?: Record<string, string> | null;
+  social_links?: Record<string, string> | null;
+  seo_tags?: string[] | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  slug?: string;
+};
 
 // Onboarding schema - only validates fields shown on the StoreIdentityStep form
 // This excludes optional fields like logo_url, business_description that may be null

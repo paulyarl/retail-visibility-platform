@@ -475,8 +475,8 @@ export default function ShopManagementPage({ params }: ShopManagementProps) {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {shops.map((shop) => (
-                      <div key={shop.tenantId} className="flex items-center justify-between p-4 border rounded-lg">
+                    {shops.map((shop, index) => (
+                      <div key={shop.tenantId || shop.autoId || `shop-${index}`} className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex items-center gap-4">
                           {shop.imageUrl ? (
                             <img

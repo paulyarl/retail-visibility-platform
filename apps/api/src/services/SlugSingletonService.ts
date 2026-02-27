@@ -322,6 +322,12 @@ class SlugSingletonService extends UniversalSingleton {
       // Invalidate cache
       const cacheKey = `slug:${tenantId}`;
       await this.clearCache(cacheKey);
+      
+      // Also invalidate tenant identifiers cache (used by TenantSingletonService)
+      await this.clearCache(`tenant_identifiers:${tenantId}`);
+      
+      // Invalidate shop data cache (used by ShopManagementService)
+      await this.clearCache(`shop_data:${tenantId}`);
 
       logger.info(`[SlugSingletonService] Updated slug to: ${newSlug} for tenant ${tenantId}`);
     } catch (error: unknown) {
@@ -402,6 +408,36 @@ class SlugSingletonService extends UniversalSingleton {
       return false;
     } catch (error: unknown) {
       logger.error('[SlugSingletonService] Failed to check slug availability:', undefined, { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get slug ownership status
+   * Returns both availability and whether it belongs to the current tenant
+   * 
+   * @param slug - The slug to check
+   * @param tenantId - The tenant ID to check ownership against
+   * @returns Object with isAvailable and isOwnSlug booleans
+   */
+  async getSlugOwnership(slug: string, tenantId?: string): Promise<{ isAvailable: boolean; isOwnSlug: boolean }> {
+    try {
+      const existing = await basePrisma.directory_settings_list.findUnique({
+        where: { slug },
+        select: { tenant_id: true },
+      });
+
+      if (!existing) {
+        return { isAvailable: true, isOwnSlug: false };
+      }
+
+      if (tenantId && existing.tenant_id === tenantId) {
+        return { isAvailable: true, isOwnSlug: true };
+      }
+
+      return { isAvailable: false, isOwnSlug: false };
+    } catch (error: unknown) {
+      logger.error('[SlugSingletonService] Failed to get slug ownership:', undefined, { error });
       throw error;
     }
   }
@@ -502,26 +538,30 @@ class SlugSingletonService extends UniversalSingleton {
     businessName: string,
     location: LocationInfo = {},
     tenantId?: string
-  ): Promise<Array<{ pattern: string; slug: string; isAvailable: boolean; description: string }>> {
-    const patterns: Array<{ pattern: string; slug: string; isAvailable: boolean; description: string }> = [];
+  ): Promise<Array<{ pattern: string; slug: string; isAvailable: boolean; isOwnSlug: boolean; description: string }>> {
+    const patterns: Array<{ pattern: string; slug: string; isAvailable: boolean; isOwnSlug: boolean; description: string }> = [];
     const baseSlug = slugify(businessName);
 
     // Pattern 1: Business name only
     const pattern1 = baseSlug;
+    const ownership1 = await this.getSlugOwnership(pattern1, tenantId);
     patterns.push({
       pattern: 'business_name',
       slug: pattern1,
-      isAvailable: await this.isSlugAvailable(pattern1, tenantId),
+      isAvailable: ownership1.isAvailable,
+      isOwnSlug: ownership1.isOwnSlug,
       description: 'Business name only (shortest, most memorable)',
     });
 
     // Pattern 2: Business name + city
     if (location.city) {
       const pattern2 = `${baseSlug}-${slugify(location.city)}`;
+      const ownership2 = await this.getSlugOwnership(pattern2, tenantId);
       patterns.push({
         pattern: 'business_name_city',
         slug: pattern2,
-        isAvailable: await this.isSlugAvailable(pattern2, tenantId),
+        isAvailable: ownership2.isAvailable,
+        isOwnSlug: ownership2.isOwnSlug,
         description: `${businessName} in ${location.city}`,
       });
     }
@@ -530,10 +570,12 @@ class SlugSingletonService extends UniversalSingleton {
     if (location.state) {
       const stateAbbr = this.getStateAbbreviation(location.state);
       const pattern3 = `${baseSlug}-${stateAbbr.toLowerCase()}`;
+      const ownership3 = await this.getSlugOwnership(pattern3, tenantId);
       patterns.push({
         pattern: 'business_name_state',
         slug: pattern3,
-        isAvailable: await this.isSlugAvailable(pattern3, tenantId),
+        isAvailable: ownership3.isAvailable,
+        isOwnSlug: ownership3.isOwnSlug,
         description: `${businessName} in ${location.state}`,
       });
     }
@@ -542,10 +584,12 @@ class SlugSingletonService extends UniversalSingleton {
     if (location.city && location.state) {
       const stateAbbr = this.getStateAbbreviation(location.state);
       const pattern4 = `${baseSlug}-${slugify(location.city)}-${stateAbbr.toLowerCase()}`;
+      const ownership4 = await this.getSlugOwnership(pattern4, tenantId);
       patterns.push({
         pattern: 'business_name_city_state',
         slug: pattern4,
-        isAvailable: await this.isSlugAvailable(pattern4, tenantId),
+        isAvailable: ownership4.isAvailable,
+        isOwnSlug: ownership4.isOwnSlug,
         description: `${businessName} in ${location.city}, ${location.state}`,
       });
     }
@@ -555,10 +599,12 @@ class SlugSingletonService extends UniversalSingleton {
       const stateAbbr = this.getStateAbbreviation(location.state);
       const countryAbbr = this.getCountryAbbreviation(location.country);
       const pattern5 = `${baseSlug}-${slugify(location.city)}-${stateAbbr.toLowerCase()}-${countryAbbr.toLowerCase()}`;
+      const ownership5 = await this.getSlugOwnership(pattern5, tenantId);
       patterns.push({
         pattern: 'business_name_city_state_country',
         slug: pattern5,
-        isAvailable: await this.isSlugAvailable(pattern5, tenantId),
+        isAvailable: ownership5.isAvailable,
+        isOwnSlug: ownership5.isOwnSlug,
         description: `${businessName} in ${location.city}, ${location.state}, ${location.country}`,
       });
     }
@@ -571,6 +617,7 @@ class SlugSingletonService extends UniversalSingleton {
         pattern: 'business_name_autoid',
         slug: pattern6,
         isAvailable: true, // Always available with autoId
+        isOwnSlug: false, // New slug, not owned yet
         description: `${businessName} (unique ID)`,
       });
     }

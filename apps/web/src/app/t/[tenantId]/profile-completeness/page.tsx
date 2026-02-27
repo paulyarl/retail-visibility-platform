@@ -3,7 +3,8 @@
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { ContextBadges } from '@/components/ContextBadges'
-import { tenantPublicService } from '@/services/TenantPublicService'
+import { PlatformHomeSingletonService } from '@/services/PlatformHomeSingletonService'
+import { BusinessProfile } from '@/lib/validation/businessProfile'
 
 interface CompletenessData {
   score: number
@@ -48,8 +49,8 @@ export default function ProfileCompletenessPage() {
       try {
         setLoading(true)
 
-        // Fetch profile data using TenantPublicService
-        const profileData = await tenantPublicService.getPublicTenantProfile(tenantId)
+        // Fetch profile data using PlatformHomeSingletonService
+        const profileData = await PlatformHomeSingletonService.getInstance().getTenantProfile(tenantId)
 
         if (!profileData) {
           throw new Error('Profile not found. Please create your business profile first.')
@@ -71,7 +72,7 @@ export default function ProfileCompletenessPage() {
           geocode: !!(profileData.latitude !== null && profileData.latitude !== undefined && 
                      profileData.longitude !== null && profileData.longitude !== undefined),
           businessDescription: !!profileData.business_description,
-          businessHours: !!(profileData.hours && profileData.hours.timezone),
+          businessHours: !!(profileData.hours && Object.keys(profileData.hours).length > 0),
           logo: !!profileData.logo_url,
           socialLinks: !!(profileData.social_links && Object.keys(profileData.social_links).length > 0),
           seoTags: !!(profileData.seo_tags && profileData.seo_tags.length > 0),

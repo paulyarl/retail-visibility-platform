@@ -86,7 +86,8 @@ export default function OnboardingWizard({
   const { 
     save, 
     saving, 
-    error: saveError 
+    error: saveError,
+    savedProfile
   } = useOnboardingSave({ 
     tenantId,
     onSuccess: () => setStep(2),
@@ -210,6 +211,7 @@ export default function OnboardingWizard({
                 transition={{ duration: 0.3 }}
               >
                 <StoreIdentityStep
+                  tenantId={tenantId}
                   initialData={businessData}
                   onDataChange={setBusinessData}
                   onValidationChange={setIsValid}
@@ -224,7 +226,7 @@ export default function OnboardingWizard({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ duration: 0.3 }}
-                className="text-center py-12"
+                className="text-center py-8"
               >
                 <motion.div
                   initial={{ scale: 0 }}
@@ -240,9 +242,81 @@ export default function OnboardingWizard({
                 <h2 className="text-3xl font-bold text-neutral-900 mb-3">
                   You're all set!
                 </h2>
-                <p className="text-neutral-600 mb-8 max-w-md mx-auto">
+                <p className="text-neutral-600 mb-6 max-w-md mx-auto">
                   Your business profile has been created. You can now start managing your inventory and syncing with Google Merchant Center.
                 </p>
+
+                {/* Profile Summary Card */}
+                {savedProfile && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 max-w-md mx-auto mb-6 text-left"
+                  >
+                    <h3 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      Profile Summary
+                    </h3>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+                          <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-neutral-500 uppercase tracking-wide">Tenant ID</p>
+                          <p className="text-sm font-mono font-medium text-neutral-900">{tenantId}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                          <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-neutral-500 uppercase tracking-wide">Slug</p>
+                          <p className="text-sm font-mono font-medium text-green-600">
+                            {savedProfile.slug || 'Not set'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+                          <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-neutral-500 uppercase tracking-wide">Business Name</p>
+                          <p className="text-sm font-medium text-neutral-900 truncate">{savedProfile.business_name || 'Not set'}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-neutral-500 uppercase tracking-wide">Location</p>
+                          <p className="text-sm font-medium text-neutral-900">
+                            {[savedProfile.city, savedProfile.state].filter(Boolean).join(', ') || 'Not set'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-center gap-2 text-sm text-neutral-600">

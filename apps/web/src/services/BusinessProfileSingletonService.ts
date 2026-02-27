@@ -6,7 +6,8 @@
  */
 
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
-import { safeTransformToCamel, BusinessProfile } from '@/utils/case-transform';
+import { safeTransformToCamel } from '@/utils/case-transform';
+import { BusinessProfile } from '@/lib/validation/businessProfile';
 
 interface ApiBusinessProfile {
   business_name?: string;
