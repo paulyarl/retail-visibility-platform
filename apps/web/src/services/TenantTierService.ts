@@ -1,4 +1,4 @@
-import { AuthenticatedApiSingleton } from '../providers/base/AuthenticatedApiSingleton';
+import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 
 export interface DbTier {
   id: string;
@@ -40,7 +40,7 @@ export interface Tenant {
  * Service for managing tenant tiers and tier system
  * Handles tier operations, tier management, and tenant tier assignments
  */
-export class TenantTierService extends AuthenticatedApiSingleton {
+export class TenantTierService extends AdminApiSingleton {
   private static instance: TenantTierService;
 
   private constructor() {
@@ -109,24 +109,40 @@ export class TenantTierService extends AuthenticatedApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
+    // Map tier values to match API validation
+    const tierMapping: Record<string, string> = {
+      'individual': 'starter',
+      // Add other mappings as needed
+    };
+
+    const mappedTier = tierMapping[updates.subscriptionTier] || updates.subscriptionTier;
+
     const result = await this.makeDefaultRequest<Tenant>(
-      `/api/tenants/${tenantId}/tier`,
+      `/api/admin/tiers/tenants/${tenantId}`,
       { 
         method: 'PATCH',
-        body: JSON.stringify(updates)
+        body: JSON.stringify({
+          subscriptionTier: mappedTier,
+          subscriptionStatus: updates.subscriptionStatus,
+          reason: updates.reason || 'Updated via admin tiers page'
+        })
       },
       `platform-update-tenant-tier-${tenantId}`
     );
 
     if (!result.success) {
       console.error('[TenantTierService] Failed to update tenant tier:', result.error);
-      throw result.error;
+      const errorMessage = result.error?.message || 'Failed to update tenant tier';
+      throw new Error(errorMessage);
     }
 
     // Invalidate tenant and tier caches
     await this.invalidateCache(`platform-tenant-${tenantId}*`);
+    await this.invalidateCache(`platform-update-tenant-tier-${tenantId}*`);
     await this.invalidateCache(`platform-tenant-tier-${tenantId}*`);
     await this.invalidateCache('platform-admin-tier-tenants*');
+    await this.invalidateCache('admin-tier-tenants');
+    await this.invalidateCache('platform-admin-tier-tenants');
 
     return result.data || null;
   }

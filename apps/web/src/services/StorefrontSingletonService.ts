@@ -194,7 +194,17 @@ class StorefrontSingletonService extends PublicApiSingleton {
         this.cacheTTL
       );
       
-      return result || null;
+      if (!result.success) {
+        // Handle 404 or other errors gracefully - tenant might not have directory listing
+        if (result.error?.status === 404) {
+          console.log(`[StorefrontSingleton] No directory listing found for tenant ${tenantId}`);
+        } else {
+          console.warn(`[StorefrontSingleton] Failed to get directory listing:`, result.error);
+        }
+        return null;
+      }
+      
+      return result.data || null;
     } catch (error) {
       console.error('[StorefrontSingleton] Failed to get directory listing:', error);
       return null;

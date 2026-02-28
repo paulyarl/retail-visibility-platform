@@ -55,20 +55,20 @@ async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
       authToken = authHeader.substring(7);
-      console.log('[Proxy] Found token in Authorization header');
+      // console.log('[Proxy] Found token in Authorization header');
     } else {
       // Fallback to cookies (server-side auth)
       authToken = getCookie(req, 'auth_token') || getCookie(req, 'access_token');
-      console.log('[Proxy] Looking for token in cookies');
+      // console.log('[Proxy] Looking for token in cookies');
     }
     
     if (!authToken) {
-      console.log('[Proxy] No auth token found in header or cookies');
-      console.log('[Proxy] Available cookies:', req.headers.get('cookie'));
+      // console.log('[Proxy] No auth token found in header or cookies');
+      // console.log('[Proxy] Available cookies:', req.headers.get('cookie'));
       return false;
     }
 
-    console.log('[Proxy] Checking platform admin with token:', authToken.substring(0, 20) + '...');
+    // console.log('[Proxy] Checking platform admin with token:', authToken.substring(0, 20) + '...');
 
     const response = await fetch(`${API_BASE_URL}/auth/me`, {
       headers: {
@@ -82,17 +82,17 @@ async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
     }
 
     const data = await response.json();
-    console.log('[Proxy] Auth/me response data:', JSON.stringify(data, null, 2));
+    // console.log('[Proxy] Auth/me response data:', JSON.stringify(data, null, 2));
     
     const user = data.user || data;
-    console.log('[Proxy] Extracted user:', JSON.stringify(user, null, 2));
-    console.log('[Proxy] User role:', user?.role);
+    // console.log('[Proxy] Extracted user:', JSON.stringify(user, null, 2));
+    // console.log('[Proxy] User role:', user?.role);
     
     const isAdmin = user.role === 'PLATFORM_ADMIN' || 
            user.role === 'ADMIN' || 
            user.isPlatformAdmin === true;
     
-    console.log('[Proxy] Is admin result:', isAdmin, 'for role:', user?.role);
+    // console.log('[Proxy] Is admin result:', isAdmin, 'for role:', user?.role);
     
     return isAdmin;
   } catch (error) {
@@ -153,7 +153,7 @@ export async function proxy(req: NextRequest) {
             destUrl.searchParams.set(key, value);
           });
 
-          console.log(`[Proxy] Subdomain routing: ${hostname}${pathname} → ${destUrl.toString()} (domain: ${domain})`);
+         // console.log(`[Proxy] Subdomain routing: ${hostname}${pathname} → ${destUrl.toString()} (domain: ${domain})`);
 
           const res = NextResponse.redirect(destUrl, { status: 302 });
 
@@ -175,12 +175,12 @@ export async function proxy(req: NextRequest) {
     const isAdmin = await isPlatformAdmin(req);
     
     // Log all admin access attempts
-    console.log('[Proxy] Admin access attempt:', {
+    /*  console.log('[Proxy] Admin access attempt:', {
       path: pathname,
       allowed: isAdmin,
       timestamp: new Date().toISOString(),
       ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
-    });
+    }); */
     
     if (!isAdmin) {
       // Redirect to access denied page with context

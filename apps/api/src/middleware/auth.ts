@@ -110,7 +110,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-    console.log('[AUTH] authenticateToken called for:', req.method, req.path, 'Token present:', !!token);
+    // console.log('[AUTH] authenticateToken called for:', req.method, req.path, 'Token present:', !!token);
 
     if (!token) {
       console.log('[AUTH] No token provided');

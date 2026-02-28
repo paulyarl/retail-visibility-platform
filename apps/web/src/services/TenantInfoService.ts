@@ -646,15 +646,15 @@ class TenantInfoService extends TenantApiSingleton {
         return [];
       }
 
-      console.log('[TenantInfoService] API Response:', result);
+     /*  console.log('[TenantInfoService] API Response:', result);
       console.log('[TenantInfoService] result.data:', result.data);
-
+ */
       // Extract users from the nested response structure
       // API returns: { success: true, users: [...], data: [...], items: [...], results: [...] }
       const users = result.data?.users || result.data?.data || result.data?.items || result.data?.results || [];
-      console.log('[TenantInfoService] Extracted users:', users);
-      console.log('[TenantInfoService] Is users array?', Array.isArray(users));
-
+      //console.log('[TenantInfoService] Extracted users:', users);
+      //console.log('[TenantInfoService] Is users array?', Array.isArray(users));
+ 
       return Array.isArray(users) ? users : [];
     } catch (error) {
       console.error('[TenantInfoService] Failed to get users:', error);

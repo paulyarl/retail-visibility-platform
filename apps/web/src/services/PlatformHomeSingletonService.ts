@@ -1004,7 +1004,13 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         tierType: tier.type,
         isActive: true, // API only returns active tiers
         sortOrder: tier.sortOrder,
-        features: tier.features || [],
+        // Transform feature strings into feature objects
+        features: (tier.features || []).map((featureKey: string) => ({
+          featureKey,
+          featureName: featureKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          isEnabled: true,
+          isInherited: false
+        })),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }));

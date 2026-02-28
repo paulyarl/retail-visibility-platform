@@ -76,7 +76,7 @@ export default function AdminTiersPage() {
       // Transform service DbTier to page DbTier format
       const transformedTiers = (data || []).map((tier: any) => ({
         id: tier.id,
-        tierKey: tier.type || tier.name, // Use type or fallback to name
+        tierKey: tier.id, // Use the actual tier ID (starter, professional, etc.)
         displayName: tier.displayName,
         priceMonthly: tier.price,
         maxSkus: tier.maxSkus,
@@ -149,6 +149,9 @@ export default function AdminTiersPage() {
 
       setSuccess(`Successfully updated tier for location`);
       
+      // Wait a moment for cache invalidation to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Force refresh to get latest data
       console.log(`[Tier Management] Refreshing tenant data...`);
       await loadTenants();
@@ -175,7 +178,7 @@ export default function AdminTiersPage() {
   const getTierOptions = () => {
     return dbTiers.map(tier => ({
       value: tier.tierKey,
-      label: `${tier.displayName} ($${(tier.priceMonthly / 100).toFixed(0)}/mo)`,
+      label: `${tier.displayName} ($${tier.priceMonthly}/mo)`,
       color: getTierColor(tier.tierType, tier.tierKey),
       tier: tier,
     }));
@@ -199,7 +202,7 @@ export default function AdminTiersPage() {
     if (!tier) return null;
     return {
       value: tier.tierKey,
-      label: `${tier.displayName} ($${(tier.priceMonthly / 100).toFixed(0)}/mo)`,
+      label: `${tier.displayName} ($${tier.priceMonthly}/mo)`,
       color: getTierColor(tier.tierType, tier.tierKey),
       tier: tier,
     };
@@ -407,7 +410,7 @@ export default function AdminTiersPage() {
                             >
                               {getTierOptions().map(tierOption => (
                                 <option key={`${tierOption.value}-${tierOption.tier.id}`} value={tierOption.value}>
-                                  {tierOption.tier.displayName} (${(tierOption.tier.priceMonthly / 100).toFixed(0)}/mo)
+                                  {tierOption.tier.displayName} (${tierOption.tier.priceMonthly}/mo)
                                 </option>
                               ))}
                             </select>

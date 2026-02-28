@@ -623,7 +623,7 @@ export default function TierSystemPage() {
                                   .filter(f => !f.isInherited)
                                   .map((feature, index) => (
                                     <Badge 
-                                      key={index} 
+                                      key={feature.featureKey || `${feature.featureName}-${index}`} 
                                       variant="success" 
                                       className="text-xs flex items-center gap-1"
                                     >
@@ -649,7 +649,7 @@ export default function TierSystemPage() {
                                   .filter(f => f.isInherited)
                                   .map((feature, index) => (
                                     <Badge 
-                                      key={index} 
+                                      key={feature.featureKey || `${feature.featureName}-${index}`} 
                                       variant="default" 
                                       className="text-xs flex items-center gap-1"
                                     >
@@ -678,7 +678,7 @@ export default function TierSystemPage() {
                                       .filter(f => !f.isInherited)
                                       .map((feature, index) => (
                                         <Badge 
-                                          key={index} 
+                                          key={feature.featureKey || `${feature.featureName}-${index}`} 
                                           variant="success" 
                                           className="text-xs"
                                         >
@@ -698,7 +698,7 @@ export default function TierSystemPage() {
                                       .filter(f => f.isInherited)
                                       .map((feature, index) => (
                                         <Badge 
-                                          key={index} 
+                                          key={feature.featureKey || `${feature.featureName}-${index}`} 
                                           variant="default" 
                                           className="text-xs opacity-75"
                                         >
@@ -841,8 +841,8 @@ export default function TierSystemPage() {
                   <div className="space-y-2">
                     {editingData.features
                       .filter(f => !f.isInherited)
-                      .map((feature) => (
-                        <div key={feature.featureKey} className="flex items-center justify-between p-3 border rounded-lg">
+                      .map((feature, index) => (
+                        <div key={feature.featureKey || `${feature.featureName}-${index}`} className="flex items-center justify-between p-3 border rounded-lg">
                           <div>
                             <div className="font-medium">{feature.featureName}</div>
                             <div className="text-sm text-gray-500">
@@ -878,8 +878,8 @@ export default function TierSystemPage() {
                   <div className="space-y-2">
                     {editingData.features
                       .filter(f => f.isInherited)
-                      .map((feature) => (
-                        <div key={feature.featureKey} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                      .map((feature, index) => (
+                        <div key={feature.featureKey || `${feature.featureName}-${index}`} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
                           <div>
                             <div className="font-medium">{feature.featureName}</div>
                             <div className="text-sm text-gray-500">

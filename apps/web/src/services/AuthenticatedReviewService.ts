@@ -105,7 +105,7 @@ class AuthenticatedReviewService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      console.log('[AuthenticatedReviewService] API result:', result);
+      /* console.log('[AuthenticatedReviewService] API result:', result); */
 
       if (!result.success) {
         console.error('[AuthenticatedReviewService] Failed to get pending reviews:', result.error);
@@ -113,9 +113,9 @@ class AuthenticatedReviewService extends TenantApiSingleton {
       }
 
       const responseData = result.data?.data;
-      console.log('[AuthenticatedReviewService] Extracted response data:', responseData);
+      /* console.log('[AuthenticatedReviewService] Extracted response data:', responseData);
       console.log('[AuthenticatedReviewService] Reviews count:', responseData?.reviews?.length || 0);
-
+ */
       return responseData || null;
     } catch (error) {
       console.error('[AuthenticatedReviewService] Failed to get pending reviews:', error);

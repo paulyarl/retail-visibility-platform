@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { itemsService, ItemsCompleteResponse, ItemsStats, Item } from '@/services/ItemsSingletonService';
 
 // Keep status and visibility aligned with backend ItemFilters for now
-export type ItemStatusFilter = "all" | "active" | "inactive" | "syncing";
+export type ItemStatusFilter = "all" | "active" | "inactive" | "syncing" | "draft" | "archived";
 export type ItemVisibilityFilter = "all" | "public" | "private";
 
 interface UseItemsCompleteOptions {
