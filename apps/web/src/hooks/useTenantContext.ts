@@ -22,9 +22,18 @@ import {
  * Automatically detects and sets tenant context from URL
  */
 export function useTenantContext() {
-  const [context, setContext] = useState<TenantContextInfo>(() => 
-    clientTenantContextManager.getTenantContext()
-  );
+  const [context, setContext] = useState<TenantContextInfo>(() => {
+    // Provide default context during SSR
+    if (typeof window === 'undefined') {
+      return {
+        tenantId: null,
+        source: 'none',
+        isAutoSet: false,
+        lastUpdated: new Date().toISOString()
+      };
+    }
+    return clientTenantContextManager.getTenantContext();
+  });
   
   // Auto-detect and set tenant context from URL
   useEffect(() => {
@@ -36,6 +45,9 @@ export function useTenantContext() {
   
   // Listen for storage changes (for cross-tab synchronization)
   useEffect(() => {
+    // Only add storage listener on client side
+    if (typeof window === 'undefined') return;
+    
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'currentTenantId' || e.key === 'tenantContext') {
         setContext(clientTenantContextManager.getTenantContext());

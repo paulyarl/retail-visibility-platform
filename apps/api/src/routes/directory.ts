@@ -87,8 +87,8 @@ router.get('/search', async (req, res) => {
       (Array.isArray(featuresParam) ? featuresParam : [featuresParam]) : 
       [];
 
-    // Build query
-    let query = Prisma.sql`
+    // Build query components separately to avoid SQL template issues
+    const selectFields = Prisma.sql`
       SELECT 
         id,
         tenantId as "tenantId",
@@ -116,21 +116,22 @@ router.get('/search', async (req, res) => {
     `;
 
     // Add distance calculation if lat/lng provided
-    if (lat && lng) {
-      query = Prisma.sql`${query},
+    const distanceField = lat && lng ? Prisma.sql`,
         calculate_distance_miles(
           ${Number(lat)}, ${Number(lng)}, 
           latitude, longitude
         ) as distance
-      `;
-    }
+    ` : Prisma.sql``;
 
-    query = Prisma.sql`${query}
+    const baseQuery = Prisma.sql`
       FROM directory_listings_list dll
       INNER JOIN tenants t ON dll.tenant_id = t.id
       WHERE dll.is_published = true
         AND (business_hours IS NULL OR business_hours::text != 'null')
     `;
+
+    // Combine query parts
+    let query = Prisma.sql`${selectFields}${distanceField} ${baseQuery}`;
 
     // Full-text search
     if (q) {
@@ -241,7 +242,7 @@ router.get('/search', async (req, res) => {
     const listings = await prisma.$queryRaw(query) as any;
 
     // Get total count for pagination
-    let countQuery = Prisma.sql`
+    const countBaseQuery = Prisma.sql`
       SELECT COUNT(*) as total
       FROM directory_listings_list dll
       INNER JOIN tenants t ON dll.tenant_id = t.id
@@ -250,6 +251,7 @@ router.get('/search', async (req, res) => {
     `;
 
     // Apply same filters to count
+    let countQuery = countBaseQuery;
     if (q) {
       countQuery = Prisma.sql`${countQuery}
         AND to_tsvector('english', 

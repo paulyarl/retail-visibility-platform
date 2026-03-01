@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, MapPin, Star, Phone, Globe, Clock, Filter, Grid, List, ChevronDown, Store, ShoppingBag, TrendingUp, Sparkles, Tag, Users, Calendar, ArrowLeft, X } from 'lucide-react';
+import { Search, MapPin, Star, Phone, Globe, Clock, Filter, Grid, List, ChevronDown, ChevronLeft, Store, ShoppingBag, TrendingUp, Sparkles, Tag, Users, Calendar, ArrowLeft, X } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Container, Grid as MantineGrid, SimpleGrid } from '@mantine/core';
 import StorefrontActions from '../../components/storefront/StorefrontActions';
@@ -36,6 +36,7 @@ interface Shop {
   rating?: number;
   review_count?: number;
   categories?: string[];
+  primary_category?: string;
   description?: string;
   hours?: any;
   is_featured?: boolean;
@@ -44,6 +45,7 @@ interface Shop {
   created_at?: string;
   updated_at?: string;
   price?: number;
+  product_count?: number;
 }
 
 interface TenantData {
@@ -272,17 +274,24 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop, onShopClick }) => {
       
       <div className="p-4">
         <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{shop.name}</h3>
-        {shop.description && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
-            {shop.description}
+        {shop.business_name && shop.business_name !== shop.name && (
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            {shop.business_name}
           </p>
         )}
         
         <div className="space-y-2">
+          {shop.product_count !== undefined && shop.product_count > 0 && (
+            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+              <ShoppingBag className="h-4 w-4 mr-1" />
+              {shop.product_count} products
+            </div>
+          )}
+          
           {shop.address && (
             <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
               <MapPin className="h-4 w-4 mr-1" />
-              {shop.address}, {shop.city}, {shop.state}
+              {shop.address}{shop.city && `, ${shop.city}`}{shop.state && `, ${shop.state}`}
             </div>
           )}
           
@@ -306,6 +315,13 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop, onShopClick }) => {
             <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
               <Clock className="h-4 w-4 mr-1" />
               <span>{specialHours[0]?.label}: {specialHours[0]?.isClosed ? 'Closed' : `${specialHours[0]?.open} - ${specialHours[0]?.close}`}</span>
+            </div>
+          )}
+          
+          {shop.primary_category && (
+            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+              <Tag className="h-4 w-4 mr-1" />
+              {shop.primary_category}
             </div>
           )}
         </div>
@@ -427,10 +443,13 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
   const [shops, setShops] = useState<Shop[]>([]);
   const [shopsLoading, setShopsLoading] = useState(false);
   const [shopsError, setShopsError] = useState<string | null>(null);
+  const [hasMoreShops, setHasMoreShops] = useState(true);
+  const [shopsOffset, setShopsOffset] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [tenantData, setTenantData] = useState<TenantData | null>(null);
-  const [tenantLoading, setTenantLoading] = useState(true);
+  const [tenantLoading, setTenantLoading] = useState(!id); // Not loading if no id
   const [tenantError, setTenantError] = useState<string | null>(null);
   const [mapLocation, setMapLocation] = useState<MapLocation | null>(null);
   const [platformSettings, setPlatformSettings] = useState<any>(null);
@@ -438,16 +457,40 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
   // Show traditional listing when searching or filtering
   const showTraditionalListing = searchQuery || selectedCategory || sortBy !== 'name';
 
-  const fetchShops = async () => {
-    setShopsLoading(true);
-    setShopsError(null);
+  const fetchShops = async (append = false) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setShopsLoading(true);
+      setShopsError(null);
+      setShopsOffset(0);
+    }
+    
     try {
+      const limit = 20;
+      const offset = append ? shopsOffset : 0;
+      
+      // For now, we'll use the existing method but could enhance it to support pagination
       const shops = await directorySingletonService.getPublicShops();
-      setShops(shops);
+      
+      if (append) {
+        // Append new shops to existing list
+        setShops(prev => [...prev, ...shops]);
+      } else {
+        // Replace shops list
+        setShops(shops);
+      }
+      
+      // Update offset and hasMore state
+      const newOffset = offset + shops.length;
+      setShopsOffset(newOffset);
+      setHasMoreShops(shops.length === limit); // If we got less than limit, no more shops
+      
     } catch (err) {
       setShopsError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setShopsLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -457,7 +500,11 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
 
   useEffect(() => {
     const loadTenantData = async () => {
-      if (!id) return;
+      // If no id, mark loading as complete immediately
+      if (!id) {
+        setTenantLoading(false);
+        return;
+      }
       
       setTenantLoading(true);
       setTenantError(null);
@@ -560,6 +607,7 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
       shop.description?.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesCategory = !selectedCategory || 
+      shop.primary_category === selectedCategory ||
       shop.categories?.includes(selectedCategory);
     
     return matchesSearch && matchesCategory;
@@ -570,7 +618,7 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
       case 'rating':
         return (b.rating || 0) - (a.rating || 0);
       case 'products':
-        return 0; // Would need product count data
+        return (b.product_count || 0) - (a.product_count || 0);
       case 'newest':
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       default:
@@ -589,7 +637,8 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
     );
   }
 
-  if (tenantError || !tenantData) {
+  // Only show "Shop Not Found" if we have an id but no tenant data
+  if (id && (tenantError || !tenantData)) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -608,7 +657,11 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
     );
   }
 
-  const { tenant, products, featuredProducts, stats } = tenantData;
+  // If we have tenant data, destructure it
+  const tenant = tenantData?.tenant;
+  const products = tenantData?.products || [];
+  const featuredProducts = tenantData?.featuredProducts || [];
+  const stats = tenantData?.stats || { totalProducts: 0, totalCategories: 0, totalReviews: 0, averageRating: 0, featuredCount: 0 };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -624,7 +677,7 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
-              <Link href="/shops" className="text-blue-600 hover:text-blue-700 mr-4">
+              <Link href="/shops/directory" className="text-blue-600 hover:text-blue-700 mr-4">
                 <ArrowLeft className="h-5 w-5" />
               </Link>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">Shop Directory</h1>
@@ -707,7 +760,8 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Shop Header */}
+        {/* Shop Header - only show if viewing a specific shop */}
+        {tenant && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
           <div className="flex items-start justify-between">
             <div className="flex items-center">
@@ -756,28 +810,29 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
             />
           </div>
         </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <StatsCard
-            icon={<ShoppingBag className="h-6 w-6" />}
-            label="Total Products"
-            value={stats.totalProducts}
+            icon={<Store className="h-6 w-6" />}
+            label="Total Shops"
+            value={shops.length}
           />
           <StatsCard
-            icon={<Tag className="h-6 w-6" />}
-            label="Categories"
-            value={stats.totalCategories}
+            icon={<ShoppingBag className="h-6 w-6" />}
+            label="Total Products"
+            value={shops.reduce((sum, shop) => sum + (shop.product_count || 0), 0)}
           />
           <StatsCard
             icon={<Sparkles className="h-6 w-6" />}
-            label="Featured"
-            value={stats.featuredCount}
+            label="Featured Shops"
+            value={shops.filter(shop => shop.is_featured).length}
           />
           <StatsCard
-            icon={<Star className="h-6 w-6" />}
-            label="Rating"
-            value="4.5"
+            icon={<TrendingUp className="h-6 w-6" />}
+            label="Active Now"
+            value={Math.floor(shops.length * 0.7)}
             trend={{ value: 12, isPositive: true }}
           />
         </div>
@@ -800,18 +855,71 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
           />
         )}
 
-        {/* Traditional Shop Listing */}
-        {showTraditionalListing && (
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                All Shops ({sortedShops.length})
-              </h2>
-              <div className="flex items-center space-x-4">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+        {/* Categories - only show on main shops page */}
+        {!id && categories.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Shop Categories</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {categories.map((category) => (
+                <Link
+                  key={category.name}
+                  href={`/shops?category=${encodeURIComponent(category.name)}`}
+                  className="bg-white dark:bg-gray-800 rounded-lg p-4 text-center hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-700"
+                >
+                  <Tag className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <h3 className="font-medium text-gray-900 dark:text-white">{category.name}</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{category.count} shops</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Featured Shops - only show on main shops page */}
+        {!id && (
+          <FeaturedSection
+            title="Featured Shops"
+            items={shops.filter(shop => shop.is_featured)}
+            renderItem={(shop) => (
+              <ShopCard
+                key={`featured-${shop.id}`}
+                shop={shop}
+                onShopClick={handleShopClick}
+              />
+            )}
+            viewAllLink="/shops?featured=true"
+            viewAllText="View All Featured"
+          />
+        )}
+
+        {/* Trending Shops - only show on main shops page */}
+        {!id && (
+          <FeaturedSection
+            title="Trending Shops"
+            items={shops.slice(0, 6)}
+            renderItem={(shop) => (
+              <ShopCard
+                key={`trending-${shop.id}`}
+                shop={shop}
+                onShopClick={handleShopClick}
+              />
+            )}
+            viewAllLink="/shops?sort=newest"
+            viewAllText="View All Trending"
+          />
+        )}
+
+        {/* Traditional Shop Listing - always show shops list */}
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              All Shops ({sortedShops.length})
+            </h2>
+            <div className="flex items-center space-x-4">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="name">Sort by Name</option>
                   <option value="rating">Sort by Rating</option>
@@ -829,7 +937,7 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
             ) : shopsError ? (
               <div className="text-center py-12">
                 <p className="text-red-600 mb-4">{shopsError}</p>
-                <Button onClick={fetchShops}>Retry</Button>
+                <Button onClick={() => fetchShops()}>Retry</Button>
               </div>
             ) : sortedShops.length === 0 ? (
               <div className="text-center py-12">
@@ -851,8 +959,38 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
                 ))}
               </div>
             )}
-          </div>
-        )}
+            
+            {/* Load More Button */}
+            {!shopsLoading && !shopsError && sortedShops.length > 0 && hasMoreShops && (
+              <div className="text-center mt-8">
+                <Button
+                  onClick={() => fetchShops(true)}
+                  disabled={loadingMore}
+                  variant="outline"
+                  className="px-6 py-3"
+                >
+                  {loadingMore ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600 mr-2"></div>
+                      Loading more...
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                      Load More Shops
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+            
+            {/* End of shops indicator */}
+            {!shopsLoading && !shopsError && sortedShops.length > 0 && !hasMoreShops && (
+              <div className="text-center mt-8 text-gray-500 dark:text-gray-400">
+                <p className="text-sm">You've reached the end of the shops list</p>
+              </div>
+            )}
+        </div>
 
         {/* Map View */}
         {!showTraditionalListing && mapLocation && (

@@ -184,6 +184,11 @@ export class ClientTenantContextManager {
    * Get tenant ID from localStorage
    */
   private getFromLocalStorage(): string | null {
+    // Check if we're on the client side
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    
     try {
       return localStorage.getItem(ClientTenantContextManager.TENANT_ID_KEY);
     } catch (error) {
@@ -196,6 +201,11 @@ export class ClientTenantContextManager {
    * Set tenant ID in localStorage
    */
   private setInLocalStorage(tenantId: string): void {
+    // Check if we're on the client side
+    if (typeof window === 'undefined') {
+      return;
+    }
+    
     try {
       localStorage.setItem(ClientTenantContextManager.TENANT_ID_KEY, tenantId);
     } catch (error) {
@@ -207,6 +217,11 @@ export class ClientTenantContextManager {
    * Remove tenant ID from localStorage
    */
   private removeFromLocalStorage(): void {
+    // Check if we're on the client side
+    if (typeof window === 'undefined') {
+      return;
+    }
+    
     try {
       localStorage.removeItem(ClientTenantContextManager.TENANT_ID_KEY);
     } catch (error) {

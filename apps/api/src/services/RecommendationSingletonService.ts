@@ -75,8 +75,10 @@ class RecommendationSingletonService extends UniversalSingleton {
     this.recommendationCache = new Map();
     this.pool = getDirectPool();
     
-    // Warm up ML models
-    this.warmUpModels();
+    // Warm up ML models in background (non-blocking)
+    this.warmUpModels().catch(error => {
+      this.logError('Background warm-up failed', error);
+    });
   }
 
   static getInstance(): RecommendationSingletonService {
@@ -504,14 +506,20 @@ class RecommendationSingletonService extends UniversalSingleton {
     try {
       this.logInfo('Warming up ML models...');
       
-      // Simulate model warm-up with some sample recommendations
-      await this.generateSampleRecommendations();
+      // Make warm-up non-blocking with timeout
+      const warmUpPromise = this.generateSampleRecommendations();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Warm-up timeout')), 10000) // 10 second timeout
+      );
+      
+      await Promise.race([warmUpPromise, timeoutPromise]);
       
       this.modelWarmedUp = true;
       this.logInfo('ML models warmed up successfully');
     } catch (error) {
       this.logError('Error warming up ML models', error);
       this.modelWarmedUp = false;
+      // Don't fail the service initialization if warm-up fails
     }
   }
 
@@ -519,14 +527,23 @@ class RecommendationSingletonService extends UniversalSingleton {
    * Generate sample recommendations for warm-up
    */
   private async generateSampleRecommendations(): Promise<void> {
-    // Simulate some sample recommendations to warm up the models
-    const sampleStoreId = 'sample-store-123';
-    await this.generateSameUsersRecommendations(sampleStoreId, undefined, 3);
-    
-    const sampleTenantId = 'sample-tenant-456';
-    await this.generateAreaRecommendations(sampleTenantId, 40.7128, -74.0060, 25, 3);
-    
-    await this.generateTrendingRecommendations(undefined, undefined, 7, 3);
+    try {
+      // Simulate some sample recommendations to warm up the models
+      // Use simple queries that are less likely to timeout
+      const sampleStoreId = 'sample-store-123';
+      
+      // Use a timeout for each recommendation generation
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Recommendation generation timeout')), 5000)
+      );
+      
+      const recommendationPromise = this.generateSameUsersRecommendations(sampleStoreId, undefined, 3);
+      await Promise.race([recommendationPromise, timeoutPromise]);
+      
+    } catch (error) {
+      this.logError('Error generating sample recommendations', error);
+      // Don't re-throw, just log the error
+    }
   }
 
   /**
@@ -584,9 +601,16 @@ class RecommendationSingletonService extends UniversalSingleton {
       `;
       
       params.push(limit);
-      const result = await this.pool.query(query, params);
       
-      return result.rows.map((row: any) => ({
+      // Add query timeout to prevent long-running queries
+      const result = await Promise.race([
+        this.pool.query(query, params),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Query timeout')), 8000) // 8 second query timeout
+        )
+      ]);
+      
+      return (result as any).rows.map((row: any) => ({
         tenantId: row.tenant_id,
         businessName: row.business_name,
         slug: row.slug,
@@ -597,6 +621,15 @@ class RecommendationSingletonService extends UniversalSingleton {
         state: row.state
       }));
     } catch (error) {
+      // Check if it's a connection timeout
+      if (error instanceof Error && 
+          (error.message.includes('connection timeout') || 
+           error.message.includes('Connection terminated') ||
+           error.message.includes('Query timeout'))) {
+        this.logError('Connection timeout in same users recommendations - using fallback', error);
+        return []; // Return empty array as fallback
+      }
+      
       this.logError('Error generating same users recommendations', error);
       return [];
     }

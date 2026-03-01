@@ -344,7 +344,8 @@ class DirectorySingletonService extends PublicApiSingleton {
   }
 
   /**
-   * Get public shops for directory browsing
+   * Get public shops with rich data
+   * Uses /api/shops/directory for complete shop information including logos, addresses, etc.
    * Used for shops page and public shop listings
    * Now tenant-aware to prevent cross-tenant contamination
    */
@@ -354,9 +355,9 @@ class DirectorySingletonService extends PublicApiSingleton {
     
     const response = await super.makeDefaultRequest<{
       success: boolean;
-      shops: any[];
+      data: any[];
     }>(
-      '/api/public/shops',
+      '/api/shops/directory',
       {},
       cacheKey,
       this.CACHE_TTL_MEDIUM
@@ -367,7 +368,42 @@ class DirectorySingletonService extends PublicApiSingleton {
       return [];
     }
 
-    return response.data?.shops || [];
+    // Handle doubly nested response structure
+    let shopsData = response.data;
+    
+    // If response.data is an object with a 'data' property, extract the inner data
+    if (shopsData && typeof shopsData === 'object' && 'data' in shopsData) {
+      shopsData = (shopsData as any).data;
+    }
+
+    // Check if shopsData is an array
+    if (!Array.isArray(shopsData)) {
+      console.error('[DirectorySingletonService] shopsData is not an array:', typeof shopsData);
+      return [];
+    }
+
+    // Transform data to match expected format
+    const shops = shopsData;
+    return shops.map((shop: any) => ({
+      id: shop.tenantId,
+      name: shop.name,
+      slug: shop.slug || '',
+      business_name: shop.name,
+      logo_url: shop.imageUrl || null,
+      address: shop.address || null,
+      city: shop.city || null,
+      state: shop.state || null,
+      zip_code: shop.zip_code || null,
+      phone: shop.phone || null,
+      website: shop.website || null,
+      product_count: parseInt(shop.productCount) || 0,
+      is_published: shop.is_published || true,
+      primary_category: shop.primary_category || null,
+      rating: shop.rating || 0,
+      review_count: shop.reviewCount || 0,
+      is_featured: shop.is_featured || false,
+      categories: shop.primary_category ? [shop.primary_category] : []
+    }));
   }
 
   /**
