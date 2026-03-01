@@ -11,6 +11,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { externalApiService } from '@/services/ExternalApiService';
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
 // Behavior Tracking Singleton Class
@@ -550,7 +551,8 @@ export async function trackStorefrontView(tenantId: string, categoriesViewed: st
 }
 
 /**
- * Get user location (server-side)
+ * Get user location server-side (with IP geolocation)
+ * Uses unique cache keys with user context to prevent cross-contamination
  */
 async function getUserLocationServer(): Promise<{
   latitude: number;
@@ -559,43 +561,73 @@ async function getUserLocationServer(): Promise<{
   state: string;
 } | null> {
   try {
-    // Add timeout to prevent hanging
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    // Get user context for unique cache key
+    const userId = getUserIdFromContext();
+    const sessionId = getSessionIdFromContext();
+    const userContext = userId || sessionId || 'anonymous';
     
-    const response = await fetch('https://ipapi.co/json/', {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'RVP-Platform/1.0'
-      }
-    });
+    // Use unique cache key with user context
+    const cacheKey = `ip-geolocation-${userContext}`;
     
-    clearTimeout(timeoutId);
+    const ipLocation = await externalApiService.getIpGeolocation(cacheKey);
     
-    if (!response.ok) {
-      throw new Error(`IP location service responded with ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    // Validate the response has the expected fields
-    if (!data.latitude || !data.longitude) {
-      throw new Error('Invalid location data received');
+    if (!ipLocation || !ipLocation.latitude || !ipLocation.longitude) {
+      console.warn('[BehaviorTracking] Invalid location data received from external API');
+      return null;
     }
     
     return {
-      latitude: data.latitude,
-      longitude: data.longitude,
-      city: data.city || 'Unknown',
-      state: data.region || 'Unknown'
+      latitude: ipLocation.latitude,
+      longitude: ipLocation.longitude,
+      city: ipLocation.city || 'Unknown',
+      state: ipLocation.region || 'Unknown'
     };
   } catch (error) {
-    // Only log in development to reduce noise in production
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('IP location failed, using default:', error instanceof Error ? error.message : 'Unknown error');
-    }
+    console.warn('[BehaviorTracking] Failed to get user location:', error);
     return null;
   }
+}
+
+/**
+ * Get user ID from various context sources
+ */
+function getUserIdFromContext(): string | null {
+  // Try localStorage first
+  if (typeof window !== 'undefined') {
+    const userId = localStorage.getItem('userId');
+    if (userId) return userId;
+    
+    // Try session storage
+    const sessionUserId = sessionStorage.getItem('userId');
+    if (sessionUserId) return sessionUserId;
+    
+    // Try cookie
+    const cookies = document.cookie.split(';');
+    const userIdCookie = cookies.find(cookie => cookie.trim().startsWith('userId='));
+    if (userIdCookie) {
+      return userIdCookie.split('=')[1]?.trim();
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Get session ID for anonymous users
+ */
+function getSessionIdFromContext(): string | null {
+  if (typeof window !== 'undefined') {
+    // Try session storage
+    let sessionId = sessionStorage.getItem('sessionId');
+    if (!sessionId) {
+      // Generate new session ID
+      sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      sessionStorage.setItem('sessionId', sessionId);
+    }
+    return sessionId;
+  }
+  
+  return null;
 }
 
 /**
@@ -679,17 +711,18 @@ async function getUserLocationClient(): Promise<{
       
       const { latitude, longitude } = position.coords;
       
-      // Reverse geocoding to get city/state
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
-      );
-      const data = await response.json();
+      // Reverse geocoding to get city/state using ExternalApiService
+      const geocodingData = await externalApiService.reverseGeocode(latitude, longitude);
       
-      const address = data.address || {};
-      const city = address.city || address.town || address.village || 'Unknown';
-      const state = address.state || 'Unknown';
+      if (geocodingData && geocodingData.address) {
+        const address = geocodingData.address;
+        const city = address.city || address.town || address.village || 'Unknown';
+        const state = address.state || 'Unknown';
+        return { latitude, longitude, city, state };
+      }
       
-      return { latitude, longitude, city, state };
+      // Fallback if geocoding fails
+      return { latitude, longitude, city: 'Unknown', state: 'Unknown' };
     }
   } catch (error) {
     console.warn('Geolocation failed, falling back to IP-based location');
@@ -697,41 +730,28 @@ async function getUserLocationClient(): Promise<{
   
   // Fallback to IP-based location
   try {
-    // Add timeout to prevent hanging
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    // Get user context for unique cache key
+    const userId = getUserIdFromContext();
+    const sessionId = getSessionIdFromContext();
+    const userContext = userId || sessionId || 'anonymous';
     
-    const response = await fetch('https://ipapi.co/json/', {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'RVP-Platform/1.0'
-      }
-    });
+    // Use unique cache key with user context
+    const cacheKey = `ip-geolocation-${userContext}`;
     
-    clearTimeout(timeoutId);
+    const ipLocation = await externalApiService.getIpGeolocation(cacheKey);
     
-    if (!response.ok) {
-      throw new Error(`IP location service responded with ${response.status}`);
+    if (ipLocation && ipLocation.latitude && ipLocation.longitude) {
+      return {
+        latitude: ipLocation.latitude,
+        longitude: ipLocation.longitude,
+        city: ipLocation.city || 'Unknown',
+        state: ipLocation.region || 'Unknown'
+      };
     }
     
-    const data = await response.json();
-    
-    // Validate the response has the expected fields
-    if (!data.latitude || !data.longitude) {
-      throw new Error('Invalid location data received');
-    }
-    
-    return {
-      latitude: data.latitude,
-      longitude: data.longitude,
-      city: data.city || 'Unknown',
-      state: data.region || 'Unknown'
-    };
+    return null;
   } catch (error) {
-    // Only log in development to reduce noise in production
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('IP location failed, using default:', error instanceof Error ? error.message : 'Unknown error');
-    }
+    console.warn('[BehaviorTracking] Failed to get IP location:', error);
     return null;
   }
 }

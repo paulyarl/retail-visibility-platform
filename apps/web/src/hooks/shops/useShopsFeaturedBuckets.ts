@@ -49,14 +49,19 @@ export function useShopsFeaturedBuckets() {
 
       // Get featured products data using FeaturedProductsSingleton
       const featuredProductsSingleton = FeaturedProductsSingleton.getInstance();
-      const tenantId = 'tid-m8ijkrnk'; // Use real tenant ID to avoid 404
+      // TODO: Get tenantId from context or URL parameter
+      const tenantId = null; // No fallback - require explicit tenant
+      if (!tenantId) {
+        console.error('[useShopsFeaturedBuckets] No tenantId provided');
+        return;
+      }
       const featuredProductsResult = await featuredProductsSingleton.getAllFeaturedProducts(tenantId, 100);
       console.log('[useShopsFeaturedBuckets] Featured products loaded:', featuredProductsResult?.buckets?.length || 0, 'buckets');
 
       // Get all products using StorefrontService
       const storefrontServiceInstance = storefrontService;
-      // For shops page, we might need to get tenant ID from URL or use default
-      const productsTenantId = 'tid-m8ijkrnk'; // Use real tenant ID to avoid 404
+      // TODO: Get tenant ID from context or URL parameter
+      const productsTenantId = tenantId; // Use same tenantId
       const allProductsResult = await storefrontServiceInstance.getFeaturedProducts(productsTenantId, { limit: 100 });
       console.log('[useShopsFeaturedBuckets] All products loaded:', allProductsResult?.items?.length || 0);
 

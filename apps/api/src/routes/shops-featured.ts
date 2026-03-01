@@ -13,25 +13,26 @@ router.get('/featured', async (req, res) => {
     
     // For now, return mock featured shops data
     // In production, this would query from a featured_shops table
+    // TODO: Replace with actual database query for featured shops
     const mockFeaturedShops = [
       {
-        tenantId: 'tid-m8ijkrnk',
-        name: 'Baraka International Market',
-        slug: 'baraka-market',
-        autoId: 'ULCW',
-        location: 'Pittsburgh, PA',
-        productCount: 156,
-        rating: 4.8,
-        trendingScore: 95,
-        weeklyGrowth: 12.5,
+        tenantId: 'example-tenant-id', // Replace with actual featured tenants
+        name: 'Example Shop',
+        slug: 'example-shop',
+        autoId: 'EXAMPLE',
+        location: 'Example City, State',
+        productCount: 100,
+        rating: 4.5,
+        trendingScore: 85,
+        weeklyGrowth: 8.0,
         featuredUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
         priority: 1,
-        category: 'grocery',
+        category: 'example',
         urls: {
-          slugUrl: '/shops/baraka-market',
-          tenantIdUrl: '/shops/tid-m8ijkrnk',
-          autoIdUrl: '/shops/ULCW',
-          canonicalUrl: '/shops/baraka-market'
+          slugUrl: '/shops/example-shop',
+          tenantIdUrl: '/shops/example-tenant-id',
+          autoIdUrl: '/shops/EXAMPLE',
+          canonicalUrl: '/shops/example-shop'
         }
       },
       {

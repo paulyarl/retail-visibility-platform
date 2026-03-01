@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isFeatureEnabled } from '@/lib/featureFlags';
+import { googleIntegrationService } from '@/services/GoogleIntegrationService';
 
 // Stub GBP category data until real GBP API is wired
 // Note: Real GBP has 4,000+ categories that are mostly universal (not region-specific)
@@ -68,22 +69,11 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('query') || '';
-    const limit = searchParams.get('limit') || '20';
+    const limit = parseInt(searchParams.get('limit') || '20');
     const tenantId = searchParams.get('tenantId') || '';
 
-    // Proxy to backend API
-    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-    const backendUrl = `${apiUrl}/api/gbp/categories?query=${encodeURIComponent(query)}&limit=${limit}&tenantId=${encodeURIComponent(tenantId)}`;
-    
-    const response = await fetch(backendUrl);
-    
-    if (!response.ok) {
-      const error = await response.json();
-      return NextResponse.json(error, { status: response.status });
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
+    const categories = await googleIntegrationService.getCategories(query, limit, tenantId);
+    return NextResponse.json({ categories });
   } catch (error) {
     console.error('[GBP Categories API] Error:', error);
     return NextResponse.json(

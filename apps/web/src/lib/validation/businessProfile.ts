@@ -198,6 +198,8 @@ export const onboardingProfileSchema = z.object({
     .or(z.literal('')),
 });
 
+import { externalApiService } from '@/services/ExternalApiService';
+
 // Helper to geocode an address using Google Geocoding API
 export async function geocodeAddress(address: {
   address_line1: string;
@@ -208,38 +210,9 @@ export async function geocodeAddress(address: {
   country_code: string;
 }): Promise<{ latitude: number; longitude: number } | null> {
   try {
-    const fullAddress = [
-      address.address_line1,
-      address.address_line2,
-      address.city,
-      address.state,
-      address.postal_code,
-      address.country_code,
-    ]
-      .filter(Boolean)
-      .join(', ');
-
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error('Geocoding API request failed');
-    }
-
-    const data = await response.json();
-
-    if (data.status === 'OK' && data.results && data.results.length > 0) {
-      const location = data.results[0].geometry.location;
-      return {
-        latitude: location.lat,
-        longitude: location.lng,
-      };
-    }
-
-    return null;
+    return await externalApiService.geocodeAddress(address);
   } catch (error) {
-    console.error('Geocoding error:', error);
+    console.error('[BusinessProfile] Failed to geocode address:', error);
     return null;
   }
 }

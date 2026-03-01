@@ -1,0 +1,212 @@
+/**
+ * Tenant Directory Management Service
+ * 
+ * Extends TenantApiSingleton to provide authenticated tenant directory listing operations
+ * Uses the platform's singleton architecture for automatic caching and tenant context
+ * For tenant owners to manage their own directory listings
+ */
+
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { RequestTarget } from '@/providers/base/FlexibleApiSingleton';
+import { DirectoryListing } from './DirectoryListingSingletonService';
+
+export class TenantDirectoryManagementService extends TenantApiSingleton {
+  private static instance: TenantDirectoryManagementService;
+
+  private constructor() {
+    super('tenant-directory-management');
+    this.cacheTTL = 10 * 60 * 1000; // 10 minutes for directory listing data
+  }
+
+  public static getInstance(): TenantDirectoryManagementService {
+    if (!TenantDirectoryManagementService.instance) {
+      TenantDirectoryManagementService.instance = new TenantDirectoryManagementService();
+    }
+    return TenantDirectoryManagementService.instance;
+  }
+
+  /**
+   * Get directory listing for the current tenant
+   */
+  async getDirectoryListing(tenantId: string): Promise<DirectoryListing | null> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<DirectoryListing>(
+      `/api/tenants/${tenantId}/directory/listing`,
+      {},
+      `directory-listing-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[TenantDirectoryManagement] Failed to get directory listing:', result.error);
+      return null;
+    }
+
+    return result.data || null;
+  }
+
+  /**
+   * Create or update directory listing for the current tenant
+   */
+  async updateDirectoryListing(tenantId: string, listingData: Partial<DirectoryListing>): Promise<DirectoryListing | null> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<DirectoryListing>(
+      `/api/tenants/${tenantId}/directory/listing`,
+      { 
+        method: 'PUT',
+        body: listingData as BodyInit
+      },
+      `directory-update-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[TenantDirectoryManagement] Failed to update directory listing:', result.error);
+      return null;
+    }
+
+    // Invalidate directory listing cache
+    await this.invalidateCache(`directory-listing-${tenantId}`);
+
+    return result.data || null;
+  }
+
+  /**
+   * Publish directory listing for the current tenant
+   */
+  async publishDirectoryListing(tenantId: string): Promise<boolean> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<void>(
+      `/api/tenants/${tenantId}/directory/listing/publish`,
+      { method: 'POST' },
+      `directory-publish-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[TenantDirectoryManagement] Failed to publish directory listing:', result.error);
+      return false;
+    }
+
+    // Invalidate directory listing cache
+    await this.invalidateCache(`directory-listing-${tenantId}`);
+
+    return true;
+  }
+
+  /**
+   * Unpublish directory listing for the current tenant
+   */
+  async unpublishDirectoryListing(tenantId: string): Promise<boolean> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<void>(
+      `/api/tenants/${tenantId}/directory/listing/unpublish`,
+      { method: 'POST' },
+      `directory-unpublish-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[TenantDirectoryManagement] Failed to unpublish directory listing:', result.error);
+      return false;
+    }
+
+    // Invalidate directory listing cache
+    await this.invalidateCache(`directory-listing-${tenantId}`);
+
+    return true;
+  }
+
+  /**
+   * Get photos for tenant directory listing
+   */
+  async getDirectoryListingPhotos(listingId: string): Promise<any[]> {
+    if (!listingId) {
+      throw new Error('Listing ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/directory/${listingId}/photos`,
+      {},
+      `directory-photos-${listingId}`,
+      this.cacheTTL
+    );
+
+    if (!result.success) {
+      console.error('[TenantDirectoryManagement] Failed to get directory photos:', result.error);
+      return [];
+    }
+
+    return Array.isArray(result.data) ? result.data : [];
+  }
+
+  /**
+   * Upload photo to directory listing
+   */
+  async uploadListingPhoto(listingId: string, photoData: FormData): Promise<any> {
+    if (!listingId) {
+      throw new Error('Listing ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/directory/${listingId}/photos`,
+      {
+        method: 'POST',
+        body: photoData
+      },
+      `directory-upload-photo-${listingId}`
+    );
+
+    return result;
+  }
+
+  /**
+   * Update photo in directory listing
+   */
+  async updateListingPhoto(listingId: string, photoId: string, photoData: any): Promise<any> {
+    if (!listingId || !photoId) {
+      throw new Error('Listing ID and Photo ID are required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/directory/${listingId}/photos/${photoId}`,
+      {
+        method: 'PUT',
+        body: photoData
+      },
+      `directory-update-photo-${listingId}-${photoId}`
+    );
+
+    return result;
+  }
+
+  /**
+   * Delete photo from directory listing
+   */
+  async deleteListingPhoto(listingId: string, photoId: string): Promise<any> {
+    if (!listingId || !photoId) {
+      throw new Error('Listing ID and Photo ID are required');
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/directory/${listingId}/photos/${photoId}`,
+      {
+        method: 'DELETE'
+      },
+      `directory-delete-photo-${listingId}-${photoId}`
+    );
+
+    return result;
+  }
+}
+
+// Export singleton instance
+export const tenantDirectoryManagementService = TenantDirectoryManagementService.getInstance();

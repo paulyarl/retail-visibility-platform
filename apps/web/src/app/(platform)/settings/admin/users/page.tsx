@@ -13,6 +13,7 @@ import UserStatusModal from '@/components/admin/UserStatusModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { canManageUsers, canViewUsers } from '@/lib/auth/access-control';
 import { adminUsersService } from '@/services/AdminUsersService';
+import { adminUserService } from '@/services/AdminUserService';
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -257,39 +258,11 @@ export default function PlatformUserMaintenancePage() {
 
   const handleSaveTenantRole = async (userId: string, tenantId: string, newRole: string) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const token = localStorage.getItem('access_token');
-      
       // First remove the existing assignment
-      const deleteResponse = await fetch(`${apiUrl}/api/admin/users/${userId}/tenants/${tenantId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!deleteResponse.ok) {
-        const data = await deleteResponse.json();
-        throw new Error(data.message || data.error || 'Failed to remove existing tenant assignment');
-      }
+      await adminUserService.removeUserFromTenant(userId, tenantId);
 
       // Then add with new role
-      const addResponse = await fetch(`${apiUrl}/api/admin/users/${userId}/tenants`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          tenant_id: tenantId,
-          role: newRole,
-        }),
-      });
-
-      if (!addResponse.ok) {
-        const data = await addResponse.json();
-        throw new Error(data.message || data.error || 'Failed to add tenant with new role');
-      }
+      await adminUserService.addUserToTenant(userId, tenantId, newRole);
 
       // Refresh users to get updated tenant data
       await loadUsers();

@@ -2,16 +2,16 @@
  * Recently Viewed Singleton - Consumer Pattern
  * 
  * Consumes and manages recently viewed items for users
- * Extends UniversalSingleton for consistent caching and metrics
+ * Extends PublicApiSingleton for public request context
  */
 
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { PublicApiSingleton } from '../base/PublicApiSingleton';
 import { recentlyViewedService } from '@/services/RecentlyViewedService';
 
 // Recently Viewed Data Interfaces
 export interface RecentlyViewedItem {
   id: string;
-  type: 'product' | 'store' | 'category' | 'page';
+  type: 'product' | 'store' | 'category' | 'page' | 'shop' | 'directory';
   title: string;
   description?: string;
   imageUrl?: string;
@@ -51,28 +51,29 @@ export interface RecentlyViewedStats {
  * Recently Viewed Singleton - Consumer Pattern
  * 
  * Consumes and manages recently viewed items for personalization
+ * Uses PublicApiSingleton for public request context
  */
-class RecentlyViewedSingleton extends UniversalSingleton {
+class RecentlyViewedSingleton extends PublicApiSingleton {
   private static instance: RecentlyViewedSingleton;
   private recentlyViewedConfig: RecentlyViewedConfig;
   private currentViewStart: string | null = null;
   private currentItemId: string | null = null;
 
-  private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
-    super(singletonKey, cacheOptions);
+  private constructor() {
+    super('recently-viewed-singleton');
     this.recentlyViewedConfig = {
       maxItems: 50,
       retentionDays: 30,
       enableTracking: true,
       trackDuration: true,
       enablePersonalization: true,
-      itemTypes: ['product', 'store', 'category', 'page']
+      itemTypes: ['product', 'store', 'category', 'page','shop', 'directory']
     };
   }
 
   static getInstance(): RecentlyViewedSingleton {
     if (!RecentlyViewedSingleton.instance) {
-      RecentlyViewedSingleton.instance = new RecentlyViewedSingleton('recently-viewed-singleton');
+      RecentlyViewedSingleton.instance = new RecentlyViewedSingleton();
     }
     return RecentlyViewedSingleton.instance;
   }
@@ -110,8 +111,14 @@ class RecentlyViewedSingleton extends UniversalSingleton {
     };
 
     try {
+      // Filter to only valid types for the service
+      const validItem = {
+        ...recentlyViewedItem,
+        type: recentlyViewedItem.type as 'product' | 'store' | 'category' | 'page'
+      };
+      
       // Track item using service
-      await recentlyViewedService.trackItem(recentlyViewedItem);
+      await recentlyViewedService.trackItem(validItem);
 
       // Start tracking view duration
       this.currentItemId = recentlyViewedItem.id;
@@ -155,7 +162,7 @@ class RecentlyViewedSingleton extends UniversalSingleton {
       tenantId?: string;
     } = {}
   ): Promise<RecentlyViewedItem[]> {
-    const cacheKey = `recently-viewed-${userId || 'anonymous'}-${JSON.stringify(options)}`;
+    const cacheKey = `recently-viewed-${userId || 'anonymous'}-${options.limit || 20}-${options.itemType || 'all'}-${options.tenantId || 'no-tenant'}`;
     
     const cached = await this.getFromCache<RecentlyViewedItem[]>(cacheKey);
     if (cached) {
@@ -209,21 +216,16 @@ class RecentlyViewedSingleton extends UniversalSingleton {
    */
   async removeRecentlyViewed(itemId: string, userId?: string): Promise<void> {
     try {
-      const params = new URLSearchParams();
-      if (userId) params.append('userId', userId);
-
-      const response = await fetch(`/api/user/recently-viewed/${itemId}?${params}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to remove recently viewed item');
-      }
+      await this.makeDefaultRequest<void>(
+        `/api/user/recently-viewed/${itemId}`,
+        { method: 'DELETE' },
+        `remove-${itemId}-${userId || 'anonymous'}`
+      );
 
       // Clear cache
       await this.clearCache(`recently-viewed-${userId || 'anonymous'}`);
     } catch (error) {
-      console.error('Error removing recently viewed item:', error);
+      console.error('Failed to remove recently viewed item:', error);
       throw error;
     }
   }
@@ -233,21 +235,16 @@ class RecentlyViewedSingleton extends UniversalSingleton {
    */
   async clearRecentlyViewed(userId?: string): Promise<void> {
     try {
-      const params = new URLSearchParams();
-      if (userId) params.append('userId', userId);
-
-      const response = await fetch(`/api/user/recently-viewed?${params}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to clear recently viewed items');
-      }
+      await this.makeDefaultRequest<void>(
+        '/api/user/recently-viewed',
+        { method: 'DELETE' },
+        `clear-${userId || 'anonymous'}`
+      );
 
       // Clear cache
       await this.clearCache(`recently-viewed-${userId || 'anonymous'}`);
     } catch (error) {
-      console.error('Error clearing recently viewed items:', error);
+      console.error('Failed to clear recently viewed items:', error);
       throw error;
     }
   }
@@ -268,24 +265,22 @@ class RecentlyViewedSingleton extends UniversalSingleton {
     }
 
     try {
-      const params = new URLSearchParams();
-      if (userId) params.append('userId', userId);
-      params.append('days', days.toString());
-
-      const response = await fetch(`/api/user/recently-viewed/stats?${params}`);
+      const stats = await this.makeDefaultRequest<RecentlyViewedStats>(
+        `/api/user/recently-viewed/stats?userId=${userId || 'anonymous'}&days=${days}`,
+        {},
+        cacheKey
+      );
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch recently viewed stats');
-      }
-
-      const stats = await response.json();
-      
-      await this.setCache(cacheKey, stats);
-      return stats;
+      return stats.data || {
+        totalViews: 0,
+        uniqueItems: 0,
+        averageViewDuration: 0,
+        topViewedTypes: [],
+        viewTrends: []
+      };
     } catch (error) {
-      console.error('Error fetching recently viewed stats:', error);
-      
-      // Return default stats
+      console.error('Failed to fetch recently viewed stats:', error);
+      // Return default stats on error
       return {
         totalViews: 0,
         uniqueItems: 0,
@@ -316,29 +311,18 @@ class RecentlyViewedSingleton extends UniversalSingleton {
     }
 
     try {
-      const params = new URLSearchParams();
-      if (userId) params.append('userId', userId);
-      params.append('days', days.toString());
-
-      const response = await fetch(`/api/user/recently-viewed/trends?${params}`);
+      const trends = await this.makeDefaultRequest<Array<{date: string; views: number; uniqueItems: number}>>(
+        `/api/user/recently-viewed/trends?userId=${userId || 'anonymous'}&days=${days}`,
+        {},
+        cacheKey
+      );
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch recently viewed trends');
-      }
-
-      const trends = await response.json();
-      
-      await this.setCache(cacheKey, trends);
-      return trends;
+      return trends.data || [];
     } catch (error) {
-      console.error('Error fetching recently viewed trends:', error);
+      console.error('Failed to fetch recently viewed trends:', error);
       return [];
     }
   }
-
-  // ====================
-  // RECENTLY VIEWED CONFIGURATION
-  // ====================
 
   /**
    * Update recently viewed configuration
@@ -386,16 +370,17 @@ class RecentlyViewedSingleton extends UniversalSingleton {
       if (userId) params.append('userId', userId);
       params.append('limit', limit.toString());
 
-      const response = await fetch(`/api/user/recently-viewed/recommendations?${params}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch personalized recommendations');
+      const recommendations = await this.makeDefaultRequest<RecentlyViewedItem[]>(
+        `/api/user/recently-viewed/recommendations?${params}`,
+        {},
+        cacheKey
+      );
+      if (!recommendations.success){
+        console.error('Error fetching personalized recommendations:', recommendations.error);
+        return [];
       }
-
-      const recommendations = await response.json();
       
-      await this.setCache(cacheKey, recommendations);
-      return recommendations;
+      return recommendations.data || [];
     } catch (error) {
       console.error('Error fetching personalized recommendations:', error);
       return [];
@@ -414,16 +399,13 @@ class RecentlyViewedSingleton extends UniversalSingleton {
     }
 
     try {
-      const response = await fetch(`/api/user/recently-viewed/${itemId}/similar?limit=${limit}`);
+      const similarItems = await this.makeDefaultRequest<RecentlyViewedItem[]>(
+        `/api/user/recently-viewed/${itemId}/similar?limit=${limit}`,
+        {},
+        cacheKey
+      );
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch similar items');
-      }
-
-      const similarItems = await response.json();
-      
-      await this.setCache(cacheKey, similarItems);
-      return similarItems;
+      return similarItems.data || [];
     } catch (error) {
       console.error('Error fetching similar items:', error);
       return [];

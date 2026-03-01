@@ -43,6 +43,7 @@ import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeatur
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import { directoryService } from '@/services/DirectorySingletonService';
+import { directoryListingService } from '@/services/DirectoryListingSingletonService';
 
 // Types
 interface DirectoryConsolidated {
@@ -107,6 +108,7 @@ interface ShopData {
   productCount: number;
   is_published: boolean;
   primary_category?: string;
+  category?: string;
   created_at: Date;
   tenantName?: string;
   latitude?: number;
@@ -149,74 +151,46 @@ interface ShopProfileClientProps {
 }
 
 // Shop profile header component
-function ShopProfileHeader({ shop }: { shop: {
+function ShopProfileHeader({ shop, shopData }: { 
+  shop: {
     success: boolean;
     data: {
       success: boolean;
       data: ShopData;
     };
   };
+  shopData: ShopData;
 }) {
-  const [directoryListing, setDirectoryListing] = useState<any>(null);
-  
-  // Get the URL slug from the window location
-  const urlSlug = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '';
+  // Create a directory listing object from shop data for the photo gallery
+  const directoryListing = shopData ? {
+    id: shopData.tenantId,
+    tenantId: shopData.tenantId,
+    name: shopData.name,
+    description: shopData.description,
+    imageUrl: shopData.imageUrl,
+    logo_url: shopData.logo_url,
+    bannerUrl: shopData.bannerUrl,
+    // Add any other required fields for the photo gallery
+  } : null;
 
-  // Debug: Log the shop data structure
-  console.log('[ShopProfile] Shop data:', shop);
-  console.log('[ShopProfile] Shop keys:', Object.keys(shop));
-  console.log('[ShopProfile] Shop data keys:', Object.keys(shop.data || {}));
-  console.log('[ShopProfile] Shop data.data keys:', Object.keys((shop.data as any)?.data || {}));
-  console.log('[ShopProfile] URL slug:', urlSlug);
-  console.log('[ShopProfile] Shop data slug:', (shop.data as any)?.data?.data?.slug);
-  console.log('[ShopProfile] Available logo fields:', {
-    logo_url: (shop.data as any)?.data?.data?.logo_url,
-    bannerUrl: (shop.data as any)?.data?.data?.bannerUrl,
-    tenantLogoUrl: (shop.data as any)?.data?.data?.tenantLogoUrl,
-    imageUrl: (shop.data as any)?.data?.data?.imageUrl
-  });
-  console.log('[ShopProfile] Contact data:', (shop.data as any)?.data?.data?.contact);
-  console.log('[ShopProfile] Hours data:', (shop.data as any)?.data?.data?.hours);
-  console.log('[ShopProfile] Description:', (shop.data as any)?.data?.data?.description);
-
-  // Fetch directory listing data to get the listing ID for photos
-  useEffect(() => {
-    const fetchDirectoryListing = async () => {
-      try {
-        // Safety check: ensure URL slug exists
-        if (!urlSlug) {
-          console.log('[ShopProfile] No URL slug available, skipping directory listing fetch');
-          return;
-        }
-
-        console.log('[ShopProfile] Fetching directory data for URL slug:', urlSlug);
-
-        // Use the URL slug directly to get directory data
-        const consolidatedData = await directoryService.getDirectoryConsolidated(urlSlug);
-        console.log('[ShopProfile] Directory consolidated data:', consolidatedData);
-        console.log('[ShopProfile] Directory listing keys:', consolidatedData?.listing ? Object.keys(consolidatedData.listing) : 'no listing');
-        console.log('[ShopProfile] Directory listing logoUrl:', consolidatedData?.listing?.logoUrl);
-        console.log('[ShopProfile] Directory listing isFeatured:', consolidatedData?.listing?.isFeatured);
-        console.log('[ShopProfile] Directory listing phone:', consolidatedData?.listing?.phone);
-        console.log('[ShopProfile] Directory listing subscriptionTier:', (consolidatedData?.listing as any)?.subscriptionTier);
-        console.log('[ShopProfile] Featured products count:', consolidatedData?.featuredProducts?.length);
-        console.log('[ShopProfile] Random featured products count:', (consolidatedData as any)?.randomFeaturedProducts?.length || consolidatedData?.featuredProducts?.length);
-        console.log('[ShopProfile] Payment gateway status:', consolidatedData?.paymentGatewayStatus);
-        console.log('[ShopProfile] Store types:', consolidatedData?.storeTypes);
-        
-        if (consolidatedData?.listing) {
-          console.log('[ShopProfile] Found directory listing:', consolidatedData.listing.id);
-          setDirectoryListing(consolidatedData.listing);
-        } else {
-          console.log('[ShopProfile] No directory listing found for URL slug:', urlSlug);
-        }
-      } catch (error) {
-        console.error('[ShopProfile] Error fetching directory listing:', error);
-      }
-    };
-
-    fetchDirectoryListing();
-  }, [urlSlug]);
+  // Check if shop data exists and is valid
+  if (!shop || !shop.success || !shopData || !shopData.tenantId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Store className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Shop Not Found</h1>
+          <p className="text-gray-600 mb-6">
+            The shop you're looking for doesn't exist or hasn't been set up yet.
+          </p>
+          <Link href="/shops" className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Shops
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -228,10 +202,10 @@ function ShopProfileHeader({ shop }: { shop: {
               {/* Shop Logo */}
               <div className="relative">
                 <div className="h-24 w-24 bg-white rounded-lg shadow-md flex items-center justify-center overflow-hidden">
-                  {(directoryListing?.logoUrl || (shop.data as any)?.data?.data?.logo_url || (shop.data as any)?.data?.data?.bannerUrl || (shop.data as any)?.data?.data?.tenantLogoUrl || (shop.data as any)?.data?.data?.imageUrl) ? (
+                  {(directoryListing?.logo_url || shopData?.logo_url || shopData?.bannerUrl || shopData?.tenantLogoUrl || shopData?.imageUrl) ? (
                     <img
-                      src={directoryListing?.logoUrl || (shop.data as any)?.data?.data?.logo_url || (shop.data as any)?.data?.data?.bannerUrl || (shop.data as any)?.data?.data?.tenantLogoUrl || (shop.data as any)?.data?.data?.imageUrl}
-                      alt={(shop.data as any)?.data?.data?.name}
+                      src={directoryListing?.logo_url || shopData?.logo_url || shopData?.bannerUrl || shopData?.tenantLogoUrl || shopData?.imageUrl}
+                      alt={shopData?.name}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -240,7 +214,7 @@ function ShopProfileHeader({ shop }: { shop: {
                     </div>
                   )}
                 </div>
-                {(shop.data as any)?.data?.data?.is_published && (
+                {shopData?.is_published && (
                   <div className="absolute -top-2 -right-2">
                     <CheckCircle className="h-6 w-6 text-green-500 bg-white rounded-full" />
                   </div>
@@ -250,37 +224,37 @@ function ShopProfileHeader({ shop }: { shop: {
               {/* Shop Details */}
               <div className="flex-1">
                 <div className="flex items-center space-x-3 mb-2">
-                  <h1 className="text-3xl font-bold text-gray-900">{(shop.data as any)?.data?.data.name}</h1>
-                  {(shop.data as any)?.data?.data.is_published && (
+                  <h1 className="text-3xl font-bold text-gray-900">{shopData.name}</h1>
+                  {shopData.is_published && (
                     <Badge variant="success" className="text-xs">
                       Verified
                     </Badge>
                   )}
                 </div>
 
-                {(shop.data as any)?.data?.data.business_name && (shop.data as any)?.data?.data.business_name !== (shop.data as any)?.data?.data.name && (
-                  <p className="text-lg text-gray-600 mb-3">{(shop.data as any)?.data?.data.business_name}</p>
+                {shopData.business_name && shopData.business_name !== shopData.name && (
+                  <p className="text-lg text-gray-600 mb-3">{shopData.business_name}</p>
                 )}
 
                 <div className="flex items-center space-x-6 text-sm text-gray-600">
-                  {(shop.data as any)?.data?.data.rating && (
+                  {shopData.rating && (
                     <div className="flex items-center space-x-1">
                       <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                      <span className="font-medium">{(shop.data as any)?.data?.data.rating.toFixed(1)}</span>
-                      {(shop.data as any)?.data?.data.rating_count && (
-                        <span className="text-gray-500">({(shop.data as any)?.data?.data.rating_count} reviews)</span>
+                      <span className="font-medium">{shopData.rating.toFixed(1)}</span>
+                      {shopData.rating_count && (
+                        <span className="text-gray-500">({shopData.rating_count} reviews)</span>
                       )}
                     </div>
                   )}
                   
                   <div className="flex items-center space-x-1">
                     <Package className="h-4 w-4" />
-                    <span>{(shop.data as any)?.data?.data.productCount} products</span>
+                    <span>{shopData.productCount} products</span>
                   </div>
 
-                  {(shop.data as any)?.data?.data.primary_category && (
+                  {shopData.primary_category||shopData.category && (
                     <Badge variant="default" className="text-xs">
-                      {(shop.data as any)?.data?.data.primary_category}
+                      {shopData.primary_category||shopData.category}
                     </Badge>
                   )}
                 </div>
@@ -288,8 +262,8 @@ function ShopProfileHeader({ shop }: { shop: {
                 {/* Action Buttons */}
                 <div className="flex items-center space-x-3 mt-4">
                   <StorefrontActions 
-                    tenantId={(shop.data as any)?.data?.data.tenantId}
-                    businessName={(shop.data as any)?.data?.data.name}
+                    tenantId={shopData.tenantId}
+                    businessName={shopData.name}
                   />
                   
                   <Button variant="outline" size="sm">
@@ -306,13 +280,58 @@ function ShopProfileHeader({ shop }: { shop: {
             </div>
 
             {/* Shop Description */}
-            {(shop.data as any)?.data?.data.tenantName && (
+            {shopData.tenantName && (
               <Card>
                 <CardContent className="pt-6">
                   <p className="text-gray-700 leading-relaxed">
-                    Welcome to {(shop.data as any)?.data?.data.name}! We're proud to be part of the {(shop.data as any)?.data?.data.tenantName} family,
+                    Welcome to {shopData.name}! We're proud to be part of the {shopData.tenantName} family,
                     offering carefully curated products and exceptional service.
                   </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Contact Information */}
+            {(shopData.contact?.phone || shopData.contact?.website) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Contact Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {shopData.contact?.phone && (
+                      <div className="flex items-center space-x-2">
+                        <Phone className="h-4 w-4 text-gray-400" />
+                        <a href={`tel:${shopData.contact.phone}`} className="text-blue-600 hover:underline">
+                          {shopData.contact.phone}
+                        </a>
+                      </div>
+                    )}
+                    
+                    {shopData.contact?.email && (
+                      <div className="flex items-center space-x-2">
+                        <Globe className="h-4 w-4 text-gray-400" />
+                        <a href={`mailto:${shopData.contact.email}`} className="text-blue-600 hover:underline">
+                          {shopData.contact.email}
+                        </a>
+                      </div>
+                    )}
+                    
+                    {shopData.contact?.website && (
+                      <div className="flex items-center space-x-2">
+                        <Globe className="h-4 w-4 text-gray-400" />
+                        <a 
+                          href={shopData.contact.website} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline flex items-center"
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          {shopData.contact.website}
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -322,169 +341,115 @@ function ShopProfileHeader({ shop }: { shop: {
               <DirectoryPhotoGalleryDisplay listing={directoryListing} />
             )}
 
-            {/* Contact Information */}
-            {((shop.data as any)?.data?.data.contact?.phone || (shop.data as any)?.data?.data.contact?.website) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Contact Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {(shop.data as any)?.data?.data.contact?.phone && (
-                      <div className="flex items-center space-x-2">
-                        <Phone className="h-4 w-4 text-gray-400" />
-                        <a href={`tel:${(shop.data as any)?.data?.data.contact.phone}`} className="text-blue-600 hover:underline">
-                          {(shop.data as any)?.data?.data.contact.phone}
-                        </a>
-                      </div>
-                    )}
-                    
-                    {(shop.data as any)?.data?.data.contact?.email && (
-                      <div className="flex items-center space-x-2">
-                        <Globe className="h-4 w-4 text-gray-400" />
-                        <a href={`mailto:${(shop.data as any)?.data?.data.contact.email}`} className="text-blue-600 hover:underline">
-                          {(shop.data as any)?.data?.data.contact.email}
-                        </a>
-                      </div>
-                    )}
-                    
-                    {(shop.data as any)?.data?.data.contact?.website && (
-                      <div className="flex items-center space-x-2">
-                        <Globe className="h-4 w-4 text-gray-400" />
-                        <a 
-                          href={(shop.data as any)?.data?.data.contact.website} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline flex items-center"
-                        >
-                          Visit Website
-                          <ExternalLink className="h-3 w-3 ml-1" />
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Business Hours */}
-            {(shop.data as any)?.data?.data.hours && (
-              (() => {
-                console.log('[ShopProfile] Raw hours data:', (shop.data as any)?.data?.data.hours);
-                const hoursData = (shop.data as any)?.data?.data.hours as Record<string, string>;
-                const convertedHours = {
-                  periods: Object.entries(hoursData).map(([day, hours]) => {
-                    console.log(`[ShopProfile] Converting ${day}: ${hours}`);
-                    const [open, close] = hours.split(' - ');
-                    const convertTo24Hour = (time12: string): string => {
-                      if (time12 === 'Closed') return '00:00';
-                      const [time, period] = time12.split(' ');
-                      const [h, m] = time.split(':').map(Number);
-                      const hour24 = period === 'PM' && h !== 12 ? h + 12 : period === 'AM' && h === 12 ? 0 : h;
-                      return `${hour24.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                    };
-                    return {
-                      open: convertTo24Hour(open || 'Closed'),
-                      close: convertTo24Hour(close || 'Closed')
-                    };
-                  }),
-                  timezone: 'America/New_York'
-                };
-                console.log('[ShopProfile] Converted hours:', convertedHours);
-                return convertedHours;
-              })() && (
-                <BusinessHoursCollapsible businessHours={(() => {
-                  const hoursData = (shop.data as any)?.data?.data.hours as Record<string, string>;
-                  const periods = Object.entries(hoursData).map(([day, hours]) => {
-                    const [open, close] = hours.split(' - ');
-                    const convertTo24Hour = (time12: string): string => {
-                      if (time12 === 'Closed') return '00:00';
-                      const [time, period] = time12.split(' ');
-                      const [h, m] = time.split(':').map(Number);
-                      const hour24 = period === 'PM' && h !== 12 ? h + 12 : period === 'AM' && h === 12 ? 0 : h;
-                      return `${hour24.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                    };
-                    return {
-                      day: day.toUpperCase(), // Uppercase as expected by component
-                      open: convertTo24Hour(open || 'Closed'),
-                      close: convertTo24Hour(close || 'Closed')
-                    };
-                  });
-                  return {
-                    periods,
-                    timezone: 'America/New_York'
+            {shopData.hours && typeof shopData.hours === 'object' && 
+             !('timezone' in shopData.hours) && Object.keys(shopData.hours).some(key => 
+               ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].includes(key.toLowerCase())
+             ) && (
+              <BusinessHoursCollapsible businessHours={{
+                periods: Object.entries(shopData.hours as Record<string, string>).map(([day, hours]) => {
+                  // Skip if hours is not a string or doesn't contain expected format
+                  if (typeof hours !== 'string' || !hours.includes(' - ')) {
+                    return null;
+                  }
+                  
+                  const [open, close] = hours.split(' - ');
+                  const convertTo24Hour = (time12: string): string => {
+                    if (!time12 || time12 === 'Closed') return '00:00';
+                    
+                    // Handle different time formats
+                    const timeParts = time12.trim().split(' ');
+                    if (timeParts.length !== 2) return '00:00';
+                    
+                    const [time, period] = timeParts;
+                    const timeComponents = time.split(':');
+                    
+                    // Validate time components
+                    if (timeComponents.length !== 2) return '00:00';
+                    
+                    const [h, m] = timeComponents.map(Number);
+                    if (isNaN(h) || isNaN(m)) return '00:00';
+                    if (!period || (period !== 'AM' && period !== 'PM')) return '00:00';
+                    
+                    const hour24 = period === 'PM' && h !== 12 ? h + 12 : period === 'AM' && h === 12 ? 0 : h;
+                    return `${hour24.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
                   };
-                })()} />
-              )
+                  
+                  return {
+                    open_day: day.charAt(0).toUpperCase() + day.slice(1),
+                    close_day: day.charAt(0).toUpperCase() + day.slice(1),
+                    open_time: convertTo24Hour(open),
+                    close_time: convertTo24Hour(close)
+                  };
+                }).filter(Boolean) // Filter out null entries
+              }} />
             )}
           </div>
 
-          {/* Map & Contact */}
+          {/* Sidebar - 1/3 width */}
           <div className="space-y-6">
-            {(shop.data as any)?.data?.data.address && (
+            {shopData.address && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Location</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                      <StorefrontMap
-                        tenant={{
-                          id: (shop.data as any)?.data?.data.tenantId,
-                          businessName: (shop.data as any)?.data?.data.name,
-                          slug: (shop.data as any)?.data?.data.slug,
-                          metadata: {
-                            address: (shop.data as any)?.data?.data.address,
-                            city: (shop.data as any)?.data?.data.city,
-                            state: (shop.data as any)?.data?.data.state,
-                            zip_code: (shop.data as any)?.data?.data.zip_code,
-                            zipCode: (shop.data as any)?.data?.data.zip_code,
-                            logo_url: (shop.data as any)?.data?.data.imageUrl,
-                            latitude: (shop.data as any)?.data?.data.latitude,
-                            longitude: (shop.data as any)?.data?.data.longitude
-                          }
-                        }}
-                        primaryCategory={(shop.data as any)?.data?.data.primary_category}
-                        productCount={(shop.data as any)?.data?.data.productCount}
-                      />
+                  <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                    <StorefrontMap
+                      tenant={{
+                        id: shopData.tenantId,
+                        businessName: shopData.name,
+                        slug: shopData.slug,
+                        metadata: {
+                          address: shopData.address,
+                          city: shopData.city,
+                          state: shopData.state,
+                          zip_code: shopData.zip_code,
+                          zipCode: shopData.zip_code,
+                          logo_url: shopData.imageUrl,
+                          latitude: shopData.latitude,
+                          longitude: shopData.longitude
+                        }
+                      }}
+                      primaryCategory={shopData.primary_category||shopData.category}
+                      productCount={shopData.productCount}
+                    />
+                  </div>
+                  
+                  <div className="mt-4">
+                    <div className="flex items-start space-x-2">
+                      <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                      <span className="text-gray-700">
+                        {shopData.address}
+                        {shopData.city && `, ${shopData.city}`}
+                        {shopData.state && ` ${shopData.state}`}
+                        {shopData.zip_code && ` ${shopData.zip_code}`}
+                      </span>
                     </div>
                     
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-start space-x-2">
-                        <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                        <span className="text-gray-700">
-                          {(shop.data as any)?.data?.data.address}
-                          {(shop.data as any)?.data?.data.city && `, ${(shop.data as any)?.data?.data.city}`}
-                          {(shop.data as any)?.data?.data.state && ` ${(shop.data as any)?.data?.data.state}`}
-                          {(shop.data as any)?.data?.data.zip_code && ` ${(shop.data as any)?.data?.data.zip_code}`}
-                        </span>
+                    {shopData.contact?.phone && (
+                      <div className="flex items-center space-x-2 mt-2">
+                        <Phone className="h-4 w-4 text-gray-400" />
+                        <a href={`tel:${shopData.contact.phone}`} className="text-blue-600 hover:underline">
+                          {shopData.contact.phone}
+                        </a>
                       </div>
-                      
-                      {(shop.data as any)?.data?.data.phone && (
-                        <div className="flex items-center space-x-2">
-                          <Phone className="h-4 w-4 text-gray-400" />
-                          <a href={`tel:${(shop.data as any)?.data?.data.phone}`} className="text-blue-600 hover:underline">
-                            {(shop.data as any)?.data?.data.phone}
-                          </a>
-                        </div>
-                      )}
-                      
-                      {(shop.data as any)?.data?.data.website && (
-                        <div className="flex items-center space-x-2">
-                          <Globe className="h-4 w-4 text-gray-400" />
-                          <a 
-                            href={(shop.data as any)?.data?.data.website} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline flex items-center"
-                          >
-                            Visit Website
-                            <ExternalLink className="h-3 w-3 ml-1" />
-                          </a>
-                        </div>
-                      )}
-                    </div>
+                    )}
+                    
+                    {shopData.contact?.website && (
+                      <div className="flex items-center space-x-2 mt-2">
+                        <Globe className="h-4 w-4 text-gray-400" />
+                        <a 
+                          href={shopData.contact.website} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline flex items-center"
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          {shopData.contact.website}
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -498,15 +463,15 @@ function ShopProfileHeader({ shop }: { shop: {
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{(shop.data as any)?.data?.data.productCount}</div>
+                    <div className="text-2xl font-bold text-blue-600">{shopData.productCount}</div>
                     <div className="text-sm text-gray-600">Products</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
-                      {(shop.data as any)?.data?.data.rating ? (shop.data as any)?.data?.data.rating.toFixed(1) : 'N/A'}
+                      {shopData.rating ? shopData.rating.toFixed(1) : 'N/A'}
                     </div>
                     <div className="text-sm text-gray-600">
-                      Rating {(shop.data as any)?.data?.data.rating_count ? `(${(shop.data as any)?.data?.data.rating_count} reviews)` : ''}
+                      Rating {shopData.rating_count ? `(${shopData.rating_count} reviews)` : ''}
                     </div>
                   </div>
                 </div>
@@ -514,14 +479,14 @@ function ShopProfileHeader({ shop }: { shop: {
             </Card>
 
             {/* Shop Description */}
-            {(shop.data as any)?.data?.data.description && (
+            {shopData.description && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">About Us</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-700 leading-relaxed">
-                    {(shop.data as any)?.data?.data.description}
+                    {shopData.description}
                   </p>
                 </CardContent>
               </Card>
@@ -543,13 +508,35 @@ export default function ShopProfileClient({ shop }: {
     };
   };
 }) {
+  // Extract shop data once at the top
+  const shopData = (shop.data as any)?.data;
+  //console.log(shopData);
+  // Check if shop data exists and is valid
+  if (!shop || !shop.success || !shopData || !shopData.tenantId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Store className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Shop Not Found</h1>
+          <p className="text-gray-600 mb-6">
+            The shop you're looking for doesn't exist or hasn't been set up yet.
+          </p>
+          <Link href="/shops" className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Shops
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Track shop page view */}
       <ShopViewTracker 
-        tenantId={(shop.data as any)?.data?.data.tenantId} 
-        shopName={(shop.data as any)?.data?.data.name}
-        category={(shop.data as any)?.data?.data.primary_category || null}
+        tenantId={shopData.tenantId} 
+        shopName={shopData.name}
+        category={shopData.category || null}
         pageType="shop_detail"
       />
       {/* Navigation Header */}
@@ -566,28 +553,29 @@ export default function ShopProfileClient({ shop }: {
               <Separator orientation="vertical" className="h-6" />
               <div className="flex items-center space-x-2">
                 <Store className="h-5 w-5 text-gray-600" />
-                <span className="font-medium text-gray-900">{(shop.data as any)?.data?.data.name}</span>
+                <span className="font-medium text-gray-900">{shopData.slug}</span>
               </div>
             </div>
             
             <div className="flex items-center space-x-2">
-              <Link href={`/shops/directory${(shop.data as any)?.data?.data.primary_category ? `?category=${encodeURIComponent((shop.data as any)?.data?.data.primary_category)}` : ''}`}>
+              <Link href={`/shops/directory${shopData.primary_category||shopData.category ? `?category=${encodeURIComponent(shopData.primary_category||shopData.category)}` : ''}`}>
                 <Button variant="ghost" size="sm">
                   Similar Shops
                 </Button>
               </Link>
-              <Link href="/shops/trending">
-                <Button variant="ghost" size="sm">
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  Trending
-                </Button>
-              </Link>
+              
+              <Separator orientation="vertical" className="h-6" />
+              
+              <div className="flex items-center space-x-2">
+                <Store className="h-5 w-5 text-gray-600" />
+                <span className="font-medium text-gray-900">{shopData.location}</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <ShopProfileHeader shop={shop} />
+      <ShopProfileHeader shop={shop} shopData={shopData} />
 
       {/* Products Section */}
       <div className="bg-gray-50 py-8">
@@ -597,21 +585,21 @@ export default function ShopProfileClient({ shop }: {
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Products</h2>
               <p className="text-gray-600">
-                Browse our selection of {(shop.data as any)?.data?.data.productCount} products
+                Browse our selection of {shopData.productCount} products
               </p>
             </div>
 
             {/* Product Search */}
             <div className="bg-white rounded-lg border shadow-sm">
               <ProductSearch 
-                tenantId={(shop.data as any)?.data?.data.tenantId}
+                tenantId={shopData.tenantId}
               />
             </div>
           </div>
 
           {/* Featured Products - Centered with page margins */}
           <div className="mb-12">
-            <StorefrontFeaturedProducts tenantId={(shop.data as any)?.data?.data.tenantId} />
+            <StorefrontFeaturedProducts tenantId={shopData.tenantId} />
           </div>
 
           {/* Recently Viewed - Centered with page margins */}
@@ -621,31 +609,7 @@ export default function ShopProfileClient({ shop }: {
         </div>
       </div>
 
-      {/* Sidebar - Contact info only, positioned separately */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-3"></div>
-          <div className="space-y-6">
-            {/* Contact Info */}
-            {((shop.data as any)?.data?.data.contact?.phone || (shop.data as any)?.data?.data.contact?.website) && (
-              <ContactInformationCollapsible
-                tenant={{
-                  metadata: {
-                    phone: (shop.data as any)?.data?.data.contact?.phone,
-                    email: (shop.data as any)?.data?.data.contact?.email,
-                    address: (shop.data as any)?.data?.data.address
-                  }
-                }}
-              />
-            )}
-
-            {/* Business Hours */}
-            {(shop.data as any)?.data?.data.hours && (
-              <BusinessHoursCollapsible businessHours={(shop.data as any)?.data?.data.hours} />
-            )}
-          </div>
-        </div>
-      </div>
+     
     </div>
   );
 }

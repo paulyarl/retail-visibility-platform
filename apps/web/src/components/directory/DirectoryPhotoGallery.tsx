@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button, Input } from "@/components/ui";
-import { directoryListingService } from "@/services/DirectoryListingSingletonService";
+import { tenantDirectoryManagementService } from "@/services/TenantDirectoryManagementService";
 import { uploadImage, ImageUploadPresets } from "@/lib/image-upload";
 import { DirectoryListing } from "@/hooks/directory/useDirectoryListing";
 
@@ -40,7 +40,7 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
   const loadPhotos = async () => {
     try {
       setLoading(true);
-      const photoAssets = await directoryListingService.getDirectoryPhotos(listing.id);
+      const photoAssets = await tenantDirectoryManagementService.getDirectoryListingPhotos(listing.id);
 
       setPhotos(photoAssets);
     } catch (error) {
@@ -71,11 +71,11 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       const result = await uploadImage(file, ImageUploadPresets.directory);
       const dataUrl = result.dataUrl;
 
-      const res = await directoryListingService.uploadDirectoryPhoto(listing.id, {
-        tenantId,
-        dataUrl,
-        contentType: "image/jpeg",
-      });
+      const formData = new FormData();
+      formData.append('dataUrl', dataUrl);
+      formData.append('contentType', 'image/jpeg');
+      
+      const res = await tenantDirectoryManagementService.uploadListingPhoto(listing.id, formData);
 
       if (!res) {
         throw new Error("Upload failed");
@@ -117,11 +117,11 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       // Use MEDIUM compression for directory photos (fewer images, better quality)
       const result = await uploadImage(file, ImageUploadPresets.directory);
 
-      const res = await directoryListingService.uploadDirectoryPhoto(listing.id, {
-        tenantId,
-        dataUrl: result.dataUrl,
-        contentType: result.contentType,
-      });
+      const formData = new FormData();
+      formData.append('dataUrl', result.dataUrl);
+      formData.append('contentType', result.contentType);
+      
+      const res = await tenantDirectoryManagementService.uploadListingPhoto(listing.id, formData);
 
       if (!res) {
         throw new Error("Upload failed");
@@ -139,7 +139,7 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
 
   const handleSetPrimary = async (photoId: string) => {
     try {
-      const res = await directoryListingService.updateDirectoryPhoto(listing.id, photoId, {
+      const res = await tenantDirectoryManagementService.updateListingPhoto(listing.id, photoId, {
         position: 0,
       });
 
@@ -157,7 +157,7 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
     if (!confirm("Delete this photo?")) return;
 
     try {
-      const res = await directoryListingService.deleteDirectoryPhoto(listing.id, photoId);
+      const res = await tenantDirectoryManagementService.deleteListingPhoto(listing.id, photoId);
       if (!res) throw new Error("Failed to delete");
 
       await loadPhotos();
@@ -176,7 +176,7 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
 
   const handleEditSave = async (photoId: string) => {
     try {
-      const res = await directoryListingService.updateDirectoryPhoto(listing.id, photoId, {
+      const res = await tenantDirectoryManagementService.updateListingPhoto(listing.id, photoId, {
         alt: editAlt || null,
         caption: editCaption || null,
       });
@@ -196,7 +196,7 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
     if (!photo || photo.position === 0) return;
 
     try {
-      const res = await directoryListingService.updateDirectoryPhoto(listing.id, photoId, {
+      const res = await tenantDirectoryManagementService.updateListingPhoto(listing.id, photoId, {
         position: photo.position - 1,
       });
 
@@ -215,7 +215,7 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
     if (!photo || photo.position === photos.length - 1) return;
 
     try {
-      const res = await directoryListingService.updateDirectoryPhoto(listing.id, photoId, {
+      const res = await tenantDirectoryManagementService.updateListingPhoto(listing.id, photoId, {
         position: photo.position + 1,
       });
 

@@ -7,6 +7,7 @@
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
+import { clientTenantContextManager } from '@/lib/clientTenantContext';
 
 export interface Item {
   id: string;
@@ -105,7 +106,10 @@ class ItemsSingletonService extends TenantApiSingleton {
     if (params.categoryFilter) queryParams.append('categoryFilter', params.categoryFilter);
 
     const queryString = queryParams.toString();
-    const cacheKey = `items_complete_${queryString}`;
+    // Use tenant-aware cache key on client-side, basic on server-side
+    const cacheKey = typeof window !== 'undefined' 
+      ? clientTenantContextManager.getTenantAwareCacheKey(`items_complete_${queryString}`)
+      : `items_complete_${queryString}`;
 
     const endpoint = `/api/items/complete?${queryString}`;
     

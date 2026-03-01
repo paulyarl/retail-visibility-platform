@@ -54,7 +54,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
    * Get comprehensive security dashboard data
    */
   async getSecurityDashboardData(filters?: SecurityDashboardFilters): Promise<SecurityDashboardData> {
-    const cacheKey = `security-dashboard-${JSON.stringify(filters || {})}`;
+    const cacheKey = `security-dashboard-${filters?.timeRange || 24}-${filters?.threatStatus || 'all'}-${filters?.alertLevel || 'all'}`;
     
     // Check cache first
     const cached = await this.getFromCache<SecurityDashboardData>(cacheKey);

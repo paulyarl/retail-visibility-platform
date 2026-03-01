@@ -22,6 +22,8 @@ interface StorefrontMapProps {
       latitude?: number;
       longitude?: number;
       logo_url?: string;
+      location?: string;
+      phone?: string;
     };
   };
   primaryCategory?: string;
@@ -60,7 +62,8 @@ export default function StorefrontMap({ tenant, primaryCategory, productCount }:
             lat: tenant.metadata.latitude,
             lng: tenant.metadata.longitude
           }}
-          zoom={15}
+          zoom={30}
+
         />
       </div>
     </div>

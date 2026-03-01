@@ -36,7 +36,7 @@ export default function DirectoryPhotoGalleryDisplay({ listing }: DirectoryPhoto
     const loadPhotos = async () => {
       try {
         setLoading(true);
-        const photoAssets = await directoryListingService.getDirectoryPhotos(listing.id);
+        const photoAssets = await directoryListingService.getDirectoryListingPhotos(listing.id);
         setPhotos(photoAssets.sort((a, b) => a.position - b.position));
       } catch (e) {
         console.error("Failed to load directory photos:", e);

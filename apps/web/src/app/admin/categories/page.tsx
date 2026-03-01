@@ -8,6 +8,9 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { QuickStartCategoryModal } from '@/components/quick-start';
 import { CategoryEditModal, type CategoryFormData } from '@/components/categories';
 import { adminCategoriesService } from '@/services/AdminCategoriesService';
+import { adminUsersService } from '@/services/AdminUsersService';
+import { organizationService } from '@/services/OrganizationService';
+import { organizationsService } from '@/services/OrganizationsSingletonService';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
@@ -174,11 +177,8 @@ export default function AdminCategoriesPage() {
     // Load tenants
     setLoadingTenants(true);
     try {
-      const res = await fetch(apiUrl('/api/tenants'), { headers, credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setTenants(Array.isArray(data) ? data : (data.data || []));
-      }
+      const tenants = await adminUsersService.getAllTenants();
+      setTenants(Array.isArray(tenants) ? tenants : []);
     } catch (e) {
       console.error('Failed to load tenants:', e);
     } finally {
@@ -188,11 +188,8 @@ export default function AdminCategoriesPage() {
     // Load organizations
     setLoadingOrgs(true);
     try {
-      const res = await fetch(apiUrl('/organizations'), { headers, credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setOrganizations(Array.isArray(data) ? data : (data.data || []));
-      }
+      const orgs = await organizationService.getOrganizations({});
+      setOrganizations(Array.isArray(orgs) ? orgs : []);
     } catch (e) {
       console.error('Failed to load organizations:', e);
     } finally {
@@ -338,21 +335,15 @@ export default function AdminCategoriesPage() {
         setMirrorLoading(false);
         return;
       }
-      const csrf = getCookie('csrf');
-      const res = await fetch(apiUrl('/api/categories/mirror'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}), ...getAuthHeader() },
-        credentials: 'include',
-        body: JSON.stringify(body),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 202 && data && data.jobId) {
-        setLastJobId(String(data.jobId));
-        setLastResult(data);
+      
+      const result = await organizationsService.mirrorCategories(body);
+      if (result && result.jobId) {
+        setLastJobId(String(result.jobId));
+        setLastResult(result);
         // brief poll for completion
-        pollUntilCompleted(String(data.jobId)).catch(() => {});
+        pollUntilCompleted(String(result.jobId)).catch(() => {});
       } else {
-        setLastResult({ error: true, status: res.status, data });
+        setLastResult({ error: true, message: 'Failed to start mirroring' });
       }
     } catch (e: any) {
       setLastResult({ error: true, message: e?.message || 'request_failed' });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { directoryListingService } from '@/services/DirectoryListingSingletonService';
+import { tenantDirectoryManagementService } from '@/services/TenantDirectoryManagementService';
 
 export interface DirectoryListing {
   id: string;
@@ -48,7 +48,7 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
       setLoading(true);
       setError(null);
       
-      const response = await directoryListingService.getDirectoryListing(tenantId);
+      const response = await tenantDirectoryManagementService.getDirectoryListing(tenantId);
       
       if (!response) {
         throw new Error('Failed to fetch directory listing');
@@ -69,7 +69,7 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     try {
       setError(null);
       
-      await directoryListingService.publishDirectoryListing(tenantId);
+      await tenantDirectoryManagementService.publishDirectoryListing(tenantId);
       
       await fetchListing();
     } catch (err) {
@@ -84,7 +84,7 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     try {
       setError(null);
       
-      await directoryListingService.unpublishDirectoryListing(tenantId);
+      await tenantDirectoryManagementService.unpublishDirectoryListing(tenantId);
       
       await fetchListing();
     } catch (err) {
@@ -109,7 +109,7 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
       };
       console.log('[updateSettings] Sending data:', requestData);
       
-      const updatedListing = await directoryListingService.updateDirectoryListing(tenantId, updates);
+      const updatedListing = await tenantDirectoryManagementService.updateDirectoryListing(tenantId, updates);
 
       if (updatedListing) {
         setListing(updatedListing);

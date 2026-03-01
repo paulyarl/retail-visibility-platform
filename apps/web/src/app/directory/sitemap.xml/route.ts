@@ -1,21 +1,15 @@
 import { NextResponse } from 'next/server';
+import { publicDirectoryService } from '@/services/PublicDirectoryService';
 
 export async function GET() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
   const webUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
 
   try {
     // Fetch all published listings
-    const res = await fetch(`${apiUrl}/api/directory/search?limit=1000`, {
-      next: { revalidate: 3600 }, // Revalidate every hour
+    const listings = await publicDirectoryService.searchDirectory({
+      limit: 1000,
+      published: true
     });
-
-    if (!res.ok) {
-      throw new Error('Failed to fetch listings');
-    }
-
-    const data = await res.json();
-    const listings = data.listings || [];
 
     // Generate XML sitemap
     const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
@@ -34,11 +28,11 @@ export async function GET() {
   </url>
 
   <!-- Store Pages -->
-${listings
+${listings.items
   .map(
     (listing: any) => `  <url>
     <loc>${webUrl}/directory/${listing.slug}</loc>
-    <lastmod>${listing.updated_at || new Date().toISOString()}</lastmod>
+    <lastmod>${listing.updatedAt || new Date().toISOString()}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>`

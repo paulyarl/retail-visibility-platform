@@ -6,7 +6,8 @@
  * Consolidates functionality from both ShopsService and ShopsSingletonService
  */
 
-import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { clientTenantContextManager } from '@/lib/clientTenantContext';
 import { Shop, ShopIdentifiers, ShopResolution, ShopUrls } from '../types/shop';
 
 // ====================
@@ -194,7 +195,10 @@ class ShopsService extends PublicApiSingleton {
     if (params.region) queryParams.append('region', params.region);
 
     const endpoint = `/api/shops/directory?${queryParams.toString()}`;
-    const cacheKey = `shop_directory_${queryParams.toString()}`;
+    // Use tenant-aware cache key on client-side, basic on server-side
+    const cacheKey = typeof window !== 'undefined' 
+      ? clientTenantContextManager.getTenantAwareCacheKey(`shop_directory_${queryParams.toString()}`)
+      : `shop_directory_${queryParams.toString()}`;
     
     try {
       const response = await this.makeDefaultRequest<Shop[]>(
@@ -231,7 +235,10 @@ class ShopsService extends PublicApiSingleton {
     if (params.region) queryParams.append('region', params.region);
 
     const endpoint = `/api/shops/trending?${queryParams.toString()}`;
-    const cacheKey = `trending_shops_${queryParams.toString()}`;
+    // Use tenant-aware cache key on client-side, basic on server-side
+    const cacheKey = typeof window !== 'undefined' 
+      ? clientTenantContextManager.getTenantAwareCacheKey(`trending_shops_${queryParams.toString()}`)
+      : `trending_shops_${queryParams.toString()}`;
     
     try {
       const response = await this.makeDefaultRequest<Shop[]>(
@@ -368,7 +375,10 @@ class ShopsService extends PublicApiSingleton {
    * Get tenant auto ID for a given tenant ID
    */
   async getTenantAutoId(tenantId: string): Promise<string> {
-    const cacheKey = `tenant_auto_id_${tenantId}`;
+    // Use tenant-aware cache key on client-side, basic on server-side
+    const cacheKey = typeof window !== 'undefined' 
+      ? clientTenantContextManager.getTenantAwareCacheKey(`tenant_auto_id_${tenantId}`)
+      : `tenant_auto_id_${tenantId}`;
     
     try {
       const response = await this.makeDefaultRequest<{ data: { autoId: string } }>(
@@ -390,7 +400,10 @@ class ShopsService extends PublicApiSingleton {
    * Get all shop identifiers (tenantId, slug, autoId)
    */
   async getShopIdentifiers(tenantId: string, slug?: string): Promise<ShopIdentifiers> {
-    const cacheKey = `shop_identifiers_${tenantId}_${slug || 'no-slug'}`;
+    // Use tenant-aware cache key on client-side, basic on server-side
+    const cacheKey = typeof window !== 'undefined' 
+      ? clientTenantContextManager.getTenantAwareCacheKey(`shop_identifiers_${tenantId}_${slug || 'no-slug'}`)
+      : `shop_identifiers_${tenantId}_${slug || 'no-slug'}`;
     
     try {
       const autoId = await this.getTenantAutoId(tenantId);
@@ -411,25 +424,89 @@ class ShopsService extends PublicApiSingleton {
    * Resolve shop by any identifier (slug, tenantId, or autoId)
    */
   async resolveShop(identifier: string): Promise<ShopResolution> {
-    const cacheKey = `resolve_shop_${identifier}`;
+    // Use tenant-aware cache key to prevent cross-tenant contamination
+    // For server-side rendering, fall back to basic cache key without tenant context
+    let cacheKey: string;
+    
+    if (typeof window !== 'undefined') {
+      // Client-side - use tenant context
+      cacheKey = clientTenantContextManager.getTenantAwareCacheKey(`resolve_shop_${identifier}`);
+    } else {
+      // Server-side - use basic cache key but with timestamp to avoid contamination
+      const timestamp = Date.now();
+      cacheKey = `resolve_shop_${identifier}_${timestamp}`;
+    }
     
     try {
+      console.log('[ShopsService] Making request to resolve shop:', identifier);
       const response = await this.makeDefaultRequest<{ data: Shop; resolved: any }>(
         `/api/shops/${identifier}`,
         {},
         cacheKey,
         15 * 60 * 1000 // 15 minutes for resolution
       );
+      if (!response.success) {
+        console.error('[ShopsService] API request failed:', response.error);
+        throw new Error('Failed to resolve shop');
+      }
 
-      // Extract shop data from response, excluding the resolved field
-      const { resolved, ...shopData } = response.data as any;
+      /* console.log('[ShopsService] API Response received:', {
+        success: response.success,
+        hasData: !!response.data,
+        dataType: typeof response.data,
+        fullResponse: JSON.stringify(response, null, 2), // Show full JSON
+        fullResponseData: JSON.stringify(response.data || {}, null, 2) // Show full JSON
+      }); */
+
+      // Extract shop data from response
+      const shopData = response.data;
+      const resolved = shopData?.resolved;
+      
+     /*  console.log('[ShopsService] After extracting data:', {
+        shopDataKeys: shopData ? Object.keys(shopData) : 'null',
+        hasDataProperty: !!shopData?.data,
+        dataPropertyType: typeof shopData?.data,
+        fullShopData: shopData ? JSON.stringify(shopData, null, 2) : 'null'
+      }); */
+      
+      // The actual shop data is now directly in shopData.data
+      const actualShopData = shopData?.data;
+      
+      /* console.log('[ShopsService] Final shop data:', {
+        hasActualData: !!actualShopData,
+        hasTenantId: !!actualShopData?.tenantId,
+        tenantId: actualShopData?.tenantId,
+        shopName: actualShopData?.name
+      }); */
+      
+      // If no shop data is found, return a not-found resolution
+      if (!actualShopData || !actualShopData.tenantId) {
+       /*  console.log(`[ShopsService] No shop found for identifier: ${identifier}`, {
+          hasActualShopData: !!actualShopData,
+          hasTenantId: !!actualShopData?.tenantId,
+          actualShopDataKeys: actualShopData ? Object.keys(actualShopData) : 'null'
+        }); */
+        return {
+          identifier,
+          type: 'tenantId' as const,
+          found: false,
+          shop: undefined
+        };
+      }
       
       const resolution: ShopResolution = {
         identifier,
         type: (resolved?.type as 'tenantId' | 'slug' | 'autoId') || ('tenantId' as const),
         found: response.success || false,
-        shop: shopData
+        shop: actualShopData?.tenantId ? actualShopData : undefined
       };
+      
+      /* console.log('[ShopsService] Resolution created:', {
+        identifier: resolution.identifier,
+        found: resolution.found,
+        hasShop: !!resolution.shop,
+        shopTenantId: resolution.shop?.tenantId
+      }); */
       
       return resolution;
     } catch (error) {
@@ -601,10 +678,10 @@ class ShopsService extends PublicApiSingleton {
    */
   async getShopUrls(tenantId: string, slug?: string): Promise<ShopUrls> {
     const urls: ShopUrls = {
-      slugUrl: slug ? `/directory/${slug}` : null,
-      tenantIdUrl: `/directory/${tenantId}`,
-      autoIdUrl: `/directory/${tenantId}`, // Fallback to tenantId
-      canonicalUrl: slug ? `/directory/${slug}` : `/directory/${tenantId}`
+      slugUrl: slug ? `/shops/${slug}` : null,
+      tenantIdUrl: `/shops/tid-${tenantId}`,
+      autoIdUrl: `/shops/${tenantId}`, // Fallback to tenantId
+      canonicalUrl: slug ? `/shops/${slug}` : `/shops/tid-${tenantId}`
     };
     
     return urls;

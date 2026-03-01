@@ -261,7 +261,7 @@ export function useStoreTypes() {
       // Get all directory store types globally (no tenant required)
       const storeTypesData = await directoryService.getDirectoryStoreTypes();
       
-      console.log('[useStoreTypes] Directory store types data:', storeTypesData);
+     // console.log('[useStoreTypes] Directory store types data:', storeTypesData);
       
       if (storeTypesData && Array.isArray(storeTypesData)) {
         // Transform storeTypes to match the expected category format
@@ -277,7 +277,7 @@ export function useStoreTypes() {
         }));
         
         setData(transformedStoreTypes);
-        console.log('[useStoreTypes] Transformed store types:', transformedStoreTypes);
+       // console.log('[useStoreTypes] Transformed store types:', transformedStoreTypes);
       } else {
         console.warn('[useStoreTypes] No store types found');
         setData([]);

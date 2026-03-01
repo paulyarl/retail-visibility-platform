@@ -75,8 +75,8 @@ export abstract class SystemSingleton extends FlexibleApiSingleton {
    */
   protected getCustomMetrics(): Record<string, any> {
     return {
-      requestType: 'system',
-      requestTarget: 'web',
+      requestType: RequestType.SYSTEM,
+      requestTarget: RequestTarget.WEB,
       defaultTTL: this.cacheTTL,
       systemWebRequests: this.apiCalls
     };

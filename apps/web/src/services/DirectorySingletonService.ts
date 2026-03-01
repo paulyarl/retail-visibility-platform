@@ -14,7 +14,8 @@
  * - Error handling and logging
  */
 
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { clientTenantContextManager } from '../lib/clientTenantContext';
 
 export interface DirectoryStore {
   id: string;
@@ -129,24 +130,29 @@ export interface DirectoryConsolidated {
 
 class DirectorySingletonService extends PublicApiSingleton {
   private static instance: DirectorySingletonService;
-  
-  // Different TTLs for different data types
-  private readonly CACHE_TTL_SHORT = 5 * 60 * 1000; // 5 minutes for dynamic data
-  private readonly CACHE_TTL_MEDIUM = 10 * 60 * 1000; // 10 minutes for semi-static data
-  private readonly CACHE_TTL_LONG = 30 * 60 * 1000; // 30 minutes for static data
 
-  static getInstance(): DirectorySingletonService {
+  // Cache TTL constants
+  private readonly CACHE_TTL_SHORT = 2 * 60 * 1000; // 2 minutes
+  private readonly CACHE_TTL_MEDIUM = 15 * 60 * 1000; // 15 minutes
+  private readonly CACHE_TTL_LONG = 60 * 60 * 1000; // 1 hour
+
+  private constructor() {
+    super('directory-singleton');
+  }
+
+  public static getInstance(): DirectorySingletonService {
     if (!DirectorySingletonService.instance) {
-      DirectorySingletonService.instance = new DirectorySingletonService('directory-service');
+      DirectorySingletonService.instance = new DirectorySingletonService();
     }
     return DirectorySingletonService.instance;
   }
 
-  constructor(singletonKey: string, cacheOptions?: any) {
-    super(singletonKey, {
-      ttl: 10 * 60 * 1000, // 10 minutes cache
-      ...cacheOptions
-    });
+  /**
+   * Get tenant-aware cache key
+   * Uses centralized tenant context utility
+   */
+  private getTenantAwareCacheKey(baseKey: string, tenantId?: string): string {
+    return clientTenantContextManager.getTenantAwareCacheKey(baseKey, tenantId);
   }
 
   /**
@@ -224,12 +230,16 @@ class DirectorySingletonService extends PublicApiSingleton {
   /**
    * Get directory categories for MV (Most Valuable)
    * Optimized for category browsing
+   * Now tenant-aware to prevent cross-tenant contamination
    */
-  async getDirectoryMVCategories(): Promise<DirectoryCategory[] | null> {
+  async getDirectoryMVCategories(tenantId?: string): Promise<DirectoryCategory[] | null> {
+    // Automatically include tenant context in cache key
+    const cacheKey = this.getTenantAwareCacheKey('directory-mv-categories', tenantId);
+    
     const response = await super.makeDefaultRequest<any>(
       '/api/directory/mv/categories',
       {},
-      'directory-mv-categories',
+      cacheKey,
       this.CACHE_TTL_LONG
     );
 
@@ -243,12 +253,16 @@ class DirectorySingletonService extends PublicApiSingleton {
 
   /**
    * Get all directory categories with full hierarchy
+   * Now tenant-aware to prevent cross-tenant contamination
    */
-  async getDirectoryCategories(): Promise<DirectoryCategory[] | null> {
+  async getDirectoryCategories(tenantId?: string): Promise<DirectoryCategory[] | null> {
+    // Automatically include tenant context in cache key
+    const cacheKey = this.getTenantAwareCacheKey('directory-categories', tenantId);
+    
     const response = await super.makeDefaultRequest<any>(
       '/api/directory/mv/categories',
       {},
-      'directory-categories',
+      cacheKey,
       this.CACHE_TTL_LONG
     );
 
@@ -332,15 +346,19 @@ class DirectorySingletonService extends PublicApiSingleton {
   /**
    * Get public shops for directory browsing
    * Used for shops page and public shop listings
+   * Now tenant-aware to prevent cross-tenant contamination
    */
-  async getPublicShops(): Promise<any[]> {
+  async getPublicShops(tenantId?: string): Promise<any[]> {
+    // Automatically include tenant context in cache key
+    const cacheKey = this.getTenantAwareCacheKey('public-shops', tenantId);
+    
     const response = await super.makeDefaultRequest<{
       success: boolean;
       shops: any[];
     }>(
       '/api/public/shops',
       {},
-      'public-shops',
+      cacheKey,
       this.CACHE_TTL_MEDIUM
     );
 
@@ -402,12 +420,16 @@ class DirectorySingletonService extends PublicApiSingleton {
 
   /**
    * Get all available locations
+   * Now tenant-aware to prevent cross-tenant contamination
    */
-  async getLocations(): Promise<DirectoryLocation[] | null> {
+  async getLocations(tenantId?: string): Promise<DirectoryLocation[] | null> {
+    // Automatically include tenant context in cache key
+    const cacheKey = this.getTenantAwareCacheKey('directory-locations', tenantId);
+    
     const response = await super.makeDefaultRequest<any>(
       '/api/directory/locations',
       {},
-      'directory-locations',
+      cacheKey,
       this.CACHE_TTL_LONG
     );
 
@@ -421,13 +443,17 @@ class DirectorySingletonService extends PublicApiSingleton {
 
   /**
    * Get directory store types
+   * Now tenant-aware to prevent cross-tenant contamination
    */
-  async getDirectoryStoreTypes(): Promise<any[] | null> {
+  async getDirectoryStoreTypes(tenantId?: string): Promise<any[] | null> {
     try {
+      // Automatically include tenant context in cache key
+      const cacheKey = this.getTenantAwareCacheKey('directory-store-types', tenantId);
+      
       const response = await super.makeDefaultRequest<any>(
         '/api/directory/store-types',
         {},
-        'directory-store-types',
+        cacheKey,
         this.CACHE_TTL_LONG
       );
       if (!response.success) {
@@ -516,7 +542,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     const response = await super.makeDefaultRequest<DirectorySearchResult>(
       `/api/directory/mv/search?${searchParams.toString()}`,
       {},
-      `search-directory-stores-${JSON.stringify(params)}`,
+      this.getTenantAwareCacheKey(`search-directory-stores-${searchParams.toString()}`),
       this.CACHE_TTL_SHORT
     );
 
@@ -550,7 +576,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     const response = await super.makeDefaultRequest<any>(
       `/api/directory/featured-stores?${searchParams.toString()}`,
       {},
-      `featured-stores-${JSON.stringify(params)}`,
+      this.getTenantAwareCacheKey(`featured-stores-${searchParams.toString()}`),
       this.CACHE_TTL_MEDIUM
     );
 
@@ -588,12 +614,16 @@ class DirectorySingletonService extends PublicApiSingleton {
 
   /**
    * Get directory sitemap data
+   * Now tenant-aware to prevent cross-tenant contamination
    */
-  async getDirectorySitemap(limit: number = 1000): Promise<any> {
+  async getDirectorySitemap(limit: number = 1000, tenantId?: string): Promise<any> {
+    // Automatically include tenant context in cache key
+    const cacheKey = this.getTenantAwareCacheKey(`directory-sitemap-${limit}`, tenantId);
+    
     const response = await super.makeDefaultRequest<any>(
       `/api/directory/search?limit=${limit}`,
       {},
-      'directory-sitemap',
+      cacheKey,
       this.CACHE_TTL_LONG
     );
 

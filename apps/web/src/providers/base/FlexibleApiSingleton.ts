@@ -12,6 +12,7 @@
  */
 
 import { UniversalSingleton, SingletonCacheOptions, ApiResult, SingletonMetrics } from './UniversalSingleton';
+import { clientTenantContextManager } from '@/lib/clientTenantContext';
 
 export type { SingletonCacheOptions, ApiResult, SingletonMetrics } from './UniversalSingleton';
 
@@ -24,7 +25,8 @@ export enum RequestType {
   AUTHENTICATED = 'authenticated',
   TENANT = 'tenant',
   ADMIN = 'admin',
-  SYSTEM = 'system'
+  SYSTEM = 'system',
+  EXTERNAL = 'external'
 }
 
 export enum RequestTarget {
@@ -75,6 +77,15 @@ export interface SystemRequestOptions {
   systemKey?: string;
 }
 
+export interface ExternalRequestOptions {
+  timeout?: number;
+  retries?: number;
+  headers?: Record<string, string>;
+  cacheKey?: string;
+  ttl?: number;
+  requestTarget?: RequestTarget;
+}
+
 export interface RequestOptions {
   requestType?: RequestType;
   requestTarget?: RequestTarget;
@@ -86,6 +97,7 @@ export interface AuthenticatedApiResponse<T> extends ApiResult<T> {}
 export interface TenantApiResponse<T> extends ApiResult<T> {}
 export interface AdminApiResponse<T> extends ApiResult<T> {}
 export interface SystemApiResponse<T> extends ApiResult<T> {}
+export interface ExternalApiResponse<T> extends ApiResult<T> {}
 
 // ====================
 // FLEXIBLE API SINGLETON
@@ -353,6 +365,29 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     };
   }
 
+  /**
+   * Setup options for external requests
+   */
+  private async setupExternalRequestOptions<T>(
+    url: string, 
+    options: RequestInit, 
+    requestOptions?: ExternalRequestOptions
+  ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
+    const modifiedOptions = await this.onExternalRequest<T>(url, options, requestOptions);
+    return {
+      options: {
+        ...modifiedOptions,
+        headers: {
+          'User-Agent': 'RVP-Platform/1.0',
+          ...modifiedOptions.headers,
+        },
+      },
+      cacheKey: requestOptions?.cacheKey,
+      ttl: requestOptions?.ttl || this.cacheTTL,
+      target: requestOptions?.requestTarget || RequestTarget.EXTERNAL
+    };
+  }
+
   // ====================
   // REQUEST TYPE METHODS
   // ====================
@@ -475,6 +510,26 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
   }
 
   /**
+   * External request method
+   */
+  protected async makeExternalRequest<T>(
+    url: string,
+    options?: RequestInit,
+    requestOptions?: ExternalRequestOptions
+  ): Promise<ExternalApiResponse<T>> {
+    const requestKey = this.getRequestKey('makeExternalRequest', url, RequestType.EXTERNAL);
+    
+    // Delegate to setup method
+    const setupResult = await this.setupExternalRequestOptions<T>(url, options || {}, requestOptions);
+    
+    // Delegate to unified execution
+    const result = await this.executeUnifiedRequest<T>(url, setupResult);
+    
+    // Convert to ExternalApiResponse format
+    return result as ExternalApiResponse<T>;
+  }
+
+  /**
    * Default request method with delegation pattern
    */
   protected async makeDefaultRequest<T>(
@@ -516,6 +571,10 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
       case RequestType.SYSTEM:
         const systemOptions = { cacheKey, ttl, requestTarget } as SystemRequestOptions;
         setupResult = await this.setupSystemRequestOptions<T>(url, options || {}, systemOptions);
+        break;
+      case RequestType.EXTERNAL:
+        const externalOptions = { cacheKey, ttl, requestTarget } as ExternalRequestOptions;
+        setupResult = await this.setupExternalRequestOptions<T>(url, options || {}, externalOptions);
         break;
       default:
         throw new Error(`Unsupported request type: ${requestType}`);
@@ -604,6 +663,29 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     requestOptions?: SystemRequestOptions
   ): Promise<RequestInit> {
     return options;
+  }
+
+  /**
+   * Override hook for subclasses to customize external request behavior
+   */
+  protected async onExternalRequest<T>(
+    url: string,
+    options: RequestInit,
+    requestOptions?: ExternalRequestOptions
+  ): Promise<RequestInit> {
+    // Add external-specific headers and options
+    const externalOptions = {
+      ...options,
+      headers: {
+        'User-Agent': 'RVP-Platform/1.0',
+        ...options.headers,
+        ...requestOptions?.headers
+      },
+      // Add timeout if specified
+      ...(requestOptions?.timeout && { signal: AbortSignal.timeout(requestOptions.timeout) })
+    };
+
+    return externalOptions;
   }
 
   // ====================
@@ -735,19 +817,10 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
 
   /**
    * Get current tenant ID
+   * Uses centralized tenant context utility for consistency
    */
   protected async getCurrentTenantId(): Promise<string | null> {
-    try {
-      // Check multiple sources for tenant ID
-      const tenantId = localStorage.getItem('currentTenantId') || 
-                      sessionStorage.getItem('currentTenantId') ||
-                      document.cookie.split(';').find(c => c.trim().startsWith('tenantId='))?.split('=')[1];
-      
-      return tenantId || null;
-    } catch (error) {
-      console.error('[FlexibleApiSingleton] Error getting tenant ID:', error);
-      return null;
-    }
+    return clientTenantContextManager.getCurrentTenantId();
   }
 
   /**

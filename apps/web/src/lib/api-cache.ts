@@ -79,7 +79,7 @@ export async function cachedFetch(
   options?: RequestInit,
   ttl: number = 60000 // 60 seconds default (1 min)
 ): Promise<Response> {
-  const cacheKey = `${url}:${JSON.stringify(options || {})}`;
+  const cacheKey = `${url}:${options?.method || 'GET'}-${JSON.stringify(options?.headers || {})}-${typeof options?.body === 'string' ? options.body.length : 0}`;
 
   // Check cache first
   const cachedData = apiCache.get(cacheKey);

@@ -133,7 +133,7 @@ export class DirectoryService extends AdminApiSingleton {
     const response = await this.makeDefaultRequest<DirectoryListingsResponse>(
       endpoint,
       {},
-      `directory-listings-${JSON.stringify(filters)}`,
+      `directory-listings-${queryString}`,
       5 * 60 * 1000 // 5 minutes cache for listings
     );
 

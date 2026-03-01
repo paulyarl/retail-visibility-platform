@@ -172,20 +172,21 @@ router.get('/featured/random', async (req, res) => {
     const { limit = 10, category, region } = req.query;
     
     // Mock random featured shops
+    // TODO: Replace with actual database query for random featured shops
     const randomShops = [
       {
-        tenantId: 'tid-m8ijkrnk',
-        name: 'Baraka International Market',
-        slug: 'baraka-market',
-        autoId: 'ULCW',
-        location: 'Pittsburgh, PA',
-        productCount: 156,
-        rating: 4.8,
+        tenantId: 'example-tenant-id', // Replace with actual random tenants
+        name: 'Example Shop',
+        slug: 'example-shop',
+        autoId: 'EXAMPLE',
+        location: 'Example City, State',
+        productCount: 100,
+        rating: 4.5,
         urls: {
-          slugUrl: '/shops/baraka-market',
-          tenantIdUrl: '/shops/tid-m8ijkrnk',
-          autoIdUrl: '/shops/ULCW',
-          canonicalUrl: '/shops/baraka-market'
+          slugUrl: '/shops/example-shop',
+          tenantIdUrl: '/shops/example-tenant-id',
+          autoIdUrl: '/shops/EXAMPLE',
+          canonicalUrl: '/shops/example-shop'
         },
         isActive: true,
         isVerified: true

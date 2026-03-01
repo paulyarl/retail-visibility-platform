@@ -1,12 +1,14 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 interface TenantPaymentContextValue {
   canPurchase: boolean;
   defaultGatewayType?: string;
   loading: boolean;
   error?: string;
+  refreshPaymentStatus: () => Promise<void>;
 }
 
 const TenantPaymentContext = createContext<TenantPaymentContextValue | undefined>(undefined);
@@ -22,39 +24,50 @@ export function TenantPaymentProvider({ tenantId, children }: TenantPaymentProvi
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
 
-  useEffect(() => {
-    const checkPurchaseAbility = async () => {
-      try {
-        setLoading(true);
-        setError(undefined);
-        
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${apiUrl}/api/tenants/${tenantId}/payment-gateway`);
-        
-        if (response.ok) {
-          const data = await response.json();
-          setCanPurchase(data.hasActiveGateway || false);
-          setDefaultGatewayType(data.defaultGatewayType || undefined);
-        } else {
-          setCanPurchase(false);
-          setError('Failed to check payment gateway');
-        }
-      } catch (err) {
-        console.error('Failed to check payment gateway:', err);
-        setCanPurchase(false);
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const checkPurchaseAbility = async () => {
+    try {
+      setLoading(true);
+      setError(undefined);
+      
+      const paymentGateways = await tenantInfoService.getPaymentGateways(tenantId);
+      
+      // Check if any gateway is active
+      const hasActiveGateway = paymentGateways.some(gw => gw.isActive !== false);
+      
+      // Find default gateway type
+      const defaultGateway = paymentGateways.find(gw => gw.isDefault);
+      
+      setCanPurchase(hasActiveGateway);
+      setDefaultGatewayType(defaultGateway?.type);
+    } catch (err) {
+      console.error('Failed to check payment gateway:', err);
+      setCanPurchase(false);
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const refreshPaymentStatus = async () => {
+    await checkPurchaseAbility();
+  };
+
+  useEffect(() => {
     if (tenantId) {
       checkPurchaseAbility();
     }
   }, [tenantId]);
 
+  const value: TenantPaymentContextValue = {
+    canPurchase,
+    loading,
+    error,
+    defaultGatewayType,
+    refreshPaymentStatus
+  };
+
   return (
-    <TenantPaymentContext.Provider value={{ canPurchase, defaultGatewayType, loading, error }}>
+    <TenantPaymentContext.Provider value={value}>
       {children}
     </TenantPaymentContext.Provider>
   );

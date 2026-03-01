@@ -63,7 +63,7 @@ class RateLimitingMonitoringSingleton extends AdminApiSingleton {
    * Get comprehensive rate limiting dashboard data
    */
   async getRateLimitingDashboardData(filters?: RateLimitingFilters): Promise<RateLimitingDashboardData> {
-    const cacheKey = `rate-limiting-dashboard-${JSON.stringify(filters || {})}`;
+    const cacheKey = `rate-limiting-dashboard-${filters?.timeRange || 24}-${filters?.ruleType || 'all'}-${filters?.ipStatus || 'all'}`;
     
     // Check cache first
     const cached = await this.getFromCache<RateLimitingDashboardData>(cacheKey);

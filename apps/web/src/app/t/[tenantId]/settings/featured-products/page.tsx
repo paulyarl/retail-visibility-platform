@@ -67,7 +67,13 @@ export default function FeaturedProductsSettings({
         
         // Get tenantId from URL
         const urlParams = new URLSearchParams(window.location.search);
-        const id = urlParams.get('tenantId') || 'tid-m8ijkrnk';
+        const id = urlParams.get('tenantId');
+        
+        // Validate tenantId exists
+        if (!id) {
+          console.error('FeaturedProductsSettings: No tenantId provided in URL');
+          return;
+        }
         
         console.log('FeaturedProductsSettings: Fetching tenant', id);
         

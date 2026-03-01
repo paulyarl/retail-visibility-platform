@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { tenantUsageService } from '@/services/TenantUsageService';
 
 /**
  * GET /api/tenants/[id]/usage
@@ -10,27 +11,9 @@ export async function GET(
 ) {
   try {
     const { id: tenantId } = await params;
-    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
     
-    // Get auth token from request
-    const authHeader = request.headers.get('authorization') || request.headers.get('cookie');
-    
-    const response = await fetch(`${apiUrl}/api/tenants/${tenantId}/usage`, {
-      headers: {
-        'Authorization': authHeader || '',
-        'Cookie': request.headers.get('cookie') || '',
-      },
-    });
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: 'Failed to fetch usage information' },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
+    const usage = await tenantUsageService.getUsage(tenantId);
+    return NextResponse.json(usage);
   } catch (error) {
     console.error('[Usage API] Error:', error);
     return NextResponse.json(

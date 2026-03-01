@@ -7,6 +7,7 @@
 
 import { Router } from 'express';
 import ShopsFeaturedService from '../services/ShopsFeaturedService';
+import ShopService from '../services/ShopService';
 
 const router = Router();
 const shopsService = ShopsFeaturedService.getInstance();
@@ -133,44 +134,53 @@ router.get('/categories', async (req, res) => {
 router.get('/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
+    console.log('[SHOPS API] Getting shop by identifier:', identifier);
     
-    // Resolve shop by identifier
-    const resolution = await shopsService.resolveShop(identifier);
+    // Use the unified shop service with fallbacks from 3 tables
+    const shopService = ShopService.getInstance();
+    const unifiedShop = await shopService.getUnifiedShopByIdentifier(identifier);
     
-    if (!resolution) {
+    if (!unifiedShop) {
       return res.status(404).json({
         success: false,
         error: 'Shop not found',
-        message: `No shop found for identifier: ${identifier}`
+        message: `No published shop found for identifier: ${identifier}`
       });
     }
+    
+    console.log('[SHOPS API] Found unified shop data:', unifiedShop.tenantId);
 
-    // Get shop details (mock for now)
+    // Build shop response using unified data
     const shopDetails = {
-      tenantId: resolution.tenantId || 'tid-m8ijkrnk',
-      name: 'Baraka International Market',
-      slug: 'baraka-market',
-      autoId: resolution.autoId || 'ULCW',
-      description: 'International market featuring authentic African goods and groceries',
-      location: 'Pittsburgh, PA',
-      address: '123 Main Street, Pittsburgh, PA 15222',
-      category: 'grocery',
-      productCount: 156,
-      rating: 4.8,
-      reviewCount: 42,
-      imageUrl: null,
-      bannerUrl: null,
-      logo_url: 'https://via.placeholder.com/400x400/3B82F6/FFFFFF?text=Baraka+Logo', // Added logo URL
-      isVerified: true,
-      isActive: true,
-      createdAt: '2025-01-15T00:00:00Z',
-      updatedAt: '2025-01-20T00:00:00Z',
+      tenantId: unifiedShop.tenantId,
+      name: unifiedShop.name,
+      slug: unifiedShop.slug,
+      autoId: unifiedShop.subdomain?.toUpperCase() || 'AUTOID',
+      description: unifiedShop.description,
+      location: `${unifiedShop.city}, ${unifiedShop.state}`,
+      address: unifiedShop.address,
+      city: unifiedShop.city,
+      state: unifiedShop.state,
+      zip_code: unifiedShop.zipCode,
+      latitude: unifiedShop.latitude ? parseFloat(unifiedShop.latitude as string) : null,
+      longitude: unifiedShop.longitude ? parseFloat(unifiedShop.longitude as string) : null,
+      category: unifiedShop.primaryCategory,
+      productCount: unifiedShop.productCount,
+      rating: unifiedShop.ratingAvg,
+      reviewCount: unifiedShop.ratingCount,
+      imageUrl: unifiedShop.logoUrl,
+      bannerUrl: unifiedShop.bannerUrl,
+      logo_url: unifiedShop.logoUrl,
+      isVerified: unifiedShop.isFeatured,
+      isActive: unifiedShop.isPublished,
+      createdAt: unifiedShop.createdAt,
+      updatedAt: unifiedShop.updatedAt,
       contact: {
-        email: 'info@baraka-market.com',
-        phone: '+1-412-555-0123',
-        website: 'https://baraka-market.com'
+        email: unifiedShop.email,
+        phone: unifiedShop.phone,
+        website: unifiedShop.website
       },
-      hours: {
+      hours: unifiedShop.hours || {
         monday: '8:00 AM - 8:00 PM',
         tuesday: '8:00 AM - 8:00 PM',
         wednesday: '8:00 AM - 8:00 PM',
@@ -179,20 +189,16 @@ router.get('/:identifier', async (req, res) => {
         saturday: '9:00 AM - 6:00 PM',
         sunday: '10:00 AM - 4:00 PM'
       },
-      urls: {
-        slugUrl: resolution.slug ? `/shops/${resolution.slug}` : null,
-        tenantIdUrl: `/shops/${resolution.tenantId}`,
-        autoIdUrl: `/shops/${resolution.autoId}`,
-        canonicalUrl: resolution.slug ? `/shops/${resolution.slug}` : `/shops/${resolution.tenantId}`
-      }
+      urls: unifiedShop.urls
     };
 
+    // Return shop data directly - FlexibleApiSingleton will add the wrapper
     res.json({
       success: true,
       data: shopDetails,
       resolved: {
-        identifier,
-        type: resolution.tenantId ? 'tenantId' : resolution.slug ? 'slug' : 'autoId',
+        identifier: unifiedShop.tenantId,
+        type: 'tenantId',
         found: true
       }
     });

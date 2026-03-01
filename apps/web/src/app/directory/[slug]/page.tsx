@@ -18,6 +18,7 @@ import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoG
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
+import { externalApiService } from '@/services/ExternalApiService';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 
@@ -230,41 +231,51 @@ async function getUserLocation(): Promise<{
   
   // Fallback to IP-based location
   try {
-    // Add timeout to prevent hanging
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-    
-    const response = await fetch('https://ipapi.co/json/', {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'RVP-Platform/1.0'
+    // Get user context for unique cache key to prevent cross-contamination
+    const getUserIdFromContext = () => {
+      if (typeof window !== 'undefined') {
+        const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
+        if (userId) return userId;
+        
+        const cookies = document.cookie.split(';');
+        const userIdCookie = cookies.find(cookie => cookie.trim().startsWith('userId='));
+        if (userIdCookie) return userIdCookie.split('=')[1]?.trim();
       }
-    });
+      return null;
+    };
     
-    clearTimeout(timeoutId);
+    const getSessionIdFromContext = () => {
+      if (typeof window !== 'undefined') {
+        let sessionId = sessionStorage.getItem('sessionId');
+        if (!sessionId) {
+          sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+          sessionStorage.setItem('sessionId', sessionId);
+        }
+        return sessionId;
+      }
+      return null;
+    };
     
-    if (!response.ok) {
-      throw new Error(`IP location service responded with ${response.status}`);
-    }
+    const userId = getUserIdFromContext();
+    const sessionId = getSessionIdFromContext();
+    const userContext = userId || sessionId || 'anonymous';
+    const cacheKey = `ip-geolocation-${userContext}`;
     
-    const data = await response.json();
+    const ipLocation = await externalApiService.getIpGeolocation(cacheKey);
     
-    // Validate the response has the expected fields
-    if (!data.latitude || !data.longitude) {
-      throw new Error('Invalid location data received');
+    if (!ipLocation || !ipLocation.latitude || !ipLocation.longitude) {
+      console.warn('Invalid location data received from external API');
+      return null;
     }
     
     return {
-      latitude: data.latitude,
-      longitude: data.longitude,
-      city: data.city || 'Unknown',
-      state: data.region || 'Unknown'
+      latitude: ipLocation.latitude,
+      longitude: ipLocation.longitude,
+      city: ipLocation.city || 'Unknown',
+      state: ipLocation.region || 'Unknown'
     };
   } catch (error) {
-    // Only log in development to reduce noise in production
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('IP location failed, using default:', error instanceof Error ? error.message : 'Unknown error');
-    }
+    console.warn('Failed to get IP location:', error);
     return null;
   }
 }

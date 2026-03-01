@@ -211,7 +211,10 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
    * Get shop identifiers (tenantId, autoId, slug) for URL generation
    */
   async getShopIdentifiers(tenantId: string, slug?: string) {
-    return this.baseService.getTenantIdentifiers(tenantId, slug);
+    console.log('[ShopsFeaturedService] getShopIdentifiers called with:', { tenantId, slug });
+    const result = this.baseService.getTenantIdentifiers(tenantId, slug);
+    console.log('[ShopsFeaturedService] getShopIdentifiers result:', result);
+    return result;
   }
 
   /**
@@ -240,18 +243,33 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
    * Resolve shop by identifier (slug, autoId, or tenantId)
    */
   async resolveShop(identifier: string) {
-    // Try to resolve by slug first
+    console.log('[ShopsFeaturedService] resolveShop called with identifier:', identifier);
+    
+    // Check if identifier is a tenantId (starts with 'tid-')
+    if (identifier.startsWith('tid-')) {
+      console.log('[ShopsFeaturedService] Identifier appears to be a tenantId, trying tenantId resolution for:', identifier);
+      const byTenantId = await this.getShopIdentifiers(identifier);
+      console.log('[ShopsFeaturedService] TenantId resolution result:', byTenantId);
+      if (byTenantId && byTenantId.tenantId) return byTenantId;
+    }
+    
+    // Try to resolve by slug first (for non-tenantId identifiers)
+    console.log('[ShopsFeaturedService] Trying slug resolution for:', identifier);
     const bySlug = await this.getShopIdentifiers('', identifier);
-    if (bySlug) return bySlug;
+    console.log('[ShopsFeaturedService] Slug resolution result:', bySlug);
+    if (bySlug && bySlug.tenantId) return bySlug;
 
-    // Try to resolve by autoId
-    const byAutoId = await this.getShopIdentifiers('', undefined);
-    if (byAutoId && byAutoId.autoId === identifier) return byAutoId;
-
-    // Try to resolve by tenantId
+    // Try to resolve by tenantId as fallback
+    console.log('[ShopsFeaturedService] Trying tenantId resolution as fallback for:', identifier);
     const byTenantId = await this.getShopIdentifiers(identifier);
-    if (byTenantId) return byTenantId;
+    console.log('[ShopsFeaturedService] TenantId resolution result:', byTenantId);
+    if (byTenantId && byTenantId.tenantId) return byTenantId;
 
+    // For autoId, we need to search differently since we don't know the tenantId
+    // This would require a different approach - for now, skip autoId resolution
+    // to prevent cross-contamination
+    // TODO: Implement proper autoId resolution without contamination
+    console.log('[ShopsFeaturedService] No resolution found for identifier:', identifier);
     return null;
   }
 

@@ -133,7 +133,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
       return [];
     }
 
-    const cacheKey = `recommendations-${userId || 'anonymous'}-${JSON.stringify(options)}`;
+    const cacheKey = `recommendations-${userId || 'anonymous'}-${options.type || 'all'}-${options.limit || 10}-${options.sources?.join(',') || 'all'}-${options.minScore || 0}-${options.tenantId || 'no-tenant'}`;
     
     // makeDefaultRequest handles caching automatically
 
@@ -181,7 +181,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
       timeRange?: number;
     } = {}
   ): Promise<Recommendation[]> {
-    const cacheKey = `popular-recommendations-${JSON.stringify(options)}`;
+    const cacheKey = `popular-recommendations-${options.type || 'all'}-${options.limit || 10}-${options.tenantId || 'no-tenant'}-${options.timeRange || 24}`;
     
     // makeDefaultRequest handles caching automatically
 
@@ -223,7 +223,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
       tenantId?: string;
     } = {}
   ): Promise<Recommendation[]> {
-    const cacheKey = `similar-recommendations-${itemId}-${itemType}-${JSON.stringify(options)}`;
+    const cacheKey = `similar-recommendations-${itemId}-${itemType}-${options.limit || 5}-${options.tenantId || 'no-tenant'}`;
     
     // makeDefaultRequest handles caching automatically
 
@@ -306,7 +306,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
     userId?: string,
     limit: number = 10
   ): Promise<Recommendation[]> {
-    const cacheKey = `contextual-recommendations-${JSON.stringify(context)}-${userId || 'anonymous'}-${limit}`;
+    const cacheKey = `contextual-recommendations-${context.page || 'unknown'}-${context.itemType || 'no-type'}-${context.itemId || 'no-item'}-${context.userSegment || 'all'}-${userId || 'anonymous'}-${limit}`;
     
     // makeDefaultRequest handles caching automatically
 

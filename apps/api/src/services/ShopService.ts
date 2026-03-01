@@ -583,6 +583,154 @@ class ShopService extends UniversalSingleton {
   }
 
   /**
+   * Get unified shop data with fallbacks from multiple tables
+   * Priority: directory_listings_list -> tenant_business_profiles_list -> tenants
+   */
+  async getUnifiedShopByIdentifier(identifier: string): Promise<any | null> {
+    this.logInfo(`Getting unified shop data for identifier: ${identifier}`);
+    
+    try {
+      const query = `
+        SELECT 
+          -- Directory listings (primary source)
+          dl.tenant_id,
+          dl.business_name,
+          dl.slug,
+          dl.address,
+          dl.city,
+          dl.state,
+          dl.zip_code,
+          dl.phone,
+          dl.email,
+          dl.website,
+          dl.latitude,
+          dl.longitude,
+          dl.primary_category,
+          dl.secondary_categories,
+          dl.logo_url,
+          dl.description,
+          dl.business_hours,
+          dl.rating_avg,
+          dl.rating_count,
+          dl.product_count,
+          dl.is_featured,
+          dl.subscription_tier,
+          dl.is_published,
+          dl.created_at,
+          dl.updated_at,
+          
+          -- Business profile fallbacks
+          bp.address_line1 as fallback_address_line1,
+          bp.address_line2 as fallback_address_line2,
+          bp.postal_code as fallback_postal_code,
+          bp.country_code as fallback_country_code,
+          bp.phone_number as fallback_phone_number,
+          bp.email as fallback_email,
+          bp.website as fallback_website,
+          bp.contact_person as fallback_contact_person,
+          bp.logo_url as fallback_logo_url,
+          bp.banner_url as fallback_banner_url,
+          bp.business_description as fallback_business_description,
+          bp.hours as fallback_hours,
+          bp.social_links as fallback_social_links,
+          bp.latitude as fallback_latitude,
+          bp.longitude as fallback_longitude,
+          bp.display_map as fallback_display_map,
+          bp.gbp_category_id as fallback_gbp_category_id,
+          bp.gbp_category_name as fallback_gbp_category_name,
+          
+          -- Tenant fallbacks
+          t.name as fallback_name,
+          t.region as fallback_region,
+          t.language as fallback_language,
+          t.currency as fallback_currency,
+          t.subscription_status as fallback_subscription_status,
+          t.subscription_tier as fallback_subscription_tier,
+          t.slug as fallback_slug,
+          t.subdomain as fallback_subdomain,
+          t.directory_visible as fallback_directory_visible,
+          t.metadata as fallback_metadata
+          
+        FROM directory_listings_list dl
+        LEFT JOIN tenant_business_profiles_list bp ON dl.tenant_id = bp.tenant_id
+        LEFT JOIN tenants t ON dl.tenant_id = t.id
+        WHERE (dl.tenant_id = $1 OR dl.slug = $1) 
+          AND dl.is_published = true
+        LIMIT 1
+      `;
+
+      const result = await this.pool.query(query, [identifier]);
+      
+      if (result.rows.length === 0) {
+        this.logInfo(`No published shop found for identifier: ${identifier}`);
+        return null;
+      }
+
+      const rawShop = result.rows[0];
+      this.logInfo(`Found shop data for tenant: ${rawShop.tenant_id}`);
+
+      // Apply fallbacks in priority order
+      const unifiedShop = {
+        tenantId: rawShop.tenant_id,
+        name: rawShop.business_name || rawShop.fallback_name || 'Shop Name',
+        slug: rawShop.slug || rawShop.fallback_slug || 'shop-slug',
+        address: rawShop.address || rawShop.fallback_address_line1 || '123 Main Street',
+        city: rawShop.city || 'Pittsburgh',
+        state: rawShop.state || 'PA',
+        zipCode: rawShop.zip_code || rawShop.fallback_postal_code || '15222',
+        phone: rawShop.phone || rawShop.fallback_phone_number,
+        email: rawShop.email || rawShop.fallback_email,
+        website: rawShop.website || rawShop.fallback_website,
+        latitude: rawShop.latitude || rawShop.fallback_latitude,
+        longitude: rawShop.longitude || rawShop.fallback_longitude,
+        primaryCategory: rawShop.primary_category || rawShop.fallback_gbp_category_name || 'grocery',
+        secondaryCategories: rawShop.secondary_categories,
+        logoUrl: rawShop.logo_url || rawShop.fallback_logo_url,
+        bannerUrl: rawShop.fallback_banner_url,
+        description: rawShop.description || rawShop.fallback_business_description || 'Shop description',
+        hours: rawShop.business_hours || rawShop.fallback_hours,
+        ratingAvg: rawShop.rating_avg || 0,
+        ratingCount: rawShop.rating_count || 0,
+        productCount: rawShop.product_count || 0,
+        isFeatured: rawShop.is_featured || false,
+        subscriptionTier: rawShop.subscription_tier || rawShop.fallback_subscription_tier || 'starter',
+        isPublished: rawShop.is_published || false,
+        createdAt: rawShop.created_at,
+        updatedAt: rawShop.updated_at,
+        
+        // Additional fields from business profile
+        contactPerson: rawShop.fallback_contact_person,
+        socialLinks: rawShop.fallback_social_links,
+        countryCode: rawShop.fallback_country_code,
+        displayMap: rawShop.fallback_display_map,
+        
+        // Additional fields from tenant
+        region: rawShop.fallback_region,
+        language: rawShop.fallback_language,
+        currency: rawShop.fallback_currency,
+        subscriptionStatus: rawShop.fallback_subscription_status,
+        subdomain: rawShop.fallback_subdomain,
+        directoryVisible: rawShop.fallback_directory_visible,
+        metadata: rawShop.fallback_metadata,
+        
+        // URLs for navigation
+        urls: {
+          slugUrl: rawShop.slug ? `/shops/${rawShop.slug}` : null,
+          tenantIdUrl: `/shops/${rawShop.tenant_id}`,
+          canonicalUrl: rawShop.slug ? `/shops/${rawShop.slug}` : `/shops/${rawShop.tenant_id}`
+        }
+      };
+
+      this.logInfo(`Successfully created unified shop data for: ${unifiedShop.name}`);
+      return unifiedShop;
+
+    } catch (error) {
+      this.logError(`Error getting unified shop data for ${identifier}`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Helper logging methods
    */
   protected logInfo(message: string): void {

@@ -140,6 +140,53 @@ export class AdminUserService extends AdminApiSingleton {
 
     return result.data || null;
   }
+
+  /**
+   * Remove user from tenant
+   */
+  async removeUserFromTenant(userId: string, tenantId: string): Promise<void> {
+    if (!userId || !tenantId) {
+      throw new Error('User ID and Tenant ID are required');
+    }
+
+    const result = await this.makeDefaultRequest<void>(
+      `/api/admin/users/${userId}/tenants/${tenantId}`,
+      { method: 'DELETE' },
+      `remove-user-${userId}-from-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[AdminUserService] Failed to remove user from tenant:', result.error);
+      throw result.error;
+    }
+
+    console.log(`[AdminUserService] Removed user ${userId} from tenant ${tenantId}`);
+  }
+
+  /**
+   * Add user to tenant
+   */
+  async addUserToTenant(userId: string, tenantId: string, role?: string): Promise<void> {
+    if (!userId || !tenantId) {
+      throw new Error('User ID and Tenant ID are required');
+    }
+
+    const result = await this.makeDefaultRequest<void>(
+      `/api/admin/users/${userId}/tenants`,
+      { 
+        method: 'POST',
+        body: JSON.stringify({ tenantId, role })
+      },
+      `add-user-${userId}-to-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[AdminUserService] Failed to add user to tenant:', result.error);
+      throw result.error;
+    }
+
+    console.log(`[AdminUserService] Added user ${userId} to tenant ${tenantId}`);
+  }
 }
 
 // Export singleton instance
