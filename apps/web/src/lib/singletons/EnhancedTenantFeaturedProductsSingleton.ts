@@ -6,7 +6,9 @@
  */
 
 import { useMemo, useCallback } from 'react';
-import { apiRequest } from '@/lib/api';
+
+// Import TenantApiSingleton for proper API handling
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 // Import existing ProductSingleton for universal product data
 import { PublicProduct } from '@/providers/data/ProductSingleton';
@@ -77,7 +79,7 @@ export interface EnhancedFeaturedProductsState {
   forceUpdate: number;
 }
 
-class EnhancedTenantFeaturedProductsSingleton {
+class EnhancedTenantFeaturedProductsSingleton extends TenantApiSingleton {
   private tenantId: string;
   private state: EnhancedFeaturedProductsState;
   private listeners: Set<() => void> = new Set();
@@ -96,7 +98,9 @@ class EnhancedTenantFeaturedProductsSingleton {
   ];
 
   constructor(tenantId: string) {
+    super('enhanced-tenant-featured-products');
     this.tenantId = tenantId;
+    this.setCurrentTenant(tenantId);
     this.state = this.getInitialState();
   }
 
@@ -171,11 +175,14 @@ class EnhancedTenantFeaturedProductsSingleton {
   // Enhanced data fetching that works with ProductProvider
   async fetchFeaturedAssignments() {
     try {
-      const response = await apiRequest(`/api/featured-products/management?tenantId=${this.tenantId}&_t=${Date.now()}`);
-      const data = await response.json();
+      const result = await this.makeDefaultRequest(
+        `/api/featured-products/management?tenantId=${this.tenantId}&_t=${Date.now()}`,
+        undefined,
+        `featured-assignments-${this.tenantId}`
+      );
       
-      if (data && typeof data === 'object') {
-        this.setState({ featuredAssignments: data });
+      if (result.success && result.data && typeof result.data === 'object') {
+        this.setState({ featuredAssignments: result.data as Record<string, FeaturedAssignment[]> });
         this.syncWithProductProvider(); // Sync after fetching assignments
       }
     } catch (error) {
@@ -192,9 +199,8 @@ class EnhancedTenantFeaturedProductsSingleton {
       const defaultExpiration = new Date();
       defaultExpiration.setDate(defaultExpiration.getDate() + 30);
       
-      const response = await apiRequest(`/api/items/${productId}/featured-types`, {
+      const result = await this.makeDefaultRequest(`/api/items/${productId}/featured-types`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenantId: this.tenantId,
           featured_type: this.state.selectedType,
@@ -202,9 +208,9 @@ class EnhancedTenantFeaturedProductsSingleton {
           featured_expires_at: defaultExpiration.toISOString(),
           auto_unfeature: true
         })
-      });
+      }, `featured-products-${this.tenantId}`);
 
-      if (response.ok) {
+      if (result.success) {
         await this.fetchFeaturedAssignments();
         
         // Notify ProductProvider of the change
@@ -215,8 +221,8 @@ class EnhancedTenantFeaturedProductsSingleton {
         // Trigger storefront revalidation
         this.triggerStorefrontRevalidation();
       } else {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to feature product');
+        const error = result.error;
+        throw new Error(error?.message || 'Failed to feature product');
       }
     } catch (error) {
       console.error('Error featuring product:', error);
@@ -231,11 +237,11 @@ class EnhancedTenantFeaturedProductsSingleton {
     this.setState({ processing: true });
     
     try {
-      const response = await apiRequest(`/api/items/${productId}/featured-types/${this.state.selectedType}`, {
+      const result = await this.makeDefaultRequest(`/api/items/${productId}/featured-types/${this.state.selectedType}`, {
         method: 'DELETE'
-      });
+      }, `featured-products-${this.tenantId}`);
 
-      if (response.ok) {
+      if (result.success) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         await this.fetchFeaturedAssignments();
@@ -289,9 +295,13 @@ class EnhancedTenantFeaturedProductsSingleton {
         throw new Error('Variant ID is required');
       }
 
-      const response = await apiRequest(`/api/featured-products/item/${variantId}`);
+      const result = await this.makeDefaultRequest(`/api/featured-products/item/${variantId}`, undefined, `featured-types-${variantId}`);
 
-      return response;
+      if (result.success) {
+        return result.data;
+      } else {
+        return null;
+      }
     } catch (error) {
       console.error('[EnhancedTenantFeaturedProductsSingleton] Failed to get featured types:', error);
       return null;
@@ -308,9 +318,13 @@ class EnhancedTenantFeaturedProductsSingleton {
         throw new Error('Product ID is required');
       }
 
-      const response = await apiRequest(`/api/items/${productId}/photos`);
+      const result = await this.makeDefaultRequest(`/api/items/${productId}/photos`, undefined, `product-photos-${productId}`);
 
-      return response;
+      if (result.success) {
+        return result.data;
+      } else {
+        return null;
+      }
     } catch (error) {
       console.error('[EnhancedTenantFeaturedProductsSingleton] Failed to get product photos:', error);
       return null;

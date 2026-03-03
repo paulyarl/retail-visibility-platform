@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui';
-import GBPCategorySelectorAdapter from './GBPCategorySelectorAdapter';
-import { api } from '@/lib/api';
+import { Card, Text, Group, Stack, Button, Badge, Alert, Loader } from '@mantine/core';
 import { CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import GBPCategorySelectorAdapter from './GBPCategorySelectorAdapter';
+import { gbpCategoryService } from '@/services/GBPCategoryService';
 
 interface SelectedCategory {
   id: string;
@@ -63,17 +63,11 @@ export default function GBPCategoryCard({
 
     try {
       setLoadingMappings(true);
-      const categoryIds = categories.map(c => c.id).join(',');
+      const categoryIds = categories.map(c => c.id);
       console.log('[GBPCategoryCard] Fetching mappings for:', categoryIds);
-      const response = await api.get(`/api/gbp/mappings?categoryIds=${encodeURIComponent(categoryIds)}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[GBPCategoryCard] Mappings received:', data.mappings);
-        setMappings(data.mappings || []);
-      } else {
-        console.error('[GBPCategoryCard] Failed to fetch mappings:', response.status);
-      }
+      const mappingsData = await gbpCategoryService.getCategoryMappings(categoryIds);
+      console.log('[GBPCategoryCard] Mappings received:', mappingsData);
+      setMappings(mappingsData);
     } catch (err) {
       console.error('[GBPCategoryCard] Failed to fetch mappings:', err);
     } finally {
@@ -92,8 +86,7 @@ export default function GBPCategoryCard({
       setError(null);
       setSuccess(false);
 
-      const response = await api.put('/api/tenant/gbp-category', {
-        tenantId,
+      await gbpCategoryService.updateGBPCategories(tenantId, {
         primary: {
           id: primary.id,
           name: primary.name,
@@ -103,11 +96,6 @@ export default function GBPCategoryCard({
           name: s.name,
         })),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save GBP categories');
-      }
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -126,193 +114,168 @@ export default function GBPCategoryCard({
   const getSyncStatusDisplay = () => {
     if (!syncStatus) return null;
 
-    const statusConfig: Record<string, { icon: React.ReactNode; label: string; className: string }> = {
-      synced: { 
-        icon: <CheckCircle2 className="w-4 h-4" />, 
-        label: 'Synced', 
-        className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' 
-      },
-      pending: { 
-        icon: <Clock className="w-4 h-4" />, 
-        label: 'Pending', 
-        className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' 
-      },
-      error: { 
-        icon: <AlertCircle className="w-4 h-4" />, 
-        label: 'Error', 
-        className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' 
-      },
+    const statusConfig: Record<string, { color: string; label: string }> = {
+      synced: { color: 'green', label: 'Synced' },
+      pending: { color: 'yellow', label: 'Pending' },
+      error: { color: 'red', label: 'Error' },
     };
 
     const config = statusConfig[syncStatus] || statusConfig.pending;
 
     return (
-      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${config.className}`}>
-        {config.icon}
+      <Badge color={config.color} variant="light" size="sm">
         {config.label}
-      </div>
+      </Badge>
     );
   };
 
   const totalCategories = (primary ? 1 : 0) + secondary.length;
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+    <Card shadow="sm" padding="lg" withBorder>
+      <Stack gap="md">
+        <Group justify="space-between">
           <div>
-            <CardTitle>Google Business Profile Categories</CardTitle>
-            <CardDescription>
+            <Text size="lg" fw={600}>Google Business Profile Categories</Text>
+            <Text size="sm" c="dimmed">
               Select your primary category and up to 9 secondary categories
-            </CardDescription>
+            </Text>
           </div>
-          <div className="flex items-center gap-2">
+          <Group gap="sm">
             {getSyncStatusDisplay()}
             {totalCategories > 0 && (
-              <span className="text-xs text-neutral-500 dark:text-neutral-400">
+              <Text size="xs" c="dimmed">
                 {totalCategories} {totalCategories === 1 ? 'category' : 'categories'}
-              </span>
+              </Text>
             )}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <GBPCategorySelectorAdapter
-            tenantId={tenantId}
-            primary={primary}
-            secondary={secondary}
-            onPrimaryChange={setPrimary}
-            onSecondaryChange={setSecondary}
-            disabled={saving}
-          />
+          </Group>
+        </Group>
 
-          {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-800 dark:text-red-300">{error}</p>
-            </div>
-          )}
+        <GBPCategorySelectorAdapter
+          tenantId={tenantId}
+          primary={primary}
+          secondary={secondary}
+          onPrimaryChange={setPrimary}
+          onSecondaryChange={setSecondary}
+          disabled={saving}
+        />
 
-          {success && (
-            <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-green-800 dark:text-green-300">
-                  Categories saved successfully!
-                </p>
-                <p className="text-xs text-green-700 dark:text-green-400 mt-1">
-                  Your categories will sync to your directory listing automatically.
-                </p>
-              </div>
-            </div>
-          )}
+        {error && (
+          <Alert color="red" icon={<AlertCircle size={16} />}>
+            <Text size="sm">{error}</Text>
+          </Alert>
+        )}
 
-          {lastSynced && (
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
-              <Clock className="w-3 h-3" />
+        {success && (
+          <Alert color="green" icon={<CheckCircle2 size={16} />}>
+            <Stack gap={4}>
+              <Text size="sm" fw={500}>Categories saved successfully!</Text>
+              <Text size="xs" c="green.7">
+                Your categories will sync to your directory listing automatically.
+              </Text>
+            </Stack>
+          </Alert>
+        )}
+
+        {lastSynced && (
+          <Group gap={4}>
+            <Clock size={12} />
+            <Text size="xs" c="dimmed">
               Last synced: {new Date(lastSynced).toLocaleString()}
-            </p>
-          )}
+            </Text>
+          </Group>
+        )}
 
-          {/* Category Mappings Display */}
-          {mappings.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                Directory Category Mappings
-              </h4>
-              <div className="space-y-2">
-                {mappings.map((mapping) => (
-                  <div
-                    key={mapping.gbpCategoryId}
-                    className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700"
-                  >
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+        {/* Category Mappings Display */}
+        {mappings.length > 0 && (
+          <Stack gap="sm">
+            <Text size="sm" fw={500}>Directory Category Mappings</Text>
+            <Stack gap="xs">
+              {mappings.map((mapping) => (
+                <Card key={mapping.gbpCategoryId} padding="sm" withBorder bg="gray.0">
+                  <Group justify="space-between">
+                    <div style={{ flex: 1 }}>
+                      <Text size="sm" fw={500}>
                         {mapping.gbpCategoryName}
-                      </p>
+                      </Text>
                       {mapping.isMapped && mapping.platformCategory ? (
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-neutral-600 dark:text-neutral-400">
-                            Maps to:
-                          </span>
-                          <a
+                        <Group gap={4} mt={4}>
+                          <Text size="xs" c="dimmed">Maps to:</Text>
+                          <Button
+                            variant="subtle"
+                            size="compact-xs"
+                            component="a"
                             href={`/directory/categories/${mapping.platformCategory.slug}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium flex items-center gap-1"
                           >
                             {mapping.platformCategory.icon} {mapping.platformCategory.name}
-                            <span className="text-[10px]">↗</span>
-                          </a>
-                        </div>
+                          </Button>
+                        </Group>
                       ) : (
-                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        <Text size="xs" c="yellow" mt={4}>
                           ⚠️ No platform category mapping
-                        </p>
+                        </Text>
                       )}
                     </div>
-                    <div>
-                      {mapping.isMapped ? (
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          mapping.mappingConfidence === 'exact'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                    <Badge
+                      size="xs"
+                      color={
+                        mapping.isMapped
+                          ? mapping.mappingConfidence === 'exact'
+                            ? 'green'
                             : mapping.mappingConfidence === 'close'
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300'
-                        }`}>
-                          {mapping.mappingConfidence}
-                        </span>
-                      ) : (
-                        <span className="text-xs px-2 py-1 rounded-full bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300">
-                          unmapped
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {mappings.some(m => !m.isMapped) && (
-                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                  <p className="text-xs text-amber-800 dark:text-amber-300">
-                    <strong>Note:</strong> Some categories don't have platform mappings yet. Your store won't appear in those category pages until mappings are added.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {loadingMappings && (
-            <div className="flex items-center justify-center py-4">
-              <div className="animate-spin h-5 w-5 border-2 border-primary-500 border-t-transparent rounded-full"></div>
-              <span className="ml-2 text-sm text-neutral-600 dark:text-neutral-400">Loading mappings...</span>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleSave}
-              disabled={saving || !primary}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-            >
-              {saving ? 'Saving...' : 'Save & Sync to Directory'}
-            </button>
-
-            {(primary || secondary.length > 0) && (
-              <button
-                onClick={() => {
-                  setPrimary(null);
-                  setSecondary([]);
-                }}
-                disabled={saving}
-                className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-              >
-                Clear All
-              </button>
+                            ? 'blue'
+                            : 'yellow'
+                          : 'gray'
+                      }
+                    >
+                      {mapping.isMapped ? mapping.mappingConfidence : 'unmapped'}
+                    </Badge>
+                  </Group>
+                </Card>
+              ))}
+            </Stack>
+            {mappings.some(m => !m.isMapped) && (
+              <Alert color="yellow" variant="light">
+                <Text size="xs">
+                  <strong>Note:</strong> Some categories don't have platform mappings yet. Your store won't appear in those category pages until mappings are added.
+                </Text>
+              </Alert>
             )}
-          </div>
-        </div>
-      </CardContent>
+          </Stack>
+        )}
+
+        {loadingMappings && (
+          <Group justify="center" py="md">
+            <Loader size="sm" />
+            <Text size="sm" c="dimmed">Loading mappings...</Text>
+          </Group>
+        )}
+
+        <Group>
+          <Button
+            onClick={handleSave}
+            disabled={saving || !primary}
+            loading={saving}
+          >
+            Save & Sync to Directory
+          </Button>
+
+          {(primary || secondary.length > 0) && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPrimary(null);
+                setSecondary([]);
+              }}
+              disabled={saving}
+            >
+              Clear All
+            </Button>
+          )}
+        </Group>
+      </Stack>
     </Card>
   );
 }

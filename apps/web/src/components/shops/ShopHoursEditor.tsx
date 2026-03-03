@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import TimeInput from "../hours/TimeInput";
-import { apiRequest } from "@/lib/api";
+import { getTenantHoursSingleton } from "@/lib/singletons/TenantHoursSingleton";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 
 type Period = { day: string; open: string; close: string };
@@ -59,37 +59,33 @@ export default function ShopHoursEditor({ tenantId, shop, onUpdate, onCancel }: 
   useEffect(() => {
     const load = async () => {
       try {
+        const hoursSingleton = getTenantHoursSingleton(tenantId);
+
         // Load shop hours from business profile
-        const response = await apiRequest(`/api/shop-management/${tenantId}`);
-        if (response.ok) {
-          const shopData = await response.json();
-          
-          // Extract timezone from shop data or default
-          const shopTimezone = shopData.data?.timezone || "America/New_York";
-          setTimezone(shopTimezone);
-          
-          // Extract hours from business profile hours field
-          const hoursData = shopData.data?.hours || {};
-          const shopPeriods = Object.entries(hoursData)
-            .filter(([day, hours]) => {
-              const hourObj = hours as any;
-              return typeof hours === 'object' && hourObj && hourObj.open && hourObj.close;
-            })
-            .map(([day, hours]: [string, any]) => ({
-              day: day.toUpperCase(),
-              open: hours.open,
-              close: hours.close
-            }));
-          
-          setPeriods(shopPeriods);
-        }
-        
+        const shopData = await hoursSingleton.loadShopHours(tenantId);
+
+        // Extract timezone from shop data or default
+        const shopTimezone = shopData.timezone || "America/New_York";
+        setTimezone(shopTimezone);
+
+        // Extract hours from business profile hours field
+        const hoursData = shopData.hours || {};
+        const shopPeriods = Object.entries(hoursData)
+          .filter(([day, hours]) => {
+            const hourObj = hours as any;
+            return typeof hours === 'object' && hourObj && hourObj.open && hourObj.close;
+          })
+          .map(([day, hours]: [string, any]) => ({
+            day: day.toUpperCase(),
+            open: hours.open,
+            close: hours.close
+          }));
+
+        setPeriods(shopPeriods);
+
         // Load special hours from tenant business hours
-        const specialRes = await apiRequest(`/api/tenant/${tenantId}/business-hours/special`);
-        if (specialRes.ok) {
-          const specialData = await specialRes.json();
-          setSpecialHours(Array.isArray(specialData?.data?.overrides) ? specialData.data.overrides : []);
-        }
+        const specialData = await hoursSingleton.loadSpecialHours(tenantId);
+        setSpecialHours(Array.isArray(specialData?.data?.overrides) ? specialData.data.overrides : []);
       } catch (error) {
         console.error('Failed to load shop hours:', error);
         setMsg('Failed to load hours data');
@@ -135,23 +131,11 @@ export default function ShopHoursEditor({ tenantId, shop, onUpdate, onCancel }: 
         hoursObject[p.day.toLowerCase()] = { open: p.open, close: p.close };
       });
 
-      // Update shop hours via shop management service
-      const updateResponse = await apiRequest(`/api/shop-management/${tenantId}/hours`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          hours: hoursObject,
-          timezone
-        })
-      });
-
-      if (updateResponse.ok) {
-        const updatedShop = await updateResponse.json();
-        onUpdate(updatedShop.data);
-        setMsg('Shop hours saved successfully');
-      } else {
-        throw new Error('Failed to save shop hours');
-      }
+      // Update shop hours via singleton
+      const hoursSingleton = getTenantHoursSingleton(tenantId);
+      const updatedShop = await hoursSingleton.saveShopHours(tenantId, hoursObject, timezone);
+      onUpdate(updatedShop);
+      setMsg('Shop hours saved successfully');
     } catch (error) {
       console.error('Failed to save shop hours:', error);
       setMsg('Failed to save hours');

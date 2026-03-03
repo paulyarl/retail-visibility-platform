@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import CategorySelectorMulti, { CategoryOption } from '@/components/shared/CategorySelectorMulti';
 import { useDirectoryCategories } from '@/hooks/directory/useDirectoryCategories';
-import { api } from '@/lib/api';
+import { gbpCategoryService } from '@/services/GBPCategoryService';
 
 interface SelectedCategory {
   id: string;
@@ -45,16 +45,12 @@ export default function GBPCategorySelectorAdapter({
     async function loadGbpCategories() {
       try {
         setLoadingGbp(true);
-        const response = await api.get(`/api/gbp/categories/popular?tenantId=${encodeURIComponent(tenantId)}`);
-        if (response.ok) {
-          const data = await response.json();
-          const items = (data.items || []) as GBPCategory[];
-          setGbpCategories(items.map(cat => ({
-            id: cat.id,
-            name: cat.name,
-            path: cat.path,
-          })));
-        }
+        const items = await gbpCategoryService.getPopularGBPCategories(tenantId);
+        setGbpCategories(items.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          path: cat.path,
+        })));
       } catch (error) {
         console.error('[GBPCategorySelector] Failed to load GBP categories:', error);
       } finally {
@@ -128,27 +124,23 @@ export default function GBPCategorySelectorAdapter({
     
     // Then search API for additional results
     try {
-      const response = await api.get(`/api/gbp/categories?query=${encodeURIComponent(query)}&limit=20&tenantId=${encodeURIComponent(tenantId)}`);
-      if (response.ok) {
-        const data = await response.json();
-        const items = (data.items || []) as GBPCategory[];
-        const apiResults = items.map(cat => ({
-          id: cat.id,
-          name: cat.name,
-          path: cat.path,
-        }));
-        
-        // Merge results, avoiding duplicates
-        const resultMap = new Map<string, CategoryOption>();
-        localResults.forEach(cat => resultMap.set(cat.id, cat));
-        apiResults.forEach(cat => {
-          if (!resultMap.has(cat.id)) {
-            resultMap.set(cat.id, cat);
-          }
-        });
-        
-        return Array.from(resultMap.values()).slice(0, 20);
-      }
+      const items = await gbpCategoryService.searchGBPCategories(query, tenantId, 20);
+      const apiResults = items.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        path: cat.path,
+      }));
+      
+      // Merge results, avoiding duplicates
+      const resultMap = new Map<string, CategoryOption>();
+      localResults.forEach(cat => resultMap.set(cat.id, cat));
+      apiResults.forEach(cat => {
+        if (!resultMap.has(cat.id)) {
+          resultMap.set(cat.id, cat);
+        }
+      });
+      
+      return Array.from(resultMap.values()).slice(0, 20);
     } catch (error) {
       console.error('[GBPCategorySelector] Search error:', error);
     }

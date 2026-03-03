@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button, Badge, Tabs, Pagination, Select, Checkbox, TextInput, MultiSelect, Textarea } from '@mantine/core';
+import { Card, Button, Badge, Tabs, Pagination, Select, Checkbox, TextInput, MultiSelect, Textarea, Text, Group, Stack, Grid } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import type { DatesRangeValue } from '@mantine/dates';
 import {
@@ -96,14 +95,14 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
         setError(null);
       }
 
-      console.log('[ReviewManagementDashboard] Fetching reviews:', {
+      /* console.log('[ReviewManagementDashboard] Fetching reviews:', {
         tenantId,
         reviewType: activeReviewType,
         status: activeStatus,
         page: currentPage,
         pageSize,
         isRetry
-      });
+      }); */
 
       let result;
       const paginationOptions = {
@@ -566,323 +565,289 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
   return (
     <div className="space-y-6">
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+      <Grid>
+        <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
+          <Card shadow="sm" padding="md" withBorder>
+            <Group justify="space-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                <Text size="sm" c="dimmed" fw={500}>
                   Pending Reviews
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                </Text>
+                <Text size="xl" fw="bold">
                   {stats?.pendingReviews || 0}
-                </p>
+                </Text>
               </div>
-              <Clock className="w-8 h-8 text-orange-500" />
-            </div>
-          </CardContent>
-        </Card>
+              <Clock size={32} className="text-orange-500" />
+            </Group>
+          </Card>
+        </Grid.Col>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+        <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
+          <Card shadow="sm" padding="md" withBorder>
+            <Group justify="space-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                <Text size="sm" c="dimmed" fw={500}>
                   Approved Reviews
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                </Text>
+                <Text size="xl" fw="bold">
                   {stats?.approvedReviews || 0}
-                </p>
+                </Text>
               </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
+              <CheckCircle size={32} className="text-green-500" />
+            </Group>
+          </Card>
+        </Grid.Col>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+        <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
+          <Card shadow="sm" padding="md" withBorder>
+            <Group justify="space-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                <Text size="sm" c="dimmed" fw={500}>
                   Total Reviews
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                </Text>
+                <Text size="xl" fw="bold">
                   {stats?.totalReviews || 0}
-                </p>
+                </Text>
               </div>
-              <MessageCircle className="w-8 h-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
+              <MessageCircle size={32} className="text-blue-500" />
+            </Group>
+          </Card>
+        </Grid.Col>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+        <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
+          <Card shadow="sm" padding="md" withBorder>
+            <Group justify="space-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                <Text size="sm" c="dimmed" fw={500}>
                   Average Rating
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                </Text>
+                <Text size="xl" fw="bold">
                   {stats?.averageRating ? Number(stats.averageRating).toFixed(1) : '0.0'}
-                </p>
+                </Text>
               </div>
-              <Star className="w-8 h-8 text-yellow-500" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              <Star size={32} className="text-yellow-500" />
+            </Group>
+          </Card>
+        </Grid.Col>
+      </Grid>
 
       {/* Bulk Actions */}
       {selectedReviews.size > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {selectedReviews.size} review{selectedReviews.size !== 1 ? 's' : ''} selected
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={clearSelection}
-                  className="text-xs"
-                >
-                  Clear Selection
-                </Button>
-              </div>
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBulkApprove}
-                  disabled={processingIds.size > 0}
-                  className="text-green-600 border-green-600 hover:bg-green-50"
-                >
-                  <Check className="w-4 h-4 mr-1" />
-                  Approve All
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBulkReject}
-                  disabled={processingIds.size > 0}
-                  className="text-red-600 border-red-600 hover:bg-red-50"
-                >
-                  <X className="w-4 h-4 mr-1" />
-                  Reject All
-                </Button>
-              </div>
-            </div>
-          </CardContent>
+        <Card shadow="sm" padding="md" withBorder>
+          <Group justify="space-between">
+            <Group>
+              <Text size="sm" c="dimmed">
+                {selectedReviews.size} review{selectedReviews.size !== 1 ? 's' : ''} selected
+              </Text>
+              <Button
+                variant="outline"
+                size="compact-sm"
+                onClick={clearSelection}
+              >
+                Clear Selection
+              </Button>
+            </Group>
+            <Group>
+              <Button
+                variant="outline"
+                size="compact-sm"
+                onClick={handleBulkApprove}
+                disabled={processingIds.size > 0}
+                c="green"
+              >
+                <Check size={14} style={{ marginRight: '4px' }} />
+                Approve All
+              </Button>
+              <Button
+                variant="outline"
+                size="compact-sm"
+                onClick={handleBulkReject}
+                disabled={processingIds.size > 0}
+                c="red"
+              >
+                <X size={14} style={{ marginRight: '4px' }} />
+                Reject All
+              </Button>
+            </Group>
+          </Group>
         </Card>
       )}
 
       {/* Reviews List */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center">
-              <AlertTriangle className="w-5 h-5 mr-2 text-orange-500" />
-              {activeStatus === 'all' ? 'All ' :
-               activeStatus === 'pending' ? 'Pending ' :
-               'Approved '}
-              {activeReviewType === 'store' ? 'Store ' : 'Product '}Reviews
-              ({reviews.length}{totalReviews > pageSize ? ` of ${totalReviews}` : ''})
-              {totalReviews > pageSize && (
-                <span className="ml-2 text-sm text-gray-500">
-                  Page {currentPage} of {Math.ceil(totalReviews / pageSize)}
-                </span>
-              )}
-            </CardTitle>
+      <Card shadow="sm" padding="md" withBorder>
+        <Card.Section p="md" mb="md">
+          <Group justify="space-between">
+            <Group>
+              <AlertTriangle size={20} className="text-orange-500" />
+              <Text size="lg" fw={600}>
+                {activeStatus === 'all' ? 'All ' :
+                 activeStatus === 'pending' ? 'Pending ' :
+                 'Approved '}
+                {activeReviewType === 'store' ? 'Store ' : 'Product '}Reviews
+                ({reviews.length}{totalReviews > pageSize ? ` of ${totalReviews}` : ''})
+                {totalReviews > pageSize && (
+                  <Text size="sm" c="dimmed" span>
+                    Page {currentPage} of {Math.ceil(totalReviews / pageSize)}
+                  </Text>
+                )}
+              </Text>
+            </Group>
             {reviews.length > 0 && (
               <Button
                 variant="outline"
-                size="sm"
+                size="compact-sm"
                 onClick={selectAllReviews}
                 disabled={selectedReviews.size === reviews.length}
               >
                 {selectedReviews.size === reviews.length ? (
-                  <>
-                    <Check className="w-4 h-4 mr-1" />
+                  <Group gap={4}>
+                    <Check size={14} />
                     Deselect All
-                  </>
+                  </Group>
                 ) : (
-                  <>
-                    <CheckSquare className="w-4 h-4 mr-1" />
+                  <Group gap={4}>
+                    <CheckSquare size={14} />
                     Select All
-                  </>
+                  </Group>
                 )}
               </Button>
             )}
-          </div>
-        </CardHeader>
-        <CardContent>
+          </Group>
+        </Card.Section>
+
+        <Card.Section p="md">
           {/* Tabs for Review Types */}
-          <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveReviewType('store')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeReviewType === 'store'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Store Reviews
-              </button>
-              <button
-                onClick={() => setActiveReviewType('product')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeReviewType === 'product'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Product Reviews
-              </button>
-            </nav>
-          </div>
+          <Tabs value={activeReviewType} onChange={(value) => setActiveReviewType(value as ReviewType)} mb="md">
+            <Tabs.List>
+              <Tabs.Tab value="store">Store Reviews</Tabs.Tab>
+              <Tabs.Tab value="product">Product Reviews</Tabs.Tab>
+            </Tabs.List>
+          </Tabs>
 
           {/* Status Filter Tabs */}
-          <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveStatus('all')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeStatus === 'all'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                All Reviews ({stats?.totalReviews || 0})
-              </button>
-              <button
-                onClick={() => setActiveStatus('pending')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeStatus === 'pending'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Pending ({stats?.pendingReviews || 0})
-              </button>
-              <button
-                onClick={() => setActiveStatus('approved')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeStatus === 'approved'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Approved ({stats?.approvedReviews || 0})
-              </button>
-            </nav>
-          </div>
+          <Tabs value={activeStatus} onChange={(value) => setActiveStatus(value as ReviewStatus)} mb="md">
+            <Tabs.List>
+              <Tabs.Tab value="all">All Reviews ({stats?.totalReviews || 0})</Tabs.Tab>
+              <Tabs.Tab value="pending">Pending ({stats?.pendingReviews || 0})</Tabs.Tab>
+              <Tabs.Tab value="approved">Approved ({stats?.approvedReviews || 0})</Tabs.Tab>
+            </Tabs.List>
+          </Tabs>
 
           {/* Search and Filter Controls */}
-          <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Search */}
-              <TextInput
-                placeholder="Search by customer name or email..."
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.currentTarget.value)}
-                leftSection={<User className="w-4 h-4" />}
-                className="w-full"
-              />
+          <Card p="md" mb="md" withBorder bg="gray.0">
+            <Grid>
+              <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
+                <TextInput
+                  placeholder="Search by customer name or email..."
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.currentTarget.value)}
+                  leftSection={<User size={16} />}
+                />
+              </Grid.Col>
 
               {/* Rating Filter */}
-              <MultiSelect
-                placeholder="Filter by rating"
-                data={[
-                  { value: '5', label: '⭐⭐⭐⭐⭐ 5 Stars' },
-                  { value: '4', label: '⭐⭐⭐⭐ 4 Stars' },
-                  { value: '3', label: '⭐⭐⭐ 3 Stars' },
-                  { value: '2', label: '⭐⭐ 2 Stars' },
-                  { value: '1', label: '⭐ 1 Star' }
-                ]}
-                value={ratingFilter}
-                onChange={setRatingFilter}
-                clearable
-                className="w-full"
-              />
+              <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
+                <MultiSelect
+                  placeholder="Filter by rating"
+                  data={[
+                    { value: '5', label: '⭐⭐⭐⭐⭐ 5 Stars' },
+                    { value: '4', label: '⭐⭐⭐⭐ 4 Stars' },
+                    { value: '3', label: '⭐⭐⭐ 3 Stars' },
+                    { value: '2', label: '⭐⭐ 2 Stars' },
+                    { value: '1', label: '⭐ 1 Star' }
+                  ]}
+                  value={ratingFilter}
+                  onChange={setRatingFilter}
+                  clearable
+                />
+              </Grid.Col>
 
               {/* Date Range */}
-              <DatePickerInput
-                type="range"
-                placeholder="Filter by date range"
-                value={dateRange}
-                onChange={setDateRange}
-                className="w-full"
-              />
+              <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
+                <DatePickerInput
+                  type="range"
+                  placeholder="Filter by date range"
+                  value={dateRange}
+                  onChange={setDateRange}
+                />
+              </Grid.Col>
 
               {/* Sort Options */}
-              <Select
-                placeholder="Sort by"
-                data={[
-                  { value: 'newest', label: 'Newest First' },
-                  { value: 'oldest', label: 'Oldest First' },
-                  { value: 'rating_high', label: 'Highest Rating' },
-                  { value: 'rating_low', label: 'Lowest Rating' },
-                  { value: 'helpful', label: 'Most Helpful' }
-                ]}
-                value={sortBy}
-                onChange={(value) => setSortBy(value as any)}
-                className="w-full"
-              />
-            </div>
+              <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
+                <Select
+                  placeholder="Sort by"
+                  data={[
+                    { value: 'newest', label: 'Newest First' },
+                    { value: 'oldest', label: 'Oldest First' },
+                    { value: 'rating_high', label: 'Highest Rating' },
+                    { value: 'rating_low', label: 'Lowest Rating' },
+                    { value: 'helpful', label: 'Most Helpful' }
+                  ]}
+                  value={sortBy}
+                  onChange={(value) => setSortBy(value as any)}
+                />
+              </Grid.Col>
+            </Grid>
 
             {/* Active Filters Summary */}
             {(searchQuery || ratingFilter.length > 0 || dateRange[0] || dateRange[1]) && (
-              <div className="mt-3 flex items-center gap-2 flex-wrap">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Active filters:</span>
+              <Group mt="md" gap="sm" wrap="wrap">
+                <Text size="sm" c="dimmed">Active filters:</Text>
                 {searchQuery && (
                   <Badge variant="light" size="sm" color="blue">
                     Search: "{searchQuery}"
-                    <button
+                    <Button
+                      variant="subtle"
+                      size="compact-xs"
                       onClick={() => setSearchQuery('')}
-                      className="ml-1 hover:text-red-600"
+                      ml={4}
                     >
                       ×
-                    </button>
+                    </Button>
                   </Badge>
                 )}
                 {ratingFilter.map(rating => (
                   <Badge key={rating} variant="light" size="sm" color="yellow">
                     {rating} ⭐
-                    <button
+                    <Button
+                      variant="subtle"
+                      size="compact-xs"
                       onClick={() => setRatingFilter(prev => prev.filter(r => r !== rating))}
-                      className="ml-1 hover:text-red-600"
+                      ml={4}
                     >
                       ×
-                    </button>
+                    </Button>
                   </Badge>
                 ))}
                 {dateRange[0] && (
                   <Badge variant="light" size="sm" color="green">
                     From: {dateRange[0] ? new Date(dateRange[0]).toLocaleDateString() : ''}
-                    <button
+                    <Button
+                      variant="subtle"
+                      size="compact-xs"
                       onClick={() => setDateRange([null, dateRange[1]])}
-                      className="ml-1 hover:text-red-600"
+                      ml={4}
                     >
                       ×
-                    </button>
+                    </Button>
                   </Badge>
                 )}
                 {dateRange[1] && (
                   <Badge variant="light" size="sm" color="green">
                     To: {dateRange[1] ? new Date(dateRange[1]).toLocaleDateString() : ''}
-                    <button
+                    <Button
+                      variant="subtle"
+                      size="compact-xs"
                       onClick={() => setDateRange([dateRange[0], null])}
-                      className="ml-1 hover:text-red-600"
+                      ml={4}
                     >
                       ×
-                    </button>
+                    </Button>
                   </Badge>
                 )}
                 <Button
-                  size="xs"
                   variant="subtle"
+                  size="compact-xs"
                   onClick={() => {
                     setSearchQuery('');
                     setRatingFilter([]);
@@ -892,18 +857,18 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
                 >
                   Clear All
                 </Button>
-              </div>
+              </Group>
             )}
-          </div>
+          </Card>
 
           {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-2 text-gray-500">Loading reviews...</p>
+            <Stack align="center" py="xl">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <Text c="dimmed">Loading reviews...</Text>
               {retryCount > 0 && (
-                <p className="text-xs text-gray-400 mt-1">Retrying... ({retryCount}/{MAX_RETRIES})</p>
+                <Text size="xs" c="dimmed">Retrying... ({retryCount}/{MAX_RETRIES})</Text>
               )}
-            </div>
+            </Stack>
           ) : error ? (
             <div className="text-center py-8">
               <div className="text-red-500 mb-4">
@@ -1210,7 +1175,7 @@ export default function ReviewManagementDashboard({ tenantId }: ReviewManagement
             )}
             </div>
           )}
-        </CardContent>
+        </Card.Section>
       </Card>
     </div>
   );

@@ -65,15 +65,18 @@ export default function FeaturedProductsSettings({
         setLoading(true);
         setError(null);
         
-        // Get tenantId from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const id = urlParams.get('tenantId');
+        // Get tenantId from route params (Next.js 15+ async params)
+        const resolvedParams = await params;
+        const id = resolvedParams.tenantId;
         
         // Validate tenantId exists
         if (!id) {
-          console.error('FeaturedProductsSettings: No tenantId provided in URL');
+          console.error('FeaturedProductsSettings: No tenantId provided in route params');
           return;
         }
+        
+        // Set the tenantId in state for use throughout the component
+        setTenantId(id);
         
         console.log('FeaturedProductsSettings: Fetching tenant', id);
         
@@ -97,7 +100,7 @@ export default function FeaturedProductsSettings({
     }
 
     fetchTenant();
-  }, []);
+  }, [params]);
 
   if (loading) {
     return (

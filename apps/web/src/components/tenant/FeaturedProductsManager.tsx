@@ -13,7 +13,6 @@ import {
   Layers, Package, AlertCircle, Calendar, Tag, Award, DollarSign, TrendingUp, Check, 
   ShoppingBag, Download, FileText, Edit2, X, Power, Pause, Play, Edit, Zap, PowerOff
 } from 'lucide-react';
-import { apiRequest } from '@/lib/api';
 import Image from 'next/image';
 import { Tooltip } from "@/components/ui/Tooltip";
 import QuickStockEditor from '@/components/shared/QuickStockEditor';
@@ -205,6 +204,9 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
 
   // Get current type info
   const currentType = featuredTypes.find(t => t.id === selectedType);
+
+  // Check if current type is at limit
+  const isCurrentTypeAtLimit = (activeFeaturedByType[selectedType]?.length || 0) >= (currentType?.maxProducts || 0);
 
   console.log('FeaturedProductsManager: Hook state', { 
     isLoading, 
@@ -407,12 +409,12 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
   };
 
   const handleProductFeatureAllTypes = async (product: any) => {
-    if (!confirm(`Are you sure you want to feature "${product.name}" across all types? This will add it to every featured type.`)) {
+    if (!confirm(`Are you sure you want to feature "${product.name}" in the current type (${currentType?.name})?`)) {
       return;
     }
 
     // Debug: Log the product object to see what fields it has
-    console.log('=== FEATURE ALL TYPES DEBUG ===');
+    console.log('=== FEATURE PRODUCT DEBUG ===');
     console.log('Product object for featuring:', product);
     console.log('Product keys:', Object.keys(product));
     console.log('Product ID fields:', {
@@ -423,73 +425,27 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
     console.log('=== END DEBUG ===');
 
     await handleError(async () => {
-      // Feature the product in all types (respecting tier limits)
-      const featurePromises = featuredTypes.map(async (type) => {
-        // Check if this type has hit its tier limit
-        const typeProducts = featuredProductsByType[type.id] || [];
-        const currentCount = typeProducts.length;
-        const maxProducts = type.maxProducts;
-        
-        // Skip if tier limit is reached
-        if (currentCount >= maxProducts) {
-          console.log(`Skipping ${type.name} - tier limit reached (${currentCount}/${maxProducts})`);
-          return Promise.resolve();
-        }
-        
-        // For available products, use product.id
-        // For featured products, use inventory_item_id
-        const productId = product.id || product.inventory_item_id || product.inventoryItemId;
-        
-        console.log('Attempting to feature product with ID:', productId, 'from product:', product);
-        
-        if (!productId) {
-          console.error('Product ID fields are all undefined:', {
-            id: product.id,
-            inventory_item_id: product.inventory_item_id,
-            inventoryItemId: product.inventoryItemId,
-            productKeys: Object.keys(product)
-          });
-          throw new Error('Product ID is undefined - cannot feature product');
-        }
-        
-        console.log(`Featuring product with ID: ${productId} as type: ${type.name} (${currentCount}/${maxProducts})`);
-        
-        // Call the API directly for each type instead of using the singleton
-        const defaultExpiration = new Date();
-        defaultExpiration.setDate(defaultExpiration.getDate() + 30);
-        
-        const response = await apiRequest(`/api/items/${productId}/featured-types`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tenantId: tenantId,
-            featured_type: type.id,
-            featured_priority: 50,
-            featured_expires_at: defaultExpiration.toISOString(),
-            auto_unfeature: true
-          })
+      // For available products, use product.id
+      const productId = product.id || product.inventory_item_id || product.inventoryItemId;
+      
+      console.log('Attempting to feature product with ID:', productId, 'from product:', product);
+      
+      if (!productId) {
+        console.error('Product ID fields are all undefined:', {
+          id: product.id,
+          inventory_item_id: product.inventory_item_id,
+          inventoryItemId: product.inventoryItemId,
+          productKeys: Object.keys(product)
         });
-
-        if (!response.ok) {
-          throw new Error(`Failed to feature product in ${type.name}`);
-        }
-        
-        return response;
-      });
-
-      const results = await Promise.all(featurePromises);
-      
-      // Count successful operations
-      const successfulTypes = results.filter(r => r && r.ok).length;
-      const skippedTypes = featuredTypes.length - successfulTypes;
-      
-      if (skippedTypes > 0) {
-        console.log(`Featured product in ${successfulTypes} types, skipped ${skippedTypes} due to tier limits`);
+        throw new Error('Product ID is undefined - cannot feature product');
       }
       
-      // Refresh the data to show the newly featured products
+      // Feature the product in the current selected type using the singleton
+      await featureProduct(productId);
+      
+      // Refresh the data to show the newly featured product
       await forceRefresh();
-    }, 'Failed to feature product across all types');
+    }, 'Failed to feature product');
   };
 
   if (isLoading) {
@@ -595,6 +551,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                         src={product.image_url}
                         alt={product.name}
                         fill
+                        sizes="64px"
                         className={`object-cover rounded ${product.is_active === false ? 'opacity-50' : ''}`}
                       />
                     ) : (
@@ -757,6 +714,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                         src={product.image_url}
                         alt={product.name}
                         fill
+                        sizes="64px"
                         className="object-cover rounded opacity-50"
                       />
                     ) : (
@@ -873,6 +831,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                       src={product.image_url}
                       alt={product.name}
                       fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       className="object-cover rounded-lg opacity-50"
                     />
                   ) : (
@@ -967,6 +926,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                           src={product.image_url}
                           alt={product.name}
                           fill
+                          sizes="64px"
                           className="object-cover rounded"
                         />
                       ) : (
@@ -986,8 +946,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                   
                   {/* Action Buttons */}
                   <div className="flex gap-2 mt-3">
-                    {/* Feature All Types Button */}
-                    <Tooltip content="Feature across all types">
+                    <Tooltip content="Feature in current type">
                       <button
                         onClick={() => handleProductFeatureAllTypes(product)}
                         disabled={processing}
@@ -1012,10 +971,15 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                         
                         handleError(() => featureProduct(product.id!), 'Failed to feature product');
                       }}
-                      disabled={processing || !product.id}
-                      className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                      disabled={processing || !product.id || isCurrentTypeAtLimit}
+                      className={`flex-1 px-3 py-2 text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 ${
+                        isCurrentTypeAtLimit 
+                          ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                          : 'bg-blue-600 text-white'
+                      }`}
+                      title={isCurrentTypeAtLimit ? `Limit reached for ${currentType?.name} (${activeFeaturedByType[selectedType]?.length || 0}/${currentType?.maxProducts})` : `Add to ${currentType?.name}`}
                     >
-                      Add to {currentType?.name}
+                      {isCurrentTypeAtLimit ? 'Limit Reached' : `Add to ${currentType?.name}`}
                     </button>
                   </div>
                 </div>
@@ -1101,6 +1065,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                         src={product.image_url}
                         alt={product.name}
                         fill
+                        sizes="64px"
                         className="object-cover rounded opacity-50"
                       />
                     ) : (

@@ -344,8 +344,10 @@ export default function ProductFeaturingPage() {
   const storeSelectionActive = activeFeatured.filter(p => p.featured_type === 'store_selection');
   const storeSelectionExpired = expiredFeatured.filter(p => p.featured_type === 'store_selection');
 
-  // Get inactive products from singleton state
+  // Get inactive products  // Get singleton state for limits
   const singletonState = singleton.getState();
+  const storeSelectionLimit = singletonState.featuredLimits?.store_selection || 10; // fallback to 10
+  const isAtLimit = storeSelectionActive.length >= storeSelectionLimit;
   const allInactiveProducts = singletonState.inactiveProducts || [];
   const storeSelectionInactive = allInactiveProducts.filter(p => !p.is_active);
 
@@ -494,7 +496,7 @@ export default function ProductFeaturingPage() {
                 <div className="mt-2">
                   <FeaturedProductLimitBadge 
                     current={storeSelectionActive.length} 
-                    limit={10} 
+                    limit={storeSelectionLimit} 
                   />
                 </div>
               </div>
@@ -510,6 +512,7 @@ export default function ProductFeaturingPage() {
                           src={product.image_url}
                           alt={product.name}
                           fill
+                          sizes="64px"
                           className="object-cover rounded"
                         />
                       ) : (
@@ -640,6 +643,7 @@ export default function ProductFeaturingPage() {
                             src={product.image_url}
                             alt={product.name}
                             fill
+                            sizes="64px"
                             className="object-cover rounded opacity-50"
                           />
                         ) : (
@@ -727,6 +731,7 @@ export default function ProductFeaturingPage() {
                             src={product.image_url}
                             alt={product.name}
                             fill
+                            sizes="64px"
                             className="object-cover rounded"
                           />
                         ) : (
@@ -788,10 +793,15 @@ export default function ProductFeaturingPage() {
                       <div className="flex gap-2 mt-3">
                         <button
                           onClick={() => product.id && featureProduct(product.id)}
-                          disabled={processing || !product.id}
-                          className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                          disabled={processing || !product.id || isAtLimit}
+                          className={`flex-1 px-3 py-2 text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 ${
+                            isAtLimit 
+                              ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                              : 'bg-blue-600 text-white'
+                          }`}
+                          title={isAtLimit ? `Limit reached (${storeSelectionActive.length}/${storeSelectionLimit})` : 'Feature in Directory'}
                         >
-                          Feature in Directory
+                          {isAtLimit ? 'Limit Reached' : 'Feature in Directory'}
                         </button>
                         {/* Queue Control */}
                         <button
@@ -865,6 +875,7 @@ export default function ProductFeaturingPage() {
                             src={product.image_url}
                             alt={product.name}
                             fill
+                            sizes="64px"
                             className="object-cover rounded opacity-50"
                           />
                         ) : (

@@ -197,6 +197,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, tenantId, onProductC
           src={product.logo_url}
           alt={product.name}
           fill
+          sizes="256px"
           className="object-cover"
         />
       ) : (
@@ -249,6 +250,7 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop, onShopClick }) => {
             src={shop.logo_url}
             alt={shop.name}
             fill
+            sizes="512px"
             className="object-cover"
           />
         ) : (

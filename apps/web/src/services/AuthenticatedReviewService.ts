@@ -76,7 +76,7 @@ class AuthenticatedReviewService extends TenantApiSingleton {
     }
 
     try {
-      console.log('[AuthenticatedReviewService] Fetching reviews for tenant:', tenantId, 'with options:', options);
+      //console.log('[AuthenticatedReviewService] Fetching reviews for tenant:', tenantId, 'with options:', options);
 
       // Build query parameters
       const queryParams = new URLSearchParams();

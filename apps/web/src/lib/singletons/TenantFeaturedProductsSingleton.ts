@@ -5,7 +5,7 @@
  * Integrates with existing ProductSingleton for universal product data.
  */
 
-import { apiRequest } from '@/lib/api';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 // Import existing ProductSingleton for universal product integration
 import { PublicProduct } from '@/providers/data/ProductSingleton';
@@ -99,7 +99,7 @@ export interface FeaturedProductsState {
   getOutOfStockProducts: () => FeaturedProduct[]; // Add this
 }
 
-class TenantFeaturedProductsSingleton {
+class TenantFeaturedProductsSingleton extends TenantApiSingleton {
   private tenantId: string;
   private state: FeaturedProductsState;
   private listeners: Set<() => void> = new Set();
@@ -154,7 +154,9 @@ class TenantFeaturedProductsSingleton {
   ];
 
   constructor(tenantId: string) {
+    super('tenant-featured-products');
     this.tenantId = tenantId;
+    this.setCurrentTenant(tenantId);
     this.state = this.getInitialState();
   }
 
@@ -162,9 +164,9 @@ class TenantFeaturedProductsSingleton {
   async fetchTierLimits() {
     try {
       // Get tenant tier information
-      const response = await apiRequest(`/api/tenant-limits/featured-products?tenantId=${this.tenantId}`);
-      if (response.ok) {
-        const data = await response.json();
+      const result = await this.makeDefaultRequest(`/api/tenant-limits/featured-products?tenantId=${this.tenantId}`, undefined, `tier-limits-${this.tenantId}`);
+      if (result.success) {
+        const data = result.data as any;
         this.tenantTier = data.tier || 'starter';
         
         // Update featured types with tenant-specific limits
@@ -375,10 +377,11 @@ class TenantFeaturedProductsSingleton {
 
   // Data fetching methods
   async fetchFeaturedLimits() {
+    let result;
     try {
-      const response = await apiRequest(`/api/tenant-limits/featured-products?tenantId=${this.tenantId}`);
-      if (response.ok) {
-        const data = await response.json();
+      result = await this.makeDefaultRequest(`/api/tenant-limits/featured-products?tenantId=${this.tenantId}`, undefined, `featured-limits-${this.tenantId}`);
+      if (result.success) {
+        const data = result.data as any;
         console.log('Featured limits fetched:', { 
           tier: data.tier, 
           status: data.status,
@@ -399,7 +402,7 @@ class TenantFeaturedProductsSingleton {
         const newCurrentType = updatedTypes.find(t => t.id === this.state.selectedType) || updatedTypes[0];
         this.setState({ currentType: newCurrentType });
       } else {
-        console.error('TenantFeaturedProductsSingleton: Failed to fetch limits:', response.status, response.statusText);
+        console.error('TenantFeaturedProductsSingleton: Failed to fetch limits:', result.error);
       }
     } catch (error) {
       console.error('TenantFeaturedProductsSingleton: Error fetching featured limits:', error);
@@ -409,51 +412,29 @@ class TenantFeaturedProductsSingleton {
 
   async fetchFeaturedProducts() {
     try {
-      // console.log('TenantFeaturedProductsSingleton: Fetching featured products...');
-      const response = await apiRequest(`/api/featured-products/management?tenantId=${this.tenantId}&_t=${Date.now()}`);
-      const data = await response.json();
-      
-      // console.log('TenantFeaturedProductsSingleton: Raw API response:', data);
-      
-      if (data && typeof data === 'object') {
-        // Check if the data has actual products (not empty)
-        const hasProducts = Object.keys(data).some(key => Array.isArray(data[key]) && data[key].length > 0);
-        
-        if (hasProducts) {
-          // console.log('TenantFeaturedProductsSingleton: Featured products fetched successfully', Object.keys(data).length);
-          /* console.log('TenantFeaturedProductsSingleton: Featured products data structure:', {
-            keys: Object.keys(data),
-            storeSelectionCount: data.store_selection?.length || 0,
-            newArrivalCount: data.new_arrival?.length || 0,
-            seasonalCount: data.seasonal?.length || 0,
-            saleCount: data.sale?.length || 0,
-            staffPickCount: data.staff_pick?.length || 0
-          }); */
-          this.setState({ featuredProducts: data });
-          
-          // CRITICAL: Set isLoading to false after successful fetch
-          this.setState({ isLoading: false });
-          // console.log('TenantFeaturedProductsSingleton: Loading state set to false');
-        } else {
-          console.log('TenantFeaturedProductsSingleton: Empty featured products data received, not updating state');
-          // Don't update state with empty data
-        }
+      const result = await this.makeDefaultRequest(
+        `/api/featured-products/management?tenantId=${this.tenantId}&_t=${Date.now()}`,
+        undefined,
+        `featured-products-${this.tenantId}`
+      );
+      if (result.success) {
+        const data = result.data as any;
+        this.setState({ featuredProducts: data });
+        this.setState({ isLoading: false });
       } else {
-        console.log('TenantFeaturedProductsSingleton: No featured products data received');
-        // Don't update state with empty data
+        console.error('TenantFeaturedProductsSingleton: Failed to fetch featured products:', result.error);
       }
     } catch (error) {
       console.error('TenantFeaturedProductsSingleton: Error fetching featured products:', error);
-      // Don't update state on error
     }
   }
 
   async fetchInactiveProducts() {
     try {
       // console.log('TenantFeaturedProductsSingleton: Fetching inactive products...');
-      const response = await apiRequest(`/api/tenants/${this.tenantId}/products/featured/inactive`);
-      if (response.ok) {
-        const data = await response.json();
+      const result = await this.makeDefaultRequest(`/api/tenants/${this.tenantId}/products/featured/inactive`, undefined, `inactive-products-${this.tenantId}`);
+      if (result.success) {
+        const data = result.data as any;
         // console.log('TenantFeaturedProductsSingleton: Raw inactive products response:', data);
         let inactiveProducts = (data.products || []) as FeaturedProduct[];
         
@@ -522,9 +503,9 @@ class TenantFeaturedProductsSingleton {
     // Fallback to direct API call (like the original page)
     try {
       //console.log('TenantFeaturedProductsSingleton: Fetching available products...');
-      const response = await apiRequest(`/api/tenants/${this.tenantId}/items?limit=100`);
-      if (response.ok) {
-        const data = await response.json();
+      const result = await this.makeDefaultRequest(`/api/tenants/${this.tenantId}/items?limit=100`, undefined, `available-products-${this.tenantId}`);
+      if (result.success) {
+        const data = result.data as any;
         //console.log('TenantFeaturedProductsSingleton: Raw available products response:', data);
         
         // Process available products (same as original page)
@@ -569,9 +550,9 @@ class TenantFeaturedProductsSingleton {
     // Fetch out-of-stock products for management visibility
     try {
       //console.log('TenantFeaturedProductsSingleton: Fetching out-of-stock products...');
-      const response = await apiRequest(`/api/tenants/${this.tenantId}/items?limit=100`);
-      if (response.ok) {
-        const data = await response.json();
+      const result = await this.makeDefaultRequest(`/api/tenants/${this.tenantId}/items?limit=100`, undefined, `out-of-stock-products-${this.tenantId}`);
+      if (result.success) {
+        const data = result.data as any;
         
         // Process out-of-stock products
         const allProducts = data.items || [];
@@ -614,19 +595,23 @@ class TenantFeaturedProductsSingleton {
       const defaultExpiration = new Date();
       defaultExpiration.setDate(defaultExpiration.getDate() + 30);
       
-      const response = await apiRequest(`/api/items/${productId}/featured-types`, {
+      const result = await this.makeDefaultRequest(`/api/items/${productId}/featured-types`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenantId: this.tenantId,
           featured_type: this.state.selectedType,
           featured_priority: 50,
           featured_expires_at: defaultExpiration.toISOString(),
           auto_unfeature: true
-        })
-      });
+        }),
+      }, `featured-products-${this.tenantId}`);
 
-      if (response.ok) {
+      if (result.success) {
+
+        this.invalidateCache(`featured-products-${this.tenantId}`);
+        this.invalidateCache(`inactive-products-${this.tenantId}`);
+        this.invalidateCache(`available-products-${this.tenantId}`);
+        
         await Promise.all([
           this.fetchFeaturedProducts(),
           this.fetchAvailableProducts()
@@ -639,8 +624,8 @@ class TenantFeaturedProductsSingleton {
 
         // Note: Backend handles storefront revalidation automatically
       } else {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to feature product');
+        const error = result.error;
+        throw new Error(error?.message || 'Failed to feature product');
       }
     } catch (error) {
       console.error('Error featuring product:', error);
@@ -654,13 +639,17 @@ class TenantFeaturedProductsSingleton {
     this.setState({ processing: true });
     
     try {
-      const response = await apiRequest(`/api/items/${productId}/featured-types/${this.state.selectedType}`, {
-        method: 'DELETE'
-      });
+      const result = await this.makeDefaultRequest(`/api/items/${productId}/featured-types/${this.state.selectedType}`, {
+        method: 'DELETE',
+      }, `featured-products-${this.tenantId}`);
 
-      if (response.ok) {
+      if (result.success) {
         // Add delay to ensure database transaction commits
         await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        this.invalidateCache(`featured-products-${this.tenantId}`);
+        this.invalidateCache(`inactive-products-${this.tenantId}`);
+        this.invalidateCache(`available-products-${this.tenantId}`);
         
         await Promise.all([
           this.fetchFeaturedProducts(),
@@ -693,28 +682,30 @@ class TenantFeaturedProductsSingleton {
       const url = `/api/tenants/${this.tenantId}/products/${productId}/feature/active`;
       console.log('[toggleProductActive] API URL:', url);
       
-      const response = await apiRequest(url, {
+      const result = await this.makeDefaultRequest(url, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           is_active: isActive
         })
-      });
+      }, `featured-products-${this.tenantId}`);
 
-      console.log('[toggleProductActive] Response status:', response.status);
+      console.log('[toggleProductActive] Response success:', result.success);
       
-      if (response.ok) {
-        const data = await response.json();
+      if (result.success) {
+        const data = result.data as any;
         console.log('[toggleProductActive] Success:', data);
+        this.invalidateCache(`featured-products-${this.tenantId}`);
+        this.invalidateCache(`inactive-products-${this.tenantId}`);
+        this.invalidateCache(`available-products-${this.tenantId}`);
         
         await Promise.all([
           this.fetchFeaturedProducts(),
           this.fetchInactiveProducts()
         ]);
       } else {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        const errorData = result.error;
         console.error('[toggleProductActive] API error:', errorData);
-        throw new Error(errorData.error || 'Failed to update product status');
+        throw new Error(errorData?.message || 'Failed to update product status');
       }
     } catch (error) {
       console.error('[toggleProductActive] Error:', error);
@@ -734,17 +725,20 @@ class TenantFeaturedProductsSingleton {
         selectedType: this.state.selectedType
       }); */
       
-      const response = await apiRequest(`/api/items/${productId}/featured-types/${this.state.selectedType}`, {
+      const result = await this.makeDefaultRequest(`/api/items/${productId}/featured-types/${this.state.selectedType}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           featured_expires_at: expirationDate ? new Date(expirationDate).toISOString() : null
         })
-      });
+      }, `featured-products-${this.tenantId}`);
 
-      if (response.ok) {
-        const result = await response.json();
-        //console.log('TenantFeaturedProductsSingleton: Expiration update successful:', result);
+      if (result.success) {
+        const responseData = result.data;
+        //console.log('TenantFeaturedProductsSingleton: Expiration update successful:', responseData);
+        
+        this.invalidateCache(`featured-products-${this.tenantId}`);
+        this.invalidateCache(`inactive-products-${this.tenantId}`);
+        this.invalidateCache(`available-products-${this.tenantId}`);
         
         // Refresh featured products to get updated data
         await this.fetchFeaturedProducts();
