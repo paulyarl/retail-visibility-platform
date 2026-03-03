@@ -11,12 +11,15 @@ export interface Category {
   id: string;
   name: string;
   slug: string;
+  googleCategoryId?: string;
+  storeCount?: number;
+  productCount?: number;
   description?: string;
   parentId?: string;
   children?: Category[];
-  level: number;
-  sortOrder: number;
-  isActive: boolean;
+  level?: number;
+  sortOrder?: number;
+  isActive?: boolean;
   metadata?: Record<string, any>;
 }
 
@@ -44,11 +47,11 @@ class CategoriesSingletonService extends PublicApiSingleton {
 
   /**
    * Get all categories with optional children with caching
-   * Uses the /directory/categories endpoint
+   * Uses the /api/public/categories endpoint
    */
   async getCategories(includeChildren: boolean = true): Promise<Category[]> {
-    const result = await this.makeDefaultRequest<{ categories: Category[] }>(
-      `/api/directory/categories?includeChildren=${includeChildren}`,
+    const result = await this.makeDefaultRequest<any>(
+      `/api/public/categories`,
       {},
       `categories-${includeChildren}`
     );
@@ -58,7 +61,9 @@ class CategoriesSingletonService extends PublicApiSingleton {
       return [];
     }
 
-    return result.data?.categories || [];
+    // Categories are at result.data.categories
+    const categories = result.data?.categories || [];
+    return categories;
   }
 
   /**

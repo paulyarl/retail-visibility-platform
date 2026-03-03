@@ -170,6 +170,15 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
         } as ApiResult<T>;
       }
 
+      // Handle 204 No Content responses
+      if (response.status === 204) {
+        return {
+          success: true,
+          data: null as T,
+          status: 204
+        } as ApiResult<T>;
+      }
+
       const data = await response.json();
       
       return {
@@ -258,10 +267,16 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     ttl?: number
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
     const modifiedOptions = await this.onPublicRequest<T>(url, options, cacheKey, ttl);
+    
+    // Don't set Content-Type for FormData - let browser set it with boundary
+    const isFormData = modifiedOptions.body instanceof FormData;
+    
     return {
       options: {
         ...modifiedOptions,
-        headers: {
+        headers: isFormData ? {
+          ...modifiedOptions.headers,
+        } : {
           'Content-Type': 'application/json',
           ...modifiedOptions.headers,
         },
@@ -282,10 +297,16 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     ttl?: number
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
     const modifiedOptions = await this.onAuthenticatedRequest<T>(url, options, cacheKey, ttl);
+    
+    // Don't set Content-Type for FormData - let browser set it with boundary
+    const isFormData = modifiedOptions.body instanceof FormData;
+    
     return {
       options: {
         ...modifiedOptions,
-        headers: {
+        headers: isFormData ? {
+          ...modifiedOptions.headers,
+        } : {
           'Content-Type': 'application/json',
           ...modifiedOptions.headers,
         },
@@ -305,10 +326,16 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     requestOptions?: TenantRequestOptions
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
     const modifiedOptions = await this.onTenantRequest<T>(url, options, requestOptions);
+    
+    // Don't set Content-Type for FormData - let browser set it with boundary
+    const isFormData = modifiedOptions.body instanceof FormData;
+    
     return {
       options: {
         ...modifiedOptions,
-        headers: {
+        headers: isFormData ? {
+          ...modifiedOptions.headers,
+        } : {
           'Content-Type': 'application/json',
           ...modifiedOptions.headers,
         },
@@ -328,10 +355,16 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     requestOptions?: AdminRequestOptions
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
     const modifiedOptions = await this.onAdminRequest<T>(url, options, requestOptions);
+    
+    // Don't set Content-Type for FormData - let browser set it with boundary
+    const isFormData = modifiedOptions.body instanceof FormData;
+    
     return {
       options: {
         ...modifiedOptions,
-        headers: {
+        headers: isFormData ? {
+          ...modifiedOptions.headers,
+        } : {
           'Content-Type': 'application/json',
           ...modifiedOptions.headers,
         },
@@ -351,10 +384,16 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     requestOptions?: SystemRequestOptions
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
     const modifiedOptions = await this.onSystemRequest<T>(url, options, requestOptions);
+    
+    // Don't set Content-Type for FormData - let browser set it with boundary
+    const isFormData = modifiedOptions.body instanceof FormData;
+    
     return {
       options: {
         ...modifiedOptions,
-        headers: {
+        headers: isFormData ? {
+          ...modifiedOptions.headers,
+        } : {
           'Content-Type': 'application/json',
           ...modifiedOptions.headers,
         },
@@ -374,10 +413,17 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     requestOptions?: ExternalRequestOptions
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
     const modifiedOptions = await this.onExternalRequest<T>(url, options, requestOptions);
+    
+    // Don't set Content-Type for FormData - let browser set it with boundary
+    const isFormData = modifiedOptions.body instanceof FormData;
+    
     return {
       options: {
         ...modifiedOptions,
-        headers: {
+        headers: isFormData ? {
+          ...modifiedOptions.headers,
+        } : {
+          'Content-Type': 'application/json',
           'User-Agent': 'RVP-Platform/1.0',
           ...modifiedOptions.headers,
         },
@@ -788,6 +834,12 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
    */
   protected async getAuthToken(): Promise<string | null> {
     try {
+      // Check if we're in a browser environment
+      if (typeof window === 'undefined') {
+        console.warn('[FlexibleApiSingleton] Cannot access auth token in server-side environment');
+        return null;
+      }
+      
       // Check multiple sources for auth token
       const token = localStorage.getItem('access_token') || 
                    sessionStorage.getItem('access_token') ||

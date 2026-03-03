@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 
 export default function HoursPreview({ tenantId }: HoursPreviewProps) {
   const { status, loading } = useStoreStatus(tenantId, false); // Private scope
-  const [specialHours, setSpecialHours] = useState<any[]>([]);
+  const [specialHours, setSpecialHours] = useState<any[] | null>(null);
 
   // Fetch special hours using TenantManagementService
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function HoursPreview({ tenantId }: HoursPreviewProps) {
       try {
         const data = await tenantManagementService.getSpecialBusinessHours(tenantId);
         //console.log(`${HoursPreview.name}: Special hours for tenant ${tenantId}:`, data);
-        if (data) {
+        if (data && Array.isArray(data)) {
           // Create a mock hours object for getTodaySpecialHours
           const mockHours = {
             special: data.map((override: any) => ({
@@ -38,9 +38,26 @@ export default function HoursPreview({ tenantId }: HoursPreviewProps) {
           };
           const todaySpecial = getTodaySpecialHours(mockHours);
           setSpecialHours(todaySpecial);
+        } else if (data && data.overrides && Array.isArray(data.overrides)) {
+          // Handle case where data is an object with overrides array
+          const mockHours = {
+            special: data.overrides.map((override: any) => ({
+              date: override.date,
+              open: override.open,
+              close: override.close,
+              isClosed: override.isClosed,
+              note: override.note
+            }))
+          };
+          const todaySpecial = getTodaySpecialHours(mockHours);
+          setSpecialHours(todaySpecial);
+        } else {
+          // No special hours data or invalid format
+          setSpecialHours(null);
         }
       } catch (error) {
         console.error('Failed to fetch special hours:', error);
+        setSpecialHours(null);
       }
     };
 
@@ -164,7 +181,7 @@ export default function HoursPreview({ tenantId }: HoursPreviewProps) {
       </div>
 
       {/* Special Hours - Today & Upcoming */}
-      {specialHours.length > 0 && (() => {
+      {specialHours && specialHours.length > 0 && (() => {
         const todayHours = specialHours.filter(sh => sh.label === 'today');
         const upcomingHours = specialHours.filter(sh => sh.label === 'upcoming');
         

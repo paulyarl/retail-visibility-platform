@@ -33,7 +33,7 @@ export function useDirectoryCategories(): DirectoryCategoriesHook {
         const mappedCategories = categoriesData.map((cat: any) => ({
           name: cat.name || '',
           slug: cat.slug || cat.name?.toLowerCase().replace(/\s+/g, '-') || '',
-          count: cat.storeCount || cat.count || 0,
+          count: cat.storeCount || cat.productCount || 0,
         }));
 
         setCategories(mappedCategories);

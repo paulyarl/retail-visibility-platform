@@ -100,16 +100,15 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     try {
       setError(null);
       
-      // Convert empty strings to undefined for API
+      // Convert camelCase to snake_case for API
       const requestData = {
         seo_description: updates.seoDescription,
         seo_keywords: updates.seoKeywords,
         primary_category: updates.primaryCategory || undefined,
         secondary_categories: updates.secondaryCategories,
       };
-      console.log('[updateSettings] Sending data:', requestData);
       
-      const updatedListing = await tenantDirectoryManagementService.updateDirectoryListing(tenantId, updates);
+      const updatedListing = await tenantDirectoryManagementService.updateDirectoryListing(tenantId, requestData);
 
       if (updatedListing) {
         setListing(updatedListing);

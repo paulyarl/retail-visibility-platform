@@ -40,7 +40,7 @@ export function mountCoreRoutes(app: Express) {
   // Mount v3.5 routes
   app.use(auditRoutes);
   app.use(policyRoutes);
-  app.use(billingRoutes);
+  app.use('/api', billingRoutes);
   app.use('/subscriptions', subscriptionRoutes);
   app.use('/api/categories', authenticateToken, categoryRoutes);
   app.use('/performance', performanceRoutes);

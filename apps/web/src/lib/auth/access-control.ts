@@ -646,11 +646,11 @@ export const AccessPresets = {
     allowPlatformAdminOverride: true,
   } as AccessControlOptions,
 
-  /** Chain propagation access (org admin for scoped tenant's org), or platform support */
+  /** Chain propagation access (org admin for scoped tenant's org), or platform support/admin */
   CHAIN_PROPAGATION: {
     requireOrganization: true,
     customCheck: (user, context) => {
-      // Platform support can help with propagation
+      // Platform admin/support can access any propagation
       if (user.role === 'PLATFORM_ADMIN' || 
           user.role === 'PLATFORM_SUPPORT' ||
           user.role === 'ADMIN') {
@@ -670,7 +670,7 @@ export const AccessPresets = {
       }
       return false;
     },
-    allowPlatformAdminOverride: false,
+    allowPlatformAdminOverride: true,
   } as AccessControlOptions,
 
   /** Any authenticated user */

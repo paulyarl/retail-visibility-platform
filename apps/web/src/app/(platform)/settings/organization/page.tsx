@@ -107,6 +107,22 @@ export default function OrganizationPage() {
 
   const combinedLoading = accessLoading || orgLoading;
 
+  // Update orgData when organizationData is available
+  useEffect(() => {
+    console.log('[OrganizationPage] organizationData:', organizationData);
+    console.log('[OrganizationPage] orgError:', orgError);
+    console.log('[OrganizationPage] organizationId:', organizationId);
+    
+    if (organizationData) {
+      console.log('[OrganizationPage] Setting orgData from organizationData');
+      setOrgData(organizationData);
+      setError(null);
+    } else if (orgError) {
+      console.log('[OrganizationPage] Setting error from orgError:', orgError);
+      setError(orgError.message || 'Failed to load organization data');
+    }
+  }, [organizationData, orgError, organizationId]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ok': return 'success';

@@ -35,6 +35,7 @@ export default function PropagationModal({
   const [propagating, setPropagating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PropagationResult | null>(null);
+  const [tenantsLoaded, setTenantsLoaded] = useState(false);
 
   // Load tenants when modal opens
   const loadTenants = async () => {
@@ -52,6 +53,7 @@ export default function PropagationModal({
       setError(error instanceof Error ? error.message : 'Failed to load locations');
     } finally {
       setLoading(false);
+      setTenantsLoaded(true);
     }
   };
 
@@ -89,11 +91,13 @@ export default function PropagationModal({
     setSelectedTenantIds([]);
     setResult(null);
     setError(null);
+    setTenantsLoaded(false);
+    setTenants([]);
     onClose();
   };
 
   // Load tenants when modal opens
-  if (isOpen && tenants.length === 0 && !loading) {
+  if (isOpen && !tenantsLoaded && !loading) {
     loadTenants();
   }
 

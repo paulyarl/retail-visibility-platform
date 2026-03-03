@@ -37,6 +37,10 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
   const [editCaption, setEditCaption] = useState("");
   const [pastedUrl, setPastedUrl] = useState("");
 
+  // Check if directory is published
+  const isPublished = listing.isPublished;
+  const isDisabled = !isPublished || photos.length >= 10 || uploading;
+
   const loadPhotos = async () => {
     try {
       setLoading(true);
@@ -71,16 +75,18 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
       const result = await uploadImage(file, ImageUploadPresets.directory);
       const dataUrl = result.dataUrl;
 
-      const formData = new FormData();
-      formData.append('dataUrl', dataUrl);
-      formData.append('contentType', 'image/jpeg');
-      
-      const res = await tenantDirectoryManagementService.uploadListingPhoto(listing.id, formData);
+      const res = await tenantDirectoryManagementService.uploadListingPhoto(listing.id, {
+        dataUrl: dataUrl,
+        contentType: 'image/jpeg'
+      });
 
       if (!res) {
         throw new Error("Upload failed");
       }
 
+      // Add a small delay to ensure API has processed the upload
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       await loadPhotos();
       onUpdate?.();
     } catch (err: any) {
@@ -116,16 +122,18 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
 
       // Use MEDIUM compression for directory photos (fewer images, better quality)
       const result = await uploadImage(file, ImageUploadPresets.directory);
-
-      const formData = new FormData();
-      formData.append('dataUrl', result.dataUrl);
-      formData.append('contentType', result.contentType);
       
-      const res = await tenantDirectoryManagementService.uploadListingPhoto(listing.id, formData);
+      const res = await tenantDirectoryManagementService.uploadListingPhoto(listing.id, {
+        dataUrl: result.dataUrl,
+        contentType: result.contentType
+      });
 
       if (!res) {
         throw new Error("Upload failed");
       }
+
+      // Add a small delay to ensure API has processed the upload
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       await loadPhotos();
       onUpdate?.();
@@ -246,30 +254,33 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
         <div className="text-sm font-medium text-neutral-700">
           Photos ({photos.length}/10)
         </div>
-        <label
-          className={`cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-            photos.length >= 10 || uploading
-              ? "bg-neutral-200 text-neutral-400 cursor-not-allowed"
-              : "bg-primary-600 text-white hover:bg-primary-700"
-          }`}
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 4v16m8-8H4"
+        <div className="relative">
+          <label
+            className={`cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+              isDisabled
+                ? "bg-neutral-200 text-neutral-400 cursor-not-allowed"
+                : "bg-primary-600 text-white hover:bg-primary-700"
+            }`}
+            title={!isPublished ? "Please publish your store to the directory first before uploading photos." : ""}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            {uploading ? "Uploading..." : "Add Photo"}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleUpload}
+              disabled={isDisabled}
+              className="hidden"
             />
-          </svg>
-          {uploading ? "Uploading..." : "Add Photo"}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleUpload}
-            disabled={photos.length >= 10 || uploading}
-            className="hidden"
-          />
-        </label>
+          </label>
+        </div>
       </div>
 
       {/* URL Paste Input */}
@@ -277,22 +288,30 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
         <div className="flex-1">
           <Input
             type="url"
-            placeholder="Or paste image URL: https://example.com/photo.jpg"
+            placeholder={!isPublished ? "Publish your store first to upload photos" : "Or paste image URL: https://example.com/photo.jpg"}
             value={pastedUrl}
             onChange={(e) => setPastedUrl(e.target.value)}
-            disabled={photos.length >= 10 || uploading}
+            disabled={isDisabled}
             className="w-full"
           />
         </div>
         <Button
           onClick={handleUploadFromUrl}
-          disabled={!pastedUrl || photos.length >= 10 || uploading}
+          disabled={!pastedUrl || isDisabled}
           variant="secondary"
           className="whitespace-nowrap"
+          title={!isPublished ? "Please publish your store to the directory first before uploading photos." : ""}
         >
           {uploading ? "Uploading..." : "Upload from URL"}
         </Button>
       </div>
+
+      {/* Warning message when not published */}
+      {!isPublished && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          Please publish your store to the directory first before uploading photos.
+        </div>
+      )}
 
       {/* Error */}
       {error && (

@@ -22,9 +22,16 @@ router.use(requireAdmin);
  */
 router.get('/tiers', async (req, res) => {
   try {
+    const { includeInactive } = req.query;
+    
     // Fetch tiers from database
+    const whereClause: any = {};
+    if (includeInactive !== 'true') {
+      whereClause.is_active = true;
+    }
+    
     const tiers = await prisma.subscription_tiers_list.findMany({
-      where: { is_active: true },
+      where: whereClause,
       include: {
         tier_features_list: {
           where: { is_enabled: true },
@@ -50,6 +57,7 @@ router.get('/tiers', async (req, res) => {
         type: tier.tier_type,
         features: tier.tier_features_list.map((f: { feature_key: string }) => f.feature_key),
         sortOrder: tier.sort_order,
+        isActive: tier.is_active,
       };
 
       if (!acc[tier.tier_type]) {

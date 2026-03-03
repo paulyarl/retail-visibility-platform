@@ -571,9 +571,12 @@ class TenantManagementService extends TenantApiSingleton {
       `org-hero-location-${organizationId}`
     );
     
-    // Invalidate organization caches
+    // Invalidate organization and tenant caches
     await this.invalidateCache(`organization-${organizationId}`);
     await this.invalidateCache(`tenant-profile-${tenantId}`);
+    await this.invalidateCache(`org-${organizationId}-tenants`);
+    await this.invalidateCache(`access-control-${organizationId}`);
+    await this.invalidateCache(`access-control-tenant-${tenantId}`);
     
     return result.data;
   }

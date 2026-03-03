@@ -303,6 +303,7 @@ router.patch('/:id/directory/listing', authenticateToken, checkTenantAccess, asy
       }
     }
     
+    // Return the updated record
     return res.json(updated);
   } catch (error: any) {
     console.error('[PATCH /tenants/:id/directory/listing] ===== ERROR =====');

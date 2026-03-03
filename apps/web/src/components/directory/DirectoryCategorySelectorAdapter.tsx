@@ -20,8 +20,6 @@ export default function DirectoryCategorySelectorAdapter({
   onSecondaryChange,
   disabled = false,
 }: DirectoryCategorySelectorAdapterProps) {
-  console.log('[DirectoryCategorySelectorAdapter] Re-rendering', { primary, secondary: secondary.length });
-
   const { categories, loading, error } = useDirectoryCategories();
 
   // Memoize category options to prevent recreation on every render

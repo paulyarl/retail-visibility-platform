@@ -9,6 +9,7 @@ import { requirePropagationTier } from '../middleware/tier-validation';
 import { generateItemId, generateOrganizationId, generatePhotoId } from '../lib/id-generator';
 import { authenticateToken } from '../middleware/auth';
 import { user_tenant_role } from '@prisma/client';
+import TierService from '../services/TierService';
 
 const router = Router();
 
@@ -308,9 +309,13 @@ router.post('/', requirePlatformAdmin, validateOrganizationTier, validateOrganiz
 const updateOrgSchema = z.object({
   name: z.string().min(1).optional(),
   maxLocations: z.number().int().positive().optional(),
+  max_locations: z.number().int().positive().optional(),
   maxTotalSKUs: z.number().int().positive().optional(),
+  max_total_skus: z.number().int().positive().optional(),
   subscriptionTier: z.enum(['chain_starter', 'chain_professional', 'chain_enterprise']).optional(),
+  subscription_tier: z.enum(['chain_starter', 'chain_professional', 'chain_enterprise']).optional(),
   subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
+  subscription_status: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
 });
 
 // PUT /organizations/:id - Update organization
@@ -339,6 +344,61 @@ router.put('/:id', requirePlatformAdmin, validateOrganizationTier, validateOrgan
     res.json(organization);
   } catch (error: any) {
     console.error('[Organizations] Update error:', error);
+    res.status(500).json({ error: 'failed_to_update_organization' });
+  }
+});
+
+// PUT /organizations/:id/self-update - Update own organization
+// Permission: Organization owner can update their own organization settings
+router.put('/:id/self-update', authenticateToken, async (req, res) => {
+  try {
+    const parsed = updateOrgSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
+    }
+
+    // Verify user owns this organization
+    const organization = await prisma.organizations_list.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!organization) {
+      return res.status(404).json({ error: 'organization_not_found', message: 'Organization not found' });
+    }
+
+    // Check if user is the owner or a platform admin
+    const userId = req.user?.userId || req.user?.user_id;
+    const isOwner = organization.owner_id === userId;
+    const isPlatformAdmin = req.user?.role === 'PLATFORM_ADMIN' || req.user?.role === 'ADMIN';
+
+    if (!isOwner && !isPlatformAdmin) {
+      return res.status(403).json({ 
+        error: 'access_denied', 
+        message: 'Only organization owners can update organization settings' 
+      });
+    }
+
+    // Transform camelCase input to snake_case for Prisma
+    const updateData: any = {};
+    if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
+    if (parsed.data.maxLocations !== undefined) updateData.max_locations = parsed.data.maxLocations;
+    if (parsed.data.max_locations !== undefined) updateData.max_locations = parsed.data.max_locations;
+    if (parsed.data.maxTotalSKUs !== undefined) updateData.max_total_skus = parsed.data.maxTotalSKUs;
+    if (parsed.data.max_total_skus !== undefined) updateData.max_total_skus = parsed.data.max_total_skus;
+    if (parsed.data.subscriptionTier !== undefined) updateData.subscription_tier = parsed.data.subscriptionTier;
+    if (parsed.data.subscription_tier !== undefined) updateData.subscription_tier = parsed.data.subscription_tier;
+    if (parsed.data.subscriptionStatus !== undefined) updateData.subscription_status = parsed.data.subscriptionStatus;
+    if (parsed.data.subscription_status !== undefined) updateData.subscription_status = parsed.data.subscription_status;
+    updateData.updated_at = new Date();
+
+    const updatedOrganization = await prisma.organizations_list.update({
+      where: { id: req.params.id },
+      data: updateData,
+    });
+
+    res.json(updatedOrganization);
+  } catch (error: any) {
+    console.error('[Organizations] Self-update error:', error);
     res.status(500).json({ error: 'failed_to_update_organization' });
   }
 });
@@ -426,7 +486,7 @@ const propagateSchema = z.object({
 
 // POST /organizations/:id/items/propagate - Propagate item to tenants
 // Permission: Tenant admin (Starter tier+, 2+ locations required)
-router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('products'), async (req, res) => {
+router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
   try {
     const parsed = propagateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -435,7 +495,7 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
 
     const { sourceItemId, targetTenantIds, mode, overrides } = parsed.data;
 
-    // Verify organization exists
+    // Verify organization exists and get tier info
     const organization = await prisma.organizations_list.findUnique({
       where: { id: req.params.id },
       include: {
@@ -449,6 +509,52 @@ router.post('/:id/items/propagate', requireTenantAdmin, requirePropagationTier('
       return res.status(400).json({ 
         error: 'organization_not_found',
         message: 'Organization not found'
+      });
+    }
+
+    // Check if organization has required tier for propagation (dynamic validation)
+    const orgTier = organization.subscription_tier || 'chain_starter';
+    const minTierForPropagation = await TierService.getMinimumTierForFeature('propagation');
+    if (!minTierForPropagation) {
+      return res.status(403).json({
+        error: 'feature_not_available',
+        message: 'Propagation feature is not available in current configuration',
+        currentTier: orgTier
+      });
+    }
+
+    // Get all valid tiers and check if current tier meets or exceeds minimum requirement
+    const allTiers = await TierService.getAllTiers();
+    const validTiers = allTiers
+      .filter(tier => tier.is_active)
+      .map(tier => tier.tier_key)
+      .filter(tierKey => {
+        // Check if this tier is equal to or higher than the minimum tier
+        const tier = allTiers.find(t => t.tier_key === tierKey);
+        const minTier = allTiers.find(t => t.tier_key === minTierForPropagation);
+        if (!minTier) return false;
+        
+        // Compare by sort_order (lower number = higher tier)
+        return (tier?.sort_order || 999) <= (minTier?.sort_order || 999);
+      });
+
+    if (!validTiers.includes(orgTier)) {
+      return res.status(403).json({
+        error: 'insufficient_tier',
+        message: `Propagation requires ${minTierForPropagation} tier or higher`,
+        currentTier: orgTier,
+        minimumTier: minTierForPropagation,
+        availableTiers: validTiers
+      });
+    }
+
+    // Check if organization has 2+ locations
+    if (organization.tenants.length < 2) {
+      return res.status(403).json({
+        error: 'insufficient_locations',
+        message: 'Propagation requires 2 or more locations',
+        currentLocations: organization.tenants.length,
+        requiredLocations: 2
       });
     }
 

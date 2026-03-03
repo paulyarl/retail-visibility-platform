@@ -522,18 +522,39 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
   }
 
   public getCurrentUser(): any {
-    // This should be implemented based on your auth context
-    // For now, return a placeholder
-    try {
-      const authUser = localStorage.getItem('auth_user_cache');
-      if (authUser) {
-        const decrypted = this.decrypt(authUser);
-        return JSON.parse(decrypted)?.user;
-      }
-    } catch (error) {
-      console.warn('Failed to get current user:', error);
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined') {
+      console.warn('[OrganizationApiSingleton] Cannot access auth token in server-side environment');
+      return null;
     }
-    return null;
+    
+    // Use the same token sources as getAuthToken() in FlexibleApiSingleton
+    const token = localStorage.getItem('access_token') || 
+                 sessionStorage.getItem('access_token') ||
+                 document.cookie.split(';').find(c => c.trim().startsWith('access_token='))?.split('=')[1] ||
+                 localStorage.getItem('authToken') ||
+                 sessionStorage.getItem('authToken') ||
+                 document.cookie.split(';').find(c => c.trim().startsWith('authToken='))?.split('=')[1];
+    
+    if (!token) {
+      console.warn('[OrganizationApiSingleton] No auth token found for getCurrentUser');
+      return null;
+    }
+    
+    // Validate token format (same as getAuthToken)
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      console.warn('[OrganizationApiSingleton] Invalid token format in getCurrentUser');
+      return null;
+    }
+    
+    try {
+      // Parse JWT payload
+      return JSON.parse(atob(parts[1]));
+    } catch (error) {
+      console.warn('[OrganizationApiSingleton] Failed to parse JWT in getCurrentUser:', error);
+      return null;
+    }
   }
 
   public logError(message: string, error: any): void {
@@ -665,15 +686,10 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
     return super.makeDefaultRequest<T>(endpoint, enhancedOptions, cacheKey, cacheTTL);
   }
 
-  // Get authentication token (consistent with other services)
+  // Get authentication token (delegate to base class for consistency)
   protected async getAuthToken(): Promise<string | null> {
-    try {
-      const token = localStorage.getItem('auth_token');
-      return token || null;
-    } catch (error) {
-      console.warn('[OrganizationApiSingleton] Failed to get auth token:', error);
-      return null;
-    }
+    // Delegate to the base class which has the proper token retrieval logic
+    return super.getAuthToken();
   }
 
   // Generate audit ID for tracking

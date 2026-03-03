@@ -50,16 +50,16 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
   /**
    * Create or update directory listing for the current tenant
    */
-  async updateDirectoryListing(tenantId: string, listingData: Partial<DirectoryListing>): Promise<DirectoryListing | null> {
+  async updateDirectoryListing(tenantId: string, listingData: any): Promise<DirectoryListing | null> {
     if (!tenantId) {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeDefaultRequest<DirectoryListing>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/tenants/${tenantId}/directory/listing`,
       { 
-        method: 'PUT',
-        body: listingData as BodyInit
+        method: 'PATCH',
+        body: JSON.stringify(listingData)
       },
       `directory-update-${tenantId}`
     );
@@ -69,10 +69,26 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
       return null;
     }
 
+    // Transform snake_case to camelCase for frontend
+    const transformed = result.data ? {
+      id: result.data.id,
+      tenantId: result.data.tenant_id,
+      isPublished: result.data.is_published,
+      seoDescription: result.data.seo_description,
+      seoKeywords: result.data.seo_keywords,
+      primaryCategory: result.data.primary_category,
+      secondaryCategories: result.data.secondary_categories,
+      slug: result.data.slug,
+      createdAt: result.data.created_at,
+      updatedAt: result.data.updated_at,
+      isFeatured: result.data.is_featured,
+      featuredUntil: result.data.featured_until,
+    } : null;
+
     // Invalidate directory listing cache
     await this.invalidateCache(`directory-listing-${tenantId}`);
 
-    return result.data || null;
+    return transformed;
   }
 
   /**
@@ -84,7 +100,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     }
 
     const result = await this.makeDefaultRequest<void>(
-      `/api/tenants/${tenantId}/directory/listing/publish`,
+      `/api/tenants/${tenantId}/directory/publish`,
       { method: 'POST' },
       `directory-publish-${tenantId}`
     );
@@ -144,14 +160,14 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
       console.error('[TenantDirectoryManagement] Failed to get directory photos:', result.error);
       return [];
     }
-
+    
     return Array.isArray(result.data) ? result.data : [];
   }
 
   /**
    * Upload photo to directory listing
    */
-  async uploadListingPhoto(listingId: string, photoData: FormData): Promise<any> {
+  async uploadListingPhoto(listingId: string, photoData: { dataUrl: string; contentType?: string }): Promise<any> {
     if (!listingId) {
       throw new Error('Listing ID is required');
     }
@@ -160,12 +176,19 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
       `/api/directory/${listingId}/photos`,
       {
         method: 'POST',
-        body: photoData
+        body: JSON.stringify(photoData)
       },
       `directory-upload-photo-${listingId}`
     );
+    if (!result.success) {
+      console.error('[TenantDirectoryManagement] Failed to upload directory photo:', result.error);
+      return null;
+    }
 
-    return result;
+    // Invalidate photos cache after successful upload
+    await this.invalidateCache(`directory-photos-${listingId}`);
+
+    return result.data;
   }
 
   /**
@@ -184,8 +207,12 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
       },
       `directory-update-photo-${listingId}-${photoId}`
     );
+    if (!result.success) {
+      console.error('[TenantDirectoryManagement] Failed to update directory photo:', result.error);
+      return null;
+    }
 
-    return result;
+    return result.data;
   }
 
   /**
@@ -203,8 +230,16 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
       },
       `directory-delete-photo-${listingId}-${photoId}`
     );
-
-    return result;
+    
+    // DELETE returns 204 No Content, so we handle it specially
+    if (result.success || (result.status === 204)) {
+      // Invalidate photos cache after successful delete
+      await this.invalidateCache(`directory-photos-${listingId}`);
+      return true;
+    }
+    
+    console.error('[TenantDirectoryManagement] Failed to delete directory photo:', result.error);
+    return null;
   }
 }
 

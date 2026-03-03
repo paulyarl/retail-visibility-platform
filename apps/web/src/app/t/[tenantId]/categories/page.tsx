@@ -11,6 +11,7 @@ import { QuickStartCategoryModal } from '@/components/quick-start'
 import { CategoryEditModal, type CategoryFormData } from '@/components/categories'
 import { tenantCategoriesService } from '@/services/TenantCategoriesService'
 import { tenantManagementService } from '@/services/TenantManagementService'
+import { tenantInfoService } from '@/services/TenantInfoService'
 import { organizationsService } from '@/services/OrganizationsSingletonService'
 
 interface Category {
@@ -227,17 +228,20 @@ export default function CategoriesPage() {
         const alignmentStatus = await tenantCategoriesService.getAlignmentStatus(tenantId)
         setAlignmentStatus(alignmentStatus)
 
-        // Get tenant info using TenantManagementService
-        const tenantData = await tenantManagementService.getCurrentTenantProfile(tenantId)
+        // Get tenant info using the correct endpoint that includes organization data
+        const tenantData = await tenantInfoService.getTenantInfo(tenantId)
+        console.log('[Categories] Tenant data with organization:', tenantData);
         if (tenantData) {
           const metadata = tenantData.metadata || {}
           const isHero = metadata.isHeroLocation === true
           setIsHeroLocation(isHero)
           
           // If tenant has an organization, fetch organization details
-          if (tenantData.organizationId) {
-            const orgData = await organizationsService.getOrganizationById(tenantData.organizationId)
+          if (tenantData.organization_id) {
+            console.log('[Categories] Loading organization data for:', tenantData.organization_id);
+            const orgData = await organizationsService.getOrganizationById(tenantData.organization_id)
             if (orgData) {
+              console.log('[Categories] Organization data loaded:', orgData);
               const tenantsWithHeroFlag = orgData.tenants?.map((t: any) => ({
                 id: t.id,
                 name: t.name,
@@ -253,17 +257,30 @@ export default function CategoriesPage() {
               // Pre-select current tenant if it's hero, or find existing hero
               const currentHero = tenantsWithHeroFlag.find((t: any) => t.isHero)
               setSelectedHeroId(currentHero?.id || tenantId)
+            } else {
+              console.log('[Categories] Failed to load organization data');
             }
+          } else {
+            console.log('[Categories] Tenant has no organizationId');
           }
         }
 
         setError(null)
       } catch (err) {
+        console.error('[Categories] Error loading data:', err);
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
         setLoading(false)
       }
     }
+
+    // Debug: Check current state
+    console.log('[Categories] Current state:', {
+      organizationInfo: organizationInfo ? 'loaded' : 'null',
+      categoriesLength: categories.length,
+      loading,
+      error
+    });
 
     if (tenantId) {
       fetchData()

@@ -6633,6 +6633,10 @@ console.log('✅ Organization requests routes mounted at /api/organization-reque
 app.use('/organizations', organizationRoutes);
 console.log('✅ Organizations routes mounted at /organizations');
 
+// Also mount organizations routes with authentication at /api/organizations
+app.use('/api/organizations', authenticateToken, organizationRoutes);
+console.log('✅ Organizations routes mounted at /api/organizations (with authentication)');
+
 /* ------------------------------ POS integrations ------------------------------ */
 import cloverRoutes from './routes/integrations/clover';
 import squareRoutes from './routes/integrations/square';

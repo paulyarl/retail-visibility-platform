@@ -49,6 +49,7 @@ export default function PropagationControlPanel() {
     organizationData,
     tenantData,
     isPlatformAdmin: userIsPlatformAdmin,
+    refetch: refetchAccessControl,
   } = useAccessControl(
     tenantId,
     AccessPresets.CHAIN_PROPAGATION,
@@ -508,26 +509,10 @@ export default function PropagationControlPanel() {
                         try {
                           await tenantManagementService.updateOrganizationHeroLocation(organizationInfo.id, newHeroId);
                           
-                          // Reload organization info
-                          const tenantData = await tenantManagementService.getCurrentTenantProfile(tenantId);
-                          if (tenantData?.organizationId) {
-                            const orgData = await organizationsService.getOrganizationById(tenantData.organizationId);
-                            if (orgData) {
-                              const tenantsWithHeroFlag = orgData.tenants?.map((t: any) => ({
-                                id: t.id,
-                                name: t.name,
-                                isHero: t.metadata?.isHeroLocation === true
-                              })) || [];
-                              
-                              setOrganizationInfo({
-                                id: orgData.id,
-                                name: orgData.name,
-                                tenants: tenantsWithHeroFlag
-                              });
-                              
-                              alert('✅ Hero location updated successfully!');
-                            }
-                          }
+                          // Refetch access control data to get updated organization info
+                          await refetchAccessControl();
+                          
+                          alert('✅ Hero location updated successfully!');
                         } catch (err) {
                           alert(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
                         }

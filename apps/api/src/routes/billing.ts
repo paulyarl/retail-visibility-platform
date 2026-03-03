@@ -145,7 +145,7 @@ router.post('/admin/billing/override', requireAdmin, async (req, res) => {
   }
 });
 
-// GET /organization/billing/counters - Get SKU counters for entire organization
+// GET /api/organization/billing/counters - Get SKU counters for entire organization
 router.get('/organization/billing/counters', requireAuth, async (req, res) => {
   try {
     const organizationId = req.query.organizationId as string;

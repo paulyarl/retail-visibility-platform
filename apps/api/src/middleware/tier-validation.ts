@@ -13,9 +13,9 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
-import TierService from '../services/TierService';
+import { checkTierFeatureAccess, getMinimumTierForFeature, isValidTier, getValidTierKeys } from '../services/TierService';
 
-type SubscriptionTier = 'trial' | 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization';
+type SubscriptionTier = 'trial' | 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization'| 'chain_starter' | 'chain_professional' | 'chain_enterprise';
 
 // LEGACY: Kept for fallback only
 const VALID_TIERS: SubscriptionTier[] = [
@@ -24,6 +24,9 @@ const VALID_TIERS: SubscriptionTier[] = [
   'starter',
   'professional',
   'enterprise',
+  'chain_starter',
+  'chain_professional',
+  'chain_enterprise',
   'organization',
 ];
 
@@ -45,12 +48,12 @@ export async function validateTierAssignment(
     }
 
     // Validate tier exists (database-driven with fallback)
-    const isValid = await TierService.isValidTier(subscriptionTier).catch(() => 
+    const isValid = await isValidTier(subscriptionTier).catch(() => 
       VALID_TIERS.includes(subscriptionTier)
     );
     
     if (!isValid) {
-      const validTiers = await TierService.getValidTierKeys().catch(() => VALID_TIERS);
+      const validTiers = await getValidTierKeys().catch(() => VALID_TIERS);
       return res.status(400).json({
         error: 'invalid_tier',
         message: `Invalid subscription tier: ${subscriptionTier}`,
@@ -224,26 +227,42 @@ export function requirePropagationTier(
         });
       }
 
-      // Define tier requirements for each propagation type
-      const tierRequirements: Record<string, string[]> = {
-        products: ['starter', 'professional', 'enterprise', 'organization'],
-        user_roles: ['starter', 'professional', 'enterprise', 'organization'],
-        hours: ['professional', 'enterprise', 'organization'],
-        profile: ['professional', 'enterprise', 'organization'],
-        categories: ['professional', 'enterprise', 'organization'],
-        gbp: ['professional', 'enterprise', 'organization'],
-        flags: ['professional', 'enterprise', 'organization'],
-        brand_assets: ['organization']
+      // Define propagation feature mapping
+      const propagationFeatureMapping: Record<string, string> = {
+        products: 'propagation_products',
+        user_roles: 'propagation_user_roles', 
+        hours: 'propagation_hours',
+        profile: 'propagation_profile',
+        categories: 'propagation_categories',
+        gbp: 'propagation_gbp_sync',
+        flags: 'propagation_feature_flags',
+        brand_assets: 'propagation_brand_assets'
       };
 
-      const allowedTiers = tierRequirements[propagationType] || [];
-      if (!allowedTiers.includes(effectiveTier)) {
-        const requiredTier = allowedTiers[0];
+      const featureKey = propagationFeatureMapping[propagationType];
+      if (!featureKey) {
+        return res.status(400).json({
+          error: 'invalid_propagation_type',
+          message: 'Invalid propagation type specified',
+          propagationType
+        });
+      }
+
+      // Check if tier has the required propagation feature
+      console.log(`[requirePropagationTier] Checking feature ${featureKey} for tier ${effectiveTier}`);
+      const hasFeature = await checkTierFeatureAccess(effectiveTier, featureKey);
+      console.log(`[requirePropagationTier] Feature access result: ${hasFeature}`);
+      
+      if (!hasFeature) {
+        // Get the minimum tier that has this feature for upgrade suggestion
+        const minTier = await getMinimumTierForFeature(featureKey);
+        console.log(`[requirePropagationTier] Minimum tier for feature: ${minTier}`);
+        
         return res.status(403).json({
           error: 'tier_upgrade_required',
-          message: `${propagationType.replace('_', ' ')} propagation requires ${requiredTier} tier or higher`,
+          message: `${propagationType.replace('_', ' ')} propagation requires ${minTier || 'higher'} tier or higher`,
           currentTier: effectiveTier,
-          requiredTier,
+          requiredTier: minTier || 'professional',
           propagationType,
           upgradeUrl: '/settings/subscription'
         });

@@ -775,6 +775,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     await this.invalidateCache('platform-admin-tier-tenants*');
     await this.invalidateCache('platform-tenants*');
     await this.invalidateCache(`platform-tenant-${tenantId}*`);
+    await this.invalidateCache(`platform-tenant-tier-${tenantId}`);
 
     return result.data || null;
   }
@@ -976,11 +977,14 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   /**
    * Get tier system tiers
    */
-  async getTierSystemTiers(): Promise<Tier[] | null> {
+  async getTierSystemTiers(includeInactive: boolean = false): Promise<Tier[] | null> {
+    const url = includeInactive ? '/api/admin/tiers/tiers?includeInactive=true' : '/api/admin/tiers/tiers';
+    const cacheKey = includeInactive ? 'platform-tier-system-tiers-inactive' : 'platform-tier-system-tiers';
+    console.log('[PlatformHomeSingleton] getTierSystemTiers called with includeInactive:', includeInactive, 'URL:', url, 'CacheKey:', cacheKey);
     const result = await this.makeDefaultRequest<{ individual: any[], organization: any[] }>(
-      '/api/admin/tiers/tiers',
+      url,
       {},
-      'platform-tier-system-tiers',
+      cacheKey,
       this.cacheTTL
     );
 
@@ -1002,7 +1006,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         maxSkus: tier.maxSkus,
         maxLocations: tier.maxLocations,
         tierType: tier.type,
-        isActive: true, // API only returns active tiers
+        isActive: tier.isActive !== undefined ? tier.isActive : true, // Use API field or default to true
         sortOrder: tier.sortOrder,
         // Transform feature strings into feature objects
         features: (tier.features || []).map((featureKey: string) => ({
@@ -1022,16 +1026,21 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   /**
    * Update tier active status
    */
-  async updateTierStatus(tierId: string, isActive: boolean): Promise<Tier | null> {
+  async updateTierStatus(tierId: string, isActive: boolean, customReason?: string): Promise<Tier | null> {
     if (!tierId) {
       throw new Error('Tier ID is required');
     }
+
+    const reason = customReason || `Tier ${isActive ? 'activated' : 'deactivated'} via admin interface at ${new Date().toISOString()}`;
 
     const result = await this.makeDefaultRequest<Tier>(
       `/api/admin/tier-system/tiers/${tierId}`,
       { 
         method: 'PATCH',
-        body: JSON.stringify({ isActive })
+        body: JSON.stringify({ 
+          isActive,
+          reason
+        })
       },
       `platform-update-tier-status-${tierId}`
     );
@@ -1043,6 +1052,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
     // Invalidate tier system cache
     await this.invalidateCache('platform-tier-system-tiers*');
+    await this.invalidateCache(`platform-tier-system-tiers-${tierId}`);
+    await this.invalidateCache('platform-tier-system-tiers');
+    await this.invalidateCache('/api/admin/tiers/tiers'); // Clear the main endpoint cache
 
     return result.data || null;
   }
@@ -1055,11 +1067,17 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw new Error('Tier ID is required');
     }
 
+    // Add reason for audit trail
+    const updatePayload = {
+      ...tierData,
+      reason: `Tier updated via admin interface at ${new Date().toISOString()}`
+    };
+
     const result = await this.makeDefaultRequest<Tier>(
       `/api/admin/tier-system/tiers/${tierId}`,
       { 
         method: 'PUT',
-        body: JSON.stringify(tierData)
+        body: JSON.stringify(updatePayload)
       },
       `platform-update-tier-${tierId}`
     );
@@ -1071,6 +1089,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
     // Invalidate tier system cache
     await this.invalidateCache('platform-tier-system-tiers*');
+    await this.invalidateCache(`platform-tier-system-tiers-${tierId}`);
 
     return result.data || null;
   }
@@ -1099,6 +1118,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
     // Invalidate tier system cache
     await this.invalidateCache('platform-tier-system-tiers*');
+    await this.invalidateCache(`platform-tier-system-tiers-${tierId}`);
+    await this.invalidateCache('platform-tier-system-tiers');
+    await this.invalidateCache('/api/admin/tiers/tiers'); // Clear the main endpoint cache
   }
 
   /**
@@ -1116,7 +1138,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
           updatedAt: new Date().toISOString()
         })
       },
-      'platform-create-tier'
+      `platform-create-tier-${tierData.tierKey}`
     );
 
     if (!result.success) {

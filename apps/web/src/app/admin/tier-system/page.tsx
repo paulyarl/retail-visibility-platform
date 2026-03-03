@@ -59,6 +59,9 @@ export default function TierSystemPage() {
   const [newFeature, setNewFeature] = useState({ featureKey: '', featureName: '' });
   const [showNewFeatureForm, setShowNewFeatureForm] = useState(false);
   const [showAddTierModal, setShowAddTierModal] = useState(false);
+  const [deactivatingTier, setDeactivatingTier] = useState<Tier | null>(null);
+  const [deactivationReason, setDeactivationReason] = useState('');
+  const [showInactiveTiers, setShowInactiveTiers] = useState(false);
   const [newTier, setNewTier] = useState<Partial<Tier>>({
     tierKey: '',
     name: '',
@@ -82,8 +85,11 @@ export default function TierSystemPage() {
       setLoading(true);
       setError(null);
       
-      const tiers = await platformHomeService.getTierSystemTiers();
-      setTiers(Array.isArray(tiers) ? tiers : []);
+      console.log('[TierSystem] Loading tiers with includeInactive:', showInactiveTiers);
+      const tiers = await platformHomeService.getTierSystemTiers(showInactiveTiers);
+      console.log('[TierSystem] Loaded tiers:', tiers?.length, 'Inactive toggle:', showInactiveTiers);
+      
+      setTiers(tiers || []); // Handle null return
     } catch (err) {
       console.error('Failed to load tiers:', err);
       setError('Failed to load tiers');
@@ -93,7 +99,24 @@ export default function TierSystemPage() {
     }
   };
 
+  // Reload tiers when showInactiveTiers changes
+  useEffect(() => {
+    console.log('[TierSystem] showInactiveTiers changed to:', showInactiveTiers);
+    loadTiers();
+  }, [showInactiveTiers]);
+
   const handleToggleTier = async (tierId: string, isActive: boolean) => {
+    if (!isActive) {
+      // Show confirmation modal for deactivation
+      const tier = tiers.find(t => t.id === tierId);
+      if (tier) {
+        setDeactivatingTier(tier);
+        setDeactivationReason('');
+      }
+      return;
+    }
+
+    // Direct activation (no confirmation needed)
     try {
       setError(null);
       setSuccess(null);
@@ -101,7 +124,7 @@ export default function TierSystemPage() {
       const tier = await platformHomeService.updateTierStatus(tierId, isActive);
       
       if (tier) {
-        setSuccess(`Tier ${isActive ? 'activated' : 'deactivated'} successfully`);
+        setSuccess(`Tier activated successfully`);
         loadTiers(); // Reload to show updated state
       } else {
         setError('Failed to update tier');
@@ -110,6 +133,40 @@ export default function TierSystemPage() {
       console.error('Failed to toggle tier:', err);
       setError('Failed to update tier');
     }
+  };
+
+  const handleConfirmDeactivation = async () => {
+    if (!deactivatingTier || !deactivationReason.trim()) {
+      setError('Deactivation reason is required');
+      return;
+    }
+
+    try {
+      setError(null);
+      setSuccess(null);
+      setSaving(true);
+      
+      const tier = await platformHomeService.updateTierStatus(deactivatingTier.id, false, deactivationReason.trim());
+      
+      if (tier) {
+        setSuccess(`Tier "${deactivatingTier.displayName}" deactivated successfully`);
+        setDeactivatingTier(null);
+        setDeactivationReason('');
+        loadTiers(); // Reload to show updated state
+      } else {
+        setError('Failed to deactivate tier');
+      }
+    } catch (err) {
+      console.error('Failed to deactivate tier:', err);
+      setError('Failed to deactivate tier');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancelDeactivation = () => {
+    setDeactivatingTier(null);
+    setDeactivationReason('');
   };
 
   const handleEditTier = (tier: Tier) => {
@@ -400,6 +457,18 @@ export default function TierSystemPage() {
             <div className="flex items-center justify-between">
               <CardTitle>Subscription Tiers</CardTitle>
               <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mr-4">
+                  <input
+                    type="checkbox"
+                    id="showInactive"
+                    checked={showInactiveTiers}
+                    onChange={(e) => setShowInactiveTiers(e.target.checked)}
+                    className="rounded"
+                  />
+                  <label htmlFor="showInactive" className="text-sm font-medium">
+                    Show inactive tiers
+                  </label>
+                </div>
                 <Button onClick={() => setShowAddTierModal(true)} variant="default" size="sm">
                   <Plus className="w-4 h-4 mr-1" />
                   Add Tier
@@ -422,15 +491,18 @@ export default function TierSystemPage() {
                   .map((tier) => (
                     <div
                       key={tier.id}
-                      className="border rounded-lg p-4 space-y-3"
+                      className={`border rounded-lg p-4 space-y-3 ${!tier.isActive ? 'bg-gray-50 opacity-75 border-gray-300' : ''}`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <h3 className="font-semibold text-lg">{tier.displayName}</h3>
+                          <h3 className={`font-semibold text-lg ${!tier.isActive ? 'text-gray-600' : ''}`}>{tier.displayName}</h3>
                           <Badge className={getTierTypeColor(tier.tierType)}>
                             {tier.tierKey}
                           </Badge>
-                          <Badge variant={tier.isActive ? 'success' : 'default'}>
+                          <Badge 
+                            variant={tier.isActive ? 'success' : 'default'}
+                            className={!tier.isActive ? 'bg-gray-200 text-gray-600 border-gray-300' : ''}
+                          >
                             {tier.isActive ? 'Active' : 'Inactive'}
                           </Badge>
                         </div>
@@ -552,7 +624,7 @@ export default function TierSystemPage() {
                           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                             <div>
                               <span className="font-medium">Price:</span>
-                              <span className="ml-2">${tier.priceMonthly / 100}/month</span>
+                              <span className="ml-2">${tier.priceMonthly}/month</span>
                             </div>
                             <div>
                               <span className="font-medium">Max SKUs:</span>
@@ -973,14 +1045,14 @@ export default function TierSystemPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Price Monthly (cents)</label>
+              <label className="block text-sm font-medium mb-1">Price Monthly ($)</label>
               <Input
                 type="number"
                 value={newTier.priceMonthly || 0}
-                onChange={(e) => handleNewTierChange('priceMonthly', parseInt(e.target.value) || 0)}
-                placeholder="9900"
+                onChange={(e) => handleNewTierChange('priceMonthly', parseFloat(e.target.value) || 0)}
+                placeholder="199"
               />
-              <p className="text-xs text-gray-500 mt-1">Enter price in cents (e.g., 9900 = $99.00)</p>
+              <p className="text-xs text-gray-500 mt-1">Enter price in dollars (e.g., 199 = $199.00)</p>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Max SKUs</label>
@@ -1043,6 +1115,53 @@ export default function TierSystemPage() {
               {saving ? 'Creating...' : 'Create Tier'}
             </Button>
             <Button onClick={() => setShowAddTierModal(false)} variant="outline">
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Deactivation Confirmation Modal */}
+      <Modal
+        isOpen={!!deactivatingTier}
+        onClose={handleCancelDeactivation}
+        title="Confirm Tier Deactivation"
+      >
+        <div className="space-y-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+            <p className="text-sm text-yellow-800">
+              <strong>Warning:</strong> You are about to deactivate the tier "{deactivatingTier?.displayName}".
+            </p>
+            <p className="text-sm text-yellow-700 mt-1">
+              This will prevent new users from subscribing to this tier, but existing subscriptions will remain active.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Reason for deactivation <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={deactivationReason}
+              onChange={(e) => setDeactivationReason(e.target.value)}
+              placeholder="Please provide a reason for deactivating this tier..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={3}
+            />
+            {error && error.includes('reason') && (
+              <p className="text-red-500 text-sm mt-1">{error}</p>
+            )}
+          </div>
+
+          <div className="flex gap-2 pt-4 border-t">
+            <Button
+              onClick={handleConfirmDeactivation}
+              disabled={saving || !deactivationReason.trim()}
+              variant="destructive"
+            >
+              {saving ? 'Deactivating...' : 'Confirm Deactivation'}
+            </Button>
+            <Button onClick={handleCancelDeactivation} variant="outline">
               Cancel
             </Button>
           </div>

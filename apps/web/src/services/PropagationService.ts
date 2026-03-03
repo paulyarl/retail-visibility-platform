@@ -125,14 +125,25 @@ export class PropagationService extends OrganizationApiSingleton {
         organizationId
       };
 
-      const result = await this.makeOrganizationRequest<OrganizationTenant[]>(
-        `/api/organizations/${organizationId}/tenants`,
+      const result = await this.makeOrganizationRequest<any>(
+        `/api/organizations/${organizationId}`,
         options,
         `org-tenants-${organizationId}`,
         5 * 60 * 1000 // 5 minutes cache
       );
 
-      return result.data || [];
+      // Extract tenants from the organization response
+      const organization = result.data;
+      const tenants = organization?.tenants || [];
+      
+      // Transform to match expected OrganizationTenant interface
+      return tenants.map((tenant: any) => ({
+        id: tenant.id,
+        name: tenant.name,
+        metadata: {
+          businessName: tenant.business_name || undefined
+        }
+      }));
     } catch (error) {
       this.logError('Failed to get organization tenants', error);
       throw error;

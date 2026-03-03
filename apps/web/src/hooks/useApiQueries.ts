@@ -72,15 +72,31 @@ export function useOrganizationData(organizationId?: string) {
     queryKey: ['organization', organizationId, 'billing'],
     queryFn: async (): Promise<OrganizationData> => {
       if (!organizationId) {
+        console.error('[useOrganizationData] Organization ID is required');
         throw new Error('Organization ID is required');
       }
 
-      const response = await apiQueriesService.getOrganizationBillingCounters(organizationId);
-      return response;
+      console.log('[useOrganizationData] Fetching organization data for:', organizationId);
+      try {
+        const response = await apiQueriesService.getOrganizationBillingCounters(organizationId);
+        console.log('[useOrganizationData] Successfully fetched organization data');
+        return response;
+      } catch (error) {
+        console.error('[useOrganizationData] Error fetching organization data:', error);
+        throw error;
+      }
     },
     staleTime: 5 * 60 * 1000, // 5 minutes - organization data updates moderately frequently
     gcTime: 15 * 60 * 1000, // 15 minutes cache
     enabled: !!organizationId, // Only run when organizationId is available
+    retry: (failureCount, error) => {
+      // Don't retry on authentication errors
+      if (error && typeof error === 'object' && 'status' in error && (error.status as number) === 401) {
+        return false;
+      }
+      // Retry up to 2 times for other errors
+      return failureCount < 2;
+    },
   });
 }
 

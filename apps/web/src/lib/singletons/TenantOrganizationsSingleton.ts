@@ -109,12 +109,12 @@ class TenantOrganizationsSingleton {
   }
 
   // Data fetching methods
-  async fetchOrganizations(): Promise<void> {
+  async fetchOrganizations(skipCache: boolean = false): Promise<void> {
     this.setState({ loading: true, error: null });
     
     try {
       console.log('TenantOrganizationsSingleton: Fetching organizations...');
-      const response = await apiRequest('/api/organizations');
+      const response = await apiRequest('/api/organizations', { skipCache });
       const data = await response.json();
       
       console.log('TenantOrganizationsSingleton: Raw organizations response:', data);
@@ -210,7 +210,7 @@ class TenantOrganizationsSingleton {
     try {
       console.log('TenantOrganizationsSingleton: Updating organization:', orgId, data);
       
-      const response = await apiRequest(`/api/organizations/${orgId}`, {
+      const response = await apiRequest(`/api/organizations/${orgId}/self-update`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -228,8 +228,8 @@ class TenantOrganizationsSingleton {
       const updatedOrg = await response.json();
       console.log('TenantOrganizationsSingleton: Organization updated successfully:', updatedOrg);
       
-      // Refresh organizations list
-      await this.fetchOrganizations();
+      // Refresh organizations list with cache bypass to ensure fresh data
+      await this.fetchOrganizations(true);
     } catch (error) {
       console.error('TenantOrganizationsSingleton: Error updating organization:', error);
       this.setState({ error: error instanceof Error ? error.message : 'Failed to update organization' });

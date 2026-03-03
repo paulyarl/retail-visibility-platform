@@ -104,9 +104,12 @@ class ApiQueriesSingletonService extends AuthenticatedApiSingleton {
    */
   async getOrganizationBillingCounters(organizationId: string): Promise<OrganizationData> {
     if (!organizationId) {
-      throw new Error('Organization ID is required');
+      console.error('[ApiQueriesSingleton] Organization ID is required for billing counters');
+      return {} as OrganizationData;
     }
 
+    console.log('[ApiQueriesSingleton] Fetching billing counters for organization:', organizationId);
+    
     const result = await this.makeAuthenticatedRequest<OrganizationData>(
       `/api/organization/billing/counters?organizationId=${organizationId}`,
       {},
@@ -115,9 +118,16 @@ class ApiQueriesSingletonService extends AuthenticatedApiSingleton {
 
     if (!result.success) {
       console.error('[ApiQueriesSingleton] Failed to get organization billing counters:', result.error);
+      console.error('[ApiQueriesSingleton] Response details:', {
+        success: result.success,
+        error: result.error,
+        data: result.data,
+        status: result.status
+      });
       return {} as OrganizationData;
     }
 
+    console.log('[ApiQueriesSingleton] Successfully fetched billing counters for organization:', organizationId);
     return result.data || {} as OrganizationData;
   }
 

@@ -342,13 +342,20 @@ const updateTierSchema = z.object({
   name: z.string().min(1).optional(),
   displayName: z.string().min(1).optional(),
   description: z.string().optional(),
-  priceMonthly: z.number().int().min(0).optional(),
+  priceMonthly: z.number().min(0).optional(),
   maxSkus: z.number().int().positive().nullable().optional(),
   maxLocations: z.number().int().positive().nullable().optional(),
   tierType: z.enum(['individual', 'organization']).optional(),
   isActive: z.boolean().optional(),
   sortOrder: z.number().int().min(0).optional(),
   metadata: z.any().optional(),
+  features: z.array(z.object({
+    id: z.string().optional(),
+    featureKey: z.string(),
+    featureName: z.string(),
+    isEnabled: z.boolean(),
+    isInherited: z.boolean().optional().default(false),
+  })).optional(),
   reason: z.string().min(1, 'Reason is required for audit trail'),
 });
 
@@ -398,6 +405,39 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
       },
     });
 
+    // Process features if provided
+    if (updateData.features && Array.isArray(updateData.features)) {
+      // Delete existing features for this tier
+      await prisma.tier_features_list.deleteMany({
+        where: { tier_id: updatedTier.id },
+      });
+
+      // Create new features
+      const featuresToCreate = updateData.features.map(feature => ({
+        id: feature.id || generateFeatureId(),
+        tier_id: updatedTier.id,
+        feature_key: feature.featureKey,
+        feature_name: feature.featureName,
+        is_enabled: feature.isEnabled,
+        is_inherited: feature.isInherited || false,
+      }));
+
+      if (featuresToCreate.length > 0) {
+        await prisma.tier_features_list.createMany({
+          data: featuresToCreate,
+        });
+      }
+
+      // Refetch tier with updated features
+      const tierWithFeatures = await prisma.subscription_tiers_list.findUnique({
+        where: { tier_key: tierId },
+        include: { tier_features_list: true },
+      });
+      if (tierWithFeatures) {
+        Object.assign(updatedTier, tierWithFeatures);
+      }
+    }
+
     // Log the change
     await logTierChange({
       entityType: 'tier',
@@ -421,6 +461,116 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
     res.json({ tier: transformedTier });
   } catch (error) {
     console.error('[PATCH /api/admin/tier-system/tiers/:tierId] Error:', error);
+    res.status(500).json({ error: 'failed_to_update_tier' });
+  }
+});
+
+/**
+ * PUT /api/admin/tier-system/tiers/:tierId
+ * Update a subscription tier (full update - same as PATCH for compatibility)
+ * Access: Platform admin only
+ */
+router.put('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
+  try {
+    const { tierId } = req.params;
+    const parsed = updateTierSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'invalid_payload',
+        details: parsed.error.flatten(),
+      });
+    }
+
+    const { reason, ...updateData } = parsed.data;
+
+    // Get current state
+    const currentTier = await prisma.subscription_tiers_list.findUnique({
+      where: { tier_key: tierId },
+      include: { tier_features_list: true },
+    });
+
+    if (!currentTier) {
+      return res.status(400).json({ error: 'tier_not_found' });
+    }
+
+    // Update tier
+    const dbUpdateData: any = {};
+    if (updateData.name !== undefined) dbUpdateData.name = updateData.name;
+    if (updateData.displayName !== undefined) dbUpdateData.display_name = updateData.displayName;
+    if (updateData.description !== undefined) dbUpdateData.description = updateData.description;
+    if (updateData.priceMonthly !== undefined) dbUpdateData.price_monthly = updateData.priceMonthly;
+    if (updateData.maxSkus !== undefined) dbUpdateData.max_skus = updateData.maxSkus;
+    if (updateData.maxLocations !== undefined) dbUpdateData.max_locations = updateData.maxLocations;
+    if (updateData.tierType !== undefined) dbUpdateData.tier_type = updateData.tierType;
+    if (updateData.isActive !== undefined) dbUpdateData.is_active = updateData.isActive;
+    if (updateData.sortOrder !== undefined) dbUpdateData.sort_order = updateData.sortOrder;
+
+    const updatedTier = await prisma.subscription_tiers_list.update({
+      where: { tier_key: tierId },
+      data: dbUpdateData,
+      include: { tier_features_list: true },
+    });
+
+    // Process features if provided
+    if (updateData.features && Array.isArray(updateData.features)) {
+      // Delete existing features for this tier
+      await prisma.tier_features_list.deleteMany({
+        where: { tier_id: updatedTier.id },
+      });
+
+      // Create new features
+      const featuresToCreate = updateData.features.map(feature => ({
+        id: feature.id || generateFeatureId(),
+        tier_id: updatedTier.id,
+        feature_key: feature.featureKey,
+        feature_name: feature.featureName,
+        is_enabled: feature.isEnabled,
+        is_inherited: feature.isInherited || false,
+      }));
+
+      if (featuresToCreate.length > 0) {
+        await prisma.tier_features_list.createMany({
+          data: featuresToCreate,
+        });
+      }
+
+      // Refetch tier with updated features
+      const tierWithFeatures = await prisma.subscription_tiers_list.findUnique({
+        where: { tier_key: tierId },
+        include: { tier_features_list: true },
+      });
+      if (tierWithFeatures) {
+        Object.assign(updatedTier, tierWithFeatures);
+      }
+    }
+
+    // Log tier change for audit
+    await prisma.tier_change_logs_list.create({
+      data: {
+        id: generateTierChangeId(),
+        entity_type: 'tier',
+        entity_id: updatedTier.id,
+        action: 'update',
+        change_type: 'updated',
+        before_state: JSON.stringify(currentTier),
+        after_state: JSON.stringify(updatedTier),
+        changed_by: req.user?.userId || req.user?.user_id || 'system',
+        changed_by_email: req.user?.email,
+        reason,
+        ip_address: req.ip,
+        user_agent: req.get('user-agent'),
+      },
+    });
+
+    console.log(`[Tier System] Tier updated by ${req.user?.email}:`, updatedTier.tier_key);
+
+    // Transform the response to match frontend expectations
+    const transformedTier = transformTier(updatedTier);
+
+    res.json({ tier: transformedTier });
+  } catch (error) {
+    console.error('[PUT /api/admin/tier-system/tiers/:tierId] Error:', error);
     res.status(500).json({ error: 'failed_to_update_tier' });
   }
 });
