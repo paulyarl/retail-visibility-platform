@@ -31,6 +31,7 @@ interface TenantCompleteResponse {
       productCount: number;
       userCount: number;
     };
+    slug: string | null;
   };
   tier: {
     tier: string;
@@ -148,21 +149,22 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
           tenant: {
             id: tenantData.tenant?.id || tenantId,
             name: tenantData.tenant?.name || 'Unknown',
-            organizationId: null, // Not available in new structure
-            subscriptionTier: tierData?.name || 'basic',
-            subscriptionStatus: 'active', // Not available in new structure
-            locationStatus: 'active',
+            organizationId: tenantData.tenant?.organization_id||null, // Not available in new structure
+            subscriptionTier: tenantData.tenant?.subscription_tier || 'basic',
+            subscriptionStatus: tenantData.tenant?.subscription_status || 'active', // Not available in new structure
+            locationStatus: tenantData.tenant?.location_status || 'active',
             subdomain: null, // Not available in new structure
-            createdAt: new Date().toISOString(),
-            statusInfo: null,
+            createdAt: tenantData.tenant?.created_at||new Date().toISOString(),
+            statusInfo: tenantData.tenant?.statusInfo||null,
             stats: {
               productCount: usageData?.items || 0,
               userCount: 0 // Not available in new structure
-            }
+            },
+            slug: tenantData.tenant?.slug || null
           },
           tier: tierData ? {
-            tier: tierData.name,
-            status: 'active'
+            tier: tenantData.tenant?.subscription_tier||tierData.name,
+            status: tenantData.tenant?.subscription_status||'active'
           } : null,
           usage: usageData ? {
             products: (usageData as any).data?.usage?.activeItems || (usageData as any).data?.usage?.totalItems || (usageData as any).currentItems || usageData.items || 0,

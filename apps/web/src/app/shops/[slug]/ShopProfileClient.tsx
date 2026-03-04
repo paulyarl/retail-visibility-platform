@@ -28,7 +28,8 @@ import {
   ExternalLink,
   CheckCircle,
   Store,
-  TrendingUp
+  TrendingUp,
+  ArrowRight
 } from 'lucide-react';
 
 // Import existing components from tenant page
@@ -44,6 +45,7 @@ import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { directoryListingService } from '@/services/DirectoryListingSingletonService';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 // Types
 interface DirectoryConsolidated {
@@ -547,13 +549,16 @@ export default function ShopProfileClient({ shop }: {
               <Link href="/shops/directory">
                 <Button variant="ghost" size="sm">
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Shops
+                  Shops Directory
                 </Button>
               </Link>
               <Separator orientation="vertical" className="h-6" />
               <div className="flex items-center space-x-2">
-                <Store className="h-5 w-5 text-gray-600" />
-                <span className="font-medium text-gray-900">{shopData.slug}</span>
+                 <Link href={`/shops`}>
+                <Button variant="ghost" size="sm">
+                  Shops Home  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </Link>
               </div>
             </div>
             
@@ -608,7 +613,8 @@ export default function ShopProfileClient({ shop }: {
           </div>
         </div>
       </div>
-
+  {/* Platform Branding Footer */}
+            <PoweredByFooter />
      
     </div>
   );

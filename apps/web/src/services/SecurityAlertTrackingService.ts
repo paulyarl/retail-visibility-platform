@@ -106,17 +106,10 @@ class SecurityAlertTrackingService extends AdminApiSingleton {
   /**
    * Send security telemetry using sendBeacon (for page unload)
    * Uses the /api/security/telemetry/:type endpoint
+   * Uses platform-aligned URL construction and base class beacon method
    */
   sendTelemetryBeacon(type: string, data: SecurityTelemetryData): boolean {
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-      const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-      
-      return navigator.sendBeacon(`${apiUrl}/api/security/telemetry/${type}`, blob);
-    } catch (error) {
-      console.error('[SecurityAlertTrackingService] Failed to send telemetry beacon:', error);
-      return false;
-    }
+    return this.sendBeacon(`/api/security/telemetry/${type}`, data);
   }
 
   /**

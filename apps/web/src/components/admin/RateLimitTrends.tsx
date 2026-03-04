@@ -6,6 +6,7 @@ import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { AlertTriangle, TrendingUp, Users, Shield } from 'lucide-react';
+import { rateLimitTrendsService, TrendData } from '@/services/RateLimitTrendsService';
 
 // Simple chart component using SVG
 function SimpleChart({ data, title }: { data: any[], title: string }) {
@@ -44,27 +45,6 @@ function SimpleChart({ data, title }: { data: any[], title: string }) {
   );
 }
 
-interface TrendData {
-  aggregatedData: Array<{
-    date: string;
-    pathname: string;
-    totalWarnings: number;
-    blockedWarnings: number;
-    uniqueClients: number;
-  }>;
-  topPaths: Array<{
-    pathname: string;
-    totalWarnings: number;
-    blockedWarnings: number;
-    uniqueClients: number;
-  }>;
-  totalWarnings: number;
-  dateRange: {
-    start: string;
-    end: string;
-  };
-}
-
 export default function RateLimitTrends() {
   const [data, setData] = useState<TrendData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,13 +55,7 @@ export default function RateLimitTrends() {
     try {
       setLoading(true);
       setError(null);
-      // Call the API app endpoint instead of local web app route
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      const response = await fetch(`${apiUrl}/api/rate-limit-warnings?days=${daysParam}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch trend data');
-      }
-      const trendData = await response.json();
+      const trendData = await rateLimitTrendsService.getRateLimitTrends(parseInt(daysParam));
       setData(trendData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');

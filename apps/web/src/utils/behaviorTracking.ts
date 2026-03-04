@@ -302,21 +302,7 @@ class BehaviorTrackingCache {
     const handleUnload = () => {
       // Send synchronously on unload (best effort)
       if (this.events.length > 0 && !this.isSending) {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const eventsToSend = [...this.events];
-        
-        // Use sendBeacon for reliable delivery on page unload
-        if (navigator.sendBeacon) {
-          const blob = new Blob([JSON.stringify({
-            events: eventsToSend.map(event => ({
-              ...event,
-              referrer: document.referrer,
-              userAgent: navigator.userAgent
-            }))
-          })], { type: 'application/json' });
-          
-          navigator.sendBeacon(`${apiUrl}/api/recommendations/track-batch`, blob);
-        }
+        recommendationsService.sendUnloadTrackingBeacon([...this.events]);
       }
     };
 

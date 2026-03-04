@@ -129,6 +129,7 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
                   fill
                   className="object-cover transition-transform duration-300 group-hover:scale-110"
                   sizes="(max-width: 64px) 100vw"
+                  loading="eager"
                   onError={handleImageError}
                 />
               ) : (
@@ -210,6 +211,7 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
                 fill
                 className="object-cover transition-transform duration-300 group-hover:scale-110"
                 sizes="(max-width: 400px) 100vw"
+                loading="eager"
                 onError={handleImageError}
               />
             ) : (
@@ -345,6 +347,7 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
               fill
               className="object-cover transition-transform duration-300 group-hover:scale-110"
               sizes="(max-width: 300px) 100vw"
+              loading="eager"
               onError={handleImageError}
             />
           ) : (

@@ -202,8 +202,9 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
         <VisibilityCards
           tenantId={tenantId}
           tenantName={tenantData?.name || 'Your Store'}
-          hasStorefront={true}
-          isInDirectory={false}
+          hasStorefront={tenantData?.statusInfo?.showStorefront}
+          isInDirectory={tenantData?.statusInfo?.showInDirectory}
+          slug={tenantData?.slug || null}
         />
 
       </div>

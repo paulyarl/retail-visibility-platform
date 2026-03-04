@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Layout, LayoutList, Star, Grid3X3, Store, ShoppingBag, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 interface ShopDirectoryPageProps {
   searchParams?: Promise<{
@@ -456,6 +457,8 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
           limitOptions={SHOP_UI_CONFIG.PAGINATION.LIMIT_OPTIONS}
         />
       )}
+      {/* Platform Branding Footer */}
+      <PoweredByFooter />
     </div>
   );
 }

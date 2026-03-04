@@ -739,8 +739,76 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
   // ====================
 
   /**
-   * Fetch with cache - delegated to base class caching system
+   * Get constructed request URL without making the request
+   * Uses same URL construction logic as fetchWithCache for consistency
    */
+  protected getRequestUrl(
+    url: string,
+    requestTarget?: RequestTarget
+  ): string {
+    // Use provided requestTarget or fall back to default
+    const target = requestTarget || this.defaultRequestTarget;
+
+    if (url.startsWith('http')) {
+      // Already absolute URL
+      return url;
+    }
+
+    // Build URL based on target
+    switch (target) {
+      case RequestTarget.API:
+        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        return `${apiUrl}${url}`;
+
+      case RequestTarget.WEB:
+        const webUrl = process.env.NEXT_PUBLIC_WEB_URL ||
+                     process.env.FRONTEND_URL ||
+                     process.env.WEB_URL ||
+                     'http://localhost:3000';
+        return `${webUrl}${url}`;
+
+      case RequestTarget.EXTERNAL:
+        // For external requests, use URL as-is
+        return url;
+
+      default:
+        // Fallback to API
+        const fallbackUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        return `${fallbackUrl}${url}`;
+    }
+  }
+
+  /**
+   * Send data using navigator.sendBeacon API for reliable delivery
+   * Useful for tracking data on page unload or other fire-and-forget scenarios
+   * Uses platform-aligned URL construction
+   */
+  protected sendBeacon(
+    url: string,
+    data: any,
+    requestTarget?: RequestTarget
+  ): boolean {
+    if (typeof window === 'undefined' || !navigator.sendBeacon) {
+      console.warn(`[${this.constructor.name}] Beacon API not available, skipping beacon send`);
+      return false;
+    }
+
+    const fullUrl = this.getRequestUrl(url, requestTarget);
+
+    try {
+      const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+      const success = navigator.sendBeacon(fullUrl, blob);
+
+      if (!success) {
+        console.warn(`[${this.constructor.name}] Beacon send failed to ${fullUrl}`);
+      }
+
+      return success;
+    } catch (error) {
+      console.warn(`[${this.constructor.name}] Beacon send error:`, error);
+      return false;
+    }
+  }
   protected async fetchWithCache(
     url: string,
     options: RequestInit,
@@ -748,43 +816,8 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     ttl?: number,
     requestTarget?: RequestTarget
   ): Promise<Response> {
-    // Construct full URL based on requestTarget parameter
-    let fullUrl: string;
-    
-    // Use provided requestTarget or fall back to default
-    const target = requestTarget || this.defaultRequestTarget;
-    
-    if (url.startsWith('http')) {
-      // Already absolute URL
-      fullUrl = url;
-    } else {
-      // Build URL based on target
-      switch (target) {
-        case RequestTarget.API:
-          const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-          fullUrl = `${apiUrl}${url}`;
-          break;
-          
-        case RequestTarget.WEB:
-          const webUrl = process.env.NEXT_PUBLIC_WEB_URL || 
-                       process.env.FRONTEND_URL || 
-                       process.env.WEB_URL || 
-                       'http://localhost:3000';
-          fullUrl = `${webUrl}${url}`;
-          break;
-          
-        case RequestTarget.EXTERNAL:
-          // For external requests, use URL as-is
-          fullUrl = url;
-          break;
-          
-        default:
-          // Fallback to API
-          const fallbackUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-          fullUrl = `${fallbackUrl}${url}`;
-          break;
-      }
-    }
+    // Construct full URL using centralized method
+    const fullUrl = this.getRequestUrl(url, requestTarget);
     
     // Check cache first ONLY for GET requests (delegated to base class)
     const method = (options.method || 'GET').toUpperCase();

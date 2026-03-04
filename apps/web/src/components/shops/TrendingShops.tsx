@@ -314,6 +314,7 @@ function TrendingShopCard({ shop, isActive, position, timeframe }: TrendingShopC
               fill
               className="object-cover"
               sizes="(max-width: 300px) 100vw"
+              loading="eager"
               onError={handleImageError}
             />
           ) : (

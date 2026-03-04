@@ -58,7 +58,7 @@ class GBPCategoryService extends TenantApiSingleton {
     }
 
     const idsParam = categoryIds.join(',');
-    const result = await this.makeAuthenticatedRequest(
+    const result = await this.makeDefaultRequest(
       `/api/gbp/mappings?categoryIds=${encodeURIComponent(idsParam)}`,
       {
         method: 'GET'
@@ -79,7 +79,7 @@ class GBPCategoryService extends TenantApiSingleton {
    * Update GBP categories for a tenant
    */
   async updateGBPCategories(tenantId: string, data: GBPCategoryUpdateData): Promise<boolean> {
-    const result = await this.makeAuthenticatedRequest(
+    const result = await this.makeDefaultRequest(
       `/api/tenant/gbp-category`,
       {
         method: 'PUT',
@@ -106,7 +106,7 @@ class GBPCategoryService extends TenantApiSingleton {
    * Get tenant GBP category profile
    */
   async getTenantGBPCategoryProfile(tenantId: string): Promise<any> {
-    const result = await this.makeAuthenticatedRequest(
+    const result = await this.makeDefaultRequest(
       `/api/tenant/profile?tenant_id=${tenantId}`,
       {
         method: 'GET'
@@ -127,7 +127,7 @@ class GBPCategoryService extends TenantApiSingleton {
    * Get popular GBP categories for tenant
    */
   async getPopularGBPCategories(tenantId: string): Promise<GBPCategory[]> {
-    const result = await this.makeAuthenticatedRequest(
+    const result = await this.makeDefaultRequest(
       `/api/gbp/categories/popular?tenantId=${encodeURIComponent(tenantId)}`,
       {
         method: 'GET'
@@ -148,7 +148,7 @@ class GBPCategoryService extends TenantApiSingleton {
    * Search GBP categories
    */
   async searchGBPCategories(query: string, tenantId: string, limit: number = 20): Promise<GBPCategory[]> {
-    const result = await this.makeAuthenticatedRequest(
+    const result = await this.makeDefaultRequest(
       `/api/gbp/categories?query=${encodeURIComponent(query)}&limit=${limit}&tenantId=${encodeURIComponent(tenantId)}`,
       {
         method: 'GET'

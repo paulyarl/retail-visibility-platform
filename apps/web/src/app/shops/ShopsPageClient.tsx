@@ -19,6 +19,7 @@ import { Category } from '@/services/StorefrontService';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { usePublicPageTenantContext } from '@/hooks/useTenantContext';
 import { PageProps } from './types';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 interface Shop {
   id: string;
@@ -1010,6 +1011,8 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
 
       {/* Debug Toggle */}
       <TroubleshootingToggle tenantId={id} />
+        {/* Platform Branding Footer */}
+                  <PoweredByFooter />
     </div>
   );
 }

@@ -119,25 +119,6 @@ class RecommendationsSingletonService extends PublicApiSingleton {
     }
   }
 
-  /**
-   * Track behavior batch for recommendations
-   * Uses the /api/recommendations/track-batch endpoint
-   */
-  async trackBehaviorBatch(batchData: any): Promise<void> {
-    try {
-      await this.makeDefaultRequest<void>(
-        '/api/recommendations/track-batch',
-        {
-          method: 'POST',
-          body: JSON.stringify(batchData)
-        },
-        undefined // Don't use cache for tracking requests
-      );
-    } catch (error) {
-      console.warn('[RecommendationsSingleton] Behavior tracking batch failed:', error);
-      // Don't throw - behavior tracking failures should be silent
-    }
-  }
 
   /**
    * Get directory recommendations
@@ -759,6 +740,56 @@ class RecommendationsSingletonService extends PublicApiSingleton {
       console.error('[RecommendationsSingleton] Failed to get directory consolidated:', error);
       return null;
     }
+  }
+
+  /**
+   * Track behavior events in batch
+   * Uses the /api/recommendations/track-batch endpoint for analytics
+   */
+  async trackBehaviorBatch(batchData: {
+    events: any[];
+    batchMetadata?: any;
+  }): Promise<void> {
+    try {
+      const response = await this.makeDefaultRequest<void>(
+        '/api/recommendations/track-batch',
+        {
+          method: 'POST',
+          body: JSON.stringify(batchData)
+        },
+        'track-behavior-batch',
+        0 // No caching for tracking data
+      );
+      if (!response.success){        
+      console.log('[RecommendationsSingleton] Failed to track behavior batch:', response.error);
+      }
+    } catch (error) {
+      console.error('[RecommendationsSingleton] Failed to track behavior batch:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send tracking data on page unload using beacon API
+   * For reliable delivery when page is closing
+   * Uses platform-aligned URL construction and base class beacon method
+   */
+  sendUnloadTrackingBeacon(events: any[]): void {
+    const data = {
+      events: events.map(event => ({
+        ...event,
+        referrer: document.referrer,
+        userAgent: navigator.userAgent,
+        unloadTracking: true // Mark as unload tracking for analytics
+      })),
+      batchMetadata: {
+        unloadBatch: true,
+        clientTimestamp: Date.now(),
+        beaconUsed: true
+      }
+    };
+
+    this.sendBeacon('/api/recommendations/track-batch', data);
   }
 }
 
