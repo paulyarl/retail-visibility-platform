@@ -178,11 +178,11 @@ export default function FeaturedBucketSimple({
             key={product.id}
             product={product as ProductData}
             variant={variant}
-            tenantId={tenantId}
-            tenantName={tenantName}
-            tenantLogo={tenantLogo}
-            hasActivePaymentGateway={contextPayment?.canPurchase}
-            defaultGatewayType={contextPayment?.defaultGatewayType}
+            tenantId={product.tenantId || tenantId}
+            tenantName={product.tenantName || tenantName}
+            tenantLogo={product.tenantLogo || tenantLogo}
+            hasActivePaymentGateway={product.hasActivePaymentGateway}
+            defaultGatewayType={product.defaultGatewayType}
           />
         ))}
       </div>

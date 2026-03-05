@@ -180,32 +180,33 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
 
         {/* Featured Type Badges */}
         {product.featuredTypes && product.featuredTypes.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
+          <div className="flex flex-wrap gap-2 mb-3">
             {product.featuredTypes.map((type: string) => {
               const badgeConfig: Record<string, { label: string; color: string; icon: string }> = {
                 store_selection: { label: 'Featured', color: 'amber', icon: '⭐' },
                 new_arrival: { label: 'New', color: 'green', icon: '🆕' },
                 seasonal: { label: 'Seasonal', color: 'orange', icon: '🎄' },
                 sale: { label: 'Sale', color: 'red', icon: '💰' },
-                staff_pick: { label: 'Staff Pick', color: 'purple', icon: '👥' }
+                featured: { label: 'Featured', color: 'purple', icon: '⭐' },
+                staff_pick: { label: 'Staff Pick', color: 'blue', icon: '👨‍🔬' }
               };
-              const config = badgeConfig[type];
-
-              if (!config) return null;
-
+              
+              const config = badgeConfig[type] || badgeConfig.featured;
+              
               return (
                 <span
                   key={type}
-                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                    config.color === 'amber' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
-                    config.color === 'green' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-                    config.color === 'orange' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
-                    config.color === 'red' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
-                    'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+                  className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full ${
+                    config.color === 'amber' ? 'bg-amber-100 text-amber-800' :
+                    config.color === 'green' ? 'bg-green-100 text-green-800' :
+                    config.color === 'orange' ? 'bg-orange-100 text-orange-800' :
+                    config.color === 'red' ? 'bg-red-100 text-red-800' :
+                    config.color === 'purple' ? 'bg-purple-100 text-purple-800' :
+                    config.color === 'blue' ? 'bg-blue-100 text-blue-800' :
+                    'bg-gray-100 text-gray-800'
                   }`}
                 >
-                  <span className="mr-1">{config.icon}</span>
-                  {config.label}
+                  {config.icon} {config.label}
                 </span>
               );
             })}
@@ -349,44 +350,89 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
           </div>
         )}
 
-        {/* Featured Badges */}
-        <div className="absolute top-3 left-3 flex flex-col gap-2">
-          {/* Featured Type Badges */}
-          {product.featuredTypes && product.featuredTypes.length > 0 && (
-            <div className="flex flex-col gap-1">
-              {product.featuredTypes.slice(0, 2).map((type: string) => {
-                const badgeConfig: Record<string, { label: string; color: string }> = {
-                  store_selection: { label: '⭐ Featured', color: 'from-amber-500 to-orange-500' },
-                  new_arrival: { label: '🆕 New', color: 'from-green-500 to-emerald-500' },
-                  seasonal: { label: '🎄 Seasonal', color: 'from-orange-500 to-red-500' },
-                  sale: { label: '💰 Sale', color: 'from-red-500 to-pink-500' },
-                  staff_pick: { label: '👥 Staff Pick', color: 'from-purple-500 to-indigo-500' }
+        {/* Featured Type Badges - Overlay on Image */}
+        {(() => {
+          // Parse featuredTypes as JSON if it's a string, otherwise use as array
+          let featuredTypesArray: string[] = [];
+          if (typeof product.featuredTypes === 'string') {
+            try {
+              featuredTypesArray = JSON.parse(product.featuredTypes);
+            } catch (e) {
+              featuredTypesArray = [];
+            }
+          } else if (Array.isArray(product.featuredTypes)) {
+            featuredTypesArray = product.featuredTypes;
+          }
+          
+          if (featuredTypesArray.length === 0) return null;
+          
+          return (
+            <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+              {featuredTypesArray.map((type: string) => {
+                const badgeConfig: Record<string, { label: string; color: string; icon: string }> = {
+                  store_selection: { label: 'Featured', color: 'amber', icon: '⭐' },
+                  new_arrival: { label: 'New', color: 'green', icon: '🆕' },
+                  seasonal: { label: 'Seasonal', color: 'orange', icon: '🎄' },
+                  sale: { label: 'Sale', color: 'red', icon: '💰' },
+                  featured: { label: 'Featured', color: 'purple', icon: '⭐' },
+                  staff_pick: { label: 'Staff Pick', color: 'blue', icon: '👨‍🔬' }
                 };
-                const config = badgeConfig[type];
-
-                if (!config) return null;
-
+                
+                const config = badgeConfig[type] || badgeConfig.featured;
+                
                 return (
                   <span
                     key={type}
-                    className={`inline-flex items-center px-3 py-1 bg-gradient-to-r ${config.color} text-white text-xs font-bold rounded-full shadow-lg`}
+                    className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full shadow-lg ${
+                      config.color === 'amber' ? 'bg-amber-100 text-amber-800' :
+                      config.color === 'green' ? 'bg-green-100 text-green-800' :
+                      config.color === 'orange' ? 'bg-orange-100 text-orange-800' :
+                      config.color === 'red' ? 'bg-red-100 text-red-800' :
+                      config.color === 'purple' ? 'bg-purple-100 text-purple-800' :
+                      config.color === 'blue' ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}
                   >
-                    {config.label}
+                    {config.icon} {config.label}
                   </span>
                 );
               })}
             </div>
-          )}
+          );
+        })()}
+      </div>
 
-          {/* Fallback to generic featured badge if no specific types */}
-          {(!product.featuredTypes || product.featuredTypes.length === 0) && product.isFeatured && (
-            <span className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg">
-              ⭐ Featured
-            </span>
-          )}
-        </div>
+      {/* Product Info */}
+      <div className="p-4">
+        {/* Shop Info */}
+        {product.shopName && (
+          <div className="flex items-center mb-2">
+            {tenantLogo ? (
+              <Image
+                src={tenantLogo}
+                alt={product.shopName}
+                width={20}
+                height={20}
+                className="rounded-full mr-2"
+              />
+            ) : (
+              <Store className="w-5 h-5 text-gray-400 mr-2" />
+            )}
+            <Link 
+              href={`/shops/${product.shopSlug || product.tenantId}`}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              {product.shopName}
+            </Link>
+          </div>
+        )}
 
-        {/* Stock Status */}
+        {/* Product Name */}
+        <Link href={`/products/${product.id}`} onClick={handleProductClick}>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-2">
+            {product.name}
+          </h3>
+        </Link>
         {product.availability === 'out_of_stock' && (
           <div className="absolute top-3 right-3">
             <span className="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-medium shadow-lg">
@@ -568,7 +614,7 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
       <Link href={`/products/${product.id}`} className="block" onClick={handleProductClick}>
         <div className="flex items-center p-3">
           {/* Product Image */}
-          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
+          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0 relative">
             {product.imageUrl ? (
               <Image
                 src={product.imageUrl}
@@ -582,6 +628,57 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
                 <Package className="w-6 h-6 text-gray-400" />
               </div>
             )}
+            
+            {/* Featured Type Badges - Overlay on Image */}
+            {(() => {
+              // Parse featuredTypes as JSON if it's a string, otherwise use as array
+              let featuredTypesArray: string[] = [];
+              if (typeof product.featuredTypes === 'string') {
+                try {
+                  featuredTypesArray = JSON.parse(product.featuredTypes);
+                } catch (e) {
+                  featuredTypesArray = [];
+                }
+              } else if (Array.isArray(product.featuredTypes)) {
+                featuredTypesArray = product.featuredTypes;
+              }
+              
+              if (featuredTypesArray.length === 0) return null;
+              
+              return (
+                <div className="absolute top-1 left-1 flex flex-wrap gap-1">
+                  {featuredTypesArray.slice(0, 2).map((type: string) => {
+                    const badgeConfig: Record<string, { label: string; color: string; icon: string }> = {
+                      store_selection: { label: '⭐', color: 'amber', icon: '' },
+                      new_arrival: { label: '🆕', color: 'green', icon: '' },
+                      seasonal: { label: '🎄', color: 'orange', icon: '' },
+                      sale: { label: '💰', color: 'red', icon: '' },
+                      featured: { label: '⭐', color: 'purple', icon: '' },
+                      staff_pick: { label: '👥', color: 'purple', icon: '' }
+                    };
+                    const config = badgeConfig[type];
+
+                    if (!config) return null;
+
+                    return (
+                      <span
+                        key={type}
+                        className={`inline-flex items-center px-1 py-0.5 text-xs font-medium rounded-full ${
+                          config.color === 'amber' ? 'bg-amber-100 text-amber-800' :
+                          config.color === 'green' ? 'bg-green-100 text-green-800' :
+                          config.color === 'orange' ? 'bg-orange-100 text-orange-800' :
+                          config.color === 'red' ? 'bg-red-100 text-red-800' :
+                          config.color === 'purple' ? 'bg-purple-100 text-purple-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {config.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
           
           {/* Product Info */}
@@ -648,40 +745,6 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
                 <span className="text-xs text-gray-600 dark:text-gray-400">
                   {product.ratingAvg.toFixed(1)}
                 </span>
-              </div>
-            )}
-
-            {/* Featured Type Badges */}
-            {product.featuredTypes && product.featuredTypes.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1">
-                {product.featuredTypes.slice(0, 2).map((type: string) => { // Limit to 2 badges for compact layout
-                  const badgeConfig: Record<string, { label: string; color: string; icon: string }> = {
-                    store_selection: { label: 'Featured', color: 'amber', icon: '⭐' },
-                    new_arrival: { label: 'New', color: 'green', icon: '🆕' },
-                    seasonal: { label: 'Seasonal', color: 'orange', icon: '🎄' },
-                    sale: { label: 'Sale', color: 'red', icon: '💰' },
-                    staff_pick: { label: 'Staff Pick', color: 'purple', icon: '👥' }
-                  };
-                  const config = badgeConfig[type];
-
-                  if (!config) return null;
-
-                  return (
-                    <span
-                      key={type}
-                      className={`inline-flex items-center px-1 py-0.5 rounded text-xs font-medium ${
-                        config.color === 'amber' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
-                        config.color === 'green' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-                        config.color === 'orange' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
-                        config.color === 'red' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
-                        'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
-                      }`}
-                    >
-                      <span className="mr-0.5 text-xs">{config.icon}</span>
-                      {config.label}
-                    </span>
-                  );
-                })}
               </div>
             )}
 
@@ -785,36 +848,53 @@ function PremiumLayout({ product, className = '', trackingContext, tenantId, ten
         )}
 
         {/* Premium Badges */}
-        <div className="absolute top-4 left-4 flex flex-col gap-2">
+        <div className="absolute top-4 right-4 flex flex-col gap-2">
           {/* Featured Type Badges */}
-          {product.featuredTypes && product.featuredTypes.length > 0 && (
-            <div className="flex flex-col gap-1">
-              {product.featuredTypes.slice(0, 2).map((type: string) => {
-                const badgeConfig: Record<string, { label: string; color: string }> = {
-                  store_selection: { label: '⭐ Featured', color: 'from-amber-500 to-orange-500' },
-                  new_arrival: { label: '🆕 New', color: 'from-green-500 to-emerald-500' },
-                  seasonal: { label: '🎄 Seasonal', color: 'from-orange-500 to-red-500' },
-                  sale: { label: '💰 Sale', color: 'from-red-500 to-pink-500' },
-                  staff_pick: { label: '👥 Staff Pick', color: 'from-purple-500 to-indigo-500' }
-                };
-                const config = badgeConfig[type];
+          {(() => {
+            // Parse featuredTypes as JSON if it's a string, otherwise use as array
+            let featuredTypesArray: string[] = [];
+            if (typeof product.featuredTypes === 'string') {
+              try {
+                featuredTypesArray = JSON.parse(product.featuredTypes);
+              } catch (e) {
+                featuredTypesArray = [];
+              }
+            } else if (Array.isArray(product.featuredTypes)) {
+              featuredTypesArray = product.featuredTypes;
+            }
+            
+            if (featuredTypesArray.length === 0) return null;
+            
+            return (
+              <div className="flex flex-col gap-1">
+                {featuredTypesArray.map((type: string) => {
+                  const badgeConfig: Record<string, { label: string; color: string }> = {
+                    store_selection: { label: '⭐ Featured', color: 'from-amber-500 to-orange-500' },
+                    new_arrival: { label: '🆕 New', color: 'from-green-500 to-emerald-500' },
+                    seasonal: { label: '🎄 Seasonal', color: 'from-orange-500 to-red-500' },
+                    sale: { label: '💰 Sale', color: 'from-red-500 to-pink-500' },
+                    featured: { label: '⭐ Featured', color: 'from-purple-500 to-indigo-500' },
+                    staff_pick: { label: '👥 Staff Pick', color: 'from-blue-500 to-cyan-500' }
+                  };
+                  const config = badgeConfig[type];
 
-                if (!config) return null;
+                  if (!config) return null;
 
-                return (
-                  <span
-                    key={type}
-                    className={`inline-flex items-center px-3 py-1 bg-gradient-to-r ${config.color} text-white text-xs font-bold rounded-full shadow-xl`}
-                  >
-                    {config.label}
-                  </span>
-                );
-              })}
-            </div>
-          )}
+                  return (
+                    <span
+                      key={type}
+                      className={`inline-flex items-center px-3 py-1.5 ${config.color} text-white text-sm font-bold rounded-full shadow-lg`}
+                    >
+                      {config.label}
+                    </span>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Fallback to generic featured badge if no specific types */}
-          {(!product.featuredTypes || product.featuredTypes.length === 0) && product.isFeatured && (
+          {(!product.featuredType || !product.featuredType.length) && product.isFeatured && (
             <span className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-xl">
               ⭐ Featured
             </span>
@@ -1084,6 +1164,57 @@ export default function ProductCard({
               </div>
             )}
 
+            {/* Featured Type Badges - Overlay on Image */}
+            {(() => {
+              // Parse featuredTypes as JSON if it's a string, otherwise use as array
+              let featuredTypesArray: string[] = [];
+              if (typeof product.featuredTypes === 'string') {
+                try {
+                  featuredTypesArray = JSON.parse(product.featuredTypes);
+                } catch (e) {
+                  featuredTypesArray = [];
+                }
+              } else if (Array.isArray(product.featuredTypes)) {
+                featuredTypesArray = product.featuredTypes;
+              }
+              
+              if (featuredTypesArray.length === 0) return null;
+              
+              return (
+                <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+                  {featuredTypesArray.map((type: string) => {
+                    const badgeConfig: Record<string, { label: string; color: string; icon: string }> = {
+                      store_selection: { label: '⭐', color: 'amber', icon: '' },
+                      new_arrival: { label: '🆕', color: 'green', icon: '' },
+                      seasonal: { label: '🎄', color: 'orange', icon: '' },
+                      sale: { label: '💰', color: 'red', icon: '' },
+                      featured: { label: '⭐', color: 'purple', icon: '' },
+                      staff_pick: { label: '👥', color: 'purple', icon: '' }
+                    };
+                    const config = badgeConfig[type];
+
+                    if (!config) return null;
+
+                    return (
+                      <span
+                        key={type}
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium shadow-lg ${
+                          config.color === 'amber' ? 'bg-amber-100 text-amber-800' :
+                          config.color === 'green' ? 'bg-green-100 text-green-800' :
+                          config.color === 'orange' ? 'bg-orange-100 text-orange-800' :
+                          config.color === 'red' ? 'bg-red-100 text-red-800' :
+                          config.color === 'purple' ? 'bg-purple-100 text-purple-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {config.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
             {/* Stock Status */}
             {product.availability === 'out_of_stock' && (
               <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
@@ -1179,38 +1310,6 @@ export default function ProductCard({
                 defaultGatewayType={defaultGatewayType}
                 className="w-full"
               />
-            )}
-
-            {/* Featured Type Badges */}
-            {(product.featuredTypes?.length ?? 0) > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {product.featuredTypes!.slice(0, 1).map((type: string) => { // Limit to 1 badge for zoom layout
-                  const badgeConfig: Record<string, { label: string; color: string; icon: string }> = {
-                    store_selection: { label: '⭐', color: 'amber', icon: '' },
-                    new_arrival: { label: '🆕', color: 'green', icon: '' },
-                    seasonal: { label: '🎄', color: 'orange', icon: '' },
-                    sale: { label: '💰', color: 'red', icon: '' },
-                    staff_pick: { label: '👥', color: 'purple', icon: '' }
-                  };
-                  const config = badgeConfig[type];
-
-                  if (!config) return null;
-
-                  return (
-                    <span
-                      className={`inline-flex items-center px-1 py-0.5 rounded text-xs font-medium ${
-                        config.color === 'amber' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
-                        config.color === 'green' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-                        config.color === 'orange' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
-                        config.color === 'red' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
-                        'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
-                      }`}
-                    >
-                      {config.label}
-                    </span>
-                  );
-                })}
-              </div>
             )}
 
             <div className="flex items-center justify-between">

@@ -15,7 +15,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
-import { type ApiResult } from '../providers/base/FlexibleApiSingleton';
+import { type ApiResult, RequestType, RequestTarget } from '../providers/base/FlexibleApiSingleton';
 import { clientTenantContextManager } from '../lib/clientTenantContext';
 
 export interface DirectoryStore {
@@ -133,6 +133,9 @@ class DirectorySingletonService extends PublicApiSingleton {
   private static instance: DirectorySingletonService;
 
   // Cache TTL constants
+  protected defaultRequestType: RequestType = RequestType.PUBLIC;
+  protected defaultRequestTarget: RequestTarget = RequestTarget.API; // Use API backend (port 4000)
+  protected cacheTTL: number = 15 * 60 * 1000; // 15 minutes for public data
   private readonly CACHE_TTL_SHORT = 2 * 60 * 1000; // 2 minutes
   private readonly CACHE_TTL_MEDIUM = 15 * 60 * 1000; // 15 minutes
   private readonly CACHE_TTL_LONG = 60 * 60 * 1000; // 1 hour
@@ -772,7 +775,7 @@ class DirectorySingletonService extends PublicApiSingleton {
   }
 
   /**
-   * Make a default API request (for featured products endpoint)
+   * Make a public API request (for featured products endpoint)
    */
   async makeDefaultRequest<T>(
     endpoint: string,
@@ -780,7 +783,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     cacheKey?: string,
     cacheTTL?: number
   ): Promise<ApiResult<T>> {
-    return super.makeDefaultRequest<T>(endpoint, options, cacheKey, cacheTTL);
+    return super.makePublicRequest<T>(endpoint, options, { cacheKey, ttl: cacheTTL });
   }
 
   /**

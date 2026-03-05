@@ -10,6 +10,7 @@ import directoryAdminRoutes from '../directory-admin';
 import directorySupportRoutes from '../directory-support';
 import directoryCategoriesRoutes from '../directory-categories';
 import directoryStoreTypesRoutes from '../directory-store-types';
+import directoryFeaturedProductsRoutes from '../directory-featured-products';
 
 /**
  * Mount directory routes
@@ -31,6 +32,10 @@ export function mountDirectoryRoutes(app: Express) {
   // Mount at specific path to avoid conflicts with other directory routes
   app.use('/api/directory/store-types', directoryStoreTypesRoutes);
   console.log('✅ Directory store types routes mounted (store type discovery)');
+
+  // Directory Featured Products routes - NEW for featured products aggregation
+  app.use('/api/directory/featured-products', directoryFeaturedProductsRoutes);
+  console.log('✅ Directory featured products routes mounted (aggregation service)');
 
   // Directory routes - mount AFTER category routes to avoid conflicts
   // Category routes handle: /api/directory/categories/*

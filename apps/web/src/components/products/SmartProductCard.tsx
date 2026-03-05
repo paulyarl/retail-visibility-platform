@@ -365,7 +365,7 @@ export default function SmartProductCard({
 
   // Debug: Log when effectiveCanPurchase changes
   useEffect(() => {
-    console.log('[SmartProductCard] effectiveCanPurchase changed:', {
+    /* console.log('[SmartProductCard] effectiveCanPurchase changed:', {
       productId: product.id,
       variant,
       effectiveCanPurchase,
@@ -375,7 +375,7 @@ export default function SmartProductCard({
         contextCanPurchase: contextPayment?.canPurchase,
         canPurchase
       }
-    });
+    }); */
   }, [effectiveCanPurchase, product.id, variant, propHasActivePaymentGateway, product.has_active_payment_gateway, contextPayment?.canPurchase, canPurchase]);
 
   const displayTitle = product.title || product.name;
@@ -610,11 +610,11 @@ export default function SmartProductCard({
 
             {/* Purchase UI - Prominent */}
             {(() => {
-              console.log('[SmartProductCard] Featured variant render check:', {
+             /*  console.log('[SmartProductCard] Featured variant render check:', {
                 productId: product.id,
                 effectiveCanPurchase,
                 hasVariants: product.has_variants
-              });
+              }); */
               return effectiveCanPurchase && (
                 <div className="mt-4">
                   {(product.has_variants === true) ? (

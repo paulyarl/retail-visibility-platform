@@ -126,17 +126,20 @@ export default function FeaturedProductsPage() {
       const response = await directorySingletonService.makeDefaultRequest(
         `/api/directory/featured-products?${queryParams}`,
         {},
-        `featured-products-${queryParams}`,
+        `featured-products-v2-${queryParams}`, // Updated cache key to avoid stale data
         5 * 60 * 1000 // 5 minutes cache
       );
 
       if (response.success && response.data) {
-        const responseData = response.data as {
-          totalCount: number;
-          buckets: Record<string, any[]>;
-          bucketCounts: Record<string, number>;
-          shops: Array<{ id: string; name: string; slug: string; logo?: string; tier: string }>;
-        };
+        const responseData = (response.data as { data: any }).data; // Fix double wrapping issue
+        
+        console.log('[FeaturedProductsPage] Data received:', {
+          success: response.success,
+          totalCount: responseData.totalCount,
+          bucketKeys: responseData.buckets ? Object.keys(responseData.buckets) : 'no buckets',
+          shopsCount: responseData.shops ? responseData.shops.length : 'no shops'
+        });
+        
         setData(responseData);
         
         // Extract categories and locations from the data
@@ -149,8 +152,8 @@ export default function FeaturedProductsPage() {
         }, {});
         
         const locationCounts = allProducts.reduce((acc: any, product: any) => {
-          if (product.shopLocation) {
-            acc[product.shopLocation] = (acc[product.shopLocation] || 0) + 1;
+          if (product.tenantCity) {
+            acc[product.tenantCity] = (acc[product.tenantCity] || 0) + 1;
           }
           return acc;
         }, {});
@@ -430,7 +433,7 @@ export default function FeaturedProductsPage() {
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
               <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {data.shops.length}
+                {data.shops?.length || 0}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 Featured Shops
@@ -438,7 +441,7 @@ export default function FeaturedProductsPage() {
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
               <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {Object.keys(data.buckets).length}
+                {Object.keys(data.buckets || {}).length}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 Active Buckets
@@ -456,42 +459,56 @@ export default function FeaturedProductsPage() {
         )}
 
         {/* Featured Buckets */}
-        {data && FEATURED_BUCKETS.map((bucket) => {
-          const products = data.buckets[bucket.type] || [];
-          const count = data.bucketCounts[bucket.type] || 0;
-          
-          if (products.length === 0) return null;
-          
-          return (
-            <div key={bucket.type} className="mb-12">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <span className="text-2xl">{bucket.icon}</span>
-                    {bucket.title}
-                  </h2>
-                  <p className="text-gray-600 dark:text-gray-400 mt-1">
-                    {bucket.description} • {count} products
-                  </p>
+        {data && data.buckets ? (
+          FEATURED_BUCKETS.map((bucket) => {
+            const products = data.buckets[bucket.type] || [];
+            const count = data.bucketCounts?.[bucket.type] || 0;
+            
+            if (products.length === 0) return null;
+            
+            return (
+              <div key={bucket.type} className="mb-12">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <span className="text-2xl">{bucket.icon}</span>
+                      {bucket.title}
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">
+                      {bucket.description} • {count} products
+                    </p>
+                  </div>
+                  {count > products.length && (
+                    <Button variant="outline">
+                      View All ({count})
+                    </Button>
+                  )}
                 </div>
-                {count > products.length && (
-                  <Button variant="outline">
-                    View All ({count})
-                  </Button>
-                )}
+                
+                <FeaturedBucketSimple
+                  title={bucket.title}
+                  description={bucket.description}
+                  products={products}
+                  totalCount={count}
+                  bucketType={bucket.type}
+                  tenantId={products[0]?.tenantId || "marketplace"}
+                  tenantName={products[0]?.tenantName}
+                  tenantLogo={products[0]?.tenantLogo}
+                />
               </div>
-              
-              <FeaturedBucketSimple
-                title={bucket.title}
-                description={bucket.description}
-                products={products}
-                totalCount={count}
-                bucketType={bucket.type}
-                tenantId="marketplace"
-              />
-            </div>
-          );
-        })}
+            );
+          })
+        ) : (
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">🔍</div>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Loading featured products...
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Please wait while we gather the latest products.
+            </p>
+          </div>
+        )}
 
         {/* No Results */}
         {data && data.totalCount === 0 && (

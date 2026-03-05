@@ -2447,6 +2447,162 @@ enum action {
   oauthRefresh
 }
 
+// Materialized View for global product discovery
+model mv_global_discovery {
+  inventory_item_id         String   @id
+  product_name              String?
+  product_title             String?
+  product_description       String?
+  marketing_description     String?
+  sku                       String?
+  brand                     String?
+  manufacturer              String?
+  condition                 String?
+  gtin                      String?
+  mpn                       String?
+  stock                     Int?
+  quantity                  Int?
+  availability              String?
+  item_status               String?
+  visibility                String?
+  image_url                 String?
+  image_urls                String[]
+  list_price_cents          Int?
+  sale_price_cents          Int?
+  current_price_cents       Int?
+  price                     Decimal?
+  is_on_sale                Boolean?
+  discount_percentage       Decimal?
+  currency                  String?
+  product_metadata          Json?
+  variant_id                String?
+  variant_name              String?
+  variant_sku               String?
+  variant_color             String?
+  variant_size              String?
+  variant_material          String?
+  variant_style             String?
+  variant_price_cents       Decimal?
+  variant_inventory_quantity Decimal?
+  product_type              String?
+  product_category          String?
+  product_category_slug     String?
+  product_google_category_id String?
+  product_parent_category_id String?
+  is_digital_product        Boolean?
+  is_physical_product       Boolean?
+  is_service                Boolean?
+  is_variant                Boolean?
+  is_bundle                 Boolean?
+  is_customizable           Boolean?
+  is_trackable              Boolean?
+  is_taxable                Boolean?
+  is_shipping_required      Boolean?
+  specifications            Json?
+  attributes                Json?
+  custom_fields             Json?
+  search_keywords           Json?
+  seo_title                 String?
+  seo_description           String?
+  seo_keywords              Json?
+  tags                      Json?
+  weight                    Decimal?
+  dimensions                String?
+  inventory_quantity        Int?
+  inventory_policy          String?
+  inventory_tracking        Boolean?
+  inventory_quantity_tracked Boolean?
+  allow_backorder           Boolean?
+  backorder_quantity        Decimal?
+  low_stock_threshold       Decimal?
+  requires_shipping         Boolean?
+  weight_unit               String?
+  length                    Decimal?
+  width                     Decimal?
+  height                    Decimal?
+  dimension_unit            String?
+  
+  // Featured fields
+  featured_type             String?
+  featured_type_array       Json?    // This is the key field - properly typed as Json
+  featured_priority        Int?
+  featured_at              DateTime?
+  featured_until           DateTime?
+  featured_is_active       Boolean?
+  is_actively_featured     Boolean?
+  featured_metadata        String?
+  
+  // Tenant fields
+  tenant_id                String?
+  tenant_name              String?
+  tenant_slug              String?
+  subscription_tier        String?
+  shop_category            String?
+  shop_category_id         String?
+  shop_google_category_id  String?
+  tenant_city              String?
+  tenant_state             String?
+  tenant_country           String?
+  tenant_zip               String?
+  tenant_address           String?
+  tenant_latitude          Float?
+  tenant_longitude         Float?
+  timezone                 String?
+  tenant_logo_url          String?
+  business_type            String?
+  business_category        String?
+  business_size            String?
+  established_year         Decimal?
+  
+  // Analytics fields
+  view_count               BigInt?
+  unique_viewers           BigInt?
+  engagement_count         BigInt?
+  conversion_count         BigInt?
+  revenue_cents            BigInt?
+  units_sold               BigInt?
+  
+  // Rating fields
+  product_average_rating   Decimal?
+  product_review_count     Decimal?
+  store_average_rating     Decimal?
+  store_review_count       Decimal?
+  average_rating           Decimal?
+  review_count             Decimal?
+  product_rating_live      Decimal?
+  product_reviews_count_live Decimal?
+  product_helpful_count_live Decimal?
+  product_reviews_approved_live Decimal?
+  wishlist_count           Decimal?
+  share_count              Decimal?
+  
+  // Scoring fields
+  bucket_priority          Int?
+  trending_score           Decimal?
+  price_status             String?
+  stock_status             String?
+  has_image                Boolean?
+  has_gallery              Boolean?
+  has_description          Boolean?
+  has_brand                Boolean?
+  has_price                Boolean?
+  in_stock                 Boolean?
+  has_active_payment_gateway Boolean?
+  default_gateway_type     String?
+  
+  // Timestamps
+  created_at               DateTime?
+  updated_at               DateTime?
+  published_at             DateTime?
+  archived_at              DateTime?
+  mv_refreshed_at          DateTime?
+
+  @@map("mv_global_discovery")
+  @@index([tenant_id])
+  @@index([featured_type])
+  @@index([item_status, visibility])
+}
+
 enum actor_type {
   user
   system
