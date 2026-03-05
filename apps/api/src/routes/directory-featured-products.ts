@@ -7,7 +7,6 @@
  */
 
 import { Router, Request, Response } from 'express';
-import axios from 'axios';
 import { prisma } from '../prisma';
 
 const router = Router();
@@ -84,16 +83,17 @@ router.get('/', async (req: Request, res: Response) => {
     const sortBy = params.sortBy || 'trending';
     
     // Use the existing working storefront endpoint
-    const storefrontUrl = `http://localhost:4000/api/storefront/tid-m8ijkrnk/featured-products?limit=100`;
+    const storefrontUrl = `${process.env.API_URL || 'http://localhost:4000'}/api/storefront/tid-m8ijkrnk/featured-products?limit=100`;
     
-    const response = await axios.get(storefrontUrl, {
-      timeout: 10000,
+    const response = await fetch(storefrontUrl, {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      signal: AbortSignal.timeout(10000)
     });
     
-    if (!response.data || !response.data.items) {
+    if (!response.ok) {
       return res.json({
         success: true,
         data: {
@@ -128,7 +128,44 @@ router.get('/', async (req: Request, res: Response) => {
       });
     }
     
-    const allFeaturedProducts = response.data.items;
+    const data = await response.json();
+    
+    if (!data || !data.items) {
+      return res.json({
+        success: true,
+        data: {
+          totalCount: 0,
+          buckets: {
+            store_selection: [],
+            new_arrival: [],
+            seasonal: [],
+            sale: [],
+            featured: []
+          },
+          bucketCounts: {
+            store_selection: 0,
+            new_arrival: 0,
+            seasonal: 0,
+            sale: 0,
+            featured: 0
+          },
+          shops: [],
+          filters: {
+            search: params.search,
+            category: params.category,
+            location: params.location,
+            minRating: params.minRating,
+            minPrice: params.minPrice,
+            maxPrice: params.maxPrice,
+            trending: params.trending === 'true',
+            inStock: params.inStock === 'true',
+            sortBy
+          }
+        }
+      });
+    }
+    
+    const allFeaturedProducts = data.items;
     
     // Fetch featured_type_array from database using Prisma model
     const productIds = allFeaturedProducts.map((p: any) => p.id);
