@@ -153,6 +153,7 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
           updatedAt: product.updated_at,
           metadata: product.product_metadata,
           featuredType: product.featured_type,
+          featuredTypes: product.featured_type_array || (product.featured_type ? [product.featured_type] : []),
           featuredPriority: product.featured_priority,
           featuredAt: product.featured_at,
           featuredExpiresAt: product.featured_until,

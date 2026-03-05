@@ -404,29 +404,6 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
 
       {/* Product Info */}
       <div className="p-4">
-        {/* Shop Info */}
-        {product.shopName && (
-          <div className="flex items-center mb-2">
-            {tenantLogo ? (
-              <Image
-                src={tenantLogo}
-                alt={product.shopName}
-                width={20}
-                height={20}
-                className="rounded-full mr-2"
-              />
-            ) : (
-              <Store className="w-5 h-5 text-gray-400 mr-2" />
-            )}
-            <Link 
-              href={`/shops/${product.shopSlug || product.tenantId}`}
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
-              {product.shopName}
-            </Link>
-          </div>
-        )}
-
         {/* Product Name */}
         <Link href={`/products/${product.id}`} onClick={handleProductClick}>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-2">

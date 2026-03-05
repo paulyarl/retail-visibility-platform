@@ -7,13 +7,14 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { ShopCard } from '@/components/shops/ShopCard';
 import { ShopPagination } from '@/components/shops/ShopPagination';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { ArrowLeft, TrendingUp, Star, MapPin, Package } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Star, MapPin, Package, Store, Grid, Sparkles } from 'lucide-react';
 import { useTrendingShops } from '@/lib/shops/shop-hooks';
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
@@ -132,25 +133,44 @@ function TrendingShopsPageContent() {
       {/* Header */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-4">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => router.back()}
-                className="flex items-center space-x-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back</span>
-              </Button>
-              
-              <div className="flex items-center space-x-2">
-                <TrendingUp className="h-6 w-6 text-red-500" />
-                <h1 className="text-2xl font-bold text-gray-900">Trending Shops</h1>
-                <Badge variant="default" className="bg-red-100 text-red-800">
-                  Hot
-                </Badge>
-              </div>
+          {/* Navigation Links */}
+          <div className="flex items-center gap-2 mb-4">
+            <Link 
+              href="/shops"
+              className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            >
+              <Store className="h-4 w-4" />
+              Shops
+            </Link>
+            <span className="text-gray-400">•</span>
+            <Link 
+              href="/shops/directory"
+              className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            >
+              <Grid className="h-4 w-4" />
+              Directory
+            </Link>
+            <span className="text-gray-400">•</span>
+            <Link 
+              href="/shops/featured"
+              className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            >
+              <Sparkles className="h-4 w-4" />
+              Featured
+            </Link>
+            <span className="text-gray-400">•</span>
+            <span className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 font-medium">
+              <TrendingUp className="h-4 w-4" />
+              Trending
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <h1 className="text-2xl font-bold text-gray-900">Trending Shops</h1>
+              <Badge variant="default" className="bg-red-100 text-red-800">
+                Hot
+              </Badge>
             </div>
 
             <div className="flex items-center space-x-4">
@@ -167,7 +187,7 @@ function TrendingShopsPageContent() {
             </div>
           </div>
 
-          <p className="text-gray-600">
+          <p className="text-gray-600 mt-2">
             Discover the most popular shops gaining traction right now
           </p>
         </div>

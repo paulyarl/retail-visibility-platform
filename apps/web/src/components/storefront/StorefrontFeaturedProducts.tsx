@@ -767,7 +767,7 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
             isTrackable: product.isTrackable,
             
             // Featured Status
-            featuredTypes: product.featuredType ? [product.featuredType] : [],
+            featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
             featuredType: product.featuredType,
             featuredPriority: product.featuredPriority,
             featuredAt: product.featuredAt,

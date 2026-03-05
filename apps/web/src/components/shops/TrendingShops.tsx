@@ -17,6 +17,7 @@ import { ChevronLeft, ChevronRight, TrendingUp, Star, MapPin, ExternalLink, Acti
 import { cn } from '@/lib/utils';
 import { useTrendingShops } from '@/lib/shops/shop-hooks';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 import { Button } from '@mantine/core';
 
 interface TrendingShopsProps {
@@ -303,6 +304,11 @@ function TrendingShopCard({ shop, isActive, position, timeframe }: TrendingShopC
               {rankChange.value}
             </Badge>
           )}
+        </div>
+
+        {/* Store Status */}
+        <div className="absolute top-2 left-2 z-10">
+          <StoreStatusIndicator tenantId={shop.tenantId} />
         </div>
 
         {/* Shop Image */}

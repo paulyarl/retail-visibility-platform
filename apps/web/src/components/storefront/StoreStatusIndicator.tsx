@@ -65,22 +65,41 @@ export default function StoreStatusIndicator({ tenantId }: StoreStatusIndicatorP
 
   if (!storeStatus) return null;
 
+  const getStatusStyles = () => {
+    switch (storeStatus.status) {
+      case 'open':
+        return {
+          bg: 'bg-green-500/90',
+          text: 'text-white',
+          dot: 'bg-white'
+        };
+      case 'closing-soon':
+        return {
+          bg: 'bg-orange-500/90',
+          text: 'text-white',
+          dot: 'bg-white'
+        };
+      case 'opening-soon':
+        return {
+          bg: 'bg-blue-500/90',
+          text: 'text-white',
+          dot: 'bg-white'
+        };
+      default:
+        return {
+          bg: 'bg-red-500/90',
+          text: 'text-white',
+          dot: 'bg-white'
+        };
+    }
+  };
+
+  const styles = getStatusStyles();
+
   return (
-    <div className="flex items-center justify-center gap-2 text-sm">
-      <span className={`inline-block w-2.5 h-2.5 rounded-full ${
-        storeStatus.status === 'open' ? 'bg-green-500' :
-        storeStatus.status === 'closing-soon' ? 'bg-orange-500' :
-        storeStatus.status === 'opening-soon' ? 'bg-blue-500' :
-        'bg-red-500'
-      }`}></span>
-      <span className={`font-medium ${
-        storeStatus.status === 'open' ? 'text-green-700' :
-        storeStatus.status === 'closing-soon' ? 'text-orange-700' :
-        storeStatus.status === 'opening-soon' ? 'text-blue-700' :
-        'text-red-700'
-      }`}>
-        {storeStatus.label}
-      </span>
+    <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold backdrop-blur-sm shadow-lg ${styles.bg} ${styles.text}`}>
+      <span className={`inline-block w-2 h-2 rounded-full ${styles.dot}`}></span>
+      <span className="truncate max-w-[210px]">{storeStatus.label}</span>
     </div>
   );
 }

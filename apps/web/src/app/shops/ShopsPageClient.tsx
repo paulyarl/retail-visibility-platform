@@ -12,6 +12,7 @@ import { directorySingletonService } from '../../services/DirectorySingletonServ
 import { shopsService } from '../../services/ShopsService';
 
 import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
+import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 import { tenantStorefrontService } from '@/services/TenantStorefrontService';
 import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
@@ -264,15 +265,9 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop, onShopClick }) => {
             Featured
           </div>
         )}
-        {status && (
-          <div className={`absolute top-2 left-2 px-2 py-1 rounded-full text-xs font-semibold ${
-            status.isOpen 
-              ? 'bg-green-500 text-white' 
-              : 'bg-red-500 text-white'
-          }`}>
-            {status.isOpen ? 'Open' : 'Closed'}
-          </div>
-        )}
+        <div className="absolute top-2 left-2">
+          <StoreStatusIndicator tenantId={shop.id} />
+        </div>
       </div>
       
       <div className="p-4">
@@ -680,10 +675,37 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
-              <Link href="/shops/directory" className="text-blue-600 hover:text-blue-700 mr-4">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Shop Directory</h1>
+              {/* Navigation Links */}
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 font-medium">
+                  <Store className="h-4 w-4" />
+                  Shops
+                </span>
+                <span className="text-gray-400">•</span>
+                <Link 
+                  href="/shops/directory"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  <Grid className="h-4 w-4" />
+                  Directory
+                </Link>
+                <span className="text-gray-400">•</span>
+                <Link 
+                  href="/shops/featured"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Featured
+                </Link>
+                <span className="text-gray-400">•</span>
+                <Link 
+                  href="/shops/trending"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  Trending
+                </Link>
+              </div>
             </div>
             
             <div className="flex items-center space-x-4">

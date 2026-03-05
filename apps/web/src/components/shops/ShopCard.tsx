@@ -15,6 +15,7 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/Card'
 import { Star, MapPin, Phone, Globe, ExternalLink, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 
 interface ShopCardProps {
   shop: Shop;
@@ -181,6 +182,11 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
               <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold text-xs px-3 py-1 rounded">
                 {shop.primary_category || shop.category || 'General'}
               </div>
+
+              {/* Store Status */}
+              <div className="mt-2">
+                <StoreStatusIndicator tenantId={shop.tenantId} />
+              </div>
             </div>
           </div>
         </CardContent>
@@ -271,6 +277,9 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
                 {shop.primary_category || shop.category || 'General'}
               </div>
             </div>
+
+            {/* Store Status */}
+            <StoreStatusIndicator tenantId={shop.tenantId} />
 
             {/* URLs */}
             {showUrls && (
@@ -398,6 +407,9 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
               </Badge>
             )}
           </div>
+
+          {/* Store Status */}
+          <StoreStatusIndicator tenantId={shop.tenantId} />
         </div>
       </CardContent>
 

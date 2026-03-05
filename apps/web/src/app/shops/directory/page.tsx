@@ -22,7 +22,7 @@ import { Card } from '@mantine/core';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Layout, LayoutList, Star, Grid3X3, Store, ShoppingBag, TrendingUp, Sparkles } from 'lucide-react';
+import { Layout, LayoutList, Star, Grid3X3, Grid, Store, ShoppingBag, TrendingUp, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
@@ -167,28 +167,35 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
+              {/* Navigation Links */}
               <div className="flex items-center gap-2">
-                <Store className="h-5 w-5 text-blue-600" />
-                <span className="font-semibold text-gray-900">Shop Directory</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Link href="/shops">
-                  <Button variant="ghost" size="sm">
-                    <ShoppingBag className="h-4 w-4 mr-2" />
-                    Shops Page
-                  </Button>
+                <Link 
+                  href="/shops"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  <Store className="h-4 w-4" />
+                  Shops
                 </Link>
-                <Link href="/shops/featured">
-                  <Button variant="ghost" size="sm">
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Featured Products
-                  </Button>
+                <span className="text-gray-400">•</span>
+                <span className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 font-medium">
+                  <Grid className="h-4 w-4" />
+                  Directory
+                </span>
+                <span className="text-gray-400">•</span>
+                <Link 
+                  href="/shops/featured"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Featured
                 </Link>
-                <Link href="/shops/trending">
-                  <Button variant="ghost" size="sm">
-                    <TrendingUp className="h-4 w-4 mr-2" />
-                    Trending
-                  </Button>
+                <span className="text-gray-400">•</span>
+                <Link 
+                  href="/shops/trending"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  Trending
                 </Link>
               </div>
             </div>

@@ -29,7 +29,9 @@ import {
   CheckCircle,
   Store,
   TrendingUp,
-  ArrowRight
+  ArrowRight,
+  Grid,
+  Sparkles
 } from 'lucide-react';
 
 // Import existing components from tenant page
@@ -547,21 +549,45 @@ export default function ShopProfileClient({ shop }: {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Link href="/shops/directory">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Shops Directory
-                </Button>
-              </Link>
-              <Separator orientation="vertical" className="h-6" />
-              <div className="flex items-center space-x-2">
-                 <Link href={`/shops`}>
-                <Button variant="ghost" size="sm">
-                  Shops Home  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              </Link>
-
+              {/* Navigation Links */}
+              <div className="flex items-center gap-2">
+                <Link 
+                  href="/shops"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  <Store className="h-4 w-4" />
+                  Shops
+                </Link>
+                <span className="text-gray-400">•</span>
+                <Link 
+                  href="/shops/directory"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  <Grid className="h-4 w-4" />
+                  Directory
+                </Link>
+                <span className="text-gray-400">•</span>
+                <Link 
+                  href="/shops/featured"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Featured
+                </Link>
+                <span className="text-gray-400">•</span>
+                <Link 
+                  href="/shops/trending"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  Trending
+                </Link>
+                <span className="text-gray-400">•</span>
+                <span className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 font-medium truncate max-w-[150px]">
+                  {shopData.name}
+                </span>
               </div>
+              <Separator orientation="vertical" className="h-6" />
               <StoreStatusIndicator tenantId={shopData.tenantId} />
             </div>
             
@@ -575,8 +601,8 @@ export default function ShopProfileClient({ shop }: {
               <Separator orientation="vertical" className="h-6" />
               
               <div className="flex items-center space-x-2">
-                <Store className="h-5 w-5 text-gray-600" />
-                <span className="font-medium text-gray-900">{shopData.location}</span>
+                <MapPin className="h-4 w-4 text-gray-600" />
+                <span className="text-sm text-gray-900">{shopData.location}</span>
               </div>
             </div>
           </div>

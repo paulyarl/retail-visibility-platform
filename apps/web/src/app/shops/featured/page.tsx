@@ -9,7 +9,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, TrendingUp, Star, MapPin, ChevronDown, X } from 'lucide-react';
+import Link from 'next/link';
+import { Search, Filter, TrendingUp, Star, MapPin, ChevronDown, X, ArrowLeft, Store, Grid, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Input } from '@/components/ui/Input';
@@ -219,6 +220,37 @@ export default function FeaturedProductsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
+              {/* Navigation Links */}
+              <div className="flex items-center gap-2 mb-2">
+                <Link 
+                  href="/shops"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  <Store className="h-4 w-4" />
+                  Shops
+                </Link>
+                <span className="text-gray-400">•</span>
+                <Link 
+                  href="/shops/directory"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  <Grid className="h-4 w-4" />
+                  Directory
+                </Link>
+                <span className="text-gray-400">•</span>
+                <span className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 font-medium">
+                  <Sparkles className="h-4 w-4" />
+                  Featured
+                </span>
+                <span className="text-gray-400">•</span>
+                <Link 
+                  href="/shops/trending"
+                  className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  Trending
+                </Link>
+              </div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 Featured Products
               </h1>
