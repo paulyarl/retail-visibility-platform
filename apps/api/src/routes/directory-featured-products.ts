@@ -2,12 +2,10 @@
  * Directory Featured Products API Route
  * 
  * Aggregates featured products from multiple shops based on filters
- * Uses existing storefront endpoint for data retrieval
- * This is the proper backend implementation
+ * Queries mv_global_discovery directly for featured products
  */
 
 import { Router, Request, Response } from 'express';
-import { prisma } from '../prisma';
 
 const router = Router();
 
@@ -82,110 +80,48 @@ router.get('/', async (req: Request, res: Response) => {
     const limit = parseInt(params.limit || '20');
     const sortBy = params.sortBy || 'trending';
     
-    // Use the existing working storefront endpoint
-    const storefrontUrl = `${process.env.API_URL || 'http://localhost:4000'}/api/storefront/tid-m8ijkrnk/featured-products?limit=100`;
+    // Query featured products directly from mv_global_discovery
+    const query = `
+      SELECT 
+        inventory_item_id,
+        tenant_id,
+        sku,
+        product_name,
+        product_title,
+        product_description,
+        current_price_cents,
+        sale_price_cents,
+        stock,
+        image_url,
+        brand,
+        item_status,
+        availability,
+        product_category,
+        product_category_name_lower,
+        tenant_name,
+        tenant_slug,
+        tenant_logo_url,
+        featured_type,
+        featured_type_array,
+        featured_priority,
+        featured_at,
+        featured_is_active,
+        marketing_description,
+        condition,
+        gtin,
+        mpn,
+        currency,
+        product_metadata
+      FROM mv_global_discovery
+      WHERE featured_is_active = true
+        AND item_status = 'active'
+        AND visibility = 'public'
+      ORDER BY featured_priority DESC, featured_at DESC
+      LIMIT $1
+    `;
     
-    const response = await fetch(storefrontUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      signal: AbortSignal.timeout(10000)
-    });
-    
-    if (!response.ok) {
-      return res.json({
-        success: true,
-        data: {
-          totalCount: 0,
-          buckets: {
-            store_selection: [],
-            new_arrival: [],
-            seasonal: [],
-            sale: [],
-            featured: []
-          },
-          bucketCounts: {
-            store_selection: 0,
-            new_arrival: 0,
-            seasonal: 0,
-            sale: 0,
-            featured: 0
-          },
-          shops: [],
-          filters: {
-            search: params.search,
-            category: params.category,
-            location: params.location,
-            minRating: params.minRating,
-            minPrice: params.minPrice,
-            maxPrice: params.maxPrice,
-            trending: params.trending === 'true',
-            inStock: params.inStock === 'true',
-            sortBy
-          }
-        }
-      });
-    }
-    
-    const data = await response.json();
-    
-    if (!data || !data.items) {
-      return res.json({
-        success: true,
-        data: {
-          totalCount: 0,
-          buckets: {
-            store_selection: [],
-            new_arrival: [],
-            seasonal: [],
-            sale: [],
-            featured: []
-          },
-          bucketCounts: {
-            store_selection: 0,
-            new_arrival: 0,
-            seasonal: 0,
-            sale: 0,
-            featured: 0
-          },
-          shops: [],
-          filters: {
-            search: params.search,
-            category: params.category,
-            location: params.location,
-            minRating: params.minRating,
-            minPrice: params.minPrice,
-            maxPrice: params.maxPrice,
-            trending: params.trending === 'true',
-            inStock: params.inStock === 'true',
-            sortBy
-          }
-        }
-      });
-    }
-    
-    const allFeaturedProducts = data.items;
-    
-    // Fetch featured_type_array from database using Prisma model
-    const productIds = allFeaturedProducts.map((p: any) => p.id);
-    const featuredTypesData = await prisma.mv_global_discovery.findMany({
-      where: {
-        inventory_item_id: { in: productIds }
-      },
-      select: {
-        inventory_item_id: true,
-        featured_type_array: true
-      }
-    });
-    
-    // Create a map of product id to featured_type_array
-    const featuredTypesMap = new Map<string, string[]>();
-    featuredTypesData.forEach((item: any) => {
-      if (item.featured_type_array && Array.isArray(item.featured_type_array)) {
-        featuredTypesMap.set(item.inventory_item_id, item.featured_type_array);
-      }
-    });
+    const { getDirectPool } = await import('../utils/db-pool');
+    const result = await getDirectPool().query(query, [limit * 5]); // Get more to account for filtering
     
     // Initialize buckets
     const buckets: Record<string, any[]> = {
@@ -204,122 +140,111 @@ router.get('/', async (req: Request, res: Response) => {
       featured: 0
     };
     
-    let totalProducts = 0;
     const featuredShops = new Map<string, { id: string; name: string; slug: string; logo?: string; tier: string }>();
-    const usedProductIds = new Set<string>(); // Track unique products
+    const usedProductIds = new Set<string>();
     
-    // Process featured products
-    for (const product of allFeaturedProducts) {
-      // Skip if product already used
-      if (usedProductIds.has(product.id)) {
+    // Process products
+    for (const product of result.rows) {
+      if (usedProductIds.has(product.inventory_item_id)) {
         continue;
       }
       
-      // Add shop info to the Map if not already present
-      if (product.tenantId && product.tenantName && !featuredShops.has(product.tenantId)) {
-        featuredShops.set(product.tenantId, {
-          id: product.tenantId,
-          name: product.tenantName,
-          slug: product.tenantSlug || product.tenantId,
-          logo: product.tenantLogoUrl,
-          tier: 'professional' // Default tier for now
+      // Add shop info
+      if (product.tenant_id && product.tenant_name && !featuredShops.has(product.tenant_id)) {
+        featuredShops.set(product.tenant_id, {
+          id: product.tenant_id,
+          name: product.tenant_name,
+          slug: product.tenant_slug || product.tenant_id,
+          logo: product.tenant_logo_url,
+          tier: 'professional'
         });
       }
       
-      // Map API fields to expected frontend fields
       const mappedProduct = {
-        ...product,
-        shopName: product.tenant_name || product.tenantName,
-        shopSlug: product.tenant_slug || product.tenantSlug || product.tenantId,
-        tenantName: product.tenant_name || product.tenantName,
-        tenantLogo: product.tenant_logo_url || product.tenantLogoUrl,
-        featuredTypes: featuredTypesMap.get(product.id) || (product.featuredType ? [product.featuredType] : [])
+        id: product.inventory_item_id,
+        tenantId: product.tenant_id,
+        sku: product.sku,
+        name: product.product_name,
+        title: product.product_title,
+        description: product.product_description,
+        priceCents: product.current_price_cents,
+        salePriceCents: product.sale_price_cents,
+        stock: product.stock,
+        imageUrl: product.image_url,
+        brand: product.brand,
+        itemStatus: product.item_status,
+        availability: product.availability,
+        categoryName: product.product_category_name_lower,
+        categorySlug: product.product_category,
+        tenantName: product.tenant_name,
+        tenantSlug: product.tenant_slug,
+        tenantLogoUrl: product.tenant_logo_url,
+        featuredType: product.featured_type,
+        featuredTypes: product.featured_type_array || (product.featured_type ? [product.featured_type] : []),
+        marketingDescription: product.marketing_description,
+        condition: product.condition,
+        gtin: product.gtin,
+        mpn: product.mpn,
+        currency: product.currency,
+        metadata: product.product_metadata
       };
       
       // Apply filters
-      if (params.search && !matchesSearch(mappedProduct, params.search)) {
-        continue;
+      if (params.search) {
+        const searchLower = params.search.toLowerCase();
+        const matches = 
+          mappedProduct.name?.toLowerCase().includes(searchLower) ||
+          mappedProduct.description?.toLowerCase().includes(searchLower) ||
+          mappedProduct.brand?.toLowerCase().includes(searchLower) ||
+          mappedProduct.tenantName?.toLowerCase().includes(searchLower);
+        if (!matches) continue;
       }
       
       if (params.category && mappedProduct.categoryName !== params.category) {
         continue;
       }
       
-      if (params.location && mappedProduct.tenantCity !== params.location) {
+      if (params.inStock === 'true' && (!mappedProduct.stock || mappedProduct.stock === 0)) {
         continue;
       }
       
-      if (params.minRating && (!mappedProduct.averageRating || parseFloat(mappedProduct.averageRating) < parseFloat(params.minRating))) {
-        continue;
-      }
-      
-      if (params.minPrice && mappedProduct.priceCents && (mappedProduct.priceCents / 100) < parseFloat(params.minPrice)) {
-        continue;
-      }
-      
-      if (params.maxPrice && mappedProduct.priceCents && (mappedProduct.priceCents / 100) > parseFloat(params.maxPrice)) {
-        continue;
-      }
-      
-      if (params.inStock === 'true' && !mappedProduct.inStock) {
-        continue;
-      }
-      
-      // Determine bucket based on featured type (priority order)
+      // Place in bucket based on featured type
       let placedInBucket = false;
+      const featuredType = mappedProduct.featuredType;
       
-      // Priority 1: Explicit featured types
-      if (mappedProduct.featuredType === 'store_selection') {
+      if (featuredType === 'store_selection' || mappedProduct.featuredTypes?.includes('store_selection')) {
         buckets.store_selection.push(mappedProduct);
         bucketCounts.store_selection++;
-        totalProducts++;
-        usedProductIds.add(product.id);
         placedInBucket = true;
-      } else if (mappedProduct.featuredType === 'new_arrival') {
+      } else if (featuredType === 'new_arrival' || mappedProduct.featuredTypes?.includes('new_arrival')) {
         buckets.new_arrival.push(mappedProduct);
         bucketCounts.new_arrival++;
-        totalProducts++;
-        usedProductIds.add(product.id);
         placedInBucket = true;
-      } else if (mappedProduct.featuredType === 'seasonal') {
+      } else if (featuredType === 'seasonal' || mappedProduct.featuredTypes?.includes('seasonal')) {
         buckets.seasonal.push(mappedProduct);
         bucketCounts.seasonal++;
-        totalProducts++;
-        usedProductIds.add(product.id);
         placedInBucket = true;
-      } else if (mappedProduct.featuredType === 'sale') {
+      } else if (featuredType === 'sale' || mappedProduct.featuredTypes?.includes('sale')) {
         buckets.sale.push(mappedProduct);
         bucketCounts.sale++;
-        totalProducts++;
-        usedProductIds.add(product.id);
         placedInBucket = true;
       }
       
-      // Priority 2: Auto-featured (only if not already placed)
       if (!placedInBucket) {
-        if (
-          (mappedProduct.averageRating && parseFloat(mappedProduct.averageRating) >= 4.0) ||
-          (params.trending === 'true' && isTrending(mappedProduct)) ||
-          mappedProduct.featuredType === 'featured'
-        ) {
-          buckets.featured.push(mappedProduct);
-          bucketCounts.featured++;
-          totalProducts++;
-          usedProductIds.add(product.id);
-          placedInBucket = true;
-        }
+        buckets.featured.push(mappedProduct);
+        bucketCounts.featured++;
       }
+      
+      usedProductIds.add(product.inventory_item_id);
     }
     
     // Sort products within each bucket
     for (const bucketType of Object.keys(buckets)) {
       buckets[bucketType] = sortProducts(buckets[bucketType], sortBy);
-    }
-    
-    // Limit products per bucket
-    for (const bucketType of Object.keys(buckets)) {
       buckets[bucketType] = applyTierLimits(buckets[bucketType], limit);
     }
+    
+    const totalProducts = Object.values(bucketCounts).reduce((a, b) => a + b, 0);
     
     return res.json({
       success: true,
