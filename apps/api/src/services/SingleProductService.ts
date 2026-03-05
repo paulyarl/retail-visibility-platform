@@ -48,6 +48,8 @@ export interface SingleProductResult {
   }>;
   createdAt: Date;
   updatedAt: Date;
+  // Featured types
+  featuredTypes?: string[];
   metadata?: any;
   tenantId: string;
   itemStatus: string;
@@ -142,6 +144,20 @@ export class SingleProductService {
         }
       }) : null;
 
+    // Get featured types from mv_global_discovery using Prisma model
+    let featuredTypes: string[] = [];
+    try {
+      const mvData = await prisma.mv_global_discovery.findUnique({
+        where: { inventory_item_id: productId },
+        select: { featured_type_array: true }
+      });
+      if (mvData?.featured_type_array && Array.isArray(mvData.featured_type_array)) {
+        featuredTypes = mvData.featured_type_array as string[];
+      }
+    } catch (err) {
+      console.log('[SingleProductService] Could not fetch featured types from MV:', err);
+    }
+
     // Transform the product data
     const transformedProduct: SingleProductResult = {
       id: product.id,
@@ -196,7 +212,9 @@ export class SingleProductService {
         name: category.name,
         slug: category.slug,
         googleCategoryId: null
-      } : null
+      } : null,
+      // Featured types from MV
+      featuredTypes: featuredTypes
     };
 
     // Cache the result

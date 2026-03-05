@@ -67,6 +67,16 @@ class ProductPhotosService extends PublicApiSingleton {
    */
   async getProductPhotos(productData: any): Promise<Photo[]> {
     try {
+      // Handle EnhancedProduct format (from mv_global_discovery)
+      if (productData.image_urls && Array.isArray(productData.image_urls) && productData.image_urls.length > 0) {
+        return productData.image_urls.map((url: string, index: number) => ({
+          url,
+          alt: productData.product_title || null,
+          caption: null,
+          position: index,
+        }));
+      }
+      
       // Use images from the product data (already fetched from /public/products/:id)
       if (productData.images && Array.isArray(productData.images)) {
         return productData.images.map((img: any) => ({
@@ -77,8 +87,23 @@ class ProductPhotosService extends PublicApiSingleton {
         }));
       }
       
+      // Single image fallback
+      if (productData.image_url) {
+        return [{
+          url: productData.image_url,
+          alt: productData.product_title || productData.title || null,
+          caption: null,
+          position: 0,
+        }];
+      }
+      
       // Fallback: try photos endpoint (for backward compatibility)
-      return await this.fetchProductPhotos(productData.id);
+      const id = productData.inventory_item_id || productData.id;
+      if (id) {
+        return await this.fetchProductPhotos(id);
+      }
+      
+      return [];
     } catch (error) {
       console.warn('Error fetching product photos:', error);
       return [];

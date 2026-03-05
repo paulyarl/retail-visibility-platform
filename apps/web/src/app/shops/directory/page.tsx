@@ -16,13 +16,8 @@ import { TrendingShops } from '@/components/shops/TrendingShops';
 import { ShopSearch } from '@/components/shops/ShopSearch';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Card } from '@mantine/core';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Layout, LayoutList, Star, Grid3X3, Grid, Store, ShoppingBag, TrendingUp, Sparkles } from 'lucide-react';
+import { Button, Badge, Card, Group, Text, Stack, Tabs, TabsList, TabsTab, TabsPanel, TextInput, Select } from '@mantine/core';
+import { Layout, LayoutList, Star, Grid3X3, Grid, Store, ShoppingBag, TrendingUp, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
@@ -245,8 +240,8 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
                 </label>
                 <Select
                   value={filters.category}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
-                  options={[
+                  onChange={(value) => handleCategoryChange(value || '')}
+                  data={[
                     { value: '', label: 'All Categories' },
                     ...filteredCategories.map((category) => ({
                       value: category.id,
@@ -261,7 +256,7 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Region
                 </label>
-                <Input
+                <TextInput
                   placeholder="Enter city or region"
                   value={filters.region}
                   onChange={(e) => handleRegionChange(e.target.value)}
@@ -275,8 +270,8 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
                 </label>
                 <Select
                   value={pagination.sortBy}
-                  onChange={(e) => handleSortChange(e.target.value)}
-                  options={[
+                  onChange={(value) => handleSortChange(value || 'name')}
+                  data={[
                     { value: 'name', label: 'Name' },
                     { value: 'rating', label: 'Rating' },
                     { value: 'productCount', label: 'Products' },
@@ -302,36 +297,39 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
             {hasFilters && (
               <div className="flex flex-wrap gap-2 pt-4 border-t">
                 {filters.search && (
-                  <Badge variant="default" className="flex items-center gap-1">
+                  <Badge variant="light" className="flex items-center gap-1">
                     Search: "{filters.search}"
-                    <button
+                    <Button
+                      variant="subtle"
                       onClick={() => handleFilterChange({ search: '' })}
                       className="ml-1 text-xs hover:text-gray-700"
                     >
-                      ×
-                    </button>
+                      <X className="h-3 w-3" />
+                    </Button>
                   </Badge>
                 )}
                 {filters.category && (
-                  <Badge variant="default" className="flex items-center gap-1">
+                  <Badge variant="light" className="flex items-center gap-1">
                     Category: {filteredCategories.find(c => c.id === filters.category)?.name}
-                    <button
+                    <Button
+                      variant="subtle"
                       onClick={() => handleFilterChange({ category: '' })}
                       className="ml-1 text-xs hover:text-gray-700"
                     >
-                      ×
-                    </button>
+                      <X className="h-3 w-3" />
+                    </Button>
                   </Badge>
                 )}
                 {filters.region && (
-                  <Badge variant="default" className="flex items-center gap-1">
+                  <Badge variant="light" className="flex items-center gap-1">
                     Region: "{filters.region}"
-                    <button
+                    <Button
+                      variant="subtle"
                       onClick={() => handleFilterChange({ region: '' })}
                       className="ml-1 text-xs hover:text-gray-700"
                     >
-                      ×
-                    </button>
+                      <X className="h-3 w-3" />
+                    </Button>
                   </Badge>
                 )}
               </div>
@@ -451,7 +449,7 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
                 : 'Check back later for new shops'}
             </p>
             {hasFilters && (
-              <Button onClick={clearFilters}>
+              <Button onClick={clearFilters} variant="light">
                 Clear Filters
               </Button>
             )}

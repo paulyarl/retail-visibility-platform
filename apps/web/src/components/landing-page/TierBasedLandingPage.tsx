@@ -11,6 +11,44 @@ import ProductActions from '@/components/products/ProductActions';
 import { storefrontService } from '@/services/StorefrontService';
 import Link from 'next/link';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
+import { Badge, Group } from '@mantine/core';
+import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame, Package } from 'lucide-react';
+
+// Featured Type Badge Component with icons
+function FeaturedTypeBadges({ featuredTypes }: { featuredTypes: string[] }) {
+  // Map featured types to icons, colors, and labels
+  const typeConfig: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
+    new_arrival: { icon: <Zap className="w-4 h-4" />, color: 'green', label: 'New Arrival' },
+    seasonal: { icon: <Clock className="w-4 h-4" />, color: 'orange', label: 'Seasonal' },
+    sale: { icon: <Tag className="w-4 h-4" />, color: 'red', label: 'On Sale' },
+    staff_pick: { icon: <Award className="w-4 h-4" />, color: 'violet', label: 'Staff Pick' },
+    clearance: { icon: <Package className="w-4 h-4" />, color: 'yellow', label: 'Clearance' },
+    featured: { icon: <Star className="w-4 h-4" />, color: 'blue', label: 'Featured' },
+    trending: { icon: <TrendingUp className="w-4 h-4" />, color: 'pink', label: 'Trending' },
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+      <Group gap="sm" justify="center">
+        {featuredTypes.map((type, index) => {
+          const config = typeConfig[type] || { icon: <Sparkles className="w-4 h-4" />, color: 'gray', label: type };
+          return (
+            <Badge
+              key={index}
+              variant="filled"
+              color={config.color}
+              size="lg"
+              leftSection={config.icon}
+              className="px-4 py-2"
+            >
+              {config.label}
+            </Badge>
+          );
+        })}
+      </Group>
+    </div>
+  );
+}
 
 // Public QR Code Section Component
 function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl: string; productName: string; tenantId: string }) {
@@ -279,6 +317,9 @@ interface Product {
   sku: string;
   availability: string;
   
+  // Featured types
+  featuredTypes?: string[];
+  
   // Category assignment
   tenantCategoryId?: string | null;
   tenantCategory?: {
@@ -428,6 +469,11 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           )}
         </div>
 
+        {/* Featured Type Badges - Prominent display below hero */}
+        {product.featuredTypes && product.featuredTypes.length > 0 && (
+          <FeaturedTypeBadges featuredTypes={product.featuredTypes} />
+        )}
+
         {/* Product Actions - Share, Print, Like */}
         <ProductActions 
           product={product} 
@@ -494,7 +540,11 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
 
           {/* Add to Cart Button - Only show if tenant has order processing enabled */}
           {tenant.hasActivePaymentGateway && (
-            <div className="mb-6">
+            <div className="mb-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 rounded-xl border-2 border-blue-200 dark:border-blue-800 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Add to Cart</span>
+              </div>
               <AddToCartButton
                 product={{
                   id: product.id,

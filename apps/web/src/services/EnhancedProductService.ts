@@ -397,8 +397,8 @@ class EnhancedProductService extends PublicApiSingleton {
       review_count: data.review_count,
       
       // Featured status - prioritize featured_type_array over single featured_type
-      featured_type: data.featured_type_array || data.featured_type,
-      featured_type_array: data.featured_type_array || (data.featured_type ? [data.featured_type] : []),
+      featured_type: data.featuredTypes || data.featured_type_array || data.featured_type,
+      featured_type_array: data.featuredTypes || data.featured_type_array || (data.featured_type ? [data.featured_type] : []),
       featured_priority: data.featured_priority,
       featured_at: data.featured_at,
       featured_until: data.featured_until,
@@ -423,19 +423,20 @@ class EnhancedProductService extends PublicApiSingleton {
   getFeaturedTypeBadges(product: EnhancedProduct): FeaturedType[] {
     const badges: FeaturedType[] = [];
     
-    if (product.is_actively_featured && product.featured_type_array && product.featured_type_array.length > 0) {
+    // Show featured types if the array has values
+    if (product.featured_type_array && product.featured_type_array.length > 0) {
       product.featured_type_array.forEach((type, index) => {
         badges.push({
           type: this.mapFeaturedType(type),
           label: this.formatFeaturedTypeLabel(this.mapFeaturedType(type)),
           priority: product.featured_priority || index,
-          active: product.featured_is_active || false
+          active: product.featured_is_active || true
         });
       });
     }
     
     // Add automatic badges based on data
-    if (parseFloat(product.trending_score) > 0.5) {
+    if (product.trending_score && parseFloat(product.trending_score) > 0.5) {
       badges.push({
         type: 'trending',
         label: 'Trending',

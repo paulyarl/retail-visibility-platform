@@ -8,12 +8,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useEffect } from 'react';
-import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Separator } from '@/components/ui/Separator';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { Button, Card, Badge, Tabs, TabsList, TabsTab, TabsPanel, Skeleton, Group, Text, Divider, Container, Stack } from '@mantine/core';
 import { 
   MapPin, 
   Phone, 
@@ -231,7 +226,7 @@ function ShopProfileHeader({ shop, shopData }: {
                 <div className="flex items-center space-x-3 mb-2">
                   <h1 className="text-3xl font-bold text-gray-900">{shopData.name}</h1>
                   {shopData.is_published && (
-                    <Badge variant="success" className="text-xs">
+                    <Badge variant="filled" color="green" size="sm">
                       Verified
                     </Badge>
                   )}
@@ -258,7 +253,7 @@ function ShopProfileHeader({ shop, shopData }: {
                   </div>
 
                   {shopData.primary_category||shopData.category && (
-                    <Badge variant="default" className="text-xs">
+                    <Badge variant="light" size="sm">
                       {shopData.primary_category||shopData.category}
                     </Badge>
                   )}
@@ -286,58 +281,36 @@ function ShopProfileHeader({ shop, shopData }: {
 
             {/* Shop Description */}
             {shopData.tenantName && (
-              <Card>
-                <CardContent className="pt-6">
-                  <p className="text-gray-700 leading-relaxed">
-                    Welcome to {shopData.name}! We're proud to be part of the {shopData.tenantName} family,
-                    offering carefully curated products and exceptional service.
-                  </p>
-                </CardContent>
+              <Card withBorder padding="lg" radius="md">
+                <Text className="text-gray-700 leading-relaxed">
+                  Welcome to {shopData.name}! We're proud to be part of the {shopData.tenantName} family,
+                  offering carefully curated products and exceptional service.
+                </Text>
               </Card>
             )}
 
             {/* Contact Information */}
             {(shopData.contact?.phone || shopData.contact?.website) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Contact Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {shopData.contact?.phone && (
-                      <div className="flex items-center space-x-2">
-                        <Phone className="h-4 w-4 text-gray-400" />
-                        <a href={`tel:${shopData.contact.phone}`} className="text-blue-600 hover:underline">
-                          {shopData.contact.phone}
-                        </a>
-                      </div>
-                    )}
-                    
-                    {shopData.contact?.email && (
-                      <div className="flex items-center space-x-2">
-                        <Globe className="h-4 w-4 text-gray-400" />
-                        <a href={`mailto:${shopData.contact.email}`} className="text-blue-600 hover:underline">
-                          {shopData.contact.email}
-                        </a>
-                      </div>
-                    )}
-                    
-                    {shopData.contact?.website && (
-                      <div className="flex items-center space-x-2">
-                        <Globe className="h-4 w-4 text-gray-400" />
-                        <a 
-                          href={shopData.contact.website} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline flex items-center"
-                        >
-                          <ExternalLink className="h-3 w-3 mr-1" />
-                          {shopData.contact.website}
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
+              <Card withBorder padding="lg" radius="md">
+                <Text fw={600} size="lg" mb="md">Contact Information</Text>
+                <Stack gap="sm">
+                  {shopData.contact?.phone && (
+                    <Group gap="xs">
+                      <Phone className="h-4 w-4 text-gray-500" />
+                      <a href={`tel:${shopData.contact.phone}`} className="text-blue-600 hover:underline">
+                        {shopData.contact.phone}
+                      </a>
+                    </Group>
+                  )}
+                  {shopData.contact?.website && (
+                    <Group gap="xs">
+                      <Globe className="h-4 w-4 text-gray-500" />
+                      <a href={shopData.contact.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        {shopData.contact.website}
+                      </a>
+                    </Group>
+                  )}
+                </Stack>
               </Card>
             )}
 
@@ -394,106 +367,94 @@ function ShopProfileHeader({ shop, shopData }: {
           {/* Sidebar - 1/3 width */}
           <div className="space-y-6">
             {shopData.address && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Location</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                    <StorefrontMap
-                      tenant={{
-                        id: shopData.tenantId,
-                        businessName: shopData.name,
-                        slug: shopData.slug,
-                        metadata: {
-                          address: shopData.address,
-                          city: shopData.city,
-                          state: shopData.state,
-                          zip_code: shopData.zip_code,
-                          zipCode: shopData.zip_code,
-                          logo_url: shopData.imageUrl,
-                          latitude: shopData.latitude,
-                          longitude: shopData.longitude
-                        }
-                      }}
-                      primaryCategory={shopData.primary_category||shopData.category}
-                      productCount={shopData.productCount}
-                    />
-                  </div>
+              <Card withBorder padding="lg" radius="md">
+                <Text fw={600} size="lg" mb="md">Location</Text>
+                <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4">
+                  <StorefrontMap
+                    tenant={{
+                      id: shopData.tenantId,
+                      businessName: shopData.name,
+                      slug: shopData.slug,
+                      metadata: {
+                        address: shopData.address,
+                        city: shopData.city,
+                        state: shopData.state,
+                        zip_code: shopData.zip_code,
+                        zipCode: shopData.zip_code,
+                        logo_url: shopData.imageUrl,
+                        latitude: shopData.latitude,
+                        longitude: shopData.longitude
+                      }
+                    }}
+                    primaryCategory={shopData.primary_category||shopData.category}
+                    productCount={shopData.productCount}
+                  />
+                </div>
+                
+                <Stack gap="xs">
+                  <Group gap="xs">
+                    <MapPin className="h-4 w-4 text-gray-400" />
+                    <Text size="sm" className="text-gray-700">
+                      {shopData.address}
+                      {shopData.city && `, ${shopData.city}`}
+                      {shopData.state && ` ${shopData.state}`}
+                      {shopData.zip_code && ` ${shopData.zip_code}`}
+                    </Text>
+                  </Group>
                   
-                  <div className="mt-4">
-                    <div className="flex items-start space-x-2">
-                      <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                      <span className="text-gray-700">
-                        {shopData.address}
-                        {shopData.city && `, ${shopData.city}`}
-                        {shopData.state && ` ${shopData.state}`}
-                        {shopData.zip_code && ` ${shopData.zip_code}`}
-                      </span>
-                    </div>
-                    
-                    {shopData.contact?.phone && (
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Phone className="h-4 w-4 text-gray-400" />
-                        <a href={`tel:${shopData.contact.phone}`} className="text-blue-600 hover:underline">
-                          {shopData.contact.phone}
-                        </a>
-                      </div>
-                    )}
-                    
-                    {shopData.contact?.website && (
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Globe className="h-4 w-4 text-gray-400" />
-                        <a 
-                          href={shopData.contact.website} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline flex items-center"
-                        >
-                          <ExternalLink className="h-3 w-3 mr-1" />
-                          {shopData.contact.website}
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
+                  {shopData.contact?.phone && (
+                    <Group gap="xs">
+                      <Phone className="h-4 w-4 text-gray-400" />
+                      <a href={`tel:${shopData.contact.phone}`} className="text-blue-600 hover:underline">
+                        {shopData.contact.phone}
+                      </a>
+                    </Group>
+                  )}
+                  
+                  {shopData.contact?.website && (
+                    <Group gap="xs">
+                      <Globe className="h-4 w-4 text-gray-400" />
+                      <a 
+                        href={shopData.contact.website} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline flex items-center"
+                      >
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        {shopData.contact.website}
+                      </a>
+                    </Group>
+                  )}
+                </Stack>
               </Card>
             )}
 
             {/* Quick Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Shop Stats</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{shopData.productCount}</div>
-                    <div className="text-sm text-gray-600">Products</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {shopData.rating ? shopData.rating.toFixed(1) : 'N/A'}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Rating {shopData.rating_count ? `(${shopData.rating_count} reviews)` : ''}
-                    </div>
-                  </div>
+            <Card withBorder padding="lg" radius="md">
+              <Text fw={600} size="lg" mb="md">Shop Stats</Text>
+              <Group grow>
+                <div className="text-center">
+                  <Text fw={700} size="xl" c="blue">{shopData.productCount}</Text>
+                  <Text size="sm" c="dimmed">Products</Text>
                 </div>
-              </CardContent>
+                <div className="text-center">
+                  <Text fw={700} size="xl" c="green">
+                    {shopData.rating ? shopData.rating.toFixed(1) : 'N/A'}
+                  </Text>
+                  <Text size="sm" c="dimmed">
+                    Rating {shopData.rating_count ? `(${shopData.rating_count} reviews)` : ''}
+                  </Text>
+                </div>
+              </Group>
             </Card>
 
             {/* Shop Description */}
             {shopData.description && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">About Us</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-700 leading-relaxed">
-                    {shopData.description}
-                  </p>
-                </CardContent>
+              <Card withBorder padding="lg" radius="md">
+                <Text fw={600} size="lg" mb="md">About Us</Text>
+                <Text className="text-gray-700 leading-relaxed">
+                  {shopData.description}
+                </Text>
               </Card>
             )}
           </div>
@@ -587,7 +548,7 @@ export default function ShopProfileClient({ shop }: {
                   {shopData.name}
                 </span>
               </div>
-              <Separator orientation="vertical" className="h-6" />
+              <Divider orientation="vertical" h={24} />
               <StoreStatusIndicator tenantId={shopData.tenantId} />
             </div>
             
@@ -598,7 +559,7 @@ export default function ShopProfileClient({ shop }: {
                 </Button>
               </Link>
               
-              <Separator orientation="vertical" className="h-6" />
+              <Divider orientation="vertical" h={24} />
               
               <div className="flex items-center space-x-2">
                 <MapPin className="h-4 w-4 text-gray-600" />

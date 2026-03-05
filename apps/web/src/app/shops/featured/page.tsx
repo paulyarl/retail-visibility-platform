@@ -11,9 +11,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Search, Filter, TrendingUp, Star, MapPin, ChevronDown, X, ArrowLeft, Store, Grid, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Select } from '@/components/ui/Select';
-import { Input } from '@/components/ui/Input';
+import { Button, Select, TextInput, Badge, Card, Group, Text, Stack } from '@mantine/core';
 import FeaturedBucketSimple from '@/components/storefront/FeaturedBucketSimple';
 import { directorySingletonService } from '@/services/DirectorySingletonService';
 import { shopsService } from '@/services/ShopsService';
@@ -284,11 +282,12 @@ export default function FeaturedProductsPage() {
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
+                <TextInput
                   placeholder="Search products..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  leftSection={<Search className="h-4 w-4 text-gray-400" />}
+                  className="flex-1"
                 />
               </div>
             </div>
@@ -297,8 +296,8 @@ export default function FeaturedProductsPage() {
             <div className="flex gap-2">
               <Select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                options={[
+                onChange={(value) => setSortBy(value || 'trending')}
+                data={[
                   { value: 'trending', label: 'Trending' },
                   { value: 'rating', label: 'Highest Rated' },
                   { value: 'newest', label: 'Newest' },
@@ -308,7 +307,7 @@ export default function FeaturedProductsPage() {
               />
               
               <Button
-                variant={filters.trending ? 'default' : 'outline'}
+                variant={filters.trending ? 'filled' : 'outline'}
                 size="sm"
                 onClick={() => handleFilterChange('trending', !filters.trending)}
               >
@@ -345,7 +344,7 @@ export default function FeaturedProductsPage() {
                   </button>
                 </span>
               )}
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
+              <Button variant="subtle" size="sm" onClick={clearFilters}>
                 Clear all
               </Button>
             </div>
@@ -360,7 +359,7 @@ export default function FeaturedProductsPage() {
             <div className="p-6 border-b">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Filters</h3>
-                <Button variant="ghost" size="sm" onClick={() => setShowFilters(false)}>
+                <Button variant="subtle" size="sm" onClick={() => setShowFilters(false)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -372,8 +371,8 @@ export default function FeaturedProductsPage() {
                 <label className="block text-sm font-medium mb-2">Category</label>
                 <Select
                   value={filters.category}
-                  onChange={(e) => handleFilterChange('category', e.target.value)}
-                  options={[
+                  onChange={(value) => handleFilterChange('category', value || '')}
+                  data={[
                     { value: '', label: 'All Categories' },
                     ...categories.map(cat => ({
                       value: cat.name,
@@ -388,8 +387,8 @@ export default function FeaturedProductsPage() {
                 <label className="block text-sm font-medium mb-2">Location</label>
                 <Select
                   value={filters.location}
-                  onChange={(e) => handleFilterChange('location', e.target.value)}
-                  options={[
+                  onChange={(value) => handleFilterChange('location', value || '')}
+                  data={[
                     { value: '', label: 'All Locations' },
                     ...locations.map(loc => ({
                       value: loc.name,
@@ -404,8 +403,8 @@ export default function FeaturedProductsPage() {
                 <label className="block text-sm font-medium mb-2">Minimum Rating</label>
                 <Select
                   value={filters.rating}
-                  onChange={(e) => handleFilterChange('rating', e.target.value)}
-                  options={[
+                  onChange={(value) => handleFilterChange('rating', value || '')}
+                  data={[
                     { value: '', label: 'All Ratings' },
                     { value: '4.5', label: '4.5+ Stars' },
                     { value: '4', label: '4+ Stars' },
@@ -420,8 +419,8 @@ export default function FeaturedProductsPage() {
                 <label className="block text-sm font-medium mb-2">Price Range</label>
                 <Select
                   value={filters.priceRange}
-                  onChange={(e) => handleFilterChange('priceRange', e.target.value)}
-                  options={[
+                  onChange={(value) => handleFilterChange('priceRange', value || '')}
+                  data={[
                     { value: '', label: 'All Prices' },
                     { value: '0-25', label: 'Under $25' },
                     { value: '25-50', label: '$25 - $50' },
@@ -552,7 +551,7 @@ export default function FeaturedProductsPage() {
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               Try adjusting your filters or search terms
             </p>
-            <Button onClick={clearFilters}>
+            <Button onClick={clearFilters} variant="light">
               Clear Filters
             </Button>
           </div>

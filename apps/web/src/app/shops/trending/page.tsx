@@ -12,8 +12,7 @@ import { ShopCard } from '@/components/shops/ShopCard';
 import { ShopPagination } from '@/components/shops/ShopPagination';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+import { Button, Badge, Card, Group, Text, Stack, Select } from '@mantine/core';
 import { ArrowLeft, TrendingUp, Star, MapPin, Package, Store, Grid, Sparkles } from 'lucide-react';
 import { useTrendingShops } from '@/lib/shops/shop-hooks';
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
@@ -168,7 +167,7 @@ function TrendingShopsPageContent() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <h1 className="text-2xl font-bold text-gray-900">Trending Shops</h1>
-              <Badge variant="default" className="bg-red-100 text-red-800">
+              <Badge variant="filled" color="red" size="lg">
                 Hot
               </Badge>
             </div>
@@ -223,7 +222,7 @@ function TrendingShopsPageContent() {
                 <div key={shop.id} className="relative">
                   {/* Trending Badge */}
                   <div className="absolute top-2 right-2 z-10">
-                    <Badge variant="default" className="bg-red-500 text-white">
+                    <Badge variant="filled" color="red">
                       #{index + 1}
                     </Badge>
                   </div>
@@ -288,7 +287,7 @@ function TrendingShopsPageContent() {
             <p className="text-gray-600 mb-4">
               {region ? `No trending shops found in ${region}.` : 'No trending shops available at the moment.'}
             </p>
-            <Button onClick={() => router.push('/shops/directory')}>
+            <Button onClick={() => router.push('/shops/directory')} variant="light">
               Browse All Shops
             </Button>
           </div>

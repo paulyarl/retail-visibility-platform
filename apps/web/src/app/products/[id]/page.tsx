@@ -14,41 +14,42 @@ import ProductBusinessInfoCollapsible from '@/components/products/ProductBusines
 import ProductReviewsSection from '@/components/products/ProductReviewsSection';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
 import StorefrontActions from '@/components/storefront/StorefrontActions';
-import { productDataService, type Product, type Tenant } from '@/services/ProductDataService';
+import { enhancedProductService, type EnhancedProduct, type FeaturedType } from '@/services/EnhancedProductService';
 import { productPhotosService, type Photo } from '@/services/ProductPhotosService';
+import { Badge, Group } from '@mantine/core';
+import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame } from 'lucide-react';
 
 // Force dynamic rendering for product pages
 export const dynamic = 'force-dynamic';
 export const revalidate = 60; // Revalidate every 60 seconds
 
-async function getProduct(id: string): Promise<{ product: Product; tenant: Tenant | null; storeStatus?: any; directorySlug?: string } | null> {
-  return await productDataService.getProductWithTenant(id);
+async function getProduct(id: string): Promise<EnhancedProduct | null> {
+  return await enhancedProductService.fetchProductWithVariants(id);
 }
 
-async function getProductPhotos(productData: any): Promise<Photo[]> {
+async function getProductPhotos(productData: EnhancedProduct): Promise<Photo[]> {
   return await productPhotosService.getProductPhotos(productData);
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const data = await getProduct(id);
+  const product = await getProduct(id);
 
-  if (!data) {
+  if (!product) {
     return {
       title: 'Product Not Found',
     };
   }
 
-  const { product, tenant } = data;
-  const businessName = tenant?.metadata?.businessName || tenant?.name || 'Unknown Store';
+  const businessName = product.tenant_name || 'Unknown Store';
 
   return {
-    title: `${product.title} - ${businessName}`,
-    description: product.description || `Buy ${product.title} from ${businessName}. ${product.brand} - ${product.currency} ${product.price}`,
+    title: `${product.product_title} - ${businessName}`,
+    description: product.product_description || `Buy ${product.product_title} from ${businessName}. ${product.brand} - ${product.currency} ${product.price}`,
     openGraph: {
-      title: product.title,
-      description: product.description,
-      images: product.imageUrl ? [product.imageUrl] : [],
+      title: product.product_title,
+      description: product.product_description,
+      images: product.image_url ? [product.image_url] : [],
       type: 'website',
     },
   };
@@ -56,35 +57,34 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const data = await getProduct(id);
+  const product = await getProduct(id);
 
-  if (!data) {
+  if (!product) {
     notFound();
   }
 
-  const { product, tenant, storeStatus, directorySlug } = data;
-  const businessName = tenant?.metadata?.businessName || tenant?.name || 'Unknown Store';
+  const businessName = product.tenant_name || 'Unknown Store';
   
-  // Track product view for recommendations (using client component)
-  // This will run on the client side where we can access localStorage for user info
+  // Get featured type badges
+  const featuredBadges = enhancedProductService.getFeaturedTypeBadges(product);
 
   // Check if product is publicly accessible
-  const isPubliclyAccessible = product.itemStatus === 'active' && product.visibility === 'public';
-  const statusLabel = product.itemStatus === 'draft' ? 'Draft' : product.itemStatus === 'archived' ? 'Archived' : product.itemStatus;
+  const isPubliclyAccessible = product.item_status === 'active' && product.visibility === 'public';
+  const statusLabel = product.item_status === 'draft' ? 'Draft' : product.item_status === 'archived' ? 'Archived' : product.item_status;
   const visibilityLabel = product.visibility === 'private' ? 'Private' : 'Public';
 
   // Build image gallery: use images from product data
   const photos = await getProductPhotos(product);
   const gallery = photos.length > 0
     ? photos
-    : (product.imageUrl ? [{ url: product.imageUrl, alt: product.title, caption: null, position: 0 }] : []);
+    : (product.image_url ? [{ url: product.image_url, alt: product.product_title, caption: null, position: 0 }] : []);
 
   // Structured data for Google
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': 'Product',
-    name: product.title,
-    description: product.description,
+    name: product.product_title,
+    description: product.product_description,
     brand: {
       '@type': 'Brand',
       name: product.brand,
@@ -92,10 +92,10 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     sku: product.sku,
     gtin: product.gtin,
     mpn: product.mpn,
-    image: gallery.map(p => p.url),
+    image: gallery.map((p: Photo) => p.url),
     offers: {
       '@type': 'Offer',
-      url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://rvp.vercel.app'}/products/${product.id}`,
+      url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://rvp.vercel.app'}/products/${product.inventory_item_id}`,
       priceCurrency: product.currency,
       price: product.price,
       availability: `https://schema.org/${product.availability === 'in_stock' ? 'InStock' : 'OutOfStock'}`,
@@ -118,19 +118,21 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
       {/* Product View Tracking */}
       <ProductViewTracker 
-        productId={product.id}
-        tenantId={product.tenantId}
-        categoryId={product.tenantCategoryId}
+        productId={product.inventory_item_id}
+        tenantId={product.tenant_id}
+        categoryId={product.product_category}
       />
 
       {/* Navigation Buttons (for authenticated users) */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-        <ProductNavigation tenantId={product.tenantId} directorySlug={directorySlug} />
+        <ProductNavigation tenantId={product.tenant_id} directorySlug={product.tenant_slug} />
+        
+        {/* Featured Type Badges - moved below, keeping space */}
         
         {/* Storefront Actions */}
         <div className="flex justify-end mt-4">
           <StorefrontActions 
-            tenantId={product.tenantId}
+            tenantId={product.tenant_id}
             businessName={businessName}
             currentUrl={typeof window !== 'undefined' ? window.location.href : ''}
             showBackButton={true}
@@ -152,10 +154,10 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   <strong>Status:</strong> {statusLabel} | <strong>Visibility:</strong> {visibilityLabel}
                 </p>
                 <p className="text-sm text-amber-700 dark:text-amber-300">
-                  {product.itemStatus === 'draft' && 'This product is in draft mode. Activate it to make it publicly accessible.'}
-                  {product.itemStatus === 'archived' && 'This product is archived. Restore it to active status to make it publicly accessible.'}
-                  {product.itemStatus === 'inactive' && 'This product is inactive. Activate it to make it publicly accessible.'}
-                  {product.visibility === 'private' && product.itemStatus === 'active' && 'This product is set to private. Change visibility to public to make it accessible.'}
+                  {product.item_status === 'draft' && 'This product is in draft mode. Activate it to make it publicly accessible.'}
+                  {product.item_status === 'archived' && 'This product is archived. Restore it to active status to make it publicly accessible.'}
+                  {product.item_status === 'inactive' && 'This product is inactive. Activate it to make it publicly accessible.'}
+                  {product.visibility === 'private' && product.item_status === 'active' && 'This product is set to private. Change visibility to public to make it accessible.'}
                 </p>
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
                   💡 Only you can see this page because you're authenticated. Public visitors will see a 404 error.
@@ -167,38 +169,63 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Tier-Based Landing Page with Gallery (only if multiple images) */}
-      {tenant && (
-        <TierBasedLandingPage 
-          product={product} 
-          tenant={tenant}
-          storeStatus={storeStatus}
-          gallery={gallery.length > 1 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
-          fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenantId} />}
-        />
-      )}
+      <TierBasedLandingPage 
+        product={{
+          id: product.inventory_item_id,
+          tenantId: product.tenant_id,
+          name: product.product_name,
+          title: product.product_title,
+          description: product.product_description,
+          marketingDescription: product.marketing_description,
+          price: parseFloat(product.price),
+          priceCents: product.current_price_cents,
+          salePriceCents: product.sale_price_cents,
+          currency: product.currency,
+          imageUrl: product.image_url,
+          imageGallery: product.gallery_urls,
+          brand: product.brand,
+          sku: product.sku,
+          stock: product.stock,
+          availability: product.availability,
+          tenantCategoryId: product.product_category,
+          featuredTypes: product.featured_type_array,
+          gtin: product.gtin,
+          mpn: product.mpn,
+          defaultGatewayType: 'square', // Default payment gateway type
+        } as any}
+        tenant={{
+          id: product.tenant_id,
+          name: product.tenant_name,
+          slug: product.tenant_slug,
+          subscriptionTier: product.subscription_tier,
+          hasActivePaymentGateway: true, // Enable Add to Cart button
+          metadata: {
+            businessName: product.tenant_name,
+            address: product.tenant_address,
+            logo_url: product.tenant_logo_url,
+          },
+        } as any}
+        storeStatus={null}
+        gallery={gallery.length > 1 ? <ProductGallery gallery={gallery} productTitle={product.product_title} /> : undefined}
+        fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenant_id} />}
+      />
 
       {/* Product Recommendations */}
-      {product && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <ProductRecommendations productId={product.id} tenantId={product.tenantId} />
-        </div>
-      )}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <ProductRecommendations productId={product.inventory_item_id} tenantId={product.tenant_id} />
+      </div>
 
       {/* Product Reviews */}
-      {product && (
-        <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <ProductReviewsSection productId={product.id} tenantId={product.tenantId} />
-          </div>
+      <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <ProductReviewsSection productId={product.inventory_item_id} tenantId={product.tenant_id} />
         </div>
-      )}
+      </div>
 
       {/* Business Information */}
-      {tenant && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <ProductBusinessInfoCollapsible product={product} tenant={tenant} storeStatus={storeStatus} />
-        </div>
-      )}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <ProductBusinessInfoCollapsible product={product as any} tenant={{ id: product.tenant_id, name: product.tenant_name, metadata: { businessName: product.tenant_name, address: product.tenant_address, logo_url: product.tenant_logo_url } }} storeStatus={null} />
+      </div>
 
       {/* Recently Viewed Products */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

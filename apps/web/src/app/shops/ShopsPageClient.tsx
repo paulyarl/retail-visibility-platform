@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, MapPin, Star, Phone, Globe, Clock, Filter, Grid, List, ChevronDown, ChevronLeft, Store, ShoppingBag, TrendingUp, Sparkles, Tag, Users, Calendar, ArrowLeft, X } from 'lucide-react';
-import { Button } from '../../components/ui/Button';
-import { Container, Grid as MantineGrid, SimpleGrid } from '@mantine/core';
+import { Button, Container, Grid as MantineGrid, SimpleGrid, Badge, Card, Group, Text, Stack } from '@mantine/core';
 import StorefrontActions from '../../components/storefront/StorefrontActions';
 import { directorySingletonService } from '../../services/DirectorySingletonService';
 import { shopsService } from '../../services/ShopsService';
@@ -377,7 +376,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Filters</h3>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="subtle" size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>
