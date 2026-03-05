@@ -37,10 +37,10 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
     handleReviewSubmit
   } = useReviews({ tenantId, isPublic, showReviews: false });
 
-  console.log('[StoreRatingDisplay] RENDER - showReviewForm:', showReviewForm, 'isPublic:', isPublic);
+//  console.log('[StoreRatingDisplay] RENDER - showReviewForm:', showReviewForm, 'isPublic:', isPublic);
 
   useEffect(() => {
-    console.log('[StoreRatingDisplay] showReviewForm changed to:', showReviewForm);
+//    console.log('[StoreRatingDisplay] showReviewForm changed to:', showReviewForm);
   }, [showReviewForm]);
 
   const renderStars = (rating: number, size: 'sm' | 'md' | 'lg' = 'md') => {
@@ -102,7 +102,7 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
           {showWriteReview && (
             <button
               onClick={() => {
-                console.log('[StoreRatingDisplay] Button clicked, setting showReviewForm to true');
+//                console.log('[StoreRatingDisplay] Button clicked, setting showReviewForm to true');
                 setShowReviewForm(true);
               }}
               className="text-blue-600 hover:text-blue-700 text-sm font-medium cursor-pointer relative z-10"
@@ -117,7 +117,7 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
         {showReviewForm && (
           <>
             {(() => {
-              console.log('[StoreRatingDisplay] Rendering ReviewForm modal, isAnonymous:', isPublic);
+//              console.log('[StoreRatingDisplay] Rendering ReviewForm modal, isAnonymous:', isPublic);
               return null;
             })()}
             <ReviewForm
