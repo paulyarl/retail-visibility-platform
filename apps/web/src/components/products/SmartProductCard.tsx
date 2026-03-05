@@ -324,8 +324,8 @@ export default function SmartProductCard({
   const [canPurchase, setCanPurchase] = useState(false);
   const [defaultGatewayType, setDefaultGatewayType] = useState<string | undefined>();
 
-  // Priority: props > product data (from MV) > context > individual API fetch
-  const effectiveCanPurchase = propHasActivePaymentGateway ?? product.has_active_payment_gateway ?? contextPayment?.canPurchase ?? canPurchase;
+  // Priority: context > props > product data (from MV) > individual API fetch
+  const effectiveCanPurchase = contextPayment?.canPurchase ?? propHasActivePaymentGateway ?? product.has_active_payment_gateway ?? canPurchase;
   const effectiveGatewayType = propDefaultGatewayType ?? product.payment_gateway_type ?? contextPayment?.defaultGatewayType ?? defaultGatewayType;
 
   useEffect(() => {
@@ -362,6 +362,21 @@ export default function SmartProductCard({
 
     checkPurchaseAbility();
   }, [product.tenantId, contextPayment, product.has_active_payment_gateway, propHasActivePaymentGateway]);
+
+  // Debug: Log when effectiveCanPurchase changes
+  useEffect(() => {
+    console.log('[SmartProductCard] effectiveCanPurchase changed:', {
+      productId: product.id,
+      variant,
+      effectiveCanPurchase,
+      sources: {
+        propHasActivePaymentGateway,
+        productHasActive: product.has_active_payment_gateway,
+        contextCanPurchase: contextPayment?.canPurchase,
+        canPurchase
+      }
+    });
+  }, [effectiveCanPurchase, product.id, variant, propHasActivePaymentGateway, product.has_active_payment_gateway, contextPayment?.canPurchase, canPurchase]);
 
   const displayTitle = product.title || product.name;
   const displayBrand = product.brand || '';
@@ -594,29 +609,36 @@ export default function SmartProductCard({
             </div>
 
             {/* Purchase UI - Prominent */}
-            {effectiveCanPurchase && (
-              <div className="mt-4">
-                {product.has_variants ? (
-                  <ProductWithVariants
-                    product={product}
-                    tenantId={tenantId}
-                    tenantName={tenantName || ''}
-                    tenantLogo={tenantLogo}
-                    defaultGatewayType={effectiveGatewayType}
-                    className="w-full"
-                  />
-                ) : (
-                  <AddToCartButton
-                    product={product}
-                    tenantName={tenantName || ''}
-                    tenantLogo={tenantLogo}
-                    hasActivePaymentGateway={effectiveCanPurchase}
-                    defaultGatewayType={effectiveGatewayType}
-                    className="w-full"
-                  />
-                )}
-              </div>
-            )}
+            {(() => {
+              console.log('[SmartProductCard] Featured variant render check:', {
+                productId: product.id,
+                effectiveCanPurchase,
+                hasVariants: product.has_variants
+              });
+              return effectiveCanPurchase && (
+                <div className="mt-4">
+                  {(product.has_variants === true) ? (
+                    <ProductWithVariants
+                      product={product}
+                      tenantId={tenantId}
+                      tenantName={tenantName || ''}
+                      tenantLogo={tenantLogo}
+                      defaultGatewayType={effectiveGatewayType}
+                      className="w-full"
+                    />
+                  ) : (
+                    <AddToCartButton
+                      product={product}
+                      tenantName={tenantName || ''}
+                      tenantLogo={tenantLogo}
+                      hasActivePaymentGateway={effectiveCanPurchase}
+                      defaultGatewayType={effectiveGatewayType}
+                      className="w-full"
+                    />
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -798,15 +820,16 @@ export default function SmartProductCard({
               )}
             </div>
             
-            {effectiveCanPurchase && effectiveGatewayType && (
+            {effectiveCanPurchase && (
               <div className="mt-2">
-                {product.has_variants ? (
-                  <Link
-                    href={`/products/${product.id}`}
-                    className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400"
-                  >
-                    View Options →
-                  </Link>
+                {(product.has_variants === true) ? (
+                  <ProductWithVariants
+                    product={product}
+                    tenantId={tenantId}
+                    tenantName={tenantName || ''}
+                    tenantLogo={tenantLogo}
+                    defaultGatewayType={effectiveGatewayType}
+                  />
                 ) : (
                   <AddToCartButton
                     product={product}
@@ -964,7 +987,7 @@ export default function SmartProductCard({
               </span>
             </div>
             {effectiveCanPurchase && (
-              product.has_variants ? (
+              (product.has_variants === true) ? (
                 <ProductWithVariants
                   product={product}
                   tenantId={tenantId}
@@ -998,6 +1021,7 @@ export default function SmartProductCard({
             src={product.imageUrl}
             alt={displayTitle}
             fill
+            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover group-hover:scale-105 transition-transform"
           />
         ) : (
@@ -1077,8 +1101,8 @@ export default function SmartProductCard({
               product.stock === 0 
                 ? 'text-red-600 dark:text-red-400' 
                 : product.stock < 10 
-                ? 'text-amber-600 dark:text-amber-400' 
-                : 'text-green-600 dark:text-green-400'
+                  ? 'text-amber-600 dark:text-amber-400' 
+                  : 'text-green-600 dark:text-green-400'
             }`}>
               Stock: {product.stock}
             </p>
@@ -1086,7 +1110,7 @@ export default function SmartProductCard({
         </div>
 
         {effectiveCanPurchase && (
-            product.has_variants ? (
+            (product.has_variants === true) ? (
               <ProductWithVariants
                 product={product}
                 tenantId={tenantId}

@@ -8,8 +8,10 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Package, ShoppingCart, Star } from 'lucide-react';
+import { Package, ShoppingCart, Star, Store } from 'lucide-react';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import { AddToCartButton } from '@/components/products/AddToCartButton';
+import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 
 // Common data interface for all layouts
 interface ProductData {
@@ -31,7 +33,12 @@ interface ProductData {
   ratingCount?: number;
   isFeatured?: boolean;
   featuredType?: string;
+  featuredTypes?: string[];
   hasVariants?: boolean;
+  payment_gateway_type?: string;
+  defaultGatewayType?: string;
+  shopName?: string;
+  shopSlug?: string;
   metadata?: Record<string, any>;
 }
 
@@ -39,6 +46,10 @@ interface ProductCardProps {
   product: ProductData;
   variant?: 'classic' | 'enhanced' | 'compact' | 'premium' | 'zoom';
   tenantId: string;
+  tenantName?: string;
+  tenantLogo?: string;
+  hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
   className?: string;
   trackingContext?: {
     source: 'directory' | 'featured' | 'search' | 'category' | 'storefront';
@@ -50,7 +61,7 @@ interface ProductCardProps {
 /**
  * Classic Layout - Original design with all essential fields
  */
-function ClassicLayout({ product, className = '', trackingContext }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext'>) {
+function ClassicLayout({ product, className = '', trackingContext, tenantId, tenantName, tenantLogo, hasActivePaymentGateway, defaultGatewayType }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext' | 'tenantId' | 'tenantName' | 'tenantLogo' | 'hasActivePaymentGateway' | 'defaultGatewayType'>) {
   const formattedPrice = (product.priceCents / 100).toFixed(2);
   const formattedSalePrice = product.salePriceCents ? (product.salePriceCents / 100).toFixed(2) : null;
   const isOnSale = product.salePriceCents && product.salePriceCents < product.priceCents;
@@ -83,6 +94,7 @@ function ClassicLayout({ product, className = '', trackingContext }: Pick<Produc
             src={product.imageUrl}
             alt={product.name}
             fill
+            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover"
           />
         ) : (
@@ -103,6 +115,29 @@ function ClassicLayout({ product, className = '', trackingContext }: Pick<Produc
 
       {/* Product Info */}
       <div className="p-4">
+        {/* Shop Info */}
+        {product.shopName && (
+          <div className="flex items-center mb-2">
+            {tenantLogo ? (
+              <Image
+                src={tenantLogo}
+                alt={product.shopName}
+                width={20}
+                height={20}
+                className="rounded-full mr-2"
+              />
+            ) : (
+              <Store className="w-5 h-5 text-gray-400 mr-2" />
+            )}
+            <Link 
+              href={`/shops/${product.shopSlug || product.tenantId}`}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              {product.shopName}
+            </Link>
+          </div>
+        )}
+        
         {/* Product Name */}
         <Link href={`/products/${product.id}`} onClick={handleProductClick}>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-2">
@@ -141,6 +176,40 @@ function ClassicLayout({ product, className = '', trackingContext }: Pick<Produc
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
             {product.description}
           </p>
+        )}
+
+        {/* Featured Type Badges */}
+        {product.featuredTypes && product.featuredTypes.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {product.featuredTypes.map((type: string) => {
+              const badgeConfig: Record<string, { label: string; color: string; icon: string }> = {
+                store_selection: { label: 'Featured', color: 'amber', icon: '⭐' },
+                new_arrival: { label: 'New', color: 'green', icon: '🆕' },
+                seasonal: { label: 'Seasonal', color: 'orange', icon: '🎄' },
+                sale: { label: 'Sale', color: 'red', icon: '💰' },
+                staff_pick: { label: 'Staff Pick', color: 'purple', icon: '👥' }
+              };
+              const config = badgeConfig[type];
+
+              if (!config) return null;
+
+              return (
+                <span
+                  key={type}
+                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    config.color === 'amber' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
+                    config.color === 'green' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                    config.color === 'orange' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
+                    config.color === 'red' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
+                    'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+                  }`}
+                >
+                  <span className="mr-1">{config.icon}</span>
+                  {config.label}
+                </span>
+              );
+            })}
+          </div>
         )}
 
         {/* Rating */}
@@ -203,6 +272,30 @@ function ClassicLayout({ product, className = '', trackingContext }: Pick<Produc
             </span>
           )}
         </div>
+
+        {/* Add to Cart Button */}
+        {hasActivePaymentGateway && (
+          <AddToCartButton
+            product={{
+              id: product.id,
+              name: product.name,
+              sku: product.sku,
+              priceCents: product.priceCents,
+              salePriceCents: product.salePriceCents,
+              imageUrl: product.imageUrl,
+              stock: product.stock,
+              tenantId,
+              tenantLogo,
+              payment_gateway_type: defaultGatewayType,
+              has_variants: product.hasVariants
+            }}
+            tenantName={tenantName || ''}
+            tenantLogo={tenantLogo}
+            hasActivePaymentGateway={hasActivePaymentGateway}
+            defaultGatewayType={defaultGatewayType}
+            className="w-full"
+          />
+        )}
       </div>
     </div>
   );
@@ -211,7 +304,7 @@ function ClassicLayout({ product, className = '', trackingContext }: Pick<Produc
 /**
  * Enhanced Layout - Modern design with improved visual hierarchy
  */
-function EnhancedLayout({ product, className = '', trackingContext }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext'>) {
+function EnhancedLayout({ product, className = '', trackingContext, tenantId, tenantName, tenantLogo, hasActivePaymentGateway, defaultGatewayType }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext' | 'tenantId' | 'tenantName' | 'tenantLogo' | 'hasActivePaymentGateway' | 'defaultGatewayType'>) {
   const formattedPrice = (product.priceCents / 100).toFixed(2);
   const formattedSalePrice = product.salePriceCents ? (product.salePriceCents / 100).toFixed(2) : null;
   const isOnSale = product.salePriceCents && product.salePriceCents < product.priceCents;
@@ -237,10 +330,8 @@ function EnhancedLayout({ product, className = '', trackingContext }: Pick<Produ
 
   return (
     <div className={`group relative bg-white dark:bg-neutral-800 rounded-xl overflow-hidden hover:shadow-2xl transition-all duration-300 ${className}`}>
-      {/* Gradient Border Effect */}
-      <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl" style={{ padding: '2px' }}>
-        <div className="w-full h-full bg-white dark:bg-neutral-800 rounded-xl"></div>
-      </div>
+      {/* Gradient Border Effect - subtle border only */}
+      <div className="absolute inset-0 rounded-xl pointer-events-none border-2 border-transparent group-hover:border-blue-500/50 transition-colors duration-300"></div>
 
       {/* Product Image */}
       <div className="relative aspect-square bg-gray-100 dark:bg-gray-700">
@@ -249,6 +340,7 @@ function EnhancedLayout({ product, className = '', trackingContext }: Pick<Produ
             src={product.imageUrl}
             alt={product.name}
             fill
+            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
@@ -257,14 +349,42 @@ function EnhancedLayout({ product, className = '', trackingContext }: Pick<Produ
           </div>
         )}
 
-        {/* Featured Badge */}
-        {product.isFeatured && (
-          <div className="absolute top-3 left-3">
+        {/* Featured Badges */}
+        <div className="absolute top-3 left-3 flex flex-col gap-2">
+          {/* Featured Type Badges */}
+          {product.featuredTypes && product.featuredTypes.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {product.featuredTypes.slice(0, 2).map((type: string) => {
+                const badgeConfig: Record<string, { label: string; color: string }> = {
+                  store_selection: { label: '⭐ Featured', color: 'from-amber-500 to-orange-500' },
+                  new_arrival: { label: '🆕 New', color: 'from-green-500 to-emerald-500' },
+                  seasonal: { label: '🎄 Seasonal', color: 'from-orange-500 to-red-500' },
+                  sale: { label: '💰 Sale', color: 'from-red-500 to-pink-500' },
+                  staff_pick: { label: '👥 Staff Pick', color: 'from-purple-500 to-indigo-500' }
+                };
+                const config = badgeConfig[type];
+
+                if (!config) return null;
+
+                return (
+                  <span
+                    key={type}
+                    className={`inline-flex items-center px-3 py-1 bg-gradient-to-r ${config.color} text-white text-xs font-bold rounded-full shadow-lg`}
+                  >
+                    {config.label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Fallback to generic featured badge if no specific types */}
+          {(!product.featuredTypes || product.featuredTypes.length === 0) && product.isFeatured && (
             <span className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-lg">
               ⭐ Featured
             </span>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Stock Status */}
         {product.availability === 'out_of_stock' && (
@@ -278,6 +398,29 @@ function EnhancedLayout({ product, className = '', trackingContext }: Pick<Produ
 
       {/* Enhanced Product Info */}
       <div className="p-5">
+        {/* Shop Info */}
+        {product.shopName && (
+          <div className="flex items-center mb-3">
+            {tenantLogo ? (
+              <Image
+                src={tenantLogo}
+                alt={product.shopName}
+                width={24}
+                height={24}
+                className="rounded-full mr-2"
+              />
+            ) : (
+              <Store className="w-6 h-6 text-gray-400 mr-2" />
+            )}
+            <Link 
+              href={`/shops/${product.shopSlug || product.tenantId}`}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 uppercase tracking-wide"
+            >
+              {product.shopName}
+            </Link>
+          </div>
+        )}
+        
         {/* Header with Brand and Rating */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
@@ -365,10 +508,28 @@ function EnhancedLayout({ product, className = '', trackingContext }: Pick<Produ
           </div>
           
           {/* Action Button */}
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-lg hover:shadow-xl">
-            <ShoppingCart className="w-4 h-4" />
-            Add to Cart
-          </button>
+          {hasActivePaymentGateway && (
+            <AddToCartButton
+              product={{
+                id: product.id,
+                name: product.name,
+                sku: product.sku,
+                priceCents: product.priceCents,
+                salePriceCents: product.salePriceCents,
+                imageUrl: product.imageUrl,
+                stock: product.stock,
+                tenantId,
+                tenantLogo,
+                payment_gateway_type: defaultGatewayType,
+                has_variants: product.hasVariants
+              }}
+              tenantName={tenantName || ''}
+              tenantLogo={tenantLogo}
+              hasActivePaymentGateway={hasActivePaymentGateway}
+              defaultGatewayType={defaultGatewayType}
+              className="w-full"
+            />
+          )}
         </div>
       </div>
     </div>
@@ -378,7 +539,7 @@ function EnhancedLayout({ product, className = '', trackingContext }: Pick<Produ
 /**
  * Compact Layout - Space-efficient design for grid views
  */
-function CompactLayout({ product, className = '', trackingContext }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext'>) {
+function CompactLayout({ product, className = '', trackingContext, tenantId, tenantName, tenantLogo, hasActivePaymentGateway, defaultGatewayType }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext' | 'tenantId' | 'tenantName' | 'tenantLogo' | 'hasActivePaymentGateway' | 'defaultGatewayType'>) {
   const formattedPrice = (product.priceCents / 100).toFixed(2);
   const formattedSalePrice = product.salePriceCents ? (product.salePriceCents / 100).toFixed(2) : null;
   const isOnSale = product.salePriceCents && product.salePriceCents < product.priceCents;
@@ -425,6 +586,29 @@ function CompactLayout({ product, className = '', trackingContext }: Pick<Produc
           
           {/* Product Info */}
           <div className="ml-3 flex-1 min-w-0">
+            {/* Shop Info */}
+            {product.shopName && (
+              <div className="flex items-center mb-1">
+                {tenantLogo ? (
+                  <Image
+                    src={tenantLogo}
+                    alt={product.shopName}
+                    width={16}
+                    height={16}
+                    className="rounded-full mr-1"
+                  />
+                ) : (
+                  <Store className="w-4 h-4 text-gray-400 mr-1" />
+                )}
+                <Link 
+                  href={`/shops/${product.shopSlug || product.tenantId}`}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium truncate"
+                >
+                  {product.shopName}
+                </Link>
+              </div>
+            )}
+            
             <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
               {product.name}
             </h3>
@@ -467,6 +651,40 @@ function CompactLayout({ product, className = '', trackingContext }: Pick<Produc
               </div>
             )}
 
+            {/* Featured Type Badges */}
+            {product.featuredTypes && product.featuredTypes.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {product.featuredTypes.slice(0, 2).map((type: string) => { // Limit to 2 badges for compact layout
+                  const badgeConfig: Record<string, { label: string; color: string; icon: string }> = {
+                    store_selection: { label: 'Featured', color: 'amber', icon: '⭐' },
+                    new_arrival: { label: 'New', color: 'green', icon: '🆕' },
+                    seasonal: { label: 'Seasonal', color: 'orange', icon: '🎄' },
+                    sale: { label: 'Sale', color: 'red', icon: '💰' },
+                    staff_pick: { label: 'Staff Pick', color: 'purple', icon: '👥' }
+                  };
+                  const config = badgeConfig[type];
+
+                  if (!config) return null;
+
+                  return (
+                    <span
+                      key={type}
+                      className={`inline-flex items-center px-1 py-0.5 rounded text-xs font-medium ${
+                        config.color === 'amber' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
+                        config.color === 'green' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                        config.color === 'orange' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
+                        config.color === 'red' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
+                        'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+                      }`}
+                    >
+                      <span className="mr-0.5 text-xs">{config.icon}</span>
+                      {config.label}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Price and Stock */}
             <div className="flex items-center justify-between mt-2">
               <div>
@@ -488,6 +706,32 @@ function CompactLayout({ product, className = '', trackingContext }: Pick<Produc
           </div>
         </div>
       </Link>
+
+      {/* Add to Cart Button - Outside Link to avoid conflicts */}
+      <div className="px-3 pb-3">
+        {hasActivePaymentGateway && (
+          <AddToCartButton
+            product={{
+              id: product.id,
+              name: product.name,
+              sku: product.sku,
+              priceCents: product.priceCents,
+              salePriceCents: product.salePriceCents,
+              imageUrl: product.imageUrl,
+              stock: product.stock,
+              tenantId,
+              tenantLogo,
+              payment_gateway_type: defaultGatewayType,
+              has_variants: product.hasVariants
+            }}
+            tenantName={tenantName || ''}
+            tenantLogo={tenantLogo}
+            hasActivePaymentGateway={hasActivePaymentGateway}
+            defaultGatewayType={defaultGatewayType}
+            className="w-full"
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -495,7 +739,7 @@ function CompactLayout({ product, className = '', trackingContext }: Pick<Produc
 /**
  * Premium Layout - High-end design with luxury styling
  */
-function PremiumLayout({ product, className = '', trackingContext }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext'>) {
+function PremiumLayout({ product, className = '', trackingContext, tenantId, tenantName, tenantLogo, hasActivePaymentGateway, defaultGatewayType }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext' | 'tenantId' | 'tenantName' | 'tenantLogo' | 'hasActivePaymentGateway' | 'defaultGatewayType'>) {
   const formattedPrice = (product.priceCents / 100).toFixed(2);
   const formattedSalePrice = product.salePriceCents ? (product.salePriceCents / 100).toFixed(2) : null;
   const isOnSale = product.salePriceCents && product.salePriceCents < product.priceCents;
@@ -521,10 +765,8 @@ function PremiumLayout({ product, className = '', trackingContext }: Pick<Produc
 
   return (
     <div className={`group relative bg-white dark:bg-neutral-800 rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-500 border border-gray-100 dark:border-gray-700 ${className}`}>
-      {/* Premium Gradient Border */}
-      <div className="absolute inset-0 bg-gradient-to-br from-amber-400 via-orange-500 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl" style={{ padding: '3px' }}>
-        <div className="w-full h-full bg-white dark:bg-neutral-800 rounded-2xl"></div>
-      </div>
+      {/* Premium Gradient Border - subtle border only */}
+      <div className="absolute inset-0 rounded-2xl pointer-events-none border-2 border-transparent group-hover:border-amber-500/50 transition-colors duration-500"></div>
 
       {/* Product Image */}
       <div className="relative aspect-square bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">
@@ -533,6 +775,7 @@ function PremiumLayout({ product, className = '', trackingContext }: Pick<Produc
             src={product.imageUrl}
             alt={product.name}
             fill
+            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover group-hover:scale-110 transition-transform duration-700"
           />
         ) : (
@@ -543,11 +786,41 @@ function PremiumLayout({ product, className = '', trackingContext }: Pick<Produc
 
         {/* Premium Badges */}
         <div className="absolute top-4 left-4 flex flex-col gap-2">
-          {product.isFeatured && (
+          {/* Featured Type Badges */}
+          {product.featuredTypes && product.featuredTypes.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {product.featuredTypes.slice(0, 2).map((type: string) => {
+                const badgeConfig: Record<string, { label: string; color: string }> = {
+                  store_selection: { label: '⭐ Featured', color: 'from-amber-500 to-orange-500' },
+                  new_arrival: { label: '🆕 New', color: 'from-green-500 to-emerald-500' },
+                  seasonal: { label: '🎄 Seasonal', color: 'from-orange-500 to-red-500' },
+                  sale: { label: '💰 Sale', color: 'from-red-500 to-pink-500' },
+                  staff_pick: { label: '👥 Staff Pick', color: 'from-purple-500 to-indigo-500' }
+                };
+                const config = badgeConfig[type];
+
+                if (!config) return null;
+
+                return (
+                  <span
+                    key={type}
+                    className={`inline-flex items-center px-3 py-1 bg-gradient-to-r ${config.color} text-white text-xs font-bold rounded-full shadow-xl`}
+                  >
+                    {config.label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Fallback to generic featured badge if no specific types */}
+          {(!product.featuredTypes || product.featuredTypes.length === 0) && product.isFeatured && (
             <span className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-xl">
               ⭐ Featured
             </span>
           )}
+
+          {/* Sale Badge */}
           {isOnSale && (
             <span className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full shadow-xl">
               💰 Sale
@@ -567,6 +840,29 @@ function PremiumLayout({ product, className = '', trackingContext }: Pick<Produc
 
       {/* Premium Product Info */}
       <div className="p-6">
+        {/* Shop Info */}
+        {product.shopName && (
+          <div className="flex items-center mb-4">
+            {tenantLogo ? (
+              <Image
+                src={tenantLogo}
+                alt={product.shopName}
+                width={28}
+                height={28}
+                className="rounded-full mr-3"
+              />
+            ) : (
+              <Store className="w-7 h-7 text-gray-400 mr-3" />
+            )}
+            <Link 
+              href={`/shops/${product.shopSlug || product.tenantId}`}
+              className="text-sm font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider hover:text-amber-700 dark:hover:text-amber-300"
+            >
+              {product.shopName}
+            </Link>
+          </div>
+        )}
+        
         {/* Brand and Name */}
         <div className="mb-4">
           {product.brand && (
@@ -664,10 +960,28 @@ function PremiumLayout({ product, className = '', trackingContext }: Pick<Produc
             </div>
             
             {/* Premium Action Button */}
-            <button className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
-              <ShoppingCart className="w-5 h-5" />
-              Add to Cart
-            </button>
+            {hasActivePaymentGateway && (
+              <AddToCartButton
+                product={{
+                  id: product.id,
+                  name: product.name,
+                  sku: product.sku,
+                  priceCents: product.priceCents,
+                  salePriceCents: product.salePriceCents,
+                  imageUrl: product.imageUrl,
+                  stock: product.stock,
+                  tenantId,
+                  tenantLogo,
+                  payment_gateway_type: defaultGatewayType,
+                  has_variants: product.hasVariants
+                }}
+                tenantName={tenantName || ''}
+                tenantLogo={tenantLogo}
+                hasActivePaymentGateway={hasActivePaymentGateway}
+                defaultGatewayType={defaultGatewayType}
+                className="w-full"
+              />
+            )}
           </div>
         </div>
       </div>
@@ -682,9 +996,23 @@ export default function ProductCard({
   product, 
   variant = 'classic', 
   tenantId, 
+  tenantName,
+  tenantLogo,
+  hasActivePaymentGateway,
+  defaultGatewayType,
   className = '',
   trackingContext 
 }: ProductCardProps) {
+  // Get payment context directly (like SmartProductCard does)
+  const contextPayment = useTenantPaymentOptional();
+  
+  // Fallback for defaultGatewayType - priority: prop > product data > context
+  // API returns defaultGatewayType (camelCase), also check payment_gateway_type for backwards compatibility
+  const effectiveGatewayType = defaultGatewayType 
+    ?? (product as any).defaultGatewayType 
+    ?? product.payment_gateway_type
+    ?? contextPayment?.defaultGatewayType;
+
   // Data integrity check - ensure all required fields are present
   if (!product || !product.id || !product.name || !product.priceCents) {
     console.error(`[ProductCard] Missing required data for product:`, {
@@ -719,11 +1047,11 @@ export default function ProductCard({
   // Render based on variant
   switch (variant) {
     case 'enhanced':
-      return <EnhancedLayout product={product} className={className} trackingContext={trackingContext} />;
-    case 'compact':
-      return <CompactLayout product={product} className={className} trackingContext={trackingContext} />;
+      return <EnhancedLayout product={product} className={className} trackingContext={trackingContext} tenantId={tenantId} tenantName={tenantName} tenantLogo={tenantLogo} hasActivePaymentGateway={hasActivePaymentGateway} defaultGatewayType={effectiveGatewayType} />;
+    case 'classic':
+      return <ClassicLayout product={product} className={className} trackingContext={trackingContext} tenantId={tenantId} tenantName={tenantName} tenantLogo={tenantLogo} hasActivePaymentGateway={hasActivePaymentGateway} defaultGatewayType={effectiveGatewayType} />;
     case 'premium':
-      return <PremiumLayout product={product} className={className} trackingContext={trackingContext} />;
+      return <PremiumLayout product={product} className={className} trackingContext={trackingContext} tenantId={tenantId} tenantName={tenantName} tenantLogo={tenantLogo} hasActivePaymentGateway={hasActivePaymentGateway} defaultGatewayType={effectiveGatewayType} />;
     case 'zoom':
       // For featured products, use the catalog's ZoomLayout
       // Import dynamically to avoid circular dependency
@@ -738,8 +1066,8 @@ export default function ProductCard({
                   alt={product.name}
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-125"
                 />
-                {/* Zoom Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                {/* Zoom Overlay - only bottom half, subtle */}
+                <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-50 transition-opacity duration-300" />
               </>
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -764,26 +1092,39 @@ export default function ProductCard({
                 </span>
               </div>
             )}
-
-            {/* Hover Info Overlay */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <p className="text-white text-xs font-medium truncate">
-                {product.name}
-              </p>
-              <p className="text-white text-xs">
-                ${(product.priceCents / 100).toFixed(2)}
-              </p>
-            </div>
           </div>
 
-          {/* Minimal Info (visible always) */}
-          <div className="p-2">
-            <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate mb-1">
+          {/* Minimal Info (visible always) - compact */}
+          <div className="p-1">
+            {/* Shop Info */}
+            {product.shopName && (
+              <div className="flex items-center mb-1">
+                {tenantLogo ? (
+                  <Image
+                    src={tenantLogo}
+                    alt={product.shopName}
+                    width={12}
+                    height={12}
+                    className="rounded-full mr-1"
+                  />
+                ) : (
+                  <Store className="w-3 h-3 text-gray-400 mr-1" />
+                )}
+                <Link 
+                  href={`/shops/${product.shopSlug || product.tenantId}`}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 truncate"
+                >
+                  {product.shopName}
+                </Link>
+              </div>
+            )}
+            
+            <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">
               {product.name}
             </h3>
             
             {/* Category - Always show */}
-            <div className="mb-1">
+            <div className="mt-0.5">
               {product.categoryName ? (
                 <span className="inline-flex items-center px-1 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs rounded">
                   {product.categoryName}
@@ -796,17 +1137,17 @@ export default function ProductCard({
             </div>
             
             {/* Stock - Always show */}
-            <div className="mb-1">
+            <div className="mt-0.5">
               {product.availability === 'out_of_stock' ? (
-                <span className="inline-flex items-center px-1 py-0.5 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs rounded">
+                <span className="inline-flex items-center px-1 py-0.5 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 text-xs rounded">
                   Out
                 </span>
               ) : product.availability === 'preorder' ? (
-                <span className="inline-flex items-center px-1 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs rounded">
+                <span className="inline-flex items-center px-1 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 text-xs rounded">
                   Pre
                 </span>
               ) : product.stock !== undefined ? (
-                <span className="inline-flex items-center px-1 py-0.5 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs rounded">
+                <span className="inline-flex items-center px-1 py-0.5 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 text-xs rounded">
                   {product.stock}
                 </span>
               ) : (
@@ -815,7 +1156,63 @@ export default function ProductCard({
                 </span>
               )}
             </div>
-            
+
+            {/* Add to Cart Button */}
+            {hasActivePaymentGateway && (
+              <AddToCartButton
+                product={{
+                  id: product.id,
+                  name: product.name,
+                  sku: product.sku,
+                  priceCents: product.priceCents,
+                  salePriceCents: product.salePriceCents,
+                  imageUrl: product.imageUrl,
+                  stock: product.stock,
+                  tenantId,
+                  tenantLogo,
+                  payment_gateway_type: defaultGatewayType,
+                  has_variants: product.hasVariants
+                }}
+                tenantName={tenantName || ''}
+                tenantLogo={tenantLogo}
+                hasActivePaymentGateway={hasActivePaymentGateway}
+                defaultGatewayType={defaultGatewayType}
+                className="w-full"
+              />
+            )}
+
+            {/* Featured Type Badges */}
+            {(product.featuredTypes?.length ?? 0) > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {product.featuredTypes!.slice(0, 1).map((type: string) => { // Limit to 1 badge for zoom layout
+                  const badgeConfig: Record<string, { label: string; color: string; icon: string }> = {
+                    store_selection: { label: '⭐', color: 'amber', icon: '' },
+                    new_arrival: { label: '🆕', color: 'green', icon: '' },
+                    seasonal: { label: '🎄', color: 'orange', icon: '' },
+                    sale: { label: '💰', color: 'red', icon: '' },
+                    staff_pick: { label: '👥', color: 'purple', icon: '' }
+                  };
+                  const config = badgeConfig[type];
+
+                  if (!config) return null;
+
+                  return (
+                    <span
+                      className={`inline-flex items-center px-1 py-0.5 rounded text-xs font-medium ${
+                        config.color === 'amber' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
+                        config.color === 'green' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                        config.color === 'orange' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
+                        config.color === 'red' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
+                        'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+                      }`}
+                    >
+                      {config.label}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
                 ${(product.priceCents / 100).toFixed(2)}
@@ -824,7 +1221,7 @@ export default function ProductCard({
                 <div className="flex items-center gap-0.5">
                   <Star className="w-2 h-2 text-yellow-400 fill-current" />
                   <span className="text-xs text-gray-600 dark:text-gray-400">
-                    {product.ratingAvg.toFixed(1)}
+                    {product.ratingAvg!.toFixed(1)}
                   </span>
                 </div>
               )}
@@ -832,12 +1229,9 @@ export default function ProductCard({
           </div>
         </div>
       );
-    case 'classic':
     default:
-      return <ClassicLayout product={product} className={className} trackingContext={trackingContext} />;
+      return <ClassicLayout product={product} className={className} trackingContext={trackingContext} tenantId={tenantId} tenantName={tenantName} tenantLogo={tenantLogo} hasActivePaymentGateway={hasActivePaymentGateway} defaultGatewayType={effectiveGatewayType} />;
   }
 }
 
-// Export individual layouts for direct use
-export { ClassicLayout, EnhancedLayout, CompactLayout, PremiumLayout };
 export type { ProductData };

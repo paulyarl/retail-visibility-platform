@@ -13,11 +13,15 @@ import FeaturedProductsSection from '@/components/storefront/FeaturedProductsSec
 import SmartProductCard from '@/components/products/SmartProductCard';
 import FeaturedBucketSimple from '@/components/storefront/FeaturedBucketSimple';
 import StorefrontActions from '@/components/storefront/StorefrontActions';
+import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Pagination } from '@/components/ui';
 import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
-import { useStoreContactData } from '@/hooks/useStoreContactData';
+// import { useStoreContactData } from '@/hooks/useStoreContactData';
+
+import { computeStoreStatus } from '@/lib/hours-utils';
+import { directoryService } from '@/services/DirectorySingletonService';
 
 interface StorefrontClientWrapperProps {
   tenantId: string;
@@ -58,7 +62,7 @@ export default function StorefrontClientWrapper({
   platformSettings,
   mapLocation,
   hasBranding,
-  storeStatus,
+  storeStatus: initialStoreStatus,
   categories,
   productCategories,
   storeCategories,
@@ -85,11 +89,12 @@ export default function StorefrontClientWrapper({
   totalItems = 0,
 }: StorefrontClientWrapperProps) {
   // Simple hook for contact data (shared with directory page)
-  const contactData = useStoreContactData({ tenantId });
+  // const contactData = useStoreContactData({ tenantId });
+  const contactData = { listing: { businessHours: undefined, address: '' } };
   
-  console.log('[StorefrontClientWrapper] Contact data:', contactData.listing);
-  console.log('[StorefrontClientWrapper] Tenant metadata phone:', tenant.metadata?.phone);
-  console.log('[StorefrontClientWrapper] Tenant metadata email:', tenant.metadata?.email);
+  // console.log('[StorefrontClientWrapper] Contact data:', contactData.listing);
+  // console.log('[StorefrontClientWrapper] Tenant metadata phone:', tenant.metadata?.phone);
+  // console.log('[StorefrontClientWrapper] Tenant metadata email:', tenant.metadata?.email);
   
   const [featuredCounts, setFeaturedCounts] = useState({
     staffPick: 0,
@@ -117,17 +122,17 @@ export default function StorefrontClientWrapper({
         }
         
         if (data) {
-          console.log('Featured data response:', data);
-          console.log('Buckets:', data.buckets);
+          // console.log('Featured data response:', data);
+          // console.log('Buckets:', data.buckets);
           
           // Debug each bucket
-          data.buckets?.forEach((bucket: any) => {
+          /* data.buckets?.forEach((bucket: any) => {
             console.log(`Bucket ${bucket.bucketType}:`, {
               totalCount: bucket.totalCount,
               productsCount: bucket.products?.length || 0,
               products: bucket.products?.slice(0, 2).map((p: any) => ({ id: p.id, name: p.name }))
             });
-          });
+          }); */
           
           // Transform bucket data into the expected format
           const transformedData = {
@@ -263,7 +268,7 @@ export default function StorefrontClientWrapper({
               {/* Cart Button */}
               <button className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Cart">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 014 4z" />
                 </svg>
               </button>
 
@@ -290,6 +295,9 @@ export default function StorefrontClientWrapper({
             </div>
           </div>
         </div>
+
+            {/* Store Open/Closed Status */}
+            <StoreStatusIndicator tenantId={tenantId} />
       </header>
 
       {/* Featured Navigation Controls - Top of Page */}
@@ -402,6 +410,8 @@ export default function StorefrontClientWrapper({
                     totalCount={featuredData.bucketCounts.staff_pick}
                     bucketType="staff_pick"
                     tenantId={tenantId}
+                    tenantName={businessName}
+                    tenantLogo={tenant?.branding?.logoUrl}
                     showLayoutSelector={true}
                   />
                 </div>
@@ -417,6 +427,8 @@ export default function StorefrontClientWrapper({
                     totalCount={featuredData.bucketCounts.new_arrival}
                     bucketType="new_arrival"
                     tenantId={tenantId}
+                    tenantName={businessName}
+                    tenantLogo={tenant?.branding?.logoUrl}
                     showLayoutSelector={false}
                   />
                 </div>
@@ -432,6 +444,8 @@ export default function StorefrontClientWrapper({
                     totalCount={featuredData.bucketCounts.sale}
                     bucketType="sale"
                     tenantId={tenantId}
+                    tenantName={businessName}
+                    tenantLogo={tenant?.branding?.logoUrl}
                     showLayoutSelector={false}
                   />
                 </div>
@@ -447,6 +461,8 @@ export default function StorefrontClientWrapper({
                     totalCount={featuredData.bucketCounts.seasonal}
                     bucketType="seasonal"
                     tenantId={tenantId}
+                    tenantName={businessName}
+                    tenantLogo={tenant?.branding?.logoUrl}
                     showLayoutSelector={false}
                   />
                 </div>
@@ -462,6 +478,8 @@ export default function StorefrontClientWrapper({
                     totalCount={featuredData.bucketCounts.store_selection}
                     bucketType="store_selection"
                     tenantId={tenantId}
+                    tenantName={businessName}
+                    tenantLogo={tenant?.branding?.logoUrl}
                     showLayoutSelector={false}
                   />
                 </div>
@@ -664,265 +682,3 @@ export default function StorefrontClientWrapper({
   );
 }
 
-// FeaturedBucket Component
-interface FeaturedBucketProps {
-  title: string;
-  description: string;
-  products: FeaturedProduct[];
-  totalCount: number;
-  bucketType: string;
-}
-
-function FeaturedBucket({ title, description, products, totalCount, bucketType }: FeaturedBucketProps) {
-  if (products.length === 0) return null;
-
-  // Get banner styling based on bucket type
-  const getBannerStyles = (type: string) => {
-    switch (type) {
-      case 'staff_pick':
-        return {
-          bgGradient: 'from-amber-50 via-amber-100 to-amber-50 dark:from-amber-950 dark:via-amber-900 dark:to-amber-950',
-          textColor: 'text-amber-900 dark:text-amber-100',
-          subTextColor: 'text-amber-700 dark:text-amber-300',
-          borderColor: 'border-amber-200 dark:border-amber-800'
-        };
-      case 'seasonal':
-        return {
-          bgGradient: 'from-emerald-50 via-emerald-100 to-emerald-50 dark:from-emerald-950 dark:via-emerald-900 dark:to-emerald-950',
-          textColor: 'text-emerald-900 dark:text-emerald-100',
-          subTextColor: 'text-emerald-700 dark:text-emerald-300',
-          borderColor: 'border-emerald-200 dark:border-emerald-800'
-        };
-      case 'sale':
-        return {
-          bgGradient: 'from-red-50 via-red-100 to-red-50 dark:from-red-950 dark:via-red-900 dark:to-red-950',
-          textColor: 'text-red-900 dark:text-red-100',
-          subTextColor: 'text-red-700 dark:text-red-300',
-          borderColor: 'border-red-200 dark:border-red-800'
-        };
-      case 'new_arrival':
-        return {
-          bgGradient: 'from-blue-50 via-blue-100 to-blue-50 dark:from-blue-950 dark:via-blue-900 dark:to-blue-950',
-          textColor: 'text-blue-900 dark:text-blue-100',
-          subTextColor: 'text-blue-700 dark:text-blue-300',
-          borderColor: 'border-blue-200 dark:border-blue-800'
-        };
-      case 'store_selection':
-        return {
-          bgGradient: 'from-purple-50 via-purple-100 to-purple-50 dark:from-purple-950 dark:via-purple-900 dark:to-purple-950',
-          textColor: 'text-purple-900 dark:text-purple-100',
-          subTextColor: 'text-purple-700 dark:text-purple-300',
-          borderColor: 'border-purple-200 dark:border-purple-800'
-        };
-      default:
-        return {
-          bgGradient: 'from-gray-50 via-gray-100 to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950',
-          textColor: 'text-gray-900 dark:text-gray-100',
-          subTextColor: 'text-gray-700 dark:text-gray-300',
-          borderColor: 'border-gray-200 dark:border-gray-800'
-        };
-    }
-  };
-
-  const bannerStyles = getBannerStyles(bucketType);
-
-  return (
-    <div className="featured-bucket mb-12">
-      {/* Bucket Banner */}
-      <div className={`relative mb-8 rounded-lg border ${bannerStyles.borderColor} overflow-hidden`}>
-        {/* Gradient Background */}
-        <div className={`absolute inset-0 bg-gradient-to-r ${bannerStyles.bgGradient}`} />
-        
-        {/* Decorative Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="h-full w-full bg-gradient-to-br from-current/20 to-transparent" />
-        </div>
-        
-        {/* Content */}
-        <div className="relative px-6 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className={`text-xl font-bold ${bannerStyles.textColor} flex items-center gap-2 mb-1`}>
-                {title}
-                <span className={`text-sm font-normal ${bannerStyles.subTextColor}`}>
-                  ({totalCount})
-                </span>
-              </h3>
-              <p className={`${bannerStyles.subTextColor}`}>
-                {description}
-              </p>
-            </div>
-            
-            {/* View All Link */}
-            {totalCount > products.length && (
-              <a
-                href={`/tenant/${products[0].tenantId}?featured=${bucketType}`}
-                className={`text-sm ${bannerStyles.textColor} hover:underline font-medium`}
-              >
-                View All →
-              </a>
-            )}
-          </div>
-        </div>
-        
-        {/* Bottom Gradient Fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-neutral-50 dark:from-neutral-900 to-transparent" />
-      </div>
-
-      {/* Products Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {products.slice(0, 8).map((product) => (
-          <FeaturedProductCard key={product.id} product={product} />
-        ))}
-      </div>
-
-      {/* Show More Link */}
-      {totalCount > 8 && (
-        <div className="mt-6 text-center">
-          <a
-            href={`/tenant/${products[0].tenantId}?featured=${bucketType}`}
-            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium ${bannerStyles.textColor} border ${bannerStyles.borderColor} rounded-lg hover:bg-current/10 transition-colors`}
-          >
-            View All {totalCount} {title.toLowerCase()} →
-          </a>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// FeaturedProductCard Component
-function FeaturedProductCard({ product }: { product: FeaturedProduct }) {
-  return (
-    <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-      {/* Product Image */}
-      <div className="aspect-square relative bg-neutral-100 dark:bg-neutral-700">
-        {product.imageUrl ? (
-          <img
-            src={product.imageUrl}
-            alt={product.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-neutral-400 dark:text-neutral-500">
-            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-        )}
-        
-        {/* Featured Badge */}
-        <div className="absolute top-2 right-2">
-          <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-primary-600 text-white rounded-full">
-            {product.featuredType ? getFeaturedTypeLabel(product.featuredType) : 'Featured'}
-          </span>
-        </div>
-      </div>
-
-      {/* Product Info */}
-      <div className="p-4">
-        {/* Product Name */}
-        <h4 className="font-medium text-neutral-900 dark:text-white line-clamp-2 mb-2">
-          {product.name}
-        </h4>
-
-        {/* Brand */}
-        {product.brand && (
-          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">
-            {product.brand}
-          </p>
-        )}
-
-        {/* Description (trimmed) */}
-        {product.description && (
-          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2 line-clamp-1">
-            {product.description}
-          </p>
-        )}
-
-        {/* Category and Condition */}
-        <div className="flex items-center gap-2 mb-2">
-          {product.categoryName && (
-            <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">
-              🏷️ {product.categoryName}
-            </span>
-          )}
-          {product.condition && (
-            <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded">
-              ✅ {product.condition.replace('_', ' ')}
-            </span>
-          )}
-        </div>
-
-        {/* Variant Indicator */}
-        {product.hasVariants && (
-          <div className="mb-2">
-            <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">
-              🔄 Multiple Variants
-            </span>
-          </div>
-        )}
-
-        {/* SKU */}
-        {product.sku && (
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-2">
-            📦 SKU: {product.sku}
-          </p>
-        )}
-
-        {/* Price */}
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg font-semibold text-neutral-900 dark:text-white">
-            ${(product.priceCents / 100).toFixed(2)}
-          </span>
-          {product.salePriceCents && product.salePriceCents < product.priceCents && (
-            <>
-              <span className="text-sm text-neutral-500 dark:text-neutral-400 line-through">
-                ${(product.priceCents / 100).toFixed(2)}
-              </span>
-              <span className="text-lg font-semibold text-red-600 dark:text-red-400">
-                ${(product.salePriceCents / 100).toFixed(2)}
-              </span>
-            </>
-          )}
-        </div>
-
-        {/* Stock Status */}
-        <div className="flex items-center gap-2 text-sm">
-          {product.stock > 0 ? (
-            <span className="text-green-600 dark:text-green-400">
-              ✓ In Stock ({product.stock})
-            </span>
-          ) : (
-            <span className="text-red-600 dark:text-red-400">
-              ✗ Out of Stock
-            </span>
-          )}
-          {product.availability && (
-            <span className="text-neutral-600 dark:text-neutral-400">
-              • {product.availability.replace('_', ' ')}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Helper function to get featured type label
-function getFeaturedTypeLabel(featuredType: string): string {
-  switch (featuredType) {
-    case 'staff_pick':
-      return 'Staff Pick';
-    case 'seasonal':
-      return 'Seasonal';
-    case 'sale':
-      return 'Sale';
-    case 'new_arrival':
-      return 'New';
-    case 'store_selection':
-      return 'Featured';
-    default:
-      return 'Featured';
-  }
-}

@@ -45,6 +45,7 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open
   
   // If any special hour is marked as closed, the store is closed all day
   const closedSpecial = todaySpecials.find((sh: any) => sh.isClosed);
+  //console.log(`[StoreStatus] closedSpecial`, closedSpecial);
   if (closedSpecial) {
     const note = closedSpecial.note ? ` (${closedSpecial.note})` : '';
     // console.log('[StoreStatus] Store closed due to special hours:', closedSpecial);
@@ -84,7 +85,7 @@ export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open
   }
   
   const specialRanges = todaySpecials.map(sp => ({ range: parseRange(sp), note: sp.note })).filter(sr => sr.range !== null);
-  
+  //console.log('[StoreStatus] specialRanges', specialRanges);
   // Check if currently open in regular hours (any period)
   for (const range of regularRanges) {
     if (currentMins >= range.openM && currentMins < range.closeM) {

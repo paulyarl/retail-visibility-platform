@@ -6,6 +6,7 @@ import Link from 'next/link';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { Button } from '@/components/ui/Button';
 import { storefrontService } from '@/services/StorefrontSingletonService';
+import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 
 interface FeaturedProduct {
   id: string;
@@ -273,6 +274,7 @@ interface FeaturedSectionWithProductsProps {
 function FeaturedSection({ tenantId, type, title, description, icon, color, products, loading, maxProducts = 8 }: FeaturedSectionWithProductsProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const config = featuredTypeConfig[type];
+  const contextPayment = useTenantPaymentOptional();
   
   // Filter products by type (already done at parent level, but keep for safety)
   const typeProducts = products.filter(p => p.featuredType === type).slice(0, maxProducts);
@@ -502,8 +504,9 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   }
                 }}
                 variant="featured"
+                hasActivePaymentGateway={contextPayment?.canPurchase}
                 showCategory={true}
-                showDescription={false}
+                showDescription={true}
                 className="h-full"
               />
             ))}
@@ -666,6 +669,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   }
                 }}
                 variant="list"
+                hasActivePaymentGateway={contextPayment?.canPurchase}
                 showCategory={true}
                 showDescription={true}
               />

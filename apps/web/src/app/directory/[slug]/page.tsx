@@ -71,28 +71,36 @@ async function getBusinessProfile(tenantId: string) {
 async function getBusinessHours(tenantId: string) {
   try {
     const data = await directoryService.getBusinessHours(tenantId);
-    if (!data?.success || !data?.data) return null;
+    if (!data || !data.success || !data.data) return null;
     
-    const { periods, timezone } = data.data;
-    const hours: any = { timezone };
+    const hoursData = data.data;
     
-    // Convert periods to day-based format for BusinessHoursDisplay
-    periods.forEach((period: any) => {
-      const dayName = period.day?.toUpperCase(); // Keep uppercase for BusinessHoursDisplay
-      if (dayName && !hours[dayName]) {
-        hours[dayName] = {
-          open: period.open,
-          close: period.close
-        };
+    // Handle both response formats: periods array or day-based object
+    if (hoursData.periods && Array.isArray(hoursData.periods)) {
+      const { periods, timezone } = hoursData;
+      const hours: any = { timezone };
+      
+      // Convert periods to day-based format for BusinessHoursDisplay
+      periods.forEach((period: any) => {
+        const dayName = period.day?.toUpperCase(); // Keep uppercase for BusinessHoursDisplay
+        if (dayName && !hours[dayName]) {
+          hours[dayName] = {
+            open: period.open,
+            close: period.close
+          };
+        }
+      });
+      
+      // Include periods array for BusinessHoursDisplay to handle multiple periods
+      if (periods.length > 0) {
+        hours.periods = periods;
       }
-    });
-    
-    // Include periods array for BusinessHoursDisplay to handle multiple periods
-    if (periods.length > 0) {
-      hours.periods = periods;
+      
+      return hours;
+    } else {
+      // Assume data is already in day-based format
+      return hoursData;
     }
-    
-    return hours;
   } catch (error) {
     console.error('Error fetching business hours:', error);
     return null;
@@ -555,7 +563,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
 
               {/* Featured Products - MOVED UP FOR CONVERSION! */}
               {(() => {
-                console.log('[Directory Page] Rendering featured products check:', featuredProducts.length);
+                //console.log('[Directory Page] Rendering featured products check:', featuredProducts.length);
                 return featuredProducts.length > 0;
               })() && (
                 <TenantPaymentProvider tenantId={listing.tenantId}>
@@ -571,7 +579,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                       {(() => {
-                        console.log('[Directory Page] Mapping featured products:', featuredProducts.length);
+                        //console.log('[Directory Page] Mapping featured products:', featuredProducts.length);
                         return featuredProducts.map((product: any) => (
                           <SmartProductCard
                             key={product.id}

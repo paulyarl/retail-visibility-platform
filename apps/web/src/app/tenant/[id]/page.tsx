@@ -33,6 +33,7 @@ import { platformSettingsService } from '@/services/PlatformSettingsSingletonSer
 import { storefrontService } from '@/services/StorefrontSingletonService';
 import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
 import { directoryService } from '@/services/DirectorySingletonService';
+import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
 
 export const dynamic = 'force-dynamic';
@@ -433,37 +434,39 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
   return (
     <ProductSingletonProvider>
-      <StorefrontClientWrapper 
-        tenantId={id}
-        tenant={tenant}
-        platformSettings={platformSettings}
-        mapLocation={mapLocation}
-        hasBranding={hasBranding}
-        storeStatus={storeStatus}
-        categories={categories}
-        productCategories={productCategories}
-        storeCategories={storeCategories}
-        uncategorizedCount={uncategorizedCount}
-        businessName={businessName}
-        search={search}
-        category={category}
-        featured={featured}
-        view={view}
-        isProductsOnly={isProductsOnly}
-        apiBaseUrl={apiBaseUrl}
-        directoryPublished={directoryPublished}
-        tenantSlug={tenantSlug}
-        primaryGBPCategory={primaryGBPCategory}
-        secondaryGBPCategories={secondaryGBPCategories}
-        tier={tier}
-        features={features}
-        totalAllProducts={totalAllProducts}
-        fullWidthLayout={false} // Default to constrained layout
-        products={products}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={total}
-      />
+      <TenantPaymentProvider tenantId={id}>
+        <StorefrontClientWrapper 
+          tenantId={id}
+          tenant={tenant}
+          platformSettings={platformSettings}
+          mapLocation={mapLocation}
+          hasBranding={hasBranding}
+          storeStatus={storeStatus}
+          categories={categories}
+          productCategories={productCategories}
+          storeCategories={storeCategories}
+          uncategorizedCount={uncategorizedCount}
+          businessName={businessName}
+          search={search}
+          category={category}
+          featured={featured}
+          view={view}
+          isProductsOnly={isProductsOnly}
+          apiBaseUrl={apiBaseUrl}
+          directoryPublished={directoryPublished}
+          tenantSlug={tenantSlug}
+          primaryGBPCategory={primaryGBPCategory}
+          secondaryGBPCategories={secondaryGBPCategories}
+          tier={tier}
+          features={features}
+          totalAllProducts={totalAllProducts}
+          fullWidthLayout={false} // Default to constrained layout
+          products={products}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={total}
+        />
+      </TenantPaymentProvider>
     </ProductSingletonProvider>
   );
 }

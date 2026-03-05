@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { tenantInfoService } from '@/services/TenantInfoService';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 
 interface TenantPaymentContextValue {
   canPurchase: boolean;
@@ -29,16 +29,19 @@ export function TenantPaymentProvider({ tenantId, children }: TenantPaymentProvi
       setLoading(true);
       setError(undefined);
       
-      const paymentGateways = await tenantInfoService.getPaymentGateways(tenantId);
+      const paymentGateways = await publicTenantInfoService.getPaymentGateways(tenantId);
       
-      // Check if any gateway is active
-      const hasActiveGateway = paymentGateways.some(gw => gw.isActive !== false);
+      // Check if any gateway is active - check both camelCase and snake_case
+      const hasActiveGateway = paymentGateways.some(gw => 
+        gw.isActive !== false && gw.is_active !== false
+      );
       
-      // Find default gateway type
-      const defaultGateway = paymentGateways.find(gw => gw.isDefault);
+      // Find default gateway type - check both camelCase and snake_case
+      const defaultGateway = paymentGateways.find(gw => gw.isDefault || gw.is_default);
+      const gatewayType = defaultGateway?.gatewayType || defaultGateway?.gateway_type || defaultGateway?.type;
       
       setCanPurchase(hasActiveGateway);
-      setDefaultGatewayType(defaultGateway?.type);
+      setDefaultGatewayType(gatewayType);
     } catch (err) {
       console.error('Failed to check payment gateway:', err);
       setCanPurchase(false);

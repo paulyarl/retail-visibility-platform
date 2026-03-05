@@ -22,7 +22,7 @@ import { Card } from '@mantine/core';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Layout, LayoutList, Star, Grid3X3, Store, ShoppingBag, TrendingUp } from 'lucide-react';
+import { Layout, LayoutList, Star, Grid3X3, Store, ShoppingBag, TrendingUp, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
@@ -176,6 +176,12 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
                   <Button variant="ghost" size="sm">
                     <ShoppingBag className="h-4 w-4 mr-2" />
                     Shops Page
+                  </Button>
+                </Link>
+                <Link href="/shops/featured">
+                  <Button variant="ghost" size="sm">
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Featured Products
                   </Button>
                 </Link>
                 <Link href="/shops/trending">

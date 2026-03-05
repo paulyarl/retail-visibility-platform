@@ -46,6 +46,7 @@ import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoG
 import { directoryService } from '@/services/DirectorySingletonService';
 import { directoryListingService } from '@/services/DirectoryListingSingletonService';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 
 // Types
 interface DirectoryConsolidated {
@@ -559,7 +560,9 @@ export default function ShopProfileClient({ shop }: {
                   Shops Home  <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </Link>
+
               </div>
+              <StoreStatusIndicator tenantId={shopData.tenantId} />
             </div>
             
             <div className="flex items-center space-x-2">

@@ -15,6 +15,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { type ApiResult } from '../providers/base/FlexibleApiSingleton';
 import { clientTenantContextManager } from '../lib/clientTenantContext';
 
 export interface DirectoryStore {
@@ -768,6 +769,18 @@ class DirectorySingletonService extends PublicApiSingleton {
     }
 
     return response.data || null;
+  }
+
+  /**
+   * Make a default API request (for featured products endpoint)
+   */
+  async makeDefaultRequest<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    cacheKey?: string,
+    cacheTTL?: number
+  ): Promise<ApiResult<T>> {
+    return super.makeDefaultRequest<T>(endpoint, options, cacheKey, cacheTTL);
   }
 
   /**

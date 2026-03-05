@@ -3,6 +3,7 @@
 import { useState } from "react";
 import ProductCard, { ProductData } from '@/components/products/ProductCardLayouts';
 import { useProductLayout, layoutVariantDescriptions } from '@/contexts/ProductLayoutContext';
+import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 
 interface FeaturedBucketSimpleProps {
   title: string;
@@ -11,6 +12,8 @@ interface FeaturedBucketSimpleProps {
   totalCount: number;
   bucketType: string;
   tenantId: string;
+  tenantName?: string;
+  tenantLogo?: string;
   initialLimit?: number;
   showLayoutSelector?: boolean;
 }
@@ -29,11 +32,15 @@ export default function FeaturedBucketSimple({
   totalCount, 
   bucketType,
   tenantId,
+  tenantName,
+  tenantLogo,
   initialLimit = 3,
   showLayoutSelector = true
 }: FeaturedBucketSimpleProps) {
   const { variant, setVariant } = useProductLayout();
+  const contextPayment = useTenantPaymentOptional();
   const [currentPage, setCurrentPage] = useState(1);
+  
   const productsPerPage = initialLimit;
   
   // Calculate pagination
@@ -172,6 +179,10 @@ export default function FeaturedBucketSimple({
             product={product as ProductData}
             variant={variant}
             tenantId={tenantId}
+            tenantName={tenantName}
+            tenantLogo={tenantLogo}
+            hasActivePaymentGateway={contextPayment?.canPurchase}
+            defaultGatewayType={contextPayment?.defaultGatewayType}
           />
         ))}
       </div>

@@ -49,9 +49,12 @@ export interface PaymentGateway {
   id: string;
   name: string;
   type: string;
+  gatewayType?: string;  // camelCase version from API
   gateway_type: string;
   is_active: boolean;
+  isActive?: boolean;  // camelCase version from API
   is_default: boolean;
+  isDefault?: boolean;  // camelCase version from API
   config: any;
   last_verified_at?: string;
   verification_status?: string;
