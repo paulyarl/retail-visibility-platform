@@ -62,8 +62,7 @@ export function ProductRecommendations({ productId, tenantId }: ProductRecommend
   if (loading || recommendations.length === 0) {
     return null;
   }
-
-  console.log('[ProductRecommendations] Rendering with', recommendations.length, 'recommendations');
+ 
 
   return (
     <div className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8">
@@ -72,8 +71,7 @@ export function ProductRecommendations({ productId, tenantId }: ProductRecommend
       </h2>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {recommendations.map((product) => {
-          console.log('[ProductRecommendations] Mapping product:', product.id, product.title);
+        {recommendations.map((product) => { 
           return (
             <SmartProductCard
               key={product.id}

@@ -87,6 +87,7 @@ export interface FeaturedProduct {
   productType?: string;
   categoryPath?: string[];
   featuredType?: FeaturedType;
+  featuredTypes?: string[];
   featuredPriority?: number;
   featuredExpiresAt?: string;
   featuredAt?: string;
@@ -102,6 +103,9 @@ export interface FeaturedProduct {
   condition?: string;
   ratingAvg?: number;
   ratingCount?: number;
+  // Payment gateway fields for Add to Cart
+  hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
 }
 
 export class FeaturedProductsSingleton extends PublicApiSingleton {
@@ -194,6 +198,15 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
           console.log(`[FeaturedProductsSingleton] Detected old bucket structure, clearing cache...`);
           return false; // Clear old format cache
         }
+        
+        // Check if products have the new fields (featuredTypes, hasActivePaymentGateway)
+        if (firstBucket.products && firstBucket.products.length > 0) {
+          const firstProduct = firstBucket.products[0];
+          if (!('featuredTypes' in firstProduct) || !('hasActivePaymentGateway' in firstProduct)) {
+            console.log(`[FeaturedProductsSingleton] Detected old product structure (missing featuredTypes/payment fields), clearing cache...`);
+            return false; // Clear old format cache
+          }
+        }
       }
       
       return true;
@@ -250,6 +263,7 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
             variantName: product.variantName || null,
             variantAttributes: product.variantAttributes || null,
             featuredType: product.featuredType,
+            featuredTypes: product.featuredTypes || (product.featuredType ? [product.featuredType] : []),
             featuredPriority: product.featuredPriority,
             featuredAt: product.featuredAt,
             featuredUntil: product.featuredUntil,
@@ -262,7 +276,10 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
             metadata: product.metadata || {},
             createdAt: product.createdAt,
             updatedAt: product.updatedAt,
-            tenant: product.tenant
+            tenant: product.tenant,
+            // Payment gateway fields for Add to Cart
+            hasActivePaymentGateway: product.hasActivePaymentGateway,
+            defaultGatewayType: product.defaultGatewayType
           };
           
           acc[type].push(transformedProduct);

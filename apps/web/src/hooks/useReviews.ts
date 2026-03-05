@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { reviewsService, type ReviewSummary, type Review } from '@/services/ReviewsSingletonService';
+import { publicReviewsService } from '@/services/PublicReviewsSingletonService';
 
 interface UseReviewsOptions {
   tenantId: string;
@@ -53,24 +54,26 @@ export function useReviews({ tenantId, isPublic, showReviews = false }: UseRevie
   // Fetch rating summary
   const fetchRatingSummary = useCallback(async () => {
     try {
-      const summary = await reviewsService.getRatingSummary(tenantId);
+      const service = isPublic ? publicReviewsService : reviewsService;
+      const summary = await service.getRatingSummary(tenantId);
       setSummary(summary);
     } catch (error) {
       console.error('Error fetching rating summary:', error);
     } finally {
       setLoading(false);
     }
-  }, [tenantId]);
+  }, [tenantId, isPublic]);
 
   // Fetch reviews
   const fetchReviews = useCallback(async () => {
     try {
-      const reviews = await reviewsService.getReviews(tenantId, 10);
+      const service = isPublic ? publicReviewsService : reviewsService;
+      const reviews = await service.getReviews(tenantId, 10);
       setReviews(reviews);
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
-  }, [tenantId]);
+  }, [tenantId, isPublic]);
 
   // Fetch user review (only for private scope)
   const fetchUserReview = useCallback(async () => {
@@ -85,8 +88,9 @@ export function useReviews({ tenantId, isPublic, showReviews = false }: UseRevie
   // Handle helpful vote
   const handleHelpfulVote = useCallback(async (reviewId: string, isHelpful: boolean) => {
     try {
-      // ReviewsSingletonService handles both public and private operations
-      const success = await reviewsService.submitHelpfulVote(reviewId, isHelpful);
+      // Use appropriate service based on scope
+      const service = isPublic ? publicReviewsService : reviewsService;
+      const success = await service.submitHelpfulVote(reviewId, isHelpful);
       
       if (success) {
         // Refresh reviews to update vote counts
@@ -110,7 +114,8 @@ export function useReviews({ tenantId, isPublic, showReviews = false }: UseRevie
     sessionId?: string;
   }) => {
     try {
-      const response = await reviewsService.submitReview(tenantId, {
+      const service = isPublic ? publicReviewsService : reviewsService;
+      const response = await service.submitReview(tenantId, {
         rating: reviewData.rating,
         content: reviewData.content,
         locationLat: null,

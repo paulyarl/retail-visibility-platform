@@ -84,8 +84,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
    * Get tenant basic information with caching
    * Uses the /public/tenant/:tenantId endpoint
    */
-  async getTenantInfo(tenantId: string): Promise<TenantInfo | null> {
-    console.log(`[PublicTenantInfoService] getTenantInfo START for tenant: ${tenantId}`, new Date().toISOString());
+  async getTenantInfo(tenantId: string): Promise<TenantInfo | null> { 
     
     if (!tenantId) {
       console.error('[PublicTenantInfoService] getTenantInfo: tenantId is required');
@@ -94,9 +93,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
 
     try {
       // Use public service for public endpoint
-      const tenant = await tenantPublicService.getPublicTenantInfo(tenantId);
-      
-      console.log(`[PublicTenantInfoService] Tenant API call completed, result:`, tenant);
+      const tenant = await tenantPublicService.getPublicTenantInfo(tenantId); 
 
       return tenant || null;
     } catch (error) {
@@ -109,8 +106,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
    * Get tenant business profile with caching
    * Uses the /public/tenant/:tenantId/profile endpoint
    */
-  async getBusinessProfile(tenantId: string): Promise<BusinessProfile | null> {
-    console.log(`[PublicTenantInfoService] getBusinessProfile START for tenant: ${tenantId}`, new Date().toISOString());
+  async getBusinessProfile(tenantId: string): Promise<BusinessProfile | null> { 
     
     if (!tenantId) {
       console.error('[PublicTenantInfoService] getBusinessProfile: tenantId is required');
@@ -119,9 +115,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
 
     try {
       // Use public service for public endpoint
-      const profile = await tenantPublicService.getPublicTenantProfile(tenantId);
-      
-      console.log(`[PublicTenantInfoService] Profile API call completed, result:`, profile);
+      const profile = await tenantPublicService.getPublicTenantProfile(tenantId); 
 
       return profile || null;
     } catch (error) {
@@ -231,9 +225,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
    * Get tenant payment gateway status (active/inactive)
    * Uses the /public/tenant/:tenantId/payment-gateways/status endpoint
    */
-  async getPaymentGatewayStatus(tenantId: string): Promise<{hasActiveGateway: boolean; defaultGatewayType?: string} | null> {
-    console.log(`[PublicTenantInfoService] getPaymentGatewayStatus START for tenant: ${tenantId}`, new Date().toISOString());
-    
+  async getPaymentGatewayStatus(tenantId: string): Promise<{hasActiveGateway: boolean; defaultGatewayType?: string} | null> { 
     if (!tenantId) {
       console.error('[PublicTenantInfoService] getPaymentGatewayStatus: tenantId is required');
       return null;
@@ -249,8 +241,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
         `public-tenant-gateway-status-${tenantId}`
       );
 
-      if (response?.success && response.data) {
-        console.log(`[PublicTenantInfoService] getPaymentGatewayStatus SUCCESS for tenant: ${tenantId}`, new Date().toISOString());
+      if (response?.success && response.data) { 
         return response.data.data;
       }
 
@@ -266,8 +257,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
    * Get tenant payment gateways with caching
    * Uses the /public/tenant/:tenantId/payment-gateways endpoint
    */
-  async getPaymentGateways(tenantId: string): Promise<PaymentGateway[]> {
-    console.log(`[PublicTenantInfoService] getPaymentGateways START for tenant: ${tenantId}`, new Date().toISOString());
+  async getPaymentGateways(tenantId: string): Promise<PaymentGateway[]> { 
     
     if (!tenantId) {
       console.error('[PublicTenantInfoService] getPaymentGateways: tenantId is required');
@@ -290,8 +280,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
         return [];
       }
 
-      if (response?.success && response.data?.gateways) {
-        console.log(`[PublicTenantInfoService] getPaymentGateways SUCCESS for tenant: ${tenantId}`, new Date().toISOString());
+      if (response?.success && response.data?.gateways) { 
         return response.data.gateways;
       }
 
@@ -308,7 +297,6 @@ class PublicTenantInfoService extends PublicApiSingleton {
    * Uses the /public/tenant/:tenantId/fulfillment-settings endpoint
    */
   async getFulfillmentSettings(tenantId: string): Promise<any> {
-    console.log(`[PublicTenantInfoService] getFulfillmentSettings START for tenant: ${tenantId}`, new Date().toISOString());
     
     if (!tenantId) {
       console.error('[PublicTenantInfoService] getFulfillmentSettings: tenantId is required');
@@ -331,8 +319,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
         return null;
       }
 
-      if (response?.success && response.data?.settings) {
-        console.log(`[PublicTenantInfoService] getFulfillmentSettings SUCCESS for tenant: ${tenantId}`, new Date().toISOString());
+      if (response?.success && response.data?.settings) { 
         return response.data.settings;
       }
 
@@ -393,8 +380,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
    * Get tenant logo URL from mv_global_discovery materialized view
    * This is used as a fallback when the tenant API doesn't return logo_url
    */
-  async getTenantLogoFromDiscovery(tenantId: string): Promise<string | null> {
-    console.log(`[PublicTenantInfoService] getTenantLogoFromDiscovery START for tenant: ${tenantId}`, new Date().toISOString());
+  async getTenantLogoFromDiscovery(tenantId: string): Promise<string | null> { 
     
     if (!tenantId) {
       return null;
@@ -413,8 +399,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
       );
       
       if (result && result.data && result.data.success && result.data.data && result.data.data.length > 0) {
-        const logoUrl = result.data.data[0].tenant_logo_url;
-        console.log(`[PublicTenantInfoService] Found logo URL from discovery: ${logoUrl}`);
+        const logoUrl = result.data.data[0].tenant_logo_url; 
         return logoUrl;
       }
 

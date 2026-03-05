@@ -92,7 +92,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
         console.error('[QR Code] Error fetching tenant info:', error);
       } finally {
         setIsFetchingTierAndLogo(false);
-        console.log('[QR Code] Tier and logo fetch complete');
+//        console.log('[QR Code] Tier and logo fetch complete');
       }
     };
     
@@ -180,7 +180,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
         tenantTier === 'chain_enterprise'
       ) && tenantLogo;
       
-      console.log('[QR Code] Should apply logo:', shouldApplyLogo, 'tenantTier:', tenantTier, 'tenantLogo:', tenantLogo);
+      //console.log('[QR Code] Should apply logo:', shouldApplyLogo, 'tenantTier:', tenantTier, 'tenantLogo:', tenantLogo);
       
       await QRCode.toCanvas(qrCanvas, productUrl, {
         width: 256,
@@ -368,6 +368,7 @@ interface Product {
   
   // Additional specs
   specifications?: Record<string, any>;
+  features?: string[];
   environmentalInfo?: string[];
   
   // Professional+ tier fields
@@ -745,10 +746,25 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           </div>
         )}
 
-        {/* Key Features - Environmental Info */}
-        {product.environmentalInfo && product.environmentalInfo.length > 0 && (
+        {/* Key Features - from product_metadata.features */}
+        {product.features && product.features.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
             <h2 className="text-xl font-semibold text-neutral-900 mb-4">✨ Key Features</h2>
+            <ul className="space-y-2">
+              {product.features.map((feature, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-sm">
+                  <span className="text-green-600 font-bold mt-0.5">✓</span>
+                  <span className="text-neutral-700">{feature}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Environmental Info */}
+        {product.environmentalInfo && product.environmentalInfo.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <h2 className="text-xl font-semibold text-neutral-900 mb-4">🌱 Environmental Information</h2>
             <ul className="space-y-2">
               {product.environmentalInfo.map((info, idx) => (
                 <li key={idx} className="flex items-start gap-2 text-sm">

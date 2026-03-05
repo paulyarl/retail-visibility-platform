@@ -163,11 +163,22 @@ class StorefrontSingletonService extends PublicApiSingleton {
       if (options.search) queryParams.append('search', options.search);
 
       const endpoint = `/api/storefront/${tenantId}/featured-products?${queryParams.toString()}`;
+      const cacheKey = `featured-products-${tenantId}-${options.limit || 10}-${options.search || ''}`;
+      
+      // Clear old cache that doesn't have new fields (featuredTypes, hasActivePaymentGateway)
+      const cached = this.cache.get(cacheKey);
+      if (cached && cached.data && cached.data.items && cached.data.items.length > 0) {
+        const firstItem = cached.data.items[0];
+        if (!('featuredTypes' in firstItem) || !('hasActivePaymentGateway' in firstItem)) {
+          console.log(`[StorefrontSingleton] Clearing old cached data (missing featuredTypes/payment fields)`);
+          this.cache.delete(cacheKey);
+        }
+      }
       
       const result = await this.makeDefaultRequest<{
         items: StorefrontProduct[];
         count?: number;
-      }>(endpoint, {}, `featured-products-${tenantId}-${options.limit || 10}-${options.search || ''}`, this.cacheTTL);
+      }>(endpoint, {}, cacheKey, this.cacheTTL);
       
       return result.data || { items: [] };
     } catch (error) {

@@ -657,6 +657,7 @@ export default function SmartProductCard({
                 alt={displayTitle}
                 fill
                 className="object-cover rounded"
+                sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-neutral-400">
@@ -859,6 +860,7 @@ export default function SmartProductCard({
               alt={displayTitle}
               fill
               className="object-cover group-hover:scale-105 transition-transform"
+              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-neutral-400">

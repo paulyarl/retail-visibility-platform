@@ -783,7 +783,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     cacheKey?: string,
     cacheTTL?: number
   ): Promise<ApiResult<T>> {
-    return super.makePublicRequest<T>(endpoint, options, { cacheKey, ttl: cacheTTL });
+    return super.makeDefaultRequest<T>(endpoint, options,cacheKey);
   }
 
   /**

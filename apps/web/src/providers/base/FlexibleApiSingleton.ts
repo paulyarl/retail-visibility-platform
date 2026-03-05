@@ -587,14 +587,6 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
   ): Promise<ApiResult<T>> {
     const requestType = requestOptions?.requestType || this.defaultRequestType;
     const requestTarget = requestOptions?.requestTarget || this.defaultRequestTarget;
-
-    console.log(`[${this.constructor.name}] ----------------------------------------`);
-    console.log(`[${this.constructor.name}] start         : ${requestType}`);
-    console.log(`[${this.constructor.name}] url           : ${url}`);
-    console.log(`[${this.constructor.name}] options       : ${JSON.stringify(options)}`);
-    console.log(`[${this.constructor.name}] cacheKey      : ${cacheKey}`);
-    console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
-    console.log(`[${this.constructor.name}] end           : ${requestTarget}  `);
     
     let setupResult: { options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget };
     

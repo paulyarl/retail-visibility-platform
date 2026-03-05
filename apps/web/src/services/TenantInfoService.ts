@@ -1226,13 +1226,15 @@ class TenantInfoService extends TenantApiSingleton {
         this.cacheTTL
       );
       if (!result.success){
-        console.error('[TenantInfoService] Failed to get current user:', result.error);
+        // Don't log as error - unauthenticated requests are normal on public pages
+        console.log('[TenantInfoService] User not authenticated');
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error('[TenantInfoService] Failed to get current user:', error);
+      // Don't log as error - unauthenticated requests are normal on public pages
+      console.log('[TenantInfoService] User not authenticated');
       return null;
     }
   }

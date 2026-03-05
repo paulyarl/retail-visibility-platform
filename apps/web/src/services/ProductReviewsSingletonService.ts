@@ -51,7 +51,6 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
    * Public endpoint for product browsing
    */
   async getProductReviewSummary(tenantId: string, productId: string): Promise<ProductReviewSummary | null> {
-    console.log('[ProductReviewsSingleton] getProductReviewSummary called with:', { tenantId, productId });
     
     try {
       if (!tenantId || !productId) {
@@ -64,16 +63,9 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
         `product-review-summary-${tenantId}-${productId}`
       );
 
-      console.log('[ProductReviewsSingleton] Debug - makeDefaultRequest result:', {
-        success: result?.success,
-        hasData: !!result?.data,
-        defaultRequestType: this.defaultRequestType,
-        defaultRequestTarget: this.defaultRequestTarget,
-        fullResult: result
-      });
+      
 
-      const data = result?.data;
-      console.log('[ProductReviewsSingleton] Extracted data:', data);
+      const data = result?.data; 
 
       return data || null;
     } catch (error) {

@@ -58,6 +58,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const product = await getProduct(id);
+  console.log('[ProductPage] product:', product);
 
   if (!product) {
     notFound();
@@ -192,6 +193,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           gtin: product.gtin,
           mpn: product.mpn,
           defaultGatewayType: 'square', // Default payment gateway type
+          // Pass features and specifications from product_metadata
+          features: product.product_metadata?.features,
+          specifications: product.product_metadata?.specifications,
         } as any}
         tenant={{
           id: product.tenant_id,

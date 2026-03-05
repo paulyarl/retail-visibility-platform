@@ -543,13 +543,10 @@ export default function ShopProfileClient({ shop }: {
                   <TrendingUp className="h-4 w-4" />
                   Trending
                 </Link>
-                <span className="text-gray-400">•</span>
-                <span className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 font-medium truncate max-w-[150px]">
-                  {shopData.name}
-                </span>
-              </div>
-              <Divider orientation="vertical" h={24} />
+                 <Divider orientation="vertical" h={24} />
               <StoreStatusIndicator tenantId={shopData.tenantId} />
+              </div>
+             
             </div>
             
             <div className="flex items-center space-x-2">

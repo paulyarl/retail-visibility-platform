@@ -103,6 +103,7 @@ const EnhancedProductGallery: React.FC<EnhancedProductGalleryProps> = ({
                 src={currentImage.url}
                 alt={currentImage.alt}
                 fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 60vw"
                 className="object-cover transition-transform duration-300 group-hover:scale-105"
                 priority
               />
@@ -203,6 +204,7 @@ const EnhancedProductGallery: React.FC<EnhancedProductGalleryProps> = ({
                     src={image.thumbnail || image.url}
                     alt={image.alt}
                     fill
+                    sizes="(max-width: 768px) 25vw, 20vw"
                     className="object-cover"
                   />
                 ) : (
