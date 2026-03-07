@@ -258,12 +258,18 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
         {/* Price */}
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-xl font-bold text-gray-900 dark:text-white">
-              ${formattedPrice}
-            </span>
-            {isOnSale && (
-              <span className="ml-2 text-sm text-gray-500 dark:text-gray-400 line-through">
-                ${formattedSalePrice}
+            {isOnSale ? (
+              <>
+                <span className="text-sm text-gray-500 dark:text-gray-400 line-through">
+                  ${formattedPrice}
+                </span>
+                <span className="ml-2 text-xl font-bold text-red-600 dark:text-red-400">
+                  ${formattedSalePrice}
+                </span>
+              </>
+            ) : (
+              <span className="text-xl font-bold text-gray-900 dark:text-white">
+                ${formattedPrice}
               </span>
             )}
           </div>
@@ -514,12 +520,18 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${formattedPrice}
-              </span>
-              {isOnSale && (
-                <span className="text-lg text-gray-500 dark:text-gray-400 line-through">
-                  ${formattedSalePrice}
+              {isOnSale ? (
+                <>
+                  <span className="text-sm text-gray-500 dark:text-gray-400 line-through">
+                    ${formattedPrice}
+                  </span>
+                  <span className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    ${formattedSalePrice}
+                  </span>
+                </>
+              ) : (
+                <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                  ${formattedPrice}
                 </span>
               )}
             </div>
@@ -728,12 +740,18 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
             {/* Price and Stock */}
             <div className="flex items-center justify-between mt-2">
               <div>
-                <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                  ${formattedPrice}
-                </span>
-                {isOnSale && (
-                  <span className="text-xs text-red-600 dark:text-red-400 line-through ml-1">
-                    ${formattedSalePrice}
+                {isOnSale ? (
+                  <>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 line-through">
+                      ${formattedPrice}
+                    </span>
+                    <span className="ml-1 text-sm font-semibold text-red-600 dark:text-red-400">
+                      ${formattedSalePrice}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                    ${formattedPrice}
                   </span>
                 )}
               </div>
@@ -1000,12 +1018,18 @@ function PremiumLayout({ product, className = '', trackingContext, tenantId, ten
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                  ${formattedPrice}
-                </span>
-                {isOnSale && (
-                  <span className="text-xl text-gray-500 dark:text-gray-400 line-through">
-                    ${formattedSalePrice}
+                {isOnSale ? (
+                  <>
+                    <span className="text-xl text-gray-500 dark:text-gray-400 line-through">
+                      ${formattedPrice}
+                    </span>
+                    <span className="text-3xl font-bold text-red-600 dark:text-red-400">
+                      ${formattedSalePrice}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-3xl font-bold text-gray-900 dark:text-white">
+                    ${formattedPrice}
                   </span>
                 )}
               </div>

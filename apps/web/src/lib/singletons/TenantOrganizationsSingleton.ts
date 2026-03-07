@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 
 // Types
 export interface Organization {
@@ -115,19 +116,19 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
     this.setState({ loading: true, error: null });
     
     try {
-      console.log('TenantOrganizationsSingleton: Fetching organizations...');
-      const result = await this.makeTenantRequest<Organization[]>(
+     // console.log('TenantOrganizationsSingleton: Fetching organizations...');
+      const result = await this.makeDefaultRequest<Organization[]>(
         '/api/organizations',
         undefined,
-        skipCache ? { bypassCache: true } : { cacheKey: `organizations-${this.tenantId}` }
+        `organizations-${this.tenantId}`
       );
 
       if (!result.success) {
-        throw new Error(result.error?.message || 'Failed to fetch organizations');
+        throw new Error(getErrorMessage(result.error) || 'Failed to fetch organizations');
       }
 
       const data = result.data;
-      console.log('TenantOrganizationsSingleton: Raw organizations response:', data);
+//      console.log('TenantOrganizationsSingleton: Raw organizations response:', data);
       
       // Transform snake_case API response to camelCase for frontend
       const transformed = (Array.isArray(data) ? data : []).map((org: any) => ({
@@ -152,7 +153,7 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
       }));
       
       this.setState({ organizations: transformed });
-      console.log('TenantOrganizationsSingleton: Organizations fetched successfully', transformed.length);
+      //console.log('TenantOrganizationsSingleton: Organizations fetched successfully', transformed.length);
     } catch (error) {
       console.error('TenantOrganizationsSingleton: Error fetching organizations:', error);
       this.setState({ error: error instanceof Error ? error.message : 'Failed to fetch organizations' });
@@ -163,11 +164,11 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
 
   async fetchAvailableTenants(): Promise<void> {
     try {
-      console.log('TenantOrganizationsSingleton: Fetching available tenants...');
-      const result = await this.makeTenantRequest<Tenant[]>(
+      //console.log('TenantOrganizationsSingleton: Fetching available tenants...');
+      const result = await this.makeDefaultRequest<Tenant[]>(
         '/api/tenants',
         undefined,
-        { cacheKey: `available-tenants-${this.tenantId}` }
+        `available-tenants-${this.tenantId}`
       );
 
       if (!result.success) {
@@ -176,11 +177,11 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
       }
 
       const data = result.data;
-      console.log('TenantOrganizationsSingleton: Available tenants response:', data);
+      //console.log('TenantOrganizationsSingleton: Available tenants response:', data);
       
       const tenants = Array.isArray(data) ? data : [];
       this.setState({ availableTenants: tenants });
-      console.log('TenantOrganizationsSingleton: Available tenants fetched successfully', tenants.length);
+      //console.log('TenantOrganizationsSingleton: Available tenants fetched successfully', tenants.length);
     } catch (error) {
       console.error('TenantOrganizationsSingleton: Error fetching available tenants:', error);
       // Don't set error state for this secondary fetch
@@ -192,23 +193,23 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
     this.setState({ processing: true, error: null });
     
     try {
-      console.log('TenantOrganizationsSingleton: Creating organization:', data);
+      //console.log('TenantOrganizationsSingleton: Creating organization:', data);
       
-      const result = await this.makeTenantRequest<Organization>('/api/organizations', {
+      const result = await this.makeDefaultRequest<Organization>('/api/organizations', {
         method: 'POST',
         body: JSON.stringify({
           name: data.name.trim(),
           subscription_tier: data.subscription_tier,
           max_locations: data.max_locations,
         }),
-      });
+      }, `organizations-${this.tenantId}`);
 
       if (!result.success) {
-        throw new Error(result.error?.message || 'Failed to create organization');
+        throw new Error(getErrorMessage(result.error) || 'Failed to create organization');
       }
 
       const newOrg = result.data;
-      console.log('TenantOrganizationsSingleton: Organization created successfully:', newOrg);
+      //console.log('TenantOrganizationsSingleton: Organization created successfully:', newOrg);
       
       // Refresh organizations list
       await this.fetchOrganizations();
@@ -225,26 +226,26 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
     this.setState({ processing: true, error: null });
     
     try {
-      console.log('TenantOrganizationsSingleton: Updating organization:', orgId, data);
+      //console.log('TenantOrganizationsSingleton: Updating organization:', orgId, data);
       
-      const result = await this.makeTenantRequest<Organization>(`/api/organizations/${orgId}/self-update`, {
+      const result = await this.makeDefaultRequest<Organization>(`/api/organizations/${orgId}/self-update`, {
         method: 'PUT',
         body: JSON.stringify({
           subscription_tier: data.subscription_tier,
           subscription_status: data.subscription_status,
           max_locations: data.max_locations,
         }),
-      });
+      }, `organizations-${this.tenantId}`);
 
       if (!result.success) {
-        throw new Error(result.error?.message || 'Failed to update organization');
+        throw new Error(getErrorMessage(result.error) || 'Failed to update organization');
       }
 
       const updatedOrg = result.data;
-      console.log('TenantOrganizationsSingleton: Organization updated successfully:', updatedOrg);
+      //console.log('TenantOrganizationsSingleton: Organization updated successfully:', updatedOrg);
       
-      // Refresh organizations list with cache bypass to ensure fresh data
-      await this.fetchOrganizations(true);
+      // Refresh organizations list
+      await this.fetchOrganizations();
     } catch (error) {
       console.error('TenantOrganizationsSingleton: Error updating organization:', error);
       this.setState({ error: error instanceof Error ? error.message : 'Failed to update organization' });
@@ -258,19 +259,19 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
     this.setState({ processing: true, error: null });
     
     try {
-      console.log('TenantOrganizationsSingleton: Adding tenant to organization:', orgId, tenantId);
+      //console.log('TenantOrganizationsSingleton: Adding tenant to organization:', orgId, tenantId);
       
-      const result = await this.makeTenantRequest(`/api/organizations/${orgId}/tenants`, {
+      const result = await this.makeDefaultRequest(`/api/organizations/${orgId}/tenants`, {
         method: 'POST',
         body: JSON.stringify({ tenantId }),
-      });
+      }, `organizations-${this.tenantId}`);
 
       if (!result.success) {
-        throw new Error(result.error?.message || 'Failed to add tenant to organization');
+        throw new Error(getErrorMessage(result.error) || 'Failed to add tenant to organization');
       }
 
       const responseData = result.data;
-      console.log('TenantOrganizationsSingleton: Tenant added to organization successfully:', responseData);
+      //console.log('TenantOrganizationsSingleton: Tenant added to organization successfully:', responseData);
       
       // Refresh organizations list
       await this.fetchOrganizations();
@@ -287,17 +288,17 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
     this.setState({ processing: true, error: null });
     
     try {
-      console.log('TenantOrganizationsSingleton: Removing tenant from organization:', orgId, tenantId);
+      //console.log('TenantOrganizationsSingleton: Removing tenant from organization:', orgId, tenantId);
       
-      const result = await this.makeTenantRequest(`/api/organizations/${orgId}/tenants/${tenantId}`, {
+      const result = await this.makeDefaultRequest(`/api/organizations/${orgId}/tenants/${tenantId}`, {
         method: 'DELETE',
-      });
+      }, `organizations-${this.tenantId}`);
 
       if (!result.success) {
-        throw new Error(result.error?.message || 'Failed to remove tenant from organization');
+        throw new Error(getErrorMessage(result.error) || 'Failed to remove tenant from organization');
       }
 
-      console.log('TenantOrganizationsSingleton: Tenant removed from organization successfully');
+      //console.log('TenantOrganizationsSingleton: Tenant removed from organization successfully');
       
       // Refresh organizations list
       await this.fetchOrganizations();

@@ -516,33 +516,126 @@ export class TenantService {
    * Get tenant tier information
    */
   private async getTenantTierInfo(tenantId: string): Promise<CompleteTenantData['tier']> {
-    // Mock implementation - replace with actual tier logic
-    return {
-      currentTier: 'basic',
-      limits: {
-        items: 1000,
-        users: 5,
-        categories: 50,
-        storage: 1024 * 1024 * 100 // 100MB
-      },
-      usage: {
-        items: 0,
-        users: 0,
-        categories: 0,
-        storage: 0
-      }
-    };
+    try {
+      // Get tenant with subscription tier
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: {
+          subscription_tier: true,
+          subscription_status: true,
+        }
+      });
+
+      const tierKey = tenant?.subscription_tier || 'starter';
+
+      // Get tier configuration from database
+      const tierConfig = await prisma.subscription_tiers_list.findUnique({
+        where: { tier_key: tierKey },
+        select: {
+          max_skus: true,
+          max_locations: true,
+          tier_key: true,
+          name: true,
+        }
+      });
+
+      // Fallback limits if tier not found in database
+      const defaultLimits: Record<string, { items: number; users: number; categories: number; storage: number }> = {
+        google_only: { items: 250, users: 1, categories: 25, storage: 1024 * 1024 * 50 },
+        starter: { items: 500, users: 3, categories: 50, storage: 1024 * 1024 * 100 },
+        professional: { items: 5000, users: 10, categories: 200, storage: 1024 * 1024 * 1024 },
+        enterprise: { items: Infinity, users: Infinity, categories: Infinity, storage: Infinity },
+        organization: { items: 10000, users: 50, categories: 500, storage: 1024 * 1024 * 1024 * 10 },
+        chain_starter: { items: 2500, users: 10, categories: 100, storage: 1024 * 1024 * 500 },
+        chain_professional: { items: 25000, users: 50, categories: 500, storage: 1024 * 1024 * 1024 * 5 },
+        chain_enterprise: { items: Infinity, users: Infinity, categories: Infinity, storage: Infinity },
+      };
+
+      const limits = tierConfig 
+        ? {
+            items: tierConfig.max_skus || defaultLimits[tierKey]?.items || 500,
+            users: defaultLimits[tierKey]?.users || 5,
+            categories: 100,
+            storage: defaultLimits[tierKey]?.storage || 1024 * 1024 * 100,
+          }
+        : defaultLimits[tierKey] || defaultLimits.starter;
+
+      // Get actual usage metrics
+      const [itemCount, userCount] = await Promise.all([
+        prisma.inventory_items.count({ where: { tenant_id: tenantId } }),
+        prisma.user_tenants.count({ where: { tenant_id: tenantId } }),
+      ]);
+
+      return {
+        currentTier: tierKey,
+        limits,
+        usage: {
+          items: itemCount,
+          users: userCount,
+          categories: 0, // Categories not tracked per tenant currently
+          storage: 0, // Storage not tracked currently
+        }
+      };
+    } catch (error) {
+      console.error(`[TenantService] Error getting tier info for ${tenantId}:`, error);
+      // Return defaults on error
+      return {
+        currentTier: 'starter',
+        limits: { items: 500, users: 3, categories: 50, storage: 1024 * 1024 * 100 },
+        usage: { items: 0, users: 0, categories: 0, storage: 0 }
+      };
+    }
   }
 
   /**
    * Get tenant subscription information
    */
   private async getTenantSubscriptionInfo(tenantId: string): Promise<CompleteTenantData['subscription']> {
-    // Mock implementation - replace with actual subscription logic
-    return {
-      status: 'active',
-      plan: 'basic',
-      features: ['basic_analytics', 'inventory_management', 'customer_support']
-    };
+    try {
+      // Get tenant subscription details
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: {
+          subscription_tier: true,
+          subscription_status: true,
+          trial_ends_at: true,
+          subscription_ends_at: true,
+        }
+      });
+
+      if (!tenant) {
+        return {
+          status: 'inactive',
+          plan: 'none',
+          features: []
+        };
+      }
+
+      // Get features for the tier
+      const tierFeatures = await prisma.tier_features_list.findMany({
+        where: {
+          tier_id: `tier_${tenant.subscription_tier || 'starter'}`,
+          is_enabled: true,
+        },
+        select: {
+          feature_key: true,
+        }
+      });
+
+      return {
+        status: tenant.subscription_status || 'active',
+        plan: tenant.subscription_tier || 'starter',
+        expiresAt: tenant.subscription_ends_at?.toISOString() || tenant.trial_ends_at?.toISOString(),
+        features: tierFeatures.map(f => f.feature_key),
+      };
+    } catch (error) {
+      console.error(`[TenantService] Error getting subscription info for ${tenantId}:`, error);
+      // Return defaults on error
+      return {
+        status: 'active',
+        plan: 'starter',
+        features: ['basic_analytics', 'inventory_management', 'customer_support']
+      };
+    }
   }
 }

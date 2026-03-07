@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-//import { Star, MessageSquare, User } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
 import ReviewForm from '@/components/reviews/ReviewForm';
 import { productReviewsService } from '@/services/ProductReviewsSingletonService';
 import { MessageSquare, Star, User } from 'lucide-react';
@@ -11,6 +9,9 @@ interface ProductRatingDisplayProps {
   productId: string;
   tenantId: string;
   showWriteReview?: boolean;
+  isAuthenticated?: boolean;
+  isAuthLoading?: boolean;
+  userId?: string;
 }
 
 interface Review {
@@ -48,8 +49,14 @@ interface UserReview {
   updated_at: string;
 }
 
-export default function ProductRatingDisplay({ productId, tenantId, showWriteReview = true }: ProductRatingDisplayProps) {
-  const { user, isAuthenticated } = useAuth();
+export default function ProductRatingDisplay({ 
+  productId, 
+  tenantId, 
+  showWriteReview = true,
+  isAuthenticated = false,
+  isAuthLoading = false,
+  userId
+}: ProductRatingDisplayProps) {
   const [summary, setSummary] = useState<RatingSummary | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [userReview, setUserReview] = useState<UserReview | null>(null);
@@ -104,8 +111,8 @@ export default function ProductRatingDisplay({ productId, tenantId, showWriteRev
         setReviews(convertedReviews);
       }
 
-      // Fetch user's review if authenticated
-      if (isAuthenticated) {
+      // Fetch user's review if authenticated (and not still loading auth state)
+      if (isAuthenticated && !isAuthLoading) {
         try {
           const userReviewData = await productReviewsService.getUserProductReview(tenantId, productId);
           if (userReviewData) {
@@ -163,7 +170,7 @@ export default function ProductRatingDisplay({ productId, tenantId, showWriteRev
         rating: formData.rating,
         title: formData.title || '',
         content: formData.content,
-        userId: user?.id
+        userId: userId
       };
       
       const response = await productReviewsService.createOrUpdateProductReview(tenantId, productId, reviewData);

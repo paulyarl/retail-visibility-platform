@@ -353,6 +353,7 @@ export default function LastViewed({
                     description: productData.productDescription,
                     priceCents: productData.productPriceCents || Math.round((productData.productPrice || 0) * 100),
                     salePriceCents: productData.productSalePriceCents,
+                    listPriceCents: productData.productPriceCents,
                     stock: productData.productStock || 999,
                     imageUrl: productData.productImage || productData.productImageUrl,
                     tenantId: productData.tenantId,

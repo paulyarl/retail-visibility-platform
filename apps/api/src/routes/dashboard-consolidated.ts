@@ -102,6 +102,12 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
     const { getLocationStatusInfo } = await import('../utils/location-status');
     const statusInfo = getLocationStatusInfo(tenant.location_status as any);
 
+    // Check if tenant has published directory listing
+    const directoryResult = await prisma.$queryRaw`
+      SELECT is_published FROM "directory_settings_list" WHERE tenant_id = ${tenant.id}
+    `;
+    const hasPublishedDirectory = (directoryResult as any[])?.[0]?.is_published === true;
+
     // Consolidated response
     res.json({
       tenant: {
@@ -111,6 +117,7 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
         bannerUrl: (tenant.metadata as any)?.banner_url,
         locationStatus: tenant.location_status,
         reopeningDate: tenant.reopening_date,
+        hasPublishedDirectory,
         statusInfo,
       },
       stats: {

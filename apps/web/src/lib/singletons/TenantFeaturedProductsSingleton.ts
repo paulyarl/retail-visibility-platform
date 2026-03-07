@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 
 // Import existing ProductSingleton for universal product integration
 import { PublicProduct } from '@/providers/data/ProductSingleton';
@@ -625,7 +626,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         // Note: Backend handles storefront revalidation automatically
       } else {
         const error = result.error;
-        throw new Error(error?.message || 'Failed to feature product');
+        throw new Error(getErrorMessage(result.error) || 'Failed to feature product');
       }
     } catch (error) {
       console.error('Error featuring product:', error);
@@ -705,7 +706,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
       } else {
         const errorData = result.error;
         console.error('[toggleProductActive] API error:', errorData);
-        throw new Error(errorData?.message || 'Failed to update product status');
+        throw new Error(getErrorMessage(result.error) || 'Failed to update product status');
       }
     } catch (error) {
       console.error('[toggleProductActive] Error:', error);

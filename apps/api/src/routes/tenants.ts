@@ -295,6 +295,12 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
     // Check if tenant has active payment gateway for cart feature
     const hasActivePaymentGateway = (tenant as any).payment_gateways?.length > 0;
 
+    // Check if tenant has published directory listing
+    const directoryResult = await prisma.$queryRaw`
+      SELECT is_published FROM "directory_settings_list" WHERE tenant_id = ${tenant.id}
+    `;
+    const hasPublishedDirectory = (directoryResult as any[])?.[0]?.is_published === true;
+
     // Transform for frontend compatibility
     const transformedTenant = {
       id: tenant.id,
@@ -304,6 +310,7 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
       subscriptionStatus: tenant.subscription_status,
       createdAt: tenant.created_at,
       locationStatus: tenant.location_status,
+      hasPublishedDirectory,
       statusInfo: getLocationStatusInfo(tenant.location_status as any),
       logoUrl: (tenant as any).tenant_business_profiles_list?.logo_url || null,
       hasActivePaymentGateway,

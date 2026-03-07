@@ -506,7 +506,9 @@ export default function OrganizationPage() {
               <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                 <h4 className="font-semibold text-green-900 mb-2">✅ Sync Complete!</h4>
                 <div className="text-sm text-green-800 space-y-1">
-                  <p>Hero: <span className="font-semibold">{syncResult.heroLocation.tenantName}</span> ({syncResult.heroLocation.itemCount} items)</p>
+                  {syncResult.heroLocation && (
+                    <p>Hero: <span className="font-semibold">{syncResult.hero_location.tenantName}</span> ({syncResult.hero_location.item_count} items)</p>
+                  )}
                   <p>✅ Created: {syncResult.summary.created} items</p>
                   <p>⏭️ Skipped: {syncResult.summary.skipped} (already exist)</p>
                   {syncResult.summary.errors > 0 && <p>❌ Errors: {syncResult.summary.errors}</p>}
@@ -835,11 +837,11 @@ export default function OrganizationPage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-green-800">
                     <div>
                       <p className="font-semibold">Hero Location</p>
-                      <p>{syncResult.heroLocation.tenantName}</p>
+                      <p>{syncResult.hero_location?.tenantName || 'Unknown'}</p>
                     </div>
                     <div>
                       <p className="font-semibold">Source Items</p>
-                      <p>{syncResult.heroLocation.itemCount}</p>
+                      <p>{syncResult.hero_location?.item_count || 0}</p>
                     </div>
                     <div>
                       <p className="font-semibold">Created</p>

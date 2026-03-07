@@ -611,15 +611,31 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     }
 
     // Invalidate tenant complete cache for this tenant
-    await this.invalidateCache(`platform-tenant-complete-${tenantId}`);
-    
-    // Invalidate tenant profile cache (exact key, no wildcard)
-    await this.invalidateCache(`platform-tenant-profile-${tenantId}`);
-    
-    // Invalidate tenant cache (slug is stored on tenant record)
-    await this.invalidateCache(`platform-tenant-${tenantId}`);
+    await this.invalidateTenantCaches(tenantId);
 
     return result.data || null;
+  }
+
+  private async invalidateTenantCaches(tenantId: string) {
+    await this.invalidateCache(`platform-tenant-complete-${tenantId}`);
+  /*   // Invalidate tenant profile cache (exact key, no wildcard)
+    await this.invalidateCache(`platform-tenant-profile-${tenantId}`);
+    // Invalidate tenant cache (slug is stored on tenant record)
+    await this.invalidateCache(`platform-tenant-${tenantId}`);
+    await this.invalidateCache('public-shops');
+    await this.invalidateCache('public-shops*');     
+    // Invalidate tenants cache
+    await this.invalidateCache('platform-tenants*');    
+    // Invalidate platform dashboard cache since tenants affect stats
+    await this.invalidateCache('platform-dashboard-complete'); 
+    await this.invalidateCache(`platform-tenant-logo-${tenantId}*`);
+    await this.invalidateCache(`platform-tenant-fulfillment-settings-${tenantId}*`);
+    await this.invalidateCache('platform-organizations*');
+
+    // Non-blocking MV refresh for tenant-related views only
+    this.refreshMaterializedView(['mv_global_discovery', 'directory_category_listings', 'directory_gbp_listings']).catch(err => {
+      console.warn('[PlatformHomeSingleton] Background MV refresh failed:', err);
+    }); */
   }
 
   /**
@@ -645,15 +661,10 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       console.error('[PlatformHomeSingleton] Failed to create tenant:', result.error);
       throw result.error;
     }
+    
 
     // Invalidate tenant complete cache for this tenant
-    await this.invalidateCache(`platform-tenant-complete-${result.data?.id}`);
-    
-    // Invalidate tenants cache
-    await this.invalidateCache('platform-tenants*');
-    
-    // Invalidate platform dashboard cache since tenants affect stats
-    await platformDashboardService.invalidateCache('platform-dashboard-complete');
+    await this.invalidateTenantCaches(result.data?.id || '');
 
     return result.data || null;
   }
@@ -679,17 +690,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       console.error('[PlatformHomeSingleton] Failed to update tenant:', result.error);
       throw result.error;
     }
-
+    
     // Invalidate tenant complete cache for this tenant
-    await this.invalidateCache(`platform-tenant-complete-${tenantId}`);
-    
-    // Invalidate tenant cache
-    await this.invalidateCache(`platform-tenant-${tenantId}*`);
-    await this.invalidateCache(`platform-tenant-profile-${tenantId}*`);
-    await this.invalidateCache('platform-tenants*');
-    
-    // Invalidate platform dashboard cache since tenants affect stats
-    await platformDashboardService.invalidateCache('platform-dashboard-complete');
+    await this.invalidateTenantCaches(tenantId);
 
     return result.data || null;
   }
@@ -713,14 +716,10 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw result.error;
     }
 
+   
     // Invalidate tenant complete cache for this tenant
-    await this.invalidateCache(`platform-tenant-complete-${tenantId}`);
-    
-    // Invalidate tenants cache
-    await this.invalidateCache('platform-tenants*');
-    
-    // Invalidate platform dashboard cache since tenants affect stats
-    await platformDashboardService.invalidateCache('platform-dashboard-complete');
+    await this.invalidateTenantCaches(tenantId);
+
   }
 
   /**
@@ -767,15 +766,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       console.error('[PlatformHomeSingleton] Failed to update tenant tier:', result.error);
       throw result.error;
     }
-
-    // Invalidate tenant complete cache for this tenant
-    await this.invalidateCache(`platform-tenant-complete-${tenantId}`);
     
-    // Invalidate relevant caches
-    await this.invalidateCache('platform-admin-tier-tenants*');
-    await this.invalidateCache('platform-tenants*');
-    await this.invalidateCache(`platform-tenant-${tenantId}*`);
-    await this.invalidateCache(`platform-tenant-tier-${tenantId}`);
+    // Invalidate tenant complete cache for this tenant
+    await this.invalidateTenantCaches(tenantId);
 
     return result.data || null;
   }
@@ -1051,12 +1044,18 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     }
 
     // Invalidate tier system cache
+    await this.invalidateTierCaches(tierId); // Clear the main endpoint cache
+
+    return result.data || null;
+  }
+
+  private async invalidateTierCaches(tierId: string) {
     await this.invalidateCache('platform-tier-system-tiers*');
     await this.invalidateCache(`platform-tier-system-tiers-${tierId}`);
     await this.invalidateCache('platform-tier-system-tiers');
-    await this.invalidateCache('/api/admin/tiers/tiers'); // Clear the main endpoint cache
-
-    return result.data || null;
+    await this.invalidateCache('/api/admin/tiers/tiers');
+    
+    await this.refreshMaterializedView(undefined, true);
   }
 
   /**
@@ -1086,10 +1085,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       console.error('[PlatformHomeSingleton] Failed to update tier:', result.error);
       throw result.error;
     }
-
+   
     // Invalidate tier system cache
-    await this.invalidateCache('platform-tier-system-tiers*');
-    await this.invalidateCache(`platform-tier-system-tiers-${tierId}`);
+    await this.invalidateTierCaches(tierId); // Clear the main endpoint cache
 
     return result.data || null;
   }
@@ -1117,10 +1115,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     }
 
     // Invalidate tier system cache
-    await this.invalidateCache('platform-tier-system-tiers*');
-    await this.invalidateCache(`platform-tier-system-tiers-${tierId}`);
-    await this.invalidateCache('platform-tier-system-tiers');
-    await this.invalidateCache('/api/admin/tiers/tiers'); // Clear the main endpoint cache
+    await this.invalidateTierCaches(tierId); // Clear the main endpoint cache
+
   }
 
   /**
@@ -1147,7 +1143,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     }
 
     // Invalidate tier system cache
-    await this.invalidateCache('platform-tier-system-tiers*');
+    await this.invalidateTierCaches(tierData.tierKey);
 
     return result.data || null;
   }
@@ -1172,7 +1168,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     }
 
     // Invalidate tier system cache
-    await this.invalidateCache('platform-tier-system-tiers*');
+    await this.invalidateTierCaches(tierId);
   }
 
   /**
@@ -1422,9 +1418,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-upload-tenant-logo-${tenantId}`
       );
 
-      // Invalidate tenant cache
-      await this.invalidateCache(`platform-tenant-${tenantId}*`);
-      await this.invalidateCache(`platform-tenant-logo-${tenantId}*`);
+     
+    // Invalidate tenant complete cache for this tenant
+    await this.invalidateTenantCaches(tenantId);
 
       return result;
     } catch (error) {
@@ -1454,9 +1450,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         },
         `platform-upload-tenant-banner-${tenantId}`
       );
-
-      // Invalidate tenant cache
-      await this.invalidateCache(`platform-tenant-${tenantId}*`);
+    
+    // Invalidate tenant complete cache for this tenant
+    await this.invalidateTenantCaches(tenantId);
 
       return result;
     } catch (error) {
@@ -1487,8 +1483,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw result.error;
     }
 
-    // Invalidate tenant cache
-    await this.invalidateCache(`platform-tenant-${tenantId}*`);
+    // Invalidate tenant complete cache for this tenant
+    await this.invalidateTenantCaches(tenantId);
 
     return result.data || null;
   }
@@ -1575,8 +1571,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw result.error;
     }
 
-    // Invalidate fulfillment settings cache
-    await this.invalidateCache(`platform-tenant-fulfillment-settings-${tenantId}*`);
+    // Invalidate tenant complete cache for this tenant
+    await this.invalidateTenantCaches(tenantId);
 
     return result.data || null;
   }
@@ -1665,6 +1661,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-google-oauth-merchants-${tenantId}`,
         this.cacheTTL
       );
+      
 
       return result;
     } catch (error) {
@@ -2288,6 +2285,10 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw new Error(error?.message || 'Failed to save business profile');
     }
     
+
+    // Invalidate tenant complete cache for this tenant
+    await this.invalidateTenantCaches(tenantId);
+    
     return result.data;
   }
 
@@ -2439,10 +2440,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         },
         `org-assign-${organizationId}-${tenantId}`
       );
-
-      // Invalidate relevant caches
-      await this.invalidateCache('platform-tenants*');
-      await this.invalidateCache('platform-organizations*');
+      
+      // Invalidate tenant complete cache for this tenant
+      await this.invalidateTenantCaches(tenantId);
     } catch (error) {
       console.error('[PlatformHomeSingleton] Failed to assign tenant to organization:', error);
       throw error;
@@ -2464,9 +2464,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `org-remove-${organizationId}-${tenantId}`
       );
 
-      // Invalidate relevant caches
-      await this.invalidateCache('platform-tenants*');
-      await this.invalidateCache('platform-organizations*');
+      // Invalidate tenant complete cache for this tenant
+      await this.invalidateTenantCaches(tenantId);
+
     } catch (error) {
       console.error('[PlatformHomeSingleton] Failed to remove tenant from organization:', error);
       throw error;

@@ -345,6 +345,49 @@ export abstract class FlexibleApiSingletonV2 extends UniversalSingleton {
   }
 
   /**
+   * Refresh materialized view(s) via API
+   * 
+   * @param views - Array of view names or single view name
+   * @param all - Refresh all known views
+   * @returns Promise with refresh results
+   * 
+   * Available views: mv_global_discovery, mv_category_discovery, mv_shop_discovery,
+   * mv_trending_scores, directory_category_products, directory_category_listings,
+   * directory_category_stats, directory_gbp_listings, directory_gbp_stats, storefront_products_mv
+   */
+  protected async refreshMaterializedView(
+    views?: string | string[],
+    all?: boolean
+  ): Promise<{ success: boolean; refreshed: number; total: number; results: any[] }> {
+    try {
+      const viewArray = typeof views === 'string' ? [views] : views;
+      
+      const result = await this.makeDefaultRequest<{ refreshed: number; total: number; results: any[] }>(
+        '/api/cache/refresh-mv',
+        {
+          method: 'POST',
+          body: JSON.stringify({ views: viewArray, all }),
+          headers: { 'Content-Type': 'application/json' }
+        },
+        undefined, // no cache
+        0, // no TTL - immediate request
+        { requestType: RequestType.SYSTEM, requestTarget: RequestTarget.API }
+      );
+
+      if (result.success && result.data) {
+        console.log(`[${this.constructor.name}] MV refresh successful: ${result.data.refreshed}/${result.data.total} views`);
+        return { success: true, ...result.data };
+      } else {
+        console.warn(`[${this.constructor.name}] MV refresh failed:`, result.error);
+        return { success: false, refreshed: 0, total: viewArray?.length || 0, results: [] };
+      }
+    } catch (error) {
+      console.error(`[${this.constructor.name}] MV refresh error:`, error);
+      return { success: false, refreshed: 0, total: 0, results: [] };
+    }
+  }
+
+  /**
    * Get singleton instance
    * Note: Subclasses should implement their own getInstance method
    */

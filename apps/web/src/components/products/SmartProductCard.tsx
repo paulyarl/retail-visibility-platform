@@ -77,9 +77,31 @@ const getStorefrontGradientBorder = (typeId: string): string => {
     case 'staff_pick':
       return 'bg-gradient-to-br from-purple-400 via-indigo-400 to-blue-400';
     default:
-      return 'bg-gradient-to-br from-amber-400 via-orange-400 to-pink-400';
+      return 'bg-gradient-to-br from-amber-400 via-orange-400 to-red-400';
   }
 };
+
+// Featured Type Icon component for image overlay
+function FeaturedTypeIcon({ type }: { type: string }) {
+  const bgColors: Record<string, string> = {
+    store_selection: 'bg-amber-500',
+    new_arrival: 'bg-green-500',
+    seasonal: 'bg-orange-500',
+    sale: 'bg-red-500',
+    staff_pick: 'bg-purple-500',
+  };
+  
+  const bgColor = bgColors[type] || 'bg-gray-500';
+  
+  return (
+    <span 
+      className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${bgColor} text-white shadow-md`}
+      title={type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+    >
+      {getStorefrontBadgeIcon(type)}
+    </span>
+  );
+}
 
 // Get all featured types for a product (supports multiple badges)
 const getFeaturedTypes = (product: ProductData): ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[] => {
@@ -1031,6 +1053,14 @@ export default function SmartProductCard({
             <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
+          </div>
+        )}
+        {/* Featured Type Icons Overlay */}
+        {product.featuredTypes && product.featuredTypes.length > 0 && (
+          <div className="absolute bottom-2 left-2 flex flex-col gap-1">
+            {product.featuredTypes.map((type, index) => (
+              <FeaturedTypeIcon key={index} type={type} />
+            ))}
           </div>
         )}
         {product.availability === 'out_of_stock' && (

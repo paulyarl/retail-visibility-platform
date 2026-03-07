@@ -360,7 +360,9 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   title: product.title,
                   brand: product.brand,
                   description: product.description,
-                  priceCents: product.priceCents,
+                  priceCents: product.listPriceCents || product.priceCents,
+                  salePriceCents: product.salePriceCents,
+                  listPriceCents: product.listPriceCents,
                   stock: product.stock,
                   imageUrl: product.imageUrl,
                   tenantId: tenantId,
@@ -525,7 +527,9 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   title: product.title,
                   brand: product.brand,
                   description: product.description,
-                  priceCents: product.priceCents,
+                  priceCents: product.listPriceCents || product.priceCents,
+                  salePriceCents: product.salePriceCents,
+                  listPriceCents: product.listPriceCents,
                   stock: product.stock,
                   imageUrl: product.imageUrl,
                   tenantId: tenantId,
@@ -698,6 +702,7 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
         
         // Use StorefrontSingletonService for backend API call with caching
         const data = await storefrontService.getFeaturedProducts(tenantId, { limit: 50 });
+        //console.log(`ShopsFeaturedProducts data:`, data);
         
         if (data.items && isMounted) {
           // Transform the data to match the expected format with all rich fields

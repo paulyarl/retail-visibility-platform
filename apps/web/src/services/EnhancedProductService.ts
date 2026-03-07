@@ -334,12 +334,12 @@ class EnhancedProductService extends PublicApiSingleton {
       visibility: data.visibility,
       
       // Pricing - map from API response
-      list_price_cents: data.priceCents || data.price * 100,
-      sale_price_cents: data.priceCents || data.price * 100,
-      current_price_cents: data.priceCents || data.price * 100,
+      list_price_cents: data.listPriceCents || data.priceCents || data.price * 100,
+      sale_price_cents: data.salePriceCents || data.priceCents || data.price * 100,
+      current_price_cents: data.priceCents || data.salePriceCents || data.price * 100,
       price: data.price,
-      is_on_sale: false, // API doesn't indicate sale status
-      discount_percentage: '0',
+      is_on_sale: data.isOnSale || false,
+      discount_percentage: data.discountPercentage || data.discount_percentage || '0',
       currency: data.currency,
       
       // Media - map from API response

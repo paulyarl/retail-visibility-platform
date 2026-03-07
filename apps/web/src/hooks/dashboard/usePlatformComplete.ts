@@ -6,6 +6,8 @@ import { PlatformDashboardData, PlatformStats, TenantMetrics, PlatformActivity }
 
 export interface UsePlatformCompleteProps {
   isAuthenticated: boolean;
+  /** Load secondary data (topTenants, recentActivity) - set false to defer loading */
+  loadSecondary?: boolean;
 }
 
 export interface UsePlatformCompleteReturn {
@@ -36,64 +38,106 @@ export interface UsePlatformCompleteReturn {
  * - Real-time metrics and performance monitoring
  * - Automatic error handling and retry logic
  * - Type-safe data structures
+ * - Supports deferred loading of secondary data (topTenants, recentActivity)
  * 
  * Usage:
  * ```typescript
+ * // Load everything immediately (default)
  * const { data, loading, error, metrics } = usePlatformComplete({ isAuthenticated });
+ * 
+ * // Defer secondary data loading for better initial performance
+ * const { data, loading, error } = usePlatformComplete({ isAuthenticated, loadSecondary: false });
  * ```
  */
-export function usePlatformComplete({ isAuthenticated }: UsePlatformCompleteProps): UsePlatformCompleteReturn {
-  // Single consolidated query - uses appropriate service based on auth state
-  const { data: dashboardData, isLoading, error, refetch } = useQuery({
-    queryKey: ['platform', 'dashboard', 'complete', isAuthenticated ? 'authenticated' : 'public'],
-    queryFn: async (): Promise<PlatformDashboardData> => {
-      // Choose service based on authentication state prop
-      const data = isAuthenticated 
-        ? await platformDashboardService.getPlatformDashboard()
-        : await publicPlatformDashboardService.getPublicPlatformDashboard();
-      
-      if (!data) {
-        throw new Error('Failed to fetch platform dashboard data');
+export function usePlatformComplete({ isAuthenticated, loadSecondary = true }: UsePlatformCompleteProps): UsePlatformCompleteReturn {
+  // Primary query - stats only (fast, critical data)
+  const { data: statsData, isLoading: statsLoading, error: statsError, refetch: refetchStats } = useQuery({
+    queryKey: ['platform', 'stats', isAuthenticated ? 'authenticated' : 'public'],
+    queryFn: async (): Promise<PlatformStats> => {
+      try {
+        const data = isAuthenticated 
+          ? await platformDashboardService.getPlatformStats()
+          : await publicPlatformDashboardService.getPublicPlatformStats();
+        
+        if (!data) {
+          throw new Error('Failed to fetch platform stats');
+        }
+        return data;
+      } catch (error) {
+        console.warn('[usePlatformComplete] Stats fetch failed:', error);
+        throw error;
       }
-
-      return data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes - matches singleton cache TTL
-    gcTime: 15 * 60 * 1000, // 15 minutes cache
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    refetchOnWindowFocus: false, // Platform data doesn't change frequently
-    refetchOnReconnect: true, // Reconnect should refresh data
-  });
-
-  // Separate query for metrics (more frequent updates)
-  const { data: metricsData } = useQuery({
-    queryKey: ['platform', 'dashboard', 'metrics'],
-    queryFn: async () => {
-      console.log('[usePlatformComplete] Fetching platform metrics');
-      
-      // For now, return null as we don't have a metrics endpoint in the service
-      // This could be added later if needed
-      return null;
-    },
-    staleTime: 30 * 1000, // 30 seconds for metrics
-    gcTime: 2 * 60 * 1000, // 2 minutes
-    retry: 1,
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    retry: 1, // Reduced from 2 to fail faster
+    retryDelay: 1000, // Fixed delay instead of exponential
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
+    // Return empty stats on error to prevent cascading failures
+    throwOnError: false,
   });
 
-  const loading = isLoading;
-  const queryError = error ? (error instanceof Error ? error.message : String(error)) : null;
+  // Secondary query - topTenants (deferred, only when loadSecondary is true)
+  const { data: topTenantsData, isLoading: topTenantsLoading } = useQuery({
+    queryKey: ['platform', 'top-tenants'],
+    queryFn: async (): Promise<TenantMetrics[]> => {
+      try {
+        const data = await platformDashboardService.getTopTenants();
+        if (!data) return []; // Return empty instead of throwing
+        return data;
+      } catch (error) {
+        console.warn('[usePlatformComplete] TopTenants fetch failed, returning empty:', error);
+        return []; // Return empty on error to prevent cascading
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    retry: 0, // No retry for secondary data
+    enabled: loadSecondary && isAuthenticated && !!statsData, // Only run if primary succeeded
+    refetchOnWindowFocus: false,
+    throwOnError: false,
+  });
+
+  // Secondary query - recentActivity (deferred, only when loadSecondary is true)
+  const { data: activityData, isLoading: activityLoading } = useQuery({
+    queryKey: ['platform', 'recent-activity'],
+    queryFn: async (): Promise<PlatformActivity[]> => {
+      try {
+        const data = await platformDashboardService.getRecentActivity();
+        if (!data) return []; // Return empty instead of throwing
+        return data;
+      } catch (error) {
+        console.warn('[usePlatformComplete] Activity fetch failed, returning empty:', error);
+        return []; // Return empty on error to prevent cascading
+      }
+    },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 0, // No retry for secondary data
+    enabled: loadSecondary && isAuthenticated && !!statsData, // Only run if primary succeeded
+    refetchOnWindowFocus: false,
+    throwOnError: false,
+  });
+
+  // Combine data into expected format
+  const dashboardData: PlatformDashboardData | null = statsData ? {
+    stats: statsData,
+    topTenants: topTenantsData || [],
+    recentActivity: activityData || [],
+  } : null;
+
+  const loading = statsLoading || (loadSecondary && (topTenantsLoading || activityLoading));
+  const queryError = statsError ? (statsError instanceof Error ? statsError.message : String(statsError)) : null;
 
   return {
-    data: dashboardData || null,
+    data: dashboardData,
     loading,
     error: queryError,
     refresh: async () => { 
-      await refetch(); 
+      await refetchStats(); 
     },
-    metrics: metricsData || null
+    metrics: null
   };
 }
 

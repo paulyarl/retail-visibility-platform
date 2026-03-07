@@ -5,6 +5,7 @@ import ProductGallery from '@/components/products/ProductGallery';
 import { TierBasedLandingPage } from '@/components/landing-page/TierBasedLandingPage';
 import { ProductNavigation } from '@/components/products/ProductNavigation';
 import { ProductRecommendations } from '@/components/products/ProductRecommendations';
+import { FeaturedTypeProducts } from '@/components/products/FeaturedTypeProducts';
 import LastViewed from '@/components/directory/LastViewed';
 import { computeStoreStatus } from '@/lib/hours-utils';
 import { ProductViewTracker } from '@/components/tracking/ProductViewTracker';
@@ -58,7 +59,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const product = await getProduct(id);
-  console.log('[ProductPage] product:', product);
+//  console.log('[ProductPage] product:', product);
 
   if (!product) {
     notFound();
@@ -179,8 +180,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           description: product.product_description,
           marketingDescription: product.marketing_description,
           price: parseFloat(product.price),
-          priceCents: product.current_price_cents,
-          salePriceCents: product.sale_price_cents,
+          priceCents: product.list_price_cents,
+          listPriceCents: product.list_price_cents, // List price for strikethrough
+          salePriceCents: product.sale_price_cents, // Sale price for actual price
           currency: product.currency,
           imageUrl: product.image_url,
           imageGallery: product.gallery_urls,
@@ -217,6 +219,15 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       {/* Product Recommendations */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <ProductRecommendations productId={product.inventory_item_id} tenantId={product.tenant_id} />
+      </div>
+
+      {/* Featured Type Products - other products with same featured types */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FeaturedTypeProducts 
+          currentProductId={product.inventory_item_id} 
+          tenantId={product.tenant_id} 
+          featuredTypes={product.featured_type_array || []}
+        />
       </div>
 
       {/* Product Reviews */}

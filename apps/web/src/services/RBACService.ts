@@ -7,6 +7,7 @@
  */
 
 import { SystemSingleton } from '../providers/base/SystemSingleton';
+import { getErrorMessage } from '../providers/base/FlexibleApiSingleton';
 
 export interface RBACRoleGroups {
   [key: string]: string[];
@@ -81,7 +82,7 @@ export class RBACService extends SystemSingleton {
         console.log('[RBACService] Role groups retrieved from web server cache');
         return result.data;
       } else {
-        throw new Error(result.error?.message || 'Failed to fetch role groups');
+        throw new Error(getErrorMessage(result.error) || 'Failed to fetch role groups');
       }
 
     } catch (error) {
@@ -112,7 +113,7 @@ export class RBACService extends SystemSingleton {
         console.log('[RBACService] User permissions retrieved from web server cache');
         return result.data;
       } else {
-        throw new Error(result.error?.message || 'Failed to fetch user permissions');
+        throw new Error(getErrorMessage(result.error) || 'Failed to fetch user permissions');
       }
 
     } catch (error) {
@@ -144,7 +145,7 @@ export class RBACService extends SystemSingleton {
         console.log('[RBACService] User access retrieved from web server cache');
         return result.data;
       } else {
-        throw new Error(result.error?.message || 'Failed to fetch user access');
+        throw new Error(getErrorMessage(result.error) || 'Failed to fetch user access');
       }
 
     } catch (error) {

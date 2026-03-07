@@ -310,12 +310,20 @@ class SlugSingletonService extends UniversalSingleton {
         throw new Error(`Slug "${newSlug}" is already taken by another tenant`);
       }
 
-      // Update in database
+      // Update in directory_settings_list
       await basePrisma.directory_settings_list.update({
         where: { tenant_id: tenantId },
         data: {
           slug: newSlug,
           updated_at: new Date(),
+        },
+      });
+
+      // Also update tenants table so getTenantComplete returns correct slug
+      await basePrisma.tenants.update({
+        where: { id: tenantId },
+        data: {
+          slug: newSlug,
         },
       });
 

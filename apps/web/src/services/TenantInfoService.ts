@@ -5,7 +5,8 @@
  * Extends TenantApiSingleton for tenant context and authentication
  */
 
-import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { platformHomeService } from './PlatformHomeSingletonService';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 
@@ -825,7 +826,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to get user subdomains:', result.error);
-        throw new Error(result.error?.message || 'Failed to get user subdomains');
+        throw new Error(getErrorMessage(result.error) || 'Failed to get user subdomains');
       }
 
       return result.data;
@@ -852,7 +853,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to check subdomain availability:', result.error);
-        throw new Error(result.error?.message || 'Failed to check subdomain availability');
+        throw new Error(getErrorMessage(result.error) || 'Failed to check subdomain availability');
       }
 
       return result.data;
@@ -881,7 +882,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to update tenant subdomain:', result.error);
-        const error = new Error(result.error?.message || 'Failed to update tenant subdomain');
+        const error = new Error(getErrorMessage(result.error) || 'Failed to update tenant subdomain');
         (error as any).cause = result.error;
         throw error;
       }
@@ -915,7 +916,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to delete tenant subdomain:', result.error);
-        const error = new Error(result.error?.message || 'Failed to delete tenant subdomain');
+        const error = new Error(getErrorMessage(result.error) || 'Failed to delete tenant subdomain');
         (error as any).cause = result.error;
         throw error;
       }
@@ -949,7 +950,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to delete subdomain:', result.error);
-        const error = new Error(result.error?.message || 'Failed to delete subdomain');
+        const error = new Error(getErrorMessage(result.error) || 'Failed to delete subdomain');
         (error as any).cause = result.error;
         throw error;
       }
@@ -978,7 +979,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to get tenant data with cache busting:', result.error);
-        throw new Error(result.error?.message || 'Failed to get tenant data with cache busting');
+        throw new Error(getErrorMessage(result.error) || 'Failed to get tenant data with cache busting');
       }
 
       return result.data;
@@ -1007,7 +1008,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to get tenant status preview:', result.error);
-        const error = new Error(result.error?.message || 'Failed to get tenant status preview');
+        const error = new Error(getErrorMessage(result.error) || 'Failed to get tenant status preview');
         (error as any).cause = result.error;
         throw error;
       }
@@ -1040,7 +1041,7 @@ class TenantInfoService extends TenantApiSingleton {
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to update tenant status:', result.error);
-        const error = new Error(result.error?.message || 'Failed to update tenant status');
+        const error = new Error(getErrorMessage(result.error) || 'Failed to update tenant status');
         (error as any).cause = result.error;
         throw error;
       }

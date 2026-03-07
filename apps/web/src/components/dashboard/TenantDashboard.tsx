@@ -1,5 +1,6 @@
 "use client";
 
+import { lazy, Suspense } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
 // Replace separate hooks with consolidated hook
 import { useTenantComplete } from "@/hooks/dashboard/useTenantComplete";
@@ -8,12 +9,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { canManageTenantSettings } from "@/lib/auth/access-control";
 import DashboardHeader from "./DashboardHeader";
 import DashboardStats from "./DashboardStats";
-import QuickActions from "./QuickActions";
 import DashboardSkeleton from "./DashboardSkeleton";
 import TierBadge from "./TierBadge";
-import TierGainsWelcome from "./TierGainsWelcome";
 import UserProfileBadge from "./UserProfileBadge";
-import VisibilityCards from "./VisibilityCards";
 import TenantLimitBadge from "@/components/tenant/TenantLimitBadge";
 import SubscriptionStateBanner from "@/components/subscription/SubscriptionStateBanner";
 import LocationStatusBanner from "@/components/tenant/LocationStatusBanner";
@@ -25,6 +23,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { AnimatedCard } from "@/components/ui";
+
+// Lazy load secondary components (non-critical for initial render)
+const QuickActions = lazy(() => import("./QuickActions"));
+const VisibilityCards = lazy(() => import("./VisibilityCards"));
+const TierGainsWelcome = lazy(() => import("./TierGainsWelcome"));
+
+// Simple loading fallback for lazy components
+const ComponentLoader = () => (
+  <div className="animate-pulse bg-neutral-200 rounded-lg h-32" />
+);
 
 interface TenantDashboardProps {
   tenantId: string;
@@ -276,26 +284,32 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
 
         {/* Tier Gains Welcome - Celebrate what they unlocked */}
         {tier && tier.effective?.level && tier.effective?.name && (
-          <TierGainsWelcome 
-            currentTier={tier.effective.level}
-            tierDisplayName={tier.effective.name}
-          />
+          <Suspense fallback={<ComponentLoader />}>
+            <TierGainsWelcome 
+              currentTier={tier.effective.level}
+              tierDisplayName={tier.effective.name}
+            />
+          </Suspense>
         )}
 
         {/* Quick Actions */}
-        <QuickActions 
-          tenantId={tenantId}
-          canManageSettings={canManageSettings}
-        />
+        <Suspense fallback={<ComponentLoader />}>
+          <QuickActions 
+            tenantId={tenantId}
+            canManageSettings={canManageSettings}
+          />
+        </Suspense>
 
         {/* Visibility Cards - Path to Visibility */}
-        <VisibilityCards
-          tenantId={tenantId}
-          tenantName={tenantData?.name || 'Your Store'}
-          hasStorefront={tenantData?.statusInfo?.showStorefront}
-          isInDirectory={tenantData?.statusInfo?.showInDirectory}
-          slug={tenantData?.slug || null}
-        />
+        <Suspense fallback={<ComponentLoader />}>
+          <VisibilityCards
+            tenantId={tenantId}
+            tenantName={tenantData?.name || 'Your Store'}
+            hasStorefront={tenantData?.statusInfo?.showStorefront}
+            isInDirectory={tenantData?.statusInfo?.showInDirectory}
+            slug={tenantData?.slug || null}
+          />
+        </Suspense>
 
         {/* Business Hours Card (tenant-scoped) */}
         <div className="mb-6">

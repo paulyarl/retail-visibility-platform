@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
+import { getUserIdentification } from '@/utils/userIdentification';
 
 interface LastViewedSession {
   userId?: string;
@@ -12,6 +13,7 @@ interface LastViewedSession {
 /**
  * Hook to manage session/user identification for last viewed functionality
  * Handles both authenticated users (userId) and anonymous users (sessionId)
+ * Uses centralized getUserIdentification to benefit from in-memory cache
  */
 export function useLastViewedSession(): LastViewedSession {
   const { user, isAuthenticated } = useAuth();
@@ -23,13 +25,9 @@ export function useLastViewedSession(): LastViewedSession {
       return; // Don't set sessionId for authenticated users
     }
 
-    // For anonymous users, get or create sessionId from localStorage
-    let storedSessionId = localStorage.getItem('lastViewedSessionId');
-    if (!storedSessionId) {
-      storedSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('lastViewedSessionId', storedSessionId);
-    }
-    setSessionId(storedSessionId);
+    // For anonymous users, use centralized identification (with caching)
+    const identification = getUserIdentification();
+    setSessionId(identification.sessionId);
   }, [user?.id]);
 
   return {

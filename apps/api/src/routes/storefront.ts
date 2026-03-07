@@ -84,6 +84,18 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         sp.marketing_description,
         sp.price_cents / 100.0 as price,
         sp.price_cents,
+        ii.sale_price_cents,
+        ii.price_cents as list_price_cents,
+        CASE 
+          WHEN ii.sale_price_cents IS NOT NULL AND ii.sale_price_cents < ii.price_cents 
+          THEN true 
+          ELSE false 
+        END as is_on_sale,
+        CASE 
+          WHEN ii.sale_price_cents IS NOT NULL AND ii.sale_price_cents < ii.price_cents 
+          THEN ROUND(((ii.price_cents - ii.sale_price_cents)::numeric / ii.price_cents::numeric) * 100, 0)
+          ELSE 0 
+        END as discount_percentage,
         sp.currency,
         sp.stock,
         sp.quantity,
@@ -121,6 +133,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
           ELSE false 
         END as is_featured
       FROM storefront_products sp
+      LEFT JOIN inventory_items ii ON ii.id = sp.id
       WHERE ${whereClause}
       ORDER BY sp.updated_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -236,7 +249,11 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         description: row.description,
         marketingDescription: row.marketing_description,
         price: row.price,
-        priceCents: row.price_cents,
+        priceCents: row.list_price_cents || row.price_cents,
+        salePriceCents: row.sale_price_cents,
+        listPriceCents: row.list_price_cents,
+        isOnSale: row.is_on_sale,
+        discountPercentage: row.discount_percentage,
         currency: row.currency,
         stock: row.stock,
         quantity: row.quantity,

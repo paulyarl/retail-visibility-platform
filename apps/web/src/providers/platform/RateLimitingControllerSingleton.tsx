@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 
 // Rate Limiting Data Interfaces
@@ -141,7 +142,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
     
     if (!result.success) {
       console.error('Error creating rate limit rule:', result.error);
-      throw new Error(result.error?.message || 'Failed to create rate limit rule');
+      throw new Error(getErrorMessage(result.error) || 'Failed to create rate limit rule');
     }
     
     const createdRule = result.data || (() => { throw new Error('No rule data received'); })();
@@ -177,7 +178,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
     
     if (!result.success) {
       console.error('Error updating rate limit rule:', result.error);
-      throw new Error(result.error?.message || 'Failed to update rate limit rule');
+      throw new Error(getErrorMessage(result.error) || 'Failed to update rate limit rule');
     }
     
     const returnedRule = result.data || (() => { throw new Error('No rule data received'); })();
@@ -201,7 +202,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
 
     if (!result.success) {
       console.error('Error deleting rate limit rule:', result.error);
-      throw new Error(result.error?.message || 'Failed to delete rate limit rule');
+      throw new Error(getErrorMessage(result.error) || 'Failed to delete rate limit rule');
     }
 
     // Remove from local cache
@@ -388,7 +389,7 @@ class RateLimitingControllerSingleton extends AdminApiSingleton {
 
     if (!result.success) {
       console.error('Error updating rate limit config:', result.error);
-      throw new Error(result.error?.message || 'Failed to update rate limit config');
+      throw new Error(getErrorMessage(result.error) || 'Failed to update rate limit config');
     }
 
     const updatedConfig = result.data || (() => { 

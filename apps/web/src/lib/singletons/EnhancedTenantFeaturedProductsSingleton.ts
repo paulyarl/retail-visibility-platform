@@ -9,6 +9,7 @@ import { useMemo, useCallback } from 'react';
 
 // Import TenantApiSingleton for proper API handling
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 
 // Import existing ProductSingleton for universal product data
 import { PublicProduct } from '@/providers/data/ProductSingleton';
@@ -222,7 +223,7 @@ class EnhancedTenantFeaturedProductsSingleton extends TenantApiSingleton {
         this.triggerStorefrontRevalidation();
       } else {
         const error = result.error;
-        throw new Error(error?.message || 'Failed to feature product');
+        throw new Error(getErrorMessage(error) || 'Failed to feature product');
       }
     } catch (error) {
       console.error('Error featuring product:', error);

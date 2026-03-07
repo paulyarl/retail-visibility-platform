@@ -12,40 +12,98 @@ import { storefrontService } from '@/services/StorefrontService';
 import Link from 'next/link';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { Badge, Group } from '@mantine/core';
-import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame, Package } from 'lucide-react';
+import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame, Package, DollarSign, Calendar } from 'lucide-react';
 
-// Featured Type Badge Component with icons
+// Featured Type Badge Component with icons only (subtle display)
+// Aligned with StorefrontFeaturedProducts.tsx featuredTypeConfig
 function FeaturedTypeBadges({ featuredTypes }: { featuredTypes: string[] }) {
-  // Map featured types to icons, colors, and labels
-  const typeConfig: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
-    new_arrival: { icon: <Zap className="w-4 h-4" />, color: 'green', label: 'New Arrival' },
-    seasonal: { icon: <Clock className="w-4 h-4" />, color: 'orange', label: 'Seasonal' },
-    sale: { icon: <Tag className="w-4 h-4" />, color: 'red', label: 'On Sale' },
-    staff_pick: { icon: <Award className="w-4 h-4" />, color: 'violet', label: 'Staff Pick' },
-    clearance: { icon: <Package className="w-4 h-4" />, color: 'yellow', label: 'Clearance' },
-    featured: { icon: <Star className="w-4 h-4" />, color: 'blue', label: 'Featured' },
-    trending: { icon: <TrendingUp className="w-4 h-4" />, color: 'pink', label: 'Trending' },
+  // Map featured types to icons, colors, and descriptions - matches shops page
+  const typeConfig: Record<string, { icon: React.ReactNode; bgColor: string; textColor: string; label: string; description: string }> = {
+    store_selection: { 
+      icon: <Star className="w-4 h-4" />, 
+      bgColor: 'bg-amber-100', 
+      textColor: 'text-amber-700',
+      label: 'Featured Product', 
+      description: 'Hand-picked favorite from our collection' 
+    },
+    new_arrival: { 
+      icon: <Package className="w-4 h-4" />, 
+      bgColor: 'bg-green-100', 
+      textColor: 'text-green-700',
+      label: 'New Arrival', 
+      description: 'Fresh product just added to our store' 
+    },
+    seasonal: { 
+      icon: <Calendar className="w-4 h-4" />, 
+      bgColor: 'bg-orange-100', 
+      textColor: 'text-orange-700',
+      label: 'Seasonal Special', 
+      description: 'Perfect for this time of year' 
+    },
+    sale: { 
+      icon: <DollarSign className="w-4 h-4" />, 
+      bgColor: 'bg-red-100', 
+      textColor: 'text-red-700',
+      label: 'Sale Item', 
+      description: 'Great deal on this product' 
+    },
+    staff_pick: { 
+      icon: <Star className="w-4 h-4" />, 
+      bgColor: 'bg-purple-100', 
+      textColor: 'text-purple-700',
+      label: 'Staff Pick', 
+      description: 'Hand-picked favorite by our team' 
+    },
+    // Keep these for backwards compatibility
+    featured: { 
+      icon: <Star className="w-4 h-4" />, 
+      bgColor: 'bg-amber-100', 
+      textColor: 'text-amber-700',
+      label: 'Featured Product', 
+      description: 'Hand-picked favorite from our collection' 
+    },
+    trending: { 
+      icon: <TrendingUp className="w-4 h-4" />, 
+      bgColor: 'bg-pink-100', 
+      textColor: 'text-pink-700',
+      label: 'Trending', 
+      description: 'Popular with customers' 
+    },
+    clearance: { 
+      icon: <Package className="w-4 h-4" />, 
+      bgColor: 'bg-yellow-100', 
+      textColor: 'text-yellow-700',
+      label: 'Clearance', 
+      description: 'Limited time offer' 
+    },
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-      <Group gap="sm" justify="center">
-        {featuredTypes.map((type, index) => {
-          const config = typeConfig[type] || { icon: <Sparkles className="w-4 h-4" />, color: 'gray', label: type };
-          return (
-            <Badge
-              key={index}
-              variant="filled"
-              color={config.color}
-              size="lg"
-              leftSection={config.icon}
-              className="px-4 py-2"
-            >
-              {config.label}
-            </Badge>
-          );
-        })}
-      </Group>
+    <div className="flex items-center gap-2 mb-4">
+      {featuredTypes.map((type, index) => {
+        const config = typeConfig[type] || { 
+          icon: <Sparkles className="w-4 h-4" />, 
+          bgColor: 'bg-gray-100', 
+          textColor: 'text-gray-600',
+          label: type, 
+          description: '' 
+        };
+        return (
+          <span
+            key={index}
+            className={`group relative inline-flex items-center justify-center w-8 h-8 rounded-full ${config.bgColor} ${config.textColor} hover:opacity-80 transition-opacity cursor-help`}
+          >
+            {config.icon}
+            {/* Mouse-over caption with description */}
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-xs font-medium text-white bg-gray-800 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
+              <span className="font-semibold">{config.label}</span>
+              {config.description && (
+                <span className="block text-gray-300 font-normal mt-0.5">{config.description}</span>
+              )}
+            </span>
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -311,11 +369,13 @@ interface Product {
   description?: string;
   price: number;
   priceCents?: number;
+  listPriceCents?: number;  // Add list price for sale display
   salePriceCents?: number;
   currency: string;
   imageUrl?: string;
   sku: string;
   availability: string;
+  stock?: number;  // Add stock property
   
   // Featured types
   featuredTypes?: string[];
@@ -508,13 +568,13 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           {!product.manufacturer && !product.tenantCategory && <div className="mb-3" />}
           {(product.manufacturer || product.tenantCategory) && <div className="mb-3" />}
           
-          <div className="flex items-baseline gap-2 mb-6">
+          <div className="mb-6">
             <PriceDisplay
-              priceCents={product.priceCents || Math.round(product.price * 100)}
+              priceCents={product.listPriceCents || product.priceCents || Math.round(product.price * 100)}
               salePriceCents={product.salePriceCents}
               variant="large"
               showSavingsBadge={true}
-              className="mb-2"
+              className="mb-1"
             />
             <span className="text-sm text-neutral-500">SKU: {product.sku}</span>
           </div>
@@ -537,6 +597,11 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
             }`}>
               {product.availability === 'in_stock' ? '✓ In Stock' : '✗ Out of Stock'}
             </span>
+            {product.availability === 'in_stock' && product.stock !== undefined && product.stock !== null && (
+              <span className="ml-2 text-sm text-neutral-600 dark:text-neutral-400">
+                {product.stock} units available
+              </span>
+            )}
           </div>
 
           {/* Add to Cart Button - Only show if tenant has order processing enabled */}

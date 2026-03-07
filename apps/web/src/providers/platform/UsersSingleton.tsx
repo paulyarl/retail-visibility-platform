@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 
 // User Types (matching server-side)
@@ -144,7 +145,7 @@ class UsersSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error creating user', result.error);
-      throw new Error(result.error?.message || 'Failed to create user');
+      throw new Error(getErrorMessage(result.error) || 'Failed to create user');
     }
 
     console.log('User created successfully', { userId: result.data?.user.id });
@@ -168,7 +169,7 @@ class UsersSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error updating user', result.error);
-      throw new Error(result.error?.message || 'Failed to update user');
+      throw new Error(getErrorMessage(result.error) || 'Failed to update user');
     }
 
     console.log('User updated successfully', { userId });
@@ -191,7 +192,7 @@ class UsersSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error deleting user', result.error);
-      throw new Error(result.error?.message || 'Failed to delete user');
+      throw new Error(getErrorMessage(result.error) || 'Failed to delete user');
     }
 
     console.log('User deleted successfully', { userId });
@@ -272,7 +273,7 @@ class UsersSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error recording activity', result.error);
-      throw new Error(result.error?.message || 'Failed to record activity');
+      throw new Error(getErrorMessage(result.error) || 'Failed to record activity');
     }
 
     console.log('User activity recorded', { userId, type: activity.type });
@@ -297,7 +298,7 @@ class UsersSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error fetching user stats', result.error);
-      throw new Error(result.error?.message || 'Failed to fetch user stats');
+      throw new Error(getErrorMessage(result.error) || 'Failed to fetch user stats');
     }
 
     return result.data?.stats || (() => { 

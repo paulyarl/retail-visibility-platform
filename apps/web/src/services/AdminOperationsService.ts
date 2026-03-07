@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { getErrorMessage } from '../providers/base/FlexibleApiSingleton';
 
 interface AdminStats {
   totalUsers: number;
@@ -350,7 +351,7 @@ class AdminOperationsService extends AdminApiSingleton {
 
       if (!result.success) {
         console.error('[AdminOperationsService] Failed to export data:', result.error);
-        throw new Error(result.error?.message || 'Failed to export data');
+        throw new Error(getErrorMessage(result.error) || 'Failed to export data');
       }
 
       return result.data || (() => { throw new Error('No export data received'); })();

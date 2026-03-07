@@ -162,6 +162,8 @@ class OrganizationsSingletonService extends TenantApiSingleton {
       console.error('[OrganizationsSingleton] Failed to update hero location:', result.error);
       return null;
     }
+    
+    this.invalidateOrganizationCache(organizationId);
 
     return result.data || null;
   }
@@ -232,10 +234,20 @@ class OrganizationsSingletonService extends TenantApiSingleton {
       console.error('[OrganizationsSingleton] Failed to sync from hero:', result.error);
       return null;
     }
+    
+    this.invalidateOrganizationCache(organizationId);
 
     return result.data || null;
   }
 
+
+  private invalidateOrganizationCache(organizationId: string) {
+    this.invalidateCache(`tenant-organization-${organizationId}`);
+    this.invalidateCache(`organization-${organizationId}`);
+    this.invalidateCache('organization-*');
+    this.invalidateCache('organizations-*');
+    this.invalidateCache('tenant-organization-*');
+  }
 }
 
 // Export singleton instance

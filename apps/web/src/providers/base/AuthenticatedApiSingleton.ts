@@ -98,6 +98,7 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
         
         return {
           success: false,
+          data: null as T,
           error: {
             status: 401,
             message: 'Authentication failed - please log in again',
@@ -114,6 +115,7 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
       
       return {
         success: false,
+        data: null as T,
         error: {
           status: 401,
           message: 'Authentication session expired',

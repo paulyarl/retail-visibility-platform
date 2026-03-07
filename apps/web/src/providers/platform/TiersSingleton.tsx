@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 
 // Tier Types (matching server-side)
@@ -180,7 +181,7 @@ class TiersSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error creating tier', result.error);
-      throw new Error(result.error?.message || 'Failed to create tier');
+      throw new Error(getErrorMessage(result.error) || 'Failed to create tier');
     }
 
     console.log('Tier created successfully', { tierId: result.data?.tier.id });
@@ -204,7 +205,7 @@ class TiersSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error updating tier', result.error);
-      throw new Error(result.error?.message || 'Failed to update tier');
+      throw new Error(getErrorMessage(result.error) || 'Failed to update tier');
     }
 
     console.log('Tier updated successfully', { tierId });
@@ -227,7 +228,7 @@ class TiersSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error deleting tier', result.error);
-      throw new Error(result.error?.message || 'Failed to delete tier');
+      throw new Error(getErrorMessage(result.error) || 'Failed to delete tier');
     }
 
     console.log('Tier deleted successfully', { tierId });
@@ -285,7 +286,7 @@ class TiersSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error fetching tier stats', result.error);
-      throw new Error(result.error?.message || 'Failed to fetch tier stats');
+      throw new Error(getErrorMessage(result.error) || 'Failed to fetch tier stats');
     }
 
     return result.data?.stats || (() => { 
@@ -305,7 +306,7 @@ class TiersSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error checking upgrade eligibility', result.error);
-      throw new Error(result.error?.message || 'Failed to check upgrade eligibility');
+      throw new Error(getErrorMessage(result.error) || 'Failed to check upgrade eligibility');
     }
 
     return result.data || (() => { 

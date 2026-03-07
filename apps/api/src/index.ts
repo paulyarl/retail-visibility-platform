@@ -688,13 +688,15 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
     });
     if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
     
-    // Fetch current slug from directory_settings_list (source of truth)
+    // Fetch current slug and published status from directory_settings_list (source of truth)
     const { basePrisma } = await import('./prisma');
-    const slugResult = await basePrisma.$queryRaw`
-      SELECT slug FROM "directory_settings_list" WHERE tenant_id = ${tenant.id}
+    const directoryResult = await basePrisma.$queryRaw`
+      SELECT slug, is_published FROM "directory_settings_list" WHERE tenant_id = ${tenant.id}
     `;
-    const currentSlug = (slugResult as any[])[0]?.slug || tenant.slug;
-    console.log('[GET /tenants/:id] Slug from directory_settings_list:', currentSlug, 'tenant.slug:', tenant.slug);
+    const directoryRow = (directoryResult as any[])[0];
+    const currentSlug = directoryRow?.slug || tenant.slug;
+    const hasPublishedDirectory = directoryRow?.is_published === true;
+    console.log('[GET /tenants/:id] Slug from directory_settings_list:', currentSlug, 'hasPublishedDirectory:', hasPublishedDirectory);
     
     const now = new Date();
     
@@ -742,6 +744,7 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
     res.json({
       ...tenant,
       slug: currentSlug, // Use slug from directory_settings_list (source of truth)
+      hasPublishedDirectory,
       statusInfo,
     });
   } catch (e: any) {

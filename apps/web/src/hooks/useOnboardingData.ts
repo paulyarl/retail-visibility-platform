@@ -52,10 +52,10 @@ export function useOnboardingData({
         // Sanitize and normalize
         const sanitized = onboardingDataService.sanitizeData(merged);
         const normalized = onboardingDataService.normalizeData(sanitized);
-
+/* 
         console.log('[useOnboardingData] API data:', apiData);
         console.log('[useOnboardingData] localStorage data:', localData);
-        console.log('[useOnboardingData] Merged data:', normalized);
+        console.log('[useOnboardingData] Merged data:', normalized); */
 
         setData(normalized);
         setStep(savedStep);

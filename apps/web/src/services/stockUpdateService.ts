@@ -1,4 +1,5 @@
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { ItemsSingletonService, Item } from './ItemsSingletonService';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 
@@ -59,7 +60,7 @@ export class StockUpdateService extends TenantApiSingleton {
       );
 
       if (!result.success) {
-        throw new Error(result.error?.message || `Failed to update stock (${result.status})`);
+        throw new Error(getErrorMessage(result.error) || `Failed to update stock (${result.status})`);
       }
 
       console.log(`[StockUpdateService] Stock update successful:`, result.data);

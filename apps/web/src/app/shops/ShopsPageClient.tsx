@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, MapPin, Star, Phone, Globe, Clock, Filter, Grid, List, ChevronDown, ChevronLeft, Store, ShoppingBag, TrendingUp, Sparkles, Tag, Users, Calendar, ArrowLeft, X } from 'lucide-react';
+import { Search, MapPin, Star, Phone, Globe, Clock, Filter, Grid, List, ChevronDown, ChevronLeft, Store, ShoppingBag, TrendingUp, Sparkles, Tag, Users, Calendar, ArrowLeft, X, Flame, Leaf, Gift, Zap } from 'lucide-react';
 import { Button, Container, Grid as MantineGrid, SimpleGrid, Badge, Card, Group, Text, Stack } from '@mantine/core';
 import StorefrontActions from '../../components/storefront/StorefrontActions';
 import { directorySingletonService } from '../../services/DirectorySingletonService';
@@ -42,6 +42,7 @@ interface Shop {
   hours?: any;
   is_featured?: boolean;
   featured_until?: string;
+  featuredTypes?: string[]; // Array of featured type slugs
   distance?: number;
   created_at?: string;
   updated_at?: string;
@@ -187,6 +188,28 @@ const StatsCard: React.FC<StatsCardProps> = ({ icon, label, value, trend }) => (
   </div>
 );
 
+// Featured Type Icon component for product cards (matching SmartProductCard pattern)
+const FeaturedTypeIcon: React.FC<{ type: string }> = ({ type }) => {
+  const config: Record<string, { icon: React.ReactNode; bgColor: string; title: string }> = {
+    store_selection: { icon: <Star className="w-3 h-3 fill-white" />, bgColor: 'bg-amber-500', title: 'Store Selection' },
+    new_arrival: { icon: <Sparkles className="w-3 h-3" />, bgColor: 'bg-green-500', title: 'New Arrival' },
+    seasonal: { icon: <Gift className="w-3 h-3" />, bgColor: 'bg-orange-500', title: 'Seasonal' },
+    sale: { icon: <Zap className="w-3 h-3" />, bgColor: 'bg-red-500', title: 'Sale' },
+    staff_pick: { icon: <Users className="w-3 h-3" />, bgColor: 'bg-purple-500', title: 'Staff Pick' },
+  };
+  
+  const cfg = config[type] || { icon: <Star className="w-3 h-3" />, bgColor: 'bg-gray-500', title: type };
+  
+  return (
+    <span 
+      className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${cfg.bgColor} text-white shadow-md`}
+      title={cfg.title}
+    >
+      {cfg.icon}
+    </span>
+  );
+};
+
 const ProductCard: React.FC<ProductCardProps> = ({ product, tenantId, onProductClick }) => (
   <div 
     className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200 dark:border-gray-700"
@@ -206,7 +229,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, tenantId, onProductC
           <ShoppingBag className="h-12 w-12 text-gray-400" />
         </div>
       )}
-      {product.is_featured && (
+      {/* Featured Type Icons Overlay - bottom left, stacked vertically */}
+      {product.featuredTypes && product.featuredTypes.length > 0 && (
+        <div className="absolute bottom-2 left-2 flex flex-col gap-1">
+          {product.featuredTypes.map((type, index) => (
+            <FeaturedTypeIcon key={index} type={type} />
+          ))}
+        </div>
+      )}
+      {/* Fallback: show single featured badge if no featuredTypes array */}
+      {!product.featuredTypes?.length && product.is_featured && (
         <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
           Featured
         </div>
@@ -259,7 +291,16 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop, onShopClick }) => {
             <Store className="h-12 w-12 text-gray-400" />
           </div>
         )}
-        {shop.is_featured && (
+        {/* Featured Type Icons Overlay - bottom left, stacked vertically */}
+        {shop.featuredTypes && shop.featuredTypes.length > 0 && (
+          <div className="absolute bottom-2 left-2 flex flex-col gap-1">
+            {shop.featuredTypes.map((type, index) => (
+              <FeaturedTypeIcon key={index} type={type} />
+            ))}
+          </div>
+        )}
+        {/* Fallback: show single featured badge if no featuredTypes array */}
+        {!shop.featuredTypes?.length && shop.is_featured && (
           <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
             Featured
           </div>

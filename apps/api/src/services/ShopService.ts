@@ -496,32 +496,37 @@ class ShopService extends UniversalSingleton {
 
     try {
       const query = `
-        SELECT DISTINCT
-          tenant_id,
-          tenant_name,
-          tenant_slug,
-          tenant_logo_url as imageUrl,
-          tenant_address,
-          tenant_city,
-          tenant_state,
-          tenant_zip,
-          shop_category as primary_category,
-          subscription_tier,
-          AVG(average_rating) as rating_avg,
-          MAX(CAST(review_count AS INTEGER)) as rating_count,
-          COUNT(DISTINCT inventory_item_id) as productCount
-        FROM mv_global_discovery
-        WHERE item_status = 'active'
-          AND visibility = 'public'
-          ${search ? `AND (tenant_name ILIKE $${search ? 3 : 0} OR shop_category ILIKE $${search ? 3 : 0})` : ''}
-          ${category ? `AND shop_category = $${category ? (search ? 4 : 3) : 0}` : ''}
-          ${location ? `AND (tenant_city ILIKE $${location ? (search && category ? 5 : search || category ? 4 : 3) : 0} OR tenant_state ILIKE $${location ? (search && category ? 5 : search || category ? 4 : 3) : 0})` : ''}
+        SELECT 
+          g.tenant_id,
+          g.tenant_name,
+          g.tenant_slug,
+          g.tenant_logo_url as imageUrl,
+          g.tenant_address,
+          g.tenant_city,
+          g.tenant_state,
+          g.tenant_zip,
+          g.shop_category as primary_category,
+          g.subscription_tier,
+          AVG(g.average_rating) as rating_avg,
+          MAX(CAST(g.review_count AS INTEGER)) as rating_count,
+          COALESCE(ic.item_count, 0) as productCount
+        FROM mv_global_discovery g
+        LEFT JOIN (
+          SELECT tenant_id, COUNT(*) as item_count
+          FROM inventory_items
+          GROUP BY tenant_id
+        ) ic ON ic.tenant_id = g.tenant_id
+        WHERE g.item_status = 'active'
+          AND g.visibility = 'public'
+          ${search ? `AND (g.tenant_name ILIKE $${search ? 3 : 0} OR g.shop_category ILIKE $${search ? 3 : 0})` : ''}
+          ${category ? `AND g.shop_category = $${category ? (search ? 4 : 3) : 0}` : ''}
+          ${location ? `AND (g.tenant_city ILIKE $${location ? (search && category ? 5 : search || category ? 4 : 3) : 0} OR g.tenant_state ILIKE $${location ? (search && category ? 5 : search || category ? 4 : 3) : 0})` : ''}
         GROUP BY 
-          tenant_id, tenant_name, tenant_slug,
-          tenant_logo_url, tenant_address, tenant_city, tenant_state,
-          tenant_zip, shop_category, subscription_tier
-        HAVING COUNT(DISTINCT inventory_item_id) > 0
-        ORDER BY COUNT(DISTINCT inventory_item_id) DESC, tenant_name ASC
+          g.tenant_id, g.tenant_name, g.tenant_slug,
+          g.tenant_logo_url, g.tenant_address, g.tenant_city, g.tenant_state,
+          g.tenant_zip, g.shop_category, g.subscription_tier, ic.item_count
+        HAVING COUNT(DISTINCT g.inventory_item_id) > 0
+        ORDER BY productCount DESC NULLS LAST, g.tenant_name ASC
         LIMIT $1 OFFSET $2
       `;
 
@@ -584,18 +589,23 @@ class ShopService extends UniversalSingleton {
 
   /**
    * Get unified shop data with fallbacks from multiple tables
-   * Priority: directory_listings_list -> tenant_business_profiles_list -> tenants
+   * Priority: directory_settings_list (slug lookup) -> directory_listings_list -> tenant_business_profiles_list -> tenants
    */
   async getUnifiedShopByIdentifier(identifier: string): Promise<any | null> {
     this.logInfo(`Getting unified shop data for identifier: ${identifier}`);
     
     try {
+      // Query from directory_settings_list first (has slug) and join to directory_listings_list
       const query = `
         SELECT 
-          -- Directory listings (primary source)
-          dl.tenant_id,
+          -- Core identifiers from directory_settings_list
+          dsl.tenant_id,
+          dsl.slug,
+          dsl.is_published,
+          dsl.is_featured,
+          
+          -- Directory listings (primary source for business data)
           dl.business_name,
-          dl.slug,
           dl.address,
           dl.city,
           dl.state,
@@ -610,14 +620,26 @@ class ShopService extends UniversalSingleton {
           dl.logo_url,
           dl.description,
           dl.business_hours,
-          dl.rating_avg,
-          dl.rating_count,
-          dl.product_count,
-          dl.is_featured,
-          dl.subscription_tier,
-          dl.is_published,
+          dl.subscription_tier as dl_subscription_tier,
           dl.created_at,
           dl.updated_at,
+          
+          -- Real-time product count from inventory_items
+          COALESCE(ic.item_count, 0) as product_count,
+          
+          -- Real-time rating from store_reviews (approved reviews only)
+          COALESCE(
+            (SELECT AVG(sr.rating)::numeric
+             FROM store_reviews sr 
+             WHERE sr.tenant_id = dsl.tenant_id AND sr.approval_status = 'approved'), 
+            0
+          ) as rating_avg,
+          COALESCE(
+            (SELECT COUNT(sr.id)::numeric
+             FROM store_reviews sr 
+             WHERE sr.tenant_id = dsl.tenant_id AND sr.approval_status = 'approved'), 
+            0
+          ) as rating_count,
           
           -- Business profile fallbacks
           bp.address_line1 as fallback_address_line1,
@@ -646,16 +668,21 @@ class ShopService extends UniversalSingleton {
           t.currency as fallback_currency,
           t.subscription_status as fallback_subscription_status,
           t.subscription_tier as fallback_subscription_tier,
-          t.slug as fallback_slug,
           t.subdomain as fallback_subdomain,
           t.directory_visible as fallback_directory_visible,
           t.metadata as fallback_metadata
           
-        FROM directory_listings_list dl
-        LEFT JOIN tenant_business_profiles_list bp ON dl.tenant_id = bp.tenant_id
-        LEFT JOIN tenants t ON dl.tenant_id = t.id
-        WHERE (dl.tenant_id = $1 OR dl.slug = $1) 
-          AND dl.is_published = true
+        FROM directory_settings_list dsl
+        LEFT JOIN directory_listings_list dl ON dsl.tenant_id = dl.tenant_id
+        LEFT JOIN tenant_business_profiles_list bp ON dsl.tenant_id = bp.tenant_id
+        LEFT JOIN tenants t ON dsl.tenant_id = t.id
+        LEFT JOIN (
+          SELECT tenant_id, COUNT(*) as item_count
+          FROM inventory_items
+          GROUP BY tenant_id
+        ) ic ON ic.tenant_id = dsl.tenant_id
+        WHERE (dsl.tenant_id = $1 OR dsl.slug = $1)
+          AND dsl.is_published = true
         LIMIT 1
       `;
 
@@ -673,7 +700,7 @@ class ShopService extends UniversalSingleton {
       const unifiedShop = {
         tenantId: rawShop.tenant_id,
         name: rawShop.business_name || rawShop.fallback_name || 'Shop Name',
-        slug: rawShop.slug || rawShop.fallback_slug || 'shop-slug',
+        slug: rawShop.slug || 'shop-slug',
         address: rawShop.address || rawShop.fallback_address_line1 || '123 Main Street',
         city: rawShop.city || 'Pittsburgh',
         state: rawShop.state || 'PA',
@@ -689,11 +716,11 @@ class ShopService extends UniversalSingleton {
         bannerUrl: rawShop.fallback_banner_url,
         description: rawShop.description || rawShop.fallback_business_description || 'Shop description',
         hours: rawShop.business_hours || rawShop.fallback_hours,
-        ratingAvg: rawShop.rating_avg || 0,
-        ratingCount: rawShop.rating_count || 0,
-        productCount: rawShop.product_count || 0,
+        ratingAvg: parseFloat(rawShop.rating_avg) || 0,
+        ratingCount: parseInt(rawShop.rating_count) || 0,
+        productCount: parseInt(rawShop.product_count) || 0,
         isFeatured: rawShop.is_featured || false,
-        subscriptionTier: rawShop.subscription_tier || rawShop.fallback_subscription_tier || 'starter',
+        subscriptionTier: rawShop.dl_subscription_tier || rawShop.fallback_subscription_tier || 'starter',
         isPublished: rawShop.is_published || false,
         createdAt: rawShop.created_at,
         updatedAt: rawShop.updated_at,

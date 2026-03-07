@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { RecentlyViewedItem } from './RecentlyViewedSingleton';
 
 // Recommendations Data Interfaces
@@ -403,7 +404,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
     
     if (!result.success) {
       console.error('Error sending recommendation feedback:', result.error);
-      throw new Error(result.error?.message || 'Failed to send feedback');
+      throw new Error(getErrorMessage(result.error) || 'Failed to send feedback');
     }
   }
 
@@ -423,7 +424,7 @@ class RecommendationsSingleton extends PublicApiSingleton {
     
     if (!result.success) {
       console.error('Error sending recommendation feedback batch:', result.error);
-      throw new Error(result.error?.message || 'Failed to send feedback batch');
+      throw new Error(getErrorMessage(result.error) || 'Failed to send feedback batch');
     }
   }
 

@@ -107,126 +107,135 @@ export interface UseTenantCompleteReturn {
  * Advanced hook that fetches complete tenant data in a single consolidated API call
  * Replaces useTenantTier + separate tenant info calls
  * Reduces 3 API calls to 1 consolidated call
+ * 
+ * @param tenantId - The tenant ID to fetch data for
+ * @param loadSecondary - If false, only loads critical tenant data (defer tier/usage)
  */
-export function useTenantComplete(tenantId: string | null): UseTenantCompleteReturn {
+export function useTenantComplete(tenantId: string | null, loadSecondary: boolean = true): UseTenantCompleteReturn {
   const { user } = useAuth();
   const authUser = user;
 
+  // Primary query - critical tenant data only (fast, essential)
+  const { data: tenantData, isLoading: tenantLoading, refetch: refetchTenant } = useQuery({
+    queryKey: ['tenant', 'info', tenantId],
+    queryFn: async () => {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      try {
+        const data = await tenantInfoService.getCompleteTenantInfo(tenantId);
+        return data;
+      } catch (error) {
+        console.warn('[useTenantComplete] Tenant info fetch failed:', error);
+        throw error;
+      }
+    },
+    staleTime: 30 * 1000, // 30 seconds for tenant info
+    gcTime: 5 * 60 * 1000,
+    enabled: !!tenantId && !!authUser,
+    retry: 1, // Reduced from 2
+    retryDelay: 1000,
+    throwOnError: false,
+  });
+
+  // Secondary query - tier data (deferred)
+  const { data: tierData, isLoading: tierLoading } = useQuery({
+    queryKey: ['tenant', 'tier', tenantId],
+    queryFn: async () => {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      try {
+        return tenantInfoService.getTenantTier(tenantId);
+      } catch (error) {
+        console.warn('[useTenantComplete] Tier fetch failed, returning null:', error);
+        return null; // Return null on error instead of throwing
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    enabled: loadSecondary && !!tenantId && !!authUser && !!tenantData, // Only if primary succeeded
+    retry: 0, // No retry for secondary
+    throwOnError: false,
+  });
+
+  // Secondary query - usage data (deferred)
+  const { data: usageData, isLoading: usageLoading } = useQuery({
+    queryKey: ['tenant', 'usage', tenantId],
+    queryFn: async () => {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      try {
+        return tenantManagementService.getTenantUsage(tenantId);
+      } catch (error) {
+        console.warn('[useTenantComplete] Usage fetch failed, returning null:', error);
+        return null; // Return null on error instead of throwing
+      }
+    },
+    staleTime: 30 * 1000,
+    gcTime: 2 * 60 * 1000,
+    enabled: loadSecondary && !!tenantId && !!authUser && !!tenantData, // Only if primary succeeded
+    retry: 0, // No retry for secondary
+    throwOnError: false,
+  });
+
+  // Combined loading state
+  const isLoading = tenantLoading || (loadSecondary && (tierLoading || usageLoading));
+  
   // Clear cache function for debugging
   const clearCacheAndRefresh = async () => {
     console.log('[useTenantComplete] Refreshing data...');
-    
-    // Refetch the query (cache clearing handled by staleTime: 0)
-    await refetch();
+    await refetchTenant();
   };
 
-  // Single consolidated query - replaces 3 separate calls
-  const { data: completeData, isLoading, error, refetch } = useQuery({
-    queryKey: ['tenant', 'complete', tenantId],
-    queryFn: async (): Promise<TenantCompleteResponse> => {
-      if (!tenantId) {
-        throw new Error('Tenant ID is required');
-      }
-
-      //console.log('[useTenantComplete] Fetching consolidated tenant data for:', tenantId);
-
-      try {
-        // Get data from multiple services
-        const [tenantData, tierData, usageData] = await Promise.all([
-          tenantInfoService.getCompleteTenantInfo(tenantId),
-          tenantInfoService.getTenantTier(tenantId),
-          tenantManagementService.getTenantUsage(tenantId)
-        ]);
-
-        //console.log('[useTenantComplete] Raw API responses:', {
-        //  tenantData: tenantData?.tenant?.id,
-        //  tierData: tierData?.name,
-        //  usageData: usageData
-        //});
-
-        // Combine data into expected format
-        const data: TenantCompleteResponse = {
-          tenant: {
-            id: tenantData.tenant?.id || tenantId,
-            name: tenantData.tenant?.name || 'Unknown',
-            organizationId: tenantData.tenant?.organization_id||null, // Not available in new structure
-            subscriptionTier: tenantData.tenant?.subscription_tier || 'basic',
-            subscriptionStatus: tenantData.tenant?.subscription_status || 'active', // Not available in new structure
-            locationStatus: tenantData.tenant?.location_status || 'active',
-            subdomain: null, // Not available in new structure
-            createdAt: tenantData.tenant?.created_at||new Date().toISOString(),
-            statusInfo: tenantData.tenant?.statusInfo||null,
-            stats: {
-              productCount: usageData?.items || 0,
-              userCount: 0 // Not available in new structure
-            },
-            slug: tenantData.tenant?.slug || null
-          },
-          tier: tierData ? {
-            tier: tenantData.tenant?.subscription_tier||tierData.name,
-            status: tenantData.tenant?.subscription_status||'active'
-          } : null,
-          usage: usageData ? {
-            products: (usageData as any).data?.usage?.activeItems || (usageData as any).data?.usage?.totalItems || (usageData as any).currentItems || usageData.items || 0,
-            locations: (usageData as any).data?.usage?.locations || 0, // Not available in new structure
-            users: (usageData as any).data?.usage?.users || 0,
-            apiCalls: 0, // Not available in new structure
-            storageGB: (usageData as any).data?.usage?.storage || 0,
-            totalItems: (usageData as any).data?.usage?.totalItems || (usageData as any).data?.usage?.activeItems || (usageData as any).currentItems || usageData.items || 0,
-            activeItems: (usageData as any).data?.usage?.activeItems || (usageData as any).data?.usage?.totalItems || (usageData as any).currentItems || usageData.items || 0,
-            categories: (usageData as any).data?.usage?.categories || 0,
-            orders: (usageData as any).data?.usage?.orders || 0
-          } : null,
-          _timestamp: new Date().toISOString()
-        };
-        /* console.log('[useTenantComplete] Received consolidated data:', {
-          tenant: data.tenant?.id,
-          hasTier: !!data.tier,
-          hasUsage: !!data.usage,
-          usageData: data.usage
-        }); */
-
-        return data;
-      } catch (apiError) {
-        console.error('[useTenantComplete] API calls failed:', apiError);
-        throw apiError;
-      }
+  // Build tenant from primary query
+  const tenant = tenantData?.tenant ? {
+    id: tenantData.tenant.id || tenantId!,
+    name: tenantData.tenant.name || 'Unknown',
+    organizationId: tenantData.tenant.organization_id || null,
+    subscriptionTier: tenantData.tenant.subscription_tier || 'basic',
+    subscriptionStatus: tenantData.tenant.subscription_status || 'active',
+    locationStatus: tenantData.tenant.location_status || 'active',
+    subdomain: null,
+    createdAt: tenantData.tenant.created_at || new Date().toISOString(),
+    statusInfo: tenantData.tenant.statusInfo || null,
+    stats: {
+      productCount: usageData?.items || 0,
+      userCount: 0
     },
-    staleTime: 0, // Force fresh data
-    gcTime: 0, // No cache to ensure fresh data
-    enabled: !!tenantId && !!authUser, // Only run when authenticated and tenantId available
-    retry: 2,
-  });
+    slug: tenantData.tenant.slug || null
+  } : null;
 
-  // Extract data from consolidated response
-  const tenant = completeData?.tenant || null;
-  const rawTier = completeData?.tier || null;
-  const rawUsage = completeData?.usage || null;
-  const loading = isLoading;
-  const queryError = error ? (error instanceof Error ? error.message : String(error)) : null;
+  // Build resolved tier from secondary query
+  const rawTier = tierData;
+  const rawUsage = usageData;
 
-  // Build resolved tier from consolidated data
-  // This replaces the complex tier resolution logic that was in useTenantTier
+  // Transform usage data to expected format
+  const usage: TenantUsage | null = rawUsage ? {
+    products: (rawUsage as any).data?.usage?.activeItems || (rawUsage as any).data?.usage?.totalItems || (rawUsage as any).currentItems || (rawUsage as any).items || 0,
+    locations: (rawUsage as any).data?.usage?.locations || 0,
+    users: (rawUsage as any).data?.usage?.users || 0,
+    apiCalls: 0,
+    storageGB: (rawUsage as any).data?.usage?.storage || 0,
+    totalItems: (rawUsage as any).data?.usage?.totalItems || (rawUsage as any).data?.usage?.activeItems || (rawUsage as any).currentItems || (rawUsage as any).items || 0,
+    activeItems: (rawUsage as any).data?.usage?.activeItems || (rawUsage as any).data?.usage?.totalItems || (rawUsage as any).currentItems || (rawUsage as any).items || 0,
+    categories: (rawUsage as any).data?.usage?.categories || 0,
+    orders: (rawUsage as any).data?.usage?.orders || 0
+  } : null;
+
+  // Build resolved tier from secondary query data
   const tier: ResolvedTier | null = useMemo(() => {
     if (!rawTier || !tenant) return null;
 
     try {
-      // Create basic tier info from consolidated response
       const tenantTier: TierInfo = {
-        id: rawTier.tier,
-        name: rawTier.tier,
-        level: mapTierLevel(rawTier.tier),
+        id: (rawTier as any).tier || (rawTier as any).name,
+        name: (rawTier as any).name || (rawTier as any).tier,
+        level: mapTierLevel((rawTier as any).tier || (rawTier as any).name),
         source: 'tenant',
-        features: [], // Would need to be populated based on tier
+        features: [],
         limits: {
-          maxProducts: getTierLimit(rawTier.tier, 'products'),
-          maxLocations: getTierLimit(rawTier.tier, 'locations'),
-          maxUsers: getTierLimit(rawTier.tier, 'users'),
+          maxProducts: getTierLimit((rawTier as any).tier || (rawTier as any).name, 'products'),
+          maxLocations: getTierLimit((rawTier as any).tier || (rawTier as any).name, 'locations'),
+          maxUsers: getTierLimit((rawTier as any).tier || (rawTier as any).name, 'users'),
         }
       };
 
-      // For now, assume individual tenant (not chain)
-      // In production, you'd check if organization exists and handle chain logic
       return {
         effective: tenantTier,
         tenant: tenantTier,
@@ -240,20 +249,8 @@ export function useTenantComplete(tenantId: string | null): UseTenantCompleteRet
     }
   }, [rawTier, tenant]);
 
-  // Transform usage data to expected format
-  //console.log('[useTenantComplete] Transforming usage data:', { rawUsage });
-  const usage: TenantUsage | null = rawUsage ? {
-    products: rawUsage.products,
-    locations: rawUsage.locations,
-    users: rawUsage.users,
-    apiCalls: rawUsage.apiCalls,
-    storageGB: rawUsage.storageGB,
-    totalItems: rawUsage.totalItems,
-    activeItems: rawUsage.activeItems,
-    categories: rawUsage.categories,
-    orders: rawUsage.orders
-  } : null;
-  // console.log('[useTenantComplete] Transformed usage data:', { usage });
+  const loading = isLoading;
+  const queryError = null; // Error handling per-query would need individual error states
 
   // Helper functions (copied from useTenantTier for backward compatibility)
   const hasTierFeature = (featureId: string): boolean => {

@@ -111,12 +111,20 @@ class ProductReviewsSingletonService extends PublicApiSingleton {
 
   /**
    * Get user's review for a product
-   * Public endpoint for product browsing
+   * Only makes request if user is authenticated (has userId or access token)
    */
   async getUserProductReview(tenantId: string, productId: string, userId?: string): Promise<ProductReview | null> {
     try {
       if (!tenantId || !productId) {
         throw new Error('Tenant ID and Product ID are required');
+      }
+
+      // Early return for anonymous users - don't make API call
+      // Check if we have an access token (user is authenticated)
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      if (!userId && !accessToken) {
+        // Anonymous user - no user review to fetch
+        return null;
       }
 
       const params = new URLSearchParams();

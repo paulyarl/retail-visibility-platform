@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const isSecure = window.location.protocol === 'https:';
       const cookieString = `access_token=${encodeURIComponent(accessToken)}; path=/; SameSite=Lax${isSecure ? '; Secure' : ''}; max-age=${7 * 24 * 60 * 60}`; // 7 days
       document.cookie = cookieString;
-      console.log('[AuthContext] Set cookie:', cookieString);
+//      console.log('[AuthContext] Set cookie:', cookieString);
     } catch (error) {
       console.error('[AuthContext] Failed to set cookie:', error);
     }

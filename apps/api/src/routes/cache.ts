@@ -1,7 +1,24 @@
 import { Router } from 'express'
 import { memoryCache } from '../utils/cache'
+import { getDirectPool } from '../utils/db-pool'
 
 const router = Router()
+
+// Materialized views that can be refreshed
+const REFRESHABLE_MVS = [
+  'mv_global_discovery',
+  'mv_category_discovery',
+  'mv_shop_discovery',
+  'mv_trending_scores',
+  'directory_category_products',
+  'directory_category_listings',
+  'directory_category_stats',
+  'directory_gbp_listings',
+  'directory_gbp_stats',
+  'storefront_products_mv',
+] as const;
+
+type MaterializedViewName = typeof REFRESHABLE_MVS[number];
 
 // GET /api/cache/stats - Get cache statistics and metrics
 router.get('/stats', async (req, res) => {
@@ -64,6 +81,66 @@ router.post('/reset-metrics', async (req, res) => {
       success: false,
       error: 'Failed to reset cache metrics'
     })
+  }
+})
+
+// POST /api/cache/refresh-mv - Refresh materialized view(s)
+// Body: { views?: string[], all?: boolean }
+router.post('/refresh-mv', async (req, res) => {
+  try {
+    const { views, all } = req.body;
+    const pool = getDirectPool();
+    
+    const viewsToRefresh: MaterializedViewName[] = all 
+      ? [...REFRESHABLE_MVS]
+      : (views || []).filter((v: string) => REFRESHABLE_MVS.includes(v as MaterializedViewName)) as MaterializedViewName[];
+    
+    if (viewsToRefresh.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid views specified. Use: ' + REFRESHABLE_MVS.join(', ')
+      });
+    }
+    
+    const results: { view: string; status: 'success' | 'error'; error?: string }[] = [];
+    
+    for (const viewName of viewsToRefresh) {
+      try {
+        // Try CONCURRENTLY first (doesn't block reads, requires unique index)
+        await pool.query(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${viewName}`);
+        results.push({ view: viewName, status: 'success' });
+      } catch (error: any) {
+        // If concurrent fails (e.g., no unique index), try blocking refresh
+        if (error?.code === '55000') {
+          try {
+            await pool.query(`REFRESH MATERIALIZED VIEW ${viewName}`);
+            results.push({ view: viewName, status: 'success' });
+          } catch (blockingError: any) {
+            results.push({ view: viewName, status: 'error', error: blockingError.message });
+          }
+        } else {
+          results.push({ view: viewName, status: 'error', error: error.message });
+        }
+      }
+    }
+    
+    const successCount = results.filter(r => r.status === 'success').length;
+    
+    res.json({
+      success: successCount === viewsToRefresh.length,
+      data: {
+        refreshed: successCount,
+        total: viewsToRefresh.length,
+        results
+      }
+    });
+  } catch (error: any) {
+    console.error('Error refreshing MVs:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to refresh materialized views',
+      message: error.message
+    });
   }
 })
 

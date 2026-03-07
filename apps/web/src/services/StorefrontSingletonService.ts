@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { getErrorMessage, getErrorStatus } from '@/providers/base/FlexibleApiSingleton';
 
 export interface StorefrontCategory {
   id: string;
@@ -207,7 +208,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
       
       if (!result.success) {
         // Handle 404 or other errors gracefully - tenant might not have directory listing
-        if (result.error?.status === 404) {
+        if (getErrorStatus(result.error) === 404) {
           console.log(`[StorefrontSingleton] No directory listing found for tenant ${tenantId}`);
         } else {
           console.warn(`[StorefrontSingleton] Failed to get directory listing:`, result.error);

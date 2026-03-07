@@ -1,4 +1,5 @@
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { getErrorMessage } from '../providers/base/FlexibleApiSingleton';
 
 export interface DbTier {
   id: string;
@@ -132,7 +133,7 @@ export class TenantTierService extends AdminApiSingleton {
 
     if (!result.success) {
       console.error('[TenantTierService] Failed to update tenant tier:', result.error);
-      const errorMessage = result.error?.message || 'Failed to update tenant tier';
+      const errorMessage = getErrorMessage(result.error) || 'Failed to update tenant tier';
       throw new Error(errorMessage);
     }
 

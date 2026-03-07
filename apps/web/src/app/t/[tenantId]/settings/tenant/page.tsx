@@ -64,7 +64,7 @@ export default function TenantBusinessProfilePage() {
       const sanitized = onboardingDataService.sanitizeData(merged);
       const normalized = onboardingDataService.normalizeData(sanitized);
 
-      console.log('[TenantSettings] Onboarding data loaded:', normalized);
+//      console.log('[TenantSettings] Onboarding data loaded:', normalized);
       return normalized;
     } catch (err) {
       console.error('[TenantSettings] Failed to load onboarding data:', err);
@@ -74,8 +74,8 @@ export default function TenantBusinessProfilePage() {
 
   const mergeProfileData = async (profileData: BusinessProfile | null) => {
     const onboardingData = await loadOnboardingData();
-    console.log('[TenantSettings] Onboarding data:', onboardingData);
-    console.log('[TenantSettings] Profile data:', profileData);
+    //console.log('[TenantSettings] Onboarding data:', onboardingData);
+    //console.log('[TenantSettings] Profile data:', profileData);
     if (!profileData) {
       // If no profile exists, use onboarding data as base
       setMergedProfile(onboardingData as BusinessProfile);
@@ -104,7 +104,7 @@ export default function TenantBusinessProfilePage() {
       slug: (profileData as any).slug || (onboardingData as any).slug || '',
     };
     
-    console.log('[TenantSettings] Merged profile data:', merged);
+    //console.log('[TenantSettings] Merged profile data:', merged);
     setMergedProfile(merged);
   };
 
@@ -142,7 +142,7 @@ export default function TenantBusinessProfilePage() {
   };
 
   const handleUpdate = async (updatedProfile: BusinessProfile) => {
-    console.log('[TenantSettings] handleUpdate called with:', updatedProfile);
+    //console.log('[TenantSettings] handleUpdate called with:', updatedProfile);
     try {
       const data = await platformHomeService.updateTenantProfile(tenantId, updatedProfile as any);
       

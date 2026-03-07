@@ -14,6 +14,11 @@ import { recommendationsService } from '@/services/RecommendationsSingletonServi
 import { externalApiService } from '@/services/ExternalApiService';
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 
+// In-memory cache to prevent race conditions when multiple calls happen simultaneously
+let cachedSessionId: string | null = null;
+let sessionCacheExpiry: number = 0;
+const SESSION_CACHE_TTL_MS = 60000; // 1 minute cache
+
 // Behavior Tracking Singleton Class
 class BehaviorTrackingSingleton extends PublicApiSingleton {
   private static instance: BehaviorTrackingSingleton;
@@ -636,6 +641,12 @@ export function trackBehaviorClient(trackingData: Omit<TrackingData, 'durationSe
   let userId: string | undefined;
   let sessionId: string | undefined;
   
+  // Check in-memory cache first (prevents race conditions)
+  const now = Date.now();
+  if (now < sessionCacheExpiry && cachedSessionId) {
+    sessionId = cachedSessionId;
+  }
+  
   try {
     const authUser = localStorage.getItem('auth_user_cache');
     
@@ -648,8 +659,14 @@ export function trackBehaviorClient(trackingData: Omit<TrackingData, 'durationSe
     }
     
     // For anonymous users, get or create session ID
-    if (!userId) {
+    if (!userId && !sessionId) {
       let lastViewedSession = localStorage.getItem('lastViewedSessionId');
+      
+      // Also check in-memory cache for session (handles race condition)
+      if (!lastViewedSession && cachedSessionId) {
+        lastViewedSession = cachedSessionId;
+      }
+      
       if (!lastViewedSession) {
         // Create new session ID if it doesn't exist
         lastViewedSession = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -657,6 +674,8 @@ export function trackBehaviorClient(trackingData: Omit<TrackingData, 'durationSe
         console.log('[Tracking] Created new session ID:', lastViewedSession);
       }
       sessionId = lastViewedSession;
+      cachedSessionId = sessionId;
+      sessionCacheExpiry = now + SESSION_CACHE_TTL_MS;
     }
   } catch (error) {
     console.error('[Tracking] Error getting user data:', error);

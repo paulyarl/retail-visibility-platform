@@ -155,7 +155,7 @@ export abstract class ApiSystemSingleton extends FlexibleApiSingleton {
     cacheKey?: string,
     ttl?: number
   ) {
-    return await this.makePublicRequest<T>(url, options, {
+    return await this.makePublicRequest<T>(url, options, cacheKey, ttl, {
       cacheKey,
       ttl
     });

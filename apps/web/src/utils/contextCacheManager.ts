@@ -12,73 +12,98 @@ import { CacheManager } from './cacheManager';
 
 import cacheManager from './cacheManager';
 
-export type AppContext = 'admin' | 'tenant' | 'product' | 'store' | 'user' | 'system';
+export enum CacheIsolation {
+  GLOBAL = 'global',
+  TENANT = 'tenant',
+  USER = 'user', 
+  ADMIN = 'admin',
+  PRODUCT = 'product',
+  STORE = 'store',
+  SYSTEM = 'system'
+}
+export enum CacheOperation {
+  GET = 'get',
+  SET = 'set',
+  DELETE = 'delete',
+  CLEAR = 'clear'
+}
+export enum ProcessOperation {
+  STORE = 'store',
+  RETRIEVE = 'retrieve'
+}
+export enum AppContext {
+  ADMIN = 'admin',
+  TENANT = 'tenant', 
+  PRODUCT = 'product',
+  STORE = 'store',
+  USER = 'user',
+  SYSTEM = 'system'
+}
 
 interface ContextCacheConfig {
   ttl: number; // Time to live in milliseconds
   maxSize: number; // Maximum entries
-  isolation: 'global' | 'tenant' | 'user' | 'admin';
+  isolation: CacheIsolation;
   encryption: boolean; // Whether to encrypt sensitive data
   compression: boolean; // Whether to compress large data
   persistent: boolean; // Whether to persist to IndexedDB
 }
-
 const CONTEXT_CONFIGS: Record<AppContext, ContextCacheConfig> = {
   // Admin context: Security-focused, short TTL, encrypted
-  admin: {
+  [AppContext.ADMIN]: {
     ttl: 5 * 60 * 1000, // 5 minutes
     maxSize: 50,
-    isolation: 'admin',
+    isolation: CacheIsolation.ADMIN,
     encryption: true,
     compression: false,
     persistent: true
   },
 
   // Tenant context: Long TTL, isolated per tenant
-  tenant: {
+  [AppContext.TENANT]: {
     ttl: 60 * 60 * 1000, // 1 hour
     maxSize: 100,
-    isolation: 'tenant',
+    isolation: CacheIsolation.TENANT,
     encryption: true,
     compression: true,
     persistent: true
   },
 
   // Product context: Shared data, medium TTL, compressed
-  product: {
+  [AppContext.PRODUCT]: {
     ttl: 30 * 60 * 1000, // 30 minutes
     maxSize: 500,
-    isolation: 'global',
+    isolation: CacheIsolation.GLOBAL,
     encryption: false,
     compression: true,
     persistent: true
   },
 
   // Store context: Location-based, medium TTL
-  store: {
+  [AppContext.STORE]: {
     ttl: 20 * 60 * 1000, // 20 minutes
     maxSize: 200,
-    isolation: 'global',
+    isolation: CacheIsolation.GLOBAL,
     encryption: false,
     compression: true,
     persistent: true
   },
 
   // User context: Personal data, session-based
-  user: {
+  [AppContext.USER]: {
     ttl: 15 * 60 * 1000, // 15 minutes
     maxSize: 100,
-    isolation: 'user',
+    isolation: CacheIsolation.USER,
     encryption: true,
     compression: false,
     persistent: false // Memory only for privacy
   },
 
   // System context: Configuration, long TTL
-  system: {
+  [AppContext.SYSTEM]: {
     ttl: 24 * 60 * 60 * 1000, // 24 hours
     maxSize: 50,
-    isolation: 'global',
+    isolation: CacheIsolation.GLOBAL,
     encryption: false,
     compression: false,
     persistent: true
@@ -103,20 +128,23 @@ class ContextCacheManager {
 
   private getCacheKey(context: AppContext, key: string, isolationId?: string): string {
     const config = CONTEXT_CONFIGS[context];
-    let prefix = context;
+    let prefix = context.toString(); // Convert enum to string
 
     // Add isolation prefix based on context type
     switch (config.isolation) {
-      case 'tenant':
+      case CacheIsolation.TENANT:
         prefix += `-${isolationId || 'default-tenant'}`;
         break;
-      case 'user':
+      case CacheIsolation.USER:
         prefix += `-${isolationId || 'anonymous'}`;
         break;
-      case 'admin':
+      case CacheIsolation.ADMIN:
         prefix += `-${isolationId || 'system'}`;
         break;
-      case 'global':
+      case CacheIsolation.SYSTEM:
+        prefix += `-${isolationId || 'system'}`;
+        break;
+      case CacheIsolation.GLOBAL:
         // No isolation prefix
         break;
     }
@@ -127,13 +155,13 @@ class ContextCacheManager {
   private async processData<T>(
     context: AppContext, 
     data: T, 
-    operation: 'store' | 'retrieve'
+    operation: ProcessOperation.STORE | ProcessOperation.RETRIEVE
   ): Promise<T> {
     const config = CONTEXT_CONFIGS[context];
     let processedData: T = data;
 
     // Compression for large data
-    if (config.compression && operation === 'store') {
+    if (config.compression && operation === ProcessOperation.STORE) {
       if (JSON.stringify(data).length > 1024) { // Only compress if > 1KB
         processedData = await this.compress(data) as T;
       }
@@ -141,7 +169,7 @@ class ContextCacheManager {
 
     // Encryption for sensitive data
     if (config.encryption) {
-      if (operation === 'store') {
+      if (operation === ProcessOperation.STORE) {
         processedData = await this.encrypt(processedData) as T;
       } else {
         processedData = await this.decrypt(processedData) as T;
@@ -149,7 +177,7 @@ class ContextCacheManager {
     }
 
     // Decompression
-    if (config.compression && operation === 'retrieve') {
+    if (config.compression && operation === ProcessOperation.RETRIEVE) {
       processedData = await this.decompress(processedData) as T;
     }
 
@@ -202,7 +230,7 @@ class ContextCacheManager {
     try {
       const cached = await manager.get(cacheKey);
       if (cached) {
-        return await this.processData<T>(context, cached as T, 'retrieve');
+        return await this.processData<T>(context, cached as T, ProcessOperation.RETRIEVE);
       }
       return null;
     } catch (error) {
@@ -236,7 +264,7 @@ class ContextCacheManager {
     }
 
     try {
-      const processedData = await this.processData<T>(context, data, 'store');
+      const processedData = await this.processData<T>(context, data, ProcessOperation.STORE);
       await manager.set(cacheKey, processedData);
       
       console.log(`[ContextCacheManager] Stored in ${context} cache:`, {
@@ -274,7 +302,7 @@ class ContextCacheManager {
       }
     } else {
       // Clear all contexts
-      for (const [ctx, manager] of this.contexts.entries()) {
+      for (const [ctx, manager] of Array.from(this.contexts.entries())) {
         await manager.clear();
       }
       console.log('[ContextCacheManager] Cleared all context caches');
@@ -283,7 +311,7 @@ class ContextCacheManager {
 
   getStats(): Record<AppContext, any> {
     const stats: Record<string, any> = {};
-    for (const [context, manager] of this.contexts.entries()) {
+    for (const [context, manager] of Array.from(this.contexts.entries())) {
       stats[context] = {
         ...manager.getStats(),
         config: CONTEXT_CONFIGS[context]
@@ -294,43 +322,43 @@ class ContextCacheManager {
 
   // Context-specific helper methods
   async getAdminData<T>(key: string): Promise<T | null> {
-    return this.get<T>('admin', key, 'system');
+    return this.get<T>(AppContext.ADMIN, key, 'system');
   }
 
   async setAdminData<T>(key: string, data: T): Promise<void> {
-    return this.set('admin', key, data, { isolationId: 'system' });
+    return this.set(AppContext.ADMIN, key, data, { isolationId: 'system' });
   }
 
   async getTenantData<T>(tenantId: string, key: string): Promise<T | null> {
-    return this.get<T>('tenant', key, tenantId);
+    return this.get<T>(AppContext.TENANT, key, tenantId);
   }
 
   async setTenantData<T>(tenantId: string, key: string, data: T): Promise<void> {
-    return this.set('tenant', key, data, { isolationId: tenantId });
+    return this.set(AppContext.TENANT, key, data, { isolationId: tenantId });
   }
 
   async getProductData<T>(key: string): Promise<T | null> {
-    return this.get<T>('product', key);
+    return this.get<T>(AppContext.PRODUCT, key);
   }
 
   async setProductData<T>(key: string, data: T): Promise<void> {
-    return this.set('product', key, data);
+    return this.set(AppContext.PRODUCT, key, data);
   }
 
   async getStoreData<T>(location: string, key: string): Promise<T | null> {
-    return this.get<T>('store', key, location);
+    return this.get<T>(AppContext.STORE, key, location);
   }
 
   async setStoreData<T>(location: string, key: string, data: T): Promise<void> {
-    return this.set('store', key, data, { isolationId: location });
+    return this.set(AppContext.STORE, key, data, { isolationId: location });
   }
 
   async getUserData<T>(userId: string, key: string): Promise<T | null> {
-    return this.get<T>('user', key, userId);
+    return this.get<T>(AppContext.USER, key, userId);
   }
 
   async setUserData<T>(userId: string, key: string, data: T): Promise<void> {
-    return this.set('user', key, data, { isolationId: userId });
+    return this.set(AppContext.USER, key, data, { isolationId: userId });
   }
 }
 

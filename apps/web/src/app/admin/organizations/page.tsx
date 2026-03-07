@@ -384,7 +384,7 @@ export default function AdminOrganizationsPage() {
                   <select
                     value={selectedTenantId}
                     onChange={(e) => setSelectedTenantId(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-64 px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   >
                     <option value="">Select a tenant...</option>
                     {availableTenants.map((tenant) => (

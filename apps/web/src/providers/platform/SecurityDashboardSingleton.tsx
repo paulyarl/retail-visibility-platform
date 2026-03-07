@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { LoginSession, SecurityAlert, SecurityMetrics, SecurityThreat, BlockedIP } from '@/types/security';
 
@@ -262,7 +263,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
     
     if (!result.success) {
       console.error('Error revoking session:', result.error);
-      throw new Error(result.error?.message || 'Failed to revoke session');
+      throw new Error(getErrorMessage(result.error) || 'Failed to revoke session');
     }
 
     // Clear cache to refresh data
@@ -279,7 +280,7 @@ class SecurityDashboardSingleton extends AdminApiSingleton {
     
     if (!result.success) {
       console.error('Error revoking all sessions:', result.error);
-      throw new Error(result.error?.message || 'Failed to revoke all sessions');
+      throw new Error(getErrorMessage(result.error) || 'Failed to revoke all sessions');
     }
 
     // Clear cache to refresh data

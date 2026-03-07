@@ -14,6 +14,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { tenantPublicService } from '@/services/TenantPublicService';
 
 // ====================
@@ -114,7 +115,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
 
     if (!result.success) {
       console.error('[TenantSettingsSingleton] Error fetching tenant info:', result.error);
-      throw new Error(result.error?.message || 'Failed to fetch tenant info');
+      throw new Error(getErrorMessage(result.error) || 'Failed to fetch tenant info');
     }
 
     console.log('[TenantSettingsSingleton] Fetched tenant info:', this.tenantId);
@@ -133,7 +134,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
 
     if (!result.success) {
       console.error('[TenantSettingsSingleton] Error fetching tenant profile:', result.error);
-      throw new Error(result.error?.message || 'Failed to fetch tenant profile');
+      throw new Error(getErrorMessage(result.error) || 'Failed to fetch tenant profile');
     }
 
     console.log('[TenantSettingsSingleton] Fetched tenant profile:', this.tenantId);
@@ -168,7 +169,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
 
     if (!result.success) {
       console.error('[TenantSettingsSingleton] Error fetching featured products limits:', result.error);
-      throw new Error(result.error?.message || 'Failed to fetch featured products limits');
+      throw new Error(getErrorMessage(result.error) || 'Failed to fetch featured products limits');
     }
 
     console.log('[TenantSettingsSingleton] Fetched featured products limits:', this.tenantId);
@@ -219,7 +220,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
 
     if (!result.success) {
       console.error('[TenantSettingsSingleton] Error updating tenant profile:', result.error);
-      throw new Error(result.error?.message || 'Failed to update tenant profile');
+      throw new Error(getErrorMessage(result.error) || 'Failed to update tenant profile');
     }
 
     // Invalidate cache

@@ -157,7 +157,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantDirectoryManagement] Failed to get directory photos:', result.error);
+      console.log('[TenantDirectoryManagement] Failed to get directory photos:', result.error);
       return [];
     }
     

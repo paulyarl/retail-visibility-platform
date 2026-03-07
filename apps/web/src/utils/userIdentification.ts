@@ -5,6 +5,12 @@
  * Can be used for encryption, caching, and operation tracking
  */
 
+// In-memory cache to prevent race conditions when multiple calls happen simultaneously
+let cachedSessionId: string | null = null;
+let cachedUserId: string | null = null;
+let identificationCacheExpiry: number = 0;
+const CACHE_TTL_MS = 60000; // 1 minute cache
+
 // Simple decryption for client-side caching (matches AuthContext and behaviorTracking)
 function decrypt(text: string): string {
   try {
@@ -28,12 +34,35 @@ export interface UserIdentification {
  * 1. Authenticated user ID from localStorage
  * 2. Existing session ID from localStorage  
  * 3. New session ID generated
+ * 
+ * Uses in-memory cache to prevent race conditions when called multiple times
  */
 export function getUserIdentification(): UserIdentification {
   // Default to anonymous
   let userId: string | undefined;
   let sessionId: string | undefined;
   let identificationMethod: 'user_id' | 'session_id' | 'anonymous' = 'anonymous';
+
+  // Check in-memory cache first (prevents race conditions)
+  const now = Date.now();
+  if (now < identificationCacheExpiry && (cachedSessionId || cachedUserId)) {
+    if (cachedUserId) {
+      return {
+        userId: cachedUserId,
+        sessionId: undefined,
+        isAuthenticated: true,
+        identificationMethod: 'user_id'
+      };
+    }
+    if (cachedSessionId) {
+      return {
+        userId: undefined,
+        sessionId: cachedSessionId,
+        isAuthenticated: false,
+        identificationMethod: 'session_id'
+      };
+    }
+  }
 
   try {
     // Get user information from localStorage (set by auth context)
@@ -47,12 +76,20 @@ export function getUserIdentification(): UserIdentification {
       if (parsed?.user?.id) {
         userId = parsed.user.id;
         identificationMethod = 'user_id';
+        cachedUserId = userId || null;
+        identificationCacheExpiry = now + CACHE_TTL_MS;
       }
     }
     
     // For anonymous users, get or create session ID
     if (!userId) {
       let lastViewedSession = typeof window !== 'undefined' ? localStorage.getItem('lastViewedSessionId') : null;
+      
+      // Also check in-memory cache for session (handles race condition)
+      if (!lastViewedSession && cachedSessionId) {
+        lastViewedSession = cachedSessionId;
+      }
+      
       if (!lastViewedSession) {
         // Create new session ID if it doesn't exist
         // Matches behavior tracking session ID format
@@ -64,13 +101,20 @@ export function getUserIdentification(): UserIdentification {
       }
       sessionId = lastViewedSession;
       identificationMethod = 'session_id';
+      cachedSessionId = sessionId;
+      identificationCacheExpiry = now + CACHE_TTL_MS;
     }
   } catch (error) {
     console.error('[UserIdentification] Error getting user data:', error);
-    // Fallback to anonymous with new session
-    sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('lastViewedSessionId', sessionId);
+    // Fallback to anonymous with new session (use cached if available)
+    if (cachedSessionId) {
+      sessionId = cachedSessionId;
+    } else {
+      sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('lastViewedSessionId', sessionId);
+      }
+      cachedSessionId = sessionId;
     }
   }
 
@@ -114,8 +158,14 @@ export function getSessionId(): string {
  */
 export function clearUserIdentification(): void {
   try {
-    // Clear session ID
+    // Clear localStorage
     localStorage.removeItem('lastViewedSessionId');
+    
+    // Clear in-memory cache
+    cachedSessionId = null;
+    cachedUserId = null;
+    identificationCacheExpiry = 0;
+    
     console.log('[UserIdentification] Cleared session ID');
   } catch (error) {
     console.error('[UserIdentification] Error clearing identification:', error);

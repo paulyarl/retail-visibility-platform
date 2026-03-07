@@ -59,7 +59,7 @@ class TickerFallbackService {
       };
 
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(fallbackData));
-      console.log('[TickerFallbackService] Saved fallback data:', { configEnabled: config?.enabled, messageCount: messages.length });
+//      console.log('[TickerFallbackService] Saved fallback data:', { configEnabled: config?.enabled, messageCount: messages.length });
     } catch (error) {
       console.error('[TickerFallbackService] Failed to save fallback data:', error);
     }
@@ -123,7 +123,7 @@ class TickerFallbackService {
   static saveFallbackConfig(config: TickerConfig): void {
     try {
       localStorage.setItem(this.CONFIG_KEY, JSON.stringify(config));
-      console.log('[TickerFallbackService] Saved fallback config:', { enabled: config.enabled });
+//      console.log('[TickerFallbackService] Saved fallback config:', { enabled: config.enabled });
     } catch (error) {
       console.error('[TickerFallbackService] Failed to save fallback config:', error);
     }

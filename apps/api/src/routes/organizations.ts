@@ -129,70 +129,110 @@ router.get('/:id', authenticateToken, async (req, res) => {
     if (!organization) {
       isTenantLookup = true;
       
-      // First verify user has access to this tenant
-      const tenant = await prisma.tenants.findFirst({
-        where: {
-          id: id,
-          OR: [
-            {
-              user_tenants: {
-                some: {
-                  user_id: user.userId,
-                  role: {
-                    in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+      // Platform admins can access any tenant's organization
+      if (!isPlatformAdmin(user)) {
+        // For non-admin users, verify access to this tenant
+        const tenant = await prisma.tenants.findFirst({
+          where: {
+            id: id,
+            OR: [
+              {
+                user_tenants: {
+                  some: {
+                    user_id: user.userId,
+                    role: {
+                      in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+                    }
                   }
                 }
+              },
+              {
+                created_by: user.userId
               }
-            },
-            {
-              created_by: user.userId
-            }
-          ]
-        },
-        select: {
-          id: true,
-          name: true,
-          organization_id: true
-        }
-      });
-
-      if (!tenant) {
-        return res.status(404).json({ 
-          error: 'not_found',
-          message: 'Organization or tenant not found, or access denied' 
-        });
-      }
-
-      // If tenant has no organization, return appropriate response
-      if (!tenant.organization_id) {
-        return res.json({
-          message: 'Tenant is not part of an organization',
-          tenant: {
-            id: tenant.id,
-            name: tenant.name
+            ]
           },
-          organization: null
+          select: {
+            id: true,
+            name: true,
+            organization_id: true
+          }
         });
-      }
 
-      // Get the organization using the tenant's organization_id
-      organization = await prisma.organizations_list.findUnique({
-        where: { id: tenant.organization_id },
-        include: {
-          tenants: {
-            where: {
-              user_tenants: {
-                some: {
-                  user_id: user.userId,
-                  role: {
-                    in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+        if (!tenant) {
+          return res.status(404).json({ 
+            error: 'not_found',
+            message: 'Organization or tenant not found, or access denied' 
+          });
+        }
+
+        // If tenant has no organization, return appropriate response
+        if (!tenant.organization_id) {
+          return res.json({
+            message: 'Tenant is not part of an organization',
+            tenant: {
+              id: tenant.id,
+              name: tenant.name
+            },
+            organization: null
+          });
+        }
+
+        // Get the organization using the tenant's organization_id
+        organization = await prisma.organizations_list.findUnique({
+          where: { id: tenant.organization_id },
+          include: {
+            tenants: {
+              where: {
+                user_tenants: {
+                  some: {
+                    user_id: user.userId,
+                    role: {
+                      in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+                    }
                   }
                 }
               }
             }
           }
+        });
+      } else {
+        // Platform admin: get tenant directly and lookup organization
+        const tenant = await prisma.tenants.findFirst({
+          where: { id: id },
+          select: {
+            id: true,
+            name: true,
+            organization_id: true
+          }
+        });
+
+        if (!tenant) {
+          return res.status(404).json({ 
+            error: 'not_found',
+            message: 'Tenant not found' 
+          });
         }
-      });
+
+        // If tenant has no organization, return appropriate response
+        if (!tenant.organization_id) {
+          return res.json({
+            message: 'Tenant is not part of an organization',
+            tenant: {
+              id: tenant.id,
+              name: tenant.name
+            },
+            organization: null
+          });
+        }
+
+        // Get the organization using the tenant's organization_id (no access restrictions for admins)
+        organization = await prisma.organizations_list.findUnique({
+          where: { id: tenant.organization_id },
+          include: {
+            tenants: true // Include all tenants for platform admin
+          }
+        });
+      }
     }
 
     if (!organization) {

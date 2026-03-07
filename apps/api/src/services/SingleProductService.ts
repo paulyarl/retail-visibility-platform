@@ -7,6 +7,10 @@ export interface SingleProductResult {
   description: string;
   price: number | null;
   priceCents: number;
+  listPriceCents: number;  // Add list price
+  salePriceCents: number;  // Add sale price
+  isOnSale: boolean;       // Add sale status
+  discountPercentage: string; // Add discount percentage
   sku: string;
   availability: string;
   stock: number;
@@ -164,8 +168,13 @@ export class SingleProductService {
       name: product.name,
       title: product.name, // Add title field
       description: product.description || '',
-      price: product.price_cents ? product.price_cents / 100 : null,
-      priceCents: product.price_cents || 0, // Add priceCents field
+      price: product.sale_price_cents ? product.sale_price_cents / 100 : (product.price_cents ? product.price_cents / 100 : null),
+      priceCents: product.sale_price_cents || product.price_cents || 0, // Use sale price if available
+      listPriceCents: product.price_cents || 0, // Add list price
+      salePriceCents: product.sale_price_cents || 0, // Add sale price
+      isOnSale: !!(product.sale_price_cents && product.sale_price_cents < product.price_cents), // Determine if on sale
+      discountPercentage: product.sale_price_cents && product.price_cents ? 
+        Math.round(((product.price_cents - product.sale_price_cents) / product.price_cents) * 100).toString() : '0',
       sku: product.sku || '',
       availability: this.determineAvailability(product.stock, product.quantity),
       stock: product.stock || 0,
@@ -281,8 +290,13 @@ export class SingleProductService {
         name: product.name,
         title: product.name, // Add title field
         description: product.description || '',
-        price: product.price_cents ? product.price_cents / 100 : null,
-        priceCents: product.price_cents || 0, // Add priceCents field
+        price: product.sale_price_cents ? product.sale_price_cents / 100 : (product.price_cents ? product.price_cents / 100 : null),
+        priceCents: product.sale_price_cents || product.price_cents || 0,
+        listPriceCents: product.price_cents || 0,
+        salePriceCents: product.sale_price_cents || 0,
+        isOnSale: !!(product.sale_price_cents && product.sale_price_cents < product.price_cents),
+        discountPercentage: product.sale_price_cents && product.price_cents ? 
+          Math.round(((product.price_cents - product.sale_price_cents) / product.price_cents) * 100).toString() : '0',
         sku: product.sku || '',
         availability: this.determineAvailability(product.stock, product.quantity),
         stock: product.stock || 0,
@@ -425,8 +439,13 @@ export class SingleProductService {
       name: product.name,
       title: product.name, // Add title field
       description: product.description || '',
-      price: product.price_cents ? product.price_cents / 100 : null,
-      priceCents: product.price_cents || 0, // Add priceCents field
+      price: product.sale_price_cents ? product.sale_price_cents / 100 : (product.price_cents ? product.price_cents / 100 : null),
+      priceCents: product.sale_price_cents || product.price_cents || 0,
+      listPriceCents: product.price_cents || 0,
+      salePriceCents: product.sale_price_cents || 0,
+      isOnSale: !!(product.sale_price_cents && product.sale_price_cents < product.price_cents),
+      discountPercentage: product.sale_price_cents && product.price_cents ? 
+        Math.round(((product.price_cents - product.sale_price_cents) / product.price_cents) * 100).toString() : '0',
       sku: product.sku || '',
       availability: this.determineAvailability(product.stock, product.quantity),
       stock: product.stock || 0,

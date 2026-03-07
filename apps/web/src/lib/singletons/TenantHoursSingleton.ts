@@ -1,4 +1,5 @@
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 
 // TypeScript interfaces for shop hours
 export interface ShopHoursPeriod {
@@ -58,7 +59,7 @@ class TenantHoursSingleton extends TenantApiSingleton {
     if (result.success) {
       return result.data as ShopHoursData;
     } else {
-      throw new Error(result.error?.message || 'Failed to load shop hours');
+      throw new Error(getErrorMessage(result.error) || 'Failed to load shop hours');
     }
   }
 
@@ -75,7 +76,7 @@ class TenantHoursSingleton extends TenantApiSingleton {
     if (result.success) {
       return result.data as SpecialHoursData;
     } else {
-      throw new Error(result.error?.message || 'Failed to load special hours');
+      throw new Error(getErrorMessage(result.error) || 'Failed to load special hours');
     }
   }
 
@@ -98,7 +99,7 @@ class TenantHoursSingleton extends TenantApiSingleton {
     if (result.success) {
       return result.data as ShopHoursData;
     } else {
-      throw new Error(result.error?.message || 'Failed to save shop hours');
+      throw new Error(getErrorMessage(result.error) || 'Failed to save shop hours');
     }
   }
 

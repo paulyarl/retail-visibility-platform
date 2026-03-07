@@ -6,6 +6,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 
 // Tenant Profile Data Interfaces
@@ -238,7 +239,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error creating tenant profile:', result.error);
-      throw new Error(result.error?.message || 'Failed to create tenant profile');
+      throw new Error(getErrorMessage(result.error) || 'Failed to create tenant profile');
     }
     
     const createdProfile = result.data;
@@ -300,7 +301,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error processing profile update:', result.error);
-      throw new Error(result.error?.message || 'Failed to process profile update');
+      throw new Error(getErrorMessage(result.error) || 'Failed to process profile update');
     }
 
     // Invalidate cache to force refresh
@@ -390,7 +391,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error updating tenant analytics:', result.error);
-      throw new Error(result.error?.message || 'Failed to update tenant analytics');
+      throw new Error(getErrorMessage(result.error) || 'Failed to update tenant analytics');
     }
 
     // Invalidate cache
@@ -418,7 +419,7 @@ class TenantProfileSingleton extends TenantApiSingleton {
     
     if (!result.success) {
       console.error('Error recording tenant activity:', result.error);
-      throw new Error(result.error?.message || 'Failed to record tenant activity');
+      throw new Error(getErrorMessage(result.error) || 'Failed to record tenant activity');
     }
 
     // Update last activity - invalidate cache

@@ -1,5 +1,6 @@
 import { calculatePricing, formatPrice, formatSavings } from '@/lib/pricing';
 import { Badge } from '@/components/ui/Badge';
+import { Tag } from 'lucide-react';
 
 interface PriceDisplayProps {
   priceCents: number;
@@ -45,8 +46,9 @@ export function PriceDisplay({
         {formatPrice(pricing.listPrice)}
       </span>
 
-      {/* Sale Price */}
-      <span className={`font-bold text-red-600 ${sizeClasses[variant]}`}>
+      {/* Sale Price with Icon */}
+      <span className={`flex items-center gap-1.5 font-bold text-red-600 ${sizeClasses[variant]}`}>
+        <Tag className="w-5 h-5" />
         {formatPrice(pricing.effectivePrice)}
       </span>
 

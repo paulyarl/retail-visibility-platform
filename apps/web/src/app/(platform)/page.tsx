@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isFeatureEnabled } from "@/lib/featureFlags";
@@ -69,15 +69,16 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
     growthMetrics: null
   });
   
-  // Extract stats from platform data
-  const stats = {
-    total: platformData?.stats?.totalItems || 0,
-    active: platformData?.stats?.activeItems || 0,
+  // Extract stats from platform stats state (after it's loaded)
+  const stats = useMemo(() => ({
+    total: platformStats.productsListed || 0,
+    active: Math.floor(platformStats.productsListed * 0.9) || 0, // Estimate active items
     syncIssues: 0, // Platform doesn't have sync issues
-    locations: platformData?.stats?.activeTenants || 0,
+    locations: platformStats.activeRetailers || 0,
     isChain: false, // Platform view shows all tenants
     organizationName: null, // Platform view
-  };
+  }), [platformStats.productsListed, platformStats.activeRetailers]);
+  //console.log('Platform stats:', stats);
   const selectedTenantId = null; // Platform view doesn't have selected tenant
   
   // Fetch platform stats for all users (public and authenticated)
@@ -91,10 +92,13 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
             // Authenticated users get full data from platform dashboard
             const { platformDashboardService } = await import('@/services/PlatformDashboardSingletonService');
             const dashboardData = await platformDashboardService.getPlatformDashboard();
+          //  console.log('Platform dashboardData:', dashboardData);
             statsData = dashboardData?.stats;
+          //  console.log('About to setPlatformStats with data:', statsData);
           } else {
             // Public users get limited data from public service
             statsData = await platformPublicService.getPlatformStats();
+         //   console.log('Platform statsData:', statsData);
           }
           
           // Transform to match expected state format

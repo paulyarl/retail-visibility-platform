@@ -88,7 +88,7 @@ class ProductLikesSingletonService extends PublicApiSingleton {
         return false;
       }
 
-      return response.data || true;
+      return true;
     } catch (error) {
       console.error('[ProductLikesSingleton] Failed to unlike product:', error);
       return false;

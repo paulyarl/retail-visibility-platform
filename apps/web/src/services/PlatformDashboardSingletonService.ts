@@ -39,8 +39,11 @@ class PlatformDashboardSingletonService extends AuthenticatedApiSingleton {
       console.error('[PlatformDashboardSingleton] Failed to get platform dashboard:', result.error);
       return null;
     }
+//    console.log(`[PlatformDashboardSingleton] Got platform dashboard:`, result.data)
 
-    return result.data || null;
+    // Handle nested data structure from API response
+    const dashboardData = (result.data as any)?.data || result.data;
+    return dashboardData || null;
   }
 
   /**

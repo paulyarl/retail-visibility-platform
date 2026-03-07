@@ -11,99 +11,65 @@
  * Default request type can be overridden per service
  */
 
-import { UniversalSingleton, SingletonCacheOptions, ApiResult, SingletonMetrics } from './UniversalSingleton';
+import { EnhancedFlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, PublicRequestOptions, TenantRequestOptions, AuthenticatedRequestOptions, AdminRequestOptions, ExternalRequestOptions, SystemRequestOptions, RequestOptions, ApiResult, AuthenticatedApiResponse, TenantApiResponse, AdminApiResponse, PublicApiResponse, ExternalApiResponse, SystemApiResponse } from './EnhancedFlexibleApiSingleton';
 import { clientTenantContextManager } from '@/lib/clientTenantContext';
 
-export type { SingletonCacheOptions, ApiResult, SingletonMetrics } from './UniversalSingleton';
+// Re-export all types for compatibility with existing services
+export {
+  RequestType,
+  RequestTarget
+} from './EnhancedFlexibleApiSingleton';
 
-// ====================
-// REQUEST TYPE ENUMS
-// ====================
+export type {
+  SingletonCacheOptions,
+  PublicRequestOptions,
+  TenantRequestOptions,
+  AuthenticatedRequestOptions,
+  AdminRequestOptions,
+  ExternalRequestOptions,
+  SystemRequestOptions,
+  RequestOptions,
+  ApiResult,
+  AuthenticatedApiResponse,
+  TenantApiResponse,
+  AdminApiResponse,
+  PublicApiResponse,
+  ExternalApiResponse,
+  SystemApiResponse
+} from './EnhancedFlexibleApiSingleton';
 
-export enum RequestType {
-  PUBLIC = 'public',
-  AUTHENTICATED = 'authenticated',
-  TENANT = 'tenant',
-  ADMIN = 'admin',
-  SYSTEM = 'system',
-  EXTERNAL = 'external'
+export type { SingletonMetrics } from './UniversalSingleton';
+
+// Helper functions for safe error handling
+export function getErrorMessage(error?: string | { status: number; message: string; code: string }): string {
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (error && typeof error === 'object') {
+    return error.message;
+  }
+  return 'Unknown error';
 }
 
-export enum RequestTarget {
-  API = 'api',
-  WEB = 'web',
-  EXTERNAL = 'external'
+export function getErrorStatus(error?: string | { status: number; message: string; code: string }): number | undefined {
+  if (error && typeof error === 'object') {
+    return error.status;
+  }
+  return undefined;
 }
 
-export interface PublicRequestOptions {
-  cacheKey?: string;
-  ttl?: number;
-  requestTarget?: RequestTarget;
+export function getErrorCode(error?: string | { status: number; message: string; code: string }): string | undefined {
+  if (error && typeof error === 'object') {
+    return error.code;
+  }
+  return undefined;
 }
-
-export interface AuthenticatedRequestOptions {
-  cacheKey?: string;
-  ttl?: number;
-  requestTarget?: RequestTarget;
-  isAdminRequest?: boolean;
-}
-
-export interface TenantRequestOptions {
-  requireTenantContext?: boolean;
-  validateTenantAccess?: boolean;
-  tenantId?: string;
-  bypassCache?: boolean;
-  cacheKey?: string;
-  ttl?: number;
-  requestTarget?: RequestTarget;
-}
-
-export interface AdminRequestOptions {
-  requireAdminContext?: boolean;
-  validateAdminAccess?: boolean;
-  bypassCache?: boolean;
-  cacheKey?: string;
-  ttl?: number;
-  requestTarget?: RequestTarget;
-}
-
-export interface SystemRequestOptions {
-  requireSystemAccess?: boolean;
-  validateSystemAccess?: boolean;
-  bypassCache?: boolean;
-  cacheKey?: string;
-  ttl?: number;
-  requestTarget?: RequestTarget;
-  systemKey?: string;
-}
-
-export interface ExternalRequestOptions {
-  timeout?: number;
-  retries?: number;
-  headers?: Record<string, string>;
-  cacheKey?: string;
-  ttl?: number;
-  requestTarget?: RequestTarget;
-}
-
-export interface RequestOptions {
-  requestType?: RequestType;
-  requestTarget?: RequestTarget;
-}
-
-// Response interfaces
-export interface PublicApiResponse<T> extends ApiResult<T> {}
-export interface AuthenticatedApiResponse<T> extends ApiResult<T> {}
-export interface TenantApiResponse<T> extends ApiResult<T> {}
-export interface AdminApiResponse<T> extends ApiResult<T> {}
-export interface SystemApiResponse<T> extends ApiResult<T> {}
-export interface ExternalApiResponse<T> extends ApiResult<T> {}
 
 // ====================
 // FLEXIBLE API SINGLETON
 // ====================
 
-export abstract class FlexibleApiSingleton extends UniversalSingleton {
+export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton {
   protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes default
   
   // Default request type for this service (can be overridden)
@@ -162,6 +128,7 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
         
         return {
           success: false,
+          data: null as T,
           error: {
             status: response.status,
             message: errorMessage,
@@ -191,6 +158,7 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
       
       return {
         success: false,
+        data: null as T,
         error: {
           status: 500,
           message: error instanceof Error ? error.message : 'Unknown error',
@@ -444,6 +412,8 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
   protected async makePublicRequest<T>(
     url: string,
     options?: RequestInit,
+    cacheKey?: string,
+    ttl?: number,
     requestOptions?: PublicRequestOptions
   ): Promise<PublicApiResponse<T>> {
     const requestKey = this.getRequestKey('makePublicRequest', url, RequestType.PUBLIC);
@@ -587,6 +557,14 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
   ): Promise<ApiResult<T>> {
     const requestType = requestOptions?.requestType || this.defaultRequestType;
     const requestTarget = requestOptions?.requestTarget || this.defaultRequestTarget;
+
+    // console.log(`[${this.constructor.name}] ----------------------------------------`);
+    // console.log(`[${this.constructor.name}] start         : ${requestType}`);
+    // console.log(`[${this.constructor.name}] url           : ${url}`);
+    // console.log(`[${this.constructor.name}] options       : ${JSON.stringify(options)}`);
+    // console.log(`[${this.constructor.name}] cacheKey      : ${cacheKey}`);
+    // console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
+    // console.log(`[${this.constructor.name}] end           : ${requestTarget}  `);
     
     let setupResult: { options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget };
     
@@ -941,6 +919,49 @@ export abstract class FlexibleApiSingleton extends UniversalSingleton {
     } catch (error) {
       console.error('[FlexibleApiSingleton] Error validating system access:', error);
       return false;
+    }
+  }
+
+  /**
+   * Refresh materialized view(s) via API
+   * 
+   * @param views - Array of view names or single view name
+   * @param all - Refresh all known views
+   * @returns Promise with refresh results
+   * 
+   * Available views: mv_global_discovery, mv_category_discovery, mv_shop_discovery,
+   * mv_trending_scores, directory_category_products, directory_category_listings,
+   * directory_category_stats, directory_gbp_listings, directory_gbp_stats, storefront_products_mv
+   */
+  protected async refreshMaterializedView(
+    views?: string | string[],
+    all?: boolean
+  ): Promise<{ success: boolean; refreshed: number; total: number; results: any[] }> {
+    try {
+      const viewArray = typeof views === 'string' ? [views] : views;
+      
+      const result = await this.makeDefaultRequest<{ refreshed: number; total: number; results: any[] }>(
+        '/api/cache/refresh-mv',
+        {
+          method: 'POST',
+          body: JSON.stringify({ views: viewArray, all }),
+          headers: { 'Content-Type': 'application/json' }
+        },
+        undefined, // no cache
+        0, // no TTL - immediate request
+        { requestType: RequestType.SYSTEM, requestTarget: RequestTarget.API }
+      );
+
+      if (result.success && result.data) {
+        console.log(`[${this.constructor.name}] MV refresh successful: ${result.data.refreshed}/${result.data.total} views`);
+        return { success: true, ...result.data };
+      } else {
+        console.warn(`[${this.constructor.name}] MV refresh failed:`, result.error);
+        return { success: false, refreshed: 0, total: viewArray?.length || 0, results: [] };
+      }
+    } catch (error) {
+      console.error(`[${this.constructor.name}] MV refresh error:`, error);
+      return { success: false, refreshed: 0, total: 0, results: [] };
     }
   }
 

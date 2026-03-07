@@ -997,6 +997,7 @@ export async function getLastViewedItems(
               'brand', sp.brand,
               'sku', sp.sku,
               'priceCents', sp.price_cents,
+              'salePriceCents', ii.sale_price_cents,
               'imageUrl', sp.image_url,
               'currency', sp.currency,
               'stock', sp.stock,
@@ -1020,6 +1021,7 @@ export async function getLastViewedItems(
             )
             FROM storefront_products sp
             JOIN directory_listings_list dcl ON sp.tenant_id = dcl.tenant_id
+            LEFT JOIN inventory_items ii ON ii.id = sp.id
             WHERE sp.id = rv.entity_id
               AND dcl.is_published = true
             LIMIT 1
@@ -1072,6 +1074,7 @@ export async function getLastViewedItems(
             productSku: data.sku,
             productPrice: data.priceCents ? data.priceCents / 100 : undefined,
             productPriceCents: data.priceCents,
+            productSalePriceCents: data.salePriceCents,
             productImage: data.imageUrl,
             productImageUrl: data.imageUrl,
             productStock: data.stock,

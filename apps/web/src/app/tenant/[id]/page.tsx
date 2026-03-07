@@ -308,21 +308,14 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   // Fetch directory publish status and actual slug using singleton services
   let directoryPublished = false;
   let tenantSlug: string;
-  
+
   try {
     // Use tenant directory service to get the actual slug from the API
     const apiSlug = await tenantDirectoryService.getTenantSlug(id);
-    
-    // Check if directory listing exists to determine publish status
-    try {
-      const directoryData = await storefrontService.getDirectoryListing(id);
-      directoryPublished = !!directoryData;
-    } catch (directoryError) {
-      // Directory API failed - assume not published
-      console.warn('[TenantPage] Directory listing check failed:', directoryError);
-      directoryPublished = false;
-    }
-    
+
+    // Use hasPublishedDirectory from tenant data (already fetched) instead of making another API call
+    directoryPublished = tenant.hasPublishedDirectory ?? false;
+
     // Use API slug if available, otherwise generate from business name or use tenant ID
     tenantSlug = apiSlug || businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
   } catch (e) {
