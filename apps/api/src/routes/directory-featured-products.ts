@@ -20,6 +20,7 @@ interface QueryParams {
   inStock?: string;
   sortBy?: string;
   limit?: string;
+  tenantId?: string;
 }
 
 // Tier-based slot limits
@@ -71,6 +72,26 @@ function applyTierLimits(products: any[], limit: number): any[] {
 }
 
 /**
+ * Shuffle array using Fisher-Yates algorithm with seed
+ * Provides randomization while maintaining relative quality
+ */
+function shuffleArray<T>(array: T[], seed: number): T[] {
+  const shuffled = [...array];
+  // Use seeded random for deterministic but varied results
+  let currentSeed = seed;
+  const random = () => {
+    const x = Math.sin(currentSeed++) * 10000;
+    return x - Math.floor(x);
+  };
+  
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+/**
  * GET /api/directory/featured-products
  * Get featured products from all shops with filtering and tier-based visibility
  */
@@ -79,8 +100,10 @@ router.get('/', async (req: Request, res: Response) => {
     const params = req.query as QueryParams;
     const limit = parseInt(params.limit || '20');
     const sortBy = params.sortBy || 'trending';
+    const tenantId = params.tenantId;
     
     // Query featured products directly from mv_global_discovery
+    const tenantFilter = tenantId ? 'AND tenant_id = $2' : '';
     const query = `
       SELECT 
         inventory_item_id,
@@ -116,12 +139,14 @@ router.get('/', async (req: Request, res: Response) => {
       WHERE featured_is_active = true
         AND item_status = 'active'
         AND visibility = 'public'
+        ${tenantFilter}
       ORDER BY featured_priority DESC, featured_at DESC
       LIMIT $1
     `;
     
     const { getDirectPool } = await import('../utils/db-pool');
-    const result = await getDirectPool().query(query, [limit * 5]); // Get more to account for filtering
+    const queryParams = tenantId ? [limit * 5, tenantId] : [limit * 5];
+    const result = await getDirectPool().query(query, queryParams);
     
     // Initialize buckets
     const buckets: Record<string, any[]> = {
@@ -129,7 +154,7 @@ router.get('/', async (req: Request, res: Response) => {
       new_arrival: [],
       seasonal: [],
       sale: [],
-      featured: []
+      staff_pick: []
     };
     
     const bucketCounts: Record<string, number> = {
@@ -137,7 +162,7 @@ router.get('/', async (req: Request, res: Response) => {
       new_arrival: 0,
       seasonal: 0,
       sale: 0,
-      featured: 0
+      staff_pick: 0
     };
     
     const featuredShops = new Map<string, { id: string; name: string; slug: string; logo?: string; tier: string }>();
@@ -208,39 +233,69 @@ router.get('/', async (req: Request, res: Response) => {
         continue;
       }
       
-      // Place in bucket based on featured type
-      let placedInBucket = false;
-      const featuredType = mappedProduct.featuredType;
+      // Place in ALL buckets matching the product's featured types
+      // A product can belong to multiple featured type buckets
+      const featuredTypesList = mappedProduct.featuredTypes || [];
+      let placedInAnyBucket = false;
       
-      if (featuredType === 'store_selection' || mappedProduct.featuredTypes?.includes('store_selection')) {
+      if (featuredTypesList.includes('store_selection')) {
         buckets.store_selection.push(mappedProduct);
         bucketCounts.store_selection++;
-        placedInBucket = true;
-      } else if (featuredType === 'new_arrival' || mappedProduct.featuredTypes?.includes('new_arrival')) {
+        placedInAnyBucket = true;
+      }
+      if (featuredTypesList.includes('new_arrival')) {
         buckets.new_arrival.push(mappedProduct);
         bucketCounts.new_arrival++;
-        placedInBucket = true;
-      } else if (featuredType === 'seasonal' || mappedProduct.featuredTypes?.includes('seasonal')) {
+        placedInAnyBucket = true;
+      }
+      if (featuredTypesList.includes('seasonal')) {
         buckets.seasonal.push(mappedProduct);
         bucketCounts.seasonal++;
-        placedInBucket = true;
-      } else if (featuredType === 'sale' || mappedProduct.featuredTypes?.includes('sale')) {
+        placedInAnyBucket = true;
+      }
+      if (featuredTypesList.includes('sale')) {
         buckets.sale.push(mappedProduct);
         bucketCounts.sale++;
-        placedInBucket = true;
+        placedInAnyBucket = true;
+      }
+      if (featuredTypesList.includes('staff_pick')) {
+        buckets.staff_pick.push(mappedProduct);
+        bucketCounts.staff_pick++;
+        placedInAnyBucket = true;
       }
       
-      if (!placedInBucket) {
-        buckets.featured.push(mappedProduct);
-        bucketCounts.featured++;
+      // Fallback: if no featured types matched, use single featuredType field
+      if (!placedInAnyBucket && mappedProduct.featuredType) {
+        const singleType = mappedProduct.featuredType;
+        if (singleType === 'store_selection') {
+          buckets.store_selection.push(mappedProduct);
+          bucketCounts.store_selection++;
+        } else if (singleType === 'new_arrival') {
+          buckets.new_arrival.push(mappedProduct);
+          bucketCounts.new_arrival++;
+        } else if (singleType === 'seasonal') {
+          buckets.seasonal.push(mappedProduct);
+          bucketCounts.seasonal++;
+        } else if (singleType === 'sale') {
+          buckets.sale.push(mappedProduct);
+          bucketCounts.sale++;
+        } else if (singleType === 'staff_pick') {
+          buckets.staff_pick.push(mappedProduct);
+          bucketCounts.staff_pick++;
+        } else {
+          // Unknown type - skip
+        }
       }
       
       usedProductIds.add(product.inventory_item_id);
     }
     
-    // Sort products within each bucket
+    // Shuffle products within each bucket for variety
+    // Use current timestamp as seed to ensure different order on each request
+    // This prevents the same product from appearing in slot 1 across all buckets
+    const shuffleSeed = Date.now();
     for (const bucketType of Object.keys(buckets)) {
-      buckets[bucketType] = sortProducts(buckets[bucketType], sortBy);
+      buckets[bucketType] = shuffleArray(buckets[bucketType], shuffleSeed + Object.keys(buckets).indexOf(bucketType));
       buckets[bucketType] = applyTierLimits(buckets[bucketType], limit);
     }
     

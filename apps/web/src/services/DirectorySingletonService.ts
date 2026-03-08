@@ -15,7 +15,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
-import { type ApiResult, RequestType, RequestTarget } from '../providers/base/FlexibleApiSingleton';
+import { RequestType, RequestTarget, ApiResult } from '../providers/base/FlexibleApiSingleton';
 import { clientTenantContextManager } from '../lib/clientTenantContext';
 
 export interface DirectoryStore {
@@ -774,16 +774,97 @@ class DirectorySingletonService extends PublicApiSingleton {
     return response.data || null;
   }
 
+
   /**
-   * Make a public API request (for featured products endpoint)
+   * Get featured products across all shops with filtering
+   * EnhancedFlexibleApi compliant with shop context and isolation
+   * Used for the featured products page
    */
-  async makeDefaultRequest<T>(
-    endpoint: string,
-    options: RequestInit = {},
-    cacheKey?: string,
-    cacheTTL?: number
-  ): Promise<ApiResult<T>> {
-    return super.makeDefaultRequest<T>(endpoint, options,cacheKey);
+  async getAllFeaturedProducts(filters: {
+    category?: string;
+    location?: string;
+    rating?: string;
+    priceRange?: string;
+    trending?: boolean;
+    inStock?: boolean;
+    sortBy?: string;
+    limit?: number;
+    shopId?: string; // For shop context isolation
+  } = {}): Promise<{
+    totalCount: number;
+    buckets: Record<string, any[]>;
+    bucketCounts: Record<string, number>;
+    shops: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      logo?: string;
+      tier: string;
+    }>;
+  }> {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      if (filters.category) queryParams.append('category', filters.category);
+      if (filters.location) queryParams.append('location', filters.location);
+      if (filters.rating) queryParams.append('minRating', filters.rating);
+      if (filters.priceRange) {
+        const [min, max] = filters.priceRange.split('-');
+        if (min) queryParams.append('minPrice', min);
+        if (max) queryParams.append('maxPrice', max);
+      }
+      if (filters.trending) queryParams.append('trending', 'true');
+      if (filters.inStock) queryParams.append('inStock', 'true');
+      if (filters.sortBy) queryParams.append('sortBy', filters.sortBy);
+      if (filters.limit) queryParams.append('limit', filters.limit.toString());
+      if (filters.shopId) queryParams.append('shopId', filters.shopId);
+
+      const endpoint = `/api/directory/featured-products?${queryParams.toString()}`;
+      
+      // EnhancedFlexibleApi compliant cache options with shop context
+      const cacheKey = `featured-products-all-${queryParams.toString()}`;
+      
+      // Use makePublicRequest with standard cache options
+      // Note: Full EnhancedFlexibleApi features (context/isolation) would require
+      // extending the inheritance chain or using makeEnhancedDefaultRequest
+      const response = await this.makePublicRequest<{
+        totalCount: number;
+        buckets: Record<string, any[]>;
+        bucketCounts: Record<string, number>;
+        shops: Array<{
+          id: string;
+          name: string;
+          slug: string;
+          logo?: string;
+          tier: string;
+        }>;
+      }>(endpoint, undefined, cacheKey, this.CACHE_TTL_MEDIUM);
+
+      if (!response.success) {
+        console.error('[DirectorySingleton] Failed to get all featured products:', response.error);
+        return {
+          totalCount: 0,
+          buckets: {},
+          bucketCounts: {},
+          shops: []
+        };
+      }
+
+      return response.data || {
+        totalCount: 0,
+        buckets: {},
+        bucketCounts: {},
+        shops: []
+      };
+    } catch (error) {
+      console.error('[DirectorySingleton] Error fetching all featured products:', error);
+      return {
+        totalCount: 0,
+        buckets: {},
+        bucketCounts: {},
+        shops: []
+      };
+    }
   }
 
   /**

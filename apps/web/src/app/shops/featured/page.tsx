@@ -96,74 +96,67 @@ export default function FeaturedProductsPage() {
   const [categories, setCategories] = useState<Array<{name: string, count: number}>>([]);
   const [locations, setLocations] = useState<Array<{name: string, count: number}>>([]);
 
-  // Build query parameters for API
-  const queryParams = useMemo(() => {
-    const params = new URLSearchParams();
-    
-    if (searchQuery) params.append('search', searchQuery);
-    if (filters.category) params.append('category', filters.category);
-    if (filters.location) params.append('location', filters.location);
-    if (filters.rating) params.append('minRating', filters.rating);
-    if (filters.priceRange) {
-      const [min, max] = filters.priceRange.split('-');
-      if (min) params.append('minPrice', min);
-      if (max) params.append('maxPrice', max);
-    }
-    if (filters.trending) params.append('trending', 'true');
-    if (filters.inStock) params.append('inStock', 'true');
-    params.append('sortBy', sortBy);
-    params.append('limit', '20'); // Per bucket
-    
-    return params.toString();
-  }, [searchQuery, filters, sortBy]);
-
   // Fetch featured products
   const fetchFeaturedProducts = async () => {
     setLoading(true);
     try {
-      // This would be a new API endpoint that aggregates featured products across all shops
-      const response = await directorySingletonService.makeDefaultRequest(
-        `/api/directory/featured-products?${queryParams}`,
-        {},
-        `featured-products-v2-${queryParams}`, // Updated cache key to avoid stale data
-        5 * 60 * 1000 // 5 minutes cache
-      );
-
-      if (response.success && response.data) {
-        const responseData = (response.data as { data: any }).data; // Fix double wrapping issue
-        
-        console.log('[FeaturedProductsPage] Data received:', {
-          success: response.success,
-          totalCount: responseData.totalCount,
-          bucketKeys: responseData.buckets ? Object.keys(responseData.buckets) : 'no buckets',
-          shopsCount: responseData.shops ? responseData.shops.length : 'no shops'
+      // Use the proper service method
+      const data = await directorySingletonService.getAllFeaturedProducts({
+        category: filters.category,
+        location: filters.location,
+        rating: filters.rating,
+        priceRange: filters.priceRange,
+        trending: filters.trending,
+        inStock: filters.inStock,
+        sortBy: sortBy === 'trending' ? 'trending' : sortBy,
+        limit: 20 // Default limit
+      });
+      
+      // If there's a search query, filter the results locally
+      // (since the API doesn't support search yet)
+      if (searchQuery) {
+        const searchLower = searchQuery.toLowerCase();
+        Object.keys(data.buckets).forEach(bucketType => {
+          data.buckets[bucketType] = data.buckets[bucketType].filter((product: any) => 
+            product.name?.toLowerCase().includes(searchLower) ||
+            product.title?.toLowerCase().includes(searchLower) ||
+            product.description?.toLowerCase().includes(searchLower) ||
+            product.brand?.toLowerCase().includes(searchLower) ||
+            product.tenantName?.toLowerCase().includes(searchLower)
+          );
         });
-        
-        setData(responseData);
-        
-        // Extract categories and locations from the data
-        const allProducts = Object.values(responseData.buckets || {}).flat();
-        const categoryCounts = allProducts.reduce((acc: any, product: any) => {
-          if (product.categoryName) {
-            acc[product.categoryName] = (acc[product.categoryName] || 0) + 1;
-          }
-          return acc;
-        }, {});
-        
-        const locationCounts = allProducts.reduce((acc: any, product: any) => {
-          if (product.tenantCity) {
-            acc[product.tenantCity] = (acc[product.tenantCity] || 0) + 1;
-          }
-          return acc;
-        }, {});
-
-        setCategories(
-          Object.entries(categoryCounts as any).map(([name, count]) => ({ name, count: count as number }))
-        );
-        setLocations(
-          Object.entries(locationCounts as any).map(([name, count]) => ({ name, count: count as number }))
-        );
       }
+
+      console.log('[FeaturedProductsPage] Data received:', {
+        totalCount: data.totalCount,
+        bucketKeys: Object.keys(data.buckets),
+        shopsCount: data.shops.length
+      });
+      
+      setData(data);
+      
+      // Extract categories and locations from the data
+      const allProducts = Object.values(data.buckets || {}).flat();
+      const categoryCounts = allProducts.reduce((acc: any, product: any) => {
+        if (product.categoryName) {
+          acc[product.categoryName] = (acc[product.categoryName] || 0) + 1;
+        }
+        return acc;
+      }, {});
+      
+      const locationCounts = allProducts.reduce((acc: any, product: any) => {
+        if (product.tenantCity) {
+          acc[product.tenantCity] = (acc[product.tenantCity] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
+      setCategories(
+        Object.entries(categoryCounts as any).map(([name, count]) => ({ name, count: count as number }))
+      );
+      setLocations(
+        Object.entries(locationCounts as any).map(([name, count]) => ({ name, count: count as number }))
+      );
     } catch (error) {
       console.error('Failed to fetch featured products:', error);
     } finally {
@@ -173,7 +166,7 @@ export default function FeaturedProductsPage() {
 
   useEffect(() => {
     fetchFeaturedProducts();
-  }, [queryParams]);
+  }, [searchQuery, filters, sortBy]);
 
   const handleFilterChange = (key: keyof FilterState, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));

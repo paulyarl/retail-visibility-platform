@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import SmartProductCard from './SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
-import { storefrontService } from '@/services/StorefrontService';
+import { storefrontService } from '@/services/StorefrontSingletonService';
 import { Package, Calendar, DollarSign, Star } from 'lucide-react';
 
 interface FeaturedTypeProduct {
@@ -88,40 +88,88 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
     let isMounted = true;
 
     const fetchFeaturedProducts = async () => {
+      console.log('[FeaturedTypeProducts] Fetching featured products:', {
+        tenantId,
+        currentProductId,
+        featuredTypes,
+        hasTenantId: !!tenantId,
+        hasFeaturedTypes: featuredTypes.length > 0
+      });
+      
       try {
-        // Fetch products for each featured type
-        const results = await Promise.all(
-          featuredTypes.map(async (type) => {
-            try {
-              const response = await fetch(`/api/storefront/${tenantId}/featured-products/${type}?limit=6`);
-              if (!response.ok) return { type, products: [] };
-              
-              const json = await response.json();
-              // API returns { success: true, data: { products: [...] } }
-              const products = json?.data?.products || [];
-              // Filter out current product
-              const filteredProducts = products.filter(
-                (p: FeaturedTypeProduct) => p.id !== currentProductId
-              ).slice(0, 4); // Limit to 4 other products
-              
-              return { type, products: filteredProducts };
-            } catch {
-              return { type, products: [] };
-            }
-          })
+        // Use singleton service to fetch featured products grouped by type
+        const groupedProducts = await storefrontService.getFeaturedProductsByType(
+          tenantId,
+          undefined, // Get all types
+          6 // Limit per type
         );
-
+        
+        console.log('[FeaturedTypeProducts] API response:', {
+          groupedProductsKeys: Object.keys(groupedProducts || {}),
+          groupedProductsCounts: Object.fromEntries(
+            Object.entries(groupedProducts || {}).map(([k, v]) => [k, v?.length || 0])
+          )
+        });
+        
         if (isMounted) {
           const grouped: Record<string, FeaturedTypeProduct[]> = {};
-          results.forEach(({ type, products }) => {
-            if (products.length > 0) {
-              grouped[type] = products;
+          
+          // Process each featured type
+          for (const type of featuredTypes) {
+            console.log(`[FeaturedTypeProducts] Processing type: ${type}`, {
+              hasProducts: !!groupedProducts[type],
+              count: groupedProducts[type]?.length || 0
+            });
+            
+            if (groupedProducts[type] && groupedProducts[type].length > 0) {
+              // Filter out current product and limit to 4
+              const filteredProducts = groupedProducts[type]
+                .filter((p: any) => p.id !== currentProductId)
+                .slice(0, 4);
+              
+              console.log(`[FeaturedTypeProducts] Filtered products for ${type}:`, {
+                filteredCount: filteredProducts.length,
+                filteredIds: filteredProducts.map((p: any) => p.id)
+              });
+              
+              if (filteredProducts.length > 0) {
+                grouped[type] = filteredProducts.map((p: any) => ({
+                  id: p.id,
+                  name: p.name,
+                  title: p.title || p.name,
+                  price: p.price || 0,
+                  priceCents: p.priceCents,
+                  listPriceCents: p.listPriceCents,
+                  salePriceCents: p.salePriceCents,
+                  isOnSale: p.isOnSale,
+                  discountPercentage: p.discountPercentage,
+                  stock: p.stock || 0,
+                  sku: p.sku,
+                  currency: p.currency || 'USD',
+                  imageUrl: p.imageUrl,
+                  brand: p.brand,
+                  tenantId: p.tenantId || tenantId,
+                  featuredType: type,
+                  featuredTypes: p.featuredTypes || [type],
+                  hasActivePaymentGateway: p.hasActivePaymentGateway,
+                  defaultGatewayType: p.defaultGatewayType,
+                  availability: p.availability,
+                }));
+              }
             }
+          }
+          
+          console.log('[FeaturedTypeProducts] Final grouped products:', {
+            types: Object.keys(grouped),
+            counts: Object.fromEntries(
+              Object.entries(grouped).map(([k, v]) => [k, v.length])
+            )
           });
+          
           setProductsByType(grouped);
         }
       } catch (error) {
-        console.error('Error fetching featured type products:', error);
+        console.error('[FeaturedTypeProducts] Error fetching featured type products:', error);
       } finally {
         if (isMounted) {
           setLoading(false);

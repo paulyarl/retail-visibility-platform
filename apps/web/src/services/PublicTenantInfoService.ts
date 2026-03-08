@@ -223,7 +223,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
 
   /**
    * Get tenant payment gateway status (active/inactive)
-   * Uses the /public/tenant/:tenantId/payment-gateways/status endpoint
+   * Uses the /public/tenant/:tenantId/payment-gateways endpoint
    */
   async getPaymentGatewayStatus(tenantId: string): Promise<{hasActiveGateway: boolean; defaultGatewayType?: string} | null> { 
     if (!tenantId) {
@@ -232,17 +232,23 @@ class PublicTenantInfoService extends PublicApiSingleton {
     }
 
     try {
+      // API returns { success: true, hasActivePaymentGateway: boolean, defaultGatewayType: string, gateways: [...] }
       const response = await this.makeDefaultRequest<{
         success: boolean;
-        data: {hasActiveGateway: boolean; defaultGatewayType?: string};
+        hasActivePaymentGateway: boolean;
+        defaultGatewayType?: string;
+        gateways: Array<{gatewayType: string; isActive: boolean; isDefault?: boolean}>;
       }>(
-        `/public/tenant/${tenantId}/payment-gateways/status`,
+        `/public/tenant/${tenantId}/payment-gateways`,
         {},
         `public-tenant-gateway-status-${tenantId}`
-      );
+      ) as any;
 
-      if (response?.success && response.data) { 
-        return response.data.data;
+      if (response?.success && response.data) {
+        return {
+          hasActiveGateway: response.data.hasActivePaymentGateway || false,
+          defaultGatewayType: response.data.defaultGatewayType
+        };
       }
 
       console.log(`[PublicTenantInfoService] getPaymentGatewayStatus NO DATA for tenant: ${tenantId}`, new Date().toISOString());

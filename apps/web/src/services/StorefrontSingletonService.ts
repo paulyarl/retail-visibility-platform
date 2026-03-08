@@ -189,6 +189,95 @@ class StorefrontSingletonService extends PublicApiSingleton {
   }
 
   /**
+   * Get featured products grouped by type for storefront display
+   * Uses the public /api/directory/featured-products endpoint
+   */
+  async getFeaturedProductsByType(
+    tenantId: string,
+    type?: string,
+    limit: number = 10
+  ): Promise<Record<string, StorefrontProduct[]>> {
+    console.log('[StorefrontSingleton] getFeaturedProductsByType called:', {
+      tenantId,
+      type,
+      limit,
+      hasTenantId: !!tenantId
+    });
+    
+    if (!tenantId) {
+      console.error('[StorefrontSingleton] getFeaturedProductsByType: tenantId is required');
+      return {};
+    }
+
+    try {
+      const endpoint = `/api/directory/featured-products?tenantId=${tenantId}&limit=${limit}`;
+      const cacheKey = `featured-products-by-type-${tenantId}-${limit}`;
+      
+      console.log('[StorefrontSingleton] Making request:', {
+        endpoint,
+        cacheKey
+      });
+      
+      // Type for the API response structure
+      type ApiResponse = {
+        success: boolean;
+        data: {
+          totalCount: number;
+          buckets: Record<string, StorefrontProduct[]>;
+          bucketCounts: Record<string, number>;
+          shops: Array<{id: string; name: string; slug: string; logo?: string; tier: string}>;
+        };
+      };
+      
+      const result = await this.makeDefaultRequest<ApiResponse>(
+        endpoint,
+        {},
+        cacheKey,
+        this.cacheTTL
+      ) as any;  // Cast to any to handle nested response structure
+      
+      console.log('[StorefrontSingleton] Request result:', {
+        success: result.success,
+        hasData: !!result.data,
+        error: result.error,
+        hasBuckets: result.data?.data?.buckets ? true : false,
+        bucketKeys: result.data?.data?.buckets ? Object.keys(result.data.data.buckets) : []
+      });
+      
+      if (!result.success) {
+        console.warn('[StorefrontSingleton] Failed to get featured products by type:', result.error);
+        return {};
+      }
+      
+      // The API returns { success: true, data: { buckets: {...}, bucketCounts: {...}, shops: [...] } }
+      // makeDefaultRequest wraps this in another layer: { success: true, data: { success: true, data: { buckets: {...} } } }
+      // So we need to extract: result.data.data.buckets
+      const groupedProducts: Record<string, StorefrontProduct[]> = result.data?.data?.buckets || {};
+      
+      // If a specific type is requested, return only that type
+      if (type && groupedProducts[type]) {
+        console.log('[StorefrontSingleton] Returning specific type:', {
+          type,
+          count: groupedProducts[type]?.length || 0
+        });
+        return { [type]: groupedProducts[type] };
+      }
+      
+      console.log('[StorefrontSingleton] Returning all types:', {
+        types: Object.keys(groupedProducts),
+        counts: Object.fromEntries(
+          Object.entries(groupedProducts).map(([k, v]) => [k, (v as any[])?.length || 0])
+        )
+      });
+      
+      return groupedProducts;
+    } catch (error) {
+      console.error('[StorefrontSingleton] Failed to get featured products by type:', error);
+      return {};
+    }
+  }
+
+  /**
    * Get directory listing for a tenant
    * Uses the /api/directory/:tenantId endpoint
    */
