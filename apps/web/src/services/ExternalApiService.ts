@@ -1,5 +1,6 @@
 import { ExternalApiSingleton } from '@/providers/base/ExternalApiSingleton';
 import { RequestTarget, RequestType, ExternalRequestOptions, ExternalApiResponse } from '@/providers/base/FlexibleApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface GeolocationResponse {
   ip: string;
@@ -45,6 +46,8 @@ class ExternalApiService extends ExternalApiSingleton {
 
   protected defaultRequestType = RequestType.EXTERNAL;
   protected defaultRequestTarget = RequestTarget.EXTERNAL;
+  protected defaultContext = AppContext.SYSTEM;
+  protected defaultIsolation = CacheIsolation.SYSTEM;
 
   private constructor() {
     super('external-api-service');

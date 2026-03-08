@@ -7,6 +7,7 @@
  */
 
 import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, AdminRequestOptions, AdminApiResponse, PublicRequestOptions, PublicApiResponse } from './FlexibleApiSingleton';
+import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
 
 // ====================
 // ADMIN API SINGLETON
@@ -15,6 +16,8 @@ import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions
 export abstract class AdminApiSingleton extends FlexibleApiSingleton {
   protected defaultRequestType: RequestType = RequestType.ADMIN;
   protected defaultRequestTarget: RequestTarget = RequestTarget.API;
+  protected defaultContext: AppContext = AppContext.ADMIN;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.ADMIN;
   protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for admin operations
   
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {

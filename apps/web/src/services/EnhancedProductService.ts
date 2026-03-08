@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
+import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
 
 // Enhanced interfaces based on mv_global_discovery schema
 export interface ProductVariant {
@@ -171,6 +172,10 @@ export interface EnhancedProduct {
  */
 class EnhancedProductService extends PublicApiSingleton {
   private static instance: EnhancedProductService;
+
+  // Override base class defaults for product data
+  protected defaultContext: AppContext = AppContext.PRODUCT;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.PRODUCT;
 
   private constructor() {
     super('enhanced-product-service', { encrypt: false });

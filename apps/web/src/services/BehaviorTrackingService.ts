@@ -5,7 +5,8 @@
  * Extends PublicApiSingleton for consistent caching and metrics
  */
 
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
+import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
 
 // Behavior Tracking Data Interfaces
 export interface TrackingEvent {
@@ -43,8 +44,12 @@ export interface BehaviorAnalytics {
   }>;
 }
 
-class BehaviorTrackingService extends PublicApiSingleton {
+class BehaviorTrackingService extends ApiSystemSingleton {
   private static instance: BehaviorTrackingService;
+
+  // Override base class defaults for behavior tracking
+  protected defaultContext: AppContext = AppContext.USER;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.USER;
 
   // TTL constants for different data types
   private readonly EVENTS_TTL = 2 * 60 * 1000; // 2 minutes for events (real-time)
@@ -68,7 +73,7 @@ class BehaviorTrackingService extends PublicApiSingleton {
    */
   async sendEvent(event: TrackingEvent): Promise<void> {
     try {
-      await this.makeDefaultRequest<void>(
+      await super.makeEnhancedDefaultRequest<void>(
         '/analytics/events',
         {
           method: 'POST',
@@ -89,7 +94,7 @@ class BehaviorTrackingService extends PublicApiSingleton {
    */
   async sendBatch(events: TrackingEvent[]): Promise<void> {
     try {
-      await this.makeDefaultRequest<void>(
+      await super.makeEnhancedDefaultRequest<void>(
         '/analytics/events/batch',
         {
           method: 'POST',
@@ -110,7 +115,7 @@ class BehaviorTrackingService extends PublicApiSingleton {
    */
   async sendSession(session: TrackingSession): Promise<void> {
     try {
-      await this.makeDefaultRequest<void>(
+      await super.makeEnhancedDefaultRequest<void>(
         '/analytics/sessions',
         {
           method: 'POST',
@@ -130,7 +135,7 @@ class BehaviorTrackingService extends PublicApiSingleton {
    * Uses the /api/analytics/behavior endpoint
    */
   async getBehaviorAnalytics(hours: number = 24): Promise<BehaviorAnalytics> {
-    const response = await this.makeDefaultRequest<BehaviorAnalytics>(
+    const response = await super.makeEnhancedDefaultRequest<BehaviorAnalytics>(
       `/analytics/behavior?hours=${hours}`,
       {},
       `behavior-analytics-${hours}`,
@@ -162,7 +167,7 @@ class BehaviorTrackingService extends PublicApiSingleton {
    * Uses the /api/analytics/users/:userId/behavior endpoint
    */
   async getUserBehaviorPatterns(userId: string, days: number = 30): Promise<any> {
-    const response = await this.makeDefaultRequest<any>(
+    const response = await super.makeEnhancedDefaultRequest<any>(
       `/analytics/users/${userId}/behavior?days=${days}`,
       {},
       `user-behavior-${userId}-${days}`,
@@ -181,15 +186,15 @@ class BehaviorTrackingService extends PublicApiSingleton {
    * Invalidate event cache
    */
   async invalidateEventCache(): Promise<void> {
-    await this.invalidateCache('send-event');
-    await this.invalidateCache('send-batch-events');
+    await super.invalidateCache('send-event');
+    await super.invalidateCache('send-batch-events');
   }
 
   /**
    * Invalidate session cache
    */
   async invalidateSessionCache(): Promise<void> {
-    await this.invalidateCache('send-session');
+    await super.invalidateCache('send-session');
   }
 
   /**
@@ -197,11 +202,11 @@ class BehaviorTrackingService extends PublicApiSingleton {
    */
   async invalidateAnalyticsCache(hours?: number): Promise<void> {
     if (hours) {
-      await this.invalidateCache(`behavior-analytics-${hours}`);
+      await super.invalidateCache(`behavior-analytics-${hours}`);
     } else {
-      await this.invalidateCache('behavior-analytics-24');
-      await this.invalidateCache('behavior-analytics-48');
-      await this.invalidateCache('behavior-analytics-168');
+      await super.invalidateCache('behavior-analytics-24');
+      await super.invalidateCache('behavior-analytics-48');
+      await super.invalidateCache('behavior-analytics-168');
     }
   }
 
@@ -210,10 +215,10 @@ class BehaviorTrackingService extends PublicApiSingleton {
    */
   async invalidateUserBehaviorCache(userId: string, days?: number): Promise<void> {
     if (days) {
-      await this.invalidateCache(`user-behavior-${userId}-${days}`);
+      await super.invalidateCache(`user-behavior-${userId}-${days}`);
     } else {
-      await this.invalidateCache(`user-behavior-${userId}-30`);
-      await this.invalidateCache(`user-behavior-${userId}-90`);
+      await super.invalidateCache(`user-behavior-${userId}-30`);
+      await super.invalidateCache(`user-behavior-${userId}-90`);
     }
   }
 }

@@ -9,6 +9,7 @@
  * - Backward compatibility with TenantApiSingleton
  */
 
+import { RequestTarget, RequestType } from './EnhancedFlexibleApiSingleton';
 import { TenantApiSingleton } from './TenantApiSingleton';
 
 // Platform role hierarchy
@@ -210,6 +211,9 @@ export class OrganizationValidationError extends Error {
 }
 
 export abstract class OrganizationApiSingleton extends TenantApiSingleton {
+
+    protected defaultRequestType: RequestType = RequestType.TENANT;
+    protected defaultRequestTarget: RequestTarget = RequestTarget.API;
   protected options: OrganizationServiceOptions;
 
   protected constructor(singletonKey: string, options?: Partial<OrganizationServiceOptions>) {

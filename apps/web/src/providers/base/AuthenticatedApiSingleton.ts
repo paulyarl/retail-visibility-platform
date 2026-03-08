@@ -11,6 +11,7 @@
  */
 
 import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, AuthenticatedApiResponse, ApiResult } from './FlexibleApiSingleton';
+import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
 
 // ====================
 // AUTHENTICATED API SINGLETON
@@ -19,6 +20,8 @@ import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions
 export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
   protected defaultRequestType: RequestType = RequestType.AUTHENTICATED;
   protected defaultRequestTarget: RequestTarget = RequestTarget.API;
+  protected defaultContext: AppContext = AppContext.USER;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.USER;
   protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for authenticated data
   
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
@@ -89,7 +92,8 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
         console.log(`[AuthenticatedApiSingleton] Token refreshed, retrying request: ${url}`);
         
         // Retry the request with new token
-        return this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, isAdminRequest);
+        const requestOptions = isAdminRequest ? { requireAuth: true } : {};
+        return this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, requestOptions);
       } else {
         console.warn(`[AuthenticatedApiSingleton] Token refresh failed for ${url}`);
         

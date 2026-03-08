@@ -17,6 +17,7 @@
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
 import { RequestType, RequestTarget, ApiResult } from '../providers/base/FlexibleApiSingleton';
 import { clientTenantContextManager } from '../lib/clientTenantContext';
+import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
 
 export interface DirectoryStore {
   id: string;
@@ -132,7 +133,11 @@ export interface DirectoryConsolidated {
 class DirectorySingletonService extends PublicApiSingleton {
   private static instance: DirectorySingletonService;
 
-  // Cache TTL constants
+  // Override base class defaults for directory operations
+  protected defaultContext: AppContext = AppContext.DIRECTORY;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.DIRECTORY;
+
+  // Cache TTL constants for different data types
   protected defaultRequestType: RequestType = RequestType.PUBLIC;
   protected defaultRequestTarget: RequestTarget = RequestTarget.API; // Use API backend (port 4000)
   protected cacheTTL: number = 15 * 60 * 1000; // 15 minutes for public data

@@ -23,6 +23,9 @@ export interface ExternalSingletonCacheOptions {
  * Default: EXTERNAL type + EXTERNAL target (port 443/80)
  */
 export abstract class ExternalApiSingleton extends FlexibleApiSingleton {
+  
+  protected defaultRequestType: RequestType = RequestType.EXTERNAL;
+  protected defaultRequestTarget: RequestTarget = RequestTarget.EXTERNAL;
   protected cacheTTL: number = 15 * 60 * 1000; // 15 minutes for external data
   
   constructor(singletonKey: string, cacheOptions?: ExternalSingletonCacheOptions) {
@@ -51,8 +54,8 @@ export abstract class ExternalApiSingleton extends FlexibleApiSingleton {
       cacheKey,
       ttl,
       {
-        requestType: RequestType.EXTERNAL,
-        requestTarget: RequestTarget.EXTERNAL
+        requestType: this.defaultRequestType,
+        requestTarget: this.defaultRequestTarget
       }
     );
 

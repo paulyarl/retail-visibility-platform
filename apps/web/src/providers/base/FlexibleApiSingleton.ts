@@ -13,6 +13,8 @@
 
 import { EnhancedFlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, PublicRequestOptions, TenantRequestOptions, AuthenticatedRequestOptions, AdminRequestOptions, ExternalRequestOptions, SystemRequestOptions, RequestOptions, ApiResult, AuthenticatedApiResponse, TenantApiResponse, AdminApiResponse, PublicApiResponse, ExternalApiResponse, SystemApiResponse } from './EnhancedFlexibleApiSingleton';
 import { clientTenantContextManager } from '@/lib/clientTenantContext';
+import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
+import { ContextAwareCacheOptions } from '../../services/contextAwareCacheService';
 
 // Re-export all types for compatibility with existing services
 export {
@@ -75,9 +77,61 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
   // Default request type for this service (can be overridden)
   protected abstract defaultRequestType: RequestType;
   protected abstract defaultRequestTarget: RequestTarget;
+  protected abstract defaultContext?: AppContext;
+  protected abstract defaultIsolation?: CacheIsolation;
   
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     super(singletonKey, cacheOptions);
+  }
+
+  /**
+   * URL-based context detection for fallback when defaults are missing
+   * Returns GLOBAL context when no confident match is found (to be ignored by calling logic)
+   */
+  protected detectContextFromUrl(url: string): { context: AppContext; isolation: CacheIsolation } {
+    // Tenant context - very specific patterns
+    if (url.includes('/tenants/') || url.includes('/tenant-') || url.includes('/dashboard') || url.includes('/tenants')) {
+      return { context: AppContext.TENANT, isolation: CacheIsolation.TENANT };
+    }
+    
+    // Admin context - very specific patterns
+    if (url.includes('/admin/') || url.includes('/platform/admin') || url.includes('/system/')) {
+      return { context: AppContext.ADMIN, isolation: CacheIsolation.ADMIN };
+    }
+    
+    // Public context - very specific patterns
+    if (url.includes('/public/') || url.includes('/platform/public')) {
+      return { context: AppContext.PUBLIC, isolation: CacheIsolation.PUBLIC };
+    }
+    
+    // Product context - very specific patterns
+    if (url.includes('/products/') || url.includes('/products') || url.includes('/product/') || url.includes('/product') || url.includes('/recommendations/') || url.includes('/featured-products')) {
+      return { context: AppContext.PRODUCT, isolation: CacheIsolation.PRODUCT };
+    }
+    
+    // Store context - very specific patterns
+    if (url.includes('/store/') || url.includes('/stores/') || url.includes('/tenant/') || url.includes('/storefront')) {
+      return { context: AppContext.STORE, isolation: CacheIsolation.STORE };
+    }
+    
+    // Shop context - very specific patterns
+    if (url.includes('/shops/') || url.includes('/shop/') || url.includes('/shops/directory') || url.includes('/shops')) {
+      return { context: AppContext.SHOP, isolation: CacheIsolation.SHOP };
+    }
+    
+    // Directory context - very specific patterns
+    if (url.includes('/directory/') || url.includes('/directory')) {
+      return { context: AppContext.DIRECTORY, isolation: CacheIsolation.DIRECTORY };
+    }
+    
+    // System context - very specific patterns
+    if (url.includes('/external/') || url.includes('/integrations/')) {
+      return { context: AppContext.SYSTEM, isolation: CacheIsolation.SYSTEM };
+    }
+    
+    // Return GLOBAL context to indicate no confident match
+    // The calling logic will check for this and ignore it
+    return { context: AppContext.GLOBAL, isolation: CacheIsolation.GLOBAL };
   }
 
   // ====================
@@ -407,7 +461,8 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
   // ====================
 
   /**
-   * Public request method
+   * Public request method with context awareness
+   * Delegates to enhanced version for context-aware caching
    */
   protected async makePublicRequest<T>(
     url: string,
@@ -416,13 +471,49 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     ttl?: number,
     requestOptions?: PublicRequestOptions
   ): Promise<PublicApiResponse<T>> {
+    // 🎯 ENHANCED: Check if we should delegate to enhanced version
+    // If context/isolation are not explicitly provided, use enhanced defaults
+    if (!requestOptions || (!('context' in requestOptions) && !('isolation' in requestOptions))) {
+      // Delegate to enhanced version with base class defaults
+      const enhancedResult = await this.makeEnhancedPublicRequest<T>(
+        url,
+        options,
+        {
+          cacheKey,
+          ttl: ttl || requestOptions?.ttl || this.cacheTTL,
+          // Use base class defaults - these will be applied in makeEnhancedPublicRequest
+        }
+      );
+      return enhancedResult as PublicApiResponse<T>;
+    }
+
+    // Legacy path for explicit context/isolation
     const requestKey = this.getRequestKey('makePublicRequest', url, RequestType.PUBLIC);
+    
+    // 🎯 STRATEGY 1: Generate enhanced cacheKey if context data is present
+    let finalCacheKey = requestOptions?.cacheKey;
+    if (requestOptions && ('context' in requestOptions || 'isolation' in requestOptions)) {
+      const context = (requestOptions as any).context;
+      const isolation = (requestOptions as any).isolation;
+      const tenantId = (requestOptions as any).tenantId;
+      const userId = (requestOptions as any).userId;
+      
+      finalCacheKey = this.generateCacheKey(
+        requestOptions?.cacheKey || url,
+        context,
+        isolation,
+        tenantId,
+        userId
+      );
+      
+      console.log(`[${this.constructor.name}] 🎯 makePublicRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+    }
     
     // Delegate to setup method
     const setupResult = await this.setupPublicRequestOptions<T>(
       url, 
       options || {}, 
-      requestOptions?.cacheKey, 
+      finalCacheKey, 
       requestOptions?.ttl
     );
     
@@ -439,24 +530,64 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
   }
 
   /**
-   * Authenticated request method
+   * Authenticated request method with context awareness
+   * Delegates to enhanced version for context-aware caching
    */
   protected async makeAuthenticatedRequest<T>(
     url: string,
     options?: RequestInit,
     cacheKey?: string,
     ttl?: number,
-    isAdminRequest: boolean = false
+    requestOptions?: AuthenticatedRequestOptions
   ): Promise<AuthenticatedApiResponse<T>> {
-    const requestKey = this.getRequestKey('makeAuthenticatedRequest', url, RequestType.AUTHENTICATED);
+    // 🎯 ENHANCED: Check if we should delegate to enhanced version
+    // If context/isolation are not explicitly provided, use enhanced defaults
+    if (!requestOptions || (!('context' in requestOptions) && !('isolation' in requestOptions))) {
+      // Delegate to enhanced version with base class defaults
+      const enhancedResult = await this.makeEnhancedAuthenticatedRequest<T>(
+        url,
+        options,
+        {
+          cacheKey,
+          ttl: ttl || this.cacheTTL,
+          // Use base class defaults - these will be applied in makeEnhancedAuthenticatedRequest
+        }
+      );
+      return enhancedResult as AuthenticatedApiResponse<T>;
+    }
+
+    // 🎯 STRATEGY 1: Generate enhanced cacheKey if context data is present
+    let finalCacheKey = requestOptions?.cacheKey || cacheKey;
+    if (requestOptions && ('context' in requestOptions || 'isolation' in requestOptions)) {
+      const context = requestOptions.context;
+      const isolation = requestOptions.isolation;
+      const userId = requestOptions.userId;
+      
+      finalCacheKey = this.generateCacheKey(
+        requestOptions?.cacheKey || cacheKey || url,
+        context,
+        isolation,
+        undefined,  // tenantId
+        userId
+      );
+      
+      console.log(`[${this.constructor.name}] 🎯 makeAuthenticatedRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+    }
     
     // Delegate to setup method
     const setupResult = await this.setupAuthenticatedRequestOptions<T>(
       url, 
       options || {}, 
-      cacheKey, 
-      ttl
+      finalCacheKey, 
+      requestOptions?.ttl || ttl
     );
+    
+    // Handle requireAuth if specified
+    if (requestOptions?.requireAuth) {
+      // Add auth headers or validation as needed
+      // TODO: Implement getCurrentAuthToken() in concrete classes
+      console.log(`[${this.constructor.name}] 🔐 Auth required for request`);
+    }
     
     // Delegate to unified execution
     const result = await this.executeUnifiedRequest<T>(url, setupResult);
@@ -466,17 +597,66 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
   }
 
   /**
-   * Tenant request method
+   * Tenant request method with context awareness
+   * Delegates to enhanced version for context-aware caching
    */
   protected async makeTenantRequest<T>(
     url: string,
     options?: RequestInit,
     requestOptions?: TenantRequestOptions
   ): Promise<TenantApiResponse<T>> {
-    const requestKey = this.getRequestKey('makeTenantRequest', url, RequestType.TENANT);
+    // 🎯 ENHANCED: Check if we should delegate to enhanced version
+    // If context/isolation are not explicitly provided, use enhanced defaults
+    if (!requestOptions || (!('context' in requestOptions) && !('isolation' in requestOptions))) {
+      // Delegate to enhanced version with base class defaults
+      const enhancedResult = await this.makeEnhancedTenantRequest<T>(
+        url,
+        options,
+        {
+          cacheKey: requestOptions?.cacheKey,
+          ttl: requestOptions?.ttl || this.cacheTTL,
+          tenantId: requestOptions?.tenantId,
+          requestTarget: requestOptions?.requestTarget
+        }
+      );
+      return enhancedResult as TenantApiResponse<T>;
+    }
+
+    // 🎯 STRATEGY 1: Generate enhanced cacheKey if context data is present
+    let finalCacheKey = requestOptions?.cacheKey;
+    if (requestOptions && ('context' in requestOptions || 'isolation' in requestOptions)) {
+      const context = (requestOptions as any).context;
+      const isolation = (requestOptions as any).isolation;
+      const tenantId = (requestOptions as any).tenantId;
+      const userId = (requestOptions as any).userId;
+      
+      finalCacheKey = this.generateCacheKey(
+        requestOptions?.cacheKey || url,
+        context,
+        isolation,
+        tenantId,
+        userId
+      );
+      
+      console.log(`[${this.constructor.name}] 🎯 makeTenantRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+    }
     
     // Delegate to setup method
-    const setupResult = await this.setupTenantRequestOptions<T>(url, options || {}, requestOptions);
+    const setupResult = await this.setupTenantRequestOptions<T>(
+      url, 
+      options || {}, 
+      {
+        tenantId: requestOptions?.tenantId || '',
+        cacheKey: finalCacheKey,
+        ttl: requestOptions?.ttl,
+        requestTarget: requestOptions?.requestTarget
+      }
+    );
+    
+    // Override target if provided in requestOptions
+    if (requestOptions?.requestTarget && requestOptions.requestTarget !== setupResult.target) {
+      setupResult.target = requestOptions.requestTarget;
+    }
     
     // Delegate to unified execution
     const result = await this.executeUnifiedRequest<T>(url, setupResult);
@@ -486,17 +666,67 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
   }
 
   /**
-   * Admin request method
+   * Admin request method with context awareness
+   * Delegates to enhanced version for context-aware caching
    */
   protected async makeAdminRequest<T>(
     url: string,
     options?: RequestInit,
     requestOptions?: AdminRequestOptions
   ): Promise<AdminApiResponse<T>> {
-    const requestKey = this.getRequestKey('makeAdminRequest', url, RequestType.ADMIN);
+    // 🎯 ENHANCED: Check if we should delegate to enhanced version
+    // If context/isolation are not explicitly provided, use enhanced defaults
+    if (!requestOptions || (!('context' in requestOptions) && !('isolation' in requestOptions))) {
+      // Delegate to enhanced version with base class defaults
+      const enhancedResult = await this.makeEnhancedAdminRequest<T>(
+        url,
+        options,
+        {
+          cacheKey: requestOptions?.cacheKey,
+          ttl: requestOptions?.ttl || this.cacheTTL,
+          requestTarget: requestOptions?.requestTarget
+        }
+      );
+      return enhancedResult as AdminApiResponse<T>;
+    }
+
+    // 🎯 STRATEGY 1: Generate enhanced cacheKey if context data is present
+    let finalCacheKey = requestOptions?.cacheKey;
+    if (requestOptions && ('context' in requestOptions || 'isolation' in requestOptions)) {
+      const context = (requestOptions as any).context;
+      const isolation = (requestOptions as any).isolation;
+      const tenantId = (requestOptions as any).tenantId;
+      const userId = (requestOptions as any).userId;
+      
+      finalCacheKey = this.generateCacheKey(
+        requestOptions?.cacheKey || url,
+        context,
+        isolation,
+        tenantId,
+        userId
+      );
+      
+      console.log(`[${this.constructor.name}] 🎯 makeAdminRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+    }
     
     // Delegate to setup method
-    const setupResult = await this.setupAdminRequestOptions<T>(url, options || {}, requestOptions);
+    const setupResult = await this.setupAdminRequestOptions<T>(
+      url, 
+      options || {}, 
+      {
+        cacheKey: finalCacheKey,
+        ttl: requestOptions?.ttl,
+        requestTarget: requestOptions?.requestTarget,
+        requireAdmin: requestOptions?.requireAdmin,
+        requireAdminContext: requestOptions?.requireAdminContext,
+        bypassCache: requestOptions?.bypassCache
+      }
+    );
+    
+    // Override target if provided in requestOptions
+    if (requestOptions?.requestTarget && requestOptions.requestTarget !== setupResult.target) {
+      setupResult.target = requestOptions.requestTarget;
+    }
     
     // Delegate to unified execution
     const result = await this.executeUnifiedRequest<T>(url, setupResult);
@@ -506,37 +736,88 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
   }
 
   /**
-   * System request method
+   * System request method with context awareness
+   * Delegates to enhanced default version for context-aware caching
    */
   protected async makeSystemRequest<T>(
     url: string,
     options?: RequestInit,
     requestOptions?: SystemRequestOptions
   ): Promise<SystemApiResponse<T>> {
-    const requestKey = this.getRequestKey('makeSystemRequest', url, RequestType.SYSTEM);
-    
-    // Delegate to setup method
-    const setupResult = await this.setupSystemRequestOptions<T>(url, options || {}, requestOptions);
-    
-    // Delegate to unified execution
-    const result = await this.executeUnifiedRequest<T>(url, setupResult);
-    
-    // Convert to SystemApiResponse format
-    return result as SystemApiResponse<T>;
+    // 🎯 ENHANCED: Always delegate to enhanced version for context-aware caching
+    const enhancedResult = await this.makeEnhancedDefaultRequest<T>(
+      url,
+      options,
+      requestOptions?.cacheKey,
+      requestOptions?.ttl,
+      {
+        // Use base class defaults - these will be applied in makeEnhancedDefaultRequest
+      }
+    );
+    return enhancedResult as SystemApiResponse<T>;
   }
 
   /**
-   * External request method
+   * External request method with context awareness
+   * Delegates to enhanced version for context-aware caching
    */
   protected async makeExternalRequest<T>(
     url: string,
     options?: RequestInit,
     requestOptions?: ExternalRequestOptions
   ): Promise<ExternalApiResponse<T>> {
-    const requestKey = this.getRequestKey('makeExternalRequest', url, RequestType.EXTERNAL);
+    // 🎯 ENHANCED: Check if we should delegate to enhanced version
+    // If context/isolation are not explicitly provided, use enhanced defaults
+    if (!requestOptions || (!('context' in requestOptions) && !('isolation' in requestOptions))) {
+      // Delegate to enhanced version with base class defaults
+      const enhancedResult = await this.makeEnhancedExternalRequest<T>(
+        url,
+        options,
+        {
+          cacheKey: requestOptions?.cacheKey,
+          ttl: requestOptions?.ttl || this.cacheTTL,
+          requestTarget: requestOptions?.requestTarget
+        }
+      );
+      return enhancedResult as ExternalApiResponse<T>;
+    }
+
+    // 🎯 STRATEGY 1: Generate enhanced cacheKey if context data is present
+    let finalCacheKey = requestOptions?.cacheKey;
+    if (requestOptions && ('context' in requestOptions || 'isolation' in requestOptions)) {
+      const context = (requestOptions as any).context;
+      const isolation = (requestOptions as any).isolation;
+      const tenantId = (requestOptions as any).tenantId;
+      const userId = (requestOptions as any).userId;
+      
+      finalCacheKey = this.generateCacheKey(
+        requestOptions?.cacheKey || url,
+        context,
+        isolation,
+        tenantId,
+        userId
+      );
+      
+      console.log(`[${this.constructor.name}] 🎯 makeExternalRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+    }
     
     // Delegate to setup method
-    const setupResult = await this.setupExternalRequestOptions<T>(url, options || {}, requestOptions);
+    const setupResult = await this.setupExternalRequestOptions<T>(
+      url, 
+      options || {}, 
+      {
+        cacheKey: finalCacheKey,
+        ttl: requestOptions?.ttl,
+        timeout: requestOptions?.timeout,
+        requestTarget: requestOptions?.requestTarget,
+        headers: requestOptions?.headers
+      }
+    );
+    
+    // Override target if provided in requestOptions
+    if (requestOptions?.requestTarget && requestOptions.requestTarget !== setupResult.target) {
+      setupResult.target = requestOptions.requestTarget;
+    }
     
     // Delegate to unified execution
     const result = await this.executeUnifiedRequest<T>(url, setupResult);
@@ -546,7 +827,9 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
   }
 
   /**
-   * Default request method with delegation pattern
+   * Default request method with context awareness and delegation pattern
+   * Now automatically uses base class defaults for context and isolation
+   * Delegates to makeEnhancedDefaultRequest for enhanced caching capabilities
    */
   protected async makeDefaultRequest<T>(
     url: string,
@@ -558,6 +841,21 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     const requestType = requestOptions?.requestType || this.defaultRequestType;
     const requestTarget = requestOptions?.requestTarget || this.defaultRequestTarget;
 
+    // 🎯 ENHANCED: Check if we should delegate to enhanced version
+    // If context/isolation are not explicitly provided, use enhanced defaults
+    if (!requestOptions || (!('context' in requestOptions) && !('isolation' in requestOptions))) {
+      // Delegate to enhanced version with base class defaults
+      return this.makeEnhancedDefaultRequest<T>(
+        url,
+        options,
+        cacheKey,
+        ttl,
+        {
+          // Use base class defaults - these will be applied in makeEnhancedDefaultRequest
+        }
+      );
+    }
+
     // console.log(`[${this.constructor.name}] ----------------------------------------`);
     // console.log(`[${this.constructor.name}] start         : ${requestType}`);
     // console.log(`[${this.constructor.name}] url           : ${url}`);
@@ -565,31 +863,50 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     // console.log(`[${this.constructor.name}] cacheKey      : ${cacheKey}`);
     // console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
     // console.log(`[${this.constructor.name}] end           : ${requestTarget}  `);
+
+    // 🎯 STRATEGY 1: Generate enhanced cacheKey if context data is present
+    let finalCacheKey = cacheKey;
+    if (requestOptions && ('context' in requestOptions || 'isolation' in requestOptions)) {
+      const context = (requestOptions as any).context;
+      const isolation = (requestOptions as any).isolation;
+      const tenantId = (requestOptions as any).tenantId;
+      const userId = (requestOptions as any).userId;
+      
+      finalCacheKey = this.generateCacheKey(
+        cacheKey || url,
+        context,
+        isolation,
+        tenantId,
+        userId
+      );
+      
+     // console.log(`[${this.constructor.name}] 🎯 Enhanced cacheKey generated: ${finalCacheKey}`);
+    }
     
     let setupResult: { options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget };
     
     // Delegate to appropriate setup method based on request type
     switch (requestType) {
       case RequestType.PUBLIC:
-        setupResult = await this.setupPublicRequestOptions<T>(url, options || {}, cacheKey, ttl);
+        setupResult = await this.setupPublicRequestOptions<T>(url, options || {}, finalCacheKey, ttl);
         break;
       case RequestType.AUTHENTICATED:
-        setupResult = await this.setupAuthenticatedRequestOptions<T>(url, options || {}, cacheKey, ttl);
+        setupResult = await this.setupAuthenticatedRequestOptions<T>(url, options || {}, finalCacheKey, ttl);
         break;
       case RequestType.TENANT:
-        const tenantOptions = { cacheKey, ttl, requestTarget } as TenantRequestOptions;
+        const tenantOptions = { cacheKey: finalCacheKey, ttl, requestTarget } as TenantRequestOptions;
         setupResult = await this.setupTenantRequestOptions<T>(url, options || {}, tenantOptions);
         break;
       case RequestType.ADMIN:
-        const adminOptions = { cacheKey, ttl, requestTarget } as AdminRequestOptions;
+        const adminOptions = { cacheKey: finalCacheKey, ttl, requestTarget } as AdminRequestOptions;
         setupResult = await this.setupAdminRequestOptions<T>(url, options || {}, adminOptions);
         break;
       case RequestType.SYSTEM:
-        const systemOptions = { cacheKey, ttl, requestTarget } as SystemRequestOptions;
+        const systemOptions = { cacheKey: finalCacheKey, ttl, requestTarget } as SystemRequestOptions;
         setupResult = await this.setupSystemRequestOptions<T>(url, options || {}, systemOptions);
         break;
       case RequestType.EXTERNAL:
-        const externalOptions = { cacheKey, ttl, requestTarget } as ExternalRequestOptions;
+        const externalOptions = { cacheKey: finalCacheKey, ttl, requestTarget } as ExternalRequestOptions;
         setupResult = await this.setupExternalRequestOptions<T>(url, options || {}, externalOptions);
         break;
       default:
@@ -789,16 +1106,49 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     // Construct full URL using centralized method
     const fullUrl = this.getRequestUrl(url, requestTarget);
     
-    // Check cache first ONLY for GET requests (delegated to base class)
+    // Check cache first using context-aware caching with correct priority hierarchy
     const method = (options.method || 'GET').toUpperCase();
     if (cacheKey && method === 'GET') {
-      const cachedResponse = await this.getFromCache<string>(cacheKey);
-      if (cachedResponse) {
-        // Return cached response as a Response object
-        return new Response(cachedResponse, {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
+      // Priority: Explicit requestOptions → Service defaults → URL detection → Generic fallback
+      let context = this.defaultContext;
+      let isolation = this.defaultIsolation;
+      
+      // Only use URL detection if no defaults are set
+      if (!context && !isolation) {
+        const urlDetected = this.detectContextFromUrl(url);
+        // Only use URL detection if it's not GLOBAL (our fallback indicator)
+        if (urlDetected.context !== AppContext.GLOBAL && urlDetected.isolation !== CacheIsolation.GLOBAL) {
+          context = urlDetected.context;
+          isolation = urlDetected.isolation;
+        }
+      }
+      
+      if (context || isolation) {
+        // Use context-aware caching
+        const cacheOptions: ContextAwareCacheOptions = {
+          context: context as any,
+          isolation: isolation as any,
+          tenantId: undefined,
+          userId: undefined
+        };
+        const cachedResponse = await this.getContextAwareCache<string>(cacheKey, cacheOptions);
+        if (cachedResponse) {
+          // Return cached response as a Response object
+          return new Response(cachedResponse, {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      } else {
+        // Fallback to generic caching
+        const cachedResponse = await this.getFromCache<string>(cacheKey);
+        if (cachedResponse) {
+          // Return cached response as a Response object
+          return new Response(cachedResponse, {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
       }
     }
     
@@ -816,7 +1166,35 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     // Cache successful responses ONLY for GET requests
     if (response.ok && cacheKey && method === 'GET') {
       const responseText = await response.text();
-      await this.setCache(cacheKey, responseText, { useAutoUser: true });
+      
+      // Priority: Explicit requestOptions → Service defaults → URL detection → Generic fallback
+      let context = this.defaultContext;
+      let isolation = this.defaultIsolation;
+      
+      // Only use URL detection if no defaults are set
+      if (!context && !isolation) {
+        const urlDetected = this.detectContextFromUrl(url);
+        // Only use URL detection if it's not GLOBAL (our fallback indicator)
+        if (urlDetected.context !== AppContext.GLOBAL && urlDetected.isolation !== CacheIsolation.GLOBAL) {
+          context = urlDetected.context;
+          isolation = urlDetected.isolation;
+        }
+      }
+      
+      if (context || isolation) {
+        // Use context-aware caching
+        const cacheOptions: ContextAwareCacheOptions = {
+          context: context as any,
+          isolation: isolation as any,
+          tenantId: undefined,
+          userId: undefined,
+          ttl: ttl || this.cacheTTL
+        };
+        await this.setContextAwareCache(cacheKey, responseText, cacheOptions);
+      } else {
+        // Fallback to generic caching
+        await this.setCache(cacheKey, responseText, { useAutoUser: true });
+      }
       
       // Return new Response from cached text
       return new Response(responseText, {

@@ -11,6 +11,7 @@
  */
 
 import cacheManager, { CacheManager } from '../../utils/cacheManager';
+import { contextAwareCacheService, ContextAwareCacheOptions } from '../../services/contextAwareCacheService';
 import { AutoUserCacheOptions } from '../../utils/userIdentification';
 
 // ====================
@@ -68,12 +69,16 @@ export abstract class UniversalSingleton {
   protected cache: Map<string, { data: any; timestamp: number; ttl: number }> = new Map();
   protected cacheManager: CacheManager;
   protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes default
+  protected contextCacheService = contextAwareCacheService;
 
   // Performance tracking
   protected cacheHits: number = 0;
   protected cacheMisses: number = 0;
   protected apiCalls: number = 0;
   protected errors: number = 0;
+  protected lastUpdated: string = '';
+  protected enableMetrics: boolean = true;
+  protected enableLogging: boolean = true;
 
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     this.singletonKey = singletonKey;
@@ -230,6 +235,59 @@ export abstract class UniversalSingleton {
       await this.cacheManager.set(key, data, options);
     } catch (error) {
       console.warn(`[${this.constructor.name}] Cache set failed for ${key}:`, error);
+    }
+  }
+
+  /**
+   * Context-aware cache get method
+   */
+  protected async getContextAwareCache<T>(key: string, options?: ContextAwareCacheOptions): Promise<T | null> {
+    // Emergency bust mode bypasses all cache operations
+    if (UniversalSingleton.emergencyBustMode) {
+      console.log(`🚨 [${this.constructor.name}] Emergency bust mode: bypassing context-aware cache for ${key}`);
+      this.cacheMisses++;
+      return null;
+    }
+
+    try {
+      const cached = await this.contextCacheService.get<T>(key, options);
+      if (cached) {
+        this.cacheHits++;
+        return cached;
+      }
+      this.cacheMisses++;
+      return null;
+    } catch (error) {
+      console.warn(`[${this.constructor.name}] Context-aware cache get failed for ${key}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Context-aware cache set method
+   */
+  protected async setContextAwareCache<T>(key: string, data: T, options?: ContextAwareCacheOptions): Promise<void> {
+    // Emergency bust mode bypasses all cache operations
+    if (UniversalSingleton.emergencyBustMode) {
+      console.log(`🚨 [${this.constructor.name}] Emergency bust mode: bypassing context-aware cache set for ${key}`);
+      return;
+    }
+
+    try {
+      await this.contextCacheService.set<T>(key, data, options);
+    } catch (error) {
+      console.warn(`[${this.constructor.name}] Context-aware cache set failed for ${key}:`, error);
+    }
+  }
+
+  /**
+   * Context-aware cache remove method
+   */
+  protected async removeContextAwareCache(key: string, options?: ContextAwareCacheOptions): Promise<void> {
+    try {
+      await this.contextCacheService.remove(key, options);
+    } catch (error) {
+      console.warn(`[${this.constructor.name}] Context-aware cache remove failed for ${key}:`, error);
     }
   }
 

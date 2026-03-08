@@ -7,6 +7,7 @@
  */
 
 import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, TenantRequestOptions, TenantApiResponse, PublicRequestOptions } from './FlexibleApiSingleton';
+import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
 
 // ====================
 // TENANT API SINGLETON
@@ -15,6 +16,8 @@ import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions
 export abstract class TenantApiSingleton extends FlexibleApiSingleton {
   protected defaultRequestType: RequestType = RequestType.TENANT;
   protected defaultRequestTarget: RequestTarget = RequestTarget.API;
+  protected defaultContext: AppContext = AppContext.TENANT;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.TENANT;
   protected cacheTTL: number = 10 * 60 * 1000; // 10 minutes for tenant operations
   protected currentTenantId?: string;
   

@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 interface DeletionRequest {
   id: string;
@@ -48,6 +49,9 @@ interface DeletionRequestsResponse {
 }
 
 class AdminDeletionRequestsService extends AdminApiSingleton {
+
+    protected defaultContext: AppContext = AppContext.ADMIN;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.ADMIN;
   private static instance: AdminDeletionRequestsService;
 
   private constructor(singletonKey: string, cacheOptions?: any) {

@@ -5,8 +5,10 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
+
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { getErrorMessage } from '../providers/base/FlexibleApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 interface AdminStats {
   totalUsers: number;
@@ -72,6 +74,9 @@ interface SecurityMetrics {
 }
 
 class AdminOperationsService extends AdminApiSingleton {
+
+    protected defaultContext: AppContext = AppContext.ADMIN;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.ADMIN;
   private static instance: AdminOperationsService;
 
   private constructor() {

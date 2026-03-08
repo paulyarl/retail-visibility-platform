@@ -7,6 +7,7 @@
  */
 
 import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, SystemApiResponse, PublicRequestOptions, PublicApiResponse } from './FlexibleApiSingleton';
+import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
 
 export interface SystemSingletonCacheOptions {
   encrypt?: boolean;
@@ -21,6 +22,8 @@ export interface SystemSingletonCacheOptions {
 export abstract class SystemSingleton extends FlexibleApiSingleton {
   protected defaultRequestType: RequestType = RequestType.SYSTEM;
   protected defaultRequestTarget: RequestTarget = RequestTarget.WEB;
+  protected defaultContext: AppContext = AppContext.SYSTEM;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.SYSTEM;
   protected cacheTTL: number = 15 * 60 * 1000; // 15 minutes for system data
   
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {

@@ -118,7 +118,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
       throw new Error(getErrorMessage(result.error) || 'Failed to fetch tenant info');
     }
 
-    console.log('[TenantSettingsSingleton] Fetched tenant info:', this.tenantId);
+ //   console.log('[TenantSettingsSingleton] Fetched tenant info:', this.tenantId);
     return result.data || (() => { throw new Error('No data received'); })();
   }
 
@@ -137,7 +137,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
       throw new Error(getErrorMessage(result.error) || 'Failed to fetch tenant profile');
     }
 
-    console.log('[TenantSettingsSingleton] Fetched tenant profile:', this.tenantId);
+ //   console.log('[TenantSettingsSingleton] Fetched tenant profile:', this.tenantId);
     return result.data || (() => { throw new Error('No profile data received'); })();
   }
 
@@ -149,7 +149,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
       // Use public service for public tier endpoint
       const data = await tenantPublicService.getPublicTenantTier(this.tenantId);
 
-      console.log('[TenantSettingsSingleton] Fetched tenant tier:', this.tenantId);
+//      console.log('[TenantSettingsSingleton] Fetched tenant tier:', this.tenantId);
       return data;
     } catch (error) {
       console.error('[TenantSettingsSingleton] Failed to fetch tenant tier:', error);
@@ -172,7 +172,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
       throw new Error(getErrorMessage(result.error) || 'Failed to fetch featured products limits');
     }
 
-    console.log('[TenantSettingsSingleton] Fetched featured products limits:', this.tenantId);
+   // console.log('[TenantSettingsSingleton] Fetched featured products limits:', this.tenantId);
     return result.data || (() => { throw new Error('No limits data received'); })();
   }
 
@@ -193,7 +193,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
         this.fetchFeaturedProductsLimits(),
       ]);
 
-      console.log('[TenantSettingsSingleton] Fetched all settings:', this.tenantId);
+      //console.log('[TenantSettingsSingleton] Fetched all settings:', this.tenantId);
       return { info, profile, tier, featuredLimits };
     } catch (error) {
       console.error('[TenantSettingsSingleton] Error fetching all settings:', error);
@@ -226,7 +226,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
     // Invalidate cache
     await this.invalidateCache(`tenant-profile-${this.tenantId}`);
 
-    console.log('[TenantSettingsSingleton] Tenant profile updated:', this.tenantId);
+    //console.log('[TenantSettingsSingleton] Tenant profile updated:', this.tenantId);
     return result.data || (() => { throw new Error('No profile data received'); })();
   }
 
@@ -239,7 +239,7 @@ class TenantSettingsSingleton extends TenantApiSingleton {
    */
   async invalidateAllCaches(): Promise<void> {
     await this.clearCache();
-    console.log('[TenantSettingsSingleton] All caches invalidated for tenant:', this.tenantId);
+  //  console.log('[TenantSettingsSingleton] All caches invalidated for tenant:', this.tenantId);
   }
 
   /**

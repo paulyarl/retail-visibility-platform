@@ -56,7 +56,7 @@ export interface PhotoDeleteResult {
 class PhotoSingleton extends UniversalSingleton {
   protected static instances: Map<string, PhotoSingleton> = new Map();
   private readonly CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-  private lastUpdated: number = Date.now();
+  protected lastUpdated: string = new Date().toISOString();
 
   private constructor(tenantId: string) {
     super(`photo-singleton-${tenantId}`);
@@ -241,7 +241,7 @@ class PhotoSingleton extends UniversalSingleton {
     this.apiCalls = 0;
     this.cacheHits = 0;
     this.cacheMisses = 0;
-    this.lastUpdated = Date.now();
+    this.lastUpdated = new Date().toISOString();
     console.log('[PhotoSingleton] Metrics reset');
   }
 }

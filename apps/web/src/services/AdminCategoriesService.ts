@@ -7,6 +7,7 @@
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 import { googleTaxonomyPublicService, type GoogleTaxonomyPath } from './GoogleTaxonomyPublicService';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface AdminCategory {
   id: string;
@@ -53,6 +54,9 @@ export interface UpdateCategoryRequest {
  * Uses AdminApiSingleton for admin privilege validation and caching
  */
 class AdminCategoriesService extends AdminApiSingleton {
+
+    protected defaultContext: AppContext = AppContext.ADMIN;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.ADMIN;
   private static instance: AdminCategoriesService;
 
   // TTL constants for different data types

@@ -9,6 +9,7 @@
  */
 
 import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions } from './FlexibleApiSingleton';
+import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
 
 // ====================
 // PUBLIC API SINGLETON
@@ -17,6 +18,8 @@ import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions
 export abstract class PublicApiSingleton extends FlexibleApiSingleton {
   protected defaultRequestType: RequestType = RequestType.PUBLIC;
   protected defaultRequestTarget: RequestTarget = RequestTarget.API;
+  protected defaultContext: AppContext = AppContext.GLOBAL;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.GLOBAL;
   protected cacheTTL: number = 15 * 60 * 1000; // 15 minutes for public data
   
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {

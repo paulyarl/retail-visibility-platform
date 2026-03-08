@@ -58,6 +58,10 @@ interface ContextStorageConfig {
   [AppContext.PRODUCT]: StorageStrategy;
   [AppContext.STORE]: StorageStrategy;
   [AppContext.USER]: StorageStrategy;
+  [AppContext.PUBLIC]: StorageStrategy;
+  [AppContext.DIRECTORY]: StorageStrategy;
+  [AppContext.GLOBAL]: StorageStrategy;
+  [AppContext.SHOP]: StorageStrategy;
   [AppContext.SYSTEM]: StorageStrategy;
 }
 
@@ -252,6 +256,18 @@ export class UniversalStorageManager {
       // USER: Privacy-focused, session-based
       [AppContext.USER]: this.createUserStrategy(),
       
+      // SHOP: Large data, compressed, persistent
+      [AppContext.SHOP]: this.createShopStrategy(),
+      
+      // DIRECTORY: Location data, compressed, persistent
+      [AppContext.DIRECTORY]: this.createDirectoryStrategy(),
+      
+      // PUBLIC: Privacy-focused, session-based
+      [AppContext.PUBLIC]: this.createPublicStrategy(),      
+      
+      // GLOBAL: Privacy-focused, session-based
+      [AppContext.GLOBAL]: this.createGlobalStrategy(),
+      
       // SYSTEM: Configuration, persistent, minimal encryption
       [AppContext.SYSTEM]: this.createSystemStrategy()
     };
@@ -345,6 +361,71 @@ export class UniversalStorageManager {
   }
 
   /**
+   * 🏪 Global context strategy: Location-based optimization
+   */
+  private createGlobalStrategy(): StorageStrategy {
+    return {
+      primary: this.capabilities[StorageType.CACHE_STORAGE] ? StorageType.CACHE_STORAGE : 
+              this.capabilities[StorageType.INDEXED_DB] ? StorageType.INDEXED_DB :
+              StorageType.LOCAL_STORAGE,
+      fallbacks: this.getFallbacks([StorageType.CACHE_STORAGE, StorageType.INDEXED_DB, StorageType.LOCAL_STORAGE]),
+      encryption: false,       // Store data is public
+      compression: true,        // Compress store data
+      maxSize: 200,            // Medium cache for stores
+      ttl: 20 * 60 * 1000,     // 20 minutes - store data
+      priority: 'medium',     // Medium priority
+      persistent: true,        // Persist store information
+      crossTab: true,         // Share across tabs
+      httpOnly: false,
+      secure: false
+    };
+  }
+
+
+  /**
+   * 🏪 Public context strategy: Location-based optimization
+   */
+  private createPublicStrategy(): StorageStrategy {
+    return {
+      primary: this.capabilities[StorageType.CACHE_STORAGE] ? StorageType.CACHE_STORAGE : 
+              this.capabilities[StorageType.INDEXED_DB] ? StorageType.INDEXED_DB :
+              StorageType.LOCAL_STORAGE,
+      fallbacks: this.getFallbacks([StorageType.CACHE_STORAGE, StorageType.INDEXED_DB, StorageType.LOCAL_STORAGE]),
+      encryption: false,       // Store data is public
+      compression: true,        // Compress store data
+      maxSize: 200,            // Medium cache for stores
+      ttl: 20 * 60 * 1000,     // 20 minutes - store data
+      priority: 'medium',     // Medium priority
+      persistent: true,        // Persist store information
+      crossTab: true,         // Share across tabs
+      httpOnly: false,
+      secure: false
+    };
+  }
+
+
+  /**
+   * 🏪 Shop context strategy: Location-based optimization
+   */
+  private createShopStrategy(): StorageStrategy {
+    return {
+      primary: this.capabilities[StorageType.CACHE_STORAGE] ? StorageType.CACHE_STORAGE : 
+              this.capabilities[StorageType.INDEXED_DB] ? StorageType.INDEXED_DB :
+              StorageType.LOCAL_STORAGE,
+      fallbacks: this.getFallbacks([StorageType.CACHE_STORAGE, StorageType.INDEXED_DB, StorageType.LOCAL_STORAGE]),
+      encryption: false,       // Store data is public
+      compression: true,        // Compress store data
+      maxSize: 200,            // Medium cache for stores
+      ttl: 20 * 60 * 1000,     // 20 minutes - store data
+      priority: 'medium',     // Medium priority
+      persistent: true,        // Persist store information
+      crossTab: true,         // Share across tabs
+      httpOnly: false,
+      secure: false
+    };
+  }
+
+  /**
    * 👤 User context strategy: Privacy first
    */
   private createUserStrategy(): StorageStrategy {
@@ -361,6 +442,27 @@ export class UniversalStorageManager {
       crossTab: false,        // No cross-tab sharing for privacy
       httpOnly: false,
       secure: true
+    };
+  }
+
+  /**
+   * 👤 User context strategy: Privacy first
+   */
+  private createDirectoryStrategy(): StorageStrategy {
+    return {
+      primary: this.capabilities[StorageType.CACHE_STORAGE] ? StorageType.CACHE_STORAGE : 
+              this.capabilities[StorageType.INDEXED_DB] ? StorageType.INDEXED_DB :
+              StorageType.LOCAL_STORAGE,
+      fallbacks: this.getFallbacks([StorageType.CACHE_STORAGE, StorageType.INDEXED_DB, StorageType.LOCAL_STORAGE]),
+      encryption: false,       // Store data is public
+      compression: true,        // Compress store data
+      maxSize: 200,            // Medium cache for stores
+      ttl: 20 * 60 * 1000,     // 20 minutes - store data
+      priority: 'medium',     // Medium priority
+      persistent: true,        // Persist store information
+      crossTab: true,         // Share across tabs
+      httpOnly: false,
+      secure: false
     };
   }
 
@@ -854,6 +956,10 @@ export class UniversalStorageManager {
         case 'store': return AppContext.STORE;
         case 'user': return AppContext.USER;
         case 'system': return AppContext.SYSTEM;
+        case 'shop': return AppContext.SHOP;
+        case 'directory': return AppContext.DIRECTORY;
+        case 'public': return AppContext.PUBLIC;
+        case 'global': return AppContext.GLOBAL;
         default: return AppContext.PRODUCT;
       }
     }
@@ -869,6 +975,10 @@ export class UniversalStorageManager {
       case AppContext.TENANT: return 60 * 60 * 1000;
       case AppContext.PRODUCT: return 30 * 60 * 1000;
       case AppContext.STORE: return 20 * 60 * 1000;
+      case AppContext.SHOP: return 20 * 60 * 1000;
+      case AppContext.DIRECTORY: return 20 * 60 * 1000;
+      case AppContext.PUBLIC: return 20 * 60 * 1000;
+      case AppContext.GLOBAL: return 24 * 60 * 60 * 1000;
       case AppContext.USER: return 15 * 60 * 1000;
       case AppContext.SYSTEM: return 24 * 60 * 60 * 1000;
       default: return 15 * 60 * 1000;

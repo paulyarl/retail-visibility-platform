@@ -19,6 +19,9 @@ export enum CacheIsolation {
   ADMIN = 'admin',
   PRODUCT = 'product',
   STORE = 'store',
+  SHOP = 'shop',
+  DIRECTORY = 'directory',
+  PUBLIC = 'public',
   SYSTEM = 'system'
 }
 export enum CacheOperation {
@@ -36,7 +39,11 @@ export enum AppContext {
   TENANT = 'tenant', 
   PRODUCT = 'product',
   STORE = 'store',
+  SHOP = 'shop',
+  DIRECTORY = 'directory',
   USER = 'user',
+  GLOBAL = 'global',
+  PUBLIC = 'public',
   SYSTEM = 'system'
 }
 
@@ -83,6 +90,25 @@ const CONTEXT_CONFIGS: Record<AppContext, ContextCacheConfig> = {
   [AppContext.STORE]: {
     ttl: 20 * 60 * 1000, // 20 minutes
     maxSize: 200,
+    isolation: CacheIsolation.STORE,
+    encryption: false,
+    compression: true,
+    persistent: true
+  },
+
+  // Shop context: Location-based, medium TTL
+  [AppContext.SHOP]: {
+    ttl: 20 * 60 * 1000, // 20 minutes
+    maxSize: 200,
+    isolation: CacheIsolation.SHOP,
+    encryption: false,
+    compression: true,
+    persistent: true
+  },
+  // Directory context: Location-based, medium TTL
+  [AppContext.DIRECTORY]: {
+    ttl: 20 * 60 * 1000, // 20 minutes
+    maxSize: 200,
     isolation: CacheIsolation.GLOBAL,
     encryption: false,
     compression: true,
@@ -96,6 +122,26 @@ const CONTEXT_CONFIGS: Record<AppContext, ContextCacheConfig> = {
     isolation: CacheIsolation.USER,
     encryption: true,
     compression: false,
+    persistent: false // Memory only for privacy
+  },
+
+  // Global context: Shared data, medium TTL, compressed
+  [AppContext.GLOBAL]: {
+    ttl: 30 * 60 * 1000, // 30 minutes
+    maxSize: 500,
+    isolation: CacheIsolation.GLOBAL,
+    encryption: false,
+    compression: true,
+    persistent: false // Memory only for privacy
+  },
+
+  // Public context: Shared data, medium TTL, compressed
+  [AppContext.PUBLIC]: {
+    ttl: 30 * 60 * 1000, // 30 minutes
+    maxSize: 500,
+    isolation: CacheIsolation.PUBLIC,
+    encryption: false,
+    compression: true,
     persistent: false // Memory only for privacy
   },
 
@@ -139,10 +185,25 @@ class ContextCacheManager {
         prefix += `-${isolationId || 'anonymous'}`;
         break;
       case CacheIsolation.ADMIN:
-        prefix += `-${isolationId || 'system'}`;
+        prefix += `-${isolationId || 'platform'}`;
+        break;
+      case CacheIsolation.STORE:
+        prefix += `-${isolationId || 'store'}`;
+        break;
+      case CacheIsolation.SHOP:
+        prefix += `-${isolationId || 'shop'}`;
+        break;
+      case CacheIsolation.DIRECTORY:
+        prefix += `-${isolationId || 'directory'}`;
+        break;
+      case CacheIsolation.PRODUCT:
+        prefix += `-${isolationId || 'product'}`;
         break;
       case CacheIsolation.SYSTEM:
         prefix += `-${isolationId || 'system'}`;
+        break;
+      case CacheIsolation.PUBLIC:
+        prefix += `-${isolationId || 'public'}`;
         break;
       case CacheIsolation.GLOBAL:
         // No isolation prefix
@@ -345,6 +406,29 @@ class ContextCacheManager {
     return this.set(AppContext.PRODUCT, key, data);
   }
 
+  async getShopData<T>(location: string, key: string): Promise<T | null> {
+    return this.get<T>(AppContext.SHOP, key, location);
+  }
+
+  async setShopData<T>(location: string, key: string, data: T): Promise<void> {
+    return this.set(AppContext.SHOP, key, data, { isolationId: location });
+  }
+
+  async getDirectoryData<T>(location: string, key: string): Promise<T | null> {
+    return this.get<T>(AppContext.DIRECTORY, key, location);
+  }
+
+  async setDirectoryData<T>(location: string, key: string, data: T): Promise<void> {
+    return this.set(AppContext.DIRECTORY, key, data, { isolationId: location });
+  }
+
+  async getPublicData<T>(location: string, key: string): Promise<T | null> {
+    return this.get<T>(AppContext.PUBLIC, key, location);
+  }
+
+  async setPublicData<T>(location: string, key: string, data: T): Promise<void> {
+    return this.set(AppContext.PUBLIC, key, data, { isolationId: location });
+  }
   async getStoreData<T>(location: string, key: string): Promise<T | null> {
     return this.get<T>(AppContext.STORE, key, location);
   }

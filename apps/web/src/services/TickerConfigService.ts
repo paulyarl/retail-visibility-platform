@@ -1,4 +1,5 @@
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface TickerMessage {
   id: string;
@@ -35,6 +36,9 @@ export interface TickerConfig {
 
 class TickerConfigService extends AdminApiSingleton {
   private static _instance: TickerConfigService;
+
+  protected defaultContext: AppContext = AppContext.SYSTEM;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.SYSTEM;
 
   protected constructor() {
     super('ticker-config-service');

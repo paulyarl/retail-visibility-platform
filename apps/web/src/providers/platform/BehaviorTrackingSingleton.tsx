@@ -2,11 +2,14 @@
  * Behavior Tracking Singleton - Producer Pattern
  * 
  * Produces and manages user behavior tracking data
- * Extends UniversalSingleton for consistent caching and metrics
+ * Extends ApiSystemSingleton for consistent caching and metrics
  */
 
-import { UniversalSingleton, SingletonCacheOptions } from '../base/UniversalSingleton';
+import { ApiSystemSingleton } from '../base/ApiSystemSingleton';
 import { behaviorTrackingService } from '@/services/BehaviorTrackingService';
+//import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
+import { SingletonCacheOptions } from '../base/FlexibleApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 // Behavior Tracking Data Interfaces
 export interface TrackingEvent {
@@ -85,7 +88,7 @@ export interface BehaviorTrackingConfig {
  * 
  * Produces behavior tracking data and manages user analytics
  */
-class BehaviorTrackingSingleton extends UniversalSingleton {
+class BehaviorTrackingSingleton extends ApiSystemSingleton {
   private static instance: BehaviorTrackingSingleton;
   private trackingConfig: BehaviorTrackingConfig;
   private eventQueue: TrackingEvent[] = [];
@@ -93,8 +96,12 @@ class BehaviorTrackingSingleton extends UniversalSingleton {
   private batchInterval: NodeJS.Timeout | null = null;
   private currentSessionId: string | null = null;
 
-  private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
-    super(singletonKey, cacheOptions);
+  // Override base class defaults for behavior tracking
+  protected defaultContext: AppContext = AppContext.USER;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.USER;
+
+  private constructor() {
+    super('behavior-tracking-singleton');
     this.trackingConfig = {
       enableTracking: true,
       batchSize: 50,
@@ -120,7 +127,7 @@ class BehaviorTrackingSingleton extends UniversalSingleton {
 
   static getInstance(): BehaviorTrackingSingleton {
     if (!BehaviorTrackingSingleton.instance) {
-      BehaviorTrackingSingleton.instance = new BehaviorTrackingSingleton('behavior-tracking-singleton');
+      BehaviorTrackingSingleton.instance = new BehaviorTrackingSingleton();
     }
     return BehaviorTrackingSingleton.instance;
   }

@@ -42,7 +42,11 @@ interface ContextStorageConfig {
   [AppContext.PRODUCT]: StorageStrategy;
   [AppContext.STORE]: StorageStrategy;
   [AppContext.USER]: StorageStrategy;
+  [AppContext.SHOP]: StorageStrategy;
+  [AppContext.DIRECTORY]: StorageStrategy;
   [AppContext.SYSTEM]: StorageStrategy;
+  [AppContext.PUBLIC]: StorageStrategy;
+  [AppContext.GLOBAL]: StorageStrategy;
 }
 
 interface EnhancedCacheOptions extends AutoUserCacheOptions {
@@ -149,10 +153,23 @@ export class ContextAwareCacheManager {
       [AppContext.PRODUCT]: this.createProductStrategy(caps),
       
       // STORE: Location data, compressed, persistent
-      [AppContext.STORE]: this.createStoreStrategy(caps),
+      [AppContext.STORE]: this.createStoreStrategy(caps),      
+      
+      // PRODUCT: Large data, compressed, persistent
+      [AppContext.SHOP]: this.createShopStrategy(caps),
+      
+      // STORE: Location data, compressed, persistent
+      [AppContext.DIRECTORY]: this.createDirectoryStrategy(caps),
       
       // USER: Privacy-focused, memory-only, encrypted
-      [AppContext.USER]: this.createUserStrategy(caps),
+      [AppContext.USER]: this.createUserStrategy(caps),      
+      
+      // GLOBAL: Shared data, compressed, persistent
+      [AppContext.GLOBAL]: this.createGlobalStrategy(caps),
+         
+      
+      // PUBLIC: Shared data, compressed, persistent
+      [AppContext.PUBLIC]: this.createPublicStrategy(caps),
       
       // SYSTEM: Configuration, persistent, minimal encryption
       [AppContext.SYSTEM]: this.createSystemStrategy(caps)
@@ -244,6 +261,49 @@ export class ContextAwareCacheManager {
   }
 
   /**
+   * 🏪 Shop context strategy: Location-based optimization
+   */
+  private createShopStrategy(caps: BrowserCapabilities): StorageStrategy {
+    const useIndexedDB = caps.indexedDB && !caps.isPrivateMode;
+    
+    return {
+      primary: useIndexedDB ? StorageType.INDEXED_DB : StorageType.LOCAL_STORAGE,
+      fallback: caps.localStorage ? StorageType.LOCAL_STORAGE : StorageType.INDEXED_DB,
+      encryption: false,       // Store data is public
+      compression: true,        // Compress store data
+      persistent: true,        // Persist store information
+      priority: 'medium',     // Medium priority
+      maxSize: caps.deviceMemory >= 4 ? 200 : 100,  // Medium cache for stores
+      ttl: 20 * 60 * 1000,    // 20 minutes
+      httpOnly: false,
+      secure: false,
+      crossTab: true
+    };
+  }
+
+  
+  /**
+   * 🏪 Directory context strategy: Location-based optimization
+   */
+  private createDirectoryStrategy(caps: BrowserCapabilities): StorageStrategy {
+    const useIndexedDB = caps.indexedDB && !caps.isPrivateMode;
+    
+    return {
+      primary: useIndexedDB ? StorageType.INDEXED_DB : StorageType.LOCAL_STORAGE,
+      fallback: caps.localStorage ? StorageType.LOCAL_STORAGE : StorageType.INDEXED_DB,
+      encryption: false,       // Store data is public
+      compression: true,        // Compress store data
+      persistent: true,        // Persist store information
+      priority: 'medium',     // Medium priority
+      maxSize: caps.deviceMemory >= 4 ? 200 : 100,  // Medium cache for stores
+      ttl: 20 * 60 * 1000,    // 20 minutes
+      httpOnly: false,
+      secure: false,
+      crossTab: true
+    };
+  }
+
+  /**
    * 👤 User context strategy: Privacy first
    */
   private createUserStrategy(caps: BrowserCapabilities): StorageStrategy {
@@ -259,6 +319,45 @@ export class ContextAwareCacheManager {
       httpOnly: false,
       secure: false,
       crossTab: false
+    };
+  }
+
+  /**
+   * 👤 Global context strategy: Shared data
+   */
+  private createGlobalStrategy(caps: BrowserCapabilities): StorageStrategy {
+    return {
+      primary: StorageType.INDEXED_DB,
+      fallback: caps.localStorage ? StorageType.LOCAL_STORAGE : StorageType.INDEXED_DB,
+      encryption: false,       // Global data is public
+      compression: true,        // Compress global data
+      persistent: true,        // Persist global information
+      priority: 'medium',     // Medium priority
+      maxSize: caps.deviceMemory >= 4 ? 200 : 100,  // Medium cache for global data
+      ttl: 20 * 60 * 1000,    // 20 minutes
+      httpOnly: false,
+      secure: false,
+      crossTab: true
+    };
+  }
+
+
+  /**
+   * 👤 Public context strategy: Shared data
+   */
+  private createPublicStrategy(caps: BrowserCapabilities): StorageStrategy {
+    return {
+      primary: StorageType.INDEXED_DB,
+      fallback: caps.localStorage ? StorageType.LOCAL_STORAGE : StorageType.INDEXED_DB,
+      encryption: false,       // Public data is public
+      compression: true,        // Compress public data
+      persistent: true,        // Persist public information
+      priority: 'medium',     // Medium priority
+      maxSize: caps.deviceMemory >= 4 ? 200 : 100,  // Medium cache for public data
+      ttl: 20 * 60 * 1000,    // 20 minutes
+      httpOnly: false,
+      secure: false,
+      crossTab: true
     };
   }
 
@@ -398,8 +497,11 @@ export class ContextAwareCacheManager {
         case 'tenant': return AppContext.TENANT;
         case 'product': return AppContext.PRODUCT;
         case 'store': return AppContext.STORE;
+        case 'shop': return AppContext.SHOP;
+        case 'directory': return AppContext.DIRECTORY;
         case 'user': return AppContext.USER;
         case 'system': return AppContext.SYSTEM;
+        case 'global': return AppContext.GLOBAL;
         default: return AppContext.PRODUCT; // Default fallback
       }
     }
@@ -419,6 +521,10 @@ export class ContextAwareCacheManager {
         case 'tenant': return CacheIsolation.TENANT;
         case 'user': return CacheIsolation.USER;
         case 'admin': return CacheIsolation.ADMIN;
+        case 'store': return CacheIsolation.STORE;
+        case 'product': return CacheIsolation.PRODUCT;
+        case 'shop': return CacheIsolation.SHOP;
+        case 'directory': return CacheIsolation.DIRECTORY;
         default: return CacheIsolation.GLOBAL; // Default fallback
       }
     }

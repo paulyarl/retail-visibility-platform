@@ -1,3 +1,4 @@
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 
 export interface AdminAnalytics {
@@ -57,6 +58,9 @@ export interface EnrichmentAnalytics {
  * Handles admin dashboard analytics, directory stats, and enrichment analytics
  */
 export class AdminAnalyticsService extends AdminApiSingleton {
+
+    protected defaultContext: AppContext = AppContext.ADMIN;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.ADMIN;
   private static instance: AdminAnalyticsService;
 
   private constructor(singletonKey: string, cacheOptions?: any) {

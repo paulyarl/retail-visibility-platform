@@ -8,6 +8,9 @@
 import { CacheEncryption } from '../lib/cache/cache-encryption';
 import { resolveCacheOptions, AutoUserCacheOptions } from './userIdentification';
 
+// Context types for cache organization
+export type CacheContext = 'public' | 'user' | 'tenant' | 'admin' | 'system' | 'shop' | 'product' | 'store' | 'directory' | 'global';
+
 interface CacheEntry<T> {
   data: T | string;      // Encrypted or plain data
   timestamp: number;
@@ -23,6 +26,13 @@ interface CacheOptions {
   storeName?: string; // IndexedDB store name
   encrypt?: boolean; // Whether to encrypt cached data
   userId?: string; // User ID for encryption key derivation
+}
+
+interface ContextAwareCacheOptions extends CacheOptions {
+  context?: CacheContext;
+  isolation?: CacheContext;
+  tenantId?: string;
+  userId?: string;
 }
 
 class CacheManager {
@@ -70,6 +80,35 @@ class CacheManager {
     if (this.indexedDBSupported) {
       this.initIndexedDB();
     }
+  }
+
+  /**
+   * Static factory method to create context-specific cache managers
+   */
+  static createContextAware(context: CacheContext, isolation?: CacheContext, tenantId?: string, userId?: string): CacheManager {
+    // Build context-specific database name
+    const parts = [`${context}-cache`];
+    
+    if (isolation && isolation !== context) {
+      parts.push(isolation);
+    }
+    
+    if (tenantId) {
+      parts.push(`tenant-${tenantId}`);
+    }
+    
+    if (userId) {
+      parts.push(`user-${userId}`);
+    }
+    
+    const dbName = parts.join('-');
+    
+    return new CacheManager({
+      dbName,
+      storeName: 'cache-store',
+      ttl: 15 * 60 * 1000, // 15 minutes
+      maxSize: 100
+    });
   }
 
   private async initIndexedDB(): Promise<void> {
@@ -330,6 +369,57 @@ class CacheManager {
     }
   }
 
+  /**
+   * Context-aware get method using factory-created cache manager instances
+   */
+  async getContextAware<T>(key: string, options?: ContextAwareCacheOptions): Promise<T | null> {
+    if (!options?.context) {
+      // Fall back to regular get if no context provided
+      return this.get<T>(key);
+    }
+
+    // Create a context-specific cache manager instance
+    const contextCacheManager = CacheManager.createContextAware(
+      options.context,
+      options.isolation,
+      options.tenantId,
+      options.userId
+    );
+
+    // Use the context-specific cache manager with proper options
+    return contextCacheManager.get<T>(key, {
+      encrypt: options?.encrypt,
+      userId: options?.userId
+    });
+  }
+
+  /**
+   * Context-aware set method using factory-created cache manager instances
+   */
+  async setContextAware<T>(key: string, data: T, options?: ContextAwareCacheOptions): Promise<void> {
+    if (!options?.context) {
+      // Fall back to regular set if no context provided
+      return this.set<T>(key, data, {
+        encrypt: options?.encrypt,
+        userId: options?.userId
+      });
+    }
+
+    // Create a context-specific cache manager instance
+    const contextCacheManager = CacheManager.createContextAware(
+      options.context,
+      options.isolation,
+      options.tenantId,
+      options.userId
+    );
+
+    // Use the context-specific cache manager with proper options
+    return contextCacheManager.set<T>(key, data, {
+      encrypt: options?.encrypt,
+      userId: options?.userId
+    });
+  }
+
   async remove(key: string): Promise<void> {
     // Remove from all storage layers
     this.memoryCache.delete(key);
@@ -416,4 +506,129 @@ const cacheManager = new CacheManager({
 });
 
 export default cacheManager;
-export { CacheManager, type CacheOptions, type CacheEntry };
+export { CacheManager, type CacheOptions, type CacheEntry, type ContextAwareCacheOptions };
+
+/**
+ * Context-specific cache manager classes that extend the base CacheManager
+ * Each context gets its own dedicated database instance with explicit configuration
+ */
+
+// Tenant cache manager - for tenant-specific data
+export class TenantCacheManager extends CacheManager {
+  constructor(tenantId?: string) {
+    super({
+      dbName: tenantId ? `tenant-cache-tenant-${tenantId}` : 'tenant-cache',
+      storeName: 'tenant-store',
+      ttl: 15 * 60 * 1000, // 15 minutes
+      maxSize: 100
+    });
+  }
+}
+
+// User cache manager - for user-specific data
+export class UserCacheManager extends CacheManager {
+  constructor(userId?: string) {
+    super({
+      dbName: userId ? `user-cache-user-${userId}` : 'user-cache',
+      storeName: 'user-store',
+      ttl: 15 * 60 * 1000, // 15 minutes
+      maxSize: 100
+    });
+  }
+}
+
+// Admin cache manager - for admin operations
+export class AdminCacheManager extends CacheManager {
+  constructor() {
+    super({
+      dbName: 'admin-cache',
+      storeName: 'admin-store',
+      ttl: 5 * 60 * 1000, // 5 minutes for admin data (security)
+      maxSize: 50
+    });
+  }
+}
+
+// Public cache manager - for public-facing data
+export class PublicCacheManager extends CacheManager {
+  constructor() {
+    super({
+      dbName: 'public-cache',
+      storeName: 'public-store',
+      ttl: 30 * 60 * 1000, // 30 minutes for public data (performance)
+      maxSize: 200
+    });
+  }
+}
+
+// Product cache manager - for product data
+export class ProductCacheManager extends CacheManager {
+  constructor() {
+    super({
+      dbName: 'product-cache',
+      storeName: 'product-store',
+      ttl: 20 * 60 * 1000, // 20 minutes for product data
+      maxSize: 150
+    });
+  }
+}
+
+// Shop cache manager - for shop data
+export class ShopCacheManager extends CacheManager {
+  constructor() {
+    super({
+      dbName: 'shop-cache',
+      storeName: 'shop-store',
+      ttl: 25 * 60 * 1000, // 25 minutes for shop data
+      maxSize: 120
+    });
+  }
+}
+
+// Store cache manager - for store data
+export class StoreCacheManager extends CacheManager {
+  constructor() {
+    super({
+      dbName: 'store-cache',
+      storeName: 'store-store',
+      ttl: 20 * 60 * 1000, // 20 minutes for store data
+      maxSize: 100
+    });
+  }
+}
+
+// System cache manager - for system operations
+export class SystemCacheManager extends CacheManager {
+  constructor() {
+    super({
+      dbName: 'system-cache',
+      storeName: 'system-store',
+      ttl: 10 * 60 * 1000, // 10 minutes for system data
+      maxSize: 80
+    });
+  }
+}
+
+// Directory cache manager - for directory data
+export class DirectoryCacheManager extends CacheManager {
+  constructor() {
+    super({
+      dbName: 'directory-cache',
+      storeName: 'directory-store',
+      ttl: 30 * 60 * 1000, // 30 minutes for directory data
+      maxSize: 150
+    });
+  }
+}
+
+// Global cache manager - for global/shared data
+export class GlobalCacheManager extends CacheManager {
+  constructor() {
+    super({
+      dbName: 'global-cache',
+      storeName: 'global-store',
+      ttl: 60 * 60 * 1000, // 1 hour for global data (stability)
+      maxSize: 300
+    });
+  }
+}
