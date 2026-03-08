@@ -14,6 +14,13 @@ interface FeaturedBucketSimpleProps {
   tenantId: string;
   tenantName?: string;
   tenantLogo?: string;
+  shops?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    logo?: string;
+    tier: string;
+  }>;
   initialLimit?: number;
   showLayoutSelector?: boolean;
 }
@@ -34,12 +41,27 @@ export default function FeaturedBucketSimple({
   tenantId,
   tenantName,
   tenantLogo,
+  shops,
   initialLimit = 3,
   showLayoutSelector = true
 }: FeaturedBucketSimpleProps) {
   const { variant, setVariant } = useProductLayout();
   const contextPayment = useTenantPaymentOptional();
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // Helper function to determine if a tenant has active payment gateway
+  const hasActivePaymentGateway = (tenantId: string): boolean => {
+    // For now, assume all shops have payment gateway enabled
+    // In a real implementation, you might check this from the shops data or a separate API
+    return true;
+  };
+  
+  // Helper function to get default gateway type for a tenant
+  const getDefaultGatewayType = (tenantId: string): string => {
+    // For now, return a default gateway type
+    // In a real implementation, you might get this from the shops data or tenant settings
+    return 'stripe';
+  };
   
   const productsPerPage = initialLimit;
   
@@ -181,8 +203,8 @@ export default function FeaturedBucketSimple({
             tenantId={product.tenantId || tenantId}
             tenantName={product.tenantName || tenantName}
             tenantLogo={product.tenantLogo || tenantLogo}
-            hasActivePaymentGateway={product.hasActivePaymentGateway}
-            defaultGatewayType={product.defaultGatewayType}
+            hasActivePaymentGateway={hasActivePaymentGateway(product.tenantId)}
+            defaultGatewayType={getDefaultGatewayType(product.tenantId)}
           />
         ))}
       </div>

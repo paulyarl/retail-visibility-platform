@@ -832,18 +832,23 @@ class DirectorySingletonService extends PublicApiSingleton {
       // Use makePublicRequest with standard cache options
       // Note: Full EnhancedFlexibleApi features (context/isolation) would require
       // extending the inheritance chain or using makeEnhancedDefaultRequest
-      const response = await this.makePublicRequest<{
-        totalCount: number;
-        buckets: Record<string, any[]>;
-        bucketCounts: Record<string, number>;
-        shops: Array<{
-          id: string;
-          name: string;
-          slug: string;
-          logo?: string;
-          tier: string;
-        }>;
+      const response = await this.makeDefaultRequest<{
+        success: boolean;
+        data: {
+          totalCount: number;
+          buckets: Record<string, any[]>;
+          bucketCounts: Record<string, number>;
+          shops: Array<{
+            id: string;
+            name: string;
+            slug: string;
+            logo?: string;
+            tier: string;
+          }>;
+        };
       }>(endpoint, undefined, cacheKey, this.CACHE_TTL_MEDIUM);
+
+      const actualData = response.data?.data; // Extract nested data
 
       if (!response.success) {
         console.error('[DirectorySingleton] Failed to get all featured products:', response.error);
@@ -855,12 +860,14 @@ class DirectorySingletonService extends PublicApiSingleton {
         };
       }
 
-      return response.data || {
+      const result = actualData || {
         totalCount: 0,
         buckets: {},
         bucketCounts: {},
         shops: []
       };
+      
+      return result;
     } catch (error) {
       console.error('[DirectorySingleton] Error fetching all featured products:', error);
       return {

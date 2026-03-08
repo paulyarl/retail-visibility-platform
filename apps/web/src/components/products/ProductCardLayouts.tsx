@@ -37,6 +37,11 @@ interface ProductData {
   hasVariants?: boolean;
   payment_gateway_type?: string;
   defaultGatewayType?: string;
+  // Shop information from API response
+  tenantName?: string;
+  tenantSlug?: string;
+  tenantLogoUrl?: string;
+  // Legacy fields for backward compatibility
   shopName?: string;
   shopSlug?: string;
   metadata?: Record<string, any>;
@@ -116,12 +121,12 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
       {/* Product Info */}
       <div className="p-4">
         {/* Shop Info */}
-        {product.shopName && (
+        {(product.tenantName || product.shopName) && (
           <div className="flex items-center mb-2">
-            {tenantLogo ? (
+            {(tenantLogo || product.tenantLogoUrl) ? (
               <Image
-                src={tenantLogo}
-                alt={product.shopName}
+                src={tenantLogo || product.tenantLogoUrl || ''}
+                alt={product.tenantName || product.shopName || 'Shop'}
                 width={20}
                 height={20}
                 className="rounded-full mr-2"
@@ -130,10 +135,10 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
               <Store className="w-5 h-5 text-gray-400 mr-2" />
             )}
             <Link 
-              href={`/shops/${product.shopSlug || product.tenantId}`}
+              href={`/shops/${product.tenantSlug || product.shopSlug || product.tenantId}`}
               className="text-sm text-blue-600 hover:text-blue-800 font-medium"
             >
-              {product.shopName}
+              {product.tenantName || product.shopName}
             </Link>
           </div>
         )}
@@ -428,12 +433,12 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
       {/* Enhanced Product Info */}
       <div className="p-5">
         {/* Shop Info */}
-        {product.shopName && (
+        {(product.tenantName || product.shopName) && (
           <div className="flex items-center mb-3">
-            {tenantLogo ? (
+            {(tenantLogo || product.tenantLogoUrl) ? (
               <Image
-                src={tenantLogo}
-                alt={product.shopName}
+                src={tenantLogo || product.tenantLogoUrl || ''}
+                alt={product.tenantName || product.shopName || 'Shop'}
                 width={24}
                 height={24}
                 className="rounded-full mr-2"
@@ -442,10 +447,10 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
               <Store className="w-6 h-6 text-gray-400 mr-2" />
             )}
             <Link 
-              href={`/shops/${product.shopSlug || product.tenantId}`}
+              href={`/shops/${product.tenantSlug || product.shopSlug || product.tenantId}`}
               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 uppercase tracking-wide"
             >
-              {product.shopName}
+              {product.tenantName || product.shopName}
             </Link>
           </div>
         )}
@@ -673,12 +678,12 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
           {/* Product Info */}
           <div className="ml-3 flex-1 min-w-0">
             {/* Shop Info */}
-            {product.shopName && (
+            {(product.tenantName || product.shopName) && (
               <div className="flex items-center mb-1">
-                {tenantLogo ? (
+                {(tenantLogo || product.tenantLogoUrl) ? (
                   <Image
-                    src={tenantLogo}
-                    alt={product.shopName}
+                    src={tenantLogo || product.tenantLogoUrl || ''}
+                    alt={product.tenantName || product.shopName || 'Shop'}
                     width={16}
                     height={16}
                     className="rounded-full mr-1"
@@ -687,10 +692,10 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
                   <Store className="w-4 h-4 text-gray-400 mr-1" />
                 )}
                 <Link 
-                  href={`/shops/${product.shopSlug || product.tenantId}`}
+                  href={`/shops/${product.tenantSlug || product.shopSlug || product.tenantId}`}
                   className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium truncate"
                 >
-                  {product.shopName}
+                  {product.tenantName || product.shopName}
                 </Link>
               </div>
             )}
@@ -916,24 +921,24 @@ function PremiumLayout({ product, className = '', trackingContext, tenantId, ten
       {/* Premium Product Info */}
       <div className="p-6">
         {/* Shop Info */}
-        {product.shopName && (
+        {(product.tenantName || product.shopName) && (
           <div className="flex items-center mb-4">
-            {tenantLogo ? (
+            {(tenantLogo || product.tenantLogoUrl) ? (
               <Image
-                src={tenantLogo}
-                alt={product.shopName}
-                width={28}
-                height={28}
-                className="rounded-full mr-3"
+                src={tenantLogo || product.tenantLogoUrl || ''}
+                alt={product.tenantName || product.shopName || 'Shop'}
+                width={32}
+                height={32}
+                className="rounded-full mr-3 border-2 border-white shadow-sm"
               />
             ) : (
-              <Store className="w-7 h-7 text-gray-400 mr-3" />
+              <Store className="w-8 h-8 text-gray-400 mr-3" />
             )}
             <Link 
-              href={`/shops/${product.shopSlug || product.tenantId}`}
-              className="text-sm font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider hover:text-amber-700 dark:hover:text-amber-300"
+              href={`/shops/${product.tenantSlug || product.shopSlug || product.tenantId}`}
+              className="text-lg font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
             >
-              {product.shopName}
+              {product.tenantName || product.shopName}
             </Link>
           </div>
         )}
@@ -1229,12 +1234,12 @@ export default function ProductCard({
           {/* Minimal Info (visible always) - compact */}
           <div className="p-1">
             {/* Shop Info */}
-            {product.shopName && (
+            {(product.tenantName || product.shopName) && (
               <div className="flex items-center mb-1">
-                {tenantLogo ? (
+                {(tenantLogo || product.tenantLogoUrl) ? (
                   <Image
-                    src={tenantLogo}
-                    alt={product.shopName}
+                    src={tenantLogo || product.tenantLogoUrl || ''}
+                    alt={product.tenantName || product.shopName || 'Shop'}
                     width={12}
                     height={12}
                     className="rounded-full mr-1"
@@ -1243,10 +1248,10 @@ export default function ProductCard({
                   <Store className="w-3 h-3 text-gray-400 mr-1" />
                 )}
                 <Link 
-                  href={`/shops/${product.shopSlug || product.tenantId}`}
+                  href={`/shops/${product.tenantSlug || product.shopSlug || product.tenantId}`}
                   className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 truncate"
                 >
-                  {product.shopName}
+                  {product.tenantName || product.shopName}
                 </Link>
               </div>
             )}

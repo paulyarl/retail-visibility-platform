@@ -40,6 +40,76 @@ interface FeaturedProductsData {
   }>;
 }
 
+/**
+ * Shuffle products within each bucket to prevent consecutive products from same tenant
+ */
+const randomizeBuckets = (data: FeaturedProductsData): FeaturedProductsData => {
+  if (!data.buckets) return data;
+  
+  const newBuckets: Record<string, any[]> = {};
+  const newBucketCounts: Record<string, number> = {};
+  
+  // Process each bucket individually
+  Object.entries(data.buckets).forEach(([bucketType, products]) => {
+    if (products.length === 0) {
+      newBuckets[bucketType] = [];
+      newBucketCounts[bucketType] = 0;
+      return;
+    }
+    
+    // Shuffle products within this bucket
+    const shuffledProducts = [...products].sort(() => Math.random() - 0.5);
+    
+    // Further shuffle to avoid consecutive products from same tenant
+    const antiConsecutiveShuffle = (products: any[]): any[] => {
+      if (products.length <= 1) return products;
+      
+      const result: any[] = [];
+      const remaining = [...products];
+      
+      while (remaining.length > 0) {
+        // Try to find a product from a different tenant than the last one
+        let bestIndex = 0;
+        let bestScore = Infinity;
+        
+        for (let i = 0; i < remaining.length; i++) {
+          let score = 0;
+          
+          // Penalize if same tenant as last product
+          if (result.length > 0 && remaining[i].tenantId === result[result.length - 1].tenantId) {
+            score += 1000; // Heavy penalty
+          }
+          
+          // Add small random factor to break ties
+          score += Math.random() * 10;
+          
+          if (score < bestScore) {
+            bestScore = score;
+            bestIndex = i;
+          }
+        }
+        
+        result.push(remaining[bestIndex]);
+        remaining.splice(bestIndex, 1);
+      }
+      
+      return result;
+    };
+    
+    // Apply anti-consecutive shuffle
+    const finalProducts = antiConsecutiveShuffle(shuffledProducts);
+    
+    newBuckets[bucketType] = finalProducts;
+    newBucketCounts[bucketType] = finalProducts.length;
+  });
+  
+  return {
+    ...data,
+    buckets: newBuckets,
+    bucketCounts: newBucketCounts,
+  };
+};
+
 const FEATURED_BUCKETS = [
   {
     type: 'store_selection',
@@ -70,9 +140,9 @@ const FEATURED_BUCKETS = [
     gradient: 'from-purple-500 to-pink-500'
   },
   {
-    type: 'featured',
-    title: 'Featured Products',
-    description: 'Top-rated and popular',
+    type: 'staff_pick',
+    title: 'Staff Picks',
+    description: 'Editor\'s choice favorites',
     icon: '🔥',
     gradient: 'from-yellow-500 to-orange-500'
   }
@@ -89,7 +159,7 @@ export default function FeaturedProductsPage() {
   });
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('trending');
+  const [sortBy, setSortBy] = useState('newest'); // Default to newest for recent featured products
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<FeaturedProductsData | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -109,34 +179,15 @@ export default function FeaturedProductsPage() {
         trending: filters.trending,
         inStock: filters.inStock,
         sortBy: sortBy === 'trending' ? 'trending' : sortBy,
-        limit: 20 // Default limit
+        limit: 100 // Fetch 100 products (20 per bucket across 5 buckets)
       });
       
-      // If there's a search query, filter the results locally
-      // (since the API doesn't support search yet)
-      if (searchQuery) {
-        const searchLower = searchQuery.toLowerCase();
-        Object.keys(data.buckets).forEach(bucketType => {
-          data.buckets[bucketType] = data.buckets[bucketType].filter((product: any) => 
-            product.name?.toLowerCase().includes(searchLower) ||
-            product.title?.toLowerCase().includes(searchLower) ||
-            product.description?.toLowerCase().includes(searchLower) ||
-            product.brand?.toLowerCase().includes(searchLower) ||
-            product.tenantName?.toLowerCase().includes(searchLower)
-          );
-        });
-      }
-
-      console.log('[FeaturedProductsPage] Data received:', {
-        totalCount: data.totalCount,
-        bucketKeys: Object.keys(data.buckets),
-        shopsCount: data.shops.length
-      });
-      
-      setData(data);
+      // Randomize buckets for better store diversity
+      const randomizedData = randomizeBuckets(data);
+      setData(randomizedData);
       
       // Extract categories and locations from the data
-      const allProducts = Object.values(data.buckets || {}).flat();
+      const allProducts = Object.values(randomizedData.buckets || {}).flat();
       const categoryCounts = allProducts.reduce((acc: any, product: any) => {
         if (product.categoryName) {
           acc[product.categoryName] = (acc[product.categoryName] || 0) + 1;
@@ -166,7 +217,31 @@ export default function FeaturedProductsPage() {
 
   useEffect(() => {
     fetchFeaturedProducts();
-  }, [searchQuery, filters, sortBy]);
+  }, [filters, sortBy]);
+
+  // Re-fetch when search query changes (for server-side search in future)
+  useEffect(() => {
+    if (data) {
+      // For now, filter locally. In future, this could trigger a new API call
+      const searchLower = searchQuery.toLowerCase();
+      if (searchQuery && data.buckets) {
+        const filteredBuckets = { ...data.buckets };
+        Object.keys(filteredBuckets).forEach(bucketType => {
+          filteredBuckets[bucketType] = filteredBuckets[bucketType].filter((product: any) => 
+            product.name?.toLowerCase().includes(searchLower) ||
+            product.title?.toLowerCase().includes(searchLower) ||
+            product.description?.toLowerCase().includes(searchLower) ||
+            product.brand?.toLowerCase().includes(searchLower) ||
+            product.tenantName?.toLowerCase().includes(searchLower)
+          );
+        });
+        setData({ ...data, buckets: filteredBuckets });
+      } else if (!searchQuery && data) {
+        // Reset to original data when search is cleared
+        fetchFeaturedProducts();
+      }
+    }
+  }, [searchQuery]);
 
   const handleFilterChange = (key: keyof FilterState, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -178,9 +253,10 @@ export default function FeaturedProductsPage() {
       location: '',
       rating: '',
       priceRange: '',
-      trending: false,
+      trending: false, // Keep trending off by default
       inStock: true
     });
+    setSortBy('newest'); // Reset to newest
     setSearchQuery('');
   };
 
@@ -289,11 +365,11 @@ export default function FeaturedProductsPage() {
             <div className="flex gap-2">
               <Select
                 value={sortBy}
-                onChange={(value) => setSortBy(value || 'trending')}
+                onChange={(value) => setSortBy(value || 'newest')}
                 data={[
+                  { value: 'newest', label: 'Newest (Recent)' },
                   { value: 'trending', label: 'Trending' },
                   { value: 'rating', label: 'Highest Rated' },
-                  { value: 'newest', label: 'Newest' },
                   { value: 'price_low', label: 'Price: Low to High' },
                   { value: 'price_high', label: 'Price: High to Low' }
                 ]}
@@ -518,6 +594,8 @@ export default function FeaturedProductsPage() {
                   tenantId={products[0]?.tenantId || "marketplace"}
                   tenantName={products[0]?.tenantName}
                   tenantLogo={products[0]?.tenantLogo}
+                  shops={data.shops}
+                  initialLimit={8} // Show 8 products per bucket initially
                 />
               </div>
             );
