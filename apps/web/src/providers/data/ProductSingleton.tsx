@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import EnhancedProductService, { EnhancedProduct } from '@/services/EnhancedProductService';
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { CacheManager } from '@/utils/cacheManager';
@@ -87,6 +88,7 @@ export class ProductSingleton extends PublicApiSingleton {
   protected defaultContext: AppContext = AppContext.DIRECTORY;
   protected defaultIsolation: CacheIsolation = CacheIsolation.DIRECTORY;
   private static instance: ProductSingleton;
+  private enhancedProductService: EnhancedProductService;
   
   // Product state
   private products: Map<string, PublicProduct> = new Map();
@@ -99,6 +101,7 @@ export class ProductSingleton extends PublicApiSingleton {
 
   private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     super(singletonKey, cacheOptions);
+    this.enhancedProductService = EnhancedProductService.getInstance();
   }
 
   // Override getInstance with ProductSingleton-specific signature
@@ -130,21 +133,112 @@ export class ProductSingleton extends PublicApiSingleton {
   
   async fetchRandomFeaturedProducts(location?: { lat: number; lng: number }, limit: number = 20): Promise<PublicProduct[]> {
     try {
-      let url = `/api/directory/random-featured?limit=${limit}`;
+      // HYBRID APPROACH: Try featured products API first (rich data), fallback to existing API
+      console.log('[ProductSingleton] Using hybrid approach for featured products');
       
-      if (location) {
-        url += `&lat=${location.lat}&lng=${location.lng}&maxDistance=500`;
+      // Primary: Try Featured Products API for rich data (store-specific approach)
+      try {
+        console.log('[ProductSingleton] Using featured products API for store_selection random data');
+        
+        // Get random featured products from multiple stores
+        const randomFeaturedProducts = await this.fetchRandomFeaturedFromMultipleStores(location, limit);
+        
+        if (randomFeaturedProducts && randomFeaturedProducts.length > 0) {
+          console.log('[ProductSingleton] Using featured products API data, found', randomFeaturedProducts.length, 'products');
+          
+          // Transform to PublicProduct interface (data is already rich)
+          const enrichedProducts: PublicProduct[] = randomFeaturedProducts.map((product: any): PublicProduct => ({
+            // Core fields - already in correct format
+            id: product.id,
+            sku: product.sku,
+            name: product.name,
+            title: product.title,
+            description: product.description,
+            brand: product.brand || '',
+            
+            // Pricing - already rich
+            priceCents: product.priceCents,
+            salePriceCents: product.salePriceCents,
+            
+            // Stock and availability - already complete
+            stock: product.stock || 0,
+            availability: product.availability || 'in_stock',
+            
+            // Media - already complete
+            imageUrl: product.imageUrl,
+            
+            // Tenant info - already complete
+            tenantId: product.tenantId,
+            
+            // Category - map to proper PublicProduct interface
+            category: product.categoryName ? {
+              id: product.googleCategoryId || '',
+              name: product.categoryName,
+              slug: product.categorySlug || '',
+              googleCategoryId: product.googleCategoryId,
+            } : undefined,
+            
+            // Featured info - Only store_selection for directory display
+            featuredType: 'store_selection',
+            featuredPriority: 1,
+            featuredAt: new Date().toISOString(),
+            
+            // Store info mapping - already complete
+            storeInfo: {
+              storeId: product.tenantId,
+              storeName: product.tenantName,
+              storeSlug: product.tenantSlug,
+              storeLogo: product.tenantLogoUrl,
+              storeCity: '', // Not available in this API
+              storeState: '', // Not available in this API
+              storeWebsite: '',
+              storePhone: '',
+            },
+            
+            // Additional fields
+            hasVariants: false,
+            hasActivePaymentGateway: product.hasActivePaymentGateway || false,
+            defaultGatewayType: product.defaultGatewayType || null,
+            distanceKm: null,
+            
+            // Metadata with rich data
+            metadata: {
+              source: 'featured_products_api',
+              marketingDescription: product.marketingDescription,
+              condition: product.condition,
+              gtin: product.gtin,
+              mpn: product.mpn,
+              currency: product.currency,
+              features: product.metadata?.features || [],
+              specifications: product.metadata?.specifications || {},
+              enhancedDescription: product.metadata?.enhancedDescription || '',
+              originalData: product
+            }
+          }));
+          
+          this.featuredProducts = enrichedProducts;
+          
+          // Store individual products
+          enrichedProducts.forEach((product: PublicProduct) => {
+            this.products.set(`${product.id}-${product.tenantId}`, product);
+          });
+          
+          return enrichedProducts;
+        }
+      } catch (featuredError) {
+        console.warn('[ProductSingleton] Featured products API failed, falling back to existing API:', featuredError);
       }
       
-      // Add cache-busting timestamp to ensure fresh data
-      url += `&_t=${Date.now()}`;
+      // Fallback: Use existing API
+      console.log('[ProductSingleton] Using fallback API: /api/directory/random-featured');
       
-      // Generate cache key based on location and parameters
-      const cacheKey = location 
-        ? `featured-products-${location.lat}-${location.lng}-${limit}`
-        : `featured-products-global-${limit}`;
+      let url = `/api/directory/random-featured?limit=${limit}`;
       
-      // Use makePublicRequest with proper cache key
+      if (location?.lat && location?.lng) {
+        url += `&lat=${location.lat}&lng=${location.lng}`;
+      }
+      
+      const cacheKey = `random-featured-${location?.lat || 'global'}-${location?.lng || 'global'}-${limit}`;
       const result = await this.makePublicRequest<{ products: any[] }>(url, {}, cacheKey);
       
       if (!result.success) {
@@ -153,19 +247,188 @@ export class ProductSingleton extends PublicApiSingleton {
       }
       
       // API returns: { products: [...] }
-      const products: PublicProduct[] = result.data?.products || [];
-      this.featuredProducts = products;
+      const rawProducts = result.data?.products || [];
+      
+      // Transform API response to match PublicProduct interface
+      const products: PublicProduct[] = rawProducts.map((product: any) => ({
+        ...product,
+        // Map category fields from API
+        productCategory: product.categoryName,
+        productCategorySlug: product.categorySlug,
+        googleCategoryId: product.googleCategoryId,
+        // Map store fields from API to storeInfo object
+        storeInfo: product.storeName ? {
+          storeId: product.tenantId,
+          storeName: product.storeName,
+          storeSlug: product.storeSlug,
+          storeLogo: product.storeLogo,
+          storeCity: product.storeCity,
+          storeState: product.storeState,
+          storeWebsite: product.storeWebsite,
+          storePhone: product.storePhone,
+        } : undefined,
+        // Add default featured information since these are "featured products"
+        isFeatured: true,
+        featuredType: 'store_selection' as const,
+        featuredTypes: this.generateRandomFeaturedTypes(),
+        featuredPriority: product.featuredPriority || 1,
+        featuredAt: product.featuredAt || new Date().toISOString(),
+        // Map sale price if available (will be enriched later)
+        salePriceCents: product.salePriceCents,
+        listPriceCents: product.listPriceCents,
+      }));
+      
+      // Enrich products with complete data from individual product API
+      const enrichedProducts = await Promise.all(
+        products.map(async (product) => {
+          try {
+            const fullProduct = await this.fetchProductById(product.id, product.tenantId);
+            if (fullProduct) {
+              // Merge the full product data with our mapped data
+              return {
+                ...product,
+                // Use complete data from individual product API
+                salePriceCents: fullProduct.salePriceCents,
+                listPriceCents: (fullProduct as any).listPriceCents,
+                featuredType: fullProduct.featuredType || product.featuredType,
+                featuredTypes: (fullProduct as any).featuredTypes || (product as any).featuredTypes,
+                featuredPriority: fullProduct.featuredPriority || product.featuredPriority,
+                featuredAt: fullProduct.featuredAt || product.featuredAt,
+                featuredExpiresAt: fullProduct.featuredExpiresAt,
+                // Keep our mapped category and store info
+                productCategory: (product as any).productCategory,
+                productCategorySlug: (product as any).productCategorySlug,
+                googleCategoryId: (product as any).googleCategoryId,
+                storeInfo: product.storeInfo,
+              };
+            }
+            return product;
+          } catch (error) {
+            console.warn(`Failed to enrich product ${product.id}:`, error);
+            return product;
+          }
+        })
+      );
+      
+      this.featuredProducts = enrichedProducts;
       
       // Store individual products
-      products.forEach((product: PublicProduct) => {
+      enrichedProducts.forEach((product: PublicProduct) => {
         this.products.set(`${product.id}-${product.tenantId}`, product);
       });
       
-      return products;
+      return enrichedProducts;
     } catch (error) {
       console.error('[ProductSingleton] Error in fetchRandomFeaturedProducts:', error);
       return [];
     }
+  }
+  
+  // Helper method to fetch random featured products from multiple stores
+  private async fetchRandomFeaturedFromMultipleStores(location?: { lat: number; lng: number }, limit: number = 20): Promise<any[]> {
+    try {
+      // First, get a list of available stores
+      const storesUrl = '/api/shops/directory?limit=50'; // Get up to 50 stores
+      const storesResult = await this.makePublicRequest<{ data: any[] }>(storesUrl, {}, 'directory-shops-list');
+      
+      if (!storesResult.success || !storesResult.data?.data || storesResult.data.data.length === 0) {
+        console.warn('[ProductSingleton] No stores available for random selection');
+        return [];
+      }
+      
+      const stores = storesResult.data.data;
+      console.log('[ProductSingleton] Found', stores.length, 'stores for slot pool collection');
+      
+      // Collect ALL store_selection products from ALL stores into one pool
+      const productPromises = stores.map(async (store: any) => {
+        try {
+          const url = `/api/directory/featured-products?tenantId=${store.tenantId}&limit=10`; // Get up to 10 slots per store
+          const result = await this.makePublicRequest<any>(url, {}, `featured-products-${store.tenantId}`);
+          
+          if (result.success && result.data?.buckets?.store_selection) {
+            // Collect all store_selection products - these are the merchant's directory slots
+            const storeSelectionProducts = result.data.buckets.store_selection;
+            console.log(`[ProductSingleton] Store ${store.name} has ${storeSelectionProducts.length} directory slots`);
+            return storeSelectionProducts;
+          }
+          return [];
+        } catch (error) {
+          console.warn(`[ProductSingleton] Failed to fetch store_selection products from store ${store.tenantId}:`, error);
+          return [];
+        }
+      });
+      
+      const allStoreProducts = await Promise.all(productPromises);
+      
+      // Flatten all products into one big pool
+      const slotPool = allStoreProducts.flat();
+      console.log('[ProductSingleton] Total slot pool size:', slotPool.length, 'products from all stores');
+      
+      if (slotPool.length === 0) {
+        console.warn('[ProductSingleton] No products found in slot pool');
+        return [];
+      }
+      
+      // Random selection from the entire pool (equal opportunity, weighted by tier slots)
+      const randomProducts = this.selectRandomItems(slotPool, limit);
+      console.log('[ProductSingleton] Selected', randomProducts.length, 'random products from slot pool');
+      
+      return randomProducts;
+    } catch (error) {
+      console.error('[ProductSingleton] Error in fetchRandomFeaturedFromMultipleStores:', error);
+      return [];
+    }
+  }
+  
+  // Helper method to select random items from an array
+  private selectRandomItems<T>(array: T[], count: number): T[] {
+    const shuffled = [...array].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+  }
+  
+  // Helper method to map featured types from mv_global_discovery to our interface
+  private mapFeaturedType(type: string): 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' {
+    const typeMap: Record<string, 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick'> = {
+      'featured': 'store_selection',
+      'trending': 'store_selection',
+      'new': 'new_arrival',
+      'premium': 'seasonal',
+      'staff_pick': 'staff_pick',
+      'bestseller': 'store_selection',
+      'gift_idea': 'seasonal',
+      'popular': 'store_selection'
+    };
+    
+    return typeMap[type] || 'store_selection';
+  }
+  
+  // Helper method to generate random featured types for variety
+  private generateRandomFeaturedTypes(): ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[] {
+    const allTypes: ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[] = [
+      'store_selection',
+      'new_arrival', 
+      'seasonal',
+      'sale',
+      'staff_pick'
+    ];
+    
+    // Always include store_selection as primary
+    const types: ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[] = ['store_selection'];
+    
+    // Randomly add 1-2 additional types for variety
+    const additionalCount = Math.floor(Math.random() * 2) + 1; // 1-2 additional types
+    const availableTypes = allTypes.filter(t => t !== 'store_selection');
+    
+    for (let i = 0; i < additionalCount && i < availableTypes.length; i++) {
+      const randomIndex = Math.floor(Math.random() * availableTypes.length);
+      const randomType = availableTypes[randomIndex];
+      if (!types.includes(randomType)) {
+        types.push(randomType);
+        availableTypes.splice(randomIndex, 1);
+      }
+    }
+    
+    return types;
   }
   
   async fetchProducts(filters?: ProductFilters): Promise<PublicProduct[]> {

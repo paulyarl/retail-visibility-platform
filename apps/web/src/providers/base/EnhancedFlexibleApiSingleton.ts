@@ -388,12 +388,12 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
       userId = this.getCurrentUserId();
     }
 
-    console.log(`[${this.constructor.name}] ----------------------------------------`);
-    console.log(`[${this.constructor.name}] makeEnhancedAuthenticatedRequest url: ${url}`);
-    console.log(`[${this.constructor.name}] context: ${context}`);
-    console.log(`[${this.constructor.name}] isolation: ${isolation}`);
-    console.log(`[${this.constructor.name}] userId: ${userId}`);
-    console.log(`[${this.constructor.name}] end:`);
+    // console.log(`[${this.constructor.name}] ----------------------------------------`);
+    // console.log(`[${this.constructor.name}] makeEnhancedAuthenticatedRequest url: ${url}`);
+    // console.log(`[${this.constructor.name}] context: ${context}`);
+    // console.log(`[${this.constructor.name}] isolation: ${isolation}`);
+    // console.log(`[${this.constructor.name}] userId: ${userId}`);
+    // console.log(`[${this.constructor.name}] end:`);
 
     // 🎯 STRATEGY 1: Return with context data only
     const contextEnhancedRequestOptions: AuthenticatedRequestOptions = {

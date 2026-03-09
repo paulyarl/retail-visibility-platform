@@ -112,6 +112,85 @@ router.get('/slug/:slug/tenant', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/public/tenant/:tenantId/payment-gateways - Get tenant payment gateways (public endpoint)
+router.get('/tenant/:tenantId/payment-gateways', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    
+    if (!tenantId) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Tenant ID is required' 
+      });
+    }
+
+    console.log(`[Public Tenant Gateways] Querying for tenant: ${tenantId}`);
+
+    // First, let's check if there are any gateways at all
+    const allGateways = await prisma.tenant_payment_gateways.findMany({
+      where: { tenant_id: tenantId },
+      select: {
+        id: true,
+        gateway_type: true,
+        is_active: true,
+        is_default: true,
+      },
+    });
+
+    console.log(`[Public Tenant Gateways] Found ${allGateways.length} total gateways:`, allGateways);
+
+    // Query active payment gateways for the tenant
+    const gateways = await prisma.tenant_payment_gateways.findMany({
+      where: { 
+        tenant_id: tenantId,
+        is_active: true, // Only return active gateways
+      },
+      select: {
+        id: true,
+        gateway_type: true,
+        is_active: true,
+        is_default: true,
+        // Don't expose sensitive config data like api keys
+      },
+      orderBy: [
+        { is_default: 'desc' },
+        { created_at: 'desc' },
+      ],
+    });
+
+    console.log(`[Public Tenant Gateways] Found ${gateways.length} active gateways:`, gateways);
+
+    // Transform the data to match expected format
+    const transformedGateways = gateways.map(gateway => ({
+      id: gateway.id,
+      name: gateway.gateway_type.charAt(0).toUpperCase() + gateway.gateway_type.slice(1), // Capitalize first letter
+      gatewayType: gateway.gateway_type,
+      isActive: gateway.is_active,
+      isDefault: gateway.is_default,
+    }));
+
+    res.json({
+      success: true,
+      gateways: transformedGateways,
+      metadata: {
+        tenant: {
+          id: tenantId,
+          type: 'tenant_id'
+        },
+        identifierType: 'tenant_id'
+      }
+    });
+    
+  } catch (error) {
+    console.error('Public tenant payment gateways error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error',
+      gateways: []
+    });
+  }
+});
+
 // Mount individual tenant routes
 router.use('/:tenantId/reviews', tenantReviewsRoutes);
 

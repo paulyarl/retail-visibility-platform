@@ -305,6 +305,7 @@ interface SmartProductCardProps {
   tenantLogo?: string;
   tenantCity?: string;
   tenantState?: string;
+  tenantSlug?: string;
   distanceKm?: number | null;
   variant?: 'grid' | 'list' | 'compact' | 'featured';
   showCategory?: boolean;
@@ -322,6 +323,7 @@ export default function SmartProductCard({
   tenantLogo,
   tenantCity,
   tenantState,
+  tenantSlug,
   distanceKm,
   variant = 'grid',
   showCategory = true,
@@ -332,18 +334,6 @@ export default function SmartProductCard({
 }: SmartProductCardProps) {
   // Try to use context first (performance optimization)
   const contextPayment = useTenantPaymentOptional();
-  
-  // Debug logging for payment gateway tracking
-  /* console.log('[SMARTCARD-DEBUG] Payment Gateway Props Received:', {
-    product_id: product.id,
-    tenant_id: product.tenantId,
-    product_name: product.name,
-    propHasActivePaymentGateway,
-    propDefaultGatewayType,
-    product_has_active_payment_gateway: product.has_active_payment_gateway,
-    product_payment_gateway_type: product.payment_gateway_type,
-    contextPayment: contextPayment ? 'available' : 'not available'
-  }); */
   
   // Fallback state for when context is not available
   const [canPurchase, setCanPurchase] = useState(false);
@@ -488,16 +478,20 @@ export default function SmartProductCard({
                   {displayBrand}
                 </p>
               )}
-              {showCategory && product.productCategory && (
+              {showCategory && (product.productCategory || (product as any).tenantCategory?.name) && (
                 <span className="text-xs px-2.5 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded-full font-medium">
-                  {typeof product.productCategory === 'string' ? product.productCategory : ''}
+                  {typeof product.productCategory === 'string' ? product.productCategory : (product as any).tenantCategory?.name || ''}
                 </span>
               )}
             </div>
             
             {/* Store Information for Directory Context */}
             {tenantName && (
-              <div className="flex items-center gap-2 mb-3 p-2 bg-neutral-50 dark:bg-neutral-700/50 rounded-lg">
+              <Link 
+                href={tenantSlug ? `/directory/${tenantSlug}` : `/shops/${tenantId}`}
+                className="flex items-center gap-2 mb-3 p-2 bg-neutral-50 dark:bg-neutral-700/50 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors group"
+                title={`Visit ${tenantName} store`}
+              >
                 {tenantLogo ? (
                   <Image
                     src={tenantLogo}
@@ -505,6 +499,7 @@ export default function SmartProductCard({
                     width={24}
                     height={24}
                     className="w-6 h-6 rounded-lg object-cover"
+                    sizes="24px"
                   />
                 ) : (
                   <div className="w-6 h-6 bg-neutral-200 dark:bg-neutral-600 rounded-lg flex items-center justify-center">
@@ -514,7 +509,7 @@ export default function SmartProductCard({
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-neutral-900 dark:text-white truncate">
+                  <p className="text-xs font-medium text-neutral-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
                     {tenantName}
                   </p>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400">
@@ -522,7 +517,12 @@ export default function SmartProductCard({
                     {distanceKm !== null && distanceKm !== undefined && ` • ${Math.round(distanceKm)}km away`}
                   </p>
                 </div>
-              </div>
+                <div className="text-neutral-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </Link>
             )}
             
             <Link href={`/products/${product.id}`}>
@@ -892,14 +892,16 @@ export default function SmartProductCard({
     return (
       <div className={`bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-lg transition-shadow flex ${className}`}>
         {/* List Image */}
-        <Link href={`/products/${product.id}`} className="relative w-48 h-48 shrink-0 bg-neutral-100 dark:bg-neutral-700 block">
+        <Link href={`/products/${product.id}`} className="relative w-32 h-32 shrink-0 bg-neutral-100 dark:bg-neutral-700 block overflow-hidden">
           {product.imageUrl ? (
             <Image
               src={product.imageUrl}
               alt={displayTitle}
-              fill
-              className="object-cover group-hover:scale-105 transition-transform"
-              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+              width={128}
+              height={128}
+              className="object-cover"
+              sizes="(max-width: 640px) 50vw, (max-width: 800px) 33vw, 25vw"
+              loading="lazy"
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-neutral-400">
@@ -1061,7 +1063,8 @@ export default function SmartProductCard({
           <Image
             src={product.imageUrl}
             alt={displayTitle}
-            fill
+            width={512}
+            height={512}
             sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover group-hover:scale-105 transition-transform"
           />

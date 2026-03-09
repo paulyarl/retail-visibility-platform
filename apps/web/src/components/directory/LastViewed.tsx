@@ -307,141 +307,162 @@ export default function LastViewed({
             </div>
           )
         ) : (
-          // Items grid
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((item, index) => {
-              const itemId = item.type === 'store' ? (item.data as LastViewedStore).tenantId : (item.data as LastViewedProduct).productId;
-              if (item.type === 'store') {
-                const storeData = item.data as LastViewedStore;
-                return (
-                  <UnifiedStoreCard
-                    key={`store-${storeData.tenantId}-${index}`}
-                    listing={{
-                      id: storeData.tenantId,
-                      tenantId: storeData.tenantId,
-                      businessName: storeData.businessName,
-                      slug: storeData.slug,
-                      address: storeData.address,
-                      city: storeData.city,
-                      state: storeData.state,
-                      logoUrl: storeData.logoUrl,
-                      ratingAvg: storeData.ratingAvg,
-                      ratingCount: storeData.ratingCount,
-                      productCount: storeData.productCount,
-                      isFeatured: storeData.isFeatured,
-                      reason: storeData.reason,
-                      directoryPublished: true
-                    }}
-                    viewMode="grid"
-                    linkType="directory"
-                    className="h-full"
-                  />
-                );
-              } else {
-                const productData = item.data as LastViewedProduct;
-                
-                return (
-                <SmartProductCard
-                  key={`product-${productData.productId}-${index}`}
-                  tenantId={productData.tenantId}
-                  product={{
-                    id: productData.productId,
-                    sku: productData.productSku || productData.productId,
-                    name: productData.productName,
-                    title: productData.productTitle || productData.productName,
-                    brand: productData.productBrand || productData.businessName,
-                    description: productData.productDescription,
-                    priceCents: productData.productPriceCents || Math.round((productData.productPrice || 0) * 100),
-                    salePriceCents: productData.productSalePriceCents,
-                    listPriceCents: productData.productPriceCents,
-                    stock: productData.productStock || 999,
-                    imageUrl: productData.productImage || productData.productImageUrl,
-                    tenantId: productData.tenantId,
-                    availability: (productData.productAvailability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
-                    has_active_payment_gateway: productData.hasActivePaymentGateway,
-                    payment_gateway_type: productData.defaultGatewayType,
-                    tenantCategory: productData.tenantCategory ? {
-                      id: productData.tenantCategory,
-                      name: productData.tenantCategory,
-                      slug: productData.tenantCategory
-                    } : undefined,
-                    isFeatured: productData.isFeatured,
-                    
-                    // Enhanced fields for rich display
-                    averageRating: typeof productData.productAverageRating === 'string' ? parseFloat(productData.productAverageRating) : productData.productAverageRating,
-                    reviewCount: productData.productReviewCount,
-                    viewCount: productData.viewCount,
-                    wishlistCount: productData.wishlistCount,
-                    shareCount: productData.shareCount,
-                    isOnSale: productData.productSalePriceCents ? true : false,
-                    discountPercentage: productData.productPriceCents && productData.productSalePriceCents ? 
-                      Math.round(((productData.productPriceCents - productData.productSalePriceCents) / productData.productPriceCents) * 100).toString() : "0",
-                    currency: productData.productCurrency || "USD",
-                    
-                    // Media fields
-                    hasGallery: productData.hasGallery,
-                    videoUrl: undefined, // Not available in last viewed data
-                    imageUrls: undefined, // Not available in last viewed data
-                    galleryUrls: undefined, // Not available in last viewed data
-                    thumbnailUrl: undefined, // Not available in last viewed data
-                    featuredImageUrl: undefined, // Not available in last viewed data
-                    
-                    // Product details
-                    manufacturer: undefined, // Not available in last viewed data
-                    condition: undefined, // Not available in last viewed data
-                    gtin: undefined, // Not available in last viewed data
-                    mpn: undefined, // Not available in last viewed data
-                    specifications: undefined, // Not available in last viewed data
-                    attributes: undefined, // Not available in last viewed data
-                    customFields: undefined, // Not available in last viewed data
-                    searchKeywords: undefined, // Not available in last viewed data
-                    seoTitle: undefined, // Not available in last viewed data
-                    seoDescription: undefined, // Not available in last viewed data
-                    seoKeywords: undefined, // Not available in last viewed data
-                    tags: undefined, // Not available in last viewed data
-                    
-                    // NEW LIVE REVIEW AGGREGATIONS
-                    productRatingLive: typeof productData.productRatingLive === 'string' ? parseFloat(productData.productRatingLive) : productData.productRatingLive,
-                    productReviewsCountLive: productData.productReviewsCountLive,
-                    productHelpfulCountLive: productData.productHelpfulCountLive,
-                    productReviewsApprovedLive: productData.productReviewsApprovedLive,
-                    
-                    // Featured data
-                    featuredType: productData.featuredType as 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' | undefined,
-                    featuredPriority: productData.featuredPriority,
-                    featuredAt: productData.featuredAt,
-                    isFeaturedActive: productData.isFeaturedActive,
-                    
-                    // Analytics
-                    uniqueViewers: productData.uniqueViewers,
-                    engagementCount: productData.engagementCount,
-                    conversionCount: productData.conversionCount,
-                    revenueCents: productData.revenueCents,
-                    unitsSold: productData.unitsSold,
-                    trendingScore: typeof productData.trendingScore === 'string' ? parseFloat(productData.trendingScore) : productData.trendingScore,
-                    
-                    // Status fields
-                    priceStatus: productData.priceStatus,
-                    stockStatus: productData.stockStatus,
-                    hasDescription: productData.hasDescription,
-                    hasBrand: productData.hasBrand,
-                    hasPrice: productData.hasPrice,
-                    inStock: productData.inStock,
-                    
-                    // Categories
-                    productCategory: productData.productCategory,
-                    productCategorySlug: productData.productCategorySlug
-                  }}
-                  tenantName={productData.businessName || productData.storeName}
-                  tenantLogo={productData.tenantLogo || productData.storeLogo}
-                  variant={productData.isFeatured ? 'featured' : 'grid'}
-                  showCategory={true}
-                  showDescription={true}
-                  className="h-full"
-                />
+          // Group items by type for better visual balance
+          <div className="space-y-8">
+            {/* Products Section */}
+            {(() => {
+              const products = items.filter(item => item.type === 'product');
+              return products.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Recently Viewed Products</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {products.map((item, index) => {
+                      const productData = item.data as LastViewedProduct;
+                      return (
+                        <SmartProductCard
+                          key={`product-${productData.productId}-${index}`}
+                          tenantId={productData.tenantId}
+                          product={{
+                            id: productData.productId,
+                            sku: productData.productSku || productData.productId,
+                            name: productData.productName,
+                            title: productData.productTitle || productData.productName,
+                            brand: productData.productBrand || productData.businessName,
+                            description: productData.productDescription,
+                            priceCents: productData.productPriceCents || Math.round((productData.productPrice || 0) * 100),
+                            salePriceCents: productData.productSalePriceCents,
+                            listPriceCents: productData.productPriceCents,
+                            stock: productData.productStock || 999,
+                            imageUrl: productData.productImage || productData.productImageUrl,
+                            tenantId: productData.tenantId,
+                            availability: (productData.productAvailability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
+                            // Don't pass stale payment gateway data - let SmartProductCard use context or fetch fresh data
+                            has_active_payment_gateway: undefined,
+                            payment_gateway_type: undefined,
+                            tenantCategory: productData.tenantCategory ? {
+                              id: productData.tenantCategory,
+                              name: productData.tenantCategory,
+                              slug: productData.tenantCategory
+                            } : undefined,
+                            isFeatured: productData.isFeatured,
+                            
+                            // Enhanced fields for rich display
+                            averageRating: typeof productData.productAverageRating === 'string' ? parseFloat(productData.productAverageRating) : productData.productAverageRating,
+                            reviewCount: productData.productReviewCount,
+                            viewCount: productData.viewCount,
+                            wishlistCount: productData.wishlistCount,
+                            shareCount: productData.shareCount,
+                            isOnSale: productData.productSalePriceCents ? true : false,
+                            discountPercentage: productData.productPriceCents && productData.productSalePriceCents ? 
+                              Math.round(((productData.productPriceCents - productData.productSalePriceCents) / productData.productPriceCents) * 100).toString() : "0",
+                            currency: productData.productCurrency || "USD",
+                            
+                            // Media fields
+                            hasGallery: productData.hasGallery,
+                            videoUrl: undefined, // Not available in last viewed data
+                            imageUrls: undefined, // Not available in last viewed data
+                            galleryUrls: undefined, // Not available in last viewed data
+                            thumbnailUrl: undefined, // Not available in last viewed data
+                            featuredImageUrl: undefined, // Not available in last viewed data
+                            
+                            // Product details
+                            manufacturer: undefined, // Not available in last viewed data
+                            condition: undefined, // Not available in last viewed data
+                            gtin: undefined, // Not available in last viewed data
+                            mpn: undefined, // Not available in last viewed data
+                            specifications: undefined, // Not available in last viewed data
+                            attributes: undefined, // Not available in last viewed data
+                            customFields: undefined, // Not available in last viewed data
+                            searchKeywords: undefined, // Not available in last viewed data
+                            seoTitle: undefined, // Not available in last viewed data
+                            seoDescription: undefined, // Not available in last viewed data
+                            seoKeywords: undefined, // Not available in last viewed data
+                            tags: undefined, // Not available in last viewed data
+                            
+                            // NEW LIVE REVIEW AGGREGATIONS
+                            productRatingLive: typeof productData.productRatingLive === 'string' ? parseFloat(productData.productRatingLive) : productData.productRatingLive,
+                            productReviewsCountLive: productData.productReviewsCountLive,
+                            productHelpfulCountLive: productData.productHelpfulCountLive,
+                            productReviewsApprovedLive: productData.productReviewsApprovedLive,
+                            
+                            // Featured data
+                            featuredType: productData.featuredType as 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' | undefined,
+                            featuredPriority: productData.featuredPriority,
+                            featuredAt: productData.featuredAt,
+                            isFeaturedActive: productData.isFeaturedActive,
+                            
+                            // Analytics
+                            uniqueViewers: productData.uniqueViewers,
+                            engagementCount: productData.engagementCount,
+                            conversionCount: productData.conversionCount,
+                            revenueCents: productData.revenueCents,
+                            unitsSold: productData.unitsSold,
+                            trendingScore: typeof productData.trendingScore === 'string' ? parseFloat(productData.trendingScore) : productData.trendingScore,
+                            
+                            // Status fields
+                            priceStatus: productData.priceStatus,
+                            stockStatus: productData.stockStatus,
+                            hasDescription: productData.hasDescription,
+                            hasBrand: productData.hasBrand,
+                            hasPrice: productData.hasPrice,
+                            inStock: productData.inStock,
+                            
+                            // Categories
+                            productCategory: productData.productCategory,
+                            productCategorySlug: productData.productCategorySlug
+                          }}
+                          tenantName={productData.businessName || productData.storeName}
+                          tenantLogo={productData.tenantLogo || productData.storeLogo}
+                          variant={productData.isFeatured ? 'featured' : 'grid'}
+                          showCategory={true}
+                          showDescription={true}
+                          className="h-full"
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
               );
-              }
-            })}
+            })()}
+
+            {/* Stores Section */}
+            {(() => {
+              const stores = items.filter(item => item.type === 'store');
+              return stores.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Recently Viewed Stores</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {stores.map((item, index) => {
+                      const storeData = item.data as LastViewedStore;
+                      return (
+                        <UnifiedStoreCard
+                          key={`store-${storeData.tenantId}-${index}`}
+                          listing={{
+                            id: storeData.tenantId,
+                            tenantId: storeData.tenantId,
+                            businessName: storeData.businessName,
+                            slug: storeData.slug,
+                            address: storeData.address,
+                            city: storeData.city,
+                            state: storeData.state,
+                            logoUrl: storeData.logoUrl,
+                            ratingAvg: storeData.ratingAvg,
+                            ratingCount: storeData.ratingCount,
+                            productCount: storeData.productCount,
+                            isFeatured: storeData.isFeatured,
+                            reason: storeData.reason,
+                            directoryPublished: true
+                          }}
+                          viewMode="grid"
+                          linkType="directory"
+                          className="h-full"
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

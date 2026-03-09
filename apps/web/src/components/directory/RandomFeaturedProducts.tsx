@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Package, ExternalLink, Grid3x3, List, MapPin } from 'lucide-react';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { useRandomFeaturedProducts, useProductSingleton } from '@/providers/data/ProductSingleton';
@@ -63,9 +64,18 @@ export default function RandomFeaturedProducts() {
   };
 
   // Log singleton metrics for debugging
- /*  useEffect(() => {
-    console.log('ProductSingleton: Products loaded:', products.length);
-  }, [products]); */
+  useEffect(() => {
+    console.log('RandomFeaturedProducts: Products loaded:', products.length);
+    console.log('RandomFeaturedProducts: Store info check:', products.map(p => ({
+      productId: p.id,
+      tenantId: p.tenantId,
+      hasStoreInfo: !!p.storeInfo,
+      storeName: p.storeInfo?.storeName,
+      storeLogo: p.storeInfo?.storeLogo,
+      storeCity: p.storeInfo?.storeCity,
+      storeState: p.storeInfo?.storeState
+    })));
+  }, [products]);
 
   if (loading) {
     return (
@@ -208,11 +218,11 @@ export default function RandomFeaturedProducts() {
                   availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
                   has_variants: product.hasVariants || false,
                   tenantCategory: product.category ? {
-                    id: product.category.id,
+                    id: product.category.googleCategoryId || product.category.id,
                     name: product.category.name,
                     slug: product.category.slug,
                   } : undefined,
-                  isFeatured: true, // All products in RandomFeaturedProducts are featured
+                  // All products in RandomFeaturedProducts are featured by definition
                   featuredType: product.featuredType,
                   featuredPriority: product.featuredPriority,
                   featuredAt: product.featuredAt,
@@ -235,6 +245,7 @@ export default function RandomFeaturedProducts() {
                 tenantLogo={product.storeInfo?.storeLogo}
                 tenantCity={product.storeInfo?.storeCity}
                 tenantState={product.storeInfo?.storeState}
+                tenantSlug={product.storeInfo?.storeSlug}
                 distanceKm={product.distanceKm}
               />
             ))}
@@ -263,11 +274,11 @@ export default function RandomFeaturedProducts() {
                   availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
                   has_variants: product.hasVariants || false,
                   tenantCategory: product.category ? {
-                    id: product.category.id,
+                    id: product.category.googleCategoryId || product.category.id,
                     name: product.category.name,
                     slug: product.category.slug,
                   } : undefined,
-                  isFeatured: true, // All products in RandomFeaturedProducts are featured
+                  // All products in RandomFeaturedProducts are featured by definition
                   featuredType: product.featuredType,
                   featuredPriority: product.featuredPriority,
                   featuredAt: product.featuredAt,
@@ -290,6 +301,7 @@ export default function RandomFeaturedProducts() {
                 tenantLogo={product.storeInfo?.storeLogo}
                 tenantCity={product.storeInfo?.storeCity}
                 tenantState={product.storeInfo?.storeState}
+                tenantSlug={product.storeInfo?.storeSlug}
                 distanceKm={product.distanceKm}
               />
             ))}
@@ -310,10 +322,13 @@ export default function RandomFeaturedProducts() {
                   className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors"
                 >
                   {store?.storeLogo ? (
-                    <img
+                    <Image
                       src={store.storeLogo}
                       alt={store.storeName}
-                      className="w-8 h-8 rounded-full"
+                      width={32}
+                      height={32}
+                      className="w-8 h-8 rounded-full object-cover"
+                      sizes="(max-width: 768px) 16px, 32px"
                     />
                   ) : (
                     <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">

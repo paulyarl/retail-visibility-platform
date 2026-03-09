@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Map, Grid3x3, List, Sparkles, ShoppingCart, RefreshCw } from 'lucide-react';
+import { Map, Grid3x3, List, Sparkles, ShoppingCart } from 'lucide-react';
 import DirectorySearch from '@/components/directory/DirectorySearch';
 import DirectoryGrid from '@/components/directory/DirectoryGrid';
 import DirectoryList from '@/components/directory/DirectoryList';
@@ -207,9 +207,7 @@ export default function DirectoryClient() {
     loading,
     error,
     pagination,
-    refetch,
-    metrics: storesMetrics,
-    fromCache
+    refetch
   } = useDirectoryStores({
     search: searchParams.get('search') || undefined,
     category: searchParams.get('category') || undefined,
@@ -547,33 +545,7 @@ export default function DirectoryClient() {
               <div className="text-sm text-neutral-500">
                 {totalItems.toLocaleString()} stores total
               </div>
-              {/* StoreSingleton Performance Metrics */}
-              <div className="flex items-center gap-4 text-xs text-blue-600">
-                <span>Cache Hits: {storesMetrics.cacheHits}</span>
-                <span>•</span>
-                <span>Cache Misses: {storesMetrics.cacheMisses}</span>
-                <span>•</span>
-                <span>Hit Rate: {storesMetrics.totalRequests > 0 ? ((storesMetrics.cacheHits / storesMetrics.totalRequests) * 100).toFixed(1) : 0}%</span>
-                <span>•</span>
-                <span>Avg Response: {storesMetrics.averageResponseTime.toFixed(0)}ms</span>
-                {fromCache && (
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                    📋 Refresh
-                  </span>
-                )}
-              </div>
             </div>
-            {/* Refresh Button */}
-            <button
-              onClick={() => {
-                refetch();
-              }}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              <span>Clear Cache & Refresh</span>
-            </button>
           </div>
 
           {!loading && data && data.length > 0 && (

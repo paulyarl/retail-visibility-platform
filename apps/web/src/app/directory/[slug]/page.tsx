@@ -599,8 +599,9 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                             availability: product.availability || 'in_stock',
                             tenantCategory: product.tenantCategory,
                             has_variants: product.has_variants,
-                            has_active_payment_gateway: product.has_active_payment_gateway,
-                            payment_gateway_type: product.default_gateway_type,
+                            // Use fresh payment gateway status from consolidated data instead of inconsistent context
+                            has_active_payment_gateway: paymentGatewayStatus.hasActiveGateway,
+                            payment_gateway_type: paymentGatewayStatus.defaultGatewayType,
                           }}
                           tenantName={listing.businessName}
                           tenantLogo={listing.logoUrl}
