@@ -17,10 +17,12 @@ import { ShopSearch } from '@/components/shops/ShopSearch';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
 import { Button, Badge, Card, Group, Text, Stack, Tabs, TabsList, TabsTab, TabsPanel, TextInput, Select } from '@mantine/core';
-import { Layout, LayoutList, Star, Grid3X3, Grid, Store, ShoppingBag, TrendingUp, Sparkles, X } from 'lucide-react';
+import { Layout, LayoutList, Star, Grid3X3, Grid, Store, ShoppingBag, TrendingUp, Sparkles, X, Layers } from 'lucide-react';
 import Link from 'next/link';
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { StoreList, StoreData } from '@/components/stores';
+import { usePublicBranding } from '@/hooks/usePublicBranding';
 
 interface ShopDirectoryPageProps {
   searchParams?: Promise<{
@@ -36,6 +38,9 @@ interface ShopDirectoryPageProps {
 export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPageProps) {
   // Unwrap searchParams Promise using React.use()
   const unwrappedParams = searchParams ? use(searchParams) : {};
+  
+  // Get platform branding
+  const { branding: platformBranding } = usePublicBranding();
   
   // Parse search params
   const params = useMemo(() => ({
@@ -63,6 +68,7 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
   });
 
   const [cardVariant, setCardVariant] = useState<'default' | 'compact' | 'featured' | 'grid'>('default');
+  const [advancedViewMode, setAdvancedViewMode] = useState<'grid' | 'list'>('grid');
 
   // Fetch data
   const { shops, loading, error, hasMore, loadMore, refresh } = useShopDirectory({
@@ -198,14 +204,42 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
         </div>
       </div>
       
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">
-          Shop Directory
-        </h1>
-        <p className="text-lg text-gray-600">
-          Discover amazing shops from our marketplace
-        </p>
+      {/* Page Header */}
+      <div className="bg-gradient-to-r from-blue-100 via-indigo-50 to-purple-50 dark:from-gray-800 dark:via-gray-850 dark:to-gray-900 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between">
+          {/* Column 1: Platform Branding */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg overflow-hidden">
+              {platformBranding?.logoUrl ? (
+                <img 
+                  src={platformBranding.logoUrl} 
+                  alt={platformBranding.platformName || 'Platform'} 
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <Store className="w-7 h-7" />
+              )}
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                {platformBranding?.platformName || 'Visible Shelf'}
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Retail visibility platform
+              </p>
+            </div>
+          </div>
+          
+          {/* Column 2: Page Name */}
+          <div className="text-right">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Shop Directory
+            </h1>
+            <p className="text-gray-600 dark:text-gray-300">
+              Discover amazing shops from our marketplace
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Trending Shops */}
@@ -339,74 +373,84 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
       </Card>
 
       {/* Results Header */}
-      <div className="mb-6 flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-semibold text-gray-900">
-            {shops ? `${shops.length} Shops` : 'Loading...'}
-          </h2>
-          {hasFilters && (
-            <p className="text-sm text-gray-600">
-              Filtered results
-            </p>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-4">
-          {/* Card Variant Toggle */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Card Style:</label>
-            <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
-              <button
-                onClick={() => setCardVariant('default')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  cardVariant === 'default'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Layout className="w-3.5 h-3.5" />
-                Default
-              </button>
-              <button
-                onClick={() => setCardVariant('compact')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  cardVariant === 'compact'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <LayoutList className="w-3.5 h-3.5" />
-                Compact
-              </button>
-              <button
-                onClick={() => setCardVariant('featured')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  cardVariant === 'featured'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Star className="w-3.5 h-3.5" />
-                Featured
-              </button>
-              <button
-                onClick={() => setCardVariant('grid')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  cardVariant === 'grid'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Grid3X3 className="w-3.5 h-3.5" />
-                Grid
-              </button>
+      <div className="relative mb-6 pb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
+              <Store className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                All Shops
+                <span className="ml-2 text-lg font-normal text-gray-500 dark:text-gray-400">
+                  ({shops?.length || 0})
+                </span>
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {hasFilters ? 'Filtered results' : 'Browse all stores in our marketplace'}
+              </p>
             </div>
           </div>
           
-          <span className="text-sm text-gray-600">
-            Page {pagination.page} of {Math.ceil((shops?.length || 0) / pagination.limit)}
-          </span>
+          <div className="flex items-center gap-4">
+            {/* Card Variant Toggle */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Card Style:</label>
+              <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
+                <button
+                  onClick={() => setCardVariant('default')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    cardVariant === 'default'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Layout className="w-3.5 h-3.5" />
+                  Default
+                </button>
+                <button
+                  onClick={() => setCardVariant('compact')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    cardVariant === 'compact'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <LayoutList className="w-3.5 h-3.5" />
+                  Compact
+                </button>
+                <button
+                  onClick={() => setCardVariant('featured')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    cardVariant === 'featured'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Star className="w-3.5 h-3.5" />
+                  Featured
+                </button>
+                <button
+                  onClick={() => setCardVariant('grid')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    cardVariant === 'grid'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Grid3X3 className="w-3.5 h-3.5" />
+                  Grid
+                </button>
+              </div>
+            </div>
+            
+            <span className="text-sm text-gray-600">
+              Page {pagination.page} of {Math.ceil((shops?.length || 0) / pagination.limit)}
+            </span>
+          </div>
         </div>
+        {/* Gradient border line */}
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-transparent" />
       </div>
 
       {/* Loading State */}
@@ -468,6 +512,88 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
           limitOptions={SHOP_UI_CONFIG.PAGINATION.LIMIT_OPTIONS}
         />
       )}
+
+      {/* Advanced View Section */}
+      {!isLoading && shops && shops.length > 0 && (
+        <div className="mt-16 pt-8 border-t border-gray-200">
+          {/* Styled Section Header */}
+          <div className="relative mb-6 pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 text-white shadow-lg">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Advanced View</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Detailed store information with product stats, categories, and ratings</p>
+                </div>
+              </div>
+              
+              {/* View Mode Toggle */}
+              <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg">
+                <button
+                  onClick={() => setAdvancedViewMode('grid')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    advancedViewMode === 'grid'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Grid3X3 className="w-3.5 h-3.5" />
+                  Grid
+                </button>
+                <button
+                  onClick={() => setAdvancedViewMode('list')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    advancedViewMode === 'list'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <LayoutList className="w-3.5 h-3.5" />
+                  List
+                </button>
+              </div>
+            </div>
+            {/* Gradient border line */}
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 via-pink-500 to-transparent" />
+          </div>
+
+          {/* Transform shops to StoreData format */}
+          <StoreList
+            stores={shops.map((shop: any) => ({
+              id: shop.id,
+              tenantId: shop.tenantId || shop.id,
+              name: shop.businessName || shop.name,
+              slug: shop.slug,
+              address: shop.address,
+              city: shop.city,
+              state: shop.state,
+              zipCode: shop.zip_code || shop.zipCode,
+              latitude: shop.latitude,
+              longitude: shop.longitude,
+              logoUrl: shop.imageUrl || shop.logoUrl || shop.logo_url,
+              bannerUrl: shop.bannerUrl || shop.banner_url,
+              primaryCategory: shop.primaryCategory || shop.primary_category || shop.category,
+              phone: shop.phone,
+              website: shop.website,
+              ratingAvg: shop.ratingAvg || shop.rating,
+              ratingCount: shop.ratingCount || shop.rating_count || shop.reviewCount,
+              productCount: shop.productCount || shop.product_count,
+              isFeatured: shop.isFeatured,
+              subscriptionTier: shop.subscriptionTier,
+              businessHours: shop.hours || shop.businessHours,
+            }))}
+            viewMode={advancedViewMode}
+            linkType="storefront"
+            showLogo={true}
+            showCategories={true}
+            maxCategories={3}
+            loading={false}
+          />
+        </div>
+      )}
+
       {/* Platform Branding Footer */}
       <PoweredByFooter />
     </div>

@@ -37,13 +37,20 @@ router.get('/directory', async (req, res) => {
       location: region as string
     });
 
+    // Normalize field names to match individual shop endpoint
+    const normalizedShops = shops.map(shop => ({
+      ...shop,
+      category: shop.primary_category, // Add 'category' field for consistency
+      // Keep primary_category for backward compatibility
+    }));
+
     res.setHeader('Cache-Control', 'public, max-age=600'); // 10 min cache
     res.setHeader('X-Cache-Source', 'ShopService-Singleton');
 
     res.json({
       success: true,
-      data: shops,
-      count: shops.length,
+      data: normalizedShops,
+      count: normalizedShops.length,
       pagination: {
         limit: parseInt(limit as string),
         offset: parseInt(offset as string)

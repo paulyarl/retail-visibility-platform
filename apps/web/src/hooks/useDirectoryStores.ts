@@ -104,7 +104,7 @@ export const useDirectoryStores = (
 
     try {
       // Log the request parameters (no manual cache key needed since service handles caching)
-      console.log('[useDirectoryStores] Fetching with params:', {
+   /*    console.log('[useDirectoryStores] Fetching with params:', {
         search,
         category,
         lat,
@@ -112,7 +112,7 @@ export const useDirectoryStores = (
         sort,
         page,
         limit
-      });
+      }); */
       
       // Use the directory API endpoint through singleton service
       // Service handles caching automatically through makeDefaultRequest
@@ -159,7 +159,7 @@ export const useDirectoryStores = (
 
       // Get actual service metrics instead of manual tracking
       const serviceMetrics = recommendationsService.getMetrics();
-      console.log('[useDirectoryStores] Service metrics:', serviceMetrics);
+   //   console.log('[useDirectoryStores] Service metrics:', serviceMetrics);
       
       // Update local metrics to match service metrics
       setLocalMetrics({

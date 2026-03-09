@@ -5,6 +5,7 @@ import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { CacheManager } from '@/utils/cacheManager';
 import { AutoUserCacheOptions } from '@/utils/userIdentification';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 // ====================
 // PRODUCT INTERFACES
@@ -82,6 +83,9 @@ export interface ProductFilters {
 // ====================
 
 export class ProductSingleton extends PublicApiSingleton {
+
+  protected defaultContext: AppContext = AppContext.DIRECTORY;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.DIRECTORY;
   private static instance: ProductSingleton;
   
   // Product state
@@ -125,15 +129,6 @@ export class ProductSingleton extends PublicApiSingleton {
 
   
   async fetchRandomFeaturedProducts(location?: { lat: number; lng: number }, limit: number = 20): Promise<PublicProduct[]> {
-    const cacheKey = `featured-${location?.lat || 'default'}-${location?.lng || 'default'}-${limit}`;
-    
-    // Check cache first
-    const cached = await this.getFromCache<PublicProduct[]>(cacheKey);
-    if (cached) {
-      this.featuredProducts = cached;
-      return cached;
-    }
-    
     try {
       let url = `/api/directory/random-featured?limit=${limit}`;
       
@@ -141,8 +136,16 @@ export class ProductSingleton extends PublicApiSingleton {
         url += `&lat=${location.lat}&lng=${location.lng}&maxDistance=500`;
       }
       
-      // Use makeDefaultRequest for public endpoint
-      const result = await super.makeDefaultRequest<{ products: any[] }>(url, {}, cacheKey);
+      // Add cache-busting timestamp to ensure fresh data
+      url += `&_t=${Date.now()}`;
+      
+      // Generate cache key based on location and parameters
+      const cacheKey = location 
+        ? `featured-products-${location.lat}-${location.lng}-${limit}`
+        : `featured-products-global-${limit}`;
+      
+      // Use makePublicRequest with proper cache key
+      const result = await this.makePublicRequest<{ products: any[] }>(url, {}, cacheKey);
       
       if (!result.success) {
         console.error('[ProductSingleton] Error fetching featured products:', result.error);
@@ -150,11 +153,7 @@ export class ProductSingleton extends PublicApiSingleton {
       }
       
       // API returns: { products: [...] }
-      // makeDefaultRequest wraps this, so we need result.data.products
       const products: PublicProduct[] = result.data?.products || [];
-      
-      // Store in cache
-      await this.setCache(cacheKey, products);
       this.featuredProducts = products;
       
       // Store individual products
@@ -164,87 +163,70 @@ export class ProductSingleton extends PublicApiSingleton {
       
       return products;
     } catch (error) {
-      console.error('[ProductSingleton] Error in getFeaturedProducts:', error);
+      console.error('[ProductSingleton] Error in fetchRandomFeaturedProducts:', error);
       return [];
     }
   }
   
   async fetchProducts(filters?: ProductFilters): Promise<PublicProduct[]> {
-    const cacheKey = `products-${JSON.stringify(filters || {})}`;
-    
-    // Check cache first
-    const cached = await this.getFromCache<PublicProduct[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-    
     try {
       const params = new URLSearchParams();
       
+      // Add filters to query params
       if (filters?.category) params.append('category', filters.category);
+      if (filters?.search) params.append('search', filters.search);
       if (filters?.minPrice) params.append('minPrice', filters.minPrice.toString());
       if (filters?.maxPrice) params.append('maxPrice', filters.maxPrice.toString());
       if (filters?.availability) params.append('availability', filters.availability);
+      if (filters?.tenantId) params.append('tenantId', filters.tenantId);
       if (filters?.featured) params.append('featured', 'true');
-      if (filters?.search) params.append('search', filters.search);
-      if (filters?.page) params.append('offset', ((filters.page - 1) * (filters.limit || 12)).toString());
       if (filters?.limit) params.append('limit', filters.limit.toString());
-      if (filters?.sort) params.append('sort', filters.sort);
-      if (filters?.order) params.append('order', filters.order || 'asc');
+      if (filters?.page) params.append('page', (filters.page || 1).toString());
       
-      if (filters?.location) {
-        params.append('lat', filters.location.lat.toString());
-        params.append('lng', filters.location.lng.toString());
-        params.append('radius', (filters.location.radius || 50).toString());
-      }
+      // Generate cache key based on filters
+      const cacheKey = `products-${JSON.stringify(filters || {})}`;
       
       // Use the correct Public API endpoint
       const url = `/api/public/products${params.toString() ? `?${params.toString()}` : ''}`;
-      const result = await super.makeDefaultRequest<{ products: any[] }>(url,{},cacheKey);
+      const result = await this.makePublicRequest<{ products: any[] }>(url, {}, cacheKey);
       
       if (!result.success) {
         console.error('[ProductSingleton] Error fetching products:', result.error);
         return [];
       }
       
-      // Handle Public API response format
       const products: PublicProduct[] = result.data?.products || [];
       
-      // Transform to match PublicProduct interface
-      const transformedProducts = products.map((product: any) => ({
+      // Transform products to PublicProduct interface
+      const transformedProducts: PublicProduct[] = products.map((product: any) => ({
         id: product.id,
-        tenantId: product.tenant?.id || '',
-        sku: product.sku || '',
+        tenantId: product.tenantId,
+        sku: product.sku || product.id,
         name: product.name,
-        title: product.name,
+        title: product.title || product.name,
         description: product.description,
-        brand: product.brand,
-        priceCents: Math.round((product.price || 0) * 100),
+        brand: product.brand || '',
+        priceCents: product.priceCents || 0,
+        salePriceCents: product.salePriceCents,
         stock: product.stock || 0,
         imageUrl: product.imageUrl,
         availability: product.availability || 'in_stock',
-        hasVariants: product.hasVariants || false,
+        hasVariants: product.has_variants || false,
         category: product.category,
         featuredType: product.featuredType,
         featuredPriority: product.featuredPriority,
         featuredAt: product.featuredAt,
         featuredExpiresAt: product.featuredExpiresAt,
         metadata: product.metadata,
-        hasGallery: product.hasGallery || false,
-        hasDescription: !!product.description,
-        hasBrand: !!product.brand,
-        hasPrice: product.price !== null,
-        storeInfo: product.tenant ? {
-          storeId: product.tenant.id,
-          storeName: product.tenant.name,
-          storeSlug: product.tenant.slug,
-        } : undefined,
-        hasActivePaymentGateway: product.hasActivePaymentGateway || false,
+        hasGallery: product.hasGallery,
+        hasDescription: product.hasDescription,
+        hasBrand: product.hasBrand,
+        hasPrice: product.hasPrice,
+        hasActivePaymentGateway: product.hasActivePaymentGateway,
         defaultGatewayType: product.defaultGatewayType,
+        storeInfo: product.storeInfo,
+        distanceKm: product.distanceKm,
       }));
-      
-      // Store in cache
-      await this.setCache(cacheKey, transformedProducts);
       
       // Store individual products
       transformedProducts.forEach((product: PublicProduct) => {
@@ -253,88 +235,72 @@ export class ProductSingleton extends PublicApiSingleton {
       
       return transformedProducts;
     } catch (error) {
-      throw error;
+      console.error('[ProductSingleton] Error in fetchProducts:', error);
+      return [];
     }
   }
   
   async fetchProductById(productId: string, tenantId?: string): Promise<PublicProduct | null> {
-    const cacheKey = `product-${productId}-${tenantId || 'default'}`;
-    
-    // Check cache first
-    const cached = await this.getFromCache<PublicProduct | null>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-    
     try {
+      // Generate cache key based on product ID and tenant
+      const cacheKey = `product-${productId}-${tenantId || 'default'}`;
+      
       // Use the correct Public API endpoint
       const url = `/api/public/products/${productId}`;
-      const data = await super.makeDefaultRequest(url,{},cacheKey);
-      const product = (data as any)?.product || (data as any) || null;
+      const result = await this.makePublicRequest(url, {}, cacheKey);
+      const product = (result as any)?.product || (result as any) || null;
       
       // Handle null product case
       if (!product) {
         return null;
       }
       
-      // Transform to match PublicProduct interface
-      const transformedProduct = {
+      // Transform to PublicProduct interface
+      const transformedProduct: PublicProduct = {
         id: product.id,
-        tenantId: product.tenant?.id || '',
-        sku: product.sku || '',
+        tenantId: product.tenantId,
+        sku: product.sku || product.id,
         name: product.name,
-        title: product.name,
+        title: product.title || product.name,
         description: product.description,
-        brand: product.brand,
-        priceCents: Math.round((product.price || 0) * 100),
+        brand: product.brand || '',
+        priceCents: product.priceCents || 0,
+        salePriceCents: product.salePriceCents,
         stock: product.stock || 0,
         imageUrl: product.imageUrl,
         availability: product.availability || 'in_stock',
-        hasVariants: product.hasVariants || false,
+        hasVariants: product.has_variants || false,
         category: product.category,
         featuredType: product.featuredType,
         featuredPriority: product.featuredPriority,
         featuredAt: product.featuredAt,
         featuredExpiresAt: product.featuredExpiresAt,
         metadata: product.metadata,
-        hasGallery: product.hasGallery || false,
-        hasDescription: !!product.description,
-        hasBrand: !!product.brand,
-        hasPrice: product.price !== null,
-        storeInfo: product.tenant ? {
-          storeId: product.tenant.id,
-          storeName: product.tenant.name,
-          storeSlug: product.tenant.slug,
-        } : undefined,
-        hasActivePaymentGateway: product.hasActivePaymentGateway || false,
+        hasGallery: product.hasGallery,
+        hasDescription: product.hasDescription,
+        hasBrand: product.hasBrand,
+        hasPrice: product.hasPrice,
+        hasActivePaymentGateway: product.hasActivePaymentGateway,
         defaultGatewayType: product.defaultGatewayType,
+        storeInfo: product.storeInfo,
+        distanceKm: product.distanceKm,
       };
       
-      // Store in cache
-      await this.setCache(cacheKey, transformedProduct);
+      // Store individual product
       this.products.set(`${transformedProduct.id}-${transformedProduct.tenantId}`, transformedProduct);
       
       return transformedProduct;
     } catch (error) {
-      throw error;
+      console.error('[ProductSingleton] Error in fetchProductById:', error);
+      return null;
     }
   }
   
   async fetchProductCategories(): Promise<ProductCategory[]> {
-    const cacheKey = 'categories';
-    
-    // Check cache first
-    const cached = await this.getFromCache<ProductCategory[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-    
     try {
-      const data = await super.makeDefaultRequest('/api/products/categories',{},cacheKey);
-      const categories: ProductCategory[] = Array.isArray(data) ? data : (data as any)?.categories || [];
-      
-      // Store in cache
-      await this.setCache(cacheKey, categories);
+      const cacheKey = 'categories';
+      const result = await this.makePublicRequest('/api/products/categories', {}, cacheKey);
+      const categories: ProductCategory[] = Array.isArray(result) ? result : (result as any)?.categories || [];
       
       // Store individual categories
       categories.forEach((category: ProductCategory) => {
@@ -343,7 +309,8 @@ export class ProductSingleton extends PublicApiSingleton {
       
       return categories;
     } catch (error) {
-      throw error;
+      console.error('[ProductSingleton] Error in fetchProductCategories:', error);
+      return [];
     }
   }
   
@@ -434,6 +401,19 @@ export function useRandomFeaturedProducts(location?: { lat: number; lng: number 
     try {
       // Use the cached fetchRandomFeaturedProducts method which handles caching
       const fetchedProducts = await actions.fetchRandomFeaturedProducts(location, limit);
+      
+      // Log payment gateway values from API
+      /* console.log('[SINGLETON-DEBUG] Payment Gateway API Values:', {
+        total_products: fetchedProducts.length,
+        products: fetchedProducts.map(p => ({
+          product_id: p.id,
+          tenant_id: p.tenantId,
+          api_hasActivePaymentGateway: p.hasActivePaymentGateway,
+          api_defaultGatewayType: p.defaultGatewayType,
+          product_name: p.name
+        })),
+        source: 'ProductSingleton API'
+      }); */
       
       // Ensure no duplicates by using product ID as unique key
       const uniqueProducts = Array.from(

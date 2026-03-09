@@ -147,8 +147,8 @@ router.get('/search', async (req: Request, res: Response) => {
         null as use_custom_website,
         dll.created_at,
         dll.updated_at,
-        -- GBP primary category name
-        dll.primary_category as gbp_primary_category_name,
+        -- GBP primary category name - fall back to tenant metadata if directory listing is null
+        COALESCE(dll.primary_category, t.metadata->'gbp_categories'->'primary'->>'name') as gbp_primary_category_name,
         -- Get logo URL from directory listings
         dll.logo_url,
         -- Address data from directory listings
@@ -206,6 +206,7 @@ router.get('/search', async (req: Request, res: Response) => {
         tenantId: row.tenant_id,
         businessName: row.business_name,
         slug: slug, // Use centralized slug
+        logoUrl: row.logo_url, // Store logo
         address: row.address,
         city: row.city,
         state: row.state,

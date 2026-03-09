@@ -37,6 +37,7 @@ interface FeaturedProduct {
   tenantCategory?: any;
   has_variants?: boolean;
   hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
   paymentGatewayType?: string;
   isFeatured?: boolean;
   featuredTypes?: ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[];
@@ -368,7 +369,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   tenantId: tenantId,
                   availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
                   has_active_payment_gateway: product.hasActivePaymentGateway,
-                  payment_gateway_type: product.paymentGatewayType,
+                  payment_gateway_type: product.defaultGatewayType,
                   tenantCategory: product.tenantCategory||product.shopCategory,
                   isFeatured: product.isFeatured,
                   
@@ -535,7 +536,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   tenantId: tenantId,
                   availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
                   has_active_payment_gateway: product.hasActivePaymentGateway,
-                  payment_gateway_type: product.paymentGatewayType,
+                  payment_gateway_type: product.defaultGatewayType,
                   tenantCategory: product.tenantCategory||product.shopCategory,
                   isFeatured: product.isFeatured,
                   

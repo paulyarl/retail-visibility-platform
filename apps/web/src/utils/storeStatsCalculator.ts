@@ -26,18 +26,19 @@ class StoreStatsSingleton extends PublicApiSingleton {
   async fetchStoreStats(tenantId: string): Promise<any> {
     // Add cache-busting timestamp to force fresh data
     const timestamp = Date.now();
-    const response = await this.makeDefaultRequest<any>(
+    const result = await this.makeDefaultRequest<any>(
       `/api/storefront/${tenantId}/storefront/categories-stats?t=${timestamp}`,
       { cache: 'no-store' }, // Disable caching
       `store-stats:${tenantId}`
     );
     
-    // The API returns data directly, not wrapped in a success object
-    if (!response || response.error) {
-      throw new Error(`Failed to fetch store stats: ${response?.error || 'Unknown error'}`);
+    // makeDefaultRequest returns ApiResult { success, data, error }
+    if (!result || !result.success || result.error) {
+      throw new Error(`Failed to fetch store stats: ${result?.error || 'Unknown error'}`);
     }
     
-    return response;
+    // Return the data property which contains { categories, storeStats }
+    return result.data;
   }
 }
 
@@ -129,7 +130,7 @@ export async function fetchMultipleStoreStats(tenantIds: string[]): Promise<Reco
     }
   });
   
-  console.log(`Store Stats Batch: ${tenantIds.length - uncachedTenants.length} cache hits, ${uncachedTenants.length} API calls needed`);
+//  console.log(`Store Stats Batch: ${tenantIds.length - uncachedTenants.length} cache hits, ${uncachedTenants.length} API calls needed`);
   
   // Fetch uncached tenants in parallel
   if (uncachedTenants.length > 0) {
@@ -178,11 +179,11 @@ export async function fetchStoreStats(tenantId: string): Promise<StoreStats> {
   const now = Date.now();
   
   if (cached && (now - cached.timestamp) < CACHE_TTL) {
-    console.log('Store Stats Cache HIT for', tenantId);
+   // console.log('Store Stats Cache HIT for', tenantId);
     return cached.data;
   }
   
-  console.log('Store Stats Cache MISS for', tenantId);
+//  console.log('Store Stats Cache MISS for', tenantId);
   
   try {
     const apiSingleton = StoreStatsSingleton.getInstance();

@@ -36,7 +36,7 @@ export default function RandomFeaturedProducts() {
           });
         },
         (error) => {
-          console.log('Geolocation not available, using default location');
+       //   console.log('Geolocation not available, using default location');
           // Default to New York if geolocation fails
           setUserLocation({ lat: 40.7128, lng: -74.0060 });
         }
@@ -63,9 +63,9 @@ export default function RandomFeaturedProducts() {
   };
 
   // Log singleton metrics for debugging
-  useEffect(() => {
+ /*  useEffect(() => {
     console.log('ProductSingleton: Products loaded:', products.length);
-  }, [products]);
+  }, [products]); */
 
   if (loading) {
     return (
@@ -222,6 +222,8 @@ export default function RandomFeaturedProducts() {
                   hasDescription: product.hasDescription,
                   hasBrand: product.hasBrand,
                   hasPrice: product.hasPrice,
+                  has_active_payment_gateway: product.hasActivePaymentGateway,
+                  payment_gateway_type: product.defaultGatewayType,
                   // Store information (passed as props, not in ProductData)
                 }}
                 variant="featured"
@@ -275,6 +277,8 @@ export default function RandomFeaturedProducts() {
                   hasDescription: product.hasDescription,
                   hasBrand: product.hasBrand,
                   hasPrice: product.hasPrice,
+                  has_active_payment_gateway: product.hasActivePaymentGateway,
+                  payment_gateway_type: product.defaultGatewayType,
                   // Store information (passed as props, not in ProductData)
                 }}
                 variant="featured"

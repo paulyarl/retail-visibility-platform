@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, MapPin, Star, Phone, Globe, Clock, Filter, Grid, List, ChevronDown, ChevronLeft, Store, ShoppingBag, TrendingUp, Sparkles, Tag, Users, Calendar, ArrowLeft, X, Flame, Leaf, Gift, Zap } from 'lucide-react';
+import { Search, MapPin, Star, Phone, Globe, Clock, Filter, Grid, List, ChevronDown, ChevronLeft, ChevronRight, Store, ShoppingBag, TrendingUp, Sparkles, Tag, Users, Calendar, ArrowLeft, X, Flame, Leaf, Gift, Zap } from 'lucide-react';
 import { Button, Container, Grid as MantineGrid, SimpleGrid, Badge, Card, Group, Text, Stack } from '@mantine/core';
 import StorefrontActions from '../../components/storefront/StorefrontActions';
 import { directorySingletonService } from '../../services/DirectorySingletonService';
@@ -16,38 +16,54 @@ import { tenantStorefrontService } from '@/services/TenantStorefrontService';
 import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import { Category } from '@/services/StorefrontService';
-import { tenantInfoService } from '@/services/TenantInfoService';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { usePublicPageTenantContext } from '@/hooks/useTenantContext';
 import { PageProps } from './types';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { StoreList, StoreData } from '@/components/stores';
+import FeaturedStoresList from '@/components/directory/FeaturedStoresList';
+import { StoreSingletonProvider } from '@/providers/data/StoreSingleton';
+import { usePublicBranding } from '@/hooks/usePublicBranding';
 
 interface Shop {
   id: string;
   name: string;
   slug: string;
   business_name: string;
+  tenantId?: string;
   logo_url?: string;
+  imageUrl?: string;
+  banner_url?: string;
   address?: string;
   city?: string;
   state?: string;
   country?: string;
   postal_code?: string;
+  zip_code?: string;
+  latitude?: number;
+  longitude?: number;
   phone?: string;
   website?: string;
   rating?: number;
   review_count?: number;
+  rating_count?: number;
   categories?: string[];
   primary_category?: string;
+  category?: string;
   description?: string;
   hours?: any;
+  businessHours?: any;
   is_featured?: boolean;
+  isFeatured?: boolean;
   featured_until?: string;
-  featuredTypes?: string[]; // Array of featured type slugs
+  featuredTypes?: string[];
   distance?: number;
   created_at?: string;
   updated_at?: string;
   price?: number;
   product_count?: number;
+  productCount?: number;
+  subscriptionTier?: string;
 }
 
 interface TenantData {
@@ -169,22 +185,22 @@ const TroubleshootingToggle: React.FC<TroubleshootingToggleProps> = ({ tenantId 
 };
 
 const StatsCard: React.FC<StatsCardProps> = ({ icon, label, value, trend }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
-        <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-      </div>
-      <div className="text-blue-600 dark:text-blue-400">
+  <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
+    <div className="flex items-start gap-3">
+      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm flex-shrink-0">
         {icon}
       </div>
-    </div>
-    {trend && (
-      <div className={`mt-2 text-sm flex items-center ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`}>
-        <TrendingUp className={`h-4 w-4 mr-1 ${!trend.isPositive ? 'rotate-180' : ''}`} />
-        {trend.value}%
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{label}</p>
+        <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+        {trend && (
+          <div className={`mt-1 text-xs flex items-center ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`}>
+            <TrendingUp className={`h-3 w-3 mr-1 ${!trend.isPositive ? 'rotate-180' : ''}`} />
+            {trend.value}%
+          </div>
+        )}
       </div>
-    )}
+    </div>
   </div>
 );
 
@@ -364,7 +380,7 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop, onShopClick }) => {
           )}
         </div>
         
-        {shop.rating && (
+        {shop.rating && (shop.review_count ?? 0) > 0 && (
           <div className="mt-3 flex items-center">
             <Star className="h-4 w-4 text-yellow-500 fill-current" />
             <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">
@@ -390,13 +406,30 @@ const FeaturedSection: React.FC<FeaturedSectionProps> = ({
   viewAllText = "View All" 
 }) => (
   <div className="mb-8">
-    <div className="flex items-center justify-between mb-4">
-      <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
-      {viewAllLink && (
-        <Link href={viewAllLink} className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-          {viewAllText}
-        </Link>
-      )}
+    {/* Styled Section Header */}
+    <div className="relative mb-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg">
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Hand-picked stores for you</p>
+          </div>
+        </div>
+        {viewAllLink && (
+          <Link 
+            href={viewAllLink} 
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+          >
+            {viewAllText}
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        )}
+      </div>
+      {/* Gradient border line */}
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 via-orange-500 to-transparent" />
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {items.slice(0, 6).map((item) => renderItem(item))}
@@ -472,6 +505,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
 export default function ShopsPageClient({ id, searchParams }: { id: string; searchParams: { page?: string; search?: string; category?: string; products_only?: string; featured?: string; view?: string } }) {
   const { tenantId, isInTenantContext, isFromUrl } = usePublicPageTenantContext();
+  const { branding: platformBranding } = usePublicBranding();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -549,13 +583,23 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
       
       try {
         // Get tenant info
-        const tenantInfo = await tenantInfoService.getCompleteTenantInfo(id);
+        const tenantInfo = await publicTenantInfoService.getCompleteTenantInfo(id);
         if (!tenantInfo || !tenantInfo.tenant) {
           setTenantError('Tenant not found');
           return;
         }
 
         const tenant = tenantInfo.tenant;
+        
+        // Transform TenantInfo to match expected TenantData.tenant shape
+        const transformedTenant = {
+          id: tenant.id,
+          businessName: tenant.metadata?.businessName || tenant.name,
+          slug: tenant.id, // Using id as slug fallback since TenantInfo doesn't have slug
+          logo: tenant.metadata?.logo_url,
+          description: tenant.metadata?.description,
+          website: tenant.metadata?.website
+        };
 
         // Get products and categories from tenant-aware storefront service
         const storefrontData = await tenantStorefrontService.getStorefrontProducts(id);
@@ -593,7 +637,7 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
         };
 
         setTenantData({
-          tenant,
+          tenant: transformedTenant,
           products,
           categories,
           featuredProducts,
@@ -601,8 +645,8 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
         });
 
         // Get map location
-        if (tenantInfo.businessProfile?.address) {
-          const location = await getTenantMapLocation(tenantInfo.businessProfile.address);
+        if (tenantInfo.businessProfile?.address_line1) {
+          const location = await getTenantMapLocation(id);
           setMapLocation(location);
         }
 
@@ -825,6 +869,46 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header - only show on main shops landing page */}
+        {!id && (
+          <div className="bg-gradient-to-r from-blue-100 via-indigo-50 to-purple-50 dark:from-gray-800 dark:via-gray-850 dark:to-gray-900 rounded-xl p-8 mb-8 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              {/* Column 1: Platform Branding */}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg overflow-hidden">
+                  {platformBranding?.logoUrl ? (
+                    <img 
+                      src={platformBranding.logoUrl} 
+                      alt={platformBranding.platformName || 'Platform'} 
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <Store className="w-7 h-7" />
+                  )}
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                    {platformBranding?.platformName || 'Visible Shelf'}
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Retail visibility platform
+                  </p>
+                </div>
+              </div>
+              
+              {/* Column 2: Page Name */}
+              <div className="text-right">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                  Shops
+                </h1>
+                <p className="text-gray-600 dark:text-gray-300">
+                  Explore our marketplace of amazing stores
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Shop Header - only show if viewing a specific shop */}
         {tenant && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
@@ -942,19 +1026,36 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
 
         {/* Featured Shops - only show on main shops page */}
         {!id && (
-          <FeaturedSection
-            title="Featured Shops"
-            items={shops.filter(shop => shop.is_featured)}
-            renderItem={(shop) => (
-              <ShopCard
-                key={`featured-${shop.id}`}
-                shop={shop}
-                onShopClick={handleShopClick}
-              />
-            )}
-            viewAllLink="/shops?featured=true"
-            viewAllText="View All Featured"
-          />
+          <StoreSingletonProvider>
+            <div className="relative mb-6 pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Featured Shops</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Hand-picked stores for you</p>
+                  </div>
+                </div>
+                <Link 
+                  href="/shops/directory" 
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                >
+                  View All
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
+              {/* Gradient border line */}
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 via-orange-500 to-transparent" />
+            </div>
+            <FeaturedStoresList 
+              limit={6} 
+              showLocation={true}
+              showRating={true}
+              showProductCount={true}
+            />
+          </StoreSingletonProvider>
         )}
 
         {/* Trending Shops - only show on main shops page */}
@@ -976,15 +1077,28 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
 
         {/* Traditional Shop Listing - always show shops list */}
         <div>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              All Shops ({sortedShops.length})
-            </h2>
-            <div className="flex items-center space-x-4">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          {/* Styled Section Header */}
+          <div className="relative mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
+                  <Store className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    All Shops
+                    <span className="ml-2 text-lg font-normal text-gray-500 dark:text-gray-400">
+                      ({sortedShops.length})
+                    </span>
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Browse all stores in our marketplace</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                 >
                   <option value="name">Sort by Name</option>
                   <option value="rating">Sort by Rating</option>
@@ -993,37 +1107,41 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
                 </select>
               </div>
             </div>
+            {/* Gradient border line */}
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-transparent" />
+          </div>
 
-            {shopsLoading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
-                <p className="text-gray-600 dark:text-gray-400">Loading shops...</p>
-              </div>
-            ) : shopsError ? (
-              <div className="text-center py-12">
-                <p className="text-red-600 mb-4">{shopsError}</p>
-                <Button onClick={() => fetchShops()}>Retry</Button>
-              </div>
-            ) : sortedShops.length === 0 ? (
-              <div className="text-center py-12">
-                <Store className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">No shops found matching your criteria.</p>
-              </div>
-            ) : (
-              <div className={`grid gap-6 ${
-                viewMode === 'grid' 
-                  ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' 
-                  : 'grid-cols-1'
-              }`}>
-                {sortedShops.map((shop) => (
-                  <ShopCard
-                    key={shop.id}
-                    shop={shop}
-                    onShopClick={handleShopClick}
-                  />
-                ))}
-              </div>
-            )}
+          <StoreList
+            stores={sortedShops.map((shop: Shop) => ({
+              id: shop.id,
+              tenantId: shop.tenantId || shop.id,
+              name: shop.business_name || shop.name,
+              slug: shop.slug,
+              address: shop.address,
+              city: shop.city,
+              state: shop.state,
+              zipCode: shop.zip_code || shop.postal_code,
+              latitude: shop.latitude,
+              longitude: shop.longitude,
+              logoUrl: shop.logo_url || shop.imageUrl,
+              bannerUrl: shop.banner_url,
+              primaryCategory: shop.primary_category || shop.category,
+              phone: shop.phone,
+              website: shop.website,
+              ratingAvg: shop.rating,
+              ratingCount: shop.review_count || shop.rating_count,
+              productCount: shop.product_count || shop.productCount,
+              isFeatured: shop.is_featured || shop.isFeatured,
+              subscriptionTier: shop.subscriptionTier,
+              businessHours: shop.hours || shop.businessHours,
+            }))}
+            viewMode={viewMode}
+            linkType="storefront"
+            showLogo={true}
+            showCategories={true}
+            maxCategories={3}
+            loading={shopsLoading}
+          />
             
             {/* Load More Button */}
             {!shopsLoading && !shopsError && sortedShops.length > 0 && hasMoreShops && (

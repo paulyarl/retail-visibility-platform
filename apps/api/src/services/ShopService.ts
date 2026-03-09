@@ -497,36 +497,39 @@ class ShopService extends UniversalSingleton {
     try {
       const query = `
         SELECT 
-          g.tenant_id,
-          g.tenant_name,
-          g.tenant_slug,
-          g.tenant_logo_url as imageUrl,
-          g.tenant_address,
-          g.tenant_city,
-          g.tenant_state,
-          g.tenant_zip,
-          g.shop_category as primary_category,
-          g.subscription_tier,
-          AVG(g.average_rating) as rating_avg,
-          MAX(CAST(g.review_count AS INTEGER)) as rating_count,
+          dsl.tenant_id,
+          dsl.tenant_name,
+          dsl.tenant_slug,
+          dsl.tenant_logo_url as imageUrl,
+          dsl.tenant_address,
+          dsl.tenant_city,
+          dsl.tenant_state,
+          dsl.tenant_zip,
+          -- Use the same category fallback logic as individual shop endpoint
+          COALESCE(dl.primary_category, bp.gbp_category_name, 'grocery') as primary_category,
+          dsl.subscription_tier,
+          NULLIF(AVG(dsl.average_rating), 0) as rating_avg,
+          MAX(CAST(dsl.review_count AS INTEGER)) as rating_count,
           COALESCE(ic.item_count, 0) as productCount
-        FROM mv_global_discovery g
+        FROM mv_global_discovery dsl
+        LEFT JOIN directory_listings_list dl ON dsl.tenant_id = dl.tenant_id
+        LEFT JOIN tenant_business_profiles_list bp ON dsl.tenant_id = bp.tenant_id
         LEFT JOIN (
           SELECT tenant_id, COUNT(*) as item_count
           FROM inventory_items
           GROUP BY tenant_id
-        ) ic ON ic.tenant_id = g.tenant_id
-        WHERE g.item_status = 'active'
-          AND g.visibility = 'public'
-          ${search ? `AND (g.tenant_name ILIKE $${search ? 3 : 0} OR g.shop_category ILIKE $${search ? 3 : 0})` : ''}
-          ${category ? `AND g.shop_category = $${category ? (search ? 4 : 3) : 0}` : ''}
-          ${location ? `AND (g.tenant_city ILIKE $${location ? (search && category ? 5 : search || category ? 4 : 3) : 0} OR g.tenant_state ILIKE $${location ? (search && category ? 5 : search || category ? 4 : 3) : 0})` : ''}
+        ) ic ON ic.tenant_id = dsl.tenant_id
+        WHERE dsl.item_status = 'active'
+          AND dsl.visibility = 'public'
+          ${search ? `AND (dsl.tenant_name ILIKE $${search ? 3 : 0} OR COALESCE(dl.primary_category, bp.gbp_category_name, 'grocery') ILIKE $${search ? 3 : 0})` : ''}
+          ${category ? `AND COALESCE(dl.primary_category, bp.gbp_category_name, 'grocery') = $${category ? (search ? 4 : 3) : 0}` : ''}
+          ${location ? `AND (dsl.tenant_city ILIKE $${location ? (search && category ? 5 : search || category ? 4 : 3) : 0} OR dsl.tenant_state ILIKE $${location ? (search && category ? 5 : search || category ? 4 : 3) : 0})` : ''}
         GROUP BY 
-          g.tenant_id, g.tenant_name, g.tenant_slug,
-          g.tenant_logo_url, g.tenant_address, g.tenant_city, g.tenant_state,
-          g.tenant_zip, g.shop_category, g.subscription_tier, ic.item_count
-        HAVING COUNT(DISTINCT g.inventory_item_id) > 0
-        ORDER BY productCount DESC NULLS LAST, g.tenant_name ASC
+          dsl.tenant_id, dsl.tenant_name, dsl.tenant_slug,
+          dsl.tenant_logo_url, dsl.tenant_address, dsl.tenant_city, dsl.tenant_state,
+          dsl.tenant_zip, dl.primary_category, bp.gbp_category_name, dsl.subscription_tier, ic.item_count
+        HAVING COUNT(DISTINCT dsl.inventory_item_id) > 0
+        ORDER BY productCount DESC NULLS LAST, dsl.tenant_name ASC
         LIMIT $1 OFFSET $2
       `;
 
@@ -552,12 +555,12 @@ class ShopService extends UniversalSingleton {
         location: `${row.tenant_city || ''}${row.tenant_city && row.tenant_state ? ', ' : ''}${row.tenant_state || ''}`,
         phone: undefined,
         website: undefined,
-        rating: row.rating_avg ? parseFloat(row.rating_avg) : 0,
-        rating_count: parseInt(row.rating_count) || 0,
-        reviewCount: parseInt(row.rating_count) || 0,
+        rating: row.rating_avg ? parseFloat(row.rating_avg) : null,
+        rating_count: row.rating_count ? parseInt(row.rating_count) : null,
+        reviewCount: row.rating_count ? parseInt(row.rating_count) : null,
         productCount: row.productcount || 0,
         is_published: true,
-        primary_category: row.primary_category || undefined,
+        primary_category: row.primary_category || 'grocery', // Ensure fallback
         created_at: new Date(),
         urls: {
           slugUrl: `/shops/${row.tenant_slug || row.tenant_id}`,

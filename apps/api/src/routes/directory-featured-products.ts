@@ -134,7 +134,9 @@ router.get('/', async (req: Request, res: Response) => {
         gtin,
         mpn,
         currency,
-        product_metadata
+        product_metadata,
+        has_active_payment_gateway,
+        default_gateway_type
       FROM mv_global_discovery
       WHERE featured_is_active = true
         AND item_status = 'active'
@@ -211,7 +213,9 @@ router.get('/', async (req: Request, res: Response) => {
         gtin: product.gtin,
         mpn: product.mpn,
         currency: product.currency,
-        metadata: product.product_metadata
+        metadata: product.product_metadata,
+        hasActivePaymentGateway: product.has_active_payment_gateway,
+        defaultGatewayType: product.default_gateway_type
       };
       
       // Apply filters

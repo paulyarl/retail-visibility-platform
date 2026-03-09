@@ -9,7 +9,7 @@ import { Suspense } from 'react';
 import { Store, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import ShopProfileClient from './ShopProfileClient';
-import { ShopsAPISingleton, shopsService } from '@/services/ShopsService';
+import { shopsService } from '@/services/ShopsService';
 
 // Types
 interface ShopData {

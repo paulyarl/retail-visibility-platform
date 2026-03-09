@@ -59,11 +59,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const product = await getProduct(id);
-//  console.log('[ProductPage] product:', product);
-
+  
   if (!product) {
     notFound();
   }
+
+  const gallery = await getProductPhotos(product);
 
   const businessName = product.tenant_name || 'Unknown Store';
   
@@ -74,12 +75,6 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const isPubliclyAccessible = product.item_status === 'active' && product.visibility === 'public';
   const statusLabel = product.item_status === 'draft' ? 'Draft' : product.item_status === 'archived' ? 'Archived' : product.item_status;
   const visibilityLabel = product.visibility === 'private' ? 'Private' : 'Public';
-
-  // Build image gallery: use images from product data
-  const photos = await getProductPhotos(product);
-  const gallery = photos.length > 0
-    ? photos
-    : (product.image_url ? [{ url: product.image_url, alt: product.product_title, caption: null, position: 0 }] : []);
 
   // Structured data for Google
   const structuredData = {
@@ -204,7 +199,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           name: product.tenant_name,
           slug: product.tenant_slug,
           subscriptionTier: product.subscription_tier,
-          hasActivePaymentGateway: true, // Enable Add to Cart button
+          hasActivePaymentGateway: false, // TODO: Fix payment gateway status after API migration
           metadata: {
             businessName: product.tenant_name,
             address: product.tenant_address,

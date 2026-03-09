@@ -221,12 +221,12 @@ export default function DirectoryClient() {
   });
 
   // Debug page parameter
-  console.log('[DirectoryClient] URL params:', {
+  /* console.log('[DirectoryClient] URL params:', {
     searchParams: searchParams.toString(),
     pageParam: searchParams.get('page'),
     parsedPage: searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1,
     finalPage: searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1
-  });
+  }); */
   const [categories, setCategories] = useState<Array<{
     id: string;
     name: string;

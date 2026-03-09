@@ -66,6 +66,12 @@ export function AddToCartButton({
     // Determine gateway type: product's assignment > tenant's default (no hardcoded fallback)
     const gatewayType = product.payment_gateway_type || defaultGatewayType;
     
+    // First check if tenant has active payment gateway
+    if (!hasActivePaymentGateway) {
+      alert('Unable to add to cart: Payment gateway is not active for this tenant.');
+      return;
+    }
+    
     // If no gateway type available, cannot add to cart
     if (!gatewayType) {
       alert('Unable to add to cart: No payment gateway configured for this tenant.');

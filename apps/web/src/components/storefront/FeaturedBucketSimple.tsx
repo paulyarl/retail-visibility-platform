@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from 'react';
 import ProductCard, { ProductData } from '@/components/products/ProductCardLayouts';
 import { useProductLayout, layoutVariantDescriptions } from '@/contexts/ProductLayoutContext';
-import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 
 interface FeaturedBucketSimpleProps {
   title: string;
@@ -46,21 +45,13 @@ export default function FeaturedBucketSimple({
   showLayoutSelector = true
 }: FeaturedBucketSimpleProps) {
   const { variant, setVariant } = useProductLayout();
-  const contextPayment = useTenantPaymentOptional();
   const [currentPage, setCurrentPage] = useState(1);
-  
-  // Helper function to determine if a tenant has active payment gateway
-  const hasActivePaymentGateway = (tenantId: string): boolean => {
-    // For now, assume all shops have payment gateway enabled
-    // In a real implementation, you might check this from the shops data or a separate API
-    return true;
-  };
   
   // Helper function to get default gateway type for a tenant
   const getDefaultGatewayType = (tenantId: string): string => {
-    // For now, return a default gateway type
-    // In a real implementation, you might get this from the shops data or tenant settings
-    return 'stripe';
+    // Find a product from this tenant to get its default gateway type
+    const tenantProduct = products.find(p => p.tenantId === tenantId);
+    return tenantProduct?.defaultGatewayType || 'stripe';
   };
   
   const productsPerPage = initialLimit;
@@ -203,8 +194,8 @@ export default function FeaturedBucketSimple({
             tenantId={product.tenantId || tenantId}
             tenantName={product.tenantName || tenantName}
             tenantLogo={product.tenantLogo || tenantLogo}
-            hasActivePaymentGateway={hasActivePaymentGateway(product.tenantId)}
-            defaultGatewayType={getDefaultGatewayType(product.tenantId)}
+            hasActivePaymentGateway={product.hasActivePaymentGateway || false}
+            defaultGatewayType={product.defaultGatewayType || getDefaultGatewayType(product.tenantId)}
           />
         ))}
       </div>

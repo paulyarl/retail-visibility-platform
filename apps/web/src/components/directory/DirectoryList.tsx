@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import { UnifiedStoreCard, DirectoryListing } from './UnifiedStoreCard';
 import { Skeleton } from '@/components/ui';
+import { fetchMultipleStoreStats } from '@/utils/storeStatsCalculator';
 
 interface DirectoryListProps {
   listings: DirectoryListing[];
@@ -18,6 +20,35 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 export default function DirectoryList({ listings, loading, contextCategory, showLogo = true }: DirectoryListProps) {
+  const [storeStats, setStoreStats] = useState<Record<string, any>>({});
+  const [statsLoading, setStatsLoading] = useState<Record<string, boolean>>({});
+
+  // Fetch store stats for all listings
+  useEffect(() => {
+    if (listings.length > 0) {
+      const fetchAllStats = async () => {
+        const loading: Record<string, boolean> = {};
+        listings.forEach(listing => {
+          loading[listing.tenantId] = true;
+        });
+        setStatsLoading(loading);
+
+        const tenantIds = [...new Set(listings.map(listing => listing.tenantId))];
+        const allStats = await fetchMultipleStoreStats(tenantIds);
+
+        setStoreStats(allStats);
+
+        const finalLoading: Record<string, boolean> = {};
+        tenantIds.forEach(tenantId => {
+          finalLoading[tenantId] = false;
+        });
+        setStatsLoading(finalLoading);
+      };
+
+      fetchAllStats();
+    }
+  }, [listings]);
+
   // Loading state
   if (loading) {
     return (
@@ -67,16 +98,32 @@ export default function DirectoryList({ listings, loading, contextCategory, show
 
   return (
     <div className="space-y-4">
-      {listings.map((listing, index) => (
-        <UnifiedStoreCard
-          key={listing.id}
-          listing={listing}
-          viewMode="list"
-          linkType="directory"
-          contextCategory={contextCategory}
-          showLogo={showLogo}
-        />
-      ))}
+      {listings.map((listing, index) => {
+        const stats = storeStats[listing.tenantId];
+        
+        return (
+          <UnifiedStoreCard
+            key={listing.id}
+            listing={listing}
+            viewMode="list"
+            linkType="directory"
+            contextCategory={contextCategory}
+            showLogo={showLogo}
+            enhancedStats={stats ? {
+              totalProducts: stats.totalProducts || 0,
+              categories: stats.categories || [],
+              ratingAvg: stats.ratingAvg || 0,
+              ratingCount: stats.ratingCount || 0,
+              rating3Count: stats.rating3Count || 0,
+              rating4Count: stats.rating4Count || 0,
+              rating5Count: stats.rating5Count || 0,
+              verifiedPurchaseCount: stats.verifiedPurchaseCount || 0,
+              lastReviewAt: stats.lastReviewAt || null,
+              isFeatured: listing.isFeatured || false,
+            } : undefined}
+          />
+        );
+      })}
     </div>
   );
 }

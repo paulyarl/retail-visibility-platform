@@ -95,7 +95,7 @@ class ItemUpdateService extends TenantApiSingleton {
         }
       ) as any;
 
-      console.log('[ItemUpdateService] API Response:', updatedItem);
+     // console.log('[ItemUpdateService] API Response:', updatedItem);
 
       // API returns item data directly, not wrapped in success property
       // Check if there's an error property in the response
@@ -109,7 +109,7 @@ class ItemUpdateService extends TenantApiSingleton {
       // Invalidate caches after successful update
       await this.invalidateRelatedCaches(itemId);
 
-      console.log('[ItemUpdateService] Item updated successfully:', itemId);
+      // console.log('[ItemUpdateService] Item updated successfully:', itemId);
       return {
         success: true,
         item: result,
@@ -151,7 +151,7 @@ class ItemUpdateService extends TenantApiSingleton {
       // Invalidate ProductSingleton cache to include new item
       await this.invalidateProductCache();
 
-      console.log('[ItemUpdateService] Item created successfully:', result.item?.id);
+    //  console.log('[ItemUpdateService] Item created successfully:', result.item?.id);
       return {
         success: true,
         item: result.item || result,
@@ -187,7 +187,7 @@ class ItemUpdateService extends TenantApiSingleton {
       // Invalidate caches after successful deletion
       await this.invalidateRelatedCaches(itemId);
 
-      console.log('[ItemUpdateService] Item deleted successfully:', itemId);
+    //  console.log('[ItemUpdateService] Item deleted successfully:', itemId);
       return {
         success: true,
         message: 'Item moved to trash',
@@ -222,7 +222,7 @@ class ItemUpdateService extends TenantApiSingleton {
       // Invalidate caches after successful restore
       await this.invalidateRelatedCaches(itemId);
 
-      console.log('[ItemUpdateService] Item restored successfully:', itemId);
+     // console.log('[ItemUpdateService] Item restored successfully:', itemId);
       return {
         success: true,
         message: 'Item restored from trash',
@@ -255,7 +255,7 @@ class ItemUpdateService extends TenantApiSingleton {
       // Invalidate PhotoSingleton cache for this item
       await this.invalidatePhotoCache(itemId);
 
-      console.log('[ItemUpdateService] Related caches invalidated for item:', itemId);
+    //  console.log('[ItemUpdateService] Related caches invalidated for item:', itemId);
     } catch (error) {
       console.error('[ItemUpdateService] Error invalidating caches:', error);
     }
@@ -269,7 +269,7 @@ class ItemUpdateService extends TenantApiSingleton {
     try {
       // Clear all product-related cache keys
       await this.clearCache();
-      console.log('[ItemUpdateService] ProductSingleton cache invalidated');
+      // console.log('[ItemUpdateService] ProductSingleton cache invalidated');
     } catch (error) {
       console.error('[ItemUpdateService] Error invalidating product cache:', error);
     }
@@ -285,7 +285,7 @@ class ItemUpdateService extends TenantApiSingleton {
       const tenantId = this.singletonKey.replace('item-update-service-', '');
       const photoSingleton = PhotoSingleton.getInstance(tenantId);
       await photoSingleton.invalidateItemCache(itemId);
-      console.log('[ItemUpdateService] PhotoSingleton cache invalidated for item:', itemId);
+      // console.log('[ItemUpdateService] PhotoSingleton cache invalidated for item:', itemId);
     } catch (error) {
       console.error('[ItemUpdateService] Error invalidating photo cache:', error);
     }

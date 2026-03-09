@@ -348,11 +348,11 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
     const context = cacheOptions?.context ?? this.defaultContext ?? urlDetectedContext.context;
     const isolation = cacheOptions?.isolation ?? this.defaultIsolation ?? urlDetectedContext.isolation;
     
-    console.log(`[${this.constructor.name}] ----------------------------------------`);
-    console.log(`[${this.constructor.name}] makeEnhancedPublicRequest url: ${url}`);
-    console.log(`[${this.constructor.name}] context: ${context}`);
-    console.log(`[${this.constructor.name}] isolation: ${isolation}`);
-    console.log(`[${this.constructor.name}] end:`);
+    // console.log(`[${this.constructor.name}] ----------------------------------------`);
+    // console.log(`[${this.constructor.name}] makeEnhancedPublicRequest url: ${url}`);
+    // console.log(`[${this.constructor.name}] context: ${context}`);
+    // console.log(`[${this.constructor.name}] isolation: ${isolation}`);
+    // console.log(`[${this.constructor.name}] end:`);
 
     // 🎯 STRATEGY 1: Return with context data only
     const contextEnhancedRequestOptions: PublicRequestOptions = {

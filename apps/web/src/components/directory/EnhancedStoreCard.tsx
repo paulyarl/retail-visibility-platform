@@ -24,6 +24,7 @@ interface Store {
   state?: string;
   logo_url?: string;
   banner_url?: string;
+  primaryCategory?: string; // Store type/category (e.g., "African Grocery Store")
   totalProducts: number;
   categories: Category[];
   ratingAvg?: number;
@@ -123,6 +124,15 @@ export default function EnhancedStoreCard({ store, showCategories = false, maxCa
           >
             <span>{store.name}</span>
           </Link>
+          
+          {/* Store Category/Type */}
+          {store.primaryCategory && (
+            <div className="flex items-center gap-1 mt-1">
+              <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                {store.primaryCategory}
+              </span>
+            </div>
+          )}
           
           {/* Rating - Use data from MV instead of separate API call */}
           {(store.ratingAvg !== undefined && store.ratingAvg !== null && (store.ratingCount || 0) > 0) && (

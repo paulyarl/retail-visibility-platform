@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 // TypeScript interfaces for hours status
 export interface StoreStatus {
@@ -25,6 +26,9 @@ export interface HoursStatusData {
  * Uses PublicApiSingleton for consistent caching and metrics
  */
 class HoursStatusService extends PublicApiSingleton {
+
+    protected defaultContext: AppContext = AppContext.STORE;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.STORE;
   private static instance: HoursStatusService;
   
   // Hours status cache
@@ -66,7 +70,10 @@ class HoursStatusService extends PublicApiSingleton {
       return null;
     }
 
-    const statusData: StoreStatus = response.data;
+    // The API returns { success, data: { isOpen, status, label } }
+    // makeDefaultRequest wraps it as { success, data: { success, data: {...} } }
+    // So response.data is the API response, and we need response.data.data for the actual status
+    const statusData: StoreStatus = (response.data as any).data || response.data;
     
     // Store in local cache for quick access
     this.hoursStatus.set(tenantId, statusData);

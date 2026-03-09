@@ -3584,26 +3584,25 @@ app.get('/api/directory/random-featured', async (req, res) => {
     
     // console.log('[Random Featured Direct] User location:', { userLat, userLng, maxDistance });
     
-    // Query for random featured products with proximity weighting
+    // Query for random featured products with proximity weighting from mv_global_discovery
     const query = `
       WITH featured_products AS (
         SELECT 
-          sp.id,
-          sp.name,
-          sp.price_cents,
-          sp.currency,
-          sp.image_url,
-          sp.brand,
-          sp.description,
-          sp.stock,
-          sp.availability,
-          sp.tenant_id,
-          sp.category_id,
-          sp.category_name,
-          sp.category_slug,
-          sp.google_category_id,
-          sp.has_active_payment_gateway,
-          sp.default_gateway_type,
+          mv.inventory_item_id as id,
+          mv.product_name as name,
+          mv.list_price_cents as price_cents,
+          'USD' as currency,
+          mv.image_url,
+          mv.brand,
+          mv.product_description as description,
+          mv.stock,
+          mv.availability,
+          mv.tenant_id,
+          mv.product_category_name_lower as category_name,
+          mv.product_category_slug as category_slug,
+          mv.product_google_category_id as google_category_id,
+          mv.has_active_payment_gateway,
+          mv.default_gateway_type,
           dsl.slug as store_slug,
           dsl.business_name as store_name,
           dsl.logo_url as store_logo,
@@ -3611,7 +3610,7 @@ app.get('/api/directory/random-featured', async (req, res) => {
           dsl.state as store_state,
           dsl.latitude,
           dsl.longitude,
-          sp.updated_at,
+          mv.updated_at,
           -- Calculate distance in kilometers using Haversine formula
           CASE 
             WHEN dsl.latitude IS NOT NULL AND dsl.longitude IS NOT NULL THEN
@@ -3630,12 +3629,12 @@ app.get('/api/directory/random-featured', async (req, res) => {
             WHEN dsl.city IS NOT NULL THEN 0.4 -- Has city info
             ELSE 0.1 -- No location info
           END as geographic_relevance
-        FROM storefront_products sp
-        JOIN directory_listings_list dsl ON dsl.tenant_id = sp.tenant_id
-        WHERE sp.is_actively_featured = true 
+        FROM mv_global_discovery mv
+        JOIN directory_listings_list dsl ON dsl.tenant_id = mv.tenant_id
+        WHERE mv.is_actively_featured = true 
           AND dsl.is_published = true
-          AND sp.has_image = true
-          AND sp.stock > 0
+          AND mv.has_image = true
+          AND mv.in_stock = true
       ),
       weighted_products AS (
         SELECT *,

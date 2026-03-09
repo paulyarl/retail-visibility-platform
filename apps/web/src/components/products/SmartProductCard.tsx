@@ -330,17 +330,20 @@ export default function SmartProductCard({
   hasActivePaymentGateway: propHasActivePaymentGateway,
   defaultGatewayType: propDefaultGatewayType,
 }: SmartProductCardProps) {
-  // Debug logging for featured products
-  /* console.log('[SmartProductCard] Rendering product:', {
-    id: product.id,
-    name: product.name,
-    variant,
-    hasImage: !!product.imageUrl,
-    priceCents: product.priceCents
-  }); */
-
   // Try to use context first (performance optimization)
   const contextPayment = useTenantPaymentOptional();
+  
+  // Debug logging for payment gateway tracking
+  /* console.log('[SMARTCARD-DEBUG] Payment Gateway Props Received:', {
+    product_id: product.id,
+    tenant_id: product.tenantId,
+    product_name: product.name,
+    propHasActivePaymentGateway,
+    propDefaultGatewayType,
+    product_has_active_payment_gateway: product.has_active_payment_gateway,
+    product_payment_gateway_type: product.payment_gateway_type,
+    contextPayment: contextPayment ? 'available' : 'not available'
+  }); */
   
   // Fallback state for when context is not available
   const [canPurchase, setCanPurchase] = useState(false);
@@ -349,6 +352,20 @@ export default function SmartProductCard({
   // Priority: context > props > product data (from MV) > individual API fetch
   const effectiveCanPurchase = contextPayment?.canPurchase ?? propHasActivePaymentGateway ?? product.has_active_payment_gateway ?? canPurchase;
   const effectiveGatewayType = propDefaultGatewayType ?? product.payment_gateway_type ?? contextPayment?.defaultGatewayType ?? defaultGatewayType;
+
+  // Log effective values
+ /*  console.log('[SMARTCARD-DEBUG] Effective Payment Gateway Values:', {
+    product_id: product.id,
+    tenant_id: product.tenantId,
+    effectiveCanPurchase,
+    effectiveGatewayType,
+    sources: {
+      contextPayment: contextPayment?.canPurchase,
+      propHasActivePaymentGateway,
+      product_has_active_payment_gateway: product.has_active_payment_gateway,
+      fallbackCanPurchase: canPurchase
+    }
+  }); */
 
   useEffect(() => {
     // Skip individual fetch if props are provided
@@ -386,8 +403,8 @@ export default function SmartProductCard({
   }, [product.tenantId, contextPayment, product.has_active_payment_gateway, propHasActivePaymentGateway]);
 
   // Debug: Log when effectiveCanPurchase changes
-  useEffect(() => {
-    /* console.log('[SmartProductCard] effectiveCanPurchase changed:', {
+ /* useEffect(() => {
+     console.log('[SmartProductCard] effectiveCanPurchase changed:', {
       productId: product.id,
       variant,
       effectiveCanPurchase,
@@ -397,8 +414,8 @@ export default function SmartProductCard({
         contextCanPurchase: contextPayment?.canPurchase,
         canPurchase
       }
-    }); */
-  }, [effectiveCanPurchase, product.id, variant, propHasActivePaymentGateway, product.has_active_payment_gateway, contextPayment?.canPurchase, canPurchase]);
+    }); 
+  }, [effectiveCanPurchase, product.id, variant, propHasActivePaymentGateway, product.has_active_payment_gateway, contextPayment?.canPurchase, canPurchase]);*/
 
   const displayTitle = product.title || product.name;
   const displayBrand = product.brand || '';

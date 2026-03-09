@@ -362,14 +362,18 @@ class DirectorySingletonService extends PublicApiSingleton {
     // Automatically include tenant context in cache key
     const cacheKey = this.getTenantAwareCacheKey('public-shops', tenantId);
     
-    const response = await super.makeDefaultRequest<{
+    const response = await this.makeDefaultRequest<{
       success: boolean;
       data: any[];
     }>(
       '/api/shops/directory',
       {},
       cacheKey,
-      this.CACHE_TTL_MEDIUM
+      this.CACHE_TTL_MEDIUM,
+      {
+        context: AppContext.SHOP,
+        isolation: CacheIsolation.SHOP
+      }
     );
 
     if (!response.success) {
@@ -408,8 +412,8 @@ class DirectorySingletonService extends PublicApiSingleton {
       product_count: parseInt(shop.productCount) || 0,
       is_published: shop.is_published || true,
       primary_category: shop.primary_category || null,
-      rating: shop.rating || 0,
-      review_count: shop.reviewCount || 0,
+      rating: shop.rating,
+      review_count: shop.reviewCount,
       is_featured: shop.is_featured || false,
       categories: shop.primary_category ? [shop.primary_category] : []
     }));
@@ -763,12 +767,15 @@ class DirectorySingletonService extends PublicApiSingleton {
     if (!tenantId) {
       throw new Error('Tenant ID is required');
     }
-
     const response = await super.makeDefaultRequest<any>(
       `/api/tenant/${tenantId}/business-hours`,
       {},
       `business-hours-${tenantId}`,
-      this.CACHE_TTL_MEDIUM
+      this.CACHE_TTL_MEDIUM,
+      {
+        context: AppContext.SHOP,
+        isolation: CacheIsolation.SHOP
+      }
     );
 
     if (!response.success) {

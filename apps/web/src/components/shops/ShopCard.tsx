@@ -91,7 +91,7 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
   // Format rating
   const formatRating = (rating: number | undefined) => {
     if (rating === undefined || rating === null) {
-      return '0.0';
+      return null;
     }
     return rating.toFixed(1);
   };
@@ -155,17 +155,19 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
               </p>
               
               {/* Rating and Reviews */}
-              <div className="flex items-center gap-2 text-sm">
-                <div className="flex items-center">
-                  <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                  <span className="ml-1 text-gray-700">
-                    {formatRating(shop.rating)}
+              {(shop.rating && shop.reviewCount > 0) && (
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center">
+                    <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                    <span className="ml-1 text-gray-700">
+                      {formatRating(shop.rating)}
+                    </span>
+                  </div>
+                  <span className="text-gray-500">
+                    ({shop.reviewCount})
                   </span>
                 </div>
-                <span className="text-gray-500">
-                  ({shop.reviewCount})
-                </span>
-              </div>
+              )}
 
               {/* Location */}
               <div className="flex items-center gap-1 text-sm text-gray-600">
@@ -242,17 +244,19 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
             </div>
 
             {/* Rating and Reviews */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center">
-                <Star className="w-5 h-5 text-yellow-400 fill-current" />
-                <span className="font-semibold text-gray-900">
-                  {formatRating(shop.rating)}
+            {(shop.rating && shop.reviewCount > 0) && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center">
+                  <Star className="w-5 h-5 text-yellow-400 fill-current" />
+                  <span className="font-semibold text-gray-900">
+                    {formatRating(shop.rating)}
+                  </span>
+                </div>
+                <span className="text-gray-500">
+                  ({shop.reviewCount} reviews)
                 </span>
               </div>
-              <span className="text-gray-500">
-                ({shop.reviewCount} reviews)
-              </span>
-            </div>
+            )}
 
             {/* Location and Contact */}
             <div className="space-y-2 text-sm">
@@ -378,17 +382,19 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
           </div>
 
           {/* Rating and Reviews */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center">
-              <Star className="w-4 h-4 text-yellow-400 fill-current" />
-              <span className="font-medium text-gray-900">
-                {formatRating(shop.rating)}
+          {(shop.rating && shop.reviewCount > 0) && (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center">
+                <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                <span className="font-medium text-gray-900">
+                  {formatRating(shop.rating)}
+                </span>
+              </div>
+              <span className="text-sm text-gray-500">
+                ({shop.reviewCount} reviews)
               </span>
             </div>
-            <span className="text-sm text-gray-500">
-              ({shop.reviewCount} reviews)
-            </span>
-          </div>
+          )}
 
           {/* Location */}
           <div className="flex items-center gap-2 text-sm text-gray-600">

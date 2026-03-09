@@ -378,7 +378,22 @@ SELECT
   case when ii.brand is not null then true else false end as has_brand,
   case when ii.price_cents > 0 then true else false end as has_price,
   case when ii.stock > 0 or ii.quantity > 0 then true else false end as in_stock,
-  case when exists (select 1 from tenant_payment_gateways tpg where tpg.tenant_id = t.id and tpg.is_active = true) then true else false end as has_active_payment_gateway,
+  case when exists (
+    select 1 from tenant_payment_gateways tpg 
+    where tpg.tenant_id = t.id and tpg.is_active = true
+    and (
+      -- For non-OAuth gateways (like Stripe with API keys), just check is_active
+      tpg.gateway_type not in ('square', 'paypal')
+      or 
+      -- For OAuth gateways, verify OAuth is completed and not expired
+      exists (
+        select 1 from oauth_tokens ot 
+        where ot.tenant_id = tpg.tenant_id 
+        and ot.gateway_type = tpg.gateway_type 
+        and ot.expires_at > now()
+      )
+    )
+  ) then true else false end as has_active_payment_gateway,
   COALESCE(
     (select tpg.gateway_type from tenant_payment_gateways tpg where tpg.tenant_id = t.id and tpg.is_active = true and tpg.is_default = true limit 1),
     (select tpg.gateway_type from tenant_payment_gateways tpg where tpg.tenant_id = t.id and tpg.is_active = true limit 1)

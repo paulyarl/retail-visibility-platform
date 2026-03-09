@@ -438,7 +438,7 @@ class TenantInfoService extends TenantApiSingleton {
       }
 
       const result = await this.makeDefaultRequest<any>(
-        `/api/tenants/${tenantId}/oauth/${provider}/status`,
+        `/api/oauth/${provider}/status?tenantId=${tenantId}`,
         {},
         `tenant-oauth-${tenantId}-${provider}`,
         this.cacheTTL

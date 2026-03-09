@@ -193,15 +193,16 @@ function ShopProfileHeader({ shop, shopData }: {
   }
 
   return (
-    <div className="bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Shop Info */}
-          <div className="lg:col-span-2 space-y-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Page Header with horizontal gradient background */}
+      <div className="bg-gradient-to-r from-blue-100 via-indigo-50 to-purple-50 dark:from-gray-800 dark:via-gray-850 dark:to-gray-900 border-b border-gray-200 dark:border-gray-700">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-between">
+            {/* Column 1: Shop Logo and Details */}
             <div className="flex items-start space-x-6">
               {/* Shop Logo */}
               <div className="relative">
-                <div className="h-24 w-24 bg-white rounded-lg shadow-md flex items-center justify-center overflow-hidden">
+                <div className="h-24 w-24 bg-white rounded-xl shadow-lg flex items-center justify-center overflow-hidden">
                   {(directoryListing?.logo_url || shopData?.logo_url || shopData?.bannerUrl || shopData?.tenantLogoUrl || shopData?.imageUrl) ? (
                     <img
                       src={directoryListing?.logo_url || shopData?.logo_url || shopData?.bannerUrl || shopData?.tenantLogoUrl || shopData?.imageUrl}
@@ -224,7 +225,7 @@ function ShopProfileHeader({ shop, shopData }: {
               {/* Shop Details */}
               <div className="flex-1">
                 <div className="flex items-center space-x-3 mb-2">
-                  <h1 className="text-3xl font-bold text-gray-900">{shopData.name}</h1>
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{shopData.name}</h1>
                   {shopData.is_published && (
                     <Badge variant="filled" color="green" size="sm">
                       Verified
@@ -233,16 +234,16 @@ function ShopProfileHeader({ shop, shopData }: {
                 </div>
 
                 {shopData.business_name && shopData.business_name !== shopData.name && (
-                  <p className="text-lg text-gray-600 mb-3">{shopData.business_name}</p>
+                  <p className="text-lg text-gray-600 dark:text-gray-300 mb-3">{shopData.business_name}</p>
                 )}
 
-                <div className="flex items-center space-x-6 text-sm text-gray-600">
+                <div className="flex items-center space-x-6 text-sm text-gray-600 dark:text-gray-300">
                   {shopData.rating && (
                     <div className="flex items-center space-x-1">
                       <Star className="h-4 w-4 text-yellow-500 fill-current" />
                       <span className="font-medium">{shopData.rating.toFixed(1)}</span>
                       {shopData.rating_count && (
-                        <span className="text-gray-500">({shopData.rating_count} reviews)</span>
+                        <span className="text-gray-500 dark:text-gray-400">({shopData.rating_count} reviews)</span>
                       )}
                     </div>
                   )}
@@ -252,32 +253,41 @@ function ShopProfileHeader({ shop, shopData }: {
                     <span>{shopData.productCount} products</span>
                   </div>
 
-                  {shopData.primary_category||shopData.category && (
+                  {(shopData.primary_category || shopData.category) && (
                     <Badge variant="light" size="sm">
-                      {shopData.primary_category||shopData.category}
+                      {shopData.primary_category || shopData.category}
                     </Badge>
                   )}
                 </div>
-
-                {/* Action Buttons */}
-                <div className="flex items-center space-x-3 mt-4">
-                  <StorefrontActions 
-                    tenantId={shopData.tenantId}
-                    businessName={shopData.name}
-                  />
-                  
-                  <Button variant="outline" size="sm">
-                    <Heart className="h-4 w-4 mr-2" />
-                    Save Shop
-                  </Button>
-                  
-                  <Button variant="outline" size="sm">
-                    <Share2 className="h-4 w-4 mr-2" />
-                    Share
-                  </Button>
-                </div>
               </div>
             </div>
+            
+            {/* Column 2: Action Buttons */}
+            <div className="flex items-center space-x-3">
+              <StorefrontActions 
+                tenantId={shopData.tenantId}
+                businessName={shopData.name}
+              />
+              
+              <Button variant="outline" size="sm">
+                <Heart className="h-4 w-4 mr-2" />
+                Save Shop
+              </Button>
+              
+              <Button variant="outline" size="sm">
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Shop Info */}
+          <div className="lg:col-span-2 space-y-6">
 
             {/* Shop Description */}
             {shopData.tenantName && (
