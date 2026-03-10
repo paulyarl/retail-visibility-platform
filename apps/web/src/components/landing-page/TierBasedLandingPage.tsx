@@ -471,6 +471,7 @@ interface Tenant {
     website?: string;
     address?: string;
   };
+  slug?: string;
 }
 
 interface TierBasedLandingPageProps {
@@ -479,14 +480,19 @@ interface TierBasedLandingPageProps {
   storeStatus?: any;
   gallery?: React.ReactNode;
   fulfillmentPane?: React.ReactNode;
+  slug?: string;
 }
 
-export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fulfillmentPane }: TierBasedLandingPageProps) {
+export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fulfillmentPane, slug }: TierBasedLandingPageProps) {
   const { settings: platformSettings } = usePlatformSettings();
   const tier = tenant.subscriptionTier || 'trial';
   const features = getLandingPageFeatures(tier);
   const branding = product.customBranding;
+
+  const tenantSlug = tenant?.slug || tenant?.id;
   
+  console.log(`Tenant: ${tenant.name}, Slug: ${slug}, Tenant: ${JSON.stringify(tenant)}`);
+
   // Check if storefront is available (Starter+ tier)
   const hasStorefront = tier !== 'trial' && tier !== 'google_only';
   
@@ -899,7 +905,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                 </p>
               </div>
               <a
-                href={`/tenant/${tenant.id}`}
+                href={`/tenant/${tenantSlug ? tenantSlug : tenant.id}`}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm whitespace-nowrap"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

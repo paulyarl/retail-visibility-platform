@@ -21,6 +21,7 @@ interface Tenant {
   metadata?: {
     businessName?: string;
   };
+  slug?: string;
 }
 
 interface ProductActionsProps {
@@ -180,7 +181,7 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
           {/* Visit Storefront Link - Only on product pages */}
           {variant === 'product' && (
             <a
-              href={`/tenant/${product.tenantId}`}
+              href={`/tenant/${tenant.slug ? tenant.slug : product.tenantId}`}
               className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               title="Visit the full storefront"
             >

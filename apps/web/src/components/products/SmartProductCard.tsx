@@ -488,7 +488,7 @@ export default function SmartProductCard({
             {/* Store Information for Directory Context */}
             {tenantName && (
               <Link 
-                href={tenantSlug ? `/directory/${tenantSlug}` : `/shops/${tenantId}`}
+                href={tenantSlug ? `/directory/${tenantSlug}` : `/shops/${tenantSlug ? tenantSlug : tenantId}`}
                 className="flex items-center gap-2 mb-3 p-2 bg-neutral-50 dark:bg-neutral-700/50 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors group"
                 title={`Visit ${tenantName} store`}
               >

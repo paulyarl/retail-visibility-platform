@@ -82,6 +82,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
   const gallery = await getProductPhotos(product);
   const shopData = await getShopData(product.tenant_id);
+  console.log('shopData', shopData);
 
   const businessName = product.tenant_name || 'Unknown Store';
   
@@ -210,11 +211,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           // Pass features and specifications from product_metadata
           features: product.product_metadata?.features,
           specifications: product.product_metadata?.specifications,
+          slug: shopData?.slug || product.tenant_slug || '',
         } as any}
         tenant={{
           id: product.tenant_id,
           name: product.tenant_name,
-          slug: product.tenant_slug,
+          slug: shopData?.slug || product.tenant_slug || '',
           subscriptionTier: product.subscription_tier,
           hasActivePaymentGateway: shopData?.has_active_payment_gateway || false,
           defaultGatewayType: shopData?.default_gateway_type || undefined,
@@ -235,28 +237,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenant_id} />}
       />
 
-      {/* Product Recommendations */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <ProductRecommendations productId={product.inventory_item_id} tenantId={product.tenant_id} />
-      </div>
-
-      {/* Featured Type Products - other products with same featured types */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <FeaturedTypeProducts 
-          currentProductId={product.inventory_item_id} 
-          tenantId={product.tenant_id} 
-          featuredTypes={product.featured_type_array || []}
-        />
-      </div>
-
-      {/* Product Reviews */}
-      <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <ProductReviewsSection productId={product.inventory_item_id} tenantId={product.tenant_id} />
-        </div>
-      </div>
-
-      {/* Business Information */}
+      {/* Business Information - Contact Us */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <ProductBusinessInfoCollapsible 
           product={product as any} 
@@ -275,8 +256,28 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               social_links: shopData?.social_links || undefined,
             }
           }} 
-          storeStatus={null} 
         />
+      </div>
+
+      {/* Product Recommendations */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <ProductRecommendations productId={product.inventory_item_id} tenantId={product.tenant_id} tenantSlug={product.tenant_slug || ''} />
+      </div>
+
+      {/* Featured Type Products - other products with same featured types */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FeaturedTypeProducts 
+          currentProductId={product.inventory_item_id} 
+          tenantId={product.tenant_id} 
+          featuredTypes={product.featured_type_array || []}
+        />
+      </div>
+
+      {/* Product Reviews */}
+      <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <ProductReviewsSection productId={product.inventory_item_id} tenantId={product.tenant_id} />
+        </div>
       </div>
 
       {/* Recently Viewed Products */}

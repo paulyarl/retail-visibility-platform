@@ -25,6 +25,14 @@ export interface SlugPatternParams {
   tenantId?: string;
 }
 
+export interface TenantSlug {
+  slug: string;
+  tenantId: string;
+  isPublished: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 class TenantSlugService extends TenantApiSingleton {
   private static instance: TenantSlugService;
 
@@ -73,6 +81,58 @@ class TenantSlugService extends TenantApiSingleton {
       // Handle API server response format: { patterns: [...] }
       if (response.data?.patterns && Array.isArray(response.data.patterns)) {
         return response.data.patterns;
+      }
+
+      // Handle array response (original frontend format)
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+
+      // Handle nested response
+      if (response.data && Array.isArray(response.data)) {
+        return response.data;
+      }
+
+      // Handle single object response
+      if (response.data?.slug) {
+        return [response.data];
+      }
+
+      throw new Error('Unexpected response format');
+    } catch (error) {
+      console.error('[TenantSlugService] Failed to get slug patterns:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate slug patterns for tenant URL
+   * Uses the /api/slugs/patterns endpoint
+   */
+  async getTenantSlug(params: SlugPatternParams): Promise<TenantSlug[]> {
+    try {
+      if (!params.tenantId) {
+        throw new Error('Tenant ID is required');
+      }
+
+      const response = await this.makeDefaultRequest<any>(
+        `/api/slugs/tenant/${params.tenantId}`,
+        {
+        },
+        `slug-patterns:${params.tenantId}`
+      );
+
+      console.log('[TenantSlugService] Slug patterns API response:', response);
+
+      // Handle case where response is not in expected format
+      if (!response || typeof response !== 'object') {
+        console.error('[TenantSlugService] Invalid API response format:', response);
+        throw new Error('Invalid API response format');
+      }
+
+      // Handle API server response format: { patterns: [...] }
+      if (response.data?.slug) {
+        return [response.data];
       }
 
       // Handle array response (original frontend format)

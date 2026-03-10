@@ -2907,6 +2907,82 @@ router.get('/platform/branding', async (_req, res) => {
   }
 });
 
+// ====================
+// UNIVERSAL RESOLVER ENDPOINTS
+// ====================
+
+/**
+ * GET /api/resolver/:type/:identifier
+ * Universal identifier resolver for all platform services
+ * Type-safe resolution with automatic caching
+ */
+router.get('/resolver/:type/:identifier', async (req, res) => {
+  try {
+    const { type, identifier } = req.params;
+    console.log(`[Public API] Resolver request: ${type}/${identifier}`);
+    
+    // Validate resolver type
+    const validTypes = ['tenant', 'shop', 'product', 'category', 'directory'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid resolver type: ${type}. Valid types: ${validTypes.join(', ')}`
+      });
+    }
+
+    // Use the universal identifier resolver
+    const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
+    const cache = UniversalIdentifierCache.getInstance();
+    
+    // Add timeout for identifier resolution to prevent hanging
+    const identifierPromise = cache.resolveIdentifier(identifier);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Identifier resolution timeout')), 10000); // 10 second timeout
+    });
+    
+    let resolved: any = null;
+    try {
+      resolved = await Promise.race([identifierPromise, timeoutPromise]);
+      console.log(`[Public API] Successfully resolved identifier: ${type}/${identifier} → ${resolved?.id}`);
+    } catch (error) {
+      console.error(`[Public API] Error resolving identifier: ${type}/${identifier}`, error);
+      return res.status(404).json({
+        success: false,
+        error: 'Identifier not found',
+        message: `No ${type} found for identifier: ${identifier}`
+      });
+    }
+    
+    if (!resolved || !resolved.id) {
+      return res.status(404).json({
+        success: false,
+        error: 'Identifier not found',
+        message: `No ${type} found for identifier: ${identifier}`
+      });
+    }
+    
+    // Return resolved identifier with caching headers
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour cache
+    res.setHeader('X-Service-Source', 'Universal-Identifier-Cache');
+    
+    res.json({
+      success: true,
+      data: {
+        resolvedId: resolved.id,
+        type: type
+      }
+    });
+    
+  } catch (error) {
+    console.error('[Public API] Error in resolver endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Resolution failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Mount shops routes under /shops
 router.use('/shops', shopsRoutes);
 

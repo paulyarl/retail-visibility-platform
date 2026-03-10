@@ -446,7 +446,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   Browse {(listing.productCount ?? 0) > 0 ? `${listing.productCount} products` : 'our full catalog'} and shop directly from their online storefront
                 </p>
                 <Link
-                  href={`/tenant/${listing.tenantId}`}
+                  href={`${slugForRelated ? `/tenant/${slugForRelated}` : `/tenant/${listing.tenantId}`}`}
                   className="inline-flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-lg shadow-md"
                 >
                   <Globe className="w-5 h-5" />
@@ -540,7 +540,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                 <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
                   {/* Visit Storefront - Left side */}
                   <Link
-                    href={`/tenant/${listing.tenantId}`}
+                    href={`/tenant/${slugForRelated ? slugForRelated : listing.tenantId}`}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
                     title="Browse products on the storefront"
                   >
@@ -571,7 +571,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="text-2xl font-bold text-gray-900">Featured Products</h2>
                       <Link
-                        href={`/tenant/${listing.tenantId}`}
+                        href={`/tenant/${slugForRelated ? slugForRelated : listing.tenantId}`}
                         className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                       >
                         View All Products →
@@ -772,6 +772,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
       {/* Related Stores */}
       <RelatedStores 
         currentSlug={slugForRelated} 
+        limit={3}
         title="Similar Stores"
       />
 

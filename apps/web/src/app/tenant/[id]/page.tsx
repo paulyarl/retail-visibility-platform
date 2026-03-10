@@ -294,6 +294,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   const isProductsOnly = products_only === 'true';
 
   const data = await getTenantWithProducts(id, currentPage, 12, search, category, featured);
+  console.log('[TenantStorefrontPage] data:', data);
 
   if (!data) {
     notFound();
@@ -338,7 +339,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   const totalPages = Math.ceil(total / limit);
 
   // API base URL for additional calls
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+ // const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
   // Fetch directory publish status and actual slug using singleton services
   let directoryPublished = false;
@@ -347,12 +348,14 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   try {
     // Use tenant directory service to get the actual slug from the API
     const apiSlug = await tenantDirectoryService.getTenantSlug(id);
+    console.log('[TenantPage] API slug:', apiSlug);
 
     // Use hasPublishedDirectory from tenant data (already fetched) instead of making another API call
     directoryPublished = tenant.hasPublishedDirectory ?? false;
 
     // Use API slug if available, otherwise generate from business name or use tenant ID
-    tenantSlug = apiSlug || businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
+    tenantSlug = apiSlug || data.tenant?.slug || id;
+    console.log('[TenantPage] Final tenantSlug:', tenantSlug);
   } catch (e) {
     // Directory page doesn't exist or error - store is not published
     console.warn('[TenantPage] Directory service failed:', e);
@@ -480,8 +483,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
           category={category}
           featured={featured}
           view={view}
-          isProductsOnly={isProductsOnly}
-          apiBaseUrl={apiBaseUrl}
+          isProductsOnly={isProductsOnly} 
           directoryPublished={directoryPublished}
           tenantSlug={tenantSlug}
           primaryGBPCategory={primaryGBPCategory}

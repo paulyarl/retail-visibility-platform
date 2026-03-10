@@ -141,9 +141,9 @@ class DirectorySingletonService extends PublicApiSingleton {
   protected defaultRequestType: RequestType = RequestType.PUBLIC;
   protected defaultRequestTarget: RequestTarget = RequestTarget.API; // Use API backend (port 4000)
   protected cacheTTL: number = 15 * 60 * 1000; // 15 minutes for public data
-  private readonly CACHE_TTL_SHORT = 2 * 60 * 1000; // 2 minutes
+  //private readonly CACHE_TTL_SHORT = 2 * 60 * 1000; // 2 minutes
   private readonly CACHE_TTL_MEDIUM = 15 * 60 * 1000; // 15 minutes
-  private readonly CACHE_TTL_LONG = 60 * 60 * 1000; // 1 hour
+  //private readonly CACHE_TTL_LONG = 60 * 60 * 1000; // 1 hour
 
   private constructor() {
     super('directory-singleton');

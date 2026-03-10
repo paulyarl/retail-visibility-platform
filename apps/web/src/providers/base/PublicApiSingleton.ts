@@ -10,6 +10,7 @@
 
 import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions } from './FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
+import { ResolverType, ResolverResponse } from '../../types/resolver';
 
 // ====================
 // PUBLIC API SINGLETON
@@ -22,11 +23,73 @@ export abstract class PublicApiSingleton extends FlexibleApiSingleton {
   protected defaultIsolation: CacheIsolation = CacheIsolation.GLOBAL;
   protected cacheTTL: number = 15 * 60 * 1000; // 15 minutes for public data
   
+  // Resolver cache TTLs
+  protected CACHE_TTL_LONG = 3600 * 1000; // 1 hour for successful resolutions
+  protected CACHE_TTL_SHORT = 5 * 60 * 1000; // 5 minutes for failed resolutions
+  
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     super(singletonKey, {
       ttl: 15 * 60 * 1000, // 15 minutes for public data
       ...cacheOptions
     });
+  }
+
+  /**
+   * Type-safe identifier resolver
+   * Resolves slugs to canonical IDs using existing working endpoint
+   * Uses makeDefaultRequest for automatic context/isolation
+   */
+  protected async resolveIdentifier<T extends ResolverType>(
+    identifier: string, 
+    type: T
+  ): Promise<string> {
+    const cacheKey = `resolved-${type}:${identifier}`;
+    
+    // Use existing working endpoint for tenant resolution
+    const endpoint = type === ResolverType.TENANT 
+      ? `/directory/resolve-slug/${identifier}`
+      : `/resolver/${type}/${identifier}`; // Fallback for other types
+    
+    console.log(`[PublicApiSingleton] Resolving ${type}/${identifier} via endpoint: ${endpoint}`);
+    
+    try {
+      const response = await this.makeDefaultRequest<any>(
+        endpoint,
+        {},
+        cacheKey,
+        this.CACHE_TTL_LONG
+      );
+
+      console.log(`[PublicApiSingleton] Resolver response for ${type}/${identifier}:`, response);
+
+      // Handle different response formats
+      let resolvedId: string;
+      
+      if (type === ResolverType.TENANT) {
+        // Directory resolve-slug endpoint returns { success: true, tenantId: "tid-..." }
+        if (!response?.success || !response?.data.tenantId) {
+          console.error(`[PublicApiSingleton] Invalid response for ${type}/${identifier}:`, response);
+          throw new Error(`${type} not found for identifier: ${identifier}`);
+        }
+        resolvedId = response.data.tenantId;
+      } else {
+        // Other resolvers return { success: true, data: { resolvedId: "..." } }
+        if (!response?.success || !response?.data?.resolvedId) {
+          console.error(`[PublicApiSingleton] Invalid response for ${type}/${identifier}:`, response);
+          throw new Error(`${type} not found for identifier: ${identifier}`);
+        }
+        resolvedId = response.data.resolvedId;
+      }
+
+      console.log(`[PublicApiSingleton] Successfully resolved ${type}/${identifier} → ${resolvedId}`);
+      return resolvedId;
+      
+    } catch (error) {
+      console.error(`[PublicApiSingleton] Resolver failed for ${type}/${identifier}:`, error);
+      // Don't cache failures immediately - let the next request try again
+      // This prevents permanent cache poisoning on temporary failures
+      throw error;
+    }
   }
   
   // ✅ All makeRequest methods inherited from FlexibleApiSingleton

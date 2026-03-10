@@ -32,6 +32,7 @@
 import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingleton';
 import { logger } from '../logger';
 import { basePrisma } from '../prisma';
+import { getDirectPool } from '../utils/db-pool';
 import { 
   generateUniqueDirectorySlug, 
   getTenantLocation, 
@@ -327,6 +328,20 @@ class SlugSingletonService extends UniversalSingleton {
         },
       });
 
+      // Also update directory_listings_list table to sync with new slug
+      try {
+        await getDirectPool().query(
+          `UPDATE directory_listings_list 
+           SET slug = $1, updated_at = NOW() 
+           WHERE tenant_id = $2`,
+          [newSlug, tenantId]
+        );
+        logger.info(`[SlugSingletonService] Updated directory listing slug to: ${newSlug} for tenant ${tenantId}`);
+      } catch (directoryError) {
+        logger.warn('[SlugSingletonService] Failed to update directory listing slug', undefined, { tenantId, error: directoryError });
+        // Don't fail the entire operation if directory sync fails
+      }
+
       // Invalidate cache
       const cacheKey = `slug:${tenantId}`;
       await this.clearCache(cacheKey);
@@ -336,6 +351,10 @@ class SlugSingletonService extends UniversalSingleton {
       
       // Invalidate shop data cache (used by ShopManagementService)
       await this.clearCache(`shop_data:${tenantId}`);
+
+      // Invalidate directory-related cache entries
+      await this.clearCache(`directory-consolidated-${newSlug}`);
+      await this.clearCache(`directory-consolidated-${tenantId}`);
 
       logger.info(`[SlugSingletonService] Updated slug to: ${newSlug} for tenant ${tenantId}`);
     } catch (error: unknown) {

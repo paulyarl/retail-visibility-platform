@@ -41,8 +41,7 @@ interface StorefrontClientWrapperProps {
   category?: string;
   featured?: string;
   view?: string;
-  isProductsOnly: boolean;
-  apiBaseUrl: string;
+  isProductsOnly: boolean; 
   directoryPublished: boolean;
   tenantSlug: string;
   primaryGBPCategory: any;
@@ -75,8 +74,7 @@ export default function StorefrontClientWrapper({
   category,
   featured,
   view,
-  isProductsOnly,
-  apiBaseUrl,
+  isProductsOnly, 
   directoryPublished,
   tenantSlug,
   primaryGBPCategory,

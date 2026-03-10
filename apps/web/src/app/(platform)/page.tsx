@@ -254,7 +254,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     alt={settings.platformName || 'Platform Logo'}
                     width={150}
                     height={40}
-                    className="h-8 sm:h-10 w-auto object-contain cursor-pointer"
+                    className="object-contain cursor-pointer"
                   />
                 </Link>
               ) : (

@@ -18,14 +18,16 @@ interface RecommendedProduct {
   tenantId: string;
   has_active_payment_gateway?: boolean;
   payment_gateway_type?: string | null;
+  tenantSlug?: string;
 }
 
 interface ProductRecommendationsProps {
   productId: string;
   tenantId: string;
+  tenantSlug?: string;
 }
 
-export function ProductRecommendations({ productId, tenantId }: ProductRecommendationsProps) {
+export function ProductRecommendations({ productId, tenantId, tenantSlug }: ProductRecommendationsProps) {
   const [recommendations, setRecommendations] = useState<RecommendedProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -97,6 +99,7 @@ export function ProductRecommendations({ productId, tenantId }: ProductRecommend
               showCategory={false}
               showDescription={false}
               className="h-full"
+              tenantSlug={product.tenantSlug || ''}
             />
           );
         })}
@@ -106,10 +109,10 @@ export function ProductRecommendations({ productId, tenantId }: ProductRecommend
       {recommendations.length >= 6 && (
         <div className="mt-8 text-center">
           <Link
-            href={`/tenant/${tenantId}`}
+            href={tenantSlug ? `/shops/${tenantSlug}` : `/tenant/${tenantId}`}
             className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Browse All Products →
+            Browse All Our Products →
           </Link>
         </div>
       )}

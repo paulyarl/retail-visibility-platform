@@ -16,9 +16,10 @@ import TenantLimitBadge from "@/components/tenant/TenantLimitBadge";
 import SubscriptionStateBanner from "@/components/subscription/SubscriptionStateBanner";
 import LocationStatusBanner from "@/components/tenant/LocationStatusBanner";
 import { useState, useEffect } from "react";
-import { apiRequest } from "@/lib/api";
 import { computeStoreStatus } from "@/lib/hours-utils";
+import { tenantSlugService } from '../../services/TenantSlugService';
 import { tenantInfoService } from '../../services/TenantInfoService';
+import { platformHomeService } from '../../services/PlatformHomeSingletonService';
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -55,6 +56,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   
   // Consolidated data fetching - replaces 3 separate API calls with 1
   const { tenant: tenantData, tier, usage, loading: completeLoading, error: completeError, refresh: refreshTenantData } = useTenantComplete(tenantId);
+
   
   // User profile (still separate since it's user-specific, not tenant-specific)
   const { profile, loading: profileLoading } = useUserProfile();
@@ -73,14 +75,16 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   
   const loading = completeLoading || profileLoading || businessProfileLoading;
   const error = completeError;
+  
+  const slugs = tenantSlugService.getTenantSlug({ businessName: tenantData?.name || '', tenantId });
 
+  console.log(`${TenantDashboard.name} tenant slugs`, slugs);
   // Fetch business profile for logo
   useEffect(() => {
     const fetchBusinessProfile = async () => {
       try {
-        const res = await apiRequest(`/api/tenant/profile?tenant_id=${tenantId}`);
-        if (res.ok) {
-          const data = await res.json();
+        const data = await platformHomeService.getTenantProfile(tenantId);
+        if (data) {
           setBusinessProfile(data);
         }
       } catch (error) {

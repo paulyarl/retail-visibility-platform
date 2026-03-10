@@ -22,7 +22,7 @@ export default function PublicFooter() {
                 alt={settings.platformName || 'Platform Logo'}
                 width={150}
                 height={40}
-                className="h-10 w-auto object-contain mb-4"
+                className="object-contain mb-4"
               />
             ) : (
               <h3 className="text-lg font-bold text-neutral-900 mb-4">
