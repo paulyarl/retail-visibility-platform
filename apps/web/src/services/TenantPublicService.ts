@@ -86,6 +86,7 @@ class TenantPublicService extends PublicApiSingleton {
         console.error('[TenantPublicService] Failed to get public tenant info:', response.error);
         return null;
       }
+      console.log(`${this.constructor.name} - Info Response:`, response.data);
 
       return response.data;
     } catch (error) {
@@ -112,6 +113,8 @@ class TenantPublicService extends PublicApiSingleton {
         return null;
       }
 
+      console.log(`${this.constructor.name} - Logo Response:`, response.data);
+
       return response.data;
     } catch (error) {
       console.error('[TenantPublicService] Failed to get tenant logo:', error);
@@ -136,6 +139,7 @@ class TenantPublicService extends PublicApiSingleton {
         console.error('[TenantPublicService] Failed to get public tenant tier:', response.error);
         return null;
       }
+      console.log(`${this.constructor.name} - Tier Response:`, response.data);
 
       return response.data;
     } catch (error) {
@@ -160,6 +164,7 @@ class TenantPublicService extends PublicApiSingleton {
         console.error('[TenantPublicService] Failed to get public tenant profile:', response.error);
         return null;
       }
+      console.log(`${this.constructor.name} - Profile Response:`, response.data);
 
       return response.data||null;
     } catch (error) {
@@ -185,6 +190,7 @@ class TenantPublicService extends PublicApiSingleton {
         console.error('[TenantPublicService] Failed to get tenant business hours:', response.error);
         return null;
       }
+      console.log(`${this.constructor.name} - Hours Response:`, response.data);
 
       return response.data;
     } catch (error) {
@@ -209,6 +215,8 @@ class TenantPublicService extends PublicApiSingleton {
     try {
       const profile = await this.getPublicTenantProfile(tenantId);
       if (!profile) return null;
+
+      console.log(`${this.constructor.name} - Directory Info Response:`, profile);
 
       return {
         id: profile.id,

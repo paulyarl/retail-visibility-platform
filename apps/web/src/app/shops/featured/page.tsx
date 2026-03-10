@@ -287,7 +287,8 @@ export default function FeaturedProductsPage() {
       {/* Page Header with horizontal gradient background */}
       <div className="bg-gradient-to-r from-blue-100 via-indigo-50 to-purple-50 dark:from-gray-800 dark:via-gray-850 dark:to-gray-900 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between">
+          {/* Mobile: Stacked layout, Desktop: Side by side */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
             {/* Column 1: Platform Branding */}
             <div className="flex items-center gap-4">
               <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg overflow-hidden">
@@ -312,7 +313,7 @@ export default function FeaturedProductsPage() {
             </div>
             
             {/* Column 2: Page Name */}
-            <div className="text-right">
+            <div className="text-center sm:text-right">
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 Featured Products
               </h1>
@@ -323,7 +324,7 @@ export default function FeaturedProductsPage() {
           </div>
           
           {/* Navigation Links */}
-          <div className="flex items-center gap-2 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex flex-wrap items-center gap-2 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
             <Link 
               href="/shops"
               className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"

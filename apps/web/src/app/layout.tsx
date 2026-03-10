@@ -13,6 +13,8 @@ import { FloatingCartWidget } from "@/components/cart/FloatingCartWidget";
 import { UniversalProvider } from "@/providers/UniversalProvider";
 import { PlatformThemeProvider } from "@/contexts/PlatformThemeProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+// Import contextCacheManager to ensure it loads and makes test available globally
+import "@/utils/contextCacheManager";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

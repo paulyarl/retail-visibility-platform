@@ -89,7 +89,7 @@ interface DirectoryConsolidated {
 }
 
 interface ShopData {
-  tenantId: string;
+  id: string;
   name: string;
   slug: string;
   business_name?: string;
@@ -101,15 +101,20 @@ interface ShopData {
   city?: string;
   state?: string;
   zip_code?: string;
+  location?: string;
   phone?: string;
+  email?: string;
   website?: string;
+  social_links?: any;
+  default_gateway_type?: string;
+  has_active_payment_gateway?: boolean;
   rating?: number;
   rating_count?: number;
   productCount: number;
   is_published: boolean;
   primary_category?: string;
   category?: string;
-  created_at: Date;
+  created_at: string;
   tenantName?: string;
   latitude?: number;
   longitude?: number;
@@ -118,16 +123,8 @@ interface ShopData {
     phone: string;
     website: string;
   };
-  hours?: {
-    monday: string;
-    tuesday: string;
-    wednesday: string;
-    thursday: string;
-    friday: string;
-    saturday: string;
-    sunday: string;
-  };
-  description?: string;
+  businessHours?: any;
+  businessDescription?: string;
 }
 
 interface Shop {
@@ -148,10 +145,11 @@ interface ShopProfileClientProps {
       data: ShopData;
     };
   };
+  businessHours?: any;
 }
 
 // Shop profile header component
-function ShopProfileHeader({ shop, shopData }: { 
+function ShopProfileHeader({ shop, shopData, businessHours }: { 
   shop: {
     success: boolean;
     data: {
@@ -160,13 +158,14 @@ function ShopProfileHeader({ shop, shopData }: {
     };
   };
   shopData: ShopData;
+  businessHours?: any;
 }) {
   // Create a directory listing object from shop data for the photo gallery
   const directoryListing = shopData ? {
-    id: shopData.tenantId,
-    tenantId: shopData.tenantId,
+    id: shopData.id,
+    tenantId: shopData.id,
     name: shopData.name,
-    description: shopData.description,
+    description: shopData.business_name || shopData.name,
     imageUrl: shopData.imageUrl,
     logo_url: shopData.logo_url,
     bannerUrl: shopData.bannerUrl,
@@ -174,7 +173,7 @@ function ShopProfileHeader({ shop, shopData }: {
   } : null;
 
   // Check if shop data exists and is valid
-  if (!shop || !shop.success || !shopData || !shopData.tenantId) {
+  if (!shop || !shop.success || !shopData || !shopData.id) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -265,7 +264,7 @@ function ShopProfileHeader({ shop, shopData }: {
             {/* Column 2: Action Buttons */}
             <div className="flex items-center space-x-3">
               <StorefrontActions 
-                tenantId={shopData.tenantId}
+                tenantId={shopData.id}
                 businessName={shopData.name}
               />
               
@@ -330,47 +329,8 @@ function ShopProfileHeader({ shop, shopData }: {
             )}
 
             {/* Business Hours */}
-            {shopData.hours && typeof shopData.hours === 'object' && 
-             !('timezone' in shopData.hours) && Object.keys(shopData.hours).some(key => 
-               ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].includes(key.toLowerCase())
-             ) && (
-              <BusinessHoursCollapsible businessHours={{
-                periods: Object.entries(shopData.hours as Record<string, string>).map(([day, hours]) => {
-                  // Skip if hours is not a string or doesn't contain expected format
-                  if (typeof hours !== 'string' || !hours.includes(' - ')) {
-                    return null;
-                  }
-                  
-                  const [open, close] = hours.split(' - ');
-                  const convertTo24Hour = (time12: string): string => {
-                    if (!time12 || time12 === 'Closed') return '00:00';
-                    
-                    // Handle different time formats
-                    const timeParts = time12.trim().split(' ');
-                    if (timeParts.length !== 2) return '00:00';
-                    
-                    const [time, period] = timeParts;
-                    const timeComponents = time.split(':');
-                    
-                    // Validate time components
-                    if (timeComponents.length !== 2) return '00:00';
-                    
-                    const [h, m] = timeComponents.map(Number);
-                    if (isNaN(h) || isNaN(m)) return '00:00';
-                    if (!period || (period !== 'AM' && period !== 'PM')) return '00:00';
-                    
-                    const hour24 = period === 'PM' && h !== 12 ? h + 12 : period === 'AM' && h === 12 ? 0 : h;
-                    return `${hour24.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                  };
-                  
-                  return {
-                    open_day: day.charAt(0).toUpperCase() + day.slice(1),
-                    close_day: day.charAt(0).toUpperCase() + day.slice(1),
-                    open_time: convertTo24Hour(open),
-                    close_time: convertTo24Hour(close)
-                  };
-                }).filter(Boolean) // Filter out null entries
-              }} />
+            {businessHours && (
+              <BusinessHoursCollapsible businessHours={businessHours} />
             )}
           </div>
 
@@ -382,7 +342,7 @@ function ShopProfileHeader({ shop, shopData }: {
                 <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4">
                   <StorefrontMap
                     tenant={{
-                      id: shopData.tenantId,
+                      id: shopData.id,
                       businessName: shopData.name,
                       slug: shopData.slug,
                       metadata: {
@@ -459,11 +419,11 @@ function ShopProfileHeader({ shop, shopData }: {
             </Card>
 
             {/* Shop Description */}
-            {shopData.description && (
+            {shopData.business_name && (
               <Card withBorder padding="lg" radius="md">
                 <Text fw={600} size="lg" mb="md">About Us</Text>
                 <Text className="text-gray-700 leading-relaxed">
-                  {shopData.description}
+                  {shopData.business_name}
                 </Text>
               </Card>
             )}
@@ -475,7 +435,7 @@ function ShopProfileHeader({ shop, shopData }: {
 }
 
 // Main Shop Profile Client Component
-export default function ShopProfileClient({ shop }: {
+export default function ShopProfileClient({ shop, businessHours }: {
   shop: {
     success: boolean;
     data: {
@@ -483,12 +443,13 @@ export default function ShopProfileClient({ shop }: {
       data: ShopData;
     };
   };
+  businessHours: any;
 }) {
   // Extract shop data once at the top
   const shopData = (shop.data as any)?.data;
   //console.log(shopData);
   // Check if shop data exists and is valid
-  if (!shop || !shop.success || !shopData || !shopData.tenantId) {
+  if (!shop || !shop.success || !shopData || !shopData.id) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -510,7 +471,7 @@ export default function ShopProfileClient({ shop }: {
     <div className="min-h-screen bg-gray-50">
       {/* Track shop page view */}
       <ShopViewTracker 
-        tenantId={shopData.tenantId} 
+        tenantId={shopData.id} 
         shopName={shopData.name}
         category={shopData.category || null}
         pageType="shop_detail"
@@ -554,7 +515,7 @@ export default function ShopProfileClient({ shop }: {
                   Trending
                 </Link>
                  <Divider orientation="vertical" h={24} />
-              <StoreStatusIndicator tenantId={shopData.tenantId} />
+              <StoreStatusIndicator tenantId={shopData.id} />
               </div>
              
             </div>
@@ -577,7 +538,7 @@ export default function ShopProfileClient({ shop }: {
         </div>
       </div>
 
-      <ShopProfileHeader shop={shop} shopData={shopData} />
+      <ShopProfileHeader shop={shop} shopData={shopData} businessHours={businessHours} />
 
       {/* Products Section */}
       <div className="bg-gray-50 py-8">
@@ -594,14 +555,18 @@ export default function ShopProfileClient({ shop }: {
             {/* Product Search */}
             <div className="bg-white rounded-lg border shadow-sm">
               <ProductSearch 
-                tenantId={shopData.tenantId}
+                tenantId={shopData.id}
               />
             </div>
           </div>
 
           {/* Featured Products - Centered with page margins */}
           <div className="mb-12">
-            <StorefrontFeaturedProducts tenantId={shopData.tenantId} />
+            <StorefrontFeaturedProducts 
+              tenantId={shopData.id} 
+              hasActivePaymentGateway={shopData.has_active_payment_gateway}
+              defaultGatewayType={shopData.default_gateway_type}
+            />
           </div>
 
           {/* Recently Viewed - Centered with page margins */}

@@ -15,7 +15,12 @@ export interface Shop {
   zip_code?: string;
   location?: string;
   phone?: string;
+  email?: string;
   website?: string;
+  social_links?: any;
+  seo_tags?: any;
+  default_gateway_type?: string;
+  has_active_payment_gateway?: boolean;
   rating?: number;
   rating_count?: number;
   reviewCount?: number;
@@ -191,29 +196,39 @@ class ShopService extends UniversalSingleton {
       // Use mv_global_discovery for optimized shop data retrieval
       const query = `
         SELECT DISTINCT
-          tenant_id,
-          tenant_name,
-          tenant_slug,
-          tenant_logo_url,
-          tenant_address,
-          tenant_city,
-          tenant_state,
-          tenant_zip,
-          shop_category as primary_category,
-          subscription_tier,
-          store_average_rating,
-          store_review_count,
-          tenant_latitude,
-          tenant_longitude,
+          d.tenant_id,
+          d.tenant_name,
+          d.tenant_slug,
+          d.tenant_logo_url,
+          d.tenant_address,
+          d.tenant_city,
+          d.tenant_state,
+          d.tenant_zip,
+          bp.phone_number,
+          bp.email,
+          bp.website,
+          bp.social_links,
+          bp.seo_tags,
+          d.shop_category as primary_category,
+          d.subscription_tier,
+          d.store_average_rating,
+          d.store_review_count,
+          d.tenant_latitude,
+          d.tenant_longitude,
+          d.default_gateway_type,
+          d.has_active_payment_gateway,
           COUNT(DISTINCT inventory_item_id) FILTER (WHERE item_status = 'active' AND visibility = 'public') as product_count
-        FROM mv_global_discovery
-        WHERE tenant_id = $1
+        FROM mv_global_discovery d
+        LEFT JOIN tenant_business_profiles_list bp ON d.tenant_id = bp.tenant_id
+        WHERE d.tenant_id = $1
         GROUP BY 
-          tenant_id, tenant_name, tenant_slug,
-          tenant_logo_url, tenant_address, tenant_city, tenant_state,
-          tenant_zip, shop_category, subscription_tier,
-          store_average_rating, store_review_count,
-          tenant_latitude, tenant_longitude
+          d.tenant_id, d.tenant_name, d.tenant_slug,
+          d.tenant_logo_url, d.tenant_address, d.tenant_city, d.tenant_state,
+          d.tenant_zip, bp.phone_number, bp.email, bp.website, bp.social_links, bp.seo_tags,
+          d.shop_category, d.subscription_tier,
+          d.store_average_rating, d.store_review_count,
+          d.tenant_latitude, d.tenant_longitude,
+          d.default_gateway_type, d.has_active_payment_gateway
         LIMIT 1
       `;
 
@@ -235,8 +250,13 @@ class ShopService extends UniversalSingleton {
         state: row.tenant_state || undefined,
         zip_code: row.tenant_zip || undefined,
         location: `${row.tenant_city || ''}${row.tenant_city && row.tenant_state ? ', ' : ''}${row.tenant_state || ''}`,
-        phone: undefined,
-        website: undefined,
+        phone: row.phone_number || undefined,
+        email: row.email || undefined,
+        website: row.website || undefined,
+        social_links: row.social_links || undefined,
+        seo_tags: row.seo_tags || undefined,
+        default_gateway_type: row.default_gateway_type || undefined,
+        has_active_payment_gateway: row.has_active_payment_gateway || false,
         rating: row.store_average_rating ? parseFloat(row.store_average_rating) : undefined,
         rating_count: row.store_review_count ? parseInt(row.store_review_count) : undefined,
         productCount: parseInt(row.product_count) || 0,

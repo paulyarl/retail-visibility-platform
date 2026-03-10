@@ -38,6 +38,9 @@ interface ProductDisplayProps {
   tenantId: string;
   tenantName?: string;
   tenantLogo?: string;
+  // Payment gateway status to avoid individual API calls
+  hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
   // New props for singleton integration
   useSingletonData?: boolean; // Whether to enhance with singleton data
   showFeaturedBadges?: boolean; // Whether to show featured type badges
@@ -57,6 +60,8 @@ export default function ProductDisplay({
   tenantId, 
   tenantName, 
   tenantLogo,
+  hasActivePaymentGateway,
+  defaultGatewayType,
   useSingletonData = true,
   showFeaturedBadges = true,
   initialPageSize = 6,
@@ -540,7 +545,9 @@ export default function ProductDisplay({
                       product={currentProduct}
                       tenantId={tenantId}
                       tenantName={tenantName}
-                      tenantLogo={tenantLogo}
+                      hasActivePaymentGateway={hasActivePaymentGateway}
+                      defaultGatewayType={defaultGatewayType}
+                      variant="featured"
                     />
                   </div>
                 </div>
@@ -623,6 +630,8 @@ export default function ProductDisplay({
               product={product}
               tenantName={tenantName}
               tenantLogo={tenantLogo}
+              hasActivePaymentGateway={hasActivePaymentGateway}
+              defaultGatewayType={defaultGatewayType}
               variant={viewMode === 'grid' ? 'grid' : 'list'}
             />
           ))}

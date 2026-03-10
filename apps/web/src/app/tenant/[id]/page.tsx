@@ -32,7 +32,6 @@ import { tenantPublicService } from '@/services/TenantPublicService';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
 import { storefrontService } from '@/services/StorefrontSingletonService';
 import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
-import { directoryService } from '@/services/DirectorySingletonService';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
 
@@ -107,11 +106,25 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
   try {
     
     // Use public services for public tenant page
-    const [tenant, businessProfile, businessHours] = await Promise.all([
+    const [tenant, shopInfo, businessHoursStatus] = await Promise.all([
       tenantPublicService.getPublicTenantInfo(tenantId),
-      tenantPublicService.getPublicTenantProfile(tenantId),
+      fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/public/shops/id/${tenantId}`).then(res => res.json()).catch(() => null),
       tenantPublicService.getTenantBusinessHours(tenantId)
     ]);
+    
+    // Fetch detailed business hours separately
+    let businessHours = null;
+    try {
+      const hoursResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/business-hours/${tenantId}`);
+      if (hoursResponse.ok) {
+        const hoursData = await hoursResponse.json();
+        if (hoursData.success) {
+          businessHours = hoursData.data;
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching business hours:', error);
+    }
     
     if (!tenant) {
       return null;
@@ -119,25 +132,40 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
 
     // Extract actual data from response objects
     const tenantData = (tenant as any)?.data || tenant;
-    const businessProfileData = (businessProfile as any)?.data || businessProfile;
+    const shopData = shopInfo?.success ? shopInfo.shop : null;
     const rawBusinessHours = businessHours;
 
-    // Merge business profile data into tenant metadata
-    if (businessProfileData) {
+    // Merge shop data into tenant metadata for contact information
+    if (shopData) {
+      console.log('[TenantPage] Shop Data:', shopData);
+      console.log('[TenantPage] Shop Address:', shopData.address);
+      console.log('[TenantPage] Shop Phone:', shopData.phone);
+      console.log('[TenantPage] Shop Email:', shopData.email);
+      console.log('[TenantPage] Shop Website:', shopData.website);
+      
       tenantData.metadata = {
         ...tenantData.metadata,
-        ...businessProfileData?.metadata, // Preserve GBP categories and other metadata from profile
-        businessName: businessProfileData?.business_name || tenantData.name,
-        phone: businessProfileData?.phone_number || null,
-        email: businessProfileData?.email || null,
-        website: businessProfileData?.website || null,
-        address: businessProfileData?.address_line1
-          ? `${businessProfileData.address_line1}${businessProfileData.address_line2 ? ', ' + businessProfileData.address_line2 : ''}, ${businessProfileData.city}, ${businessProfileData.state} ${businessProfileData.postal_code}`
+        businessName: shopData.business_name || tenantData.name,
+        phone: shopData.phone || null,
+        email: shopData.email || null,
+        website: shopData.website || null,
+        address: shopData.address && shopData.city && shopData.state && shopData.zip_code
+          ? `${shopData.address}, ${shopData.city}, ${shopData.state} ${shopData.zip_code}`
           : null,
-        logo_url: businessProfileData?.logo_url || tenantData.logo_url || tenantData.metadata?.logo_url,
-        business_description: businessProfileData?.business_description || null,
-        social_links: businessProfileData?.social_links || null,
+        logo_url: shopData.imageUrl || tenantData.logo_url || tenantData.metadata?.logo_url,
+        business_description: shopData.description || null,
+        defaultGatewayType: shopData.default_gateway_type || null,
+        hasActivePaymentGateway: shopData.has_active_payment_gateway || false,
       };
+      
+      console.log('[TenantPage] Merged Tenant Metadata:', tenantData.metadata);
+      console.log('[TenantPage] Merged Phone:', tenantData.metadata.phone);
+      console.log('[TenantPage] Merged Email:', tenantData.metadata.email);
+      console.log('[TenantPage] Merged Address:', tenantData.metadata.address);
+      console.log('[TenantPage] Merged Website:', tenantData.metadata.website);
+    } else {
+      console.log('[TenantPage] No shop data found');
+      console.log('[TenantPage] Raw shopInfo:', shopInfo);
     }
 
     const hasLogo = !!tenantData.metadata?.logo_url;
@@ -225,7 +253,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Find current category name if filtering
     const currentCategory = category ? categories.find((c: Category) => c.slug === category) : null;
 
-    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours: rawBusinessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory };
+    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -285,6 +313,13 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
   const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
+
+  // Log what data we're passing to StorefrontClientWrapper
+  console.log('[TenantPage Main] Tenant metadata being passed:', tenant.metadata);
+  console.log('[TenantPage Main] Tenant phone:', tenant.metadata?.phone);
+  console.log('[TenantPage Main] Tenant email:', tenant.metadata?.email);
+  console.log('[TenantPage Main] Tenant address:', tenant.metadata?.address);
+  console.log('[TenantPage Main] Business hours:', businessHours);
 
   // Track storefront view for recommendations (fire and forget)
   if (category && currentCategory) {
@@ -440,6 +475,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
           storeCategories={storeCategories}
           uncategorizedCount={uncategorizedCount}
           businessName={businessName}
+          businessHours={businessHours}
           search={search}
           category={category}
           featured={featured}

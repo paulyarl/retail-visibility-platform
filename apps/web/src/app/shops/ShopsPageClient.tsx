@@ -415,7 +415,7 @@ const FeaturedSection: React.FC<FeaturedSectionProps> = ({
           </div>
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Hand-picked stores for you</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Viral stores for you</p>
           </div>
         </div>
         {viewAllLink && (
@@ -757,9 +757,10 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          {/* Mobile: Stacked layout, Desktop: Side by side */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-4">
+            {/* Navigation Links */}
             <div className="flex items-center">
-              {/* Navigation Links */}
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 font-medium">
                   <Store className="h-4 w-4" />
@@ -792,7 +793,8 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
               </div>
             </div>
             
-            <div className="flex items-center space-x-4">
+            {/* Search and Filters */}
+            <div className="flex items-center space-x-2 sm:space-x-4">
               {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />

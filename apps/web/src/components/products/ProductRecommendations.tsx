@@ -91,6 +91,8 @@ export function ProductRecommendations({ productId, tenantId }: ProductRecommend
                 payment_gateway_type: product.payment_gateway_type,
               }}
               tenantName=""
+              hasActivePaymentGateway={product.has_active_payment_gateway}
+              defaultGatewayType={product.payment_gateway_type || undefined}
               variant="compact"
               showCategory={false}
               showDescription={false}

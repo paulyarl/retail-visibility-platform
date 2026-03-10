@@ -17,6 +17,7 @@ import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPa
 import StorefrontActions from '@/components/storefront/StorefrontActions';
 import { enhancedProductService, type EnhancedProduct, type FeaturedType } from '@/services/EnhancedProductService';
 import { productPhotosService, type Photo } from '@/services/ProductPhotosService';
+import { shopsService } from '@/services/ShopsService';
 import { Badge, Group } from '@mantine/core';
 import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame } from 'lucide-react';
 
@@ -30,6 +31,21 @@ async function getProduct(id: string): Promise<EnhancedProduct | null> {
 
 async function getProductPhotos(productData: EnhancedProduct): Promise<Photo[]> {
   return await productPhotosService.getProductPhotos(productData);
+}
+
+async function getShopData(tenantId: string) {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/public/shops/id/${tenantId}`);
+    if (!response.ok) {
+      console.error('Error fetching shop data:', response.statusText);
+      return null;
+    }
+    const data = await response.json();
+    return data.success ? data.shop : null;
+  } catch (error) {
+    console.error('Error fetching shop data:', error);
+    return null;
+  }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -65,6 +81,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   }
 
   const gallery = await getProductPhotos(product);
+  const shopData = await getShopData(product.tenant_id);
 
   const businessName = product.tenant_name || 'Unknown Store';
   
@@ -199,11 +216,18 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           name: product.tenant_name,
           slug: product.tenant_slug,
           subscriptionTier: product.subscription_tier,
-          hasActivePaymentGateway: false, // TODO: Fix payment gateway status after API migration
+          hasActivePaymentGateway: shopData?.has_active_payment_gateway || false,
+          defaultGatewayType: shopData?.default_gateway_type || undefined,
           metadata: {
-            businessName: product.tenant_name,
-            address: product.tenant_address,
-            logo_url: product.tenant_logo_url,
+            businessName: shopData?.business_name || product.tenant_name,
+            phone: shopData?.phone || undefined,
+            email: shopData?.email || undefined,
+            website: shopData?.website || undefined,
+            address: shopData?.address ? 
+              `${shopData.address}${shopData.city ? ', ' + shopData.city : ''}${shopData.state ? ', ' + shopData.state : ''}${shopData.zip_code ? ' ' + shopData.zip_code : ''}` : 
+              product.tenant_address,
+            logo_url: shopData?.imageUrl || product.tenant_logo_url,
+            social_links: shopData?.social_links || undefined,
           },
         } as any}
         storeStatus={null}
@@ -234,7 +258,25 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
       {/* Business Information */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <ProductBusinessInfoCollapsible product={product as any} tenant={{ id: product.tenant_id, name: product.tenant_name, metadata: { businessName: product.tenant_name, address: product.tenant_address, logo_url: product.tenant_logo_url } }} storeStatus={null} />
+        <ProductBusinessInfoCollapsible 
+          product={product as any} 
+          tenant={{
+            id: product.tenant_id, 
+            name: product.tenant_name, 
+            metadata: {
+              businessName: shopData?.business_name || product.tenant_name,
+              phone: shopData?.phone || undefined,
+              email: shopData?.email || undefined,
+              website: shopData?.website || undefined,
+              address: shopData?.address ? 
+                `${shopData.address}${shopData.city ? ', ' + shopData.city : ''}${shopData.state ? ', ' + shopData.state : ''}${shopData.zip_code ? ' ' + shopData.zip_code : ''}` : 
+                product.tenant_address,
+              logo_url: shopData?.imageUrl || product.tenant_logo_url,
+              social_links: shopData?.social_links || undefined,
+            }
+          }} 
+          storeStatus={null} 
+        />
       </div>
 
       {/* Recently Viewed Products */}

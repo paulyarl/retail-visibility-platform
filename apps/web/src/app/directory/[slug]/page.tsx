@@ -605,6 +605,8 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                           }}
                           tenantName={listing.businessName}
                           tenantLogo={listing.logoUrl}
+                          hasActivePaymentGateway={paymentGatewayStatus.hasActiveGateway}
+                          defaultGatewayType={paymentGatewayStatus.defaultGatewayType}
                           variant="featured"
                           showCategory={true}
                           showDescription={true}

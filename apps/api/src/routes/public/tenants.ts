@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../../prisma';
 import { Prisma } from '@prisma/client';
 import { getDirectPool } from '../../utils/db-pool';
+import TenantProfileService from '../../services/TenantProfileService';
 const tenantReviewsRoutes = require('./[tenantId]/reviews').default;
 
 const router = Router();
@@ -109,6 +110,91 @@ router.get('/slug/:slug/tenant', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Slug tenant error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/public/tenant/:tenantId/profile - Get public tenant profile with contact information
+router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    
+    if (!tenantId) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Tenant ID is required' 
+      });
+    }
+
+    console.log(`[Public Tenant Profile] Fetching profile for tenant: ${tenantId}`);
+
+    // Get singleton instance of TenantProfileService
+    const tenantService = TenantProfileService.getInstance();
+    
+    // Get the tenant profile (this includes contact information)
+    const profile = await tenantService.getTenantProfile(tenantId);
+    
+    if (!profile) {
+      console.log(`[Public Tenant Profile] No profile found for tenant: ${tenantId}`);
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant profile not found'
+      });
+    }
+
+    console.log(`[Public Tenant Profile] Found profile for tenant: ${tenantId}`, {
+      hasPhone: !!profile.contact?.phone,
+      hasEmail: !!profile.contact?.email,
+      hasWebsite: !!profile.contact?.website,
+      hasAddress: !!profile.contact?.address
+    });
+
+    // Return the profile data (contact info is included in the profile object)
+    res.json({
+      success: true,
+      data: {
+        id: profile.id,
+        name: profile.name,
+        slug: profile.slug,
+        description: profile.description,
+        logo: profile.logo,
+        banner: profile.banner,
+        business_name: profile.name, // For compatibility with frontend
+        phone_number: profile.contact?.phone, // For compatibility with frontend
+        email: profile.contact?.email,
+        website: profile.contact?.website,
+        address_line1: profile.contact?.address?.street,
+        address_line2: null,
+        city: profile.contact?.address?.city,
+        state: profile.contact?.address?.state,
+        postal_code: profile.contact?.address?.zipCode,
+        country: profile.contact?.address?.country,
+        business_description: profile.description,
+        logo_url: profile.logo,
+        contact: profile.contact, // Include full contact object
+        business: profile.business,
+        branding: profile.branding,
+        settings: profile.settings,
+        metadata: {
+          // Merge branding info for frontend compatibility
+          theme: profile.branding?.theme || 'professional',
+          primaryColor: profile.branding?.primaryColor,
+          secondaryColor: profile.branding?.secondaryColor,
+          accentColor: profile.branding?.accentColor,
+          // Include other metadata
+          ...profile.business,
+          ...profile.branding
+        }
+      },
+      message: 'Public tenant profile retrieved successfully'
+    });
+    
+  } catch (error) {
+    console.error('[Public Tenant Profile] Error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error',
+      message: 'Failed to retrieve tenant profile'
+    });
   }
 });
 

@@ -270,9 +270,11 @@ interface FeaturedSectionWithProductsProps {
   products: FeaturedProduct[];
   loading: boolean;
   maxProducts?: number;
+  hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
 }
 
-function FeaturedSection({ tenantId, type, title, description, icon, color, products, loading, maxProducts = 8 }: FeaturedSectionWithProductsProps) {
+function FeaturedSection({ tenantId, type, title, description, icon, color, products, loading, maxProducts = 8, hasActivePaymentGateway, defaultGatewayType }: FeaturedSectionWithProductsProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const config = featuredTypeConfig[type];
   const contextPayment = useTenantPaymentOptional();
@@ -507,7 +509,8 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   }
                 }}
                 variant="featured"
-                hasActivePaymentGateway={contextPayment?.canPurchase}
+                hasActivePaymentGateway={hasActivePaymentGateway}
+                defaultGatewayType={defaultGatewayType}
                 showCategory={true}
                 showDescription={true}
                 className="h-full"
@@ -674,7 +677,8 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   }
                 }}
                 variant="list"
-                hasActivePaymentGateway={contextPayment?.canPurchase}
+                hasActivePaymentGateway={hasActivePaymentGateway}
+                defaultGatewayType={defaultGatewayType}
                 showCategory={true}
                 showDescription={true}
               />
@@ -686,7 +690,15 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
   );
 }
 
-export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: string }) {
+export default function StorefrontFeaturedProducts({ 
+  tenantId, 
+  hasActivePaymentGateway, 
+  defaultGatewayType 
+}: { 
+  tenantId: string; 
+  hasActivePaymentGateway?: boolean; 
+  defaultGatewayType?: string; 
+}) {
   const [allProducts, setAllProducts] = useState<FeaturedProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -923,6 +935,8 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
         <FeaturedSection
           tenantId={tenantId}
           type="new_arrival"
+          hasActivePaymentGateway={hasActivePaymentGateway}
+          defaultGatewayType={defaultGatewayType}
           {...featuredTypeConfig.new_arrival}
           products={productsByType.new_arrival}
           loading={false}
@@ -933,6 +947,8 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
         <FeaturedSection
           tenantId={tenantId}
           type="seasonal"
+          hasActivePaymentGateway={hasActivePaymentGateway}
+          defaultGatewayType={defaultGatewayType}
           {...featuredTypeConfig.seasonal}
           products={productsByType.seasonal}
           loading={false}
@@ -943,6 +959,8 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
         <FeaturedSection
           tenantId={tenantId}
           type="sale"
+          hasActivePaymentGateway={hasActivePaymentGateway}
+          defaultGatewayType={defaultGatewayType}
           {...featuredTypeConfig.sale}
           products={productsByType.sale}
           loading={false}
@@ -953,6 +971,8 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
         <FeaturedSection
           tenantId={tenantId}
           type="staff_pick"
+          hasActivePaymentGateway={hasActivePaymentGateway}
+          defaultGatewayType={defaultGatewayType}
           {...featuredTypeConfig.staff_pick}
           products={productsByType.staff_pick}
           loading={false}
@@ -963,6 +983,8 @@ export default function StorefrontFeaturedProducts({ tenantId }: { tenantId: str
         <FeaturedSection
           tenantId={tenantId}
           type="store_selection"
+          hasActivePaymentGateway={hasActivePaymentGateway}
+          defaultGatewayType={defaultGatewayType}
           {...featuredTypeConfig.store_selection}
           products={productsByType.store_selection}
           loading={false}

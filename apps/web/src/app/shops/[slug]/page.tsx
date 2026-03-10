@@ -10,31 +10,32 @@ import { Store, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import ShopProfileClient from './ShopProfileClient';
 import { shopsService } from '@/services/ShopsService';
+import { tenantPublicService } from '@/services/TenantPublicService';
 
 // Types
 interface ShopData {
   id: string;
-  tenantId: string;
   name: string;
   slug: string;
   business_name?: string;
-  logo_url?: string;
+  imageUrl?: string;
   address?: string;
   city?: string;
   state?: string;
   zip_code?: string;
+  location?: string;
   phone?: string;
+  email?: string;
   website?: string;
-  rating_avg?: number;
+  social_links?: any;
+  default_gateway_type?: string;
+  has_active_payment_gateway?: boolean;
+  rating?: number;
   rating_count?: number;
   productCount: number;
   is_published: boolean;
   primary_category?: string;
-  created_at: Date;
-  tenantName?: string;
-  tenantLogoUrl?: string;
-  latitude?: number;
-  longitude?: number;
+  created_at: string;
 }
 
 interface Shop {
@@ -66,33 +67,47 @@ export async function getShopBySlug(identifier: string): Promise<ShopResponse | 
   try {
     console.log('[getShopBySlug] Starting fetch for identifier:', identifier);
     
-    // Use shopsService for consistent API communication and caching
-    const response = await shopsService.getShopByIdentifier(identifier);
+    // First, try to resolve the identifier to get the tenant ID
+    const resolveResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/public/shops/${identifier}`);
     
-    /* console.log('[getShopBySlug] ShopsService response:', {
-      hasResponse: !!response,
-      responseKeys: response ? Object.keys(response) : 'null',
-      hasTenantId: !!response?.tenantId,
-      tenantId: response?.tenantId,
-      shopName: response?.name
-    }); */
+    if (!resolveResponse.ok) {
+      console.error('Error resolving shop identifier:', resolveResponse.statusText);
+      return null;
+    }
     
-    if (response) {
+    const resolveData = await resolveResponse.json();
+    
+    if (!resolveData.success || !resolveData.shop) {
+      console.error('Shop not found:', resolveData);
+      return null;
+    }
+    
+    // Now get the full shop data using the tenant ID
+    const tenantId = resolveData.shop.id;
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/public/shops/id/${tenantId}`);
+    
+    if (!response.ok) {
+      console.error('Error fetching shop details:', response.statusText);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    console.log('[getShopBySlug] Shop details API response:', {
+      success: data.success,
+      hasShop: !!data.shop,
+      shopKeys: data.shop ? Object.keys(data.shop) : 'null'
+    });
+    
+    if (data.success) {
       // Wrap the shop data in the expected triple-nested ShopResponse structure
       const wrappedResponse = {
         success: true,
         data: {
           success: true,
-          data: response as unknown as ShopData
+          data: data.shop as unknown as ShopData
         }
       };
-      
-     /*  console.log('[getShopBySlug] Returning wrapped response:', {
-        success: wrappedResponse.success,
-        hasData: !!wrappedResponse.data,
-        hasInnerData: !!wrappedResponse.data?.data,
-        innerDataTenantId: wrappedResponse.data?.data?.tenantId
-      }); */
       
       return wrappedResponse;
     }
@@ -167,19 +182,38 @@ function ShopProfileSkeleton() {
 export default async function ShopProfilePage({ params, searchParams }: ShopProfilePageProps) {
   const { slug } = await params;
   
-  //console.log('[ShopProfilePage] Page component called with slug:', slug);
+  console.log('[ShopProfilePage] Page component called with slug:', slug);
   
   // Fetch shop data
   const shop = await getShopBySlug(slug);
   
-  /* console.log('[ShopProfilePage] Shop data received:', {
+  // Fetch business hours separately using the direct API endpoint
+  let businessHours = null;
+  if (shop?.success && shop?.data?.data?.id) {
+    try {
+      const hoursResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/business-hours/${shop.data.data.id}`);
+      if (hoursResponse.ok) {
+        const hoursData = await hoursResponse.json();
+        if (hoursData.success) {
+          businessHours = hoursData.data;
+          console.log('[ShopProfilePage] Business hours fetched:', !!businessHours);
+          console.log('[ShopProfilePage] Business hours data:', JSON.stringify(businessHours, null, 2));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching business hours:', error);
+    }
+  }
+  
+  console.log('[ShopProfilePage] Shop data received:', {
     hasShop: !!shop,
     shopSuccess: shop?.success,
     hasShopData: !!shop?.data,
     shopDataSuccess: shop?.data?.success,
     hasInnerData: !!shop?.data?.data,
-    innerDataTenantId: shop?.data?.data?.tenantId
-  }); */
+    innerDataTenantId: shop?.data?.data?.id,
+    hasBusinessHours: !!businessHours
+  });
   
   // If no shop found, show not found page
   if (!shop || !shop.success || !shop.data || !shop.data.success || !shop.data.data) {
@@ -203,7 +237,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
   
   return (
     <Suspense fallback={<ShopProfileSkeleton />}>
-      <ShopProfileClient shop={shop} />
+      <ShopProfileClient shop={shop} businessHours={businessHours} />
     </Suspense>
   );
 }

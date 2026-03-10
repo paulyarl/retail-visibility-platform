@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 export default function BusinessHoursCollapsible({
   businessHours,
 }: BusinessHoursCollapsibleProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true); // Changed to true for open by default
 
   if (!businessHours) return null;
 

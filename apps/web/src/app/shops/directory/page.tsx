@@ -166,7 +166,8 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
       {/* Navigation Header */}
       <div className="bg-white border-b sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          {/* Mobile: Stacked layout, Desktop: Side by side */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-4">
               {/* Navigation Links */}
               <div className="flex items-center gap-2">
