@@ -32,6 +32,7 @@ import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionS
 import ChangeLocationStatusModal from '@/components/tenant/ChangeLocationStatusModal';
 import CreateTenantModal, { TenantCreationData } from './CreateTenantModal';
 import NextLink from "next/link";
+import { IconBuilding } from "@tabler/icons-react";
 //import { Link } from "lucide-react";
 
 type Tenant = { 
@@ -742,28 +743,13 @@ function TenantRow({ tenant, index, onSelect, onViewItems, onEditProfile, onRena
                 style={{ width: '100%', padding: 0 }}
               >
                 <Group gap="md" wrap="nowrap">
-                  <svg style={{ width: 20, height: 20 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" color="gray">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                  <Box style={{ flex: 1, minWidth: 0 }}>
-                    <Group gap="xs" mb="xs">
-                      <Badge 
-                        size="lg" 
-                        color="blue" 
-                        variant="light"
-                        style={{ marginBottom: 4 }}
-                      >
-                        <Text fw="bold" size="sm">{tenant.name}</Text>
-                      </Badge>
-                      {tenant.organization && (
+                    {tenant.organization && (
                         <Badge 
                           size="xs" 
                           color="cyan" 
                           variant="light"
                           leftSection={
-                            <svg style={{ width: 12, height: 12 }} fill="none" viewBox="0 0 48 48" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                            </svg>
+                            <IconBuilding size={12} />
                           }
                         >
                           <NextLink className="hover:underline" target="_blank" href={`/t/${tenant.id}/settings/organization`}>
@@ -771,6 +757,20 @@ function TenantRow({ tenant, index, onSelect, onViewItems, onEditProfile, onRena
                           </NextLink>
                         </Badge>
                       )}
+                  <svg style={{ width: 20, height: 20 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" color="gray">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  <Box >
+                    <Group gap="xs" mb="xs">
+                      <Badge 
+                        size="lg" 
+                        color="blue" 
+                        variant="light"
+                        style={{ marginBottom: 2 }}
+                      >
+                        <Text size="sm">{tenant.name}</Text>
+                      </Badge>
+                    
                       {tenant.locationStatus && tenant.locationStatus !== 'active' && (
                         <Badge
                           size="xs"
@@ -799,9 +799,11 @@ function TenantRow({ tenant, index, onSelect, onViewItems, onEditProfile, onRena
                         </Badge>
                       )}
                     </Group>
-                    <Text size="xs" c="dimmed" style={{ fontFamily: 'monospace' }}>{tenant.id}</Text>
+                    
                   </Box>
+                  
                 </Group>
+
               </Button>
             )}
           </Box>
