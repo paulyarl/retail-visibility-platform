@@ -102,7 +102,7 @@ export function StoreCard({
 
   // Determine link destination
   const linkHref = linkType === 'storefront' 
-    ? `/tenant/${store.tenantId}`
+    ? `/shops/${store.tenantId}`
     : `/directory/${store.slug || store.tenantId}`;
 
   // Format category name

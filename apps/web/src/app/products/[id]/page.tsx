@@ -35,13 +35,9 @@ async function getProductPhotos(productData: EnhancedProduct): Promise<Photo[]> 
 
 async function getShopData(tenantId: string) {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/public/shops/id/${tenantId}`);
-    if (!response.ok) {
-      console.error('Error fetching shop data:', response.statusText);
-      return null;
-    }
-    const data = await response.json();
-    return data.success ? data.shop : null;
+    // Use shopsService singleton for caching and optimization benefits
+    const shop = await shopsService.getShopByIdentifier(tenantId);
+    return shop;
   } catch (error) {
     console.error('Error fetching shop data:', error);
     return null;
@@ -82,7 +78,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
   const gallery = await getProductPhotos(product);
   const shopData = await getShopData(product.tenant_id);
-  console.log('shopData', shopData);
+  // console.log('shopData', shopData);
 
   const businessName = product.tenant_name || 'Unknown Store';
   

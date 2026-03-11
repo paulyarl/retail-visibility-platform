@@ -76,9 +76,12 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   const loading = completeLoading || profileLoading || businessProfileLoading;
   const error = completeError;
   
-  const slugs = tenantSlugService.getTenantSlug({ businessName: tenantData?.name || '', tenantId });
+  //const slugs = tenantSlugService.getTenantSlug({ businessName: tenantData?.name || '', tenantId });
+ // console.log(`${TenantDashboard.name} tenant data`, tenantData);
 
-  console.log(`${TenantDashboard.name} tenant slugs`, slugs);
+  const slugs = tenantData?.slug || tenantData?.id || tenantId;
+
+ // console.log(`${TenantDashboard.name} tenant slugs`, slugs);
   // Fetch business profile for logo
   useEffect(() => {
     const fetchBusinessProfile = async () => {

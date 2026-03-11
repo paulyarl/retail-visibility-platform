@@ -272,15 +272,19 @@ interface FeaturedSectionWithProductsProps {
   maxProducts?: number;
   hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
+  instanceId?: string;
 }
 
-function FeaturedSection({ tenantId, type, title, description, icon, color, products, loading, maxProducts = 8, hasActivePaymentGateway, defaultGatewayType }: FeaturedSectionWithProductsProps) {
+function FeaturedSection({ tenantId, type, title, description, icon, color, products, loading, maxProducts = 8, hasActivePaymentGateway, defaultGatewayType, instanceId = 'default' }: FeaturedSectionWithProductsProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const config = featuredTypeConfig[type];
   const contextPayment = useTenantPaymentOptional();
   
   // Filter products by type (already done at parent level, but keep for safety)
-  const typeProducts = products.filter(p => p.featuredType === type).slice(0, maxProducts);
+  const typeProducts = products.filter(p => 
+    p.featuredType === type || 
+    (p.featuredTypes && p.featuredTypes.includes(type))
+  ).slice(0, maxProducts);
 
   if (loading) {
     return (
@@ -353,7 +357,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {products.map((product) => (
               <SmartProductCard
-                key={product.id}
+                key={`${instanceId}-${type}-${product.id}`}
                 tenantId={tenantId}
                 product={{
                   // Basic fields
@@ -521,7 +525,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
           <div className="space-y-4">
             {products.map((product) => (
               <SmartProductCard
-                key={product.id}
+                key={`${instanceId}-${type}-${product.id}`}
                 tenantId={tenantId}
                 product={{
                   // Basic fields
@@ -693,11 +697,13 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
 export default function StorefrontFeaturedProducts({ 
   tenantId, 
   hasActivePaymentGateway, 
-  defaultGatewayType 
+  defaultGatewayType,
+  instanceId = 'default'
 }: { 
   tenantId: string; 
   hasActivePaymentGateway?: boolean; 
-  defaultGatewayType?: string; 
+  defaultGatewayType?: string;
+  instanceId?: string;
 }) {
   const [allProducts, setAllProducts] = useState<FeaturedProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -922,11 +928,11 @@ export default function StorefrontFeaturedProducts({
 
   // Filter products by type for each section
   const productsByType = {
-    new_arrival: allProducts.filter(p => p.featuredType === 'new_arrival'),
-    seasonal: allProducts.filter(p => p.featuredType === 'seasonal'),
-    sale: allProducts.filter(p => p.featuredType === 'sale'),
-    staff_pick: allProducts.filter(p => p.featuredType === 'staff_pick'),
-    store_selection: allProducts.filter(p => p.featuredType === 'store_selection')
+    new_arrival: allProducts.filter(p => p.featuredType === 'new_arrival' || (p.featuredTypes && p.featuredTypes.includes('new_arrival'))),
+    seasonal: allProducts.filter(p => p.featuredType === 'seasonal' || (p.featuredTypes && p.featuredTypes.includes('seasonal'))),
+    sale: allProducts.filter(p => p.featuredType === 'sale' || (p.featuredTypes && p.featuredTypes.includes('sale'))),
+    staff_pick: allProducts.filter(p => p.featuredType === 'staff_pick' || (p.featuredTypes && p.featuredTypes.includes('staff_pick'))),
+    store_selection: allProducts.filter(p => p.featuredType === 'store_selection' || (p.featuredTypes && p.featuredTypes.includes('store_selection')))
   };
 
   return (
@@ -937,6 +943,7 @@ export default function StorefrontFeaturedProducts({
           type="new_arrival"
           hasActivePaymentGateway={hasActivePaymentGateway}
           defaultGatewayType={defaultGatewayType}
+          instanceId={instanceId}
           {...featuredTypeConfig.new_arrival}
           products={productsByType.new_arrival}
           loading={false}
@@ -949,6 +956,7 @@ export default function StorefrontFeaturedProducts({
           type="seasonal"
           hasActivePaymentGateway={hasActivePaymentGateway}
           defaultGatewayType={defaultGatewayType}
+          instanceId={instanceId}
           {...featuredTypeConfig.seasonal}
           products={productsByType.seasonal}
           loading={false}
@@ -961,6 +969,7 @@ export default function StorefrontFeaturedProducts({
           type="sale"
           hasActivePaymentGateway={hasActivePaymentGateway}
           defaultGatewayType={defaultGatewayType}
+          instanceId={instanceId}
           {...featuredTypeConfig.sale}
           products={productsByType.sale}
           loading={false}
@@ -973,6 +982,7 @@ export default function StorefrontFeaturedProducts({
           type="staff_pick"
           hasActivePaymentGateway={hasActivePaymentGateway}
           defaultGatewayType={defaultGatewayType}
+          instanceId={instanceId}
           {...featuredTypeConfig.staff_pick}
           products={productsByType.staff_pick}
           loading={false}
@@ -985,6 +995,7 @@ export default function StorefrontFeaturedProducts({
           type="store_selection"
           hasActivePaymentGateway={hasActivePaymentGateway}
           defaultGatewayType={defaultGatewayType}
+          instanceId={instanceId}
           {...featuredTypeConfig.store_selection}
           products={productsByType.store_selection}
           loading={false}

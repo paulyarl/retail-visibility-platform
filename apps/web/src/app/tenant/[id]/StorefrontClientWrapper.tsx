@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSingleton';
 import { FeaturedProduct } from '@/providers/data/FeaturedProductsSingleton';
 import StorefrontViewTracker from '@/components/tracking/StorefrontViewTracker';
@@ -12,16 +13,37 @@ import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDispl
 import FeaturedProductsSection from '@/components/storefront/FeaturedProductsSection';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import FeaturedBucketSimple from '@/components/storefront/FeaturedBucketSimple';
-import StorefrontActions from '@/components/storefront/StorefrontActions';
+import FeaturedBucketsShowcase from '@/components/storefront/FeaturedBucketsShowcase';
+import StorefrontActions from '@/components/products/StorefrontActions';
 import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Pagination } from '@/components/ui';
 import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
+
+// Product Discovery & Navigation
+import ProductSearch from '@/components/storefront/ProductSearch';
+import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
+import ProductCategoriesCollapsible from '@/components/storefront/ProductCategoriesCollapsible';
+import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
+import GBPCategoriesNav from '@/components/storefront/GBPCategoriesNav';
+import GBPCategoryBadges from '@/components/shared/GBPCategoryBadges';
+
+// Store Information & Location
+import TenantMapSection from '@/components/tenant/TenantMapSection';
+import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
+
+// User Engagement & Shopping Experience
+import LastViewed from '@/components/directory/LastViewed';
+import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
+import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalogSidebar';
+import { StorefrontRecommendations } from './StorefrontClient';
+
 // import { useStoreContactData } from '@/hooks/useStoreContactData';
 
 import { computeStoreStatus } from '@/lib/hours-utils';
 import { directoryService } from '@/services/DirectorySingletonService';
+import { useMultiCart } from '@/hooks/useMultiCart';
 
 interface StorefrontClientWrapperProps {
   tenantId: string;
@@ -88,18 +110,17 @@ export default function StorefrontClientWrapper({
   totalPages = 1,
   totalItems = 0,
 }: StorefrontClientWrapperProps) {
-  // Extract contact information from tenant metadata
+  // Extract contact information from tenant metadata with fallbacks
   const contactInfo = {
-    phone: tenant.metadata?.phone,
-    email: tenant.metadata?.email,
-    address: tenant.metadata?.address,
-    website: tenant.metadata?.website
+    phone: tenant?.metadata?.phone || tenant?.phone || null,
+    email: tenant?.metadata?.email || tenant?.email || null,
+    address: tenant?.metadata?.address || 
+      (tenant?.address_line1 ? `${tenant.address_line1}${tenant.city ? ', ' + tenant.city : ''}${tenant.state ? ', ' + tenant.state : ''}${tenant.postal_code ? ' ' + tenant.postal_code : ''}` : null),
+    website: tenant?.metadata?.website || tenant?.website || null
   };
   
-  // Log what data StorefrontClientWrapper received
-  console.log('[StorefrontClientWrapper] Received tenant metadata:', tenant.metadata);
-  console.log('[StorefrontClientWrapper] Extracted contact info:', contactInfo);
-  console.log('[StorefrontClientWrapper] Initial store status:', initialStoreStatus);
+  // Extract logo URL with multiple fallbacks
+  const logoUrl = tenant?.metadata?.logo_url || tenant?.logo_url || tenant?.branding?.logoUrl || null;
   
   // console.log('[StorefrontClientWrapper] Contact data:', contactData.listing);
   // console.log('[StorefrontClientWrapper] Tenant metadata phone:', tenant.metadata?.phone);
@@ -115,6 +136,13 @@ export default function StorefrontClientWrapper({
 
   const [isFullWidth, setIsFullWidth] = useState(fullWidthLayout);
   const [featuredData, setFeaturedData] = useState<any>(null);
+  const { totalItems: cartTotalItems } = useMultiCart();
+  const router = useRouter();
+
+  // Handle view cart
+  const handleViewCart = () => {
+    router.push('/carts');
+  };
 
   // Fetch featured data on mount
   useEffect(() => {
@@ -201,38 +229,42 @@ export default function StorefrontClientWrapper({
 
   return (
     <>
-      {/* Simplified Header - Brand Identity and Actions */}
-      <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Mobile: Stacked layout, Desktop: Side by side */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Hero Header - Brand Identity, Status, Navigation, Actions */}
+      <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shadow-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Main Header Row */}
+          <div className="flex items-center justify-between py-4">
             {/* Brand Identity */}
             <div className="flex items-center gap-4">
               {/* Store Logo */}
               <div className="flex-shrink-0">
-                {tenant.metadata?.logo_url ? (
-                  <div className="relative w-12 h-12">
+                {logoUrl ? (
+                  <div className="relative w-14 h-14">
                     <Image
-                      src={tenant.metadata.logo_url}
+                      src={logoUrl}
                       alt={businessName}
                       fill
                       className="object-contain rounded-lg shadow-sm"
                     />
                   </div>
                 ) : (
-                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 flex items-center justify-center shadow-sm">
-                    <svg className="w-6 h-6 text-primary-600 dark:text-primary-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 flex items-center justify-center shadow-sm">
+                    <svg className="w-7 h-7 text-primary-600 dark:text-primary-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                   </div>
                 )}
               </div>
 
-              {/* Store Name and Category */}
-              <div>
-                <h1 className="text-xl font-semibold text-neutral-900 dark:text-white">
-                  {businessName || 'Store Name Not Available'}
-                </h1>
+              {/* Store Name, Category, and Status */}
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-neutral-900 dark:text-white">
+                    {businessName || 'Store Name Not Available'}
+                  </h1>
+                  {/* Store Status Badge */}
+                  <StoreStatusIndicator tenantId={tenantId} />
+                </div>
                 {primaryGBPCategory && (
                   <p className="text-sm text-neutral-600 dark:text-neutral-400">
                     {primaryGBPCategory.name}
@@ -241,114 +273,119 @@ export default function StorefrontClientWrapper({
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2 sm:gap-2">
-              {/* Review Button */}
-              <button 
-                onClick={() => {
-                  const reviewsSection = document.getElementById('reviews-section');
-                  if (reviewsSection) {
-                    reviewsSection.scrollIntoView({ behavior: 'smooth' });
-                  }
-                }}
-                className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" 
-                title="Reviews"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                </svg>
-              </button>
-
-              {/* Contact Button */}
-              <button 
-                onClick={() => {
-                  const contactSection = document.getElementById('contact-section');
-                  if (contactSection) {
-                    contactSection.scrollIntoView({ behavior: 'smooth' });
-                  }
-                }}
-                className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" 
-                title="Contact Us"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </button>
-
-              {/* Cart Button */}
-              <button className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Cart">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 014 4z" />
-                </svg>
-              </button>
-
-              {/* Heart/Favorite Button */}
-              <button className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Favorite">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              </button>
-
-              {/* Print Button */}
-              <button className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Print">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-              </button>
-
-              {/* Share Button */}
-              <button className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Share">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-            {/* Store Open/Closed Status */}
-            <StoreStatusIndicator tenantId={tenantId} />
-      </header>
-
-      {/* Contact Information & Business Hours - Top Priority */}
-      <div className="bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Contact Information */}
-            <div>
-              <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            {/* Quick Actions */}
+            <div className="flex items-center gap-3">
+              {/* Navigation Pills */}
+              <div className="hidden sm:flex items-center gap-2">
+                {directoryPublished && tenantSlug && (
+                  <a
+                    href={`/directory/${tenantSlug}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
+                    title="View in Directory"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" />
+                    </svg>
+                    <span className="hidden lg:inline">Directory</span>
+                  </a>
+                )}
+                <a
+                  href="/directory"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap"
+                  title="Browse Directory"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
-                  Contact Information
-                </h2>
-                <ContactInformationCollapsible 
-                  tenant={tenant} 
-                  contactData={{
-                    phone: tenant.metadata?.phone,
-                    email: tenant.metadata?.email,
-                    address: tenant.metadata?.address
+                  <span className="hidden lg:inline">Directory</span>
+                </a>
+                <a
+                  href="/shops"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"
+                  title="Browse All Shops"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4zm0 0v10a2 2 0 002 2h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" />
+                  </svg>
+                  <span className="hidden lg:inline">Shops</span>
+                </a>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={() => {
+                    const reviewsSection = document.getElementById('reviews-section');
+                    if (reviewsSection) {
+                      reviewsSection.scrollIntoView({ behavior: 'smooth' });
+                    }
                   }}
-                />
-              </div>
-            </div>
-
-            {/* Business Hours */}
-            <div>
-              <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  className="p-2.5 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" 
+                  title="Reviews"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                   </svg>
-                  Business Hours
-                </h2>
-                <BusinessHoursCollapsible businessHours={businessHours} />
+                </button>
+
+                <button 
+                  onClick={handleViewCart}
+                  className="p-2.5 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors relative" 
+                  title="Cart"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 014 4z" />
+                  </svg>
+                  {cartTotalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
+                      {cartTotalItems > 99 ? '99+' : cartTotalItems}
+                    </span>
+                  )}
+                </button>
+
+                <button className="p-2.5 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Share">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
+
+          {/* Mobile Navigation */}
+          <div className="sm:hidden pb-3 flex items-center gap-2 overflow-x-auto">
+            {directoryPublished && tenantSlug && (
+              <a
+                href={`/directory/${tenantSlug}`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <span>Directory</span>
+              </a>
+            )}
+            <a
+              href="/directory"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap flex-shrink-0"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              <span>Directory</span>
+            </a>
+            <a
+              href="/shops"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap flex-shrink-0"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4zm0 0v10a2 2 0 002 2h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" />
+              </svg>
+              <span>Shops</span>
+            </a>
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* Shop Description & Gallery - About the Store */}
       <div className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
@@ -461,7 +498,7 @@ export default function StorefrontClientWrapper({
       {/* Featured Navigation Controls - Top of Page */}
       {featuredData && (featuredCounts.staffPick > 0 || featuredCounts.newArrival > 0 || featuredCounts.sale > 0 || featuredCounts.seasonal > 0 || featuredCounts.storeSelection > 0) && (
         <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
-          <div className="py-4 border-b border-neutral-200 dark:border-neutral-700">
+          <div className="py-4 border-b border-neutral-200 dark:border-neutral-700 sticky top-[60px] z-30 bg-white dark:bg-neutral-900">
             {/* First Row - Product Categories */}
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400 whitespace-nowrap">Quick Jump:</span>
@@ -562,192 +599,69 @@ export default function StorefrontClientWrapper({
               </button>
 
               {/* Map/Directions - Show if address available */}
-              {contactInfo.address && (
-                <button
-                  onClick={() => {
-                    const element = document.getElementById('map-section');
-                    element?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap"
-                  title="Jump to Map & Directions"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span>Map & Directions</span>
-                </button>
-              )}
-
-              {/* Directory - Browse All Stores */}
-              <a
-                href="/directory"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border border-teal-300 dark:border-teal-600 hover:bg-teal-200 dark:hover:bg-teal-900/50 transition-colors whitespace-nowrap"
-                title="Browse Directory"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-                <span>Browse Directory</span>
-              </a>
-
-              {/* Shops - Browse All Shops */}
-              <a
-                href="/shops"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"
-                title="Browse All Shops"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4zm0 0v10a2 2 0 002 2h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" />
-                </svg>
-                <span>Browse All Shops</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Featured Products Section - Conditional Width */}
-      {featuredData && featuredData.totalCount > 0 && (
-        <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
-          <div className="featured-products-section mb-12">
-            <div className="mb-8">
-              <h2 className="text-2xl font-semibold text-neutral-900 dark:text-white mb-2">
-                Featured Products
-              </h2>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                Discover our hand-picked selection of featured items
-              </p>
-            </div>
-
-            <div className="space-y-8">
-              {/* Staff Picks Bucket */}
-              {featuredData.staffPick.length > 0 && (
-                <div id="staff_pick-section">
-                  <FeaturedBucketSimple
-                    title="⭐ Staff Picks"
-                    description="Our team's favorite picks"
-                    products={featuredData.staffPick}
-                    totalCount={featuredData.bucketCounts.staff_pick}
-                    bucketType="staff_pick"
-                    tenantId={tenantId}
-                    tenantName={businessName}
-                    tenantLogo={tenant?.branding?.logoUrl}
-                    showLayoutSelector={true}
-                  />
-                </div>
-              )}
-
-              {/* New Arrivals Bucket */}
-              {featuredData.newArrival.length > 0 && (
-                <div id="new_arrival-section">
-                  <FeaturedBucketSimple
-                    title="✨ New Arrivals"
-                    description="Fresh additions to our collection"
-                    products={featuredData.newArrival}
-                    totalCount={featuredData.bucketCounts.new_arrival}
-                    bucketType="new_arrival"
-                    tenantId={tenantId}
-                    tenantName={businessName}
-                    tenantLogo={tenant?.branding?.logoUrl}
-                    showLayoutSelector={false}
-                  />
-                </div>
-              )}
-
-              {/* Sale Bucket */}
-              {featuredData.sale.length > 0 && (
-                <div id="sale-section">
-                  <FeaturedBucketSimple
-                    title="💰 Sale"
-                    description="Great deals on selected items"
-                    products={featuredData.sale}
-                    totalCount={featuredData.bucketCounts.sale}
-                    bucketType="sale"
-                    tenantId={tenantId}
-                    tenantName={businessName}
-                    tenantLogo={tenant?.branding?.logoUrl}
-                    showLayoutSelector={false}
-                  />
-                </div>
-              )}
-
-              {/* Seasonal Bucket */}
-              {featuredData.seasonal.length > 0 && (
-                <div id="seasonal-section">
-                  <FeaturedBucketSimple
-                    title="🍂 Seasonal"
-                    description="Perfect for the current season"
-                    products={featuredData.seasonal}
-                    totalCount={featuredData.bucketCounts.seasonal}
-                    bucketType="seasonal"
-                    tenantId={tenantId}
-                    tenantName={businessName}
-                    tenantLogo={tenant?.branding?.logoUrl}
-                    showLayoutSelector={false}
-                  />
-                </div>
-              )}
-
-              {/* Store Selection Bucket */}
-              {featuredData.storeSelection.length > 0 && (
-                <div id="store_selection-section">
-                  <FeaturedBucketSimple
-                    title="🏪 Store Selection"
-                    description="Curated by our store experts"
-                    products={featuredData.storeSelection}
-                    totalCount={featuredData.bucketCounts.store_selection}
-                    bucketType="store_selection"
-                    tenantId={tenantId}
-                    tenantName={businessName}
-                    tenantLogo={tenant?.branding?.logoUrl}
-                    showLayoutSelector={false}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Visual Separator Banner */}
-            <div className="relative my-16">
-              <div className="absolute inset-0 bg-gradient-to-r from-primary-50 via-primary-100 to-primary-50 dark:from-primary-950 dark:via-primary-900 dark:to-primary-950" />
-              <div className="relative px-8 py-12 text-center">
-                <div className="max-w-3xl mx-auto">
-                  <h3 className="text-2xl font-bold text-primary-900 dark:text-primary-100 mb-3">
-                    Discover Our Complete Collection
-                  </h3>
-                  <p className="text-primary-700 dark:text-primary-300 text-lg mb-6">
-                    Browse our entire catalog of {totalAllProducts > 0 ? `${totalAllProducts}+ ` : ''}products with advanced search and filtering
-                  </p>
-                  <Link
-                    href={`/shops/${tenantId}`}
-                    className="inline-flex items-center px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors shadow-lg hover:shadow-xl"
-                  >
-                    Browse Full Catalog
-                    <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                    </svg>
-                  </Link>
-                </div>
               </div>
-            </div>
           </div>
         </div>
       )}
 
-      {/* Main Product Catalog Section - Only show if not in products_only mode and we have products */}
+      {/* Main Product Catalog Section - PRIMARY CONTENT (Above-the-Fold) */}
       {!isProductsOnly && products.length > 0 && (
         <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
-          <div className="py-12">
-            {/* Section Header */}
+          <div className="py-8">
+            
+            {/* Product Search and Navigation */}
             <div className="mb-8">
-              <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-2">
-                Our Products
-              </h2>
-              <p className="text-lg text-neutral-600 dark:text-neutral-400">
-                Browse our complete catalog of {totalItems} products
-                {search && ` matching "${search}"`}
-                {category && ` in ${categories.find((c: any) => c.slug === category)?.name || category}`}
-              </p>
+              {/* Search Bar */}
+              <div className="mb-6">
+                <ProductSearch tenantId={tenantId} />
+              </div>
+
+              {/* Category Navigation */}
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* Desktop Category Sidebar */}
+                <div className="hidden lg:block lg:w-64 flex-shrink-0">
+                  <ProductCategorySidebar
+                    tenantId={tenantId}
+                    categories={categories}
+                    totalProducts={totalItems || 0}
+                  />
+                </div>
+
+                {/* Mobile Category Dropdown */}
+                <div className="lg:hidden">
+                  <CategoryMobileDropdown
+                    tenantId={tenantId}
+                    categories={categories}
+                    totalProducts={totalItems || 0}
+                  />
+                </div>
+
+                {/* Main Content Area */}
+                <div className="flex-1">
+                  {/* Section Header */}
+                  <div className="mb-6">
+                    <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-2">
+                      Our Products
+                    </h2>
+                    <p className="text-lg text-neutral-600 dark:text-neutral-400">
+                      Browse our complete catalog of {totalItems} products
+                      {search && ` matching "${search}"`}
+                      {category && ` in ${categories.find((c: any) => c.slug === category)?.name || category}`}
+                    </p>
+                    
+                    {/* Category Badges */}
+                    {primaryGBPCategory && (
+                      <div className="mt-4">
+                        <GBPCategoryBadges
+                          categories={[primaryGBPCategory, ...secondaryGBPCategories]}
+                          showCount={false}
+                          size="sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Enhanced Product Display */}
@@ -777,11 +691,10 @@ export default function StorefrontClientWrapper({
                 <Pagination
                   currentPage={currentPage}
                   totalItems={totalItems || 0}
-                  pageSize={12} // Fixed page size of 12 products
+                  pageSize={12}
                   onPageChange={(page) => {
                     const params = new URLSearchParams(window.location.search);
                     params.set('page', page.toString());
-                    // Preserve other parameters
                     if (search) params.set('search', search);
                     if (category) params.set('category', category);
                     if (featured) params.set('featured', featured);
@@ -791,7 +704,7 @@ export default function StorefrontClientWrapper({
                   }}
                   onPageSizeChange={(size) => {
                     const params = new URLSearchParams(window.location.search);
-                    params.set('page', '1'); // Reset to first page when changing page size
+                    params.set('page', '1');
                     params.set('limit', size.toString());
                     const newUrl = `${window.location.pathname}?${params.toString()}`;
                     window.location.href = newUrl;
@@ -800,85 +713,217 @@ export default function StorefrontClientWrapper({
                 />
               </div>
             )}
+
+            {/* AI-Powered Product Recommendations */}
+            <div className="mt-12">
+              <StorefrontRecommendations tenantId={tenantId} />
+            </div>
           </div>
         </div>
       )}
 
-      {/* Store Ratings and Reviews - Social Proof */}
+      {/* Featured Products Showcase - SECONDARY (After Main Catalog) */}
+      {featuredData && featuredData.totalCount > 0 && (
+        <div className="bg-neutral-50 dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-700">
+          <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12'}>
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2">
+                Featured Selections
+              </h2>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Discover our hand-picked selection of featured items
+              </p>
+            </div>
+
+            {/* Featured Buckets with Products and Section IDs for Quick Jump */}
+            <FeaturedBucketsShowcase 
+              featuredData={featuredData}
+              tenantId={tenantId}
+              hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
+              defaultGatewayType={tenant.metadata?.defaultGatewayType}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Store Information Card - Consolidated Location, Contact, Hours */}
+      <div className="bg-neutral-50 dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* Map & Location */}
+            <div className="lg:col-span-2">
+              <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm overflow-hidden">
+                <div className="p-6">
+                  <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-2">
+                    Visit Our Store
+                  </h3>
+                  {contactInfo.address && (
+                    <p className="text-neutral-600 dark:text-neutral-400 mb-4">
+                      {contactInfo.address}
+                    </p>
+                  )}
+                </div>
+                
+                {/* Single Map Display */}
+                {mapLocation ? (
+                  <TenantMapSection location={mapLocation} />
+                ) : contactInfo.address ? (
+                  <GoogleMapEmbed address={contactInfo.address} height="h-80" showDirections={true} />
+                ) : tenant && (
+                  <StorefrontMap
+                    tenant={{
+                      id: tenantId,
+                      businessName: businessName,
+                      metadata: {
+                        address: tenant.address_line1,
+                        city: tenant.city,
+                        state: tenant.state,
+                        zip_code: tenant.postal_code,
+                        latitude: tenant.metadata?.latitude,
+                        longitude: tenant.metadata?.longitude,
+                        logo_url: tenant.metadata?.logo_url,
+                        phone: tenant.metadata?.phone
+                      }
+                    }}
+                    primaryCategory={primaryGBPCategory?.name}
+                    productCount={totalItems}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Contact & Hours Sidebar */}
+            <div className="space-y-6">
+              {/* Contact Information */}
+              <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Contact
+                </h3>
+                <div className="space-y-3 text-sm">
+                  {contactInfo.phone && (
+                    <a href={`tel:${contactInfo.phone}`} className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300 hover:text-primary-600 dark:hover:text-primary-400">
+                      <span>📞</span> {contactInfo.phone}
+                    </a>
+                  )}
+                  {contactInfo.email && (
+                    <a href={`mailto:${contactInfo.email}`} className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300 hover:text-primary-600 dark:hover:text-primary-400">
+                      <span>✉️</span> {contactInfo.email}
+                    </a>
+                  )}
+                  {contactInfo.website && (
+                    <a href={contactInfo.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300 hover:text-primary-600 dark:hover:text-primary-400">
+                      <span>🌐</span> Website
+                    </a>
+                  )}
+                  {!contactInfo.phone && !contactInfo.email && !contactInfo.website && (
+                    <p className="text-neutral-500 dark:text-neutral-400 italic">Contact information not available</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Business Hours */}
+              <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Hours
+                </h3>
+                {businessHours ? (
+                  <BusinessHoursCollapsible businessHours={businessHours} />
+                ) : (
+                  <p className="text-neutral-500 dark:text-neutral-400 italic">Business hours not available</p>
+                )}
+              </div>
+
+              {/* Fulfillment Options */}
+              <FulfillmentOptionsPane tenantId={tenantId} compact={true} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Store Ratings and Reviews */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div id="reviews-section" className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
           <StoreRatingDisplay tenantId={tenantId} showWriteReview={true} isPublic={true} />
         </div>
       </div>
 
-      {/* Map Section - How to Get There */}
-      {contactInfo.address && (
-        <div id="map-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-6">Find Us</h2>
-            <GoogleMapEmbed address={contactInfo.address} height="h-64 sm:h-80" />
-          </div>
+      {/* Advanced Catalog Navigation */}
+      {(categories.length > 0 || productCategories.length > 0 || storeCategories.length > 0) && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <CollapsibleCatalogSidebar
+            tenantId={tenantId}
+            categories={categories}
+            totalProducts={totalItems || 0}
+            productsLength={products.length}
+            totalPages={totalPages || 1}
+            currentPage={currentPage || 1}
+            search={search}
+            currentCategory={category}
+            featured={featured}
+            view={view}
+            featuredCounts={featuredCounts}
+          />
         </div>
       )}
 
       {/* Tier-Based Footer */}
       <footer className="bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
             {/* Quick Links */}
             <div>
               <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
                 Quick Links
               </h3>
-              <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700 mb-4">
-                <div className="space-y-3 text-sm">
-                  {/* Directory Entry Link */}
-                  {directoryPublished && tenantSlug && (
-                    <Link
-                      href={`/directory/${tenantSlug}`}
-                      className="flex items-center gap-2 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                      View Store in Directory
-                    </Link>
-                  )}
-
-                </div>
+              <div className="flex flex-wrap gap-4">
+                {directoryPublished && tenantSlug && (
+                  <Link
+                    href={`/directory/${tenantSlug}`}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors text-sm font-medium"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    View in Directory
+                  </Link>
+                )}
+                <Link
+                  href="/shops"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors text-sm font-medium"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4z" />
+                  </svg>
+                  Browse Shops
+                </Link>
               </div>
-
             </div>
-
-            {/* Store Location Map */}
-            <StorefrontMap
-              tenant={{
-                id: tenant.id,
-                businessName: businessName,
-                slug: tenantSlug,
-                metadata: tenant.metadata
-              }}
-              primaryCategory={primaryGBPCategory?.name}
-              productCount={totalAllProducts}
-            />
           </div>
 
-          {/* Platform Branding (unless Enterprise with removal) */}
+          {/* Platform Branding */}
           {!features.removePlatformBranding && (
-            <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700 text-sm text-neutral-500">
-              <Link href="/" title={platformSettings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }} ><div className="flex items-center justify-center gap-2" >
-                <span>⚡Powered by</span>
-                <img 
-                  src={platformSettings?.logoUrl} 
-                  alt={platformSettings?.platformName || 'Platform Logo'} 
-                  className="h-8 w-auto object-contain"
-                  loading="lazy"
-                  decoding="async"
-                  width="32"
-                  height="32"
-                />
-                <span>{platformSettings?.platformName || 'Visible Shelf'}</span>
-              </div>
+            <div className="mt-8 pt-8 border-t border-neutral-200 dark:border-neutral-700 text-sm text-neutral-500">
+              <Link href="/" title={platformSettings?.platformName || 'Visible Shelf'} style={{ textDecoration: 'none' }}>
+                <div className="flex items-center justify-center gap-2">
+                  <span>⚡Powered by</span>
+                  <img 
+                    src={platformSettings?.logoUrl} 
+                    alt={platformSettings?.platformName || 'Platform Logo'} 
+                    className="h-8 w-auto object-contain"
+                    loading="lazy"
+                    decoding="async"
+                    width="32"
+                    height="32"
+                  />
+                  <span>{platformSettings?.platformName || 'Visible Shelf'}</span>
+                </div>
               </Link>
             </div>
           )}

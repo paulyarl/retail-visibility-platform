@@ -47,7 +47,7 @@ export default function BusinessHoursCollapsible({
       {isExpanded && (
         <div className="px-4 pb-4 border-t border-neutral-200 dark:border-neutral-700">
           <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-3">
               {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
                 const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
 
@@ -94,27 +94,27 @@ export default function BusinessHoursCollapsible({
                 return (
                   <div
                     key={day}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
+                    className={`flex items-center justify-between p-4 rounded-lg border ${
                       isToday
                         ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
                         : 'bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className={`font-medium ${isToday ? 'text-blue-900 dark:text-blue-100' : 'text-neutral-900 dark:text-neutral-100'}`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`font-semibold text-base ${isToday ? 'text-blue-900 dark:text-blue-100' : 'text-neutral-900 dark:text-neutral-100'}`}>
                         {day}
                       </span>
-                      {isToday && <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full">Today</span>}
+                      {isToday && <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full font-medium">Today</span>}
                     </div>
-                    <div className={`text-right ${
+                    <div className={`font-medium ${
                       isToday
                         ? 'text-blue-700 dark:text-blue-300'
                         : hasHours ? 'text-neutral-700 dark:text-neutral-300' : 'text-neutral-500 dark:text-neutral-400'
                     }`}>
                       {hasHours ? (
-                        <span className="text-sm">{displayText}</span>
+                        <span>{displayText}</span>
                       ) : (
-                        <span className="text-sm">Closed</span>
+                        <span>Closed</span>
                       )}
                     </div>
                   </div>

@@ -187,8 +187,8 @@ const CONTEXT_CONFIGS: Record<AppContext, ContextCacheConfig> = {
     isolation: CacheIsolation.GLOBAL,
     encryption: false,
     compression: true,
-    compressionLevel: CompressionLevel.OPTIMAL, // Balanced for directory data
-    compressionType: CompressionType.GZIP, // Good balance of speed/ratio
+    compressionLevel: CompressionLevel.MAXIMUM, // Maximum compression for shared data
+    compressionType: CompressionType.BROTLI, // Best compression ratio
     persistent: true
   },
 

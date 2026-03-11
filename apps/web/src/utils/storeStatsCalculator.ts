@@ -5,9 +5,13 @@
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
+import { AppContext, CacheIsolation } from './contextCacheManager';
 
 // Store Stats Singleton Class
 class StoreStatsSingleton extends PublicApiSingleton {
+
+    protected defaultContext: AppContext = AppContext.SHOP;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.SHOP;
   private static instance: StoreStatsSingleton;
 
   private constructor() {

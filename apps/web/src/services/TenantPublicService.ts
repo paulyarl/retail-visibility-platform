@@ -86,7 +86,15 @@ class TenantPublicService extends PublicApiSingleton {
         console.error('[TenantPublicService] Failed to get public tenant info:', response.error);
         return null;
       }
-      console.log(`${this.constructor.name} - Info Response:`, response.data);
+      
+      // console.log('[TenantPublicService] getPublicTenantInfo result:', {
+      //   success: response.success,
+      //   hasData: !!response.data,
+      //   dataKeys: response.data ? Object.keys(response.data) : 'null',
+      //   nestedKeys: response.data?.data ? Object.keys(response.data.data) : 'null',
+      //   metadata: response.data?.metadata ? Object.keys(response.data.metadata) : 'null',
+      //   fullData: JSON.stringify(response.data, null, 2)
+      // });
 
       return response.data;
     } catch (error) {
@@ -113,7 +121,7 @@ class TenantPublicService extends PublicApiSingleton {
         return null;
       }
 
-      console.log(`${this.constructor.name} - Logo Response:`, response.data);
+    //  console.log(`${this.constructor.name} - Logo Response:`, response.data);
 
       return response.data;
     } catch (error) {
@@ -139,7 +147,7 @@ class TenantPublicService extends PublicApiSingleton {
         console.error('[TenantPublicService] Failed to get public tenant tier:', response.error);
         return null;
       }
-      console.log(`${this.constructor.name} - Tier Response:`, response.data);
+   //   console.log(`${this.constructor.name} - Tier Response:`, response.data);
 
       return response.data;
     } catch (error) {
@@ -164,7 +172,7 @@ class TenantPublicService extends PublicApiSingleton {
         console.error('[TenantPublicService] Failed to get public tenant profile:', response.error);
         return null;
       }
-      console.log(`${this.constructor.name} - Profile Response:`, response.data);
+   //   console.log(`${this.constructor.name} - Profile Response:`, response.data);
 
       return response.data||null;
     } catch (error) {
@@ -190,11 +198,36 @@ class TenantPublicService extends PublicApiSingleton {
         console.error('[TenantPublicService] Failed to get tenant business hours:', response.error);
         return null;
       }
-      console.log(`${this.constructor.name} - Hours Response:`, response.data);
+    //  console.log(`${this.constructor.name} - Hours Response:`, response.data);
 
       return response.data;
     } catch (error) {
       console.error('[TenantPublicService] Failed to get tenant business hours:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get tenant business hours from the business-hours API (public)
+   * Uses the /api/business-hours/:tenantId endpoint (same as shops page)
+   */
+  async getBusinessHours(tenantId: string): Promise<any | null> {
+    try {
+      const response = await this.makeDefaultRequest<any>(
+        `/api/business-hours/${tenantId}`,
+        {},
+        `business-hours-${tenantId}`,
+        this.HOURS_TTL
+      );
+
+      if (!response.success){
+        console.error('[TenantPublicService] Failed to get business hours:', response.error);
+        return null;
+      }
+
+      return response.data || null;
+    } catch (error) {
+      console.error('[TenantPublicService] Failed to get business hours:', error);
       return null;
     }
   }
@@ -216,7 +249,7 @@ class TenantPublicService extends PublicApiSingleton {
       const profile = await this.getPublicTenantProfile(tenantId);
       if (!profile) return null;
 
-      console.log(`${this.constructor.name} - Directory Info Response:`, profile);
+//      console.log(`${this.constructor.name} - Directory Info Response:`, profile);
 
       return {
         id: profile.id,

@@ -19,6 +19,9 @@ interface FeaturedBucketsShowcaseProps {
     };
   };
   tenantId: string;
+  // Payment gateway status from parent page
+  hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
 }
 
 /**
@@ -27,7 +30,12 @@ interface FeaturedBucketsShowcaseProps {
  * Displays all featured product types as separate buckets,
  * each with 3 products per page and pagination controls.
  */
-export default function FeaturedBucketsShowcase({ featuredData, tenantId }: FeaturedBucketsShowcaseProps) {
+export default function FeaturedBucketsShowcase({ 
+  featuredData, 
+  tenantId,
+  hasActivePaymentGateway,
+  defaultGatewayType
+}: FeaturedBucketsShowcaseProps) {
   if (!featuredData) {
     return null;
   }
@@ -40,7 +48,7 @@ export default function FeaturedBucketsShowcase({ featuredData, tenantId }: Feat
       icon: '⭐',
       gradient: 'from-blue-500 to-cyan-500',
       products: featuredData.storeSelection,
-      totalCount: featuredData.bucketCounts.store_selection,
+      totalCount: featuredData.bucketCounts?.store_selection || 0,
       bucketType: 'store_selection'
     },
     {
@@ -49,7 +57,7 @@ export default function FeaturedBucketsShowcase({ featuredData, tenantId }: Feat
       icon: '✨',
       gradient: 'from-green-500 to-emerald-500',
       products: featuredData.newArrival,
-      totalCount: featuredData.bucketCounts.new_arrival,
+      totalCount: featuredData.bucketCounts?.new_arrival || 0,
       bucketType: 'new_arrival'
     },
     {
@@ -58,7 +66,7 @@ export default function FeaturedBucketsShowcase({ featuredData, tenantId }: Feat
       icon: '🗓️',
       gradient: 'from-orange-500 to-red-500',
       products: featuredData.seasonal,
-      totalCount: featuredData.bucketCounts.seasonal,
+      totalCount: featuredData.bucketCounts?.seasonal || 0,
       bucketType: 'seasonal'
     },
     {
@@ -67,7 +75,7 @@ export default function FeaturedBucketsShowcase({ featuredData, tenantId }: Feat
       icon: '🏷️',
       gradient: 'from-red-500 to-pink-500',
       products: featuredData.sale,
-      totalCount: featuredData.bucketCounts.sale,
+      totalCount: featuredData.bucketCounts?.sale || 0,
       bucketType: 'sale'
     },
     {
@@ -76,7 +84,7 @@ export default function FeaturedBucketsShowcase({ featuredData, tenantId }: Feat
       icon: '👥',
       gradient: 'from-purple-500 to-indigo-500',
       products: featuredData.staffPick,
-      totalCount: featuredData.bucketCounts.staff_pick,
+      totalCount: featuredData.bucketCounts?.staff_pick || 0,
       bucketType: 'staff_pick'
     }
   ];
@@ -104,6 +112,8 @@ export default function FeaturedBucketsShowcase({ featuredData, tenantId }: Feat
           bucketType={bucket.bucketType}
           tenantId={tenantId}
           initialLimit={3}
+          hasActivePaymentGateway={hasActivePaymentGateway}
+          defaultGatewayType={defaultGatewayType}
         />
       ))}
     </div>

@@ -18,8 +18,30 @@ export interface Shop {
   // Location & contact
   location: string;
   address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
   category: string;
   primary_category?: string;
+  
+  // Contact info
+  phone?: string;
+  email?: string;
+  website?: string;
+  social_links?: {
+    facebook?: string;
+    instagram?: string;
+    twitter?: string;
+    linkedin?: string;
+  };
+  
+  // Business info
+  business_name?: string;
+  
+  // Payment gateway
+  has_active_payment_gateway?: boolean;
+  default_gateway_type?: string;
+  
   contact?: {
     email: string;
     phone: string;
@@ -40,13 +62,16 @@ export interface Shop {
   // Metrics & status
   productCount: number;
   rating: number;
+  rating_count?: number;
   reviewCount: number;
   isVerified: boolean;
   isActive: boolean;
+  is_published?: boolean;
   
   // Timestamps
   createdAt: string;
   updatedAt: string;
+  created_at?: string;
   
   // Media
   imageUrl?: string;

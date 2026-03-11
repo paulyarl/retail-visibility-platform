@@ -6,9 +6,10 @@
  * Consolidates functionality from both ShopsService and ShopsSingletonService
  */
 
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
-import { clientTenantContextManager } from '@/lib/clientTenantContext';
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton'; 
 import { Shop, ShopIdentifiers, ShopResolution, ShopUrls } from '../types/shop';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { clientTenantContextManager } from '@/lib/clientTenantContext';
 
 // ====================
 // INTERFACES
@@ -19,6 +20,9 @@ export type { Shop, ShopUrls };
 
 // Check if ShopsAPISingleton exists, if not create a placeholder
 export class ShopsAPISingleton extends PublicApiSingleton {
+
+    protected defaultContext: AppContext = AppContext.SHOP;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.SHOP;
   private static instance: ShopsAPISingleton;
 
   private constructor() {
@@ -275,7 +279,7 @@ class ShopsService extends PublicApiSingleton {
             const parsedData = JSON.parse(responseData);
             if (Array.isArray(parsedData)) {
               shops = parsedData;
-              console.log('[ShopsService] Parsed response.data string to array, length:', shops.length);
+              // console.log('[ShopsService] Parsed response.data string to array, length:', shops.length);
             } else {
               console.warn('[ShopsService] Parsed data is not an array:', parsedData);
             }
@@ -438,52 +442,56 @@ class ShopsService extends PublicApiSingleton {
     }
     
     try {
-      console.log('[ShopsService] Making request to resolve shop:', identifier);
-      const response = await this.makeDefaultRequest<{ data: Shop; resolved: any }>(
-        `/api/shops/${identifier}`,
+      // console.log('[ShopsService] Making request to resolve shop:', identifier);
+      const tenantId = await this.resolveIdentifier(identifier,AppContext.TENANT);
+      if (!tenantId) {
+        console.error('[ShopsService] Failed to resolve tenant ID for identifier:', identifier);
+        throw new Error('Failed to resolve shop');
+      }
+      const response = await this.makeDefaultRequest<{ shop: any; metadata?: any }>(
+        `/api/public/shops/id/${tenantId}`,
         {},
         cacheKey,
         15 * 60 * 1000 // 15 minutes for resolution
       );
+      
+      // console.log('[ShopsService] API Response:', {
+      //   success: response.success,
+      //   hasData: !!response.data,
+      //   dataKeys: response.data ? Object.keys(response.data) : 'null',
+      //   fullData: JSON.stringify(response.data, null, 2)
+      // });
+      
       if (!response.success) {
-        console.error('[ShopsService] API request failed:', response.error);
-        throw new Error('Failed to resolve shop');
+        console.log('[ShopsService] API request failed:', response.error);
+     //   throw new Error('Failed to resolve shop');
       }
 
-      /* console.log('[ShopsService] API Response received:', {
-        success: response.success,
-        hasData: !!response.data,
-        dataType: typeof response.data,
-        fullResponse: JSON.stringify(response, null, 2), // Show full JSON
-        fullResponseData: JSON.stringify(response.data || {}, null, 2) // Show full JSON
-      }); */
-
       // Extract shop data from response
+      // API returns: { success: true, shop: {...}, metadata: {...} }
       const shopData = response.data;
-      const resolved = shopData?.resolved;
       
-     /*  console.log('[ShopsService] After extracting data:', {
-        shopDataKeys: shopData ? Object.keys(shopData) : 'null',
-        hasDataProperty: !!shopData?.data,
-        dataPropertyType: typeof shopData?.data,
-        fullShopData: shopData ? JSON.stringify(shopData, null, 2) : 'null'
-      }); */
+      // console.log('[ShopsService] Shop data extracted:', {
+      //   hasShopProperty: !!shopData?.shop,
+      //   shopKeys: shopData?.shop ? Object.keys(shopData.shop) : 'null',
+      //   shopData: JSON.stringify(shopData?.shop, null, 2)
+      // });
       
-      // The actual shop data is now directly in shopData.data
-      const actualShopData = shopData?.data;
+      // The actual shop data is in shopData.shop (from /api/public/shops/:identifier)
+      const actualShopData = shopData?.shop;
       
       /* console.log('[ShopsService] Final shop data:', {
         hasActualData: !!actualShopData,
-        hasTenantId: !!actualShopData?.tenantId,
-        tenantId: actualShopData?.tenantId,
+        hasId: !!actualShopData?.id,
+        shopId: actualShopData?.id,
         shopName: actualShopData?.name
       }); */
       
       // If no shop data is found, return a not-found resolution
-      if (!actualShopData || !actualShopData.tenantId) {
+      if (!actualShopData || !actualShopData.id) {
        /*  console.log(`[ShopsService] No shop found for identifier: ${identifier}`, {
           hasActualShopData: !!actualShopData,
-          hasTenantId: !!actualShopData?.tenantId,
+          hasId: !!actualShopData?.id,
           actualShopDataKeys: actualShopData ? Object.keys(actualShopData) : 'null'
         }); */
         return {
@@ -496,9 +504,12 @@ class ShopsService extends PublicApiSingleton {
       
       const resolution: ShopResolution = {
         identifier,
-        type: (resolved?.type as 'tenantId' | 'slug' | 'autoId') || ('tenantId' as const),
+        type: 'tenantId' as const,
         found: response.success || false,
-        shop: actualShopData?.tenantId ? actualShopData : undefined
+        shop: actualShopData?.id ? {
+          ...actualShopData,
+          tenantId: actualShopData.id, // Map id to tenantId for Shop interface
+        } as unknown as Shop : undefined
       };
       
       /* console.log('[ShopsService] Resolution created:', {

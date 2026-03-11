@@ -10,9 +10,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, Filter, TrendingUp, Star, MapPin, ChevronDown, X, ArrowLeft, Store, Grid, Sparkles } from 'lucide-react';
+import { Search, Filter, TrendingUp, Star, MapPin, ChevronDown, X, ArrowLeft, Store, Grid, Sparkles, LayoutGrid, List, Image as ImageIcon } from 'lucide-react';
 import { Button, Select, TextInput, Badge, Card, Group, Text, Stack } from '@mantine/core';
 import FeaturedBucketSimple from '@/components/storefront/FeaturedBucketSimple';
+import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
+import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { directorySingletonService } from '@/services/DirectorySingletonService';
 import { shopsService } from '@/services/ShopsService';
 import { FEATURED_TYPES } from '@/types/product-display';
@@ -167,6 +169,7 @@ export default function FeaturedProductsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [categories, setCategories] = useState<Array<{name: string, count: number}>>([]);
   const [locations, setLocations] = useState<Array<{name: string, count: number}>>([]);
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'gallery'>('grid');
 
   // Fetch featured products
   const fetchFeaturedProducts = async () => {
@@ -435,6 +438,126 @@ export default function FeaturedProductsPage() {
         </div>
       </div>
 
+      {/* Quick Jump Navigation - Featured Types */}
+      {data && data.bucketCounts && (
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-30">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-400 mr-2">Quick Jump:</span>
+                
+                {/* Store Selection */}
+                {(data.bucketCounts?.store_selection || 0) > 0 && (
+                  <button
+                    onClick={() => {
+                      const element = document.getElementById('store_selection-section');
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap"
+                  >
+                    <span>⭐</span>
+                    <span>Staff Selections ({data.bucketCounts.store_selection})</span>
+                  </button>
+                )}
+
+                {/* New Arrivals */}
+                {(data.bucketCounts?.new_arrival || 0) > 0 && (
+                  <button
+                    onClick={() => {
+                      const element = document.getElementById('new_arrival-section');
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
+                  >
+                    <span>✨</span>
+                    <span>New Arrivals ({data.bucketCounts.new_arrival})</span>
+                  </button>
+                )}
+
+                {/* Seasonal */}
+                {(data.bucketCounts?.seasonal || 0) > 0 && (
+                  <button
+                    onClick={() => {
+                      const element = document.getElementById('seasonal-section');
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-600 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors whitespace-nowrap"
+                  >
+                    <span>🍂</span>
+                    <span>Seasonal ({data.bucketCounts.seasonal})</span>
+                  </button>
+                )}
+
+                {/* Sale */}
+                {(data.bucketCounts?.sale || 0) > 0 && (
+                  <button
+                    onClick={() => {
+                      const element = document.getElementById('sale-section');
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-600 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors whitespace-nowrap"
+                  >
+                    <span>🏷️</span>
+                    <span>Sale Items ({data.bucketCounts.sale})</span>
+                  </button>
+                )}
+
+                {/* Staff Picks */}
+                {(data.bucketCounts?.staff_pick || 0) > 0 && (
+                  <button
+                    onClick={() => {
+                      const element = document.getElementById('staff_pick-section');
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-600 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors whitespace-nowrap"
+                  >
+                    <span>🔥</span>
+                    <span>Staff Picks ({data.bucketCounts.staff_pick})</span>
+                  </button>
+                )}
+              </div>
+
+              {/* View Mode Controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 text-sm border rounded ${
+                    viewMode === 'grid'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                  title="Grid View"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 text-sm border rounded ${
+                    viewMode === 'list'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                  title="List View"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('gallery')}
+                  className={`p-2 text-sm border rounded ${
+                    viewMode === 'gallery'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                  title="Gallery View"
+                >
+                  <ImageIcon className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters Panel */}
       {showFilters && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
@@ -534,55 +657,145 @@ export default function FeaturedProductsPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats */}
-        {data && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {data.totalCount}
+        {/* Category Navigation with Stats */}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Desktop Category Sidebar */}
+          <div className="hidden lg:block lg:w-64 flex-shrink-0">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Product Categories
+                </h2>
+                <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+                  Marketplace
+                </span>
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                Total Products
-              </div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {data.shops?.length || 0}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                Featured Shops
-              </div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {Object.keys(data.buckets || {}).length}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                Active Buckets
-              </div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {filters.trending ? 'On' : 'Off'}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                Trending Filter
-              </div>
+              
+              {/* Active Filter Indicator */}
+              {filters.category && (
+                <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-between">
+                  <span className="text-sm text-blue-700 dark:text-blue-300">
+                    Filtered: <strong>{filters.category}</strong>
+                  </span>
+                  <button
+                    onClick={() => handleFilterChange('category', '')}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+              
+              <nav className="space-y-1">
+                {/* All Products / Reset */}
+                <button
+                  onClick={() => handleFilterChange('category', '')}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
+                    !filters.category
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-medium'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <span>All Products</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    {data?.totalCount || 0}
+                  </span>
+                </button>
+
+                {/* Category List */}
+                {categories.map((cat) => (
+                  <button
+                    key={cat.name}
+                    onClick={() => handleFilterChange('category', cat.name)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
+                      filters.category === cat.name
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <span className="truncate">{cat.name}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {cat.count}
+                    </span>
+                  </button>
+                ))}
+              </nav>
+
+              {categories.length === 0 && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                  No categories available
+                </p>
+              )}
             </div>
           </div>
-        )}
 
-        {/* Featured Buckets */}
-        {data && data.buckets ? (
-          FEATURED_BUCKETS.map((bucket) => {
-            const products = data.buckets[bucket.type] || [];
-            const count = data.bucketCounts?.[bucket.type] || 0;
-            
-            if (products.length === 0) return null;
-            
-            return (
-              <div key={bucket.type} className="mb-12">
-                <div className="flex items-center justify-between mb-6">
+          {/* Mobile Category Dropdown */}
+          <div className="lg:hidden">
+            <Select
+              value={filters.category}
+              onChange={(value) => handleFilterChange('category', value || '')}
+              data={[
+                { value: '', label: 'All Categories' },
+                ...categories.map(cat => ({
+                  value: cat.name,
+                  label: `${cat.name} (${cat.count})`
+                }))
+              ]}
+              placeholder="Select category"
+            />
+          </div>
+
+          {/* Main Content Area */}
+          <div className="flex-1">
+            {/* Stats */}
+            {data && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {data.totalCount}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Total Products
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {data.shops?.length || 0}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Featured Shops
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {Object.keys(data.buckets || {}).length}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Active Buckets
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {filters.trending ? 'On' : 'Off'}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Trending Filter
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Featured Buckets */}
+            {data && data.buckets ? (
+              FEATURED_BUCKETS.map((bucket) => {
+                const products = data.buckets[bucket.type] || [];
+                const count = data.bucketCounts?.[bucket.type] || 0;
+                
+                if (products.length === 0) return null;
+                
+                return (
+                  <div key={bucket.type} id={`${bucket.type}-section`} className="mb-12 scroll-mt-20">
+                    <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                       <span className="text-2xl">{bucket.icon}</span>
@@ -641,6 +854,8 @@ export default function FeaturedProductsPage() {
             </Button>
           </div>
         )}
+          </div>
+        </div>
       </div>
 
       {/* Footer */}

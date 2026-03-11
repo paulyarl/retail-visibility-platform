@@ -65,7 +65,7 @@ export default function RandomFeaturedProducts() {
 
   // Log singleton metrics for debugging
   useEffect(() => {
-    console.log('RandomFeaturedProducts: Products loaded:', products.length);
+    /* console.log('RandomFeaturedProducts: Products loaded:', products.length);
     console.log('RandomFeaturedProducts: Store info check:', products.map(p => ({
       productId: p.id,
       tenantId: p.tenantId,
@@ -74,7 +74,7 @@ export default function RandomFeaturedProducts() {
       storeLogo: p.storeInfo?.storeLogo,
       storeCity: p.storeInfo?.storeCity,
       storeState: p.storeInfo?.storeState
-    })));
+    }))); */
   }, [products]);
 
   if (loading) {

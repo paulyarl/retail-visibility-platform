@@ -5,9 +5,8 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useEffect } from 'react';
 import { Button, Card, Badge, Tabs, TabsList, TabsTab, TabsPanel, Skeleton, Group, Text, Divider, Container, Stack } from '@mantine/core';
 import { 
   MapPin, 
@@ -26,7 +25,10 @@ import {
   TrendingUp,
   ArrowRight,
   Grid,
-  Sparkles
+  Sparkles,
+  LayoutGrid,
+  List,
+  Image as ImageIcon
 } from 'lucide-react';
 
 // Import existing components from tenant page
@@ -38,12 +40,17 @@ import ContactInformationCollapsible from '@/components/storefront/ContactInform
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import LastViewed from '@/components/directory/LastViewed';
 import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
+import FeaturedBucketsShowcase from '@/components/storefront/FeaturedBucketsShowcase';
+import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
+import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { directoryListingService } from '@/services/DirectoryListingSingletonService';
+import { storefrontService } from '@/services/StorefrontSingletonService';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
+import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSingleton';
 
 // Types
 interface DirectoryConsolidated {
@@ -447,6 +454,89 @@ export default function ShopProfileClient({ shop, businessHours }: {
 }) {
   // Extract shop data once at the top
   const shopData = (shop.data as any)?.data;
+  
+  // Featured products state
+  const [featuredCounts, setFeaturedCounts] = useState({
+    staff_pick: 0,
+    seasonal: 0,
+    sale: 0,
+    new_arrival: 0,
+    store_selection: 0,
+  });
+  const [featuredData, setFeaturedData] = useState<any>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  
+  // Fetch categories on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      if (!shopData?.id) return;
+      
+      try {
+        const storefrontData = await storefrontService.getStorefrontCategories(shopData.id);
+        const storefrontCategories = storefrontData.categories || [];
+        
+        // Convert to category format
+        const cats = storefrontCategories.map((cat: any) => ({
+          id: cat.id,
+          name: cat.name,
+          slug: cat.slug,
+          count: parseInt(cat.productCount) || 0, // API returns productCount as string
+          googleCategoryId: cat.googleCategoryId,
+          category_type: 'platform',
+        }));
+        
+        setCategories(cats);
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+      }
+    };
+    
+    fetchCategories();
+  }, [shopData?.id]);
+  
+  // Fetch featured data on mount
+  useEffect(() => {
+    const loadFeaturedCounts = async () => {
+      if (!shopData?.id) return;
+      
+      try {
+        let data = await featuredProductsSingleton.getAllFeaturedProducts(shopData.id, 20);
+        
+        // Validate cache: if data is empty, force a fresh fetch
+        if (data && data.totalCount === 0 && (!data.buckets || data.buckets.length === 0)) {
+          await featuredProductsSingleton.clearCache();
+          data = await featuredProductsSingleton.getAllFeaturedProducts(shopData.id, 20);
+        }
+        
+        if (data) {
+          setFeaturedData(data);
+          // Derive counts from buckets array
+          const counts = {
+            staff_pick: 0,
+            seasonal: 0,
+            sale: 0,
+            new_arrival: 0,
+            store_selection: 0,
+          };
+          
+          data.buckets?.forEach((bucket: { bucketType: string; totalCount?: number }) => {
+            if (bucket.bucketType === 'staff_pick') counts.staff_pick = bucket.totalCount || 0;
+            if (bucket.bucketType === 'seasonal') counts.seasonal = bucket.totalCount || 0;
+            if (bucket.bucketType === 'sale') counts.sale = bucket.totalCount || 0;
+            if (bucket.bucketType === 'new_arrival') counts.new_arrival = bucket.totalCount || 0;
+            if (bucket.bucketType === 'store_selection') counts.store_selection = bucket.totalCount || 0;
+          });
+          
+          setFeaturedCounts(counts);
+        }
+      } catch (error) {
+        console.error('Failed to load featured products:', error);
+      }
+    };
+    
+    loadFeaturedCounts();
+  }, [shopData?.id]);
+  
   //console.log(shopData);
   // Check if shop data exists and is valid
   if (!shop || !shop.success || !shopData || !shopData.id) {
@@ -540,33 +630,158 @@ export default function ShopProfileClient({ shop, businessHours }: {
 
       <ShopProfileHeader shop={shop} shopData={shopData} businessHours={businessHours} />
 
+      {/* Quick Jump Navigation - Featured Types */}
+      {(featuredCounts.staff_pick > 0 || featuredCounts.new_arrival > 0 || featuredCounts.sale > 0 || featuredCounts.seasonal > 0 || featuredCounts.store_selection > 0) && (
+        <div className="bg-white border-b border-gray-200 sticky top-[60px] z-30">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-gray-600 mr-2">Quick Jump:</span>
+              
+              {/* Staff Picks */}
+              {featuredCounts.staff_pick > 0 && (
+                <button
+                  onClick={() => {
+                    const element = document.getElementById('staff_pick-section');
+                    element?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-600 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors whitespace-nowrap"
+                >
+                  <span>⭐</span>
+                  <span>Staff Picks ({featuredCounts.staff_pick})</span>
+                </button>
+              )}
+
+              {/* New Arrivals */}
+              {featuredCounts.new_arrival > 0 && (
+                <button
+                  onClick={() => {
+                    const element = document.getElementById('new_arrival-section');
+                    element?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
+                >
+                  <span>✨</span>
+                  <span>New Arrivals ({featuredCounts.new_arrival})</span>
+                </button>
+              )}
+
+              {/* Sale Items */}
+              {featuredCounts.sale > 0 && (
+                <button
+                  onClick={() => {
+                    const element = document.getElementById('sale-section');
+                    element?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-600 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors whitespace-nowrap"
+                >
+                  <span>💰</span>
+                  <span>Sale Items ({featuredCounts.sale})</span>
+                </button>
+              )}
+
+              {/* Seasonal Specials */}
+              {featuredCounts.seasonal > 0 && (
+                <button
+                  onClick={() => {
+                    const element = document.getElementById('seasonal-section');
+                    element?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-600 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors whitespace-nowrap"
+                >
+                  <span>🍂</span>
+                  <span>Seasonal ({featuredCounts.seasonal})</span>
+                </button>
+              )}
+
+              {/* Store Selection */}
+              {featuredCounts.store_selection > 0 && (
+                <button
+                  onClick={() => {
+                    const element = document.getElementById('store_selection-section');
+                    element?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                >
+                  <span>🏪</span>
+                  <span>Store Selection ({featuredCounts.store_selection})</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Products Section */}
       <div className="bg-gray-50 py-8">
         <div className="container mx-auto px-4">
           {/* Search Section - Full width */}
           <div className="mb-8">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Products</h2>
-              <p className="text-gray-600">
-                Browse our selection of {shopData.productCount} products
-              </p>
-            </div>
-
-            {/* Product Search */}
-            <div className="bg-white rounded-lg border shadow-sm">
+            <div className="bg-white rounded-lg border shadow-sm p-4">
               <ProductSearch 
                 tenantId={shopData.id}
               />
             </div>
           </div>
 
-          {/* Featured Products - Centered with page margins */}
-          <div className="mb-12">
-            <StorefrontFeaturedProducts 
-              tenantId={shopData.id} 
-              hasActivePaymentGateway={shopData.has_active_payment_gateway}
-              defaultGatewayType={shopData.default_gateway_type}
-            />
+          {/* Category Navigation */}
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Desktop Category Sidebar */}
+            <div className="hidden lg:block lg:w-64 flex-shrink-0">
+              <ProductCategorySidebar
+                tenantId={shopData.id}
+                categories={categories}
+                totalProducts={shopData.productCount || 0}
+              />
+            </div>
+
+            {/* Mobile Category Dropdown */}
+            <div className="lg:hidden">
+              <CategoryMobileDropdown
+                tenantId={shopData.id}
+                categories={categories}
+                totalProducts={shopData.productCount || 0}
+              />
+            </div>
+
+            {/* Main Content Area */}
+            <div className="flex-1">
+              {/* Section Header */}
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Products</h2>
+                <p className="text-gray-600">
+                  Browse our selection of {shopData.productCount} products
+                </p>
+              </div>
+
+              {/* Featured Buckets Showcase - with Quick Jump targets */}
+              {featuredData && featuredData.totalCount > 0 && (
+                <div className="mb-12">
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Featured Selections</h2>
+                    <p className="text-sm text-gray-600">
+                      Discover our hand-picked selection of featured items
+                    </p>
+                  </div>
+                  
+                  <FeaturedBucketsShowcase 
+                    featuredData={{
+                      totalCount: featuredData.totalCount,
+                      bucketCounts: featuredCounts,
+                      // Transform buckets array to individual properties
+                      staffPick: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'staff_pick')?.products || [],
+                      newArrival: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'new_arrival')?.products || [],
+                      seasonal: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'seasonal')?.products || [],
+                      sale: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'sale')?.products || [],
+                      storeSelection: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'store_selection')?.products || []
+                    }}
+                    tenantId={shopData.id}
+                    hasActivePaymentGateway={shopData.has_active_payment_gateway}
+                    defaultGatewayType={shopData.default_gateway_type}
+                  />
+                </div>
+              )}
+
+                          </div>
           </div>
 
           {/* Recently Viewed - Centered with page margins */}

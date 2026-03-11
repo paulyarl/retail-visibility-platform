@@ -31,7 +31,7 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
       
       // Only use public branding service for platform settings
       const settingsData = await publicBrandingService.getPublicBrandingSettings();
-      console.log('[PlatformSettingsProvider] Using public branding service');
+      // console.log('[PlatformSettingsProvider] Using public branding service');
 
       // Map PlatformSettings to the context's PlatformSettings interface
       if (settingsData) {

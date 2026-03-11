@@ -491,7 +491,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
 
   const tenantSlug = tenant?.slug || tenant?.id;
   
-  console.log(`Tenant: ${tenant.name}, Slug: ${slug}, Tenant: ${JSON.stringify(tenant)}`);
+  // console.log(`Tenant: ${tenant.name}, Slug: ${slug}, Tenant: ${JSON.stringify(tenant)}`);
 
   // Check if storefront is available (Starter+ tier)
   const hasStorefront = tier !== 'trial' && tier !== 'google_only';

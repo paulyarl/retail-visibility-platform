@@ -62,57 +62,24 @@ interface ShopProfilePageProps {
   }>;
 }
 
-// Shop data fetching function
+// Shop data fetching function using singleton service
 export async function getShopBySlug(identifier: string): Promise<ShopResponse | null> {
   try {
-    console.log('[getShopBySlug] Starting fetch for identifier:', identifier);
+    // Use shopsService singleton for caching and optimization benefits
+    const shop = await shopsService.getShopByIdentifier(identifier);
     
-    // First, try to resolve the identifier to get the tenant ID
-    const resolveResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/public/shops/${identifier}`);
-    
-    if (!resolveResponse.ok) {
-      console.error('Error resolving shop identifier:', resolveResponse.statusText);
+    if (!shop) {
       return null;
     }
     
-    const resolveData = await resolveResponse.json();
-    
-    if (!resolveData.success || !resolveData.shop) {
-      console.error('Shop not found:', resolveData);
-      return null;
-    }
-    
-    // Now get the full shop data using the tenant ID
-    const tenantId = resolveData.shop.id;
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/public/shops/id/${tenantId}`);
-    
-    if (!response.ok) {
-      console.error('Error fetching shop details:', response.statusText);
-      return null;
-    }
-    
-    const data = await response.json();
-    
-    console.log('[getShopBySlug] Shop details API response:', {
-      success: data.success,
-      hasShop: !!data.shop,
-      shopKeys: data.shop ? Object.keys(data.shop) : 'null'
-    });
-    
-    if (data.success) {
-      // Wrap the shop data in the expected triple-nested ShopResponse structure
-      const wrappedResponse = {
+    // Wrap the shop data in the expected triple-nested ShopResponse structure
+    return {
+      success: true,
+      data: {
         success: true,
-        data: {
-          success: true,
-          data: data.shop as unknown as ShopData
-        }
-      };
-      
-      return wrappedResponse;
-    }
-    
-    return null;
+        data: shop as unknown as ShopData
+      }
+    };
   } catch (error) {
     console.error('Error fetching shop:', error);
     return null;
@@ -182,38 +149,36 @@ function ShopProfileSkeleton() {
 export default async function ShopProfilePage({ params, searchParams }: ShopProfilePageProps) {
   const { slug } = await params;
   
-  console.log('[ShopProfilePage] Page component called with slug:', slug);
+  // console.log('[ShopProfilePage] Fetching shop for slug:', slug);
   
-  // Fetch shop data
+  // Fetch shop data using singleton service
   const shop = await getShopBySlug(slug);
   
-  // Fetch business hours separately using the direct API endpoint
+  // console.log('[ShopProfilePage] Shop response:', {
+  //   hasShop: !!shop,
+  //   shopSuccess: shop?.success,
+  //   hasData: !!shop?.data,
+  //   dataSuccess: shop?.data?.success,
+  //   hasInnerData: !!shop?.data?.data,
+  //   innerDataId: shop?.data?.data?.id,
+  //   innerDataName: shop?.data?.data?.name,
+  //   innerDataKeys: shop?.data?.data ? Object.keys(shop.data.data) : 'null',
+  //   fullShop: JSON.stringify(shop, null, 2)
+  // });
+  
+  // Fetch business hours using singleton service
   let businessHours = null;
   if (shop?.success && shop?.data?.data?.id) {
     try {
-      const hoursResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/business-hours/${shop.data.data.id}`);
-      if (hoursResponse.ok) {
-        const hoursData = await hoursResponse.json();
-        if (hoursData.success) {
-          businessHours = hoursData.data;
-          console.log('[ShopProfilePage] Business hours fetched:', !!businessHours);
-          console.log('[ShopProfilePage] Business hours data:', JSON.stringify(businessHours, null, 2));
-        }
-      }
+      businessHours = await tenantPublicService.getBusinessHours(shop.data.data.id);
+      // console.log('[ShopProfilePage] Business hours:', {
+      //   hasHours: !!businessHours,
+      //   hoursData: JSON.stringify(businessHours, null, 2)
+      // });
     } catch (error) {
       console.error('Error fetching business hours:', error);
     }
   }
-  
-  console.log('[ShopProfilePage] Shop data received:', {
-    hasShop: !!shop,
-    shopSuccess: shop?.success,
-    hasShopData: !!shop?.data,
-    shopDataSuccess: shop?.data?.success,
-    hasInnerData: !!shop?.data?.data,
-    innerDataTenantId: shop?.data?.data?.id,
-    hasBusinessHours: !!businessHours
-  });
   
   // If no shop found, show not found page
   if (!shop || !shop.success || !shop.data || !shop.data.success || !shop.data.data) {

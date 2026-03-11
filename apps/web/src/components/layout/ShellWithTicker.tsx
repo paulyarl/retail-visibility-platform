@@ -104,7 +104,7 @@ export default function ShellWithTicker({ children, shellHeader }: ShellWithTick
     if (!shouldShowTicker || hasLoaded) return;
 
     const timer = setTimeout(() => {
-      console.log(`[ShellWithTicker] Delayed loading ticker data after ${TICKER_DELAY_MS / 1000} seconds`);
+      // console.log(`[ShellWithTicker] Delayed loading ticker data after ${TICKER_DELAY_MS / 1000} seconds`);
       setHasLoaded(true);
     }, TICKER_DELAY_MS);
 
@@ -113,7 +113,7 @@ export default function ShellWithTicker({ children, shellHeader }: ShellWithTick
 
   const handleTickerDismiss = (messageId: string) => {
     // Optional: Track dismissal analytics
-    console.log('Ticker message dismissed:', messageId);
+    // console.log('Ticker message dismissed:', messageId);
     
     // Note: With React Query, we'd typically invalidate the query
     // For now, this is handled locally in the PlatformTicker component

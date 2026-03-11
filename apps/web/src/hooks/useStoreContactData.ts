@@ -98,10 +98,10 @@ export async function getStoreContactDataStatic(params: { slug?: string; tenantI
       directoryData = await directoryService.getDirectoryConsolidated(params.slug);
     }
     // For tenant pages: this won't work during SSR (no auth), returns null
-    else if (params.tenantId) {
-      // Skip during SSR - tenant slug lookup requires authentication
-      console.log('[getStoreContactDataStatic] Skipping tenant slug fetch during SSR');
-    }
+    // else if (params.tenantId) {
+    //   // Skip during SSR - tenant slug lookup requires authentication
+    //   console.log('[getStoreContactDataStatic] Skipping tenant slug fetch during SSR');
+    // }
 
     return {
       listing: directoryData?.listing || null,

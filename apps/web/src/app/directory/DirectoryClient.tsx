@@ -310,7 +310,7 @@ export default function DirectoryClient() {
         }
 
         let categories = getCachedData(CACHE_CONFIG.categories.key);
-        console.log('[DirectoryClient] Categories cache check:', categories ? 'HIT' : 'MISS');
+        // console.log('[DirectoryClient] Categories cache check:', categories ? 'HIT' : 'MISS');
 
         if (!categories || categories.length === 0) {
           // Fetch directory categories
@@ -412,7 +412,7 @@ export default function DirectoryClient() {
   // Mark component render completion (minimal logging only)
   useEffect(() => {
     if (!loading && data) {
-      console.log('Directory loaded:', data?.length || 0, 'stores');
+      // console.log('Directory loaded:', data?.length || 0, 'stores');
     }
   }, [loading, data]);
 

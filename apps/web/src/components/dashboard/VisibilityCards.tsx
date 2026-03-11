@@ -45,8 +45,8 @@ export default function VisibilityCards({
 }: VisibilityCardsProps) {
   // Generate URLs if not provided
   const finalStorefrontUrl = storefrontUrl || `/tenant/${tenantId}`;
-  const finalShopUrl = storefrontUrl || `/shops/${tenantId}`;
-  const finalDirectoryUrl = directoryUrl || slug ? `/directory/${slug}` : `/directory`;
+  const finalShopUrl = storefrontUrl || `/shops/${slug || tenantId}`;
+  const finalDirectoryUrl = directoryUrl || `/directory/${slug || '/directory'}`;
   
   // Build directory URL with location and category filters for proximity viewing
   const buildDirectoryUrl = () => {

@@ -17,7 +17,28 @@ interface UniversalProductCardProps {
   showStoreInfo?: boolean;
   showQuickActions?: boolean;
   className?: string;
+  productData?: any; // Pre-fetched product data to avoid additional fetch
+  // Payment gateway status from parent page/shop
+  hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
 }
+
+// Featured type configuration
+const FEATURED_TYPE_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
+  staff_pick: { icon: '⭐', label: 'Staff Pick', color: 'from-amber-500 to-yellow-500' },
+  new_arrival: { icon: '✨', label: 'New', color: 'from-emerald-500 to-green-500' },
+  sale: { icon: '💰', label: 'Sale', color: 'from-red-500 to-rose-500' },
+  seasonal: { icon: '🍂', label: 'Seasonal', color: 'from-orange-500 to-amber-500' },
+  store_selection: { icon: '🏪', label: 'Featured', color: 'from-blue-500 to-indigo-500' },
+};
+
+// Get featured type badges to display
+const getFeaturedTypeBadges = (types: string[] | undefined) => {
+  if (!types || types.length === 0) return [];
+  return types
+    .filter(type => FEATURED_TYPE_CONFIG[type])
+    .map(type => ({ ...FEATURED_TYPE_CONFIG[type], type }));
+};
 
 export function UniversalProductCard({ 
   productId, 
@@ -25,14 +46,25 @@ export function UniversalProductCard({
   variant = 'detailed', 
   showStoreInfo = true, 
   showQuickActions = true,
-  className = '' 
+  className = '',
+  productData, // Pre-fetched product data
+  hasActivePaymentGateway: propHasActivePaymentGateway, // From parent page
+  defaultGatewayType: propDefaultGatewayType, // From parent page
 }: UniversalProductCardProps) {
   const { actions } = useProductSingleton();
-  const [product, setProduct] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [product, setProduct] = useState<any>(productData || null);
+  const [loading, setLoading] = useState(!productData);
   const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
+    // If productData is provided, use it directly
+    if (productData) {
+      setProduct(productData);
+      setLoading(false);
+      return;
+    }
+    
+    // Otherwise fetch the product
     const fetchProduct = async () => {
       setLoading(true);
       setError(null);
@@ -50,10 +82,27 @@ export function UniversalProductCard({
     if (productId) {
       fetchProduct();
     }
-  }, [productId, tenantId]);
+  }, [productId, tenantId, productData]);
   
   const storeData = tenantId ? useStoreData(tenantId) : { store: null, loading: false, error: null };
   const { store } = storeData;
+
+  // Payment gateway status: props > product data
+  const hasActivePaymentGateway = propHasActivePaymentGateway ?? product?.hasActivePaymentGateway ?? false;
+  const defaultGatewayType = propDefaultGatewayType ?? product?.defaultGatewayType;
+
+  // Format price - handle both raw values and pre-formatted values
+  const formatPrice = (value: number | string | undefined): string => {
+    if (value === undefined || value === null) return '0.00';
+    if (typeof value === 'string') return value;
+    // If value looks like cents (large number), convert to dollars
+    if (value > 1000) return (value / 100).toFixed(2);
+    return value.toFixed(2);
+  };
+
+  // Get formatted prices
+  const formattedPrice = product?.formattedPrice || formatPrice(product?.price ?? product?.priceCents);
+  const formattedSalePrice = product?.formattedSalePrice || formatPrice(product?.salePrice ?? product?.salePriceCents);
 
   if (loading) {
     return (
@@ -82,12 +131,14 @@ export function UniversalProductCard({
 
   // Compact variant
   if (variant === 'compact') {
+    const featuredBadges = getFeaturedTypeBadges(product.featuredTypes);
+    
     return (
       <div className={`bg-white dark:bg-neutral-800 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow ${className}`}>
         <Link href={`/products/${product.id}`} className="block">
           <div className="flex items-center p-3">
             {/* Product Image */}
-            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
+            <div className="relative w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
               {product.imageUrl ? (
                 <Image
                   src={product.imageUrl}
@@ -99,6 +150,19 @@ export function UniversalProductCard({
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <Package className="w-6 h-6 text-gray-400" />
+                </div>
+              )}
+              {/* Featured type icons overlay */}
+              {featuredBadges.length > 0 && (
+                <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-0.5 bg-black/40 px-1 py-0.5">
+                  {featuredBadges.slice(0, 3).map((badge) => (
+                    <span key={badge.type} title={badge.label} className="text-xs">
+                      {badge.icon}
+                    </span>
+                  ))}
+                  {featuredBadges.length > 3 && (
+                    <span className="text-xs text-white">+{featuredBadges.length - 3}</span>
+                  )}
                 </div>
               )}
             </div>
@@ -129,13 +193,18 @@ export function UniversalProductCard({
               </div>
               <div className="flex items-center justify-between mt-1">
                 <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                  ${product.formattedPrice}
+                  ${formattedPrice}
                 </span>
-                {product.isOnSale && (
-                  <span className="text-xs text-red-600 dark:text-red-400 line-through">
-                    ${product.formattedSalePrice}
-                  </span>
-                )}
+                <div className="flex items-center gap-1">
+                  {product.isOnSale && (
+                    <span className="text-xs text-red-600 dark:text-red-400 line-through">
+                      ${formattedSalePrice}
+                    </span>
+                  )}
+                  {product.hasActivePaymentGateway && (
+                    <ShoppingCart className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                  )}
+                </div>
               </div>
             </div>
             {showStoreInfo && store && (
@@ -151,13 +220,15 @@ export function UniversalProductCard({
 
   // Minimal variant
   if (variant === 'minimal') {
+    const featuredBadges = getFeaturedTypeBadges(product.featuredTypes);
+    
     return (
       <div className={`bg-white dark:bg-neutral-800 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow ${className}`}>
         <Link href={`/products/${product.id}`} className="block">
           <div className="p-3">
             <div className="flex items-center">
               {/* Product Image */}
-              <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
+              <div className="relative w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
                 {product.imageUrl ? (
                   <Image
                     src={product.imageUrl}
@@ -171,6 +242,16 @@ export function UniversalProductCard({
                     <Package className="w-4 h-4 text-gray-400" />
                   </div>
                 )}
+                {/* Featured type icons overlay */}
+                {featuredBadges.length > 0 && (
+                  <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-0.5 bg-black/40 px-0.5 py-px">
+                    {featuredBadges.slice(0, 2).map((badge) => (
+                      <span key={badge.type} title={badge.label} className="text-[10px]">
+                        {badge.icon}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               
               {/* Product Info */}
@@ -179,7 +260,7 @@ export function UniversalProductCard({
                   {product.name}
                 </h3>
                 <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                  ${product.formattedPrice}
+                  ${formattedPrice}
                 </span>
               </div>
             </div>
@@ -208,12 +289,18 @@ export function UniversalProductCard({
           </div>
         )}
         
-        {/* Featured Badge */}
-        {product.isFeatured && (
-          <div className="absolute top-2 right-2">
-            <span className="inline-flex items-center px-2 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full">
-              Featured
-            </span>
+        {/* Featured Type Badges - displayed in a column on top-left */}
+        {product.featuredTypes && product.featuredTypes.length > 0 && (
+          <div className="absolute top-2 left-2 flex flex-col gap-1">
+            {getFeaturedTypeBadges(product.featuredTypes).map((badge) => (
+              <span
+                key={badge.type}
+                className={`inline-flex items-center px-2 py-0.5 bg-gradient-to-r ${badge.color} text-white text-xs font-medium rounded-full shadow-sm`}
+              >
+                <span className="mr-1">{badge.icon}</span>
+                {badge.label}
+              </span>
+            ))}
           </div>
         )}
         
@@ -294,11 +381,11 @@ export function UniversalProductCard({
         <div className="flex items-center justify-between mb-3">
           <div>
             <span className="text-xl font-bold text-gray-900 dark:text-white">
-              ${product.formattedPrice}
+              ${formattedPrice}
             </span>
             {product.isOnSale && (
               <span className="ml-2 text-sm text-gray-500 dark:text-gray-400 line-through">
-                ${product.formattedSalePrice}
+                ${formattedSalePrice}
               </span>
             )}
           </div>
@@ -326,13 +413,31 @@ export function UniversalProductCard({
         {/* Quick Actions */}
         {showQuickActions && (
           <div className="flex items-center gap-2">
-            <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
-              <ShoppingCart className="w-4 h-4" />
-              Add to Cart
-            </button>
-            <button className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-              <Package className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-            </button>
+            {hasActivePaymentGateway ? (
+              <>
+                <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                  <ShoppingCart className="w-4 h-4" />
+                  Add to Cart
+                </button>
+                {defaultGatewayType && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                    {defaultGatewayType === 'paypal' && (
+                      <span className="text-blue-600">💳</span>
+                    )}
+                    {defaultGatewayType === 'stripe' && (
+                      <span className="text-purple-600">💳</span>
+                    )}
+                    {defaultGatewayType === 'square' && (
+                      <span className="text-green-600">💳</span>
+                    )}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-xs text-gray-500 dark:text-gray-400 italic">
+                Contact store for purchase
+              </span>
+            )}
           </div>
         )}
       </div>

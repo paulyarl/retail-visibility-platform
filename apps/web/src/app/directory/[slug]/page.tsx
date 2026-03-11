@@ -21,6 +21,7 @@ import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { externalApiService } from '@/services/ExternalApiService';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
 
 interface StoreDetailPageProps {
   params: {
@@ -582,7 +583,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                         //console.log('[Directory Page] Mapping featured products:', featuredProducts.length);
                         return featuredProducts.map((product: any) => (
                           <SmartProductCard
-                            key={product.id}
+                            key={`directory-featured-${product.id}`}
                             tenantId={listing.tenantId}
                             product={{
                             id: product.id,
@@ -766,8 +767,6 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
             </div>
           </div>
         </div>
-
-      {/* Featured Products - REMOVED FROM BOTTOM - MOVED UP! */}
 
       {/* Related Stores */}
       <RelatedStores 

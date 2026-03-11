@@ -275,25 +275,25 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
         imageUrl: (itemData as any).image_url || (itemData as any).imageUrl,
       };
       
-      console.log('[ItemDetailPage] Loaded item:', {
-        id: normalizedItem.id,
-        status: normalizedItem.status,
-        visibility: normalizedItem.visibility,
-        price: normalizedItem.price,
-        stock: normalizedItem.stock,
-        itemStatus: normalizedItem.itemStatus,
-        tenantCategory: normalizedItem.tenantCategory,
-        tenantCategoryId: normalizedItem.tenantCategoryId,
-        originalData: {
-          item_status: (itemData as any).item_status,
-          visibility: (itemData as any).visibility,
-          price_cents: (itemData as any).price_cents,
-          stock: (itemData as any).stock,
-          tenant_category_id: (itemData as any).tenant_category_id,
-          image_url: (itemData as any).image_url,
-        },
-        fullOriginalData: itemData,
-      });
+      // console.log('[ItemDetailPage] Loaded item:', {
+      //   id: normalizedItem.id,
+      //   status: normalizedItem.status,
+      //   visibility: normalizedItem.visibility,
+      //   price: normalizedItem.price,
+      //   stock: normalizedItem.stock,
+      //   itemStatus: normalizedItem.itemStatus,
+      //   tenantCategory: normalizedItem.tenantCategory,
+      //   tenantCategoryId: normalizedItem.tenantCategoryId,
+      //   originalData: {
+      //     item_status: (itemData as any).item_status,
+      //     visibility: (itemData as any).visibility,
+      //     price_cents: (itemData as any).price_cents,
+      //     stock: (itemData as any).stock,
+      //     tenant_category_id: (itemData as any).tenant_category_id,
+      //     image_url: (itemData as any).image_url,
+      //   },
+      //   fullOriginalData: itemData,
+      // });
       setItem(normalizedItem);
 
       // Fetch photos via PhotoSingleton

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, MapPin, Star, Phone, Globe, Clock, Filter, Grid, List, ChevronDown, ChevronLeft, ChevronRight, Store, ShoppingBag, TrendingUp, Sparkles, Tag, Users, Calendar, ArrowLeft, X, Flame, Leaf, Gift, Zap } from 'lucide-react';
+import { Search, MapPin, Star, Phone, Globe, Clock, Filter, Grid, List, ChevronDown, ChevronLeft, ChevronRight, Store, ShoppingBag, TrendingUp, Sparkles, Tag, Users, Calendar, ArrowLeft, X, Flame, Leaf, Gift, Zap, ShoppingCart } from 'lucide-react';
 import { Button, Container, Grid as MantineGrid, SimpleGrid, Badge, Card, Group, Text, Stack } from '@mantine/core';
 import StorefrontActions from '../../components/storefront/StorefrontActions';
 import { directorySingletonService } from '../../services/DirectorySingletonService';
@@ -24,6 +24,7 @@ import { StoreList, StoreData } from '@/components/stores';
 import FeaturedStoresList from '@/components/directory/FeaturedStoresList';
 import { StoreSingletonProvider } from '@/providers/data/StoreSingleton';
 import { usePublicBranding } from '@/hooks/usePublicBranding';
+import { useMultiCart } from '@/hooks/useMultiCart';
 
 interface Shop {
   id: string;
@@ -152,7 +153,7 @@ interface Product {
 // Mock components for now - these should be imported from their actual files
 const ShopViewTracker: React.FC<ShopViewTrackerProps> = ({ tenantId, pageType, category }) => {
   useEffect(() => {
-    console.log(`Shop view tracked: ${tenantId}, ${pageType}, ${category}`);
+    // console.log(`Shop view tracked: ${tenantId}, ${pageType}, ${category}`);
   }, [tenantId, pageType, category]);
   return null;
 };
@@ -506,6 +507,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 export default function ShopsPageClient({ id, searchParams }: { id: string; searchParams: { page?: string; search?: string; category?: string; products_only?: string; featured?: string; view?: string } }) {
   const { tenantId, isInTenantContext, isFromUrl } = usePublicPageTenantContext();
   const { branding: platformBranding } = usePublicBranding();
+  const { totalItems: cartTotalItems } = useMultiCart();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -525,6 +527,11 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
   const [tenantError, setTenantError] = useState<string | null>(null);
   const [mapLocation, setMapLocation] = useState<MapLocation | null>(null);
   const [platformSettings, setPlatformSettings] = useState<any>(null);
+
+  // Handle view cart
+  const handleViewCart = () => {
+    router.push('/carts');
+  };
 
   // Show traditional listing when searching or filtering
   const showTraditionalListing = searchQuery || selectedCategory || sortBy !== 'name';
@@ -840,6 +847,21 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
                   <List className="h-4 w-4" />
                 </button>
               </div>
+              
+              {/* Cart Button - Only show if items in cart */}
+              {cartTotalItems > 0 && (
+                <button
+                  onClick={handleViewCart}
+                  className="relative inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                  title="View your shopping cart"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span className="hidden sm:inline">Cart</span>
+                  <span className="absolute -top-2 -right-2 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
+                    {cartTotalItems > 99 ? '99+' : cartTotalItems}
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         </div>

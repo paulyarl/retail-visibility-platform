@@ -618,7 +618,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
   private async invalidateTenantCaches(tenantId: string) {
     await this.invalidateCache(`platform-tenant-complete-${tenantId}`);
-  /*   // Invalidate tenant profile cache (exact key, no wildcard)
+    // Invalidate tenant profile cache (exact key, no wildcard)
     await this.invalidateCache(`platform-tenant-profile-${tenantId}`);
     // Invalidate tenant cache (slug is stored on tenant record)
     await this.invalidateCache(`platform-tenant-${tenantId}`);
@@ -633,9 +633,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     await this.invalidateCache('platform-organizations*');
 
     // Non-blocking MV refresh for tenant-related views only
-    this.refreshMaterializedView(['mv_global_discovery', 'directory_category_listings', 'directory_gbp_listings']).catch(err => {
-      console.warn('[PlatformHomeSingleton] Background MV refresh failed:', err);
-    }); */
+    // this.refreshMaterializedView(['mv_global_discovery', 'directory_category_listings', 'directory_gbp_listings']).catch(err => {
+    //   console.warn('[PlatformHomeSingleton] Background MV refresh failed:', err);
+    // });
   }
 
   /**

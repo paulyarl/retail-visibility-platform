@@ -6,6 +6,8 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { ResolverType } from '@/types/resolver';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface DirectoryItem {
   id: string;
@@ -83,6 +85,13 @@ export interface LastViewedItem {
 }
 
 class PublicDirectoryService extends PublicApiSingleton {
+  async resolveBySlug(slug: string): Promise<any> {
+    const response = await this.resolveIdentifier(slug, AppContext.TENANT);
+    return response;
+  }
+
+    protected defaultContext: AppContext = AppContext.STORE;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.STORE;
   private static instance: PublicDirectoryService;
 
   private constructor() {
@@ -159,6 +168,56 @@ class PublicDirectoryService extends PublicApiSingleton {
       return null;
     }
   }
+ /**
+  * Get shop info by slug or identifier (basic resolve)
+  */
+ async getShopInfo(tenantId: string): Promise<any | null> {
+   try {
+     const result = await this.makeDefaultRequest<any>(
+       `/api/public/shops/${encodeURIComponent(tenantId)}`,
+       {},
+       `shop-info-${tenantId}`
+     );
+     if (!result.success){
+      console.log('[PublicDirectoryService] Failed to get shop info:', result.error);
+      return null;
+     }
+     return result.data || null;
+   } catch (error) {
+     console.error('[PublicDirectoryService] Failed to get shop info:', error);
+     return null;
+   }
+ }
+
+ /**
+  * Get full shop details by tenant ID
+  * Uses the /api/public/shops/id/:tenantId endpoint for complete shop data
+  */
+ async getShopInfoById(tenantId: string): Promise<any | null> {
+   try {
+     const result = await this.makeDefaultRequest<any>(
+       `/api/public/shops/id/${encodeURIComponent(tenantId)}`,
+       {},
+       `shop-info-by-id-${tenantId}`
+     );
+    
+    // console.log('[PublicDirectoryService] getShopInfoById result:', {
+    //   success: result.success,
+    //   hasData: !!result.data,
+    //   dataKeys: result.data ? Object.keys(result.data) : 'null',
+    //   fullData: JSON.stringify(result.data, null, 2)
+    // });
+    
+    if (!result.success){
+      console.log('[PublicDirectoryService] Failed to get shop info by ID:', result.error);
+      return null;
+    }
+    return result.data || null;
+  } catch (error) {
+    console.error('[PublicDirectoryService] Failed to get shop info by ID:', error);
+    return null;
+  }
+}
 
   /**
    * Get featured listings
@@ -221,6 +280,10 @@ class PublicDirectoryService extends PublicApiSingleton {
         'directory-categories',
         30 * 60 * 1000 // 30 minutes cache for categories
       );
+      if (!result.success){
+        console.log('[PublicDirectoryService] Failed to get categories:', result.error);
+        return [];
+      }
       
       return result.data?.categories || [];
     } catch (error) {
@@ -240,6 +303,10 @@ class PublicDirectoryService extends PublicApiSingleton {
         'directory-locations',
         30 * 60 * 1000 // 30 minutes cache for locations
       );
+      if (!result.success){
+        console.log('[PublicDirectoryService] Failed to get locations:', result.error);
+        return [];
+      }
       
       return result.data?.locations || [];
     } catch (error) {
@@ -259,6 +326,10 @@ class PublicDirectoryService extends PublicApiSingleton {
         'directory-sitemap',
         60 * 60 * 1000 // 1 hour cache for sitemap
       );
+      if (!result.success){
+        console.log('[PublicDirectoryService] Failed to get sitemap:', result.error);
+        return [];
+      }
       
       return result.data?.entries || [];
     } catch (error) {
@@ -278,6 +349,10 @@ class PublicDirectoryService extends PublicApiSingleton {
         'directory-recent-viewed',
         5 * 60 * 1000 // 5 minutes cache for recently viewed
       );
+      if (!result.success){
+        console.log('[PublicDirectoryService] Failed to get last viewed:', result.error);
+        return [];
+      }
       
       return result.data?.items || [];
     } catch (error) {
@@ -328,6 +403,17 @@ class PublicDirectoryService extends PublicApiSingleton {
         'directory-stats',
         15 * 60 * 1000 // 15 minutes cache for stats
       );
+      if (!result.success){
+        console.log('[PublicDirectoryService] Failed to get statistics:', result.error);
+        return {
+          totalShops: 0,
+          totalProducts: 0,
+          totalCategories: 0,
+          totalLocations: 0,
+          featuredShops: 0,
+          publishedShops: 0
+        };
+      }
       
       return result.data || {
         totalShops: 0,

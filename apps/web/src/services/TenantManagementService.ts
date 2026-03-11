@@ -325,18 +325,52 @@ class TenantManagementService extends TenantApiSingleton {
    * Get business hours for a tenant
    */
   async getBusinessHours(tenantId: string): Promise<any> {
-    // Get business hours from tenant profile (includes hours data)
-    const profile = await this.getTenantProfile(tenantId);
-    return profile?.hours || null;
+    try {
+      const response = await this.makeDefaultRequest(
+        `/api/tenant/${tenantId}/business-hours`,
+        {},
+        `business-hours-${tenantId}`,
+        this.PROFILE_TTL
+      );
+      
+      if (!response.success) {
+        console.error('[TenantManagementService] Failed to get business hours:', response.error);
+        return null;
+      }
+      
+      // API returns { success: true, data: { timezone, periods } }
+      const data = response.data as any;
+      return data?.data || data || null;
+    } catch (error) {
+      console.error('[TenantManagementService] Error fetching business hours:', error);
+      return null;
+    }
   }
 
   /**
    * Get special business hours for a tenant
    */
   async getSpecialBusinessHours(tenantId: string): Promise<any> {
-    // Get special hours from tenant profile (included in hours data)
-    const profile = await this.getTenantProfile(tenantId);
-    return profile?.hours?.overrides || profile?.hours || null;
+    try {
+      const response = await this.makeDefaultRequest(
+        `/api/tenant/${tenantId}/business-hours`,
+        {},
+        `business-hours-${tenantId}`,
+        this.PROFILE_TTL
+      );
+      
+      if (!response.success) {
+        console.error('[TenantManagementService] Failed to get special business hours:', response.error);
+        return null;
+      }
+      
+      // API returns { success: true, data: { timezone, periods, overrides? } }
+      const data = response.data as any;
+      return data?.data?.overrides || data?.data || data || null;
+    } catch (error) {
+      console.error('[TenantManagementService] Error fetching special business hours:', error);
+      return null;
+    }
   }
 
   /**

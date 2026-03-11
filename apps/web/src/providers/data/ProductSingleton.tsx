@@ -134,17 +134,17 @@ export class ProductSingleton extends PublicApiSingleton {
   async fetchRandomFeaturedProducts(location?: { lat: number; lng: number }, limit: number = 20): Promise<PublicProduct[]> {
     try {
       // HYBRID APPROACH: Try featured products API first (rich data), fallback to existing API
-      console.log('[ProductSingleton] Using hybrid approach for featured products');
+      // console.log('[ProductSingleton] Using hybrid approach for featured products');
       
       // Primary: Try Featured Products API for rich data (store-specific approach)
       try {
-        console.log('[ProductSingleton] Using featured products API for store_selection random data');
+        // console.log('[ProductSingleton] Using featured products API for store_selection random data');
         
         // Get random featured products from multiple stores
         const randomFeaturedProducts = await this.fetchRandomFeaturedFromMultipleStores(location, limit);
         
         if (randomFeaturedProducts && randomFeaturedProducts.length > 0) {
-          console.log('[ProductSingleton] Using featured products API data, found', randomFeaturedProducts.length, 'products');
+          // console.log('[ProductSingleton] Using featured products API data, found', randomFeaturedProducts.length, 'products');
           
           // Transform to PublicProduct interface (data is already rich)
           const enrichedProducts: PublicProduct[] = randomFeaturedProducts.map((product: any): PublicProduct => ({
@@ -230,7 +230,7 @@ export class ProductSingleton extends PublicApiSingleton {
       }
       
       // Fallback: Use existing API
-      console.log('[ProductSingleton] Using fallback API: /api/directory/random-featured');
+      // console.log('[ProductSingleton] Using fallback API: /api/directory/random-featured');
       
       let url = `/api/directory/random-featured?limit=${limit}`;
       
@@ -337,7 +337,7 @@ export class ProductSingleton extends PublicApiSingleton {
       }
       
       const stores = storesResult.data.data;
-      console.log('[ProductSingleton] Found', stores.length, 'stores for slot pool collection');
+      // console.log('[ProductSingleton] Found', stores.length, 'stores for slot pool collection');
       
       // Collect ALL store_selection products from ALL stores into one pool
       const productPromises = stores.map(async (store: any) => {
@@ -348,7 +348,7 @@ export class ProductSingleton extends PublicApiSingleton {
           if (result.success && result.data?.buckets?.store_selection) {
             // Collect all store_selection products - these are the merchant's directory slots
             const storeSelectionProducts = result.data.buckets.store_selection;
-            console.log(`[ProductSingleton] Store ${store.name} has ${storeSelectionProducts.length} directory slots`);
+            // console.log(`[ProductSingleton] Store ${store.name} has ${storeSelectionProducts.length} directory slots`);
             return storeSelectionProducts;
           }
           return [];
@@ -362,16 +362,16 @@ export class ProductSingleton extends PublicApiSingleton {
       
       // Flatten all products into one big pool
       const slotPool = allStoreProducts.flat();
-      console.log('[ProductSingleton] Total slot pool size:', slotPool.length, 'products from all stores');
+      // console.log('[ProductSingleton] Total slot pool size:', slotPool.length, 'products from all stores');
       
       if (slotPool.length === 0) {
-        console.warn('[ProductSingleton] No products found in slot pool');
+        // console.warn('[ProductSingleton] No products found in slot pool');
         return [];
       }
       
       // Random selection from the entire pool (equal opportunity, weighted by tier slots)
       const randomProducts = this.selectRandomItems(slotPool, limit);
-      console.log('[ProductSingleton] Selected', randomProducts.length, 'random products from slot pool');
+      // console.log('[ProductSingleton] Selected', randomProducts.length, 'random products from slot pool');
       
       return randomProducts;
     } catch (error) {

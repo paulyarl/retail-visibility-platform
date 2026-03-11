@@ -133,6 +133,85 @@ export default function CollapsibleCatalogSidebar({
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6 h-full">
+          {/* Featured Collections - Moved to top */}
+          {(featuredCounts?.staffPick || featuredCounts?.newArrival || featuredCounts?.sale || featuredCounts?.seasonal || featuredCounts?.storeSelection) && (
+            <div className="bg-neutral-50 dark:bg-neutral-900 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-neutral-900 dark:text-white mb-3">Featured Collections</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {/* Staff Picks - Only show if has products */}
+                {featuredCounts?.staffPick && featuredCounts.staffPick > 0 && (
+                  <button
+                    onClick={() => handleFeaturedNavigation('staff_pick')}
+                    className="flex flex-col items-center justify-center p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors group"
+                    title="Staff Picks"
+                  >
+                    <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 mb-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                    <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">Staff Picks</span>
+                  </button>
+                )}
+                
+                {/* New Arrivals - Only show if has products */}
+                {featuredCounts?.newArrival && featuredCounts.newArrival > 0 && (
+                  <button
+                    onClick={() => handleFeaturedNavigation('new_arrival')}
+                    className="flex flex-col items-center justify-center p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors group"
+                    title="New Arrivals"
+                  >
+                    <svg className="w-5 h-5 text-green-600 dark:text-green-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span className="text-xs text-green-700 dark:text-green-300 font-medium">New</span>
+                  </button>
+                )}
+                
+                {/* Sale Items - Only show if has products */}
+                {featuredCounts?.sale && featuredCounts.sale > 0 && (
+                  <button
+                    onClick={() => handleFeaturedNavigation('sale')}
+                    className="flex flex-col items-center justify-center p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors group"
+                    title="Sale Items"
+                  >
+                    <svg className="w-5 h-5 text-red-600 dark:text-red-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2-3-.895-3-2 1.343-2 3-2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 4v16H5V4h14z" />
+                    </svg>
+                    <span className="text-xs text-red-700 dark:text-red-300 font-medium">Sale</span>
+                  </button>
+                )}
+                
+                {/* Seasonal Specials - Only show if has products */}
+                {featuredCounts?.seasonal && featuredCounts.seasonal > 0 && (
+                  <button
+                    onClick={() => handleFeaturedNavigation('seasonal')}
+                    className="flex flex-col items-center justify-center p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors group"
+                    title="Seasonal Specials"
+                  >
+                    <svg className="w-5 h-5 text-orange-600 dark:text-orange-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-xs text-orange-700 dark:text-orange-300 font-medium">Seasonal</span>
+                  </button>
+                )}
+                
+                {/* Store Selection - Only show if has products */}
+                {featuredCounts?.storeSelection && featuredCounts.storeSelection > 0 && (
+                  <button
+                    onClick={() => handleFeaturedNavigation('store_selection')}
+                    className="flex flex-col items-center justify-center p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors group"
+                    title="Store Selection"
+                  >
+                    <svg className="w-5 h-5 text-purple-600 dark:text-purple-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    <span className="text-xs text-purple-700 dark:text-purple-300 font-medium">Store Pick</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Search Box */}
           <div className="bg-neutral-50 dark:bg-neutral-900 rounded-lg p-4">
             <h4 className="text-sm font-medium text-neutral-900 dark:text-white mb-3">Search Products</h4>
@@ -253,82 +332,6 @@ export default function CollapsibleCatalogSidebar({
               </div>
             </div>
 
-            {/* Featured Navigation */}
-            <div className="bg-neutral-50 dark:bg-neutral-900 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-neutral-900 dark:text-white mb-3">Featured Collections</h4>
-              <div className="grid grid-cols-2 gap-2">
-                {/* Staff Picks - Only show if has products */}
-                {featuredCounts?.staffPick && featuredCounts.staffPick > 0 && (
-                  <button
-                    onClick={() => handleFeaturedNavigation('staff_pick')}
-                    className="flex flex-col items-center justify-center p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors group"
-                    title="Staff Picks"
-                  >
-                    <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 mb-1" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                    <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">Staff Picks</span>
-                  </button>
-                )}
-                
-                {/* New Arrivals - Only show if has products */}
-                {featuredCounts?.newArrival && featuredCounts.newArrival > 0 && (
-                  <button
-                    onClick={() => handleFeaturedNavigation('new_arrival')}
-                    className="flex flex-col items-center justify-center p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors group"
-                    title="New Arrivals"
-                  >
-                    <svg className="w-5 h-5 text-green-600 dark:text-green-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    <span className="text-xs text-green-700 dark:text-green-300 font-medium">New</span>
-                  </button>
-                )}
-                
-                {/* Sale Items - Only show if has products */}
-                {featuredCounts?.sale && featuredCounts.sale > 0 && (
-                  <button
-                    onClick={() => handleFeaturedNavigation('sale')}
-                    className="flex flex-col items-center justify-center p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors group"
-                    title="Sale Items"
-                  >
-                    <svg className="w-5 h-5 text-red-600 dark:text-red-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2-3-.895-3-2 1.343-2 3-2z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 4v16H5V4h14z" />
-                    </svg>
-                    <span className="text-xs text-red-700 dark:text-red-300 font-medium">Sale</span>
-                  </button>
-                )}
-                
-                {/* Seasonal Specials - Only show if has products */}
-                {featuredCounts?.seasonal && featuredCounts.seasonal > 0 && (
-                  <button
-                    onClick={() => handleFeaturedNavigation('seasonal')}
-                    className="flex flex-col items-center justify-center p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors group"
-                    title="Seasonal Specials"
-                  >
-                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
-                    <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">Seasonal</span>
-                  </button>
-                )}
-                
-                {/* Store Selection - Only show if has products */}
-                {featuredCounts?.storeSelection && featuredCounts.storeSelection > 0 && (
-                  <button
-                    onClick={() => handleFeaturedNavigation('store_selection')}
-                    className="flex flex-col items-center justify-center p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors group"
-                    title="Store Selection"
-                  >
-                    <svg className="w-5 h-5 text-purple-600 dark:text-purple-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                    <span className="text-xs text-purple-700 dark:text-purple-300 font-medium">Store Pick</span>
-                  </button>
-                )}
-              </div>
-            </div>
           </div>
         </div>
       </div>

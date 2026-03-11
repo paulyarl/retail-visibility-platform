@@ -12,6 +12,12 @@ interface Category {
   count: number;
   inStockProducts?: number;
 }
+enum Target {
+  DIRECTORY = 'directory',
+  SHOP = 'shop',
+  STORE = 'store',
+  TENANT = 'tenant'
+}
 
 interface Store {
   id: string;
@@ -43,9 +49,11 @@ interface EnhancedStoreCardProps {
   store: Store;
   showCategories?: boolean;
   maxCategories?: number;
+  slug?: string;
+  target?: Target;
 }
 
-export default function EnhancedStoreCard({ store, showCategories = false, maxCategories = 3 }: EnhancedStoreCardProps) {
+export default function EnhancedStoreCard({ store, showCategories = false, maxCategories = 3, slug, target = Target.SHOP }: EnhancedStoreCardProps) {
   // Get business hours status
   const { status: hoursStatus } = useStoreStatus(store.tenantId, true); // Public scope
   
@@ -54,6 +62,8 @@ export default function EnhancedStoreCard({ store, showCategories = false, maxCa
 
   const displayCategories = store.categories.slice(0, maxCategories);
   const remainingCategories = store.categories.length - maxCategories;
+
+  const storeSlug = slug?slug:store.slug || "";
 
   return (
     <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 overflow-hidden hover:shadow-md transition-shadow">
@@ -219,7 +229,7 @@ export default function EnhancedStoreCard({ store, showCategories = false, maxCa
               {displayCategories.map((category) => (
                 <Link
                   key={category.id}
-                  href={`/tenant/${store.id}?category=${category.slug}`}
+                  href={`/${target}/${store.id}?category=${category.slug}`}
                   className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
                 >
                   {category.name}
@@ -230,7 +240,7 @@ export default function EnhancedStoreCard({ store, showCategories = false, maxCa
               ))}
               {remainingCategories > 0 && (
                 <Link
-                  href={`/tenant/${store.id}?featured=false`}
+                  href={`/${target}/${store.id}?featured=false`}
                   className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                 >
                   +{remainingCategories} more
@@ -242,7 +252,7 @@ export default function EnhancedStoreCard({ store, showCategories = false, maxCa
 
         {/* Action Button */}
         <Link
-          href={`/tenant/${store.id}`}
+          href={`/${target}/${store.id}`}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
         >
           Visit Store

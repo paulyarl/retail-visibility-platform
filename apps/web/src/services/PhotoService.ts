@@ -68,7 +68,7 @@ class PhotoService extends AuthenticatedApiSingleton {
    */
   async fetchItemPhotos(itemId: string): Promise<Photo[]> {
     const response = await this.makeDefaultRequest<{ photos: Photo[] }>(
-      `/photos/item/${itemId}`,
+      `/api/items/${itemId}/photos`,
       {},
       `item-photos-${itemId}`,
       this.PHOTOS_TTL

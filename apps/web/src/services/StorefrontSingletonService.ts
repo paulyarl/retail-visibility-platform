@@ -7,6 +7,7 @@
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { getErrorMessage, getErrorStatus } from '@/providers/base/FlexibleApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface StorefrontCategory {
   id: string;
@@ -39,6 +40,9 @@ export interface DirectoryListing {
 }
 
 class StorefrontSingletonService extends PublicApiSingleton {
+
+    protected defaultContext: AppContext = AppContext.STORE;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.STORE;
   private static instance: StorefrontSingletonService;
 
   private constructor() {
@@ -77,6 +81,19 @@ class StorefrontSingletonService extends PublicApiSingleton {
         `storefront-categories-${tenantId}`,
         this.cacheTTL
       );
+      
+      // console.log('[StorefrontSingleton] getStorefrontCategories result:', {
+      //   success: result.success,
+      //   hasData: !!result.data,
+      //   categoriesCount: result.data?.categories?.length || 0,
+      //   categories: result.data?.categories?.map((c: any) => ({
+      //     name: c.name,
+      //     count: c.count,
+      //     id: c.id
+      //   })),
+      //   uncategorizedCount: result.data?.uncategorizedCount || 0,
+      //   fullData: JSON.stringify(result.data, null, 2)
+      // });
       
       return {
         categories: result.data?.categories || [],
@@ -197,15 +214,15 @@ class StorefrontSingletonService extends PublicApiSingleton {
     type?: string,
     limit: number = 10
   ): Promise<Record<string, StorefrontProduct[]>> {
-    console.log('[StorefrontSingleton] getFeaturedProductsByType called:', {
-      tenantId,
-      type,
-      limit,
-      hasTenantId: !!tenantId
-    });
+    // console.log('[StorefrontSingleton] getFeaturedProductsByType called:', {
+    //   tenantId,
+    //   type,
+    //   limit,
+    //   hasTenantId: !!tenantId
+    // });
     
     if (!tenantId) {
-      console.error('[StorefrontSingleton] getFeaturedProductsByType: tenantId is required');
+      // console.error('[StorefrontSingleton] getFeaturedProductsByType: tenantId is required');
       return {};
     }
 
@@ -213,10 +230,10 @@ class StorefrontSingletonService extends PublicApiSingleton {
       const endpoint = `/api/directory/featured-products?tenantId=${tenantId}&limit=${limit}`;
       const cacheKey = `featured-products-by-type-${tenantId}-${limit}`;
       
-      console.log('[StorefrontSingleton] Making request:', {
-        endpoint,
-        cacheKey
-      });
+      // console.log('[StorefrontSingleton] Making request:', {
+      //   endpoint,
+      //   cacheKey
+      // });
       
       // Type for the API response structure
       type ApiResponse = {
@@ -236,13 +253,13 @@ class StorefrontSingletonService extends PublicApiSingleton {
         this.cacheTTL
       ) as any;  // Cast to any to handle nested response structure
       
-      console.log('[StorefrontSingleton] Request result:', {
-        success: result.success,
-        hasData: !!result.data,
-        error: result.error,
-        hasBuckets: result.data?.data?.buckets ? true : false,
-        bucketKeys: result.data?.data?.buckets ? Object.keys(result.data.data.buckets) : []
-      });
+      // console.log('[StorefrontSingleton] Request result:', {
+      //   success: result.success,
+      //   hasData: !!result.data,
+      //   error: result.error,
+      //   hasBuckets: result.data?.data?.buckets ? true : false,
+      //   bucketKeys: result.data?.data?.buckets ? Object.keys(result.data.data.buckets) : []
+      // });
       
       if (!result.success) {
         console.warn('[StorefrontSingleton] Failed to get featured products by type:', result.error);
@@ -256,19 +273,19 @@ class StorefrontSingletonService extends PublicApiSingleton {
       
       // If a specific type is requested, return only that type
       if (type && groupedProducts[type]) {
-        console.log('[StorefrontSingleton] Returning specific type:', {
-          type,
-          count: groupedProducts[type]?.length || 0
-        });
+        // console.log('[StorefrontSingleton] Returning specific type:', {
+        //   type,
+        //   count: groupedProducts[type]?.length || 0
+        // });
         return { [type]: groupedProducts[type] };
       }
       
-      console.log('[StorefrontSingleton] Returning all types:', {
-        types: Object.keys(groupedProducts),
-        counts: Object.fromEntries(
-          Object.entries(groupedProducts).map(([k, v]) => [k, (v as any[])?.length || 0])
-        )
-      });
+      // console.log('[StorefrontSingleton] Returning all types:', {
+      //   types: Object.keys(groupedProducts),
+      //   counts: Object.fromEntries(
+      //     Object.entries(groupedProducts).map(([k, v]) => [k, (v as any[])?.length || 0])
+      //   )
+      // });
       
       return groupedProducts;
     } catch (error) {

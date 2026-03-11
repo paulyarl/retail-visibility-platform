@@ -19,8 +19,8 @@ import { ResolverType, ResolverResponse } from '../../types/resolver';
 export abstract class PublicApiSingleton extends FlexibleApiSingleton {
   protected defaultRequestType: RequestType = RequestType.PUBLIC;
   protected defaultRequestTarget: RequestTarget = RequestTarget.API;
-  protected defaultContext: AppContext = AppContext.GLOBAL;
-  protected defaultIsolation: CacheIsolation = CacheIsolation.GLOBAL;
+  protected defaultContext: AppContext = AppContext.PUBLIC;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.PUBLIC;
   protected cacheTTL: number = 15 * 60 * 1000; // 15 minutes for public data
   
   // Resolver cache TTLs
@@ -39,18 +39,18 @@ export abstract class PublicApiSingleton extends FlexibleApiSingleton {
    * Resolves slugs to canonical IDs using existing working endpoint
    * Uses makeDefaultRequest for automatic context/isolation
    */
-  protected async resolveIdentifier<T extends ResolverType>(
+  protected async resolveIdentifier<T extends AppContext>(
     identifier: string, 
     type: T
   ): Promise<string> {
     const cacheKey = `resolved-${type}:${identifier}`;
     
     // Use existing working endpoint for tenant resolution
-    const endpoint = type === ResolverType.TENANT 
-      ? `/directory/resolve-slug/${identifier}`
-      : `/resolver/${type}/${identifier}`; // Fallback for other types
+    const endpoint = type === AppContext.TENANT 
+      ? `/api/directory/resolve-slug/${identifier}`
+      : `/api/resolver/${type}/${identifier}`; // Fallback for other types
     
-    console.log(`[PublicApiSingleton] Resolving ${type}/${identifier} via endpoint: ${endpoint}`);
+  //  console.log(`[PublicApiSingleton] Resolving ${type}/${identifier} via endpoint: ${endpoint}`);
     
     try {
       const response = await this.makeDefaultRequest<any>(
@@ -60,28 +60,30 @@ export abstract class PublicApiSingleton extends FlexibleApiSingleton {
         this.CACHE_TTL_LONG
       );
 
-      console.log(`[PublicApiSingleton] Resolver response for ${type}/${identifier}:`, response);
+    //  console.log(`[PublicApiSingleton] Resolver response for ${type}/${identifier}:`, response);
 
       // Handle different response formats
       let resolvedId: string;
       
-      if (type === ResolverType.TENANT) {
+      if (type === AppContext.TENANT) {
         // Directory resolve-slug endpoint returns { success: true, tenantId: "tid-..." }
         if (!response?.success || !response?.data.tenantId) {
-          console.error(`[PublicApiSingleton] Invalid response for ${type}/${identifier}:`, response);
-          throw new Error(`${type} not found for identifier: ${identifier}`);
+          console.log(`[PublicApiSingleton] Invalid response for ${type}/${identifier}:`, response);
+          //throw new Error(`${type} not found for identifier: ${identifier}`);
+          return identifier;
         }
         resolvedId = response.data.tenantId;
       } else {
         // Other resolvers return { success: true, data: { resolvedId: "..." } }
         if (!response?.success || !response?.data?.resolvedId) {
-          console.error(`[PublicApiSingleton] Invalid response for ${type}/${identifier}:`, response);
-          throw new Error(`${type} not found for identifier: ${identifier}`);
+          console.log(`[PublicApiSingleton] Invalid response for ${type}/${identifier}:`, response);
+          //throw new Error(`${type} not found for identifier: ${identifier}`);
+          return identifier;
         }
         resolvedId = response.data.resolvedId;
       }
 
-      console.log(`[PublicApiSingleton] Successfully resolved ${type}/${identifier} → ${resolvedId}`);
+     // console.log(`[PublicApiSingleton] Successfully resolved ${type}/${identifier} → ${resolvedId}`);
       return resolvedId;
       
     } catch (error) {

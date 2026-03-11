@@ -383,7 +383,7 @@ class DirectorySingletonService extends PublicApiSingleton {
 
     // Handle doubly nested response structure
     let shopsData = response.data;
-    console.log(`[DirectorySingletonService] shopsData:`, shopsData);
+    // console.log(`[DirectorySingletonService] shopsData:`, shopsData);
     // If response.data is an object with a 'data' property, extract the inner data
     if (shopsData && typeof shopsData === 'object' && 'data' in shopsData) {
       shopsData = (shopsData as any).data;
@@ -391,7 +391,7 @@ class DirectorySingletonService extends PublicApiSingleton {
 
     // Check if shopsData is an array
     if (!Array.isArray(shopsData)) {
-      console.error('[DirectorySingletonService] shopsData is not an array:', typeof shopsData);
+      // console.error('[DirectorySingletonService] shopsData is not an array:', typeof shopsData);
       return [];
     }
 

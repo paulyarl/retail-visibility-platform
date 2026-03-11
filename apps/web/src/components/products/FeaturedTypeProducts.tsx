@@ -88,13 +88,13 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
     let isMounted = true;
 
     const fetchFeaturedProducts = async () => {
-      console.log('[FeaturedTypeProducts] Fetching featured products:', {
+      /* console.log('[FeaturedTypeProducts] Fetching featured products:', {
         tenantId,
         currentProductId,
         featuredTypes,
         hasTenantId: !!tenantId,
         hasFeaturedTypes: featuredTypes.length > 0
-      });
+      }) */;
       
       try {
         // Use singleton service to fetch featured products grouped by type
@@ -104,22 +104,22 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
           6 // Limit per type
         );
         
-        console.log('[FeaturedTypeProducts] API response:', {
-          groupedProductsKeys: Object.keys(groupedProducts || {}),
-          groupedProductsCounts: Object.fromEntries(
-            Object.entries(groupedProducts || {}).map(([k, v]) => [k, v?.length || 0])
-          )
-        });
+        // console.log('[FeaturedTypeProducts] API response:', {
+        //   groupedProductsKeys: Object.keys(groupedProducts || {}),
+        //   groupedProductsCounts: Object.fromEntries(
+        //     Object.entries(groupedProducts || {}).map(([k, v]) => [k, v?.length || 0])
+        //   )
+        // });
         
         if (isMounted) {
           const grouped: Record<string, FeaturedTypeProduct[]> = {};
           
           // Process each featured type
           for (const type of featuredTypes) {
-            console.log(`[FeaturedTypeProducts] Processing type: ${type}`, {
+            /* console.log(`[FeaturedTypeProducts] Processing type: ${type}`, {
               hasProducts: !!groupedProducts[type],
               count: groupedProducts[type]?.length || 0
-            });
+            }) */;
             
             if (groupedProducts[type] && groupedProducts[type].length > 0) {
               // Filter out current product and limit to 4
@@ -127,10 +127,10 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
                 .filter((p: any) => p.id !== currentProductId)
                 .slice(0, 4);
               
-              console.log(`[FeaturedTypeProducts] Filtered products for ${type}:`, {
-                filteredCount: filteredProducts.length,
-                filteredIds: filteredProducts.map((p: any) => p.id)
-              });
+              // console.log(`[FeaturedTypeProducts] Filtered products for ${type}:`, {
+              //   filteredCount: filteredProducts.length,
+              //   filteredIds: filteredProducts.map((p: any) => p.id)
+              // });
               
               if (filteredProducts.length > 0) {
                 grouped[type] = filteredProducts.map((p: any) => ({
@@ -159,12 +159,12 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
             }
           }
           
-          console.log('[FeaturedTypeProducts] Final grouped products:', {
-            types: Object.keys(grouped),
-            counts: Object.fromEntries(
-              Object.entries(grouped).map(([k, v]) => [k, v.length])
-            )
-          });
+          // console.log('[FeaturedTypeProducts] Final grouped products:', {
+          //   types: Object.keys(grouped),
+          //   counts: Object.fromEntries(
+          //     Object.entries(grouped).map(([k, v]) => [k, v.length])
+          //   )
+          // });
           
           setProductsByType(grouped);
         }

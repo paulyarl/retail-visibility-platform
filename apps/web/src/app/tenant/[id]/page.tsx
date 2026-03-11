@@ -34,6 +34,7 @@ import { storefrontService } from '@/services/StorefrontSingletonService';
 import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
+import { publicDirectoryService } from '@/services/PublicDirectoryService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -104,45 +105,48 @@ interface PageProps {
 
 async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string, category?: string, featured?: string) {
   try {
+    const directoryItem = await publicDirectoryService.resolveBySlug(tenantId);
+    const tenant = await tenantPublicService.getPublicTenantInfo(directoryItem);
+    const hoursResponse = await tenantPublicService.getBusinessHours(directoryItem);
     
-    // Use public services for public tenant page
-    const [tenant, shopInfo, businessHoursStatus] = await Promise.all([
-      tenantPublicService.getPublicTenantInfo(tenantId),
-      fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/public/shops/id/${tenantId}`).then(res => res.json()).catch(() => null),
-      tenantPublicService.getTenantBusinessHours(tenantId)
-    ]);
+    // Extract business hours data from API response
+    const rawBusinessHours = hoursResponse?.data || hoursResponse;
     
-    // Fetch detailed business hours separately
+    // Transform business hours data to handle periods format
     let businessHours = null;
-    try {
-      const hoursResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000'}/api/business-hours/${tenantId}`);
-      if (hoursResponse.ok) {
-        const hoursData = await hoursResponse.json();
-        if (hoursData.success) {
-          businessHours = hoursData.data;
-        }
+    if (rawBusinessHours) {
+      if (rawBusinessHours.periods && Array.isArray(rawBusinessHours.periods)) {
+        const { periods, timezone } = rawBusinessHours;
+        const hours: any = { timezone };
+        
+        // Convert periods to day-based format for BusinessHoursDisplay
+        periods.forEach((period: any) => {
+          const dayName = period.day?.toUpperCase();
+          if (dayName && !hours[dayName]) {
+            hours[dayName] = {
+              open: period.open,
+              close: period.close
+            };
+          }
+        });
+        
+        // Include periods array for BusinessHoursDisplay to handle multiple periods
+        hours.periods = periods;
+        businessHours = hours;
+      } else {
+        // Already in day-based format
+        businessHours = rawBusinessHours;
       }
-    } catch (error) {
-      console.error('Error fetching business hours:', error);
     }
     
-    if (!tenant) {
-      return null;
-    }
+    // Fetch full shop details using the resolved tenant ID
+    const shopInfo = await publicDirectoryService.getShopInfoById(directoryItem);
 
-    // Extract actual data from response objects
     const tenantData = (tenant as any)?.data || tenant;
+    // API returns { success: true, shop: {...} }
     const shopData = shopInfo?.success ? shopInfo.shop : null;
-    const rawBusinessHours = businessHours;
 
-    // Merge shop data into tenant metadata for contact information
     if (shopData) {
-      console.log('[TenantPage] Shop Data:', shopData);
-      console.log('[TenantPage] Shop Address:', shopData.address);
-      console.log('[TenantPage] Shop Phone:', shopData.phone);
-      console.log('[TenantPage] Shop Email:', shopData.email);
-      console.log('[TenantPage] Shop Website:', shopData.website);
-      
       tenantData.metadata = {
         ...tenantData.metadata,
         businessName: shopData.business_name || tenantData.name,
@@ -158,31 +162,31 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
         hasActivePaymentGateway: shopData.has_active_payment_gateway || false,
       };
       
-      console.log('[TenantPage] Merged Tenant Metadata:', tenantData.metadata);
-      console.log('[TenantPage] Merged Phone:', tenantData.metadata.phone);
-      console.log('[TenantPage] Merged Email:', tenantData.metadata.email);
-      console.log('[TenantPage] Merged Address:', tenantData.metadata.address);
-      console.log('[TenantPage] Merged Website:', tenantData.metadata.website);
+      // console.log('[TenantPage] Merged Tenant Metadata:', tenantData.metadata);
+      // console.log('[TenantPage] Merged Phone:', tenantData.metadata.phone);
+      // console.log('[TenantPage] Merged Email:', tenantData.metadata.email);
+      // console.log('[TenantPage] Merged Address:', tenantData.metadata.address);
+      // console.log('[TenantPage] Merged Website:', tenantData.metadata.website);
     } else {
       console.log('[TenantPage] No shop data found');
-      console.log('[TenantPage] Raw shopInfo:', shopInfo);
+     // console.log('[TenantPage] Raw shopInfo:', shopInfo);
     }
 
     const hasLogo = !!tenantData.metadata?.logo_url;
-    const hasBranding = hasLogo || !!rawBusinessHours;
-    const storeStatus = rawBusinessHours ? computeStoreStatus(rawBusinessHours) : null;
+    const hasBranding = hasLogo || !!businessHours;
+    const storeStatus = businessHours ? computeStoreStatus(businessHours) : null;
 
-    // Fetch map location using utility
-    const mapLocation = await getTenantMapLocation(tenantId);
+    // Fetch map location using utility (use resolved tenant ID)
+    const mapLocation = await getTenantMapLocation(directoryItem);
 
-    // Fetch categories with counts using singleton service
+    // Fetch categories with counts using singleton service (use resolved tenant ID)
     let categories: Category[] = [];
     let productCategories: Category[] = [];
     let storeCategories: Category[] = [];
     let uncategorizedCount = 0;
     try {
       // Get product counts per category from storefront singleton service
-      const storefrontData = await storefrontService.getStorefrontCategories(tenantId);
+      const storefrontData = await storefrontService.getStorefrontCategories(directoryItem);
       const storefrontCategories = storefrontData.categories || [];
       uncategorizedCount = storefrontData.uncategorizedCount || 0;
 
@@ -191,7 +195,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
         id: cat.id,
         name: cat.name,
         slug: cat.slug,
-        count: cat.count,
+        count: parseInt(cat.productCount) || 0, // API returns productCount as string
         googleCategoryId: cat.googleCategoryId,
         category_type: 'platform', // All storefront categories are platform categories
       }));
@@ -203,20 +207,20 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       console.error('Failed to fetch categories:', e);
     }
 
-    // Fetch products using singleton service
+    // Fetch products using singleton service (use resolved tenant ID)
     const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
     const categoryParam = category ? `&category=${encodeURIComponent(category)}` : '';
     
     let productsData;
     if (featured) {
       // Use the featured products API when filtering by featured type
-      productsData = await storefrontService.getFeaturedProducts(tenantId, {
+      productsData = await storefrontService.getFeaturedProducts(directoryItem, {
         limit,
         search
       });
     } else {
       // Use regular products API for general browsing
-      productsData = await storefrontService.getStorefrontProducts(tenantId, {
+      productsData = await storefrontService.getStorefrontProducts(directoryItem, {
         page,
         limit,
         search,
@@ -253,7 +257,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Find current category name if filtering
     const currentCategory = category ? categories.find((c: Category) => c.slug === category) : null;
 
-    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory };
+    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: directoryItem };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;
@@ -294,7 +298,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   const isProductsOnly = products_only === 'true';
 
   const data = await getTenantWithProducts(id, currentPage, 12, search, category, featured);
-  console.log('[TenantStorefrontPage] data:', data);
+ // console.log('[TenantStorefrontPage] data:', data);
 
   if (!data) {
     notFound();
@@ -312,15 +316,15 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
     }
   };
 
-  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory } = data as any;
+  const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
 
   // Log what data we're passing to StorefrontClientWrapper
-  console.log('[TenantPage Main] Tenant metadata being passed:', tenant.metadata);
-  console.log('[TenantPage Main] Tenant phone:', tenant.metadata?.phone);
-  console.log('[TenantPage Main] Tenant email:', tenant.metadata?.email);
-  console.log('[TenantPage Main] Tenant address:', tenant.metadata?.address);
-  console.log('[TenantPage Main] Business hours:', businessHours);
+  // console.log('[TenantPage Main] Tenant metadata being passed:', tenant.metadata);
+  // console.log('[TenantPage Main] Tenant phone:', tenant.metadata?.phone);
+  // console.log('[TenantPage Main] Tenant email:', tenant.metadata?.email);
+  // console.log('[TenantPage Main] Tenant address:', tenant.metadata?.address);
+  // console.log('[TenantPage Main] Business hours:', businessHours);
 
   // Track storefront view for recommendations (fire and forget)
   if (category && currentCategory) {
@@ -348,17 +352,17 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   try {
     // Use tenant directory service to get the actual slug from the API
     const apiSlug = await tenantDirectoryService.getTenantSlug(id);
-    console.log('[TenantPage] API slug:', apiSlug);
+ //   console.log('[TenantPage] API slug:', apiSlug);
 
     // Use hasPublishedDirectory from tenant data (already fetched) instead of making another API call
     directoryPublished = tenant.hasPublishedDirectory ?? false;
 
     // Use API slug if available, otherwise generate from business name or use tenant ID
     tenantSlug = apiSlug || data.tenant?.slug || id;
-    console.log('[TenantPage] Final tenantSlug:', tenantSlug);
+    // console.log('[TenantPage] Final tenantSlug:', tenantSlug);
   } catch (e) {
     // Directory page doesn't exist or error - store is not published
-    console.warn('[TenantPage] Directory service failed:', e);
+    // console.warn('[TenantPage] Directory service failed:', e);
     directoryPublished = false;
     // Fallback to generated slug
     tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
@@ -465,9 +469,9 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
   return (
     <ProductSingletonProvider>
-      <TenantPaymentProvider tenantId={id}>
+      <TenantPaymentProvider tenantId={resolvedTenantId || tenant.id || id}>
         <StorefrontClientWrapper 
-          tenantId={id}
+          tenantId={resolvedTenantId || tenant.id || id}
           tenant={tenant}
           platformSettings={platformSettings}
           mapLocation={mapLocation}

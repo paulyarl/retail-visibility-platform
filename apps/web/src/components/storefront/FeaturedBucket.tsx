@@ -12,6 +12,9 @@ interface FeaturedBucketProps {
   bucketType: string;
   tenantId: string;
   initialLimit?: number;
+  // Payment gateway status from parent page
+  hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
 }
 
 /**
@@ -28,7 +31,9 @@ export default function FeaturedBucket({
   totalCount, 
   bucketType,
   tenantId,
-  initialLimit = 3
+  initialLimit = 3,
+  hasActivePaymentGateway,
+  defaultGatewayType
 }: FeaturedBucketProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = initialLimit;
@@ -54,7 +59,7 @@ export default function FeaturedBucket({
   };
 
   return (
-    <div id={`${bucketType}-section`} className="featured-bucket mb-12">
+    <div id={`${bucketType}-section`} className="featured-bucket mb-12 scroll-mt-20">
       {/* Section Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -87,6 +92,9 @@ export default function FeaturedBucket({
             key={product.id}
             productId={product.id}
             tenantId={tenantId}
+            productData={product}
+            hasActivePaymentGateway={hasActivePaymentGateway}
+            defaultGatewayType={defaultGatewayType}
           />
         ))}
       </div>

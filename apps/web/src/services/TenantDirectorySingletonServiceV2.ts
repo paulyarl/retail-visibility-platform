@@ -90,7 +90,7 @@ class TenantDirectorySingletonServiceV2 extends FlexibleApiSingletonV2 {
     // During SSR, we should not make authenticated requests at all
     // The tenant slug will be fetched client-side
     if (isServer) {
-      console.log('[TenantDirectorySingletonV2] Skipping tenant slug fetch during SSR');
+      // console.log('[TenantDirectorySingletonV2] Skipping tenant slug fetch during SSR');
       return undefined;
     }
     

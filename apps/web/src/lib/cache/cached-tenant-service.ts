@@ -33,12 +33,12 @@ export class CachedTenantService {
     if (useCache) {
       const cached = await LocalStorageCache.get<CachedTenantData>(cacheKey, { tenantId, userId });
       if (cached && cached._cacheVersion === this.CACHE_VERSION) {
-        console.log(`[CachedTenantService] Cache hit for tenant ${tenantId}`);
+        // console.log(`[CachedTenantService] Cache hit for tenant ${tenantId}`);
         return cached;
       }
     }
 
-    console.log(`[CachedTenantService] Cache miss for tenant ${tenantId}, fetching fresh data`);
+    // console.log(`[CachedTenantService] Cache miss for tenant ${tenantId}, fetching fresh data`);
 
     try {
       // Get tenant info and usage separately using tenant-scoped service
