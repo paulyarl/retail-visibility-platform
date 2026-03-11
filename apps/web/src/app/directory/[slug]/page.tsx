@@ -22,6 +22,7 @@ import { externalApiService } from '@/services/ExternalApiService';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
+import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
 
 interface StoreDetailPageProps {
   params: {
@@ -29,12 +30,55 @@ interface StoreDetailPageProps {
   };
 }
 
-async function getConsolidatedDirectoryData(slug: string) {
+async function getConsolidatedDirectoryData(identifier: string) {
   try {
-    const data = await directoryService.getDirectoryConsolidated(slug);
-    return data;
+    // First, try to load as a slug (most common case)
+    try {
+      const data = await directoryService.getDirectoryConsolidated(identifier);
+      
+      // Check if data has listing property - if not, might be tenant ID case
+      if (!data?.listing) {
+        // More flexible pattern - tenant IDs start with 'tid-' followed by alphanumeric characters
+        const isTenantId = /^tid-[a-z0-9]+$/i.test(identifier);
+        
+        if (isTenantId) {
+          console.log(`[Directory] Resolving tenant ID: ${identifier}`);
+          const resolvedSlug = await tenantDirectoryService.getTenantSlug(identifier);
+          
+          if (resolvedSlug) {
+            console.log(`[Directory] Resolved to slug: ${resolvedSlug}`);
+            const resolvedData = await directoryService.getDirectoryConsolidated(resolvedSlug);
+            return resolvedData;
+          } else {
+            console.error(`[Directory] Could not resolve tenant ID ${identifier} to slug`);
+            return null;
+          }
+        } else {
+          return data; // Return original data (will trigger 404)
+        }
+      }
+      
+      return data;
+    } catch (slugError) {
+      // If slug fails, check if it might be a tenant ID and try resolution
+      const isTenantId = /^tid-[a-z0-9]+$/i.test(identifier);
+      
+      if (isTenantId) {
+        const resolvedSlug = await tenantDirectoryService.getTenantSlug(identifier);
+        
+        if (!resolvedSlug) {
+          console.error(`[Directory] Could not resolve tenant ID ${identifier} to slug`);
+          return null;
+        }
+        
+        const data = await directoryService.getDirectoryConsolidated(resolvedSlug);
+        return data;
+      } else {
+        throw slugError;
+      }
+    }
   } catch (error) {
-    console.error('Error fetching consolidated directory data:', error);
+    console.error(`[Directory] Error fetching consolidated directory data for ${identifier}:`, error);
     return null;
   }
 }
@@ -290,8 +334,8 @@ async function getUserLocation(): Promise<{
 }
 
 export async function generateMetadata({ params }: StoreDetailPageProps): Promise<Metadata> {
-  const { slug } = await params;
-  const consolidatedData = await getConsolidatedDirectoryData(slug);
+  const { slug: identifier } = await params;
+  const consolidatedData = await getConsolidatedDirectoryData(identifier);
 
   if (!consolidatedData?.listing) {
     return {
@@ -388,7 +432,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
   const currentUrl = `${baseUrl}/directory/${identifier}`;
 
   // For RelatedStores, we need the slug (not tenant ID)
-  const slugForRelated = identifier.startsWith('t-') ? listing.slug : identifier;
+  const slugForRelated = identifier.startsWith('tid-') ? listing.slug : identifier;
 
   return (
     <>

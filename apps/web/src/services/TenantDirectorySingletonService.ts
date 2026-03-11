@@ -77,11 +77,31 @@ class TenantDirectorySingletonService extends PublicApiSingleton {
     // Check if we're in a server environment where auth might not be available
     const isServer = typeof window === 'undefined';
     
-    // During SSR, we should not make authenticated requests at all
-    // The tenant slug will be fetched client-side
+    // During SSR, we can still make public requests for tenant slug resolution
+    // This is a public endpoint that doesn't require authentication
     if (isServer) {
-      // console.log('[TenantDirectorySingleton] Skipping tenant slug fetch during SSR');
-      return undefined;
+      console.log('[TenantDirectorySingleton] Making tenant slug request during SSR');
+      try {
+        // For SSR, make a direct fetch request since we can't use the singleton service
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+        const response = await fetch(`${baseUrl}/api/directory/tenant/${tenantId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          console.warn('[TenantDirectorySingleton] Failed to fetch tenant slug during SSR:', response.status);
+          return undefined;
+        }
+        
+        const result = await response.json();
+        return result.slug;
+      } catch (error) {
+        console.error('[TenantDirectorySingleton] Error fetching tenant slug during SSR:', error);
+        return undefined;
+      }
     }
     
     // Add retry logic for connection issues during startup
