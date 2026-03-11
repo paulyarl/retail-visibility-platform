@@ -39,7 +39,7 @@ import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPa
 import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalogSidebar';
 import { StorefrontRecommendations } from './StorefrontClient';
 
-// import { useStoreContactData } from '@/hooks/useStoreContactData';
+import { useStoreContactData } from '@/hooks/useStoreContactData';
 
 import { computeStoreStatus } from '@/lib/hours-utils';
 import { directoryService } from '@/services/DirectorySingletonService';

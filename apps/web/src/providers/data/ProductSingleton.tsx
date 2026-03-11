@@ -85,8 +85,8 @@ export interface ProductFilters {
 
 export class ProductSingleton extends PublicApiSingleton {
 
-  protected defaultContext: AppContext = AppContext.DIRECTORY;
-  protected defaultIsolation: CacheIsolation = CacheIsolation.DIRECTORY;
+  protected defaultContext: AppContext = AppContext.PRODUCT;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.PRODUCT;
   private static instance: ProductSingleton;
   private enhancedProductService: EnhancedProductService;
   
@@ -239,7 +239,7 @@ export class ProductSingleton extends PublicApiSingleton {
       }
       
       const cacheKey = `random-featured-${location?.lat || 'global'}-${location?.lng || 'global'}-${limit}`;
-      const result = await this.makePublicRequest<{ products: any[] }>(url, {}, cacheKey);
+      const result = await this.makeDefaultRequest<{ products: any[] }>(url, {}, cacheKey);
       
       if (!result.success) {
         console.error('[ProductSingleton] Error fetching featured products:', result.error);
@@ -329,7 +329,7 @@ export class ProductSingleton extends PublicApiSingleton {
     try {
       // First, get a list of available stores
       const storesUrl = '/api/shops/directory?limit=50'; // Get up to 50 stores
-      const storesResult = await this.makePublicRequest<{ data: any[] }>(storesUrl, {}, 'directory-shops-list');
+      const storesResult = await this.makeDefaultRequest<{ data: any[] }>(storesUrl, {}, 'directory-shops-list');
       
       if (!storesResult.success || !storesResult.data?.data || storesResult.data.data.length === 0) {
         console.warn('[ProductSingleton] No stores available for random selection');
@@ -343,7 +343,7 @@ export class ProductSingleton extends PublicApiSingleton {
       const productPromises = stores.map(async (store: any) => {
         try {
           const url = `/api/directory/featured-products?tenantId=${store.tenantId}&limit=10`; // Get up to 10 slots per store
-          const result = await this.makePublicRequest<any>(url, {}, `featured-products-${store.tenantId}`);
+          const result = await this.makeDefaultRequest<any>(url, {}, `featured-products-${store.tenantId}`);
           
           if (result.success && result.data?.buckets?.store_selection) {
             // Collect all store_selection products - these are the merchant's directory slots
@@ -451,7 +451,7 @@ export class ProductSingleton extends PublicApiSingleton {
       
       // Use the correct Public API endpoint
       const url = `/api/public/products${params.toString() ? `?${params.toString()}` : ''}`;
-      const result = await this.makePublicRequest<{ products: any[] }>(url, {}, cacheKey);
+      const result = await this.makeDefaultRequest<{ products: any[] }>(url, {}, cacheKey);
       
       if (!result.success) {
         console.error('[ProductSingleton] Error fetching products:', result.error);
@@ -510,7 +510,7 @@ export class ProductSingleton extends PublicApiSingleton {
       
       // Use the correct Public API endpoint
       const url = `/api/public/products/${productId}`;
-      const result = await this.makePublicRequest(url, {}, cacheKey);
+      const result = await this.makeDefaultRequest(url, {}, cacheKey);
       const product = (result as any)?.product || (result as any) || null;
       
       // Handle null product case
@@ -562,7 +562,7 @@ export class ProductSingleton extends PublicApiSingleton {
   async fetchProductCategories(): Promise<ProductCategory[]> {
     try {
       const cacheKey = 'categories';
-      const result = await this.makePublicRequest('/api/products/categories', {}, cacheKey);
+      const result = await this.makeDefaultRequest('/api/products/categories', {}, cacheKey);
       const categories: ProductCategory[] = Array.isArray(result) ? result : (result as any)?.categories || [];
       
       // Store individual categories

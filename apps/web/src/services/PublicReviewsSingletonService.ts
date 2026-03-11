@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface ReviewSummary {
   rating_avg: number;
@@ -45,6 +46,9 @@ export interface HelpfulVoteRequest {
 }
 
 class PublicReviewsSingletonService extends PublicApiSingleton {
+
+  protected defaultContext: AppContext = AppContext.STORE;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.STORE;
   private static instance: PublicReviewsSingletonService;
 
   private constructor() {

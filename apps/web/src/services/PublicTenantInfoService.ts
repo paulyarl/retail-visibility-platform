@@ -8,6 +8,7 @@
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { BusinessProfile } from '@/lib/validation/businessProfile';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface TenantInfo {
   id: string;
@@ -64,6 +65,9 @@ export interface PaymentGateway {
 }
 
 class PublicTenantInfoService extends PublicApiSingleton {
+
+  protected defaultContext: AppContext = AppContext.STORE;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.STORE;
   private static _instance: PublicTenantInfoService;
 
   private constructor(singletonKey: string, cacheOptions?: any) {

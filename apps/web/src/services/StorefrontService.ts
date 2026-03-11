@@ -1,5 +1,6 @@
 'use client';
 
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import PublicApiSingleton from '../providers/base/PublicApiSingleton';
 // ====================
 // STOREFRONT SERVICE - PLATFORM-ALIGNED
@@ -70,6 +71,9 @@ interface ServiceMetrics {
 
 // Service implementation
 class StorefrontService extends PublicApiSingleton {
+
+    protected defaultContext: AppContext = AppContext.SHOP;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.SHOP;
   private static instance: StorefrontService;
 
   // TTL constants for different data types

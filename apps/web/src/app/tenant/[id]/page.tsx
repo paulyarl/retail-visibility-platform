@@ -105,9 +105,9 @@ interface PageProps {
 
 async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string, category?: string, featured?: string) {
   try {
-    const directoryItem = await publicDirectoryService.resolveBySlug(tenantId);
-    const tenant = await tenantPublicService.getPublicTenantInfo(directoryItem);
-    const hoursResponse = await tenantPublicService.getBusinessHours(directoryItem);
+    const idResolvedBySlug = await publicDirectoryService.resolveBySlug(tenantId);
+    const tenant = await tenantPublicService.getPublicTenantInfo(idResolvedBySlug);
+    const hoursResponse = await tenantPublicService.getBusinessHours(idResolvedBySlug);
     
     // Extract business hours data from API response
     const rawBusinessHours = hoursResponse?.data || hoursResponse;
@@ -140,7 +140,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     }
     
     // Fetch full shop details using the resolved tenant ID
-    const shopInfo = await publicDirectoryService.getShopInfoById(directoryItem);
+    const shopInfo = await publicDirectoryService.getShopInfoById(idResolvedBySlug);
 
     const tenantData = (tenant as any)?.data || tenant;
     // API returns { success: true, shop: {...} }
@@ -177,7 +177,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     const storeStatus = businessHours ? computeStoreStatus(businessHours) : null;
 
     // Fetch map location using utility (use resolved tenant ID)
-    const mapLocation = await getTenantMapLocation(directoryItem);
+    const mapLocation = await getTenantMapLocation(idResolvedBySlug);
 
     // Fetch categories with counts using singleton service (use resolved tenant ID)
     let categories: Category[] = [];
@@ -186,7 +186,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     let uncategorizedCount = 0;
     try {
       // Get product counts per category from storefront singleton service
-      const storefrontData = await storefrontService.getStorefrontCategories(directoryItem);
+      const storefrontData = await storefrontService.getStorefrontCategories(idResolvedBySlug);
       const storefrontCategories = storefrontData.categories || [];
       uncategorizedCount = storefrontData.uncategorizedCount || 0;
 
@@ -214,13 +214,13 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     let productsData;
     if (featured) {
       // Use the featured products API when filtering by featured type
-      productsData = await storefrontService.getFeaturedProducts(directoryItem, {
+      productsData = await storefrontService.getFeaturedProducts(idResolvedBySlug, {
         limit,
         search
       });
     } else {
       // Use regular products API for general browsing
-      productsData = await storefrontService.getStorefrontProducts(directoryItem, {
+      productsData = await storefrontService.getStorefrontProducts(idResolvedBySlug, {
         page,
         limit,
         search,
@@ -257,7 +257,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Find current category name if filtering
     const currentCategory = category ? categories.find((c: Category) => c.slug === category) : null;
 
-    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: directoryItem };
+    return { tenant: tenantData, products, total, page, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId: idResolvedBySlug };
   } catch (error) {
     console.error('Error fetching tenant storefront:', error);
     return null;

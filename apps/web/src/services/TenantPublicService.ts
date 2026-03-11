@@ -1,3 +1,4 @@
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
 
 export interface TenantProfile {
@@ -52,6 +53,9 @@ export interface TenantProfile {
  * Used for public pages and public tenant information display
  */
 class TenantPublicService extends PublicApiSingleton {
+
+    protected defaultContext: AppContext = AppContext.STORE;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.STORE;
   private static instance: TenantPublicService;
 
   // TTL for public tenant data (longer since it changes less frequently)

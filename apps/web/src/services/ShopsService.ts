@@ -434,7 +434,8 @@ class ShopsService extends PublicApiSingleton {
     
     if (typeof window !== 'undefined') {
       // Client-side - use tenant context
-      cacheKey = clientTenantContextManager.getTenantAwareCacheKey(`resolve_shop_${identifier}`);
+      // cacheKey = clientTenantContextManager.getTenantAwareCacheKey(`resolve_shop_${identifier}`);
+      cacheKey = `resolve_shop_${identifier}`;
     } else {
       // Server-side - use basic cache key but with timestamp to avoid contamination
       const timestamp = Date.now();
@@ -452,7 +453,11 @@ class ShopsService extends PublicApiSingleton {
         `/api/public/shops/id/${tenantId}`,
         {},
         cacheKey,
-        15 * 60 * 1000 // 15 minutes for resolution
+        15 * 60 * 1000, // 15 minutes for resolution
+        {
+          context: AppContext.SHOP,
+          isolation: CacheIsolation.SHOP
+        }
       );
       
       // console.log('[ShopsService] API Response:', {

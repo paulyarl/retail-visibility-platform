@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface StoreRecommendation {
   id: string;
@@ -21,6 +22,9 @@ export interface RecommendationGroup {
 }
 
 class RecommendationsSingletonService extends PublicApiSingleton {
+
+  protected defaultContext: AppContext = AppContext.DIRECTORY;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.DIRECTORY;
   private static instance: RecommendationsSingletonService;
 
   // Different TTL for different recommendation types

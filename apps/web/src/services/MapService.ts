@@ -9,6 +9,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface MapLocation {
   businessName: string;
@@ -42,6 +43,9 @@ export interface TenantProfile {
  * Map Service - Specialized singleton for map operations
  */
 class MapService extends PublicApiSingleton {
+
+  protected defaultContext: AppContext = AppContext.DIRECTORY;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.DIRECTORY;
   private static instance: MapService;
   
   private constructor() {

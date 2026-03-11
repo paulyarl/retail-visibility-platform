@@ -11,6 +11,7 @@ import Link from 'next/link';
 import ShopProfileClient from './ShopProfileClient';
 import { shopsService } from '@/services/ShopsService';
 import { tenantPublicService } from '@/services/TenantPublicService';
+import { publicDirectoryService } from '@/services/PublicDirectoryService';
 
 // Types
 interface ShopData {
@@ -66,7 +67,9 @@ interface ShopProfilePageProps {
 export async function getShopBySlug(identifier: string): Promise<ShopResponse | null> {
   try {
     // Use shopsService singleton for caching and optimization benefits
+    // console.log('[getShopBySlug] Fetching shop for identifier:', identifier);
     const shop = await shopsService.getShopByIdentifier(identifier);
+    // console.log('[getShopBySlug] Shop:', shop);
     
     if (!shop) {
       return null;
@@ -148,7 +151,8 @@ function ShopProfileSkeleton() {
 // Main Page Component
 export default async function ShopProfilePage({ params, searchParams }: ShopProfilePageProps) {
   const { slug } = await params;
-  
+  // console.log('[ShopProfilePage] Params:', { slug });
+  // console.log('[ShopProfilePage] Search Params:', { searchParams });
   // console.log('[ShopProfilePage] Fetching shop for slug:', slug);
   
   // Fetch shop data using singleton service
@@ -165,12 +169,20 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
   //   innerDataKeys: shop?.data?.data ? Object.keys(shop.data.data) : 'null',
   //   fullShop: JSON.stringify(shop, null, 2)
   // });
+  //  const idResolvedBySlug = await publicDirectoryService.resolveBySlug(tenantId);
+  //     const tenant = await tenantPublicService.getPublicTenantInfo(idResolvedBySlug);
+  //     const hoursResponse = await tenantPublicService.getBusinessHours(idResolvedBySlug);
+      
   
   // Fetch business hours using singleton service
   let businessHours = null;
+  // console.log('[ShopProfilePage] Shop:', shop);
   if (shop?.success && shop?.data?.data?.id) {
     try {
-      businessHours = await tenantPublicService.getBusinessHours(shop.data.data.id);
+      const idResolvedBySlug = await publicDirectoryService.resolveBySlug(slug);
+      // console.log('[ShopProfilePage] Resolved ID:', idResolvedBySlug);
+      businessHours = await tenantPublicService.getBusinessHours(idResolvedBySlug);
+      // console.log('[ShopProfilePage] Business hours:', businessHours);
       // console.log('[ShopProfilePage] Business hours:', {
       //   hasHours: !!businessHours,
       //   hoursData: JSON.stringify(businessHours, null, 2)
@@ -202,7 +214,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
   
   return (
     <Suspense fallback={<ShopProfileSkeleton />}>
-      <ShopProfileClient shop={shop} businessHours={businessHours} />
+      <ShopProfileClient shop={shop} businessHours={businessHours?.data} />
     </Suspense>
   );
 }

@@ -507,7 +507,14 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         userId
       );
       
-      //console.log(`[${this.constructor.name}] 🎯 makePublicRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+    // console.log(`[${this.constructor.name}] ----------------------------------------`);
+    // console.log(`[${this.constructor.name}] start         : makePublicRequest`);
+    // console.log(`[${this.constructor.name}] url           : ${url}`);
+    // console.log(`[${this.constructor.name}] options       : ${JSON.stringify(options)}`);
+    // console.log(`[${this.constructor.name}] cacheKey      : ${cacheKey}`);
+    // console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
+    // console.log(`[${this.constructor.name}] end           : makePublicRequest  `);      
+    // console.log(`[${this.constructor.name}] 🎯 makePublicRequest Enhanced cacheKey generated: ${finalCacheKey}`);
     }
     
     // Delegate to setup method
@@ -878,7 +885,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         userId
       );
       
-  // console.log(`[${this.constructor.name}] 🎯 Enhanced cacheKey generated: ${finalCacheKey}`);
+      // console.log(`[${this.constructor.name}] 🎯 Enhanced cacheKey generated: ${finalCacheKey}`);
     }
     
     let setupResult: { options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget };

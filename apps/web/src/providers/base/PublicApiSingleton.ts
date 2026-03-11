@@ -57,7 +57,11 @@ export abstract class PublicApiSingleton extends FlexibleApiSingleton {
         endpoint,
         {},
         cacheKey,
-        this.CACHE_TTL_LONG
+        this.CACHE_TTL_LONG,
+         {
+          context: AppContext.SHOP,
+          isolation: CacheIsolation.SHOP
+        }
       );
 
     //  console.log(`[PublicApiSingleton] Resolver response for ${type}/${identifier}:`, response);

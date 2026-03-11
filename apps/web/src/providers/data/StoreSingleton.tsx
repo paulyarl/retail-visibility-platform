@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
 import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { Store } from 'lucide-react';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 // ====================
 // STORE INTERFACES
@@ -70,6 +71,9 @@ export interface StoreCategory {
 // ====================
 
 class StoreSingleton extends PublicApiSingleton {
+
+    protected defaultContext: AppContext = AppContext.STORE;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.STORE;
   private static instance: StoreSingleton;
   
   // Store data

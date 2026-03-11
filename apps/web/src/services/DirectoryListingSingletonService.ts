@@ -7,6 +7,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface DirectoryListing {
   id: string;
@@ -30,6 +31,9 @@ export interface DirectoryListing {
 }
 
 export class DirectoryListingSingletonService extends PublicApiSingleton {
+
+    protected defaultContext: AppContext = AppContext.DIRECTORY;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.DIRECTORY;
   private static instance: DirectoryListingSingletonService;
 
   private constructor() {
