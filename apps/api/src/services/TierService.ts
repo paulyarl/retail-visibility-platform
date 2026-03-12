@@ -60,7 +60,16 @@ async function loadTiers(): Promise<Map<string, TierWithFeatures>> {
   const cache = new Map<string, TierWithFeatures>();
   for (const tier of tiers) {
     const tierWithFeatures: TierWithFeatures = {
-      ...tier,
+      id: tier.id,
+      tier_key: tier.tier_key,
+      name: tier.name,
+      display_name: tier.display_name,
+      price_monthly: tier.price_monthly,
+      max_skus: tier.max_skus,
+      max_locations: tier.max_locations,
+      tier_type: tier.tier_type,
+      is_active: tier.is_active,
+      sort_order: tier.sort_order,
       features: (tier.tier_features_list || []).map(f => ({
         id: f.id,
         feature_key: f.feature_key,
