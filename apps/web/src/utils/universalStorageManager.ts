@@ -121,7 +121,7 @@ export class UniversalStorageManager {
     // 🎯 Generate context-aware storage configurations
     this.contextStorageConfig = this.generateContextStorageConfig();
     
-    console.log('[UniversalStorageManager] Initialized with capabilities:', this.capabilities);
+    // console.log('[UniversalStorageManager] Initialized with capabilities:', this.capabilities);
   }
 
   // ==================== STORAGE CAPABILITY DETECTION ====================
@@ -593,7 +593,7 @@ export class UniversalStorageManager {
       return await this.processEntryForRetrieval<T>(entry, options);
     }
 
-    console.log(`[UniversalStorageManager] MISS for ${context}:${key}`);
+    // console.log(`[UniversalStorageManager] MISS for ${context}:${key}`);
     return null;
   }
 
@@ -1029,7 +1029,7 @@ export class UniversalStorageManager {
       const toRemove = entries.slice(0, entries.length - strategy.maxSize);
       toRemove.forEach(([key]) => this.cache.delete(key));
       
-      console.log(`[UniversalStorageManager] Cleaned up ${toRemove.length} entries for ${context}`);
+      // console.log(`[UniversalStorageManager] Cleaned up ${toRemove.length} entries for ${context}`);
     }
   }
 

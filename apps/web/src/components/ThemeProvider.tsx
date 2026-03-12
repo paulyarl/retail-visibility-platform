@@ -87,20 +87,21 @@ const theme = createTheme({
   components: {
     Button: Button.extend({
       defaultProps: {
-        size: 'sm',
         radius: 'md',
+        // Remove size constraint to allow natural width
       },
       styles: {
         root: {
           fontWeight: 500,
           transition: 'all 0.2s ease',
+          // Allow natural width by not setting min-width or width constraints
         },
       },
     }),
 
     TextInput: TextInput.extend({
       defaultProps: {
-        size: 'sm',
+        size: 'md',
         radius: 'md',
       },
     }),
@@ -119,7 +120,7 @@ const theme = createTheme({
 
     Badge: Badge.extend({
       defaultProps: {
-        size: 'sm',
+        size: 'md',
         radius: 'md',
       },
     }),

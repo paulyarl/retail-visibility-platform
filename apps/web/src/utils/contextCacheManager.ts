@@ -397,12 +397,12 @@ class ContextCacheManager {
         const decompressed = pako.ungzip(compressedData);
         const jsonString = new TextDecoder().decode(decompressed);
         
-        console.log(`[ContextCacheManager] Decompression stats:`, {
-          originalSize: data.originalSize,
-          compressedSize: data.compressedSize,
-          compressionRatio: ((data.originalSize - data.compressedSize) / data.originalSize * 100).toFixed(1) + '%',
-          level: data.level
-        });
+        // console.log(`[ContextCacheManager] Decompression stats:`, {
+        //   originalSize: data.originalSize,
+        //   compressedSize: data.compressedSize,
+        //   compressionRatio: ((data.originalSize - data.compressedSize) / data.originalSize * 100).toFixed(1) + '%',
+        //   level: data.level
+        // });
         
         return JSON.parse(jsonString);
       }
@@ -481,13 +481,13 @@ class ContextCacheManager {
     try {
       const processedData = await this.processData<T>(context, data, ProcessOperation.STORE);
       await manager.set(cacheKey, processedData);
-      
-      console.log(`[ContextCacheManager] Stored in ${context} cache:`, {
-        key: cacheKey,
-        size: JSON.stringify(data).length,
-        encrypted: config.encryption,
-        compressed: config.compression
-      });
+        
+        // console.log(`[ContextCacheManager] Stored in ${context} cache:`, {
+        //   key: cacheKey,
+        //   size: JSON.stringify(data).length,
+        //   encrypted: config.encryption,
+        //   compressed: config.compression
+        // });
     } catch (error) {
       console.error(`[ContextCacheManager] Set failed for ${context}:`, error);
     }
@@ -501,7 +501,7 @@ class ContextCacheManager {
 
     try {
       await manager.remove(cacheKey);
-      console.log(`[ContextCacheManager] Removed from ${context} cache:`, { key: cacheKey });
+      // console.log(`[ContextCacheManager] Removed from ${context} cache:`, { key: cacheKey });
     } catch (error) {
       console.error(`[ContextCacheManager] Remove failed for ${context}:`, error);
     }
@@ -685,13 +685,13 @@ class ContextCacheManager {
     });
 
     // Demonstrate compression guidance utilities
-    console.log('\n🎯 Compression Guidance Examples:');
-    console.log('==================================');
-    console.log(`Recommended for 'mobile': ${CompressionGuidance.getRecommendedFor('mobile')} (${CompressionGuidance.getDescription(CompressionGuidance.getRecommendedFor('mobile'))})`);
-    console.log(`Recommended for 'large-catalog': ${CompressionGuidance.getRecommendedFor('large-catalog')} (${CompressionGuidance.getDescription(CompressionGuidance.getRecommendedFor('large-catalog'))})`);
-    console.log(`Recommended for 'api-response': ${CompressionGuidance.getRecommendedFor('api-response')} (${CompressionGuidance.getDescription(CompressionGuidance.getRecommendedFor('api-response'))})`);
+    // console.log('\n🎯 Compression Guidance Examples:');
+    // console.log('==================================');
+    // console.log(`Recommended for 'mobile': ${CompressionGuidance.getRecommendedFor('mobile')} (${CompressionGuidance.getDescription(CompressionGuidance.getRecommendedFor('mobile'))})`);
+    // console.log(`Recommended for 'large-catalog': ${CompressionGuidance.getRecommendedFor('large-catalog')} (${CompressionGuidance.getDescription(CompressionGuidance.getRecommendedFor('large-catalog'))})`);
+    // console.log(`Recommended for 'api-response': ${CompressionGuidance.getRecommendedFor('api-response')} (${CompressionGuidance.getDescription(CompressionGuidance.getRecommendedFor('api-response'))})`);
     
-    console.log('\n💡 Available Compression Levels:');
+    // console.log('\n💡 Available Compression Levels:');
     Object.values(CompressionLevel).forEach((level) => {
       if (typeof level === 'number') {
         console.log(`  ${level}: ${CompressionGuidance.getDescription(level)}`);

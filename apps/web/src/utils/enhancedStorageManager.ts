@@ -104,7 +104,7 @@ export class EnhancedStorageManager extends UniversalStorageManager {
     // 📊 Try memory first (fastest)
     const memoryEntry = (this as any).cache.get(key);
     if (memoryEntry && (this as any).isValidEntry(memoryEntry)) {
-      console.log(`[EnhancedStorageManager] Memory HIT for ${context}:${key}`);
+      // console.log(`[EnhancedStorageManager] Memory HIT for ${context}:${key}`);
       return await (this as any).processEntryForRetrieval(memoryEntry, options);
     }
 
@@ -118,7 +118,7 @@ export class EnhancedStorageManager extends UniversalStorageManager {
         const entry = await (this as any).getFromStorage(key, storageType);
         if (entry && (this as any).isValidEntry(entry)) {
           // ✅ Found data!
-          console.log(`[EnhancedStorageManager] ${storageType} HIT for ${context}:${key}`);
+          // console.log(`[EnhancedStorageManager] ${storageType} HIT for ${context}:${key}`);
           
           // 🔄 Cache in memory for faster access
           (this as any).cache.set(key, entry);
@@ -137,7 +137,7 @@ export class EnhancedStorageManager extends UniversalStorageManager {
     }
 
     // ❌ Not found anywhere
-    console.log(`[EnhancedStorageManager] MISS for ${context}:${key}`);
+    // console.log(`[EnhancedStorageManager] MISS for ${context}:${key}`);
     return null;
   }
 
@@ -173,14 +173,14 @@ export class EnhancedStorageManager extends UniversalStorageManager {
     // 🎯 If we have registry info, use it for efficient lookup
     if (registryEntry) {
       const typesToCheck = [registryEntry.storageType, ...registryEntry.fallbacks];
-      console.log(`[EnhancedStorageManager] Registry lookup: ${typesToCheck.join(' → ')}`);
+      // console.log(`[EnhancedStorageManager] Registry lookup: ${typesToCheck.join(' → ')}`);
       return typesToCheck;
     }
 
     // 🔄 If no registry info, use context-based strategy
     const strategy = (this as any).contextStorageConfig[context];
     const typesToCheck = [strategy.primary, ...strategy.fallbacks];
-    console.log(`[EnhancedStorageManager] Context-based lookup: ${typesToCheck.join(' → ')}`);
+    // console.log(`[EnhancedStorageManager] Context-based lookup: ${typesToCheck.join(' → ')}`);
     return typesToCheck;
   }
 
@@ -241,7 +241,7 @@ export class EnhancedStorageManager extends UniversalStorageManager {
       if (registryData) {
         const parsedRegistry = JSON.parse(registryData);
         this.storageRegistry = parsedRegistry;
-        console.log(`[EnhancedStorageManager] Loaded ${Object.keys(this.storageRegistry).length} registry entries`);
+        // console.log(`[EnhancedStorageManager] Loaded ${Object.keys(this.storageRegistry).length} registry entries`);
       }
     } catch (error) {
       console.warn('[EnhancedStorageManager] Failed to load storage registry:', error);
@@ -385,7 +385,7 @@ export class EnhancedStorageManager extends UniversalStorageManager {
     // Persist cleaned registry
     await this.persistStorageRegistry();
 
-    console.log(`[EnhancedStorageManager] Cleaned up ${keysToRemove.length} old registry entries`);
+    // console.log(`[EnhancedStorageManager] Cleaned up ${keysToRemove.length} old registry entries`);
     return keysToRemove.length;
   }
 

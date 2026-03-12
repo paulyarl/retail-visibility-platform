@@ -535,7 +535,14 @@ class DirectorySingletonService extends PublicApiSingleton {
     );
 
     if (!response.success) {
-      console.error('[DirectorySingleton] Failed to get tenant directory slug:', response.error);
+      console.log('[DirectorySingleton] Failed to get tenant directory slug:', response.error);
+      return null;
+    }
+
+    // Handle case where tenant exists but has no published directory
+    // This is expected behavior, not an error
+    if (response.data && response.data.slug === null) {
+      console.log('[DirectorySingleton] Tenant has no published directory:', tenantId);
       return null;
     }
 

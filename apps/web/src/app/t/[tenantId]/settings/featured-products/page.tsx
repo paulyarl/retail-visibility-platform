@@ -171,7 +171,7 @@ export default function FeaturedProductsSettings({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-700">
-              <strong>Multi-Type Featuring:</strong> Managing all featured product types (Store Selection, New Arrivals, Seasonal, Sale, Staff Picks)
+              <strong>Storefront Featuring:</strong> Managing storefront featured product types (New Arrivals, Seasonal, Staff Picks, Sale Items, Bestsellers, Clearance, Trending Now, Featured, Recommended)
             </p>
           </div>
           <FeaturedProductsManager tenantId={tenant.id} />

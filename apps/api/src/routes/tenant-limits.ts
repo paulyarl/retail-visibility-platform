@@ -204,8 +204,41 @@ router.get('/featured-products', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'tenant_not_found' });
     }
 
-    // Get limits based on tenant's actual tier
-    const limits = getFeaturedProductsLimits(tenant.subscription_tier as any);
+    // Get limits from database based on tenant's actual tier
+    const tierLimits = await prisma.subscription_tiers_list.findUnique({
+      where: { tier_key: tenant.subscription_tier },
+      select: {
+        featured_store_selection: true,
+        featured_new_arrival: true,
+        featured_seasonal: true,
+        featured_sale: true,
+        featured_staff_pick: true,
+        featured_bestseller: true,
+        featured_clearance: true,
+        featured_trending: true,
+        featured_featured: true,
+        featured_recommended: true
+      }
+    });
+
+    if (!tierLimits) {
+      return res.status(404).json({ error: 'tier_limits_not_found' });
+    }
+
+    // Convert database columns to expected format
+    const limits = {
+      store_selection: tierLimits.featured_store_selection || 0,
+      new_arrival: tierLimits.featured_new_arrival || 0,
+      seasonal: tierLimits.featured_seasonal || 0,
+      sale: tierLimits.featured_sale || 0,
+      staff_pick: tierLimits.featured_staff_pick || 0,
+      random_featured: 0, // Legacy field - not used in new schema
+      bestseller: tierLimits.featured_bestseller || 0,
+      clearance: tierLimits.featured_clearance || 0,
+      trending: tierLimits.featured_trending || 0,
+      featured: tierLimits.featured_featured || 0,
+      recommended: tierLimits.featured_recommended || 0
+    };
 
     return res.json({
       limits,
@@ -218,6 +251,11 @@ router.get('/featured-products', authenticateToken, async (req, res) => {
         seasonal: 'Seasonal Specials',
         sale: 'Sale Items',
         staff_pick: 'Staff Picks',
+        bestseller: 'Bestsellers',
+        clearance: 'Clearance',
+        trending: 'Trending',
+        featured: 'Featured',
+        recommended: 'Recommended'
       }
     });
   } catch (error) {
@@ -229,22 +267,66 @@ router.get('/featured-products', authenticateToken, async (req, res) => {
 /**
  * GET /api/tenant-limits/featured-products/all
  * 
- * Get featured products limits for all tiers (admin endpoint)
+ * Get all featured products limits for all tiers from database
  */
 router.get('/featured-products/all', authenticateToken, async (req, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'authentication_required' });
+    // Check if user is platform admin
+    const user = (req as any).user;
+    if (!isPlatformAdmin(user)) {
+      return res.status(403).json({ error: 'Platform admin access required' });
     }
 
-    // Return all tier limits from the persisted configuration
+    // Query subscription tiers from database
+    const tiers = await prisma.subscription_tiers_list.findMany({
+      where: {
+        is_active: true
+      },
+      select: {
+        tier_key: true,
+        display_name: true,
+        featured_store_selection: true,
+        featured_new_arrival: true,
+        featured_seasonal: true,
+        featured_sale: true,
+        featured_staff_pick: true,
+        featured_bestseller: true,
+        featured_clearance: true,
+        featured_trending: true,
+        featured_featured: true,
+        featured_recommended: true
+      },
+      orderBy: {
+        sort_order: 'asc'
+      }
+    });
+
+    // Convert database rows to the expected format
+    const limits: Record<string, any> = {};
+    tiers.forEach(tier => {
+      limits[tier.tier_key] = {
+        store_selection: tier.featured_store_selection || 0,
+        new_arrival: tier.featured_new_arrival || 0,
+        seasonal: tier.featured_seasonal || 0,
+        sale: tier.featured_sale || 0,
+        staff_pick: tier.featured_staff_pick || 0,
+        random_featured: 0, // Legacy field - not used in new schema
+        bestseller: tier.featured_bestseller || 0,
+        clearance: tier.featured_clearance || 0,
+        trending: tier.featured_trending || 0,
+        featured: tier.featured_featured || 0,
+        recommended: tier.featured_recommended || 0
+      };
+    });
+
+    // Return all tier limits from the database
     return res.json({
-      limits: FEATURED_PRODUCTS_LIMITS,
-      tiers: Object.keys(FEATURED_PRODUCTS_LIMITS),
+      limits,
+      tiers: Object.keys(limits),
     });
   } catch (error) {
     console.error('[GET /api/tenant-limits/featured-products/all] Error:', error);
-    return res.status(500).json({ error: 'failed_to_get_all_featured_limits' });
+    return res.status(500).json({ error: 'failed_to_get_featured_products_limits' });
   }
 });
 
@@ -258,40 +340,63 @@ router.put('/featured-products', authenticateToken, async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ error: 'authentication_required' });
     }
-
     // Check if user is platform admin
-    if (!isPlatformAdmin(req.user)) {
-      return res.status(403).json({ error: 'admin_required' });
+    const user = (req as any).user;
+    if (!isPlatformAdmin(user)) {
+      return res.status(403).json({ error: 'Platform admin access required' });
     }
 
     const { tier, limits } = req.body;
 
     if (!tier || !limits) {
-      return res.status(400).json({ error: 'tier_and_limits_required' });
+      return res.status(400).json({ error: 'tier and limits are required' });
     }
 
-    // Validate limits structure
-    const requiredFields = ['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick', 'random_featured'];
-    for (const field of requiredFields) {
-      if (typeof limits[field] !== 'number' || limits[field] < 0) {
-        return res.status(400).json({ error: `invalid_${field}_limit` });
+    // Update the database record
+    const updatedTier = await prisma.subscription_tiers_list.update({
+      where: {
+        tier_key: tier
+      },
+      data: {
+        featured_store_selection: limits.store_selection || 0,
+        featured_new_arrival: limits.new_arrival || 0,
+        featured_seasonal: limits.seasonal || 0,
+        featured_sale: limits.sale || 0,
+        featured_staff_pick: limits.staff_pick || 0,
+        featured_bestseller: limits.bestseller || 0,
+        featured_clearance: limits.clearance || 0,
+        featured_trending: limits.trending || 0,
+        featured_featured: limits.featured || 0,
+        featured_recommended: limits.recommended || 0,
+        updated_at: new Date(),
+        updated_by: user.email || user.id
       }
-    }
+    });
 
-    // Update the configuration file (for now, just update in memory)
-    // TODO: Persist to database or configuration file
-    const { FEATURED_PRODUCTS_LIMITS } = require('../config/tenant-limits');
-    FEATURED_PRODUCTS_LIMITS[tier] = limits;
+    // Invalidate any relevant caches
+    // TODO: Add cache invalidation if needed
 
     return res.json({
       success: true,
       tier,
-      limits: FEATURED_PRODUCTS_LIMITS[tier],
+      limits: {
+        store_selection: updatedTier.featured_store_selection,
+        new_arrival: updatedTier.featured_new_arrival,
+        seasonal: updatedTier.featured_seasonal,
+        sale: updatedTier.featured_sale,
+        staff_pick: updatedTier.featured_staff_pick,
+        random_featured: 0, // Legacy field
+        bestseller: updatedTier.featured_bestseller,
+        clearance: updatedTier.featured_clearance,
+        trending: updatedTier.featured_trending,
+        featured: updatedTier.featured_featured,
+        recommended: updatedTier.featured_recommended
+      },
       message: 'Featured products limits updated successfully'
     });
   } catch (error) {
     console.error('[PUT /api/tenant-limits/featured-products] Error:', error);
-    return res.status(500).json({ error: 'failed_to_update_featured_limits' });
+    return res.status(500).json({ error: 'failed_to_update_featured_products_limits' });
   }
 });
 

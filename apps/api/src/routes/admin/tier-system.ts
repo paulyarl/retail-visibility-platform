@@ -134,6 +134,18 @@ router.get('/tiers', requirePlatformStaff, async (req, res) => {
   try {
     const { includeInactive } = req.query;
 
+    // Check cache first
+    const { memoryCache } = require('../../utils/cache');
+    const cacheKey = `tier-system:tiers:${includeInactive === 'true' ? 'all' : 'active'}`;
+    const cachedResult = memoryCache.get(cacheKey);
+    
+    if (cachedResult) {
+      console.log(`[Tier System] Cache hit for ${cacheKey}`);
+      return res.json(cachedResult);
+    }
+
+    console.log(`[Tier System] Cache miss for ${cacheKey}, fetching from database`);
+
     const where: any = {};
     if (includeInactive !== 'true') {
       where.is_active = true;
@@ -155,8 +167,12 @@ router.get('/tiers', requirePlatformStaff, async (req, res) => {
 
     // Transform the response to match frontend expectations
     const transformedTiers = tiers.map(transformTier);
+    const result = { tiers: transformedTiers };
 
-    res.json({ tiers: transformedTiers });
+    // Cache for 5 minutes (tier data changes infrequently)
+    memoryCache.set(cacheKey, result, 300);
+
+    res.json(result);
   } catch (error) {
     console.error('[GET /api/admin/tier-system/tiers] Error:', error);
     res.status(500).json({ error: 'failed_to_list_tiers' });
@@ -327,7 +343,7 @@ router.post('/tiers', requirePlatformAdmin, async (req, res) => {
       userAgent: req.get('user-agent'),
     });
 
-    console.log(`[Tier System] Tier created by ${req.user?.email}:`, tier.tier_key);
+    // console.log(`[Tier System] Tier created by ${req.user?.email}:`, tier.tier_key);
 
     // Transform the response to match frontend expectations
     const transformedTier = transformTier(tier);
@@ -411,6 +427,14 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
       },
     });
 
+    // Invalidate tier-related cache entries
+    const { memoryCache } = require('../../utils/cache');
+    memoryCache.deletePattern('tier-system');
+    memoryCache.deletePattern('subscription_tiers');
+    memoryCache.deletePattern('tier_list');
+    
+    // console.log(`[Tier System] Cache invalidated for tier update: ${tierId}`);
+
     // Process features if provided
     if (updateData.features && Array.isArray(updateData.features)) {
       // Delete existing features for this tier
@@ -459,7 +483,7 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
       userAgent: req.get('user-agent'),
     });
 
-    console.log(`[Tier System] Tier updated by ${req.user?.email}:`, updatedTier.tier_key);
+    // console.log(`[Tier System] Tier updated by ${req.user?.email}:`, updatedTier.tier_key);
 
     // Transform the response to match frontend expectations
     const transformedTier = transformTier(updatedTier);
@@ -569,7 +593,7 @@ router.put('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
       },
     });
 
-    console.log(`[Tier System] Tier updated by ${req.user?.email}:`, updatedTier.tier_key);
+    // console.log(`[Tier System] Tier updated by ${req.user?.email}:`, updatedTier.tier_key);
 
     // Transform the response to match frontend expectations
     const transformedTier = transformTier(updatedTier);
@@ -647,7 +671,7 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
         userAgent: req.get('user-agent'),
       });
 
-      console.log(`[Tier System] Tier hard deleted by ${req.user?.email}:`, currentTier.tier_key);
+      // console.log(`[Tier System] Tier hard deleted by ${req.user?.email}:`, currentTier.tier_key);
 
       res.json({ success: true, deleted: true });
     } else {
@@ -674,7 +698,7 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
         userAgent: req.get('user-agent'),
       });
 
-      console.log(`[Tier System] Tier soft deleted by ${req.user?.email}:`, currentTier.tier_key);
+      // console.log(`[Tier System] Tier soft deleted by ${req.user?.email}:`, currentTier.tier_key);
 
     // Transform the response to match frontend expectations
     const transformedTier = transformTier(updatedTier);
@@ -794,7 +818,7 @@ router.post('/tiers/:tierId/features', requirePlatformAdmin, async (req, res) =>
       userAgent: req.get('user-agent'),
     });
 
-    console.log(`[Tier System] Feature added by ${req.user?.email}:`, feature.feature_key, 'to', tier.tier_key);
+    // console.log(`[Tier System] Feature added by ${req.user?.email}:`, feature.feature_key, 'to', tier.tier_key);
 
     res.status(201).json({ feature });
   } catch (error) {
@@ -883,7 +907,7 @@ router.patch('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async (
       userAgent: req.get('user-agent'),
     });
 
-    console.log(`[Tier System] Feature updated by ${req.user?.email}:`, updatedFeature.feature_key, 'in', tier.tier_key);
+    // console.log(`[Tier System] Feature updated by ${req.user?.email}:`, updatedFeature.feature_key, 'in', tier.tier_key);
 
     res.json({ feature: updatedFeature });
   } catch (error) {
@@ -1045,8 +1069,8 @@ router.post('/tiers/:tierId/inherit-features', requirePlatformAdmin, async (req,
       userAgent: req.get('user-agent'),
     });
 
-    console.log(`[Tier System] ${result.totalProcessed} features processed by ${req.user?.email}:`, 
-      `${result.createdFeatures.length} created, ${result.updatedFeatures.length} marked as inherited from ${sourceTier.tier_key} to ${targetTier.tier_key}`);
+    // console.log(`[Tier System] ${result.totalProcessed} features processed by ${req.user?.email}:`, 
+    //   `${result.createdFeatures.length} created, ${result.updatedFeatures.length} marked as inherited from ${sourceTier.tier_key} to ${targetTier.tier_key}`);
 
     res.json({ 
       message: 'Features inherited successfully',
@@ -1127,7 +1151,7 @@ router.delete('/tiers/:tierId/features/:featureId', requirePlatformAdmin, async 
       userAgent: req.get('user-agent'),
     });
 
-    console.log(`[Tier System] Feature removed by ${req.user?.email}:`, feature.feature_key, 'from', feature.subscription_tiers_list.tier_key);
+    // console.log(`[Tier System] Feature removed by ${req.user?.email}:`, feature.feature_key, 'from', feature.subscription_tiers_list.tier_key);
 
     res.json({ success: true });
   } catch (error) {

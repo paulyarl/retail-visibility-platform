@@ -508,16 +508,61 @@ router.get('/admin/products/featured', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Platform admin access required' });
     }
 
-    const { limit = 100, offset = 0 } = req.query;
+    const { 
+      limit = 100, 
+      offset = 0, 
+      tenant_id,
+      subscription_tier,
+      expiration_status,
+      featured_type,
+      is_active
+    } = req.query;
 
-    const featuredProducts = await prisma.inventory_items.findMany({
-      where: {
-        is_featured: true,
-        OR: [
-          { featured_until: null },
-          { featured_until: { gte: new Date() } }
-        ]
-      },
+    // Build where clause
+    let whereClause: any = {};
+
+    // Add tenant filter
+    if (tenant_id) {
+      whereClause.tenant_id = tenant_id;
+    }
+
+    // Add featured type filter
+    if (featured_type) {
+      whereClause.featured_type = featured_type;
+    }
+
+    // Add active status filter
+    if (is_active !== undefined) {
+      whereClause.is_active = is_active === 'true';
+    }
+
+    // Add expiration status filter
+    if (expiration_status) {
+      switch (expiration_status) {
+        case 'expired':
+          whereClause.featured_expires_at = {
+            lte: new Date()
+          };
+          break;
+        case 'expiring_soon':
+          whereClause.featured_expires_at = {
+            lte: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+            gt: new Date()
+          };
+          break;
+        case 'active':
+          whereClause.featured_expires_at = {
+            gt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // more than 3 days from now
+          };
+          break;
+        case 'no_expiration':
+          whereClause.featured_expires_at = null;
+          break;
+      }
+    }
+
+    const featuredProducts = await prisma.featured_products.findMany({
+      where: whereClause,
       orderBy: [
         { featured_priority: 'desc' },
         { featured_at: 'desc' }
@@ -526,17 +571,26 @@ router.get('/admin/products/featured', authenticateToken, async (req, res) => {
       skip: parseInt(offset as string),
       select: {
         id: true,
+        inventory_item_id: true,
         tenant_id: true,
-        sku: true,
-        name: true,
-        title: true,
-        brand: true,
-        price_cents: true,
-        image_url: true,
-        is_featured: true,
-        featured_at: true,
-        featured_until: true,
+        featured_type: true,
         featured_priority: true,
+        featured_at: true,
+        featured_expires_at: true,
+        auto_unfeature: true,
+        is_active: true,
+        inventory_items: {
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+            title: true,
+            brand: true,
+            price_cents: true,
+            image_url: true,
+            stock: true
+          }
+        },
         tenants: {
           select: {
             id: true,
@@ -547,18 +601,41 @@ router.get('/admin/products/featured', authenticateToken, async (req, res) => {
       }
     });
 
-    const total = await prisma.inventory_items.count({
-      where: {
-        is_featured: true,
-        OR: [
-          { featured_until: null },
-          { featured_until: { gte: new Date() } }
-        ]
-      }
+    // Apply subscription tier filter if specified (post-filter)
+    let filteredProducts = featuredProducts;
+    if (subscription_tier) {
+      filteredProducts = featuredProducts.filter(fp => 
+        fp.tenants.subscription_tier === subscription_tier
+      );
+    }
+
+    // Transform the data to match expected format
+    const transformedProducts = filteredProducts.map(fp => ({
+      featured_product_id: fp.id,  // Unique featured products record ID
+      id: fp.inventory_items.id,    // Product ID (may have duplicates)
+      tenant_id: fp.tenant_id,
+      sku: fp.inventory_items.sku,
+      name: fp.inventory_items.name,
+      title: fp.inventory_items.title,
+      brand: fp.inventory_items.brand,
+      price_cents: fp.inventory_items.price_cents,
+      image_url: fp.inventory_items.image_url,
+      stock: fp.inventory_items.stock,
+      featured_type: fp.featured_type,
+      featured_priority: fp.featured_priority,
+      featured_at: fp.featured_at,
+      featured_until: fp.featured_expires_at,
+      auto_unfeature: fp.auto_unfeature,
+      is_active: fp.is_active,
+      tenants: fp.tenants
+    }));
+
+    const total = await prisma.featured_products.count({
+      where: whereClause
     });
 
     res.json({
-      products: featuredProducts,
+      products: transformedProducts,
       total,
       limit: parseInt(limit as string),
       offset: parseInt(offset as string)
@@ -578,26 +655,18 @@ router.get('/admin/products/featuring/stats', authenticateToken, async (req, res
       return res.status(403).json({ error: 'Platform admin access required' });
     }
 
-    const [totalFeatured, featuredItems, expiringSoon] = await Promise.all([
+    const [totalFeatured, featuredItems, expiringSoon, typeStats] = await Promise.all([
       // Total featured products
-      prisma.inventory_items.count({
+      prisma.featured_products.count({
         where: {
-          is_featured: true,
-          OR: [
-            { featured_until: null },
-            { featured_until: { gte: new Date() } }
-          ]
+          is_active: true
         }
       }),
       
-      // Featured products by tier - use standard query instead of raw
-      prisma.inventory_items.findMany({
+      // Featured products by tier and type
+      prisma.featured_products.findMany({
         where: {
-          is_featured: true,
-          OR: [
-            { featured_until: null },
-            { featured_until: { gte: new Date() } }
-          ]
+          is_active: true
         },
         include: {
           tenants: {
@@ -609,13 +678,24 @@ router.get('/admin/products/featuring/stats', authenticateToken, async (req, res
       }),
       
       // Expiring soon (next 7 days)
-      prisma.inventory_items.count({
+      prisma.featured_products.count({
         where: {
-          is_featured: true,
-          featured_until: {
+          is_active: true,
+          featured_expires_at: {
             gte: new Date(),
             lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
           }
+        }
+      }),
+
+      // Featured products by type
+      prisma.featured_products.groupBy({
+        by: ['featured_type'],
+        where: {
+          is_active: true
+        },
+        _count: {
+          featured_type: true
         }
       })
     ]);
@@ -631,9 +711,18 @@ router.get('/admin/products/featuring/stats', authenticateToken, async (req, res
       .map(([tier, count]) => ({ tier, count }))
       .sort((a, b) => b.count - a.count);
 
+    // Process type statistics
+    const byType = typeStats
+      .map(stat => ({ 
+        type: stat.featured_type, 
+        count: stat._count.featured_type 
+      }))
+      .sort((a, b) => b.count - a.count);
+
     res.json({
       totalFeatured,
       byTier,
+      byType,
       expiringSoon
     });
   } catch (error) {
@@ -767,6 +856,40 @@ router.get('/tenants/:tenantId/products/featured/out-of-stock', authenticateToke
   } catch (error) {
     console.error('Error fetching out-of-stock featured products:', error);
     res.status(500).json({ error: 'Failed to fetch out-of-stock featured products' });
+  }
+});
+
+// DELETE /api/admin/products/featured/:id - Unfeature a specific featured product
+router.delete('/admin/products/featured/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+
+    if (!user || user.role !== 'PLATFORM_ADMIN') {
+      return res.status(403).json({ error: 'Platform admin access required' });
+    }
+
+    // Check if the featured product exists
+    const featuredProduct = await prisma.featured_products.findUnique({
+      where: { id }
+    });
+
+    if (!featuredProduct) {
+      return res.status(404).json({ error: 'Featured product not found' });
+    }
+
+    // Delete the featured product record
+    await prisma.featured_products.delete({
+      where: { id }
+    });
+
+    res.json({ 
+      message: 'Product unfeatured successfully',
+      deletedProductId: id
+    });
+  } catch (error) {
+    console.error('Error unfeaturing product:', error);
+    res.status(500).json({ error: 'Failed to unfeature product' });
   }
 });
 

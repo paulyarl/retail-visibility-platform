@@ -97,7 +97,7 @@ export class ContextAwareCacheManager {
     // 🎯 Generate context-aware storage configurations
     this.contextStorageConfig = this.generateContextStorageConfig();
     
-    console.log('[ContextAwareCacheManager] Initialized with capabilities:', this.browserCapabilities);
+    // console.log('[ContextAwareCacheManager] Initialized with capabilities:', this.browserCapabilities);
   }
 
   // ==================== BROWSER CAPABILITY DETECTION ====================
@@ -130,7 +130,7 @@ export class ContextAwareCacheManager {
       }
     }
 
-    console.log('[ContextAwareCacheManager] Browser capabilities detected:', capabilities);
+    // console.log('[ContextAwareCacheManager] Browser capabilities detected:', capabilities);
     return capabilities;
   }
 
@@ -402,15 +402,15 @@ export class ContextAwareCacheManager {
     }
 
     // 📊 Log storage decision
-    console.log(`[ContextAwareCacheManager] Storing ${context}:${isolation} using ${strategy.primary} strategy`, {
-      key,
-      strategy: {
-        primary: strategy.primary,
-        encryption: strategy.encryption,
-        compression: strategy.compression,
-        persistent: strategy.persistent
-      }
-    });
+      // console.log(`[ContextAwareCacheManager] Storing ${context}:${isolation} using ${strategy.primary} strategy`, {
+      //   key,
+      //   strategy: {
+      //     primary: strategy.primary,
+      //     encryption: strategy.encryption,
+      //     compression: strategy.compression,
+      //     persistent: strategy.persistent
+      //   }
+      // });
 
     // 🔧 Apply context-specific processing
     let processedData = data;
@@ -458,11 +458,11 @@ export class ContextAwareCacheManager {
     const result = await this.cacheManager.get<T>(key, options);
     
     if (result) {
-      console.log(`[ContextAwareCacheManager] HIT for ${context}:${key}`);
+      // console.log(`[ContextAwareCacheManager] HIT for ${context}:${key}`);
       return result;
     }
 
-    console.log(`[ContextAwareCacheManager] MISS for ${context}:${key}`);
+    // console.log(`[ContextAwareCacheManager] MISS for ${context}:${key}`);
     return null;
   }
 
@@ -550,7 +550,7 @@ export class ContextAwareCacheManager {
           for (const [key] of toRemove) {
             this.cacheManager.remove(key);
           }
-          console.log(`[ContextAwareCacheManager] Cleaned up ${toRemove.length} entries for ${context}`);
+          // console.log(`[ContextAwareCacheManager] Cleaned up ${toRemove.length} entries for ${context}`);
         }
       }
     }

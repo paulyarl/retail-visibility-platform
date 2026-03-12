@@ -506,14 +506,14 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         userId
       );
       
-    console.log(`[${this.constructor.name}] ----------------------------------------`);
-    console.log(`[${this.constructor.name}] start         : makePublicRequest`);
-    console.log(`[${this.constructor.name}] url           : ${url}`);
-    console.log(`[${this.constructor.name}] options       : ${JSON.stringify(options)}`);
-    console.log(`[${this.constructor.name}] cacheKey      : ${cacheKey}`);
-    console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
-    console.log(`[${this.constructor.name}] end           : makePublicRequest  `);      
-    console.log(`[${this.constructor.name}] 🎯 makePublicRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+    // console.log(`[${this.constructor.name}] ----------------------------------------`);
+    // console.log(`[${this.constructor.name}] start         : makePublicRequest`);
+    // console.log(`[${this.constructor.name}] url           : ${url}`);
+    // console.log(`[${this.constructor.name}] options       : ${JSON.stringify(options)}`);
+    // console.log(`[${this.constructor.name}] cacheKey      : ${cacheKey}`);
+    // console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
+    // console.log(`[${this.constructor.name}] end           : makePublicRequest  `);      
+    // console.log(`[${this.constructor.name}] 🎯 makePublicRequest Enhanced cacheKey generated: ${finalCacheKey}`);
     }
     
     // Delegate to setup method
@@ -578,14 +578,14 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         userId
       );
       
-    console.log(`[${this.constructor.name}] ----------------------------------------`);
-    console.log(`[${this.constructor.name}] start         : makeAuthenticatedRequest`);
-    console.log(`[${this.constructor.name}] url           : ${url}`);
-    console.log(`[${this.constructor.name}] options       : ${JSON.stringify(options)}`);
-    console.log(`[${this.constructor.name}] cacheKey      : ${cacheKey}`);
-    console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
-    console.log(`[${this.constructor.name}] end           : makeAuthenticatedRequest  `);      
-    console.log(`[${this.constructor.name}] 🎯 makeAuthenticatedRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+    // console.log(`[${this.constructor.name}] ----------------------------------------`);
+    // console.log(`[${this.constructor.name}] start         : makeAuthenticatedRequest`);
+    // console.log(`[${this.constructor.name}] url           : ${url}`);
+    // console.log(`[${this.constructor.name}] options       : ${JSON.stringify(options)}`);
+    // console.log(`[${this.constructor.name}] cacheKey      : ${cacheKey}`);
+    // console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
+    // console.log(`[${this.constructor.name}] end           : makeAuthenticatedRequest  `);      
+    // console.log(`[${this.constructor.name}] 🎯 makeAuthenticatedRequest Enhanced cacheKey generated: ${finalCacheKey}`);
 
     }
     
@@ -654,17 +654,16 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       );
 
       
-    console.log(`[${this.constructor.name}] ----------------------------------------`);
-    console.log(`[${this.constructor.name}] start         : makeTenantRequest`);
-    console.log(`[${this.constructor.name}] url           : ${url}`);
-    console.log(`[${this.constructor.name}] options       : ${JSON.stringify(options)}`);
-    //console.log(`[${this.constructor.name}] cacheKey      : ${cacheKey}`);
-    console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
-    console.log(`[${this.constructor.name}] end           : makeTenantRequest  `);      
-    console.log(`[${this.constructor.name}] 🎯 makeAuthenticatedRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+    // console.log(`[${this.constructor.name}] ----------------------------------------`);
+    // console.log(`[${this.constructor.name}] start         : makeTenantRequest`);
+    // console.log(`[${this.constructor.name}] url           : ${url}`);
+    // console.log(`[${this.constructor.name}] options       : ${JSON.stringify(options)}`);
+    // console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
+    // console.log(`[${this.constructor.name}] end           : makeTenantRequest  `);      
+    // console.log(`[${this.constructor.name}] 🎯 makeAuthenticatedRequest Enhanced cacheKey generated: ${finalCacheKey}`);
     
       
-      console.log(`[${this.constructor.name}] 🎯 makeTenantRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+    //   console.log(`[${this.constructor.name}] 🎯 makeTenantRequest Enhanced cacheKey generated: ${finalCacheKey}`);
     }
     
     // Delegate to setup method
@@ -734,13 +733,13 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       );
 
       
-    console.log(`[${this.constructor.name}] ----------------------------------------`);
-    console.log(`[${this.constructor.name}] start         : makeAdminRequest`);
-    console.log(`[${this.constructor.name}] url           : ${url}`);
-    console.log(`[${this.constructor.name}] options       : ${JSON.stringify(options)}`);
-    console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
-    console.log(`[${this.constructor.name}] end           : makeAdminRequest  `);      
-    console.log(`[${this.constructor.name}] 🎯 makeAdminRequest Enhanced cacheKey generated: ${finalCacheKey}`);
+    // console.log(`[${this.constructor.name}] ----------------------------------------`);
+    // console.log(`[${this.constructor.name}] start         : makeAdminRequest`);
+    // console.log(`[${this.constructor.name}] url           : ${url}`);
+    // console.log(`[${this.constructor.name}] options       : ${JSON.stringify(options)}`);
+    // console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
+    // console.log(`[${this.constructor.name}] end           : makeAdminRequest  `);      
+    // console.log(`[${this.constructor.name}] 🎯 makeAdminRequest Enhanced cacheKey generated: ${finalCacheKey}`);
     
 
     }
@@ -889,13 +888,13 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       );
     }
 
-    console.log(`[${this.constructor.name}] ----------------------------------------`);
-    console.log(`[${this.constructor.name}] start         : ${requestType}`);
-    console.log(`[${this.constructor.name}] url           : ${url}`);
-    console.log(`[${this.constructor.name}] options       : ${JSON.stringify(options)}`);
-    console.log(`[${this.constructor.name}] cacheKey      : ${cacheKey}`);
-    console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
-    console.log(`[${this.constructor.name}] end           : ${requestTarget}  `);
+    // console.log(`[${this.constructor.name}] ----------------------------------------`);
+    // console.log(`[${this.constructor.name}] start         : ${requestType}`);
+    // console.log(`[${this.constructor.name}] url           : ${url}`);
+    // console.log(`[${this.constructor.name}] options       : ${JSON.stringify(options)}`);
+    // console.log(`[${this.constructor.name}] cacheKey      : ${cacheKey}`);
+    // console.log(`[${this.constructor.name}] requestOptions: ${JSON.stringify(requestOptions)}`);
+    // console.log(`[${this.constructor.name}] end           : ${requestTarget}  `);
 
     // 🎯 STRATEGY 1: Generate enhanced cacheKey if context data is present
     let finalCacheKey = cacheKey;

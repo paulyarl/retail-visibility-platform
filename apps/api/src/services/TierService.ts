@@ -239,8 +239,8 @@ export async function checkTenantFeatureAccess(
       return { hasAccess: false, source: 'none' };
     }
 
-    console.log(`[checkTenantFeatureAccess] Tenant: ${tenantId}, Feature: ${featureKey}`);
-    console.log(`[checkTenantFeatureAccess] Tenant tier: ${tenant.subscription_tier}, Org tier: ${tenant.organizations_list?.subscription_tier}`);
+    // console.log(`[checkTenantFeatureAccess] Tenant: ${tenantId}, Feature: ${featureKey}`);
+    // console.log(`[checkTenantFeatureAccess] Tenant tier: ${tenant.subscription_tier}, Org tier: ${tenant.organizations_list?.subscription_tier}`);
 
     // 1. Check for active override first (highest priority)
     const override = tenant.tenant_feature_overrides_list[0];
@@ -264,19 +264,19 @@ export async function checkTenantFeatureAccess(
     const orgTier = tenant.organizations_list?.subscription_tier;
     const tenantTier = tenant.subscription_tier || 'starter';
     
-    console.log(`[checkTenantFeatureAccess] Org tier: ${orgTier}, Tenant tier: ${tenantTier}`);
+    // console.log(`[checkTenantFeatureAccess] Org tier: ${orgTier}, Tenant tier: ${tenantTier}`);
     
     // Check org tier first if it exists
     let tierAccess = false;
     if (orgTier) {
       tierAccess = await checkTierFeatureAccess(orgTier, featureKey);
-      console.log(`[checkTenantFeatureAccess] Org tier (${orgTier}) access: ${tierAccess}`);
+      // console.log(`[checkTenantFeatureAccess] Org tier (${orgTier}) access: ${tierAccess}`);
     }
     
     // If org tier doesn't grant access, check tenant tier
     if (!tierAccess) {
       tierAccess = await checkTierFeatureAccess(tenantTier, featureKey);
-      console.log(`[checkTenantFeatureAccess] Tenant tier (${tenantTier}) access: ${tierAccess}`);
+      // console.log(`[checkTenantFeatureAccess] Tenant tier (${tenantTier}) access: ${tierAccess}`);
     }
 
     return {

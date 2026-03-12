@@ -8,7 +8,18 @@ const router = express.Router();
 
 // Validation schemas
 const addFeaturedTypeSchema = z.object({
-  featured_type: z.enum(['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick']),
+  featured_type: z.enum([
+    'store_selection', 
+    'new_arrival', 
+    'seasonal', 
+    'sale', 
+    'staff_pick',
+    'bestseller',
+    'clearance',
+    'trending',
+    'featured',
+    'recommended'
+  ]),
   featured_priority: z.number().int().min(0).max(100).optional(),
   featured_expires_at: z.string().datetime().nullable().optional(),
   auto_unfeature: z.boolean().optional(),

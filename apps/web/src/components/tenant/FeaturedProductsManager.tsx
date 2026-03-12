@@ -10,8 +10,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
   Search, Star, Sparkles, Eye, ArrowUp, ArrowDown, AlertTriangle, Timer, Clock, 
-  Layers, Package, AlertCircle, Calendar, Tag, Award, DollarSign, TrendingUp, Check, 
-  ShoppingBag, Download, FileText, Edit2, X, Power, Pause, Play, Edit, Zap, PowerOff
+  Layers, Package, AlertCircle, Calendar, Tag, Award, TrendingUp, Check, 
+  ShoppingBag, FileText, Edit2, X, Power, Pause, Play, Edit, Zap, PowerOff
 } from 'lucide-react';
 import Image from 'next/image';
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -36,8 +36,18 @@ const getFeaturedBadgeStyle = (typeId: string): string => {
       return 'bg-gradient-to-r from-red-500 to-pink-500 text-white';
     case 'staff_pick':
       return 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white';
+    case 'bestseller':
+      return 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white';
+    case 'clearance':
+      return 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white';
+    case 'trending':
+      return 'bg-gradient-to-r from-pink-500 to-rose-500 text-white';
+    case 'featured':
+      return 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white';
+    case 'recommended':
+      return 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white';
     default:
-      return 'bg-gradient-to-r from-amber-500 to-orange-500 text-white';
+      return 'bg-gradient-to-r from-gray-500 to-gray-600 text-white';
   }
 };
 
@@ -53,6 +63,16 @@ const getFeaturedBadgeIcon = (typeId: string) => {
       return <Tag className="w-3 h-3 fill-white" />;
     case 'staff_pick':
       return <Award className="w-3 h-3 fill-white" />;
+    case 'bestseller':
+      return <TrendingUp className="w-3 h-3 fill-white" />;
+    case 'clearance':
+      return <Tag className="w-3 h-3 fill-white" />;
+    case 'trending':
+      return <ShoppingBag className="w-3 h-3 fill-white" />;
+    case 'featured':
+      return <Star className="w-3 h-3 fill-white" />;
+    case 'recommended':
+      return <Star className="w-3 h-3 fill-white" />;
     default:
       return <Star className="w-3 h-3 fill-white" />;
   }
@@ -153,7 +173,7 @@ const getProductTypeIcon = (productType: string) => {
     case 'physical':
       return <Package className="w-3 h-3" />;
     case 'digital':
-      return <Download className="w-3 h-3" />;
+      return <FileText className="w-3 h-3" />;
     case 'service':
       return <FileText className="w-3 h-3" />;
     default:
@@ -161,11 +181,17 @@ const getProductTypeIcon = (productType: string) => {
   }
 };
 
-export default function FeaturedProductsManager({ tenantId }: { tenantId: string }) {
+export default function FeaturedProductsManager({ 
+  tenantId, 
+  context = 'storefront' 
+}: { 
+  tenantId: string; 
+  context?: 'storefront' | 'directory' | 'admin';
+}) {
   // Get ProductSingleton for universal product integration
   const productProvider = useProduct();
   
-  console.log('FeaturedProductsManager: Component rendering', { tenantId, productProvider: !!productProvider });
+  // console.log('FeaturedProductsManager: Component rendering', { tenantId, productProvider: !!productProvider });
   
   const {
     // State
@@ -200,7 +226,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
     updateProductExpiration,
     forceRefresh,
     singleton // Get singleton instance for MV refresh
-  } = useTenantFeaturedProducts(tenantId, productProvider);
+  } = useTenantFeaturedProducts(tenantId, productProvider, { context });
 
   // Get current type info
   const currentType = featuredTypes.find(t => t.id === selectedType);
@@ -208,52 +234,52 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
   // Check if current type is at limit
   const isCurrentTypeAtLimit = (activeFeaturedByType[selectedType]?.length || 0) >= (currentType?.maxProducts || 0);
 
-  console.log('FeaturedProductsManager: Hook state', { 
-    isLoading, 
-    selectedType,
-    currentFeaturedCount: currentFeatured?.length || 0,
-    activeFeaturedCount: activeFeatured?.length || 0,
-    expiredFeaturedCount: expiredFeatured?.length || 0,
-    featuredProductsKeys: Object.keys(featuredProductsByType || {}),
-    featuredTypesCount: featuredTypes.length,
-    inactiveProductsCount: inactiveProducts?.length || 0,
-    inStockCount: paginatedInStock?.length || 0,
-    outOfStockCount: paginatedOutOfStock?.length || 0,
-    totalAvailableCount: totalAvailableProducts || 0,
-    sampleCurrentFeatured: currentFeatured?.slice(0, 2).map(p => ({ 
-      id: p.id, 
-      name: p.name, 
-      stock: p.stock, 
-      availability: p.availability,
-      featured_expires_at: p.featured_expires_at,
-      is_active: p.is_active
-    })),
-    sampleInStock: paginatedInStock?.slice(0, 2).map(p => ({ 
-      id: p.id, 
-      name: p.name, 
-      stock: p.stock, 
-      availability: p.availability 
-    })),
-    sampleOutOfStock: paginatedOutOfStock?.slice(0, 2).map(p => ({ 
-      id: p.id, 
-      name: p.name, 
-      stock: p.stock, 
-      availability: p.availability 
-    })),
-    sampleFeaturedProductsByType: Object.keys(featuredProductsByType || {}).reduce((acc, key) => {
-      acc[key] = featuredProductsByType[key]?.length || 0;
-      return acc;
-    }, {} as any),
-    detailedFeaturedProductsByType: Object.keys(featuredProductsByType || {}).reduce((acc, key) => {
-      acc[key] = featuredProductsByType[key]?.map(p => ({ id: p.id, name: p.name, is_active: p.is_active }));
-      return acc;
-    }, {} as any),
-    sampleInactiveProducts: inactiveProducts?.slice(0, 2).map(p => ({ 
-      id: p.id, 
-      name: p.name, 
-      inventory_item_id: p.inventory_item_id 
-    }))
-  });
+  // console.log('FeaturedProductsManager: Hook state', { 
+  //   isLoading, 
+  //   selectedType,
+  //   currentFeaturedCount: currentFeatured?.length || 0,
+  //   activeFeaturedCount: activeFeatured?.length || 0,
+  //   expiredFeaturedCount: expiredFeatured?.length || 0,
+  //   featuredProductsKeys: Object.keys(featuredProductsByType || {}),
+  //   featuredTypesCount: featuredTypes.length,
+  //   inactiveProductsCount: inactiveProducts?.length || 0,
+  //   inStockCount: paginatedInStock?.length || 0,
+  //   outOfStockCount: paginatedOutOfStock?.length || 0,
+  //   totalAvailableCount: totalAvailableProducts || 0,
+  //   sampleCurrentFeatured: currentFeatured?.slice(0, 2).map(p => ({ 
+  //     id: p.id, 
+  //     name: p.name, 
+  //     stock: p.stock, 
+  //     availability: p.availability,
+  //     featured_expires_at: p.featured_expires_at,
+  //     is_active: p.is_active
+  //   })),
+  //   sampleInStock: paginatedInStock?.slice(0, 2).map(p => ({ 
+  //     id: p.id, 
+  //     name: p.name, 
+  //     stock: p.stock, 
+  //     availability: p.availability 
+  //   })),
+  //   sampleOutOfStock: paginatedOutOfStock?.slice(0, 2).map(p => ({ 
+  //     id: p.id, 
+  //     name: p.name, 
+  //     stock: p.stock, 
+  //     availability: p.availability 
+  //   })),
+  //   sampleFeaturedProductsByType: Object.keys(featuredProductsByType || {}).reduce((acc, key) => {
+  //     acc[key] = featuredProductsByType[key]?.length || 0;
+  //     return acc;
+  //   }, {} as any),
+  //   detailedFeaturedProductsByType: Object.keys(featuredProductsByType || {}).reduce((acc, key) => {
+  //     acc[key] = featuredProductsByType[key]?.map(p => ({ id: p.id, name: p.name, is_active: p.is_active }));
+  //     return acc;
+  //   }, {} as any),
+  //   sampleInactiveProducts: inactiveProducts?.slice(0, 2).map(p => ({ 
+  //     id: p.id, 
+  //     name: p.name, 
+  //     inventory_item_id: p.inventory_item_id 
+  //   }))
+  // });
 
   // Local state for modals and UI
   const [showAddModal, setShowAddModal] = useState(false);
@@ -265,12 +291,12 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
   const getPausedProductType = (pausedProduct: any) => {
     // Use the featured_type from the API response directly
     if (pausedProduct.featured_type) {
-      console.log(`getPausedProductType: Using API returned type "${pausedProduct.featured_type}" for paused product "${pausedProduct.name}"`);
+      // console.log(`getPausedProductType: Using API returned type "${pausedProduct.featured_type}" for paused product "${pausedProduct.name}"`);
       return pausedProduct.featured_type;
     }
     
     // Fallback to the old matching logic if API doesn't provide featured_type
-    console.log(`getPausedProductType: API didn't provide featured_type, falling back to matching logic for "${pausedProduct.name}"`);
+    // console.log(`getPausedProductType: API didn't provide featured_type, falling back to matching logic for "${pausedProduct.name}"`);
     
     for (const [typeId, products] of Object.entries(featuredProductsByType)) {
       const found = products.find(p => 
@@ -281,12 +307,12 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
       );
       
       if (found) {
-        console.log(`getPausedProductType: Found match for paused product "${pausedProduct.name}" in type "${typeId}"`);
+        // console.log(`getPausedProductType: Found match for paused product "${pausedProduct.name}" in type "${typeId}"`);
         return typeId;
       }
     }
     
-    console.log(`getPausedProductType: No match found for paused product "${pausedProduct.name}"`);
+    // console.log(`getPausedProductType: No match found for paused product "${pausedProduct.name}"`);
     return null;
   };
 
@@ -307,22 +333,22 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
   // Stock update handler for out-of-stock products
   const handleStockUpdate = async (itemId: string, newStock: number) => {
     try {
-      console.log('[FeaturedProductsManager] Updating stock for item:', itemId, 'to:', newStock);
+      // console.log('[FeaturedProductsManager] Updating stock for item:', itemId, 'to:', newStock);
       
       // Use the StockUpdateService middleware with singleton refresh
       await StockUpdateService.getInstance().updateStock(itemId, newStock, {
         tenantId,
         onSuccess: (updatedStock: number) => {
-          console.log('[FeaturedProductsManager] Stock update successful:', updatedStock);
+          // console.log('[FeaturedProductsManager] Stock update successful:', updatedStock);
           // Refresh data to show updated stock and move products between sections
           forceRefresh();
         },
         onError: (error: Error) => {
-          console.error('[FeaturedProductsManager] Stock update failed:', error);
+          // console.error('[FeaturedProductsManager] Stock update failed:', error);
         },
         singletonRefresh: async () => {
           // Trigger singleton refresh for MV cache invalidation
-          console.log('[FeaturedProductsManager] Triggering singleton refresh for MV cache');
+          // console.log('[FeaturedProductsManager] Triggering singleton refresh for MV cache');
           await singleton.forceRefresh();
         }
       });
@@ -414,29 +440,29 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
     }
 
     // Debug: Log the product object to see what fields it has
-    console.log('=== FEATURE PRODUCT DEBUG ===');
-    console.log('Product object for featuring:', product);
-    console.log('Product keys:', Object.keys(product));
-    console.log('Product ID fields:', {
-      id: product.id,
-      inventory_item_id: product.inventory_item_id,
-      inventoryItemId: product.inventoryItemId
-    });
-    console.log('=== END DEBUG ===');
+    // console.log('=== FEATURE PRODUCT DEBUG ===');
+    // console.log('Product object for featuring:', product);
+    // console.log('Product keys:', Object.keys(product));
+    // console.log('Product ID fields:', {
+    //   id: product.id,
+    //   inventory_item_id: product.inventory_item_id,
+    //   inventoryItemId: product.inventoryItemId
+    // });
+    // console.log('=== END DEBUG ===');
 
     await handleError(async () => {
       // For available products, use product.id
       const productId = product.id || product.inventory_item_id || product.inventoryItemId;
       
-      console.log('Attempting to feature product with ID:', productId, 'from product:', product);
+      // console.log('Attempting to feature product with ID:', productId, 'from product:', product);
       
       if (!productId) {
-        console.error('Product ID fields are all undefined:', {
-          id: product.id,
-          inventory_item_id: product.inventory_item_id,
-          inventoryItemId: product.inventoryItemId,
-          productKeys: Object.keys(product)
-        });
+        // console.error('Product ID fields are all undefined:', {
+        //   id: product.id,
+        //   inventory_item_id: product.inventory_item_id,
+        //   inventoryItemId: product.inventoryItemId,
+        //   productKeys: Object.keys(product)
+        // });
         throw new Error('Product ID is undefined - cannot feature product');
       }
       
@@ -449,7 +475,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
   };
 
   if (isLoading) {
-    console.log('FeaturedProductsManager: Still loading...');
+    // console.log('FeaturedProductsManager: Still loading...');
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -526,7 +552,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {activeFeatured.map((product, index) => (
-              <div key={product.id || index} className={`border rounded-lg p-4 relative ${product.is_active === false ? 'border-orange-200 bg-orange-50 opacity-75' : 'border-gray-200'}`}>
+              <div key={`${product.inventory_item_id || product.id || 'unknown'}-${product.featured_type || selectedType}-${index}`} className={`border rounded-lg p-4 relative ${product.is_active === false ? 'border-orange-200 bg-orange-50 opacity-75' : 'border-gray-200'}`}>
                 {/* Badges Container */}
                 <div className="absolute top-2 left-2 right-2 z-10 flex justify-between">
                   {/* Featured Type Badge - Left */}
@@ -581,17 +607,17 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => {
-                      console.log('=== PAUSE BUTTON CLICKED ===');
-                      console.log('Product object:', product);
-                      console.log('Product keys:', Object.keys(product));
-                      console.log('product.id:', product.id);
-                      console.log('product.inventory_item_id:', product.inventory_item_id);
-                      console.log('product.is_active:', product.is_active);
-                      console.log('=== END DEBUG ===');
+                      // console.log('=== PAUSE BUTTON CLICKED ===');
+                      // console.log('Product object:', product);
+                      // console.log('Product keys:', Object.keys(product));
+                      // console.log('product.id:', product.id);
+                      // console.log('product.inventory_item_id:', product.inventory_item_id);
+                      // console.log('product.is_active:', product.is_active);
+                      // console.log('=== END DEBUG ===');
                       
                       // Featured products MUST use inventory_item_id (the junction table key)
                       if (!product.inventory_item_id) {
-                        console.error('Missing inventory_item_id for featured product:', product);
+                        // console.error('Missing inventory_item_id for featured product:', product);
                         return;
                       }
                       handleError(() => toggleProductActive(product.inventory_item_id, product.is_active === false), 'Failed to toggle product status');
@@ -669,7 +695,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                     onClick={() => {
                       // Featured products MUST use inventory_item_id
                       if (!product.inventory_item_id) {
-                        console.error('Missing inventory_item_id for featured product:', product);
+                        // console.error('Missing inventory_item_id for featured product:', product);
                         return;
                       }
                       handleError(() => unfeatureProduct(product.inventory_item_id), 'Failed to remove from featured');
@@ -688,10 +714,10 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
 
       {/* Expired/Inactive Products */}
       {(() => {
-        console.log('[FeaturedProductsManager] Expired products check:', { 
-          expiredFeaturedCount: expiredFeatured?.length || 0,
-          expiredFeaturedSample: expiredFeatured?.slice(0, 2).map(p => ({ id: p.id, name: p.name, is_active: p.is_active }))
-        });
+        // console.log('[FeaturedProductsManager] Expired products check:', { 
+        //   expiredFeaturedCount: expiredFeatured?.length || 0,
+        //   expiredFeaturedSample: expiredFeatured?.slice(0, 2).map(p => ({ id: p.id, name: p.name, is_active: p.is_active }))
+        // });
         return expiredFeatured.length > 0;
       })() && (
         <div className="bg-white rounded-lg border border-amber-200 p-6">
@@ -741,7 +767,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                     onClick={() => {
                       // Expired featured products MUST use inventory_item_id
                       if (!product.inventory_item_id) {
-                        console.error('Missing inventory_item_id for expired product:', product);
+                        // console.error('Missing inventory_item_id for expired product:', product);
                         return;
                       }
                       handleError(() => toggleProductActive(product.inventory_item_id, true), 'Failed to reactivate product');
@@ -755,7 +781,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                     onClick={() => {
                       // Expired featured products MUST use inventory_item_id
                       if (!product.inventory_item_id) {
-                        console.error('Missing inventory_item_id for expired product:', product);
+                        // console.error('Missing inventory_item_id for expired product:', product);
                         return;
                       }
                       handleError(() => unfeatureProduct(product.inventory_item_id), 'Failed to remove product');
@@ -774,12 +800,12 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
 
       {/* Inactive Products - Paused Only */}
       {(() => {
-        console.log('[FeaturedProductsManager] Inactive products check:', { 
-          inactiveProductsCount: inactiveProducts?.length || 0,
-          filteredInactiveCount: filteredInactiveProducts?.length || 0,
-          selectedType,
-          inactiveSample: inactiveProducts?.slice(0, 2).map(p => ({ id: p.id, name: p.name, is_active: p.is_active, featured_type: p.featured_type }))
-        });
+        // console.log('[FeaturedProductsManager] Inactive products check:', { 
+        //   inactiveProductsCount: inactiveProducts?.length || 0,
+        //   filteredInactiveCount: filteredInactiveProducts?.length || 0,
+        //   selectedType,
+        //   inactiveSample: inactiveProducts?.slice(0, 2).map(p => ({ id: p.id, name: p.name, is_active: p.is_active, featured_type: p.featured_type }))
+        // });
         return filteredInactiveProducts.length > 0;
       })() && (
         <div className="bg-gradient-to-r from-orange-50 to-amber-100 border-2 border-orange-200 rounded-lg p-6">
@@ -863,7 +889,7 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                     onClick={() => {
                       // Paused featured products MUST use inventory_item_id
                       if (!product.inventory_item_id) {
-                        console.error('Missing inventory_item_id for paused product:', product);
+                        // console.error('Missing inventory_item_id for paused product:', product);
                         return;
                       }
                       handleError(() => toggleProductActive(product.inventory_item_id, true), 'Failed to resume featuring');
@@ -909,13 +935,13 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
               <Check className="w-5 h-5 text-green-600" />
               In Stock ({paginatedInStock.length} of {totalAvailableProducts})
             </h3>
-            {paginatedInStock.length > 0 && console.log('PRODUCT STRUCTURE DEBUG:', {
+            {/* {paginatedInStock.length > 0 && console.log('PRODUCT STRUCTURE DEBUG:', {
               firstProduct: paginatedInStock[0],
               productKeys: Object.keys(paginatedInStock[0]),
               idField: paginatedInStock[0].id,
               inventory_item_id: paginatedInStock[0].inventory_item_id,
               inventoryItemId: paginatedInStock[0].inventory_item_id
-            })}
+            })} */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
               {paginatedInStock.map((product, index) => (
                 <div key={`product-${product.id || 'unknown'}-${index}`} className="border border-gray-200 rounded-lg p-4">
@@ -958,14 +984,14 @@ export default function FeaturedProductsManager({ tenantId }: { tenantId: string
                     
                     <button
                       onClick={() => {
-                        console.log('=== BUTTON CLICK DEBUG ===');
-                        console.log('Feature button clicked - product object:', product);
-                        console.log('Product keys:', Object.keys(product));
-                        console.log('Product ID:', product.id);
-                        console.log('=== END BUTTON CLICK DEBUG ===');
+                        // console.log('=== BUTTON CLICK DEBUG ===');
+                        // console.log('Feature button clicked - product object:', product);
+                        // console.log('Product keys:', Object.keys(product));
+                        // console.log('Product ID:', product.id);
+                        // console.log('=== END BUTTON CLICK DEBUG ===');
                         
                         if (!product.id) {
-                          console.error('Product ID is undefined, cannot feature product');
+                          // console.error('Product ID is undefined, cannot feature product');
                           return;
                         }
                         

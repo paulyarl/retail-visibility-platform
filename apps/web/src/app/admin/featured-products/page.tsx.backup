@@ -7,7 +7,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { featuredProductsService } from '@/services/FeaturedProductsService';
 import AdminTenantFeaturedManagement from '@/components/admin/AdminTenantFeaturedManagement';
-import AdminDirectoryFeaturedManagement from '@/components/admin/AdminDirectoryFeaturedManagement';
 
 interface FeaturedProduct {
   featured_product_id: string;
@@ -41,9 +40,8 @@ interface FeaturingStats {
 }
 
 export default function AdminFeaturedProductsPage() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'store-featured' | 'directory-featured'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'tenant-management'>('overview');
   const [selectedTenant, setSelectedTenant] = useState<string>('');
-  const [selectedDirectoryTenant, setSelectedDirectoryTenant] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<FeaturingStats | null>(null);
   const [products, setProducts] = useState<FeaturedProduct[]>([]);
@@ -61,7 +59,6 @@ export default function AdminFeaturedProductsPage() {
   const [tenantFilter, setTenantFilter] = useState<string>('all');
   const [expirationFilter, setExpirationFilter] = useState<string>('all');
   const [featuredTypeFilter, setFeaturedTypeFilter] = useState<string>('all');
-  const [activeStatusFilter, setActiveStatusFilter] = useState<string>('active');
   const [showFilters, setShowFilters] = useState(false);
   const [uniqueTenants, setUniqueTenants] = useState<Array<{id: string, name: string}>>([]);
 
@@ -80,23 +77,16 @@ export default function AdminFeaturedProductsPage() {
     { value: 'store_selection', label: 'Directory Featured' }
   ];
 
-  // Active status options
-  const activeStatusOptions = [
-    { value: 'all', label: 'All Status' },
-    { value: 'active', label: 'Active Only' },
-    { value: 'inactive', label: 'Inactive Only' }
-  ];
-
   useEffect(() => {
     fetchData();
-  }, [page, searchQuery, tierFilter, tenantFilter, expirationFilter, featuredTypeFilter, activeStatusFilter]);
+  }, [page, searchQuery, tierFilter, tenantFilter, expirationFilter, featuredTypeFilter]);
 
   useEffect(() => {
     // Reset to page 0 when filters change
     if (page !== 0) {
       setPage(0);
     }
-  }, [searchQuery, tierFilter, tenantFilter, expirationFilter, featuredTypeFilter, activeStatusFilter]);
+  }, [searchQuery, tierFilter, tenantFilter, expirationFilter, featuredTypeFilter]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -108,7 +98,6 @@ export default function AdminFeaturedProductsPage() {
           subscription_tier: tierFilter !== 'all' ? tierFilter : undefined,
           expiration_status: expirationFilter !== 'all' ? expirationFilter : undefined,
           featured_type: featuredTypeFilter !== 'all' ? featuredTypeFilter : undefined,
-          is_active: activeStatusFilter !== 'all' ? activeStatusFilter === 'active' : undefined,
         })
       ]);
 
@@ -294,10 +283,9 @@ export default function AdminFeaturedProductsPage() {
     setTenantFilter('all');
     setExpirationFilter('all');
     setFeaturedTypeFilter('all');
-    setActiveStatusFilter('active');
   };
 
-  const hasActiveFilters = searchQuery || tierFilter !== 'all' || tenantFilter !== 'all' || expirationFilter !== 'all' || featuredTypeFilter !== 'all' || activeStatusFilter !== 'active';
+  const hasActiveFilters = searchQuery || tierFilter !== 'all' || tenantFilter !== 'all' || expirationFilter !== 'all' || featuredTypeFilter !== 'all';
   const totalPages = Math.ceil(total / limit);
   const startItem = total > 0 ? page * limit + 1 : 0;
   const endItem = Math.min((page + 1) * limit, total);
@@ -342,37 +330,25 @@ export default function AdminFeaturedProductsPage() {
               </div>
             </button>
             <button
-              onClick={() => setActiveTab('store-featured')}
+              onClick={() => setActiveTab('tenant-management')}
               className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'store-featured'
+                activeTab === 'tenant-management'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
               <div className="flex items-center gap-2">
                 <Store className="w-4 h-4" />
-                Store Featured Management
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('directory-featured')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'directory-featured'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Star className="w-4 h-4" />
-                Directory Featured Management
+                Tenant Management
               </div>
             </button>
           </nav>
         </div>
       </div>
 
+      {/* Tab Content */}
       {activeTab === 'overview' && (
-        <div>
+        <>
           {/* Stats Cards */}
           {stats && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -461,7 +437,7 @@ export default function AdminFeaturedProductsPage() {
 
             {/* Advanced Filters */}
             {showFilters && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Tenant Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -535,45 +511,21 @@ export default function AdminFeaturedProductsPage() {
                     ))}
                   </select>
                 </div>
-
-                {/* Active Status Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Active Status
-                  </label>
-                  <select
-                    value={activeStatusFilter}
-                    onChange={(e) => setActiveStatusFilter(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                  >
-                    {activeStatusOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* By Type */}
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-medium text-gray-600">By Type</p>
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                      <TrendingUp className="w-6 h-6 text-green-600" />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    {stats?.byType.slice(0, 3).map((item) => (
-                      <div key={item.type} className="flex justify-between text-sm">
-                        <span className="text-gray-600 capitalize">{item.type.replace('_', ' ')}:</span>
-                        <span className="font-semibold text-gray-900">{item.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
-            )}
-        </div>
+
+              {/* Clear Filters */}
+              {hasActiveFilters && (
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={clearFilters}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Clear All Filters
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Bulk Actions Bar */}
           {selectedProducts.size > 0 && (
@@ -897,15 +849,22 @@ export default function AdminFeaturedProductsPage() {
                   : 'Featured products will appear here once tenants start featuring their products'
                 }
               </p>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
 
-      {activeTab === 'directory-featured' && (
+      {activeTab === 'tenant-management' && (
         <AdminTenantFeaturedManagement selectedTenant={selectedTenant} setSelectedTenant={setSelectedTenant} />
       )}
-
     </div>
   );
 }

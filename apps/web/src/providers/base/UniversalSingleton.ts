@@ -300,18 +300,19 @@ export abstract class UniversalSingleton {
       // Clear memory cache
       if (key) {
         this.cache.delete(key);
-      //   console.log(`[${this.constructor.name}] Cache memory cache cleared for ${key ? key : 'all'}`);
+        console.log(`[${this.constructor.name}] Memory cache cleared for key: ${key}`);
       } else {
         this.cache.clear();
+        console.log(`[${this.constructor.name}] Memory cache cleared for all keys`);
       }
      
       // Clear persistent cache
       if (key) {
         await this.cacheManager.remove(key);
-    //    console.log(`[${this.constructor.name}] Cache persistent cache cleared for ${key ? key : 'all'}`);
+        console.log(`[${this.constructor.name}] Persistent cache cleared for key: ${key}`);
       } else {
         await this.cacheManager.clear();
-   //     console.log(`[${this.constructor.name}] Cache persistent cache cleared for ${key ? key : 'all'}`);
+        console.log(`[${this.constructor.name}] Persistent cache cleared for all keys`);
       }
     } catch (error) {
       console.warn(`[${this.constructor.name}] Cache clear failed:`, error);

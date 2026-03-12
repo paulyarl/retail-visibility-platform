@@ -794,7 +794,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     if (!result.success) {
       console.error('[PlatformHomeSingleton] Failed to get admin tier tenants:', result.error);
       return null;
+
     }
+    console.log(`[PlatformHomeSingleton] Got admin tier tenants:`, result.data)
 
     return result.data?.tenants || null;
   }
@@ -1031,7 +1033,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   async getTierSystemTiers(includeInactive: boolean = false): Promise<Tier[] | null> {
     const url = includeInactive ? '/api/admin/tiers/tiers?includeInactive=true' : '/api/admin/tiers/tiers';
     const cacheKey = includeInactive ? 'platform-tier-system-tiers-inactive' : 'platform-tier-system-tiers';
-    console.log('[PlatformHomeSingleton] getTierSystemTiers called with includeInactive:', includeInactive, 'URL:', url, 'CacheKey:', cacheKey);
+    // console.log('[PlatformHomeSingleton] getTierSystemTiers called with includeInactive:', includeInactive, 'URL:', url, 'CacheKey:', cacheKey);
     const result = await this.makeDefaultRequest<{ individual: any[], organization: any[] }>(
       url,
       {},

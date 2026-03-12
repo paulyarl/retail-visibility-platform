@@ -54,12 +54,12 @@ export default function DirectoryMap({
   const handleAutoGeocode = async (store: DirectoryListing) => {
     // Only require address, city, and zipCode - country defaults to US
     if (!store.address || !store.city || !store.zipCode) {
-      console.log('[DirectoryMap] Store missing required address fields for geocoding:', store.businessName);
+      // console.log('[DirectoryMap] Store missing required address fields for geocoding:', store.businessName);
       return null;
     }
     
     try {
-      console.log('[DirectoryMap] Auto-geocoding store:', store.businessName);
+      // console.log('[DirectoryMap] Auto-geocoding store:', store.businessName);
       
       const coordinates = await geocodeAddress({
         address_line1: store.address,
@@ -70,7 +70,7 @@ export default function DirectoryMap({
       });
 
       if (coordinates) {
-        console.log('[DirectoryMap] Got coordinates for', store.businessName, ':', coordinates);
+        // console.log('[DirectoryMap] Got coordinates for', store.businessName, ':', coordinates);
         
         // Update the store coordinates using service with automatic cache invalidation
         const updatedListing = await tenantDirectoryManagementService.updateDirectoryListing(store.id, {
@@ -79,7 +79,7 @@ export default function DirectoryMap({
         });
 
         if (updatedListing) {
-          console.log('[DirectoryMap] Successfully updated coordinates for', store.businessName);
+          // console.log('[DirectoryMap] Successfully updated coordinates for', store.businessName);
           return coordinates;
         } else {
           console.error('[DirectoryMap] Failed to update coordinates for', store.businessName);
@@ -107,7 +107,7 @@ export default function DirectoryMap({
 
       if (storesWithCompleteAddress.length === 0) return;
 
-      console.log(`[DirectoryMap] Found ${storesWithCompleteAddress.length} stores with addresses but no coordinates`);
+      // console.log(`[DirectoryMap] Found ${storesWithCompleteAddress.length} stores with addresses but no coordinates`);
       
       // Auto-geocode the first store (to avoid overwhelming the geocoding API)
       const store = storesWithCompleteAddress[0];

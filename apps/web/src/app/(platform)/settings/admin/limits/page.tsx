@@ -1,16 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Building2, TrendingUp, AlertTriangle, Info, Edit2, Save, X, Settings, ArrowUp, ArrowDown } from 'lucide-react';
+import { Building2, TrendingUp, AlertTriangle, Info, Edit2, Save, X, Settings, ArrowUp, ArrowDown, ChevronRight } from 'lucide-react';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Button } from '@mantine/core';
-import { Input, Badge } from '@/components/ui';
+import { Input, Badge, ToastContainer } from '@/components/ui';
 import { adminTenantLimitsService, type LimitsData, type FeaturedProductsLimit, type TierSystemTier } from '@/services/AdminTenantLimitsSingletonService';
+import { useToast } from '@/components/ui/use-toast';
 
 export default function AdminLimitsPage() {
   const [limitsData, setLimitsData] = useState<LimitsData | null>(null);
   const [allTierLimits, setAllTierLimits] = useState<Record<string, FeaturedProductsLimit> | null>(null);
+  const [featuredTypes, setFeaturedTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('tenant-limits');
@@ -19,7 +21,11 @@ export default function AdminLimitsPage() {
   const [saving, setSaving] = useState(false);
   const [selectedTier, setSelectedTier] = useState<string>('starter');
   const [focusedEdit, setFocusedEdit] = useState<{ tierKey: string; field: 'maxLocations' | 'priceMonthly' | 'maxSkus' } | null>(null);
-  const [editValue, setEditValue] = useState<string>('');
+  const [editValue, setEditValue] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [lastSavedTier, setLastSavedTier] = useState<string | null>(null);
+  const toastHook = useToast();
+  const { toasts, toast, success, error: showError, removeToast } = toastHook;
 
   useEffect(() => {
     fetchLimits();
@@ -27,24 +33,41 @@ export default function AdminLimitsPage() {
 
   const fetchLimits = async () => {
     try {
+      // console.log(`[FetchLimits] Starting data fetch...`);
       setLoading(true);
       setError(null);
 
+      // Force refresh to get the latest data
+      // console.log(`[FetchLimits] Force refreshing cached data...`);
+      await adminTenantLimitsService.forceRefreshAll();
+
       // Get comprehensive limits data using the service
+      // console.log(`[FetchLimits] Calling getLimitsData...`);
       const data = await adminTenantLimitsService.getLimitsData(false);
+      // console.log(`[FetchLimits] getLimitsData result:`, data);
       
       if (!data) {
         throw new Error('Failed to load limits data');
       }
 
+      // console.log(`[FetchLimits] Setting limitsData...`);
       setLimitsData(data);
       
       // Get all tier featured products limits
+      // console.log(`[FetchLimits] Calling getAllFeaturedProductsLimits...`);
       const allLimits = await adminTenantLimitsService.getAllFeaturedProductsLimits();
-      setAllTierLimits(allLimits || {});
+      // console.log(`[FetchLimits] getAllFeaturedProductsLimits result:`, allLimits);
+      setAllTierLimits(allLimits);
+
+      // Get dynamic featured types
+      // console.log(`[FetchLimits] Calling getFeaturedTypes...`);
+      const types = await adminTenantLimitsService.getFeaturedTypes();
+      // console.log(`[FetchLimits] getFeaturedTypes result:`, types);
+      setFeaturedTypes(types);
       
+      // console.log(`[FetchLimits] Data fetch completed successfully`);
     } catch (err) {
-      console.error('Failed to fetch limits:', err);
+      console.error(`[FetchLimits] Failed to fetch limits:`, err);
       setError(err instanceof Error ? err.message : 'Failed to load limits data');
     } finally {
       setLoading(false);
@@ -58,7 +81,12 @@ export default function AdminLimitsPage() {
       seasonal: 6,
       sale: 10,
       staff_pick: 6,
-      random_featured: 12,
+      random_featured: 0,
+      bestseller: 8,
+      clearance: 5,
+      trending: 7,
+      featured: 10,
+      recommended: 6,
     };
   };
 
@@ -78,29 +106,73 @@ export default function AdminLimitsPage() {
 
     try {
       setSaving(true);
+      setSaveStatus('saving');
       setError(null);
       
-      // Save featured products limits using the service
-      const success = await adminTenantLimitsService.updateFeaturedProductsLimits(selectedTier, editingLimits);
+      // console.log(`[FeaturedSave] Starting save for tier: ${selectedTier}`);
+      // console.log(`[FeaturedSave] Current editingLimits:`, editingLimits);
       
-      if (success) {
-        // Update local state on successful save
-        setAllTierLimits(prev => ({
-          ...prev,
-          [selectedTier]: editingLimits
-        }));
+      // Save featured products limits using the service
+      const result = await adminTenantLimitsService.updateFeaturedProductsLimits(selectedTier, editingLimits);
+      
+      // console.log(`[FeaturedSave] updateFeaturedProductsLimits result:`, result);
+      
+      if (result.success) {
+        // console.log(`[FeaturedSave] Save successful, using response data...`);
+        
+        // Use the updated limits data from the response
+        const updatedLimits = result.updatedLimits;
+        // console.log(`[FeaturedSave] Updated limits data:`, updatedLimits);
+        
+        // Update local state with the updated limits data
+        if (updatedLimits) {
+          setAllTierLimits(prev => ({
+            ...prev,
+            [selectedTier]: updatedLimits
+          }));
+          
+          // console.log(`[FeaturedSave] Local state updated with new limits data`);
+        }
         
         setIsEditing(false);
         setEditingLimits(null);
+        setLastSavedTier(selectedTier);
+        setSaveStatus('success');
+        
+        // Show success toast with API message
+        success(result.message || 'Featured products limits have been updated');
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSaveStatus('idle'), 3000);
+        
+        // console.log(`[FeaturedSave] Save process completed successfully`);
       } else {
+        // console.log(`[FeaturedSave] Save failed`);
         setError('Failed to save limits. Please try again.');
+        setSaveStatus('error');
+        
+        // Show error toast
+        showError('Failed to save limits. Please try again.');
       }
     } catch (err) {
-      console.error('Failed to save limits:', err);
+      // console.error(`[FeaturedSave] Exception occurred:`, err);
       setError('Failed to save limits. Please try again.');
+      setSaveStatus('error');
     } finally {
       setSaving(false);
+      // console.log(`[FeaturedSave] Save process completed`);
     }
+  };
+
+  const handleTierSelect = (tierKey: string) => {
+    if (isEditing && editingLimits) {
+      // Auto-save current changes before switching tiers
+      handleSave();
+    }
+    setSelectedTier(tierKey);
+    setIsEditing(false);
+    setEditingLimits(null);
+    setSaveStatus('idle');
   };
 
   const handleLimitChange = (type: keyof FeaturedProductsLimit, value: string) => {
@@ -139,14 +211,16 @@ export default function AdminLimitsPage() {
         {activeTiers.map(tier => {
           const limits = allTierLimits[tier.tierKey] || getCurrentTierLimits();
           const isCurrentTier = tier.tierKey === selectedTier;
+          const wasJustSaved = tier.tierKey === lastSavedTier && saveStatus === 'success';
           
           return (
             <div 
               key={tier.tierKey}
-              className={`flex items-center justify-between p-3 rounded-lg border ${
+              onClick={() => handleTierSelect(tier.tierKey)}
+              className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
                 isCurrentTier 
-                  ? 'bg-blue-50 border-blue-200' 
-                  : 'bg-white border-gray-200'
+                  ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-500' 
+                  : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
               }`}
             >
               <div className="flex items-center gap-3">
@@ -158,15 +232,20 @@ export default function AdminLimitsPage() {
                 </div>
                 {isCurrentTier && (
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-600 text-white">
-                    Current
+                    Editing
+                  </span>
+                )}
+                {wasJustSaved && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-600 text-white">
+                    Saved ✓
                   </span>
                 )}
               </div>
               
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <div className="font-mono text-sm font-medium text-gray-900">
-                    {limits.store_selection}-{limits.new_arrival}-{limits.seasonal}-{limits.sale}-{limits.staff_pick}
+                  <div className="font-mono text-xs font-medium text-gray-900">
+                    {limits.store_selection}-{limits.new_arrival}-{limits.seasonal}-{limits.sale}-{limits.staff_pick}-{limits.bestseller}-{limits.clearance}-{limits.trending}-{limits.featured}-{limits.recommended}
                   </div>
                   <div className="text-xs text-purple-600 font-medium">
                     +{limits.random_featured} Random
@@ -179,6 +258,10 @@ export default function AdminLimitsPage() {
                     {Object.values(limits).reduce((sum, val) => sum + val, 0)}
                   </div>
                 </div>
+
+                {isCurrentTier && (
+                  <ChevronRight className="w-4 h-4 text-blue-600" />
+                )}
               </div>
             </div>
           );
@@ -187,15 +270,31 @@ export default function AdminLimitsPage() {
         <div className="mt-3 pt-3 border-t border-gray-200">
           <p className="text-xs text-gray-500">
             Format: Store-New-Seasonal-Sale-Staff <span className="text-purple-600">+Random Directory</span> • 
-            Total includes all featured product slots per tier
+            Total includes all featured product slots per tier • Click any tier to edit its limits
           </p>
+          {saveStatus === 'success' && (
+            <p className="text-xs text-green-600 font-medium mt-1">
+              ✓ Changes saved successfully
+            </p>
+          )}
+          {saveStatus === 'error' && (
+            <p className="text-xs text-red-600 font-medium mt-1">
+              ✗ Failed to save changes
+            </p>
+          )}
         </div>
       </div>
     );
   };
   const handleFocusedEdit = (tierKey: string, field: 'maxLocations' | 'priceMonthly' | 'maxSkus', currentValue: string | number | null | undefined) => {
     setFocusedEdit({ tierKey, field });
-    setEditValue(currentValue === null || currentValue === undefined ? '' : currentValue.toString());
+    
+    // Handle Infinity case for max locations
+    if (field === 'maxLocations' && currentValue === Infinity) {
+      setEditValue('');
+    } else {
+      setEditValue(currentValue === null || currentValue === undefined ? '' : currentValue.toString());
+    }
   };
 
   const handleFocusedCancel = () => {
@@ -205,6 +304,9 @@ export default function AdminLimitsPage() {
 
   const handleFocusedSave = async (tierKey: string, field: 'maxLocations' | 'priceMonthly' | 'maxSkus') => {
     try {
+      // console.log(`[FocusedSave] Starting save for tier: ${tierKey}, field: ${field}`);
+      // console.log(`[FocusedSave] Current editValue: "${editValue}"`);
+      
       setSaving(true);
       setError(null);
       
@@ -218,28 +320,59 @@ export default function AdminLimitsPage() {
         updateValue = parseInt(editValue) || 0;
       }
       
+      // console.log(`[FocusedSave] Prepared updateValue:`, updateValue);
+      
       // Update the tier using the service
-      const success = await adminTenantLimitsService.updateTierField(
+      // console.log(`[FocusedSave] Calling updateTierField...`);
+      const result = await adminTenantLimitsService.updateTierField(
         tierKey, 
         field, 
         updateValue, 
         `Updated ${field} via limits page`
       );
       
-      if (success) {
-        // Refresh the data to show updated values
-        fetchLimits();
-      } else {
-        setError('Failed to update tier');
-      }
+      // console.log(`[FocusedSave] updateTierField result:`, result);
       
+      if (result.success) {
+        // console.log(`[FocusedSave] Save successful, using response data...`);
+        
+        // Use the updated tier data from the response
+        const updatedTier = result.updatedTier;
+        // console.log(`[FocusedSave] Updated tier data:`, updatedTier);
+        
+        // Update local state with the updated tier data
+        if (updatedTier && limitsData?.tiers) {
+          const updatedTiers = limitsData.tiers.map(tier => 
+            tier.tierKey === tierKey ? updatedTier : tier
+          );
+          
+          setLimitsData({
+            ...limitsData,
+            tiers: updatedTiers
+          });
+          
+          // console.log(`[FocusedSave] Local state updated with new tier data`);
+        }
+        
+        // Clear edit state
+        setFocusedEdit(null);
+        setEditValue('');
+        // console.log(`[FocusedSave] Edit state cleared`);
+        
+      } else {
+        // console.log(`[FocusedSave] Save failed`);
+        setError('Failed to update tier');
+        setFocusedEdit(null);
+        setEditValue('');
+      }
+    } catch (err) {
+      console.error(`[FocusedSave] Exception occurred:`, err);
+      setError('Failed to update tier');
       setFocusedEdit(null);
       setEditValue('');
-    } catch (err) {
-      console.error('Failed to update tier:', err);
-      setError('Failed to update tier');
     } finally {
       setSaving(false);
+      // console.log(`[FocusedSave] Save process completed`);
     }
   };
 
@@ -404,8 +537,12 @@ export default function AdminLimitsPage() {
                               type="number"
                               min="0"
                               max="999"
-                              value={config.limit === Infinity ? '' : config.limit}
+                              value={editValue}
                               onChange={(e) => {
+                                // Update editValue state for save function
+                                setEditValue(e.target.value);
+                                
+                                // Also update limitsData for real-time feedback
                                 if (limitsData) {
                                   const newLimit = e.target.value === '' ? Infinity : parseInt(e.target.value) || 0;
                                   setLimitsData({
@@ -427,16 +564,22 @@ export default function AdminLimitsPage() {
                               onClick={() => handleFocusedSave(tierKey, 'maxLocations')}
                               disabled={saving}
                               variant="default"
-                              size="sm"
+                              title="Save changes"
+                              w="auto"
+                              miw="fit-content"
                             >
-                              <Save className="w-3 h-3" />
+                              <Save className="w-4 h-4 mr-1" />
+                              Save
                             </Button>
-                            <Button
+                            <Button 
                               onClick={handleFocusedCancel}
                               variant="outline"
-                              size="sm"
+                              title="Cancel editing"
+                              w="auto"
+                              miw="fit-content"
                             >
-                              <X className="w-3 h-3" />
+                              <X className="w-4 h-4 mr-1" />
+                              Cancel
                             </Button>
                           </div>
                         ) : (
@@ -447,9 +590,12 @@ export default function AdminLimitsPage() {
                             <Button
                               onClick={() => handleFocusedEdit(tierKey, 'maxLocations', config.limit)}
                               variant="outline"
-                              size="sm"
+                              title="Edit max locations"
+                              w="auto"
+                              miw="fit-content"
                             >
-                              <Edit2 className="w-3 h-3" />
+                              <Edit2 className="w-4 h-4 mr-1" />
+                              Edit
                             </Button>
                           </div>
                         )}
@@ -477,16 +623,22 @@ export default function AdminLimitsPage() {
                                   onClick={() => handleFocusedSave(tierKey, 'priceMonthly')}
                                   disabled={saving}
                                   variant="default"
-                                  size="sm"
+                                  title="Save price"
+                                  w="auto"
+                                  miw="fit-content"
                                 >
-                                  <Save className="w-3 h-3" />
+                                  <Save className="w-4 h-4 mr-1" />
+                                  Save
                                 </Button>
                                 <Button
                                   onClick={handleFocusedCancel}
                                   variant="outline"
-                                  size="sm"
+                                  title="Cancel editing"
+                                  w="auto"
+                                  miw="fit-content"
                                 >
-                                  <X className="w-3 h-3" />
+                                  <X className="w-4 h-4 mr-1" />
+                                  Cancel
                                 </Button>
                               </div>
                             ) : (
@@ -495,9 +647,12 @@ export default function AdminLimitsPage() {
                                 <Button
                                   onClick={() => handleFocusedEdit(tierKey, 'priceMonthly', tierData.priceMonthly)}
                                   variant="outline"
-                                  size="sm"
+                                  title="Edit price"
+                                  w="auto"
+                                  miw="fit-content"
                                 >
-                                  <Edit2 className="w-3 h-3" />
+                                  <Edit2 className="w-4 h-4 mr-1" />
+                                  Edit
                                 </Button>
                               </div>
                             )}
@@ -511,7 +666,13 @@ export default function AdminLimitsPage() {
                                   min="0"
                                   max="999999"
                                   value={editValue}
-                                  onChange={(e) => setEditValue(e.target.value)}
+                                  onChange={(e) => {
+                                    // Update editValue state for save function
+                                    setEditValue(e.target.value);
+                                    
+                                    // Also update limitsData for real-time feedback (if needed)
+                                    // Note: maxSkus might not need real-time visual feedback like max locations
+                                  }}
                                   className="w-24 px-2 py-1 text-sm"
                                   placeholder="Unlimited"
                                 />
@@ -519,16 +680,22 @@ export default function AdminLimitsPage() {
                                   onClick={() => handleFocusedSave(tierKey, 'maxSkus')}
                                   disabled={saving}
                                   variant="default"
-                                  size="sm"
+                                  title="Save max SKUs"
+                                  w="auto"
+                                  miw="fit-content"
                                 >
-                                  <Save className="w-3 h-3" />
+                                  <Save className="w-4 h-4 mr-1" />
+                                  Save
                                 </Button>
                                 <Button
                                   onClick={handleFocusedCancel}
                                   variant="outline"
-                                  size="sm"
+                                  title="Cancel editing"
+                                  w="auto"
+                                  miw="fit-content"
                                 >
-                                  <X className="w-3 h-3" />
+                                  <X className="w-4 h-4 mr-1" />
+                                  Cancel
                                 </Button>
                               </div>
                             ) : (
@@ -539,9 +706,12 @@ export default function AdminLimitsPage() {
                                 <Button
                                   onClick={() => handleFocusedEdit(tierKey, 'maxSkus', maxSkus)}
                                   variant="outline"
-                                  size="sm"
+                                  title="Edit max SKUs"
+                                  w="auto"
+                                  miw="fit-content"
                                 >
-                                  <Edit2 className="w-3 h-3" />
+                                  <Edit2 className="w-4 h-4 mr-1" />
+                                  Edit
                                 </Button>
                               </div>
                             )}
@@ -563,16 +733,22 @@ export default function AdminLimitsPage() {
                                   onClick={() => handleFocusedSave(tierKey, 'maxLocations')}
                                   disabled={saving}
                                   variant="default"
-                                  size="sm"
+                                  title="Save changes"
+                                  w="auto"
+                                  miw="fit-content"
                                 >
-                                  <Save className="w-3 h-3" />
+                                  <Save className="w-4 h-4 mr-1" />
+                                  Save
                                 </Button>
                                 <Button
                                   onClick={handleFocusedCancel}
                                   variant="outline"
-                                  size="sm"
+                                  title="Cancel editing"
+                                  w="auto"
+                                  miw="fit-content"
                                 >
-                                  <X className="w-3 h-3" />
+                                  <X className="w-4 h-4 mr-1" />
+                                  Cancel
                                 </Button>
                               </div>
                             ) : (
@@ -583,9 +759,12 @@ export default function AdminLimitsPage() {
                                 <Button
                                   onClick={() => handleFocusedEdit(tierKey, 'maxLocations', maxLocations)}
                                   variant="outline"
-                                  size="sm"
+                                  title="Edit max locations"
+                                  w="auto"
+                                  miw="fit-content"
                                 >
-                                  <Edit2 className="w-3 h-3" />
+                                  <Edit2 className="w-4 h-4 mr-1" />
+                                  Edit
                                 </Button>
                               </div>
                             )}
@@ -642,15 +821,15 @@ export default function AdminLimitsPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={handleSave}
-                      disabled={saving}
+                      disabled={saving || saveStatus === 'saving'}
                       className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
                     >
                       <Save className="w-4 h-4" />
-                      {saving ? 'Saving...' : 'Save'}
+                      {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'success' ? 'Saved!' : 'Save Changes'}
                     </button>
                     <button
                       onClick={handleCancel}
-                      disabled={saving}
+                      disabled={saving || saveStatus === 'saving'}
                       className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors"
                     >
                       <X className="w-4 h-4" />
@@ -789,6 +968,9 @@ export default function AdminLimitsPage() {
         </TabsContent>
         </Tabs>
       </div>
+      
+      {/* Toast Container */}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </>
   );
 }

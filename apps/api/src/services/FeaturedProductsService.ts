@@ -5,7 +5,7 @@ export interface FeaturedProduct {
   id: string;
   inventory_item_id: string;
   tenant_id: string;
-  featured_type: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  featured_type: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' | 'bestseller' | 'clearance' | 'trending' | 'featured' | 'recommended';
   featured_priority: number;
   featured_at: Date;
   featured_expires_at: Date | null;
@@ -141,7 +141,7 @@ export class FeaturedProductsService {
   static async addFeaturedType(
     inventoryItemId: string,
     tenantId: string,
-    featuredType: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick',
+    featuredType: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' | 'bestseller' | 'clearance' | 'trending' | 'featured' | 'recommended',
     options?: {
       featured_priority?: number;
       featured_expires_at?: Date | string | null;
@@ -149,7 +149,7 @@ export class FeaturedProductsService {
     }
   ): Promise<FeaturedProduct> {
     try {
-      console.log(`[addFeaturedType] Adding product ${inventoryItemId} as ${featuredType} for tenant ${tenantId}`);
+      // console.log(`[addFeaturedType] Adding product ${inventoryItemId} as ${featuredType} for tenant ${tenantId}`);
       
       const featuredProduct = await prisma.featured_products.upsert({
         where: {
@@ -176,13 +176,13 @@ export class FeaturedProductsService {
         }
       });
 
-      console.log(`[addFeaturedType] Successfully created/updated featured product:`, {
-        id: featuredProduct.id,
-        inventory_item_id: featuredProduct.inventory_item_id,
-        tenant_id: featuredProduct.tenant_id,
-        featured_type: featuredProduct.featured_type,
-        is_active: featuredProduct.is_active
-      });
+      // console.log(`[addFeaturedType] Successfully created/updated featured product:`, {
+      //   id: featuredProduct.id,
+      //   inventory_item_id: featuredProduct.inventory_item_id,
+      //   tenant_id: featuredProduct.tenant_id,
+      //   featured_type: featuredProduct.featured_type,
+      //   is_active: featuredProduct.is_active
+      // });
 
       // Trigger storefront revalidation
       triggerRevalidate(tenantId, [
@@ -203,10 +203,10 @@ export class FeaturedProductsService {
    */
   static async removeFeaturedType(
     inventoryItemId: string,
-    featuredType: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick'
+    featuredType: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' | 'bestseller' | 'clearance' | 'trending' | 'featured' | 'recommended'
   ): Promise<boolean> {
     try {
-      console.log(`[FeaturedProductsService] Removing ${featuredType} from inventory_item_id: ${inventoryItemId}`);
+      // console.log(`[FeaturedProductsService] Removing ${featuredType} from inventory_item_id: ${inventoryItemId}`);
       
       // First check if the featured product exists
       const existingFeatured = await prisma.featured_products.findFirst({
@@ -217,11 +217,11 @@ export class FeaturedProductsService {
       });
 
       if (!existingFeatured) {
-        console.log(`[FeaturedProductsService] Featured product not found: inventory_item_id=${inventoryItemId}, featured_type=${featuredType}`);
+        // console.log(`[FeaturedProductsService] Featured product not found: inventory_item_id=${inventoryItemId}, featured_type=${featuredType}`);
         return false;
       }
 
-      console.log(`[FeaturedProductsService] Found featured product to delete: ${existingFeatured.id}`);
+      // console.log(`[FeaturedProductsService] Found featured product to delete: ${existingFeatured.id}`);
 
       const result = await prisma.featured_products.deleteMany({
         where: {
@@ -230,7 +230,7 @@ export class FeaturedProductsService {
         }
       });
 
-      console.log(`[FeaturedProductsService] Deleted ${result.count} featured products for inventory_item_id=${inventoryItemId}, featured_type=${featuredType}`);
+      // console.log(`[FeaturedProductsService] Deleted ${result.count} featured products for inventory_item_id=${inventoryItemId}, featured_type=${featuredType}`);
       
       // Verify the deletion by checking the database immediately
       const remainingCount = await prisma.featured_products.count({
@@ -241,7 +241,7 @@ export class FeaturedProductsService {
         }
       });
       
-      console.log(`[FeaturedProductsService] Verification: ${remainingCount} ${featuredType} products remaining for tenant ${existingFeatured.tenant_id}`);
+      // console.log(`[FeaturedProductsService] Verification: ${remainingCount} ${featuredType} products remaining for tenant ${existingFeatured.tenant_id}`);
       
       // Trigger storefront revalidation
       triggerRevalidate(existingFeatured.tenant_id, [
@@ -262,7 +262,7 @@ export class FeaturedProductsService {
    */
   static async updateFeaturedType(
     inventoryItemId: string,
-    featuredType: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick',
+    featuredType: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' | 'bestseller' | 'clearance' | 'trending' | 'featured' | 'recommended',
     updates: {
       featured_expires_at?: Date | string | null;
       auto_unfeature?: boolean;
@@ -302,7 +302,7 @@ export class FeaturedProductsService {
    */
   static async updateFeaturedTypeExpiration(
     inventoryItemId: string,
-    featuredType: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick',
+    featuredType: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' | 'bestseller' | 'clearance' | 'trending' | 'featured' | 'recommended',
     featured_expires_at: Date | string | null,
     auto_unfeature?: boolean
   ): Promise<FeaturedProduct | null> {
@@ -439,7 +439,7 @@ export class FeaturedProductsService {
     limit: number = 10
   ): Promise<{ [key: string]: FeaturedProductWithDetails[] }> {
     try {
-      console.log(`[getStorefrontFeaturedProducts] Fetching for tenant: ${tenantId}`);
+      // console.log(`[getStorefrontFeaturedProducts] Fetching for tenant: ${tenantId}`);
       
       // First get the featured products using Prisma ORM
       const featuredProducts = await prisma.featured_products.findMany({
@@ -454,7 +454,7 @@ export class FeaturedProductsService {
         take: limit * 5 // Get more to account for filtering
       });
 
-      console.log(`[getStorefrontFeaturedProducts] Found ${featuredProducts.length} featured products`);
+      // console.log(`[getStorefrontFeaturedProducts] Found ${featuredProducts.length} featured products`);
 
       // Then get the inventory items for these products
       const inventoryItemIds = featuredProducts.map(fp => fp.inventory_item_id);
@@ -537,7 +537,7 @@ export class FeaturedProductsService {
 
       // Log the final counts
       Object.keys(grouped).forEach(key => {
-        console.log(`[getStorefrontFeaturedProducts] ${key}: ${grouped[key].length} products`);
+        // console.log(`[getStorefrontFeaturedProducts] ${key}: ${grouped[key].length} products`);
       });
 
       return grouped;
@@ -633,7 +633,7 @@ export class FeaturedProductsService {
     items: Array<{
       inventory_item_id: string;
       tenant_id: string;
-      featured_type: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+      featured_type: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' | 'bestseller' | 'clearance' | 'trending' | 'featured' | 'recommended';
       featured_priority?: number;
       featured_expires_at?: Date | string | null;
       auto_unfeature?: boolean;

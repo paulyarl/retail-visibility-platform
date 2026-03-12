@@ -290,6 +290,7 @@ export default function ProductFeaturingPage() {
   const {
     isLoading,
     selectedType,
+    featuredTypes,
     searchQuery,
     availablePage,
     outOfStockPage,
@@ -310,11 +311,12 @@ export default function ProductFeaturingPage() {
     setOutOfStockPage,
     setEditingExpiration: setSingletonEditingExpiration,
     featureProduct,
+    featureProductInDirectory,
     unfeatureProduct,
     toggleProductActive,
     updateProductExpiration,
     singleton // Get singleton for MV refresh
-  } = useTenantFeaturedProducts(tenantId);
+  } = useTenantFeaturedProducts(tenantId, undefined, { context: 'directory' });
 
   // Stock update handler for out-of-stock products
   const handleStockUpdate = async (itemId: string, newStock: number) => {
@@ -339,20 +341,27 @@ export default function ProductFeaturingPage() {
     }
   };
 
-  // Filter to only store_selection products
-  const storeSelectionFeatured = currentFeatured.filter(p => p.featured_type === 'store_selection');
-  const storeSelectionActive = activeFeatured.filter(p => p.featured_type === 'store_selection');
-  const storeSelectionExpired = expiredFeatured.filter(p => p.featured_type === 'store_selection');
+  // Since we're using directory context, featuredTypes only contains store_selection
+  const directoryFeatured = currentFeatured; // All current featured are store_selection
+  const directoryActive = activeFeatured;   // All active featured are store_selection
+  const directoryExpired = expiredFeatured; // All expired featured are store_selection
 
   // Get inactive products  // Get singleton state for limits
   const singletonState = singleton.getState();
-  const storeSelectionLimit = singletonState.featuredLimits?.store_selection || 10; // fallback to 10
-  const isAtLimit = storeSelectionActive.length >= storeSelectionLimit;
+  const directoryLimit = singletonState.featuredLimits?.store_selection || 8; // Use store_selection limit
+  const isAtLimit = directoryActive.length >= directoryLimit;
   const allInactiveProducts = singletonState.inactiveProducts || [];
-  const storeSelectionInactive = allInactiveProducts.filter(p => !p.is_active);
+  const directoryInactive = allInactiveProducts.filter(p => !p.is_active);
+
+  // Debug: Show directory context information
+  console.log(`[ProductFeaturingPage] Directory Context:`);
+  console.log(`[ProductFeaturingPage] - featuredTypes count: ${featuredTypes.length}`);
+  console.log(`[ProductFeaturingPage] - featuredTypes:`, featuredTypes.map((t: any) => t.id));
+  console.log(`[ProductFeaturingPage] - directory active: ${directoryActive.length}`);
+  console.log(`[ProductFeaturingPage] - directory limit: ${directoryLimit}`);
 
   // Group inactive products by reason
-  const inactiveGroups = groupInactiveProductsByReason(storeSelectionInactive);
+  const inactiveGroups = groupInactiveProductsByReason(directoryInactive);
 
   const fetchTenant = async () => {
     try {
@@ -368,6 +377,13 @@ export default function ProductFeaturingPage() {
   useEffect(() => {
     fetchTenant();
   }, [tenantId]);
+
+  // Set selected type to store_selection for directory page
+  useEffect(() => {
+    if (featuredTypes.length > 0) {
+      setSelectedType('store_selection');
+    }
+  }, [setSelectedType, featuredTypes]);
 
   useEffect(() => {
     setAvailablePage(1); // Reset to page 1 when search changes
@@ -417,7 +433,7 @@ export default function ProductFeaturingPage() {
 
   const handleFeaturePaused = async (productId: string) => {
     // Feature the product and immediately pause it
-    await featureProduct(productId);
+    await featureProductInDirectory(productId);
     // Wait a moment for the feature to complete, then pause
     setTimeout(() => {
       handleToggleActive(productId, false);
@@ -485,7 +501,7 @@ export default function ProductFeaturingPage() {
         </div>
 
         {/* Current Featured Products */}
-        {storeSelectionActive.length > 0 && (
+        {directoryActive.length > 0 && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -494,15 +510,15 @@ export default function ProductFeaturingPage() {
                 </h2>
                 <div className="mt-2">
                   <FeaturedProductLimitBadge 
-                    current={storeSelectionActive.length} 
-                    limit={storeSelectionLimit} 
+                    current={directoryActive.length} 
+                    limit={directoryLimit} 
                   />
                 </div>
               </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {storeSelectionActive.map((product, index) => (
+              {directoryActive.map((product, index) => (
                 <div key={product.id || index} className="border border-gray-200 rounded-lg p-4">
                   <div className="flex gap-3">
                     <div className="relative w-16 h-16 bg-gray-100 rounded flex-shrink-0">
@@ -791,14 +807,14 @@ export default function ProductFeaturingPage() {
                     ) : (
                       <div className="flex gap-2 mt-3">
                         <button
-                          onClick={() => product.id && featureProduct(product.id)}
+                          onClick={() => product.id && featureProductInDirectory(product.id)}
                           disabled={processing || !product.id || isAtLimit}
                           className={`flex-1 px-3 py-2 text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 ${
                             isAtLimit 
                               ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
                               : 'bg-blue-600 text-white'
                           }`}
-                          title={isAtLimit ? `Limit reached (${storeSelectionActive.length}/${storeSelectionLimit})` : 'Feature in Directory'}
+                          title={isAtLimit ? `Limit reached (${directoryActive.length}/${directoryLimit})` : 'Feature in Directory'}
                         >
                           {isAtLimit ? 'Limit Reached' : 'Feature in Directory'}
                         </button>
@@ -904,7 +920,7 @@ export default function ProductFeaturingPage() {
                     </div>
                     <div className="flex gap-2 mt-3">
                       <button
-                        onClick={() => product.id && featureProduct(product.id)}
+                        onClick={() => product.id && featureProductInDirectory(product.id)}
                         disabled={processing || !product.id}
                         className="flex-1 px-3 py-2 bg-gray-400 text-white text-sm rounded-lg cursor-not-allowed"
                         title="Out of stock products cannot be featured"

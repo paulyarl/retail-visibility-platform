@@ -21,11 +21,13 @@ import { PublicProduct } from '@/providers/data/ProductSingleton';
 interface UseTenantFeaturedProductsOptions {
   autoInitialize?: boolean;
   autoDestroy?: boolean;
+  context?: 'storefront' | 'directory' | 'admin'; // Context for type filtering
 }
 
 interface UseTenantFeaturedProductsReturn extends FeaturedProductsState {
   // Actions
   featureProduct: (productId: string) => Promise<void>;
+  featureProductInDirectory: (productId: string) => Promise<void>;
   unfeatureProduct: (productId: string) => Promise<void>;
   toggleProductActive: (productId: string, isActive: boolean) => Promise<void>;
   updateProductExpiration: (productId: string, expirationDate: string) => Promise<void>;
@@ -63,7 +65,7 @@ export function useTenantFeaturedProducts(
   productSingleton?: any, // ProductSingleton integration
   options: UseTenantFeaturedProductsOptions = {}
 ): UseTenantFeaturedProductsReturn {
-  const { autoInitialize = true, autoDestroy = false } = options;
+  const { autoInitialize = true, autoDestroy = false, context = 'storefront' } = options;
 
   // Helper function for checking expiration status
   const getExpirationStatus = (product: FeaturedProduct) => {
@@ -102,11 +104,48 @@ export function useTenantFeaturedProducts(
   useEffect(() => {
     const unsubscribe = singleton.subscribe(() => {
       const newState = singleton.getState();
+      // console.log(`[useTenantFeaturedProducts] State update received, featured products count:`, 
+      //   Object.values(newState.featuredProducts || {}).reduce((sum, arr) => sum + arr.length, 0));
       setState(newState);
     });
 
     return unsubscribe;
   }, [singleton]);
+
+  // Get featured types based on context
+  const contextFeaturedTypes = useMemo(() => {
+    const types = context === 'directory' 
+      ? singleton.getDirectoryOnlyTypes()
+      : context === 'admin'
+      ? singleton.getAllTypes()
+      : singleton.getStorefrontTypes();
+    
+      // console.log(`[useTenantFeaturedProducts] Context: ${context}`);
+      // console.log(`[useTenantFeaturedProducts] Available types:`, types.map(t => t.id));
+      // console.log(`[useTenantFeaturedProducts] Selected type: ${state.selectedType}`);
+    
+    return types;
+  }, [context, singleton, state.selectedType, state.featuredLimits]);
+
+  // Set context-appropriate default selected type
+  useEffect(() => {
+    if (context === 'directory' && contextFeaturedTypes.length > 0) {
+      const storeSelectionType = contextFeaturedTypes.find(t => t.id === 'store_selection');
+      if (storeSelectionType && !state.selectedType) {
+        singleton.setSelectedType('store_selection');
+      }
+    } else if (context === 'admin' && contextFeaturedTypes.length > 0) {
+      const firstType = contextFeaturedTypes[0];
+      if (firstType && !state.selectedType) {
+        singleton.setSelectedType(firstType.id);
+      }
+    } else if (context === 'storefront' && contextFeaturedTypes.length > 0) {
+      const newArrivalType = contextFeaturedTypes.find(t => t.id === 'new_arrival');
+      if (newArrivalType && !state.selectedType) {
+        singleton.setSelectedType('new_arrival');
+      }
+    }
+  }, [context, contextFeaturedTypes, singleton, state.selectedType]);
 
   // Memoized computed values
   const currentFeatured = useMemo(() => {
@@ -195,6 +234,10 @@ export function useTenantFeaturedProducts(
     return singleton.featureProduct(productId);
   }, [singleton]);
 
+  const featureProductInDirectory = useCallback((productId: string) => {
+    return singleton.featureProductInDirectory(productId);
+  }, [singleton]);
+
   const unfeatureProduct = useCallback((productId: string) => {
     return singleton.unfeatureProduct(productId);
   }, [singleton]);
@@ -265,11 +308,11 @@ export function useTenantFeaturedProducts(
   // Pre-calculated data for each type
   const featuredProductsByType = useMemo(() => {
     const byType: Record<string, FeaturedProduct[]> = {};
-    state.featuredTypes.forEach(type => {
+    contextFeaturedTypes.forEach(type => {
       byType[type.id] = state.featuredProducts[type.id] || [];
     });
     return byType;
-  }, [state.featuredProducts, state.featuredTypes]);
+  }, [state.featuredProducts, contextFeaturedTypes]);
 
   const activeFeaturedByType = useMemo(() => {
     const byType: Record<string, FeaturedProduct[]> = {};
@@ -282,6 +325,9 @@ export function useTenantFeaturedProducts(
   return {
     // State
     ...state,
+    
+    // Override featuredTypes with context-specific types
+    featuredTypes: contextFeaturedTypes,
     
     // Computed values
     currentFeatured,
@@ -298,6 +344,7 @@ export function useTenantFeaturedProducts(
     
     // Actions
     featureProduct,
+    featureProductInDirectory,
     unfeatureProduct,
     toggleProductActive,
     updateProductExpiration,

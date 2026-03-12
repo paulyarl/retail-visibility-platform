@@ -1,6 +1,7 @@
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
 
 export interface FeaturedProduct {
+  featured_product_id: string;
   id: string;
   tenant_id: string;
   sku: string;
@@ -9,10 +10,13 @@ export interface FeaturedProduct {
   brand: string;
   price_cents: number;
   image_url: string;
-  is_featured: boolean;
+  stock?: number;
+  featured_type: string;
+  featured_priority: number;
   featured_at: string;
   featured_until: string | null;
-  featured_priority: number;
+  auto_unfeature: boolean;
+  is_active: boolean;
   tenants: {
     id: string;
     name: string;
@@ -22,9 +26,9 @@ export interface FeaturedProduct {
 
 export interface FeaturingStats {
   totalFeatured: number;
-  activeFeatured: number;
-  expiredFeatured: number;
-  recentlyFeatured: number;
+  byTier: Array<{ tier: string; count: number }>;
+  byType: Array<{ type: string; count: number }>;
+  expiringSoon: number;
 }
 
 /**
@@ -65,11 +69,35 @@ export class FeaturedProductsService extends AdminApiSingleton {
   }
 
   /**
-   * Get featured products with pagination
+   * Get featured products with pagination and filtering
    */
-  async getFeaturedProducts(limit: number, offset: number): Promise<FeaturedProduct[] | null> {
+  async getFeaturedProducts(
+    limit: number, 
+    offset: number,
+    filters?: {
+      tenant_id?: string;
+      subscription_tier?: string;
+      expiration_status?: string;
+      featured_type?: string;
+      is_active?: boolean;
+    }
+  ): Promise<FeaturedProduct[] | null> {
+    // Build query string from filters
+    const queryParams = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+
+    if (filters) {
+      if (filters.tenant_id) queryParams.append('tenant_id', filters.tenant_id);
+      if (filters.subscription_tier) queryParams.append('subscription_tier', filters.subscription_tier);
+      if (filters.expiration_status) queryParams.append('expiration_status', filters.expiration_status);
+      if (filters.featured_type) queryParams.append('featured_type', filters.featured_type);
+      if (filters.is_active !== undefined) queryParams.append('is_active', filters.is_active.toString());
+    }
+
     const result = await this.makeDefaultRequest<any>(
-      `/api/admin/products/featured?limit=${limit}&offset=${offset}`,
+      `/api/admin/products/featured?${queryParams.toString()}`,
       {},
       'platform-featured-products',
       this.cacheTTL

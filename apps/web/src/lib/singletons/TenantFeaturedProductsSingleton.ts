@@ -106,6 +106,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
   private listeners: Set<() => void> = new Set();
   private initialized = false;
   private tenantTier: string = 'starter';
+  private cacheBypassUntil: number = 0; // Add cache bypass timestamp
 
   /**
    * PILOT: Get all cache patterns for this service
@@ -131,31 +132,31 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
   // ProductSingleton integration
   private productSingleton: any = null;
 
-  // Default featured types configuration
+  // Default featured types (storefront)
   private defaultFeaturedTypes: FeaturedType[] = [
-    {
-      id: 'store_selection',
-      name: 'Directory Featured',
-      description: 'Premium placement in directory listings',
-      icon: null, // Will be set in component
-      color: 'blue',
-      maxProducts: 8
-    },
     {
       id: 'new_arrival',
       name: 'New Arrivals',
       description: 'Recently added products',
       icon: null,
       color: 'green',
-      maxProducts: 12
+      maxProducts: 6
     },
     {
       id: 'seasonal',
-      name: 'Seasonal Favorites',
+      name: 'Seasonal',
       description: 'Seasonal product highlights',
       icon: null,
       color: 'orange',
       maxProducts: 6
+    },
+    {
+      id: 'staff_pick',
+      name: 'Staff Picks',
+      description: 'Hand-picked by our team',
+      icon: null,
+      color: 'purple',
+      maxProducts: 8
     },
     {
       id: 'sale',
@@ -165,15 +166,95 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
       color: 'red',
       maxProducts: 10
     },
+    // New expansion types
     {
-      id: 'staff_pick',
-      name: 'Staff Picks',
-      description: 'Hand-picked favorites by your team',
+      id: 'bestseller',
+      name: 'Bestsellers',
+      description: 'Top-selling products',
       icon: null,
-      color: 'purple',
+      color: 'amber',
+      maxProducts: 8
+    },
+    {
+      id: 'clearance',
+      name: 'Clearance',
+      description: 'Discounted clearance items',
+      icon: null,
+      color: 'yellow',
+      maxProducts: 5
+    },
+    {
+      id: 'trending',
+      name: 'Trending Now',
+      description: 'Currently trending products',
+      icon: null,
+      color: 'pink',
+      maxProducts: 7
+    },
+    {
+      id: 'featured',
+      name: 'Featured',
+      description: 'General featured products',
+      icon: null,
+      color: 'indigo',
+      maxProducts: 10
+    },
+    {
+      id: 'recommended',
+      name: 'Recommended',
+      description: 'AI/customer recommended products',
+      icon: null,
+      color: 'teal',
       maxProducts: 6
     }
   ];
+
+  // Directory-only types (not available in storefront)
+  private directoryOnlyTypes: FeaturedType[] = [
+    {
+      id: 'store_selection',
+      name: 'Directory Featured',
+      description: 'Premium placement in directory listings',
+      icon: null,
+      color: 'blue',
+      maxProducts: 8
+    }
+  ];
+
+  // Get storefront-only types (exclude directory types)
+  getStorefrontTypes(): FeaturedType[] {
+    return this.defaultFeaturedTypes.map(type => ({
+      ...type,
+      maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
+    }));
+  }
+
+  // Get directory-only types (not available in storefront)
+  getDirectoryOnlyTypes(): FeaturedType[] {
+    return this.directoryOnlyTypes.map(type => ({
+      ...type,
+      maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
+    }));
+  }
+
+  // Get all featured types (for admin context)
+  getAllTypes(): FeaturedType[] {
+    const allTypes = [...this.defaultFeaturedTypes, ...this.directoryOnlyTypes];
+    
+    // Apply current database limits to all types
+    const typesWithLimits = allTypes.map(type => ({
+      ...type,
+      maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
+    }));
+    
+    console.log('[TenantFeaturedProductsSingleton] getAllTypes returning:', {
+      totalTypes: typesWithLimits.length,
+      featuredLimits: this.state.featuredLimits,
+      typesWithLimits: typesWithLimits.map(t => ({ id: t.id, maxProducts: t.maxProducts }))
+    });
+    
+    return typesWithLimits;
+  }
 
   constructor(tenantId: string) {
     super('tenant-featured-products');
@@ -216,7 +297,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
       isLoading: true,
       processing: false,
       searchQuery: '',
-      selectedType: 'store_selection',
+      selectedType: 'new_arrival', // Default to storefront type
       currentType: null,
       availablePage: 1,
       outOfStockPage: 1,
@@ -264,7 +345,11 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
   }
 
   private notifyListeners() {
-    this.listeners.forEach(listener => listener());
+    // console.log(`[TenantFeaturedProductsSingleton] Notifying ${this.listeners.size} listeners of state change`);
+    this.listeners.forEach(listener => {
+      // console.log(`[TenantFeaturedProductsSingleton] Calling listener`);
+      listener();
+    });
   }
 
   // Public API for state subscription
@@ -383,6 +468,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
       await Promise.all([
         this.fetchFeaturedProducts(),
         this.fetchTierLimits(),
+        this.fetchFeaturedLimits(), // Add this to get database limits
         this.fetchInactiveProducts(),
         this.fetchAvailableProducts(), // Load available products for featuring
         this.fetchOutOfStockProducts() // Load out-of-stock products for management
@@ -401,6 +487,7 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
   async fetchFeaturedLimits() {
     let result;
     try {
+      console.log('[TenantFeaturedProductsSingleton] Fetching featured limits for tenant:', this.tenantId);
       result = await this.makeDefaultRequest(`/api/tenant-limits/featured-products?tenantId=${this.tenantId}`, undefined, `featured-limits-${this.tenantId}`);
       if (result.success) {
         const data = result.data as any;
@@ -412,12 +499,14 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         
         this.setState({ featuredLimits: data.limits });
         
-        // Update featuredTypes with actual limits
-        const updatedTypes = this.state.featuredTypes.map(type => ({
+        // Update featuredTypes with actual limits - include ALL types
+        const allTypes = this.getAllTypes(); // Get all 10 types
+        const updatedTypes = allTypes.map(type => ({
           ...type,
-          maxProducts: data.limits[type.id as keyof typeof data.limits] || type.maxProducts
+          maxProducts: (data.limits as any)[type.id] || type.maxProducts
         }));
         
+        // Update state with all types
         this.setState({ featuredTypes: updatedTypes });
         
         // Update currentType if needed
@@ -434,10 +523,19 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
 
   async fetchFeaturedProducts() {
     try {
+      // Check if we should bypass cache
+      const shouldBypassCache = Date.now() < this.cacheBypassUntil;
+      const cacheOptions = shouldBypassCache ? 0 : 600000; // 0 TTL = bypass cache
+      
+      if (shouldBypassCache) {
+        console.log(`[TenantFeaturedProductsSingleton] Cache bypass active, forcing fresh fetch`);
+      }
+      
       const result = await this.makeDefaultRequest(
         `/api/featured-products/management?tenantId=${this.tenantId}&_t=${Date.now()}`,
         undefined,
-        `featured-products-${this.tenantId}`
+        `/api/featured-products/management?tenantId=${this.tenantId}`, // Remove timestamp from cache key
+        cacheOptions
       );
       if (result.success) {
         const data = result.data as any;
@@ -629,16 +727,32 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
       }, `featured-products-${this.tenantId}`);
 
       if (result.success) {
-
-        this.invalidateCache(`featured-products-${this.tenantId}`);
-        this.invalidateCache(`inactive-products-${this.tenantId}`);
-        this.invalidateCache(`available-products-${this.tenantId}`);
+        const responseData = result.data as any;
+        console.log('[TenantFeaturedProductsSingleton] Feature product successful:', responseData);
         
-        await Promise.all([
-          this.fetchFeaturedProducts(),
-          this.fetchAvailableProducts()
-        ]);
-
+        // Use the response data to update local state immediately
+        const featuredProduct = responseData.featuredProduct;
+        if (featuredProduct) {
+          // Add the product to featured products list (grouped by type)
+          const featuredType = featuredProduct.featured_type || this.state.selectedType;
+          const currentTypeProducts = this.state.featuredProducts[featuredType] || [];
+          
+          this.setState({
+            featuredProducts: {
+              ...this.state.featuredProducts,
+              [featuredType]: [...currentTypeProducts, featuredProduct]
+            },
+            availableProducts: this.state.availableProducts.filter(
+              product => product.inventory_item_id !== featuredProduct.inventory_item_id
+            ),
+            inactiveProducts: this.state.inactiveProducts.filter(
+              product => product.inventory_item_id !== featuredProduct.inventory_item_id
+            )
+          });
+          
+          // console.log('[TenantFeaturedProductsSingleton] Local state updated with response data');
+        }
+        
         // Invalidate ProductSingleton cache for this product
         if (this.productSingleton?.invalidateCache) {
           this.productSingleton.invalidateCache(productId);
@@ -657,6 +771,78 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
     }
   }
 
+  // Separate method for directory featuring (uses store_selection type for backend compatibility)
+  async featureProductInDirectory(productId: string) {
+    if (!productId) {
+      throw new Error('Product ID is required for directory featuring');
+    }
+    
+    this.setState({ processing: true });
+    
+    try {
+      const defaultExpiration = new Date();
+      defaultExpiration.setDate(defaultExpiration.getDate() + 30);
+      
+      const result = await this.makeDefaultRequest(`/api/items/${productId}/featured-types`, {
+        method: 'POST',
+        body: JSON.stringify({
+          tenantId: this.tenantId,
+          featured_type: 'store_selection', // Use existing backend-recognized type
+          featured_priority: 50,
+          featured_expires_at: defaultExpiration.toISOString(),
+          auto_unfeature: true
+        })
+      });
+
+      if (result.success || (result as any).featuredProduct) {
+        console.log('[TenantFeaturedProductsSingleton] Directory feature successful:', result);
+        
+        // Update local state with the new featured product
+        if ((result as any).featuredProduct) {
+          const featuredProduct = {
+            ...(result as any).featuredProduct,
+            featuredTypes: ['store_selection']
+          };
+          
+          this.setState({
+            featuredProducts: {
+              ...this.state.featuredProducts,
+              store_selection: [...(this.state.featuredProducts?.store_selection || []), featuredProduct]
+            },
+            availableProducts: this.state.availableProducts.filter(
+              product => product.inventory_item_id !== featuredProduct.inventory_item_id
+            ),
+            inactiveProducts: this.state.inactiveProducts.filter(
+              product => product.inventory_item_id !== featuredProduct.inventory_item_id
+            )
+          });
+          
+          // console.log('[TenantFeaturedProductsSingleton] Directory state updated');
+        }
+        
+        // Invalidate cache
+        // console.log(`[TenantFeaturedProductsSingleton] About to invalidate pattern: /api/featured-products/management?tenantId=${this.tenantId}*`);
+        try {
+          await this.invalidateCachePattern(`/api/featured-products/management?tenantId=${this.tenantId}*`);
+          // console.log(`[TenantFeaturedProductsSingleton] Pattern invalidation completed`);
+        } catch (patternError) {
+          console.warn(`[TenantFeaturedProductsSingleton] Pattern invalidation failed, using fallback:`, patternError);
+          this.invalidateCache(`/api/featured-products/management?tenantId=${this.tenantId}`);
+        }
+        
+        // Set cache bypass for 5 seconds
+        this.cacheBypassUntil = Date.now() + 5000;
+      } else {
+        throw new Error(getErrorMessage(result.error) || 'Failed to feature product in directory');
+      }
+    } catch (error) {
+      console.error('Error featuring product in directory:', error);
+      throw error;
+    } finally {
+      this.setState({ processing: false });
+    }
+  }
+
   async unfeatureProduct(productId: string) {
     this.setState({ processing: true });
     
@@ -669,7 +855,21 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         // Add delay to ensure database transaction commits
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        this.invalidateCache(`featured-products-${this.tenantId}`);
+        // Invalidate cache using pattern matching for the management endpoint
+        // console.log(`[TenantFeaturedProductsSingleton] About to invalidate pattern: /api/featured-products/management?tenantId=${this.tenantId}*`);
+        try {
+          await this.invalidateCachePattern(`/api/featured-products/management?tenantId=${this.tenantId}*`);
+          // console.log(`[TenantFeaturedProductsSingleton] Pattern invalidation completed`);
+        } catch (patternError) {
+          console.warn(`[TenantFeaturedProductsSingleton] Pattern invalidation failed, using fallback:`, patternError);
+          // Fallback: try to clear the specific cache key used by fetchFeaturedProducts
+          this.invalidateCache(`/api/featured-products/management?tenantId=${this.tenantId}`);
+        }
+        
+        // Set cache bypass for 5 seconds to ensure fresh data
+        this.cacheBypassUntil = Date.now() + 5000;
+        // console.log(`[TenantFeaturedProductsSingleton] Cache bypass set until: ${new Date(this.cacheBypassUntil).toISOString()}`);
+        
         this.invalidateCache(`inactive-products-${this.tenantId}`);
         this.invalidateCache(`available-products-${this.tenantId}`);
         
@@ -699,10 +899,10 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
     this.setState({ togglingActive: true });
     
     try {
-      console.log('[toggleProductActive] Called with:', { productId, isActive, tenantId: this.tenantId });
+      // console.log('[toggleProductActive] Called with:', { productId, isActive, tenantId: this.tenantId });
       
       const url = `/api/tenants/${this.tenantId}/products/${productId}/feature/active`;
-      console.log('[toggleProductActive] API URL:', url);
+      // console.log('[toggleProductActive] API URL:', url);
       
       const result = await this.makeDefaultRequest(url, {
         method: 'PATCH',
@@ -711,12 +911,21 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         })
       }, `featured-products-${this.tenantId}`);
 
-      console.log('[toggleProductActive] Response success:', result.success);
+      // console.log('[toggleProductActive] Response success:', result.success);
       
       if (result.success) {
         const data = result.data as any;
-        console.log('[toggleProductActive] Success:', data);
-        this.invalidateCache(`featured-products-${this.tenantId}`);
+        // console.log('[toggleProductActive] Success:', data);
+        // Invalidate cache using pattern matching for the management endpoint
+        // console.log(`[TenantFeaturedProductsSingleton] About to invalidate pattern: /api/featured-products/management?tenantId=${this.tenantId}*`);
+        try {
+          await this.invalidateCachePattern(`/api/featured-products/management?tenantId=${this.tenantId}*`);
+          // console.log(`[TenantFeaturedProductsSingleton] Pattern invalidation completed`);
+        } catch (patternError) {
+          console.warn(`[TenantFeaturedProductsSingleton] Pattern invalidation failed, using fallback:`, patternError);
+          // Fallback: try to clear the specific cache key used by fetchFeaturedProducts
+          this.invalidateCache(`/api/featured-products/management?tenantId=${this.tenantId}`);
+        }
         this.invalidateCache(`inactive-products-${this.tenantId}`);
         this.invalidateCache(`available-products-${this.tenantId}`);
         
@@ -758,7 +967,8 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         const responseData = result.data;
         //console.log('TenantFeaturedProductsSingleton: Expiration update successful:', responseData);
         
-        this.invalidateCache(`featured-products-${this.tenantId}`);
+        // Invalidate cache using pattern matching for the management endpoint
+        await this.invalidateCachePattern(`/api/featured-products/management?tenantId=${this.tenantId}*`);
         this.invalidateCache(`inactive-products-${this.tenantId}`);
         this.invalidateCache(`available-products-${this.tenantId}`);
         

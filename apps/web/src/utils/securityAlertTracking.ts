@@ -140,7 +140,7 @@ class SecurityAlertTrackingCache {
 
     // Check if we should send critical events immediately
     if (priority === 'critical' && this.isOnline && !this.isSending) {
-      console.log('[SecurityAlertTracking] Critical security event detected, sending immediately');
+      // console.log('[SecurityAlertTracking] Critical security event detected, sending immediately');
       setTimeout(() => this.sendBatch(), 100); // Small delay to allow batching
     }
   }
@@ -231,7 +231,7 @@ class SecurityAlertTrackingCache {
       this.retryState.nextRetryAt = 0;
       this.saveRetryState();
 
-      console.log(`[SecurityAlertTracking] Sent ${eventsToSend.length} security events in ${Object.keys(eventsByType).length} type groups (priorities: ${Object.entries(this.getPriorityBreakdown(eventsToSend)).map(([p, c]) => `${p}:${c}`).join(', ')})`);
+      // console.log(`[SecurityAlertTracking] Sent ${eventsToSend.length} security events in ${Object.keys(eventsByType).length} type groups (priorities: ${Object.entries(this.getPriorityBreakdown(eventsToSend)).map(([p, c]) => `${p}:${c}`).join(', ')})`);
     } catch (error) {
       // Security tracking failures should not break the application
       console.warn('[SecurityAlertTracking] Security alert batch failed, will retry:', error instanceof Error ? error.message : 'Unknown error');
@@ -528,7 +528,7 @@ export function trackSecurityEvent(event: Omit<SecurityAlertEvent, 'timestamp' |
     // Session info will be added by the cache
   };
   
-  console.log('[Security Tracking Debug] Adding security event:', eventWithSession);
+  // console.log('[Security Tracking Debug] Adding security event:', eventWithSession);
   cache.addEvent(eventWithSession);
 }
 

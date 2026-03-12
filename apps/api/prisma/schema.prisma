@@ -1240,23 +1240,33 @@ model stripe_webhook_events {
 }
 
 model subscription_tiers_list {
-  id                 String               @id
-  tier_key           String               @unique
-  name               String
-  display_name       String
-  description        String?
-  price_monthly      Decimal              @db.Decimal(10, 2)
-  max_skus           Int?
-  max_locations      Int?
-  tier_type          String               @default("individual")
-  is_active          Boolean              @default(true)
-  sort_order         Int                  @default(0)
-  metadata           Json?
-  created_at         DateTime             @default(now())
-  updated_at         DateTime             @default(now())
-  updated_by         String?
-  created_by         String?
-  tier_features_list tier_features_list[]
+  id                       String               @id
+  tier_key                 String               @unique
+  name                     String
+  display_name             String
+  description              String?
+  price_monthly            Decimal              @db.Decimal(10, 2)
+  max_skus                 Int?
+  max_locations            Int?
+  tier_type                String               @default("individual")
+  is_active                Boolean              @default(true)
+  sort_order               Int                  @default(0)
+  metadata                 Json?
+  created_at               DateTime             @default(now())
+  updated_at               DateTime             @default(now())
+  updated_by               String?
+  created_by               String?
+  featured_store_selection Int                  @default(0)
+  featured_new_arrival     Int                  @default(0)
+  featured_seasonal        Int                  @default(0)
+  featured_sale            Int                  @default(0)
+  featured_staff_pick      Int                  @default(0)
+  featured_bestseller      Int                  @default(0)
+  featured_clearance       Int                  @default(0)
+  featured_trending        Int                  @default(0)
+  featured_featured        Int                  @default(0)
+  featured_recommended     Int                  @default(0)
+  tier_features_list       tier_features_list[]
 }
 
 model sync_jobs {

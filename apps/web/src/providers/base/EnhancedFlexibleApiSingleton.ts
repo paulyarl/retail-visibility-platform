@@ -479,11 +479,11 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
     const context = cacheOptions?.context ?? this.defaultContext;
     const isolation = cacheOptions?.isolation ?? this.defaultIsolation;
 
-    console.log(`[${this.constructor.name}] ----------------------------------------`);
-    console.log(`[${this.constructor.name}] makeEnhancedAdminRequest url: ${url}`);
-    console.log(`[${this.constructor.name}] context: ${context}`);
-    console.log(`[${this.constructor.name}] isolation: ${isolation}`);
-    console.log(`[${this.constructor.name}] end:`);
+    // console.log(`[${this.constructor.name}] ----------------------------------------`);
+    // console.log(`[${this.constructor.name}] makeEnhancedAdminRequest url: ${url}`);
+    // console.log(`[${this.constructor.name}] context: ${context}`);
+    // console.log(`[${this.constructor.name}] isolation: ${isolation}`);
+    // console.log(`[${this.constructor.name}] end:`);
 
     // 🎯 STRATEGY 1: Return with context data only
     const contextEnhancedRequestOptions: AdminRequestOptions = {
@@ -510,11 +510,11 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
     const context = cacheOptions?.context ?? this.defaultContext;
     const isolation = cacheOptions?.isolation ?? this.defaultIsolation;
 
-    console.log(`[${this.constructor.name}] ----------------------------------------`);
-    console.log(`[${this.constructor.name}] makeEnhancedExternalRequest url: ${url}`);
-    console.log(`[${this.constructor.name}] context: ${context}`);
-    console.log(`[${this.constructor.name}] isolation: ${isolation}`);
-    console.log(`[${this.constructor.name}] end:`);
+    // console.log(`[${this.constructor.name}] ----------------------------------------`);
+    // console.log(`[${this.constructor.name}] makeEnhancedExternalRequest url: ${url}`);
+    // console.log(`[${this.constructor.name}] context: ${context}`);
+    // console.log(`[${this.constructor.name}] isolation: ${isolation}`);
+    // console.log(`[${this.constructor.name}] end:`);
 
     // 🎯 STRATEGY 1: Return with context data only
     const contextEnhancedRequestOptions: ExternalRequestOptions = {

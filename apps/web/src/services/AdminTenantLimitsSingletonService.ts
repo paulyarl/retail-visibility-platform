@@ -15,6 +15,11 @@ export interface FeaturedProductsLimit {
   sale: number;
   staff_pick: number;
   random_featured: number;
+  bestseller: number;
+  clearance: number;
+  trending: number;
+  featured: number;
+  recommended: number;
 }
 
 export interface TierLimits {
@@ -79,10 +84,32 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
    * PILOT: Public cache invalidation method for this service
    */
   public async invalidateServiceCaches(tenantId?: string): Promise<void> {
-    await this.invalidateCachePattern('admin-tenant-limits*');
-    await this.invalidateCachePattern('admin-featured-products*');
-    await this.invalidateCachePattern('admin-tier-system*');
-    await this.invalidateCachePattern('platform-limits*');
+    // console.log(`[AdminTenantLimits] Starting cache invalidation...`);
+    
+    const patterns = [
+      'admin-tenant-limits*',
+      'admin-featured-products*', 
+      '/api/admin/tier-system/tiers*',
+      '/api/tenant-limits/tiers*',
+      '/api/tenant-limits/featured-products/all*',
+      'platform-limits*'
+    ];
+    
+    for (const pattern of patterns) {
+      // console.log(`[AdminTenantLimits] Invalidating pattern: ${pattern}`);
+      await this.invalidateCachePattern(pattern);
+    }
+    
+    // console.log(`[AdminTenantLimits] Cache invalidation completed`);
+  }
+
+  /**
+   * Invalidate a specific cache key with logging
+   */
+  public async invalidateCache(cacheKey: string): Promise<void> {
+    // console.log(`[AdminTenantLimits] Invalidating specific cache key: ${cacheKey}`);
+    await this.clearCache(cacheKey);
+    // console.log(`[AdminTenantLimits] Cache key invalidated: ${cacheKey}`);
   }
 
   protected constructor() {
@@ -96,6 +123,25 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
       AdminTenantLimitsSingletonService.instance = new AdminTenantLimitsSingletonService();
     }
     return AdminTenantLimitsSingletonService.instance;
+  }
+
+  /**
+   * Force refresh all cached data
+   */
+  async forceRefreshAll(): Promise<void> {
+    try {
+      // console.log('[AdminTenantLimits] Force refreshing all cached data...');
+      await this.invalidateServiceCaches();
+      
+      // Force refresh individual endpoints
+      await this.getTierSystemTiers(false);
+      await this.getTenantLimitsTiers();
+      await this.getAllFeaturedProductsLimits();
+      
+      // console.log('[AdminTenantLimits] All cached data refreshed successfully');
+    } catch (error) {
+      console.error('[AdminTenantLimits] Failed to force refresh cached data:', error);
+    }
   }
 
   /**
@@ -177,13 +223,28 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
    * Update featured products limits for a tier
    * Uses the PUT /api/tenant-limits/featured-products endpoint
    */
-  async updateFeaturedProductsLimits(tier: string, limits: FeaturedProductsLimit): Promise<boolean> {
+  async updateFeaturedProductsLimits(tier: string, limits: FeaturedProductsLimit): Promise<{ success: boolean; updatedLimits?: FeaturedProductsLimit; message?: string }> {
     try {
+      // Ensure all required fields are present with defaults
+      const completeLimits: FeaturedProductsLimit = {
+        store_selection: limits.store_selection || 0,
+        new_arrival: limits.new_arrival || 0,
+        seasonal: limits.seasonal || 0,
+        sale: limits.sale || 0,
+        staff_pick: limits.staff_pick || 0,
+        random_featured: limits.random_featured || 0, // Ensure this field is always included
+        bestseller: limits.bestseller || 0,
+        clearance: limits.clearance || 0,
+        trending: limits.trending || 0,
+        featured: limits.featured || 0,
+        recommended: limits.recommended || 0,
+      };
+
       const result = await this.makeDefaultRequest(
         '/api/tenant-limits/featured-products',
         {
           method: 'PUT',
-          body: JSON.stringify({ tier, limits })
+          body: JSON.stringify({ tier, limits: completeLimits })
         },
         `update-featured-products-${tier}`,
         0 // No cache for write operations
@@ -191,16 +252,21 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
       
       if (!result.success) {
         console.error('[AdminTenantLimits] Failed to update featured products limits:', result.error);
-        return false;
+        return { success: false };
       }
 
       // Invalidate relevant caches after update
       await this.invalidateServiceCaches();
       
-      return true;
+      // Return success and the updated limits data
+      return { 
+        success: true, 
+        updatedLimits: (result.data as any)?.limits,
+        message: (result.data as any)?.message 
+      };
     } catch (error) {
       console.error('[AdminTenantLimits] Failed to update featured products limits:', error);
-      return false;
+      return { success: false };
     }
   }
 
@@ -208,7 +274,7 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
    * Update tier field (for inline editing in the limits page)
    * Uses PATCH /api/admin/tier-system/tiers/{tierKey}
    */
-  async updateTierField(tierKey: string, field: string, value: any, reason?: string): Promise<boolean> {
+  async updateTierField(tierKey: string, field: string, value: any, reason?: string): Promise<{ success: boolean; updatedTier?: any }> {
     try {
       const updateData: any = { [field]: value };
       if (reason) {
@@ -227,16 +293,20 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
       
       if (!result.success) {
         console.error('[AdminTenantLimits] Failed to update tier field:', result.error);
-        return false;
+        return { success: false };
       }
 
       // Invalidate relevant caches after update
       await this.invalidateServiceCaches();
       
-      return true;
+      // Return success and the updated tier data
+      return { 
+        success: true, 
+        updatedTier: (result.data as any)?.tier 
+      };
     } catch (error) {
       console.error('[AdminTenantLimits] Failed to update tier field:', error);
-      return false;
+      return { success: false };
     }
   }
 
@@ -254,19 +324,29 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
       ]);
 
       if (!tiersData || !tenantLimitsData || !allFeaturedLimits) {
-        console.error('[AdminTenantLimits] Failed to fetch complete limits data');
+        // console.error('[AdminTenantLimits] Failed to fetch complete limits data', {
+        //   tiersData: !!tiersData,
+        //   tenantLimitsData: !!tenantLimitsData,
+        //   allFeaturedLimits: !!allFeaturedLimits
+        // });
         return null;
       }
 
-      // Use starter limits as default for featured limits display
+      // Use actual starter limits from database, not hardcoded values
       const defaultFeaturedLimits = allFeaturedLimits.starter || {
-        store_selection: 8,
-        new_arrival: 12,
-        seasonal: 6,
-        sale: 10,
-        staff_pick: 6,
-        random_featured: 12,
+        store_selection: 0,
+        new_arrival: 0,
+        seasonal: 0,
+        sale: 0,
+        staff_pick: 0,
+        random_featured: 0,
       };
+
+      // console.log('[AdminTenantLimits] Using actual database limits:', {
+      //   allFeaturedLimits: Object.keys(allFeaturedLimits),
+      //   starterLimits: allFeaturedLimits.starter,
+      //   defaultFeaturedLimits
+      // });
 
       return {
         tenantLimits: tenantLimitsData,
@@ -277,6 +357,26 @@ class AdminTenantLimitsSingletonService extends AdminApiSingleton {
     } catch (error) {
       console.error('[AdminTenantLimits] Failed to get limits data:', error);
       return null;
+    }
+  }
+
+  /**
+   * Get all available featured types from database constraint
+   */
+  async getFeaturedTypes(): Promise<string[]> {
+    try {
+      // Query the database constraint to get all valid featured types
+      const result = await this.makeDefaultRequest('/api/admin/products/featured', {}, 'admin-featured-types-all');
+      
+      // Get all featured products and extract unique types
+      const featuredProducts = Array.isArray(result.data) ? result.data : [];
+      const uniqueTypes = [...new Set(featuredProducts.map((fp: any) => fp.featured_type).filter((type: any): type is string => Boolean(type)))];
+      
+      return uniqueTypes.sort();
+    } catch (error) {
+      console.error('[AdminTenantLimits] Error fetching featured types:', error);
+      // Fallback to hardcoded types if API fails
+      return ['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick', 'bestseller', 'clearance', 'trending', 'featured', 'recommended'];
     }
   }
 }

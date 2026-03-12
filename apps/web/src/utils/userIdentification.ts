@@ -97,7 +97,7 @@ export function getUserIdentification(): UserIdentification {
         if (typeof window !== 'undefined') {
           localStorage.setItem('lastViewedSessionId', lastViewedSession);
         }
-        console.log('[UserIdentification] Created new session ID:', lastViewedSession);
+        // console.log('[UserIdentification] Created new session ID:', lastViewedSession);
       }
       sessionId = lastViewedSession;
       identificationMethod = 'session_id';
@@ -166,7 +166,7 @@ export function clearUserIdentification(): void {
     cachedUserId = null;
     identificationCacheExpiry = 0;
     
-    console.log('[UserIdentification] Cleared session ID');
+    // console.log('[UserIdentification] Cleared session ID');
   } catch (error) {
     console.error('[UserIdentification] Error clearing identification:', error);
   }

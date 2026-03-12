@@ -96,7 +96,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       }, { status: 400 });
     }
 
-    console.log('[PATCH /api/tenants/:id] Updating tenant:', id, body);
+    // console.log('[PATCH /api/tenants/:id] Updating tenant:', id, body);
     
     // Update tenant using service with automatic cache invalidation
     // Use appropriate update method based on data provided
@@ -121,7 +121,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       }, { status: 400 });
     }
     
-    console.log('[PATCH /api/tenants/:id] Update successful');
+    // console.log('[PATCH /api/tenants/:id] Update successful');
     return NextResponse.json(updatedTenant);
   } catch (error) {
     console.error('[PATCH /api/tenants/:id] Error:', error);
