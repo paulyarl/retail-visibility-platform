@@ -44,6 +44,26 @@ export interface InventoryMetrics {
 class InventoryStatsSingletonService extends TenantApiSingleton {
   private static instance: InventoryStatsSingletonService;
   
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'inventory-stats*',
+      'inventory-metrics*',
+      'stock-analytics*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('inventory-stats*');
+    await this.invalidateCachePattern('inventory-metrics*');
+    await this.invalidateCachePattern('stock-analytics*');
+  }
+  
   // Different TTLs for different data types
   private readonly CACHE_TTL_SHORT = 2 * 60 * 1000; // 2 minutes for real-time stats
   private readonly CACHE_TTL_MEDIUM = 5 * 60 * 1000; // 5 minutes for semi-static stats

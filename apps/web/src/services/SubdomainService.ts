@@ -39,6 +39,26 @@ export interface SubdomainStats {
 export class SubdomainService extends TenantApiSingleton {
   private static _instance: SubdomainService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'subdomain-service*',
+      'dns-records*',
+      'subdomain-stats*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('subdomain-service*');
+    await this.invalidateCachePattern('dns-records*');
+    await this.invalidateCachePattern('subdomain-stats*');
+  }
+
   private constructor(singletonKey: string, cacheOptions?: any) {
     super(singletonKey, {
       ttl: 15 * 60 * 1000, // 15 minutes cache for subdomain operations

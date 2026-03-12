@@ -6,6 +6,7 @@
  */
 
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
 
 export interface Tier {
   id: string;
@@ -94,8 +95,9 @@ export class TierSystemService extends AdminApiSingleton {
       0 // No cache for admin operations
     );
 
-    // Invalidate tier cache
-    this.invalidateCache('tier-system-tiers');
+    // Invalidate tier cache - use context-aware invalidation for admin operations
+    // Clear admin context cache (current admin user) and system cache (shared data)
+    await this.invalidateCacheAcrossContexts('tier-system-tiers', [AppContext.ADMIN, AppContext.SYSTEM], [CacheIsolation.ADMIN, CacheIsolation.TENANT]);
 
     return response?.data || null;
   }
@@ -121,8 +123,9 @@ export class TierSystemService extends AdminApiSingleton {
       0 // No cache for admin operations
     );
 
-    // Invalidate tier cache
-    this.invalidateCache('tier-system-tiers');
+    // Invalidate tier cache - use context-aware invalidation for admin operations
+    // Clear admin context cache (current admin user) and system cache (shared data)
+    await this.invalidateCacheAcrossContexts('tier-system-tiers', [AppContext.ADMIN, AppContext.SYSTEM], [CacheIsolation.ADMIN, CacheIsolation.TENANT]);
 
     return response?.data || null;
   }
@@ -145,8 +148,9 @@ export class TierSystemService extends AdminApiSingleton {
       0
     );
 
-    // Invalidate tier cache
-    this.invalidateCache('tier-system-tiers');
+    // Invalidate tier cache - use context-aware invalidation for admin operations
+    // Clear admin context cache (current admin user) and system cache (shared data)
+    await this.invalidateCacheAcrossContexts('tier-system-tiers', [AppContext.ADMIN, AppContext.SYSTEM], [CacheIsolation.ADMIN, CacheIsolation.TENANT]);
   }
 
   /**
@@ -163,8 +167,9 @@ export class TierSystemService extends AdminApiSingleton {
       0
     );
 
-    // Invalidate tier cache
-    this.invalidateCache('tier-system-tiers');
+    // Invalidate tier cache - use context-aware invalidation for admin operations
+    // Clear admin context cache (current admin user) and system cache (shared data)
+    await this.invalidateCacheAcrossContexts('tier-system-tiers', [AppContext.ADMIN, AppContext.SYSTEM], [CacheIsolation.ADMIN, CacheIsolation.TENANT]);
 
     return response?.data || null;
   }
@@ -183,8 +188,9 @@ export class TierSystemService extends AdminApiSingleton {
       0
     );
 
-    // Invalidate tier cache
-    this.invalidateCache('tier-system-tiers');
+    // Invalidate tier cache - use context-aware invalidation for admin operations
+    // Clear admin context cache (current admin user) and system cache (shared data)
+    await this.invalidateCacheAcrossContexts('tier-system-tiers', [AppContext.ADMIN, AppContext.SYSTEM], [CacheIsolation.ADMIN, CacheIsolation.TENANT]);
 
     return response?.data || null;
   }
@@ -204,8 +210,9 @@ export class TierSystemService extends AdminApiSingleton {
       0
     );
 
-    // Invalidate tier cache
-    this.invalidateCache('tier-system-tiers');
+    // Invalidate tier cache - use context-aware invalidation for admin operations
+    // Clear admin context cache (current admin user) and system cache (shared data)
+    await this.invalidateCacheAcrossContexts('tier-system-tiers', [AppContext.ADMIN, AppContext.SYSTEM], [CacheIsolation.ADMIN, CacheIsolation.TENANT]);
   }
 
   /**
@@ -250,8 +257,9 @@ export class TierSystemService extends AdminApiSingleton {
       0
     );
 
-    // Invalidate tier cache
-    this.invalidateCache('tier-system-tiers');
+    // Invalidate tier cache - use context-aware invalidation for admin operations
+    // Clear admin context cache (current admin user) and system cache (shared data)
+    await this.invalidateCacheAcrossContexts('tier-system-tiers', [AppContext.ADMIN, AppContext.SYSTEM], [CacheIsolation.ADMIN, CacheIsolation.TENANT]);
   }
 
   /**
@@ -272,8 +280,9 @@ export class TierSystemService extends AdminApiSingleton {
       0
     );
 
-    // Invalidate tier cache
-    this.invalidateCache('tier-system-tiers');
+    // Invalidate tier cache - use context-aware invalidation for admin operations
+    // Clear admin context cache (current admin user) and system cache (shared data)
+    await this.invalidateCacheAcrossContexts('tier-system-tiers', [AppContext.ADMIN, AppContext.SYSTEM], [CacheIsolation.ADMIN, CacheIsolation.TENANT]);
 
     return response?.data || null;
   }

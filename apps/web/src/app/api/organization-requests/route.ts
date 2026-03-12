@@ -1,18 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyGet, proxyPost } from '@/lib/api-proxy';
+import { organizationService } from '@/services/OrganizationService';
 
 // GET /api/organization-requests - List all requests (Admin only) or user's requests
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const path = `/organization-requests${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-    const res = await proxyGet(request, path);
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const params: {
+      status?: string;
+      tenantId?: string;
+      organizationId?: string;
+      page?: number;
+      limit?: number;
+    } = {};
+    
+    if (searchParams.has('status')) {
+      params.status = searchParams.get('status')!;
+    }
+    if (searchParams.has('tenantId')) {
+      params.tenantId = searchParams.get('tenantId')!;
+    }
+    if (searchParams.has('organizationId')) {
+      params.organizationId = searchParams.get('organizationId')!;
+    }
+    if (searchParams.has('page')) {
+      params.page = parseInt(searchParams.get('page')!);
+    }
+    if (searchParams.has('limit')) {
+      params.limit = parseInt(searchParams.get('limit')!);
+    }
+
+    // Get organization requests using service with automatic caching
+    const requests = await organizationService.getOrganizationRequests(params);
+    
+    return NextResponse.json(requests);
   } catch (error) {
-    console.error('[Organization Requests] GET error:', error);
+    console.error('[Organization Requests API GET] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch organization requests' },
+      { 
+        error: 'internal_server_error',
+        message: 'Failed to fetch organization requests' 
+      },
       { status: 500 }
     );
   }
@@ -22,13 +49,25 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const res = await proxyPost(request, '/organization-requests', body);
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    
+    // Create organization request using service with automatic cache invalidation
+    const newRequest = await organizationService.createOrganizationRequest(body);
+    
+    if (!newRequest) {
+      return NextResponse.json({ 
+        error: 'creation_failed',
+        message: 'Failed to create organization request' 
+      }, { status: 400 });
+    }
+    
+    return NextResponse.json(newRequest, { status: 201 });
   } catch (error) {
-    console.error('[Organization Requests] POST error:', error);
+    console.error('[Organization Requests API POST] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to create organization request' },
+      { 
+        error: 'internal_server_error',
+        message: 'Failed to create organization request' 
+      },
       { status: 500 }
     );
   }

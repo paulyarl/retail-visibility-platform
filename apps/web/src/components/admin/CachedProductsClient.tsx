@@ -20,36 +20,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { Button, Input, ConfirmDialog } from '@/components/ui';
-import { apiRequest } from '@/lib/api';
-
-interface CachedProduct {
-  id: string;
-  businessType: string;
-  categoryName: string;
-  googleCategoryId: string | null;
-  productName: string;
-  priceCents: number;
-  brand: string | null;
-  description: string | null;
-  skuPattern: string | null;
-  imageUrl: string | null;
-  thumbnailUrl: string | null;
-  enhancedDescription: string | null;
-  features: any;
-  specifications: any;
-  generationSource: string;
-  hasImage: boolean;
-  imageQuality: string | null;
-  usageCount: number;
-  qualityScore: number | null;
-  createdAt: string;
-  lastUsedAt: string | null;
-}
-
-interface FilterOption {
-  value: string;
-  count: number;
-}
+import { adminCachedProductsService, type CachedProduct, type FilterOption } from '@/services/AdminCachedProductsService';
 
 export default function CachedProductsClient() {
   const [products, setProducts] = useState<CachedProduct[]>([]);
@@ -90,37 +61,29 @@ export default function CachedProductsClient() {
     setError(null);
     
     try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        pageSize: pageSize.toString(),
+      const response = await adminCachedProductsService.getCachedProducts({
+        page,
+        pageSize,
         sortBy,
         sortOrder,
+        search,
+        businessType,
+        categoryName,
+        hasImage: hasImageFilter
       });
       
-      if (search) params.set('search', search);
-      if (businessType) params.set('businessType', businessType);
-      if (categoryName) params.set('categoryName', categoryName);
-      if (hasImageFilter) params.set('hasImage', hasImageFilter);
-      
-      const response = await apiRequest(`/api/admin/cached-products?${params}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch cached products');
-      }
-      
-      const data = await response.json();
-      
-      setProducts(data.data || []);
-      setTotal(data.pagination?.total || 0);
-      setTotalPages(data.pagination?.totalPages || 0);
-      setBusinessTypes(data.filters?.businessTypes || []);
-      setCategories(data.filters?.categories || []);
-    } catch (err: any) {
-      setError(err.message);
+      setProducts(response.products);
+      setTotal(response.total);
+      setTotalPages(response.totalPages);
+      setBusinessTypes(response.businessTypes);
+      setCategories(response.categories);
+    } catch (error) {
+      console.error('Failed to fetch cached products:', error);
+      setError('Failed to fetch cached products');
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, search, businessType, categoryName, hasImageFilter, sortBy, sortOrder]);
+  }, [page, pageSize, sortBy, sortOrder, search, businessType, categoryName, hasImageFilter]);
   
   useEffect(() => {
     fetchProducts();
@@ -130,18 +93,22 @@ export default function CachedProductsClient() {
   const handleDelete = async (ids: string[]) => {
     try {
       if (ids.length === 1) {
-        await apiRequest(`/api/admin/cached-products/${ids[0]}`, { method: 'DELETE' });
+        const success = await adminCachedProductsService.deleteCachedProduct(ids[0]);
+        if (!success) {
+          throw new Error('Failed to delete product');
+        }
       } else {
-        await apiRequest('/api/admin/cached-products/bulk', {
-          method: 'DELETE',
-          body: JSON.stringify({ ids }),
-        });
+        const result = await adminCachedProductsService.bulkDeleteCachedProducts(ids);
+        if (result.failed.length > 0) {
+          throw new Error(`Failed to delete ${result.failed.length} products`);
+        }
       }
       
-      setSelectedIds(new Set());
-      fetchProducts();
-    } catch (err: any) {
-      setError(err.message);
+      // Refresh products list
+      await fetchProducts();
+    } catch (error) {
+      console.error('Failed to delete products:', error);
+      setError('Failed to delete products');
     }
   };
   
@@ -635,18 +602,16 @@ function EditCachedProductModal({
     setError(null);
     
     try {
-      const response = await apiRequest(`/api/admin/cached-products/${product.id}`, {
-        method: 'PUT',
-        body: JSON.stringify(formData),
-      });
-      
-      if (!response.ok) {
+      const updatedProduct = await adminCachedProductsService.updateCachedProduct(product.id, formData);
+      if (!updatedProduct) {
         throw new Error('Failed to update product');
       }
       
+      // Call onSave to refresh the products list
       onSave();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error) {
+      console.error('Failed to update product:', error);
+      setError('Failed to update product');
     } finally {
       setSaving(false);
     }

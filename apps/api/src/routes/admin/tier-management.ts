@@ -50,7 +50,7 @@ router.get('/tiers', async (req, res) => {
         id: tier.tier_key,
         name: tier.name,
         displayName: tier.display_name,
-        price: tier.price_monthly / 100, // Convert from cents to dollars
+        price: tier.price_monthly, // Already stored as dollars (DECIMAL)
         maxSkus: tier.max_skus,
         maxLocations: tier.max_locations,
         description: tier.description || '',

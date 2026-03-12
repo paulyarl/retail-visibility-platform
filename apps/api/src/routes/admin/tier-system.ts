@@ -23,13 +23,19 @@ router.use(authenticateToken);
  * Helper to transform tier data from Prisma format to frontend format
  */
 function transformTier(tier: any) {
+  // Convert Decimal price to number for JSON serialization
+  const priceMonthly = tier.price_monthly;
+  const numericPrice = typeof priceMonthly?.toNumber === 'function' 
+    ? priceMonthly.toNumber() 
+    : Number(priceMonthly);
+  
   return {
     id: tier.id,
     tierKey: tier.tier_key,
     name: tier.name,
     displayName: tier.display_name,
     description: tier.description,
-    priceMonthly: tier.price_monthly,
+    priceMonthly: numericPrice,
     maxSkus: tier.max_skus,
     maxLocations: tier.max_locations,
     tierType: tier.tier_type,
@@ -229,7 +235,7 @@ const createTierSchema = z.object({
   name: z.string().min(1),
   displayName: z.string().min(1),
   description: z.string().optional(),
-  priceMonthly: z.number().int().min(0),
+  priceMonthly: z.number().min(0), // Allow decimals for prices
   maxSkus: z.number().int().positive().nullable().optional(),
   maxLocations: z.number().int().positive().nullable().optional(),
   tierType: z.enum(['individual', 'organization']).default('individual'),
@@ -342,7 +348,7 @@ const updateTierSchema = z.object({
   name: z.string().min(1).optional(),
   displayName: z.string().min(1).optional(),
   description: z.string().optional(),
-  priceMonthly: z.number().min(0).optional(),
+  priceMonthly: z.number().min(0).optional(), // Allow decimals for prices
   maxSkus: z.number().int().positive().nullable().optional(),
   maxLocations: z.number().int().positive().nullable().optional(),
   tierType: z.enum(['individual', 'organization']).optional(),

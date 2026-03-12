@@ -59,6 +59,26 @@ export interface ItemUpdateResult {
 class ItemUpdateService extends TenantApiSingleton {
   protected static instances: Map<string, ItemUpdateService> = new Map();
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'item-update-*',
+      'item-bulk-update*',
+      'item-inventory-update*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('item-update-*');
+    await this.invalidateCachePattern('item-bulk-update*');
+    await this.invalidateCachePattern('item-inventory-update*');
+  }
+
   private constructor(tenantId: string) {
     super(`item-update-service-${tenantId}`);
   }

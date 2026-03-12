@@ -5,7 +5,7 @@ import { Modal, ModalFooter, Button, Input, Select, Alert } from '@/components/u
 import { BusinessProfile, businessProfileSchema, countries, normalizePhoneInput, geocodeAddress } from '@/lib/validation/businessProfile';
 import { z } from 'zod';
 import { uploadImage, ImageUploadPresets } from '@/lib/image-upload';
-import { api } from '@/lib/api';
+import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import SlugPatternSelector from '@/components/shops/SlugPatternSelector';
 
 interface EditBusinessProfileModalProps {
@@ -78,21 +78,16 @@ export default function EditBusinessProfileModal({
         return null;
       }
 
-      // Upload to server
-      const res = await api.post(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
-        tenant_id: tenantId, 
-        dataUrl: result.dataUrl, 
-        contentType: result.contentType 
-      });
-
-      const payload = await res.json();
-      if (!res.ok) {
-        setError(payload?.error || "Upload failed");
+      // Upload logo using service with automatic cache invalidation
+      const uploadResult = await platformHomeService.uploadTenantLogo(tenantId, result.dataUrl, result.contentType);
+      
+      if (!uploadResult.success) {
+        setError(uploadResult.error || 'Upload failed');
         return null;
       }
 
       // Return the optimized URL
-      return payload.url;
+      return uploadResult.data?.url || uploadResult.data?.dataUrl;
     } catch (err: any) {
       console.error('Failed to optimize pasted logo URL:', err);
       setError(err.message || 'Failed to fetch and optimize logo from URL');
@@ -119,27 +114,16 @@ export default function EditBusinessProfileModal({
         return;
       }
 
-      // Upload to server
-      const body = JSON.stringify({ 
-        tenant_id: tenantId, 
-        dataUrl: result.dataUrl, 
-        contentType: result.contentType 
-      });
-
-      const res = await api.post(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
-        tenant_id: tenantId, 
-        dataUrl: result.dataUrl, 
-        contentType: result.contentType 
-      });
-
-      const payload = await res.json();
-      if (!res.ok) {
-        setError(payload?.error || "Upload failed");
+      // Upload logo using service with automatic cache invalidation
+      const uploadResult = await platformHomeService.uploadTenantLogo(tenantId, result.dataUrl, result.contentType);
+      
+      if (!uploadResult.success) {
+        setError(uploadResult.error || 'Upload failed');
         return;
       }
 
       // Update form data with uploaded URL
-      const uploadedUrl = payload.url;
+      const uploadedUrl = uploadResult.data?.url || uploadResult.data?.dataUrl;
       if (uploadedUrl) {
         handleChange('logo_url', uploadedUrl);
         setLogoPreview(uploadedUrl);
@@ -160,32 +144,29 @@ export default function EditBusinessProfileModal({
       setUploadingLogo(true);
       setError(null);
 
-      // Send URL directly to API - let the server fetch and process it
+      // Get tenant ID from localStorage
       const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
       if (!tenantId) {
         setError('No tenant selected');
         return;
       }
 
-      const res = await api.post(`/api/tenants/${encodeURIComponent(tenantId)}/logo`, {
-        url: pastedLogoUrl
-      });
-
-      const payload = await res.json();
-      if (!res.ok) {
-        setError(payload?.error || "Upload failed");
+      // Upload logo using service with automatic cache invalidation
+      const result = await platformHomeService.uploadTenantLogo(tenantId, pastedLogoUrl, 'image/*');
+      
+      if (!result.success) {
+        setError(result.error || 'Upload failed');
         return;
       }
 
-      // Update form data with uploaded URL
-      const uploadedUrl = payload.url;
-      if (uploadedUrl) {
-        handleChange('logo_url', uploadedUrl);
-        setLogoPreview(uploadedUrl);
-        setPastedLogoUrl(""); // Clear the input after successful upload
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to upload logo from URL');
+      // Update form with new logo URL
+      setFormData(prev => ({ ...prev, logo_url: result.data?.logo_url || result.data?.dataUrl }));
+      setLogoPreview(result.data?.logo_url || result.data?.dataUrl);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      console.error('[EditBusinessProfile] Error uploading logo from URL:', err);
+      setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploadingLogo(false);
     }

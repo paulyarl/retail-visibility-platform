@@ -89,6 +89,26 @@ class TenantOrderService extends TenantApiSingleton {
   private static instance: TenantOrderService;
   protected cacheTTL: number = 10 * 60 * 1000; // 10 minutes cache for order data
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-order-service*',
+      'tenant-orders*',
+      'order-management*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tenant-order-service*');
+    await this.invalidateCachePattern('tenant-orders*');
+    await this.invalidateCachePattern('order-management*');
+  }
+
   protected constructor(singletonKey: string, cacheOptions?: any) {
     super(singletonKey, {
       ttl: 10 * 60 * 1000, // 10 minutes cache for order data

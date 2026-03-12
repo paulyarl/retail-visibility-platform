@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import Link from "next/link";
-import { apiRequest } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import MobileCapacityIndicator from "@/components/capacity/MobileCapacityIndicator";
@@ -13,6 +12,7 @@ import { Settings, LogOut, ArrowLeft, Store, Menu, X } from "lucide-react";
 import SidebarLayout from "@/components/navigation/SidebarLayout";
 import TenantSwitcher from "@/components/app-shell/TenantSwitcher";
 import ShellWithTicker from "@/components/layout/ShellWithTicker";
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 // Force edge runtime to prevent prerendering issues
 export const runtime = 'edge';
@@ -61,28 +61,15 @@ export default function TenantAppShell({ children, navItems }: TenantAppShellPro
       if (!tenantId) return;
       
       try {
-        // Fetch tenant basic info
-        const res = await apiRequest(`/api/tenants/${tenantId}`);
-        if (res.ok) {
-          const data = await res.json();
-          
-          // Fetch business profile for logo
-          let logoUrl = null;
-          try {
-            const profileRes = await apiRequest(`/api/tenant/profile?tenant_id=${tenantId}`);
-            if (profileRes.ok) {
-              const profileData = await profileRes.json();
-              logoUrl = profileData.logo_url;
-            }
-          } catch (profileError) {
-            console.error('Failed to fetch business profile:', profileError);
-          }
-          
+        // Get complete tenant info including business profile
+        const completeInfo = await tenantInfoService.getCompleteTenantInfo(tenantId);
+        
+        if (completeInfo.tenant) {
           setTenantInfo({
-            id: data.id,
-            name: data.name,
-            logo: logoUrl, // Use logo from business profile
-            subdomain: data.subdomain,
+            id: completeInfo.tenant.id,
+            name: completeInfo.tenant.name,
+            logo: completeInfo.businessProfile?.logo_url,
+            subdomain: completeInfo.tenant.subdomain,
           });
         }
       } catch (error) {

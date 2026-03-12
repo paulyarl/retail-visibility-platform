@@ -2,66 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { Building2, TrendingUp, AlertTriangle, Info, Edit2, Save, X, Settings, ArrowUp, ArrowDown } from 'lucide-react';
-import { apiRequest } from '@/lib/api';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Button } from '@mantine/core';
 import { Input, Badge } from '@/components/ui';
-
-interface Tier {
-  id: string;
-  tierKey: string;
-  name: string;
-  displayName: string;
-  description: string;
-  priceMonthly: number;
-  maxSkus: number | null;
-  maxLocations: number | null;
-  tierType: string;
-  isActive: boolean;
-  sortOrder: number;
-  features: Array<{
-    id: string;
-    featureKey: string;
-    featureName: string;
-    isEnabled: boolean;
-    isInherited: boolean;
-  }>;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface TenantLimitConfig {
-  limit: number;
-  displayName: string;
-  description: string;
-  upgradeMessage: string;
-  upgradeToTier?: string;
-}
-
-interface FeaturedProductsLimit {
-  store_selection: number;
-  new_arrival: number;
-  seasonal: number;
-  sale: number;
-  staff_pick: number;
-  random_featured: number;
-}
-
-interface LimitsData {
-  tenantLimits: Record<string, TenantLimitConfig>;
-  featuredLimits: FeaturedProductsLimit;
-  currentTier: string;
-  tiers: Tier[];
-}
-
-interface AllTierLimits {
-  [tier: string]: FeaturedProductsLimit;
-}
+import { adminTenantLimitsService, type LimitsData, type FeaturedProductsLimit, type TierSystemTier } from '@/services/AdminTenantLimitsSingletonService';
 
 export default function AdminLimitsPage() {
   const [limitsData, setLimitsData] = useState<LimitsData | null>(null);
-  const [allTierLimits, setAllTierLimits] = useState<AllTierLimits | null>(null);
+  const [allTierLimits, setAllTierLimits] = useState<Record<string, FeaturedProductsLimit> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('tenant-limits');
@@ -81,116 +30,19 @@ export default function AdminLimitsPage() {
       setLoading(true);
       setError(null);
 
-      // Fetch tier system data - this is our primary source of truth
-      let tiersData: Tier[] = [];
-      try {
-        const tiersResponse = await apiRequest('/api/admin/tier-system/tiers');
-        if (tiersResponse.ok) {
-          const tiersResult = await tiersResponse.json();
-          tiersData = tiersResult.tiers || [];
-        }
-      } catch (tiersError) {
-        console.log('Tier system data not available, using fallback');
-      }
-
-      // Fetch tenant limits (for backward compatibility)
-      let tenantLimitsData: Record<string, TenantLimitConfig> = {};
-      try {
-        const tenantResponse = await apiRequest('/api/tenant-limits/tiers');
-        if (tenantResponse.ok) {
-          const tenantResult = await tenantResponse.json();
-          tenantLimitsData = tenantResult.tiers || {};
-        }
-      } catch (tenantError) {
-        console.log('Tenant limits not available');
-      }
-
-      // Fetch all tier featured products limits from persisted configuration
-      let allLimits: AllTierLimits = {};
-      try {
-        const allFeaturedResponse = await apiRequest('/api/tenant-limits/featured-products/all');
-        if (allFeaturedResponse.ok) {
-          const allFeaturedData = await allFeaturedResponse.json();
-          allLimits = allFeaturedData.limits;
-        }
-      } catch (allFeaturedError) {
-        console.log('All featured products limits not available, using defaults');
-        // Fallback to hardcoded defaults if API fails
-        allLimits = {
-          google_only: {
-            store_selection: 3,
-            new_arrival: 3,
-            seasonal: 2,
-            sale: 3,
-            staff_pick: 2,
-            random_featured: 6,
-          },
-          starter: {
-            store_selection: 8,
-            new_arrival: 12,
-            seasonal: 6,
-            sale: 10,
-            staff_pick: 6,
-            random_featured: 12,
-          },
-          professional: {
-            store_selection: 15,
-            new_arrival: 20,
-            seasonal: 12,
-            sale: 15,
-            staff_pick: 10,
-            random_featured: 18,
-          },
-          enterprise: {
-            store_selection: 25,
-            new_arrival: 30,
-            seasonal: 20,
-            sale: 25,
-            staff_pick: 15,
-            random_featured: 48,
-          },
-          organization: {
-            store_selection: 50,
-            new_arrival: 50,
-            seasonal: 40,
-            sale: 50,
-            staff_pick: 30,
-            random_featured: 24,
-          },
-        };
-      }
-
-      // Try to fetch current user's featured products limits (for current tier display)
-      let featuredData: { limits: FeaturedProductsLimit; tier: string } = {
-        limits: allLimits.starter, // Default to starter
-        tier: 'starter (guest)',
-      };
+      // Get comprehensive limits data using the service
+      const data = await adminTenantLimitsService.getLimitsData(false);
       
-      try {
-        // Use the all limits endpoint since this is an admin page
-        // and we don't have a specific tenant context here
-        const featuredResponse = await apiRequest('/api/tenant-limits/featured-products/all');
-        if (featuredResponse.ok) {
-          const featuredAllData = await featuredResponse.json();
-          // Use starter limits as default for display
-          featuredData = {
-            limits: featuredAllData.limits.starter,
-            tier: 'starter (guest)',
-          };
-        }
-      } catch (featuredError) {
-        // User might not be authenticated, use default starter limits
-        console.log('Featured products limits not available, using defaults');
+      if (!data) {
+        throw new Error('Failed to load limits data');
       }
 
-      setLimitsData({
-        tenantLimits: tenantLimitsData,
-        featuredLimits: featuredData.limits,
-        currentTier: featuredData.tier,
-        tiers: tiersData
-      });
+      setLimitsData(data);
       
-      setAllTierLimits(allLimits);
+      // Get all tier featured products limits
+      const allLimits = await adminTenantLimitsService.getAllFeaturedProductsLimits();
+      setAllTierLimits(allLimits || {});
+      
     } catch (err) {
       console.error('Failed to fetch limits:', err);
       setError(err instanceof Error ? err.message : 'Failed to load limits data');
@@ -222,25 +74,27 @@ export default function AdminLimitsPage() {
   };
 
   const handleSave = async () => {
-    if (!editingLimits || !allTierLimits) return;
+    if (!editingLimits || !selectedTier) return;
 
     try {
       setSaving(true);
+      setError(null);
       
-      // TODO: Add API endpoint to save featured products limits
-      // const response = await apiRequest('/api/admin/tenant-limits/featured-products', {
-      //   method: 'PUT',
-      //   body: JSON.stringify({ tier: selectedTier, limits: editingLimits }),
-      // });
+      // Save featured products limits using the service
+      const success = await adminTenantLimitsService.updateFeaturedProductsLimits(selectedTier, editingLimits);
       
-      // For now, just update local state
-      setAllTierLimits({
-        ...allTierLimits,
-        [selectedTier]: editingLimits,
-      });
-      
-      setIsEditing(false);
-      setEditingLimits(null);
+      if (success) {
+        // Update local state on successful save
+        setAllTierLimits(prev => ({
+          ...prev,
+          [selectedTier]: editingLimits
+        }));
+        
+        setIsEditing(false);
+        setEditingLimits(null);
+      } else {
+        setError('Failed to save limits. Please try again.');
+      }
     } catch (err) {
       console.error('Failed to save limits:', err);
       setError('Failed to save limits. Please try again.');
@@ -261,7 +115,7 @@ export default function AdminLimitsPage() {
 
   // Dynamic tier comparison generator
   const getTierComparison = () => {
-    if (!tiers || tiers.length === 0 || !allTierLimits) {
+    if (!limitsData?.tiers || limitsData.tiers.length === 0 || !allTierLimits) {
       return (
         <div className="text-sm text-gray-600 space-y-1">
           <p><strong>Google-Only:</strong> 3-3-2-3-2 <span className="text-purple-600 font-medium">+6 Random</span> (very limited)</p>
@@ -276,7 +130,7 @@ export default function AdminLimitsPage() {
       );
     }
 
-    const activeTiers = tiers
+    const activeTiers = limitsData.tiers
       .filter(tier => tier.isActive)
       .sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -299,7 +153,7 @@ export default function AdminLimitsPage() {
                 <div>
                   <div className="font-medium text-gray-900">{tier.displayName}</div>
                   <div className="text-xs text-gray-500">
-                    ${tier.priceMonthly ? (tier.priceMonthly / 100).toFixed(0) : '0'}/month
+                    ${tier.priceMonthly?.toFixed(2) || '0.00'}/month
                   </div>
                 </div>
                 {isCurrentTier && (
@@ -354,32 +208,29 @@ export default function AdminLimitsPage() {
       setSaving(true);
       setError(null);
       
-      let updateData: any = {};
-      
-      // Convert value based on field type
+      // Prepare update data based on field type
+      let updateValue: any;
       if (field === 'priceMonthly') {
-        updateData[field] = parseInt(editValue) || 0;
+        updateValue = parseInt(editValue) || 0;
       } else if (field === 'maxSkus') {
-        updateData[field] = editValue === '' ? null : parseInt(editValue) || 0;
+        updateValue = editValue === '' ? null : parseInt(editValue) || 0;
       } else if (field === 'maxLocations') {
-        updateData[field] = parseInt(editValue) || 0;
+        updateValue = parseInt(editValue) || 0;
       }
       
-      // Update the tier in the database using PATCH
-      const response = await apiRequest(`/api/admin/tier-system/tiers/${tierKey}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          ...updateData,
-          reason: `Updated ${field} via limits page`
-        })
-      });
+      // Update the tier using the service
+      const success = await adminTenantLimitsService.updateTierField(
+        tierKey, 
+        field, 
+        updateValue, 
+        `Updated ${field} via limits page`
+      );
       
-      if (response.ok) {
+      if (success) {
         // Refresh the data to show updated values
         fetchLimits();
       } else {
-        const data = await response.json();
-        setError(data.error || 'Failed to update tier');
+        setError('Failed to update tier');
       }
       
       setFocusedEdit(null);
@@ -433,19 +284,17 @@ export default function AdminLimitsPage() {
     return null;
   }
 
-  const { tenantLimits, featuredLimits, currentTier, tiers } = limitsData;
-
   // Merge tier system data with tenant limits for display
   const getEnhancedTierData = () => {
-    if (!tiers || tiers.length === 0) return [];
+    if (!limitsData?.tiers || limitsData.tiers.length === 0) return [];
     
-    return tiers.map((tier) => {
+    return limitsData.tiers.map((tier) => {
       // Get tenant limit config if available, otherwise create from tier data
       const tenantConfig = limitsData?.tenantLimits[tier.tierKey];
       
       // Generate upgrade message based on actual tier hierarchy
       const generateUpgradeMessage = (currentTierKey: string, currentSortOrder: number) => {
-        const higherTiers = tiers
+        const higherTiers = limitsData.tiers
           .filter(t => t.isActive && t.sortOrder > currentSortOrder)
           .sort((a, b) => a.sortOrder - b.sortOrder);
         
@@ -471,12 +320,12 @@ export default function AdminLimitsPage() {
           displayName: tier.displayName,
           description: tier.description,
           upgradeMessage: generateUpgradeMessage(tier.tierKey, tier.sortOrder),
-          upgradeToTier: tiers.find(t => t.isActive && t.sortOrder > tier.sortOrder)?.tierKey
+          upgradeToTier: limitsData.tiers.find(t => t.isActive && t.sortOrder > tier.sortOrder)?.tierKey
         },
         tierData: tier,
         isActive: tier.isActive,
         sortOrder: tier.sortOrder,
-        price: tier.priceMonthly ? tier.priceMonthly / 100 : 0,
+        price: tier.priceMonthly || 0,
         maxSkus: tier.maxSkus,
         maxLocations: tier.maxLocations
       };
@@ -518,7 +367,7 @@ export default function AdminLimitsPage() {
                 <div
                   key={tierKey}
                   className={`border rounded-lg p-6 ${
-                    tierKey === currentTier
+                    tierKey === limitsData.currentTier
                       ? 'border-blue-200 bg-blue-50'
                       : 'border-gray-200'
                   } ${!isActive ? 'opacity-60' : ''}`}
@@ -527,7 +376,7 @@ export default function AdminLimitsPage() {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <h3 className="text-lg font-semibold capitalize">{tierKey.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</h3>
-                        {tierKey === currentTier && (
+                        {tierKey === limitsData.currentTier && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-600 text-white">
                             Current Tier
                           </span>
@@ -818,8 +667,8 @@ export default function AdminLimitsPage() {
                     <Info className="w-4 h-4 text-blue-600" />
                     <span className="text-blue-800 font-medium">
                       Viewing limits for: <span className="font-bold">
-                        {tiers && tiers.length > 0 
-                          ? tiers.find(t => t.tierKey === selectedTier)?.displayName || selectedTier
+                        {limitsData?.tiers && limitsData.tiers.length > 0 
+                          ? limitsData.tiers.find((t: TierSystemTier) => t.tierKey === selectedTier)?.displayName || selectedTier
                           : selectedTier.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
                         }
                       </span>
@@ -837,11 +686,11 @@ export default function AdminLimitsPage() {
                     disabled={isEditing}
                     className="px-3 py-2 border border-blue-300 rounded-md bg-white text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                   >
-                    {tiers && tiers.length > 0 ? (
-                      tiers
-                        .filter(tier => tier.isActive)
-                        .sort((a, b) => a.sortOrder - b.sortOrder)
-                        .map(tier => (
+                    {limitsData?.tiers && limitsData.tiers.length > 0 ? (
+                      limitsData.tiers
+                        .filter((tier: TierSystemTier) => tier.isActive)
+                        .sort((a: TierSystemTier, b: TierSystemTier) => a.sortOrder - b.sortOrder)
+                        .map((tier: TierSystemTier) => (
                           <option key={tier.tierKey} value={tier.tierKey}>
                             {tier.displayName}
                           </option>
@@ -927,9 +776,9 @@ export default function AdminLimitsPage() {
               <div className="mt-6 p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium">Tier Comparison</h4>
-                  {tiers && tiers.length > 0 && (
+                  {limitsData?.tiers && limitsData.tiers.length > 0 && (
                     <div className="text-xs text-gray-500">
-                      {tiers.filter(t => t.isActive).length} active tiers
+                      {limitsData.tiers.filter((t: TierSystemTier) => t.isActive).length} active tiers
                     </div>
                   )}
                 </div>

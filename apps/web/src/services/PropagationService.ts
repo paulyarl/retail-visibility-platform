@@ -11,6 +11,28 @@ export type { PropagationRequest, PropagationResult, OrganizationTenant };
 export class PropagationService extends OrganizationApiSingleton {
   private static instance: PropagationService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'propagation-service*',
+      'item-propagation*',
+      'propagation-status*',
+      'org-tenant*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(organizationId?: string): Promise<void> {
+    await this.invalidateCachePattern('propagation-service*');
+    await this.invalidateCachePattern('item-propagation*');
+    await this.invalidateCachePattern('propagation-status*');
+    await this.invalidateCachePattern('org-tenant*');
+  }
+
   private constructor() {
     super('propagation-service', {
       defaultOrganizationValidation: {

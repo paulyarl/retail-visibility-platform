@@ -48,6 +48,26 @@ export interface Review {
 class AuthenticatedReviewService extends TenantApiSingleton {
   private static instance: AuthenticatedReviewService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'authenticated-review-service*',
+      'admin-reviews*',
+      'review-moderation*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('authenticated-review-service*');
+    await this.invalidateCachePattern('admin-reviews*');
+    await this.invalidateCachePattern('review-moderation*');
+  }
+
   private constructor() {
     super('authenticated-review-service');
     this.cacheTTL = 2 * 60 * 1000; // 2 minutes for admin operations

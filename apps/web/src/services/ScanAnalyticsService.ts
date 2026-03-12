@@ -53,6 +53,26 @@ export interface ProductPreview {
 class ScanAnalyticsService extends TenantApiSingleton {
   private static instance: ScanAnalyticsService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'scan-analytics*',
+      'product-preview*',
+      'scan-insights*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('scan-analytics*');
+    await this.invalidateCachePattern('product-preview*');
+    await this.invalidateCachePattern('scan-insights*');
+  }
+
   // TTL for different types of data
   private readonly ANALYTICS_TTL = 5 * 60 * 1000; // 5 minutes for analytics
   private readonly PREVIEW_TTL = 30 * 60 * 1000; // 30 minutes for product previews

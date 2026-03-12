@@ -6,7 +6,6 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Anima
 import { Button } from '@mantine/core';
 import { motion } from 'framer-motion';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { api } from '@/lib/api';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';

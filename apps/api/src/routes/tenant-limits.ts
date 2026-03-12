@@ -248,4 +248,51 @@ router.get('/featured-products/all', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * PUT /api/tenant-limits/featured-products
+ * 
+ * Update featured products limits for a tier (admin endpoint)
+ */
+router.put('/featured-products', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'authentication_required' });
+    }
+
+    // Check if user is platform admin
+    if (!isPlatformAdmin(req.user)) {
+      return res.status(403).json({ error: 'admin_required' });
+    }
+
+    const { tier, limits } = req.body;
+
+    if (!tier || !limits) {
+      return res.status(400).json({ error: 'tier_and_limits_required' });
+    }
+
+    // Validate limits structure
+    const requiredFields = ['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick', 'random_featured'];
+    for (const field of requiredFields) {
+      if (typeof limits[field] !== 'number' || limits[field] < 0) {
+        return res.status(400).json({ error: `invalid_${field}_limit` });
+      }
+    }
+
+    // Update the configuration file (for now, just update in memory)
+    // TODO: Persist to database or configuration file
+    const { FEATURED_PRODUCTS_LIMITS } = require('../config/tenant-limits');
+    FEATURED_PRODUCTS_LIMITS[tier] = limits;
+
+    return res.json({
+      success: true,
+      tier,
+      limits: FEATURED_PRODUCTS_LIMITS[tier],
+      message: 'Featured products limits updated successfully'
+    });
+  } catch (error) {
+    console.error('[PUT /api/tenant-limits/featured-products] Error:', error);
+    return res.status(500).json({ error: 'failed_to_update_featured_limits' });
+  }
+});
+
 export default router;

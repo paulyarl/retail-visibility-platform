@@ -89,6 +89,27 @@ class EnhancedTenantFeaturedProductsSingleton extends TenantApiSingleton {
   // ProductProvider integration
   private productProvider: any = null; // Will be injected or imported
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      `enhanced-featured-products-${this.tenantId}*`,
+      `featured-products-state-${this.tenantId}*`,
+      `tenant-featured-config-${this.tenantId}*`
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    const targetTenantId = tenantId || this.tenantId;
+    await this.invalidateCachePattern(`enhanced-featured-products-${targetTenantId}*`);
+    await this.invalidateCachePattern(`featured-products-state-${targetTenantId}*`);
+    await this.invalidateCachePattern(`tenant-featured-config-${targetTenantId}*`);
+  }
+
   // Default featured types configuration
   private defaultFeaturedTypes: FeaturedType[] = [
     'store_selection',

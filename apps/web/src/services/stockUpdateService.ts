@@ -20,6 +20,26 @@ export class StockUpdateService extends TenantApiSingleton {
   private static instance: StockUpdateService;
   private itemsService: ItemsSingletonService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'stock-update*',
+      'inventory-sync*',
+      'stock-levels*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('stock-update*');
+    await this.invalidateCachePattern('inventory-sync*');
+    await this.invalidateCachePattern('stock-levels*');
+  }
+
   private constructor() {
     super('stock-update-service');
     this.cacheTTL = 5 * 60 * 1000; // 5 minutes for stock updates

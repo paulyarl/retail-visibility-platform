@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { api } from '@/lib/api';
+import { tenantCategoriesService } from '@/services/TenantCategoriesService';
 
 interface GBPCategory {
   id: string;
@@ -36,10 +36,19 @@ export default function GBPCategorySelector({
     async function loadPopularCategories() {
       try {
         setLoadingPopular(true);
-        const response = await api.get(`/api/gbp/categories/popular?tenantId=${encodeURIComponent(tenantId)}`);
-        if (response.ok) {
-          const data = await response.json();
-          setPopularCategories(data.items || []);
+        
+        // For now, we'll use tenant categories as popular categories
+        // This could be enhanced with a proper GBP service
+        const categories = await tenantCategoriesService.getTenantCategories(tenantId);
+        
+        if (categories) {
+          // Map tenant categories to GBP format
+          const mappedCategories = categories.slice(0, 10).map(cat => ({
+            id: cat.id,
+            name: cat.name,
+            path: [cat.name]
+          }));
+          setPopularCategories(mappedCategories);
         }
       } catch (error) {
         console.error('[GBPCategorySelector] Failed to load popular categories:', error);
@@ -61,13 +70,22 @@ export default function GBPCategorySelector({
     const timer = setTimeout(async () => {
       try {
         setLoading(true);
-        const response = await api.get(`/api/gbp/categories?query=${encodeURIComponent(query)}&limit=10&tenantId=${encodeURIComponent(tenantId)}`);
-        if (response.ok && active) {
-          const data = await response.json();
-          setResults(data.items || []);
-        } else {
-          const errorData = await response.json();
-          console.error('[GBPCategorySelector] API error:', errorData);
+        
+        // Search through tenant categories for now
+        // This could be enhanced with a proper GBP search service
+        const categories = await tenantCategoriesService.getTenantCategories(tenantId);
+        
+        if (categories && active) {
+          // Filter categories by query
+          const filteredCategories = categories
+            .filter(cat => cat.name.toLowerCase().includes(query.toLowerCase()))
+            .slice(0, 10)
+            .map(cat => ({
+              id: cat.id,
+              name: cat.name,
+              path: [cat.name]
+            }));
+          setResults(filteredCategories);
         }
       } catch (error) {
         console.error('[GBPCategorySelector] Search error:', error);

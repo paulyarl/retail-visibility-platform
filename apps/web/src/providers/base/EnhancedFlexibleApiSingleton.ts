@@ -46,13 +46,13 @@ export interface AuthenticatedRequestOptions {
 
 export interface TenantRequestOptions {
   tenantId: string;
-  cacheKey?: string;
   ttl?: number;
   requestTarget?: RequestTarget;
   // 🎯 STRATEGY 1: Context data for enhanced cacheKey generation
   context?: AppContext;
   isolation?: CacheIsolation;
   userId?: string;
+  cacheKey?: string;
 }
 
 export interface AdminRequestOptions {
@@ -114,13 +114,27 @@ export interface ApiResult<T> {
   };
 }
 
-export interface AuthenticatedApiResponse<T> extends ApiResult<T> {}
-export interface TenantApiResponse<T> extends ApiResult<T> {}
-export interface AdminApiResponse<T> extends ApiResult<T> {}
-export interface PublicApiResponse<T> extends ApiResult<T> {}
-export interface ExternalApiResponse<T> extends ApiResult<T> {}
+export interface AuthenticatedApiResponse<T> extends ApiResult<T> {
+  cacheKey?: string;
+}
+export interface TenantApiResponse<T> extends ApiResult<T> {
+  cacheKey?: string;
+  tenantId?: string;
+}
+export interface AdminApiResponse<T> extends ApiResult<T> {
+  cacheKey?: string;
+  userId?: string;
+}
+export interface PublicApiResponse<T> extends ApiResult<T> {
+  cacheKey?: string;
+}
+export interface ExternalApiResponse<T> extends ApiResult<T> {
+  cacheKey?: string;
+}
 
-export interface SystemApiResponse<T> extends ApiResult<T> {}
+export interface SystemApiResponse<T> extends ApiResult<T> {
+  cacheKey?: string;
+}
 
 // Extend the imported EnhancedCacheOptions with additional properties needed for API requests
 interface ApiEnhancedCacheOptions extends EnhancedCacheOptions {
@@ -340,6 +354,7 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
   protected async makeEnhancedPublicRequest<T>(
     url: string,
     options?: RequestInit,
+    cacheKey?: string,
     cacheOptions?: ApiEnhancedCacheOptions
   ): Promise<ApiResult<T>> {
     // 🎯 STRATEGY 1: Get context data, don't generate cacheKey here
@@ -374,6 +389,7 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
   protected async makeEnhancedAuthenticatedRequest<T>(
     url: string,
     options?: RequestInit,
+    cacheKey?: string,
     cacheOptions?: ApiEnhancedCacheOptions
   ): Promise<AuthenticatedApiResponse<T>> {
     // 🎯 STRATEGY 1: Get context data, don't generate cacheKey here
@@ -415,7 +431,8 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
   protected async makeEnhancedTenantRequest<T>(
     url: string,
     options?: RequestInit,
-    cacheOptions?: ApiEnhancedCacheOptions
+    cacheKey?: string,
+    cacheOptions?: TenantRequestOptions & ApiEnhancedCacheOptions   
   ): Promise<TenantApiResponse<T>> {
     // 🎯 STRATEGY 1: Get context data, don't generate cacheKey here
     const context = cacheOptions?.context ?? this.defaultContext;
@@ -455,7 +472,8 @@ export abstract class EnhancedFlexibleApiSingleton extends UniversalSingleton {
   protected async makeEnhancedAdminRequest<T>(
     url: string,
     options?: RequestInit,
-    cacheOptions?: ApiEnhancedCacheOptions
+    cacheKey?: string,
+    cacheOptions?:AdminRequestOptions & ApiEnhancedCacheOptions
   ): Promise<AdminApiResponse<T>> {
     // 🎯 STRATEGY 1: Get context data, don't generate cacheKey here
     const context = cacheOptions?.context ?? this.defaultContext;

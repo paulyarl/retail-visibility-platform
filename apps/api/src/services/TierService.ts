@@ -136,7 +136,7 @@ export async function getTierPrice(tierKey: string): Promise<number> {
   const tier = await getTierByKey(tierKey);
   if (!tier) return 0;
   
-  return tier.price_monthly / 100; // Convert cents to dollars
+  return tier.price_monthly; // Already stored as dollars (DECIMAL)
 }
 
 /**

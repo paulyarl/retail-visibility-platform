@@ -37,6 +37,32 @@ export interface RBACUserAccess {
  * Provides RBAC functionality with platform cache integration
  * Uses SYSTEM + WEB target for web-to-API communication (port 3000)
  */
+export interface RBACPermission {
+  id: string;
+  name: string;
+  description?: string;
+  resource: string;
+  action: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RBACCreatePermissionRequest {
+  name: string;
+  description?: string;
+  resource: string;
+  action: string;
+}
+
+export interface RBACUpdatePermissionRequest {
+  name?: string;
+  description?: string;
+  resource?: string;
+  action?: string;
+  isActive?: boolean;
+}
+
 export class RBACService extends SystemSingleton {
   private static readonly CACHE_TTL = 10 * 60 * 1000; // 10 minutes
   private static instance: RBACService;
@@ -51,11 +77,200 @@ export class RBACService extends SystemSingleton {
   /**
    * Get singleton instance using platform singleton pattern
    */
-  static getInstance(): RBACService {
+  public static getInstance(): RBACService {
     if (!RBACService.instance) {
       RBACService.instance = new RBACService();
     }
     return RBACService.instance;
+  }
+
+  /**
+   * Get all permissions with system-level caching
+   * Routes to WEB server (port 3000) for web-to-API communication
+   */
+  async getPermissions(params?: {
+    resource?: string;
+    action?: string;
+    isActive?: boolean;
+  }): Promise<RBACPermission[]> {
+    try {
+      console.log('[RBACService] Fetching permissions via web server (port 3000)');
+      
+      const queryParams = new URLSearchParams();
+      if (params?.resource) queryParams.set('resource', params.resource);
+      if (params?.action) queryParams.set('action', params.action);
+      if (params?.isActive !== undefined) queryParams.set('isActive', params.isActive.toString());
+      
+      const queryString = queryParams.toString();
+      const endpoint = `/permissions${queryString ? `?${queryString}` : ''}`;
+      
+      const result = await this.makeDefaultRequest<RBACPermission[]>(
+        endpoint,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'max-age=600', // 10 minutes
+            'X-Service-Worker': 'rbac-cache',
+            'X-Platform-Cache': 'enabled'
+          }
+        },
+        `rbac-permissions-${JSON.stringify(params || {})}`
+      );
+      
+      if (!result.success) {
+        console.error('[RBACService] Failed to get permissions:', result.error);
+        return [];
+      }
+
+      return result.data || [];
+    } catch (error) {
+      console.error('[RBACService] Failed to get permissions:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Create a new permission
+   * Note: This will invalidate relevant cache entries
+   */
+  async createPermission(permissionData: RBACCreatePermissionRequest): Promise<RBACPermission | null> {
+    try {
+      const result = await this.makeDefaultRequest<RBACPermission>(
+        '/permissions',
+        {
+          method: 'POST',
+          body: JSON.stringify(permissionData)
+        },
+        'rbac-create-permission'
+      );
+      
+      if (!result.success) {
+        console.error('[RBACService] Failed to create permission:', result.error);
+        return null;
+      }
+
+      // Invalidate permissions cache after creation
+      await this.invalidateCachePattern('rbac-permissions*');
+      
+      return result.data || null;
+    } catch (error) {
+      console.error('[RBACService] Failed to create permission:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update an existing permission
+   * Note: This will invalidate relevant cache entries
+   */
+  async updatePermission(permissionId: string, permissionData: RBACUpdatePermissionRequest): Promise<RBACPermission | null> {
+    if (!permissionId) {
+      console.error('[RBACService] Permission ID is required');
+      return null;
+    }
+
+    try {
+      const result = await this.makeDefaultRequest<RBACPermission>(
+        `/permissions/${permissionId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(permissionData)
+        },
+        `rbac-update-permission-${permissionId}`
+      );
+      
+      if (!result.success) {
+        console.error('[RBACService] Failed to update permission:', result.error);
+        return null;
+      }
+
+      // Invalidate permissions cache after update
+      await this.invalidateCachePattern('rbac-permissions*');
+      
+      return result.data || null;
+    } catch (error) {
+      console.error('[RBACService] Failed to update permission:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Bulk update permissions
+   * Note: This will invalidate relevant cache entries
+   */
+  async bulkUpdatePermissions(updates: Array<{
+    id: string;
+    updates: RBACUpdatePermissionRequest;
+  }>): Promise<{
+    success: number;
+    failed: string[];
+  }> {
+    if (!updates || updates.length === 0) {
+      console.error('[RBACService] Updates array is required');
+      return { success: 0, failed: [] };
+    }
+
+    try {
+      const result = await this.makeDefaultRequest<{
+        success: number;
+        failed: string[];
+      }>(
+        '/permissions/bulk-update',
+        {
+          method: 'POST',
+          body: JSON.stringify({ updates })
+        },
+        'rbac-bulk-update-permissions'
+      );
+      
+      if (!result.success) {
+        console.error('[RBACService] Failed to bulk update permissions:', result.error);
+        return { success: 0, failed: updates.map(u => u.id) };
+      }
+
+      // Invalidate permissions cache after bulk update
+      await this.invalidateCachePattern('rbac-permissions*');
+      
+      return result.data || { success: 0, failed: updates.map(u => u.id) };
+    } catch (error) {
+      console.error('[RBACService] Failed to bulk update permissions:', error);
+      return { success: 0, failed: updates.map(u => u.id) };
+    }
+  }
+
+  /**
+   * Delete a permission
+   * Note: This will invalidate relevant cache entries
+   */
+  async deletePermission(permissionId: string): Promise<boolean> {
+    if (!permissionId) {
+      console.error('[RBACService] Permission ID is required');
+      return false;
+    }
+
+    try {
+      const result = await this.makeDefaultRequest<void>(
+        `/permissions/${permissionId}`,
+        {
+          method: 'DELETE'
+        },
+        `rbac-delete-permission-${permissionId}`
+      );
+      
+      if (!result.success) {
+        console.error('[RBACService] Failed to delete permission:', result.error);
+        return false;
+      }
+
+      // Invalidate permissions cache after deletion
+      await this.invalidateCachePattern('rbac-permissions*');
+      
+      return true;
+    } catch (error) {
+      console.error('[RBACService] Failed to delete permission:', error);
+      return false;
+    }
   }
 
   /**
@@ -282,3 +497,6 @@ export class RBACService extends SystemSingleton {
     };
   }
 }
+
+// Export singleton instance
+export const rbacService = RBACService.getInstance();

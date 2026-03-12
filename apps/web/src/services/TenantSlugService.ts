@@ -36,6 +36,26 @@ export interface TenantSlug {
 class TenantSlugService extends TenantApiSingleton {
   private static instance: TenantSlugService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-slug-service*',
+      'tenant-slugs*',
+      'slug-operations*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tenant-slug-service*');
+    await this.invalidateCachePattern('tenant-slugs*');
+    await this.invalidateCachePattern('slug-operations*');
+  }
+
   protected constructor() {
     super('tenant-slug-service');
   }

@@ -61,6 +61,26 @@ export interface UpdateOrganizationData {
 class TenantOrganizationsSingleton extends TenantApiSingleton {
   private static instances: Map<string, TenantOrganizationsSingleton> = new Map();
   
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-organizations*',
+      'organization-members*',
+      'available-tenants*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tenant-organizations*');
+    await this.invalidateCachePattern('organization-members*');
+    await this.invalidateCachePattern('available-tenants*');
+  }
+  
   private state: OrganizationsState = {
     organizations: [],
     availableTenants: [],

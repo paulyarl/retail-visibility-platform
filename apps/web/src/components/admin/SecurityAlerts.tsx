@@ -6,6 +6,7 @@ import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui/Badge';
 import { SecurityPagination } from './SecurityPagination';
 import { AlertTriangle, Shield, TrendingUp, Users, Eye, EyeOff, Clock, User, Globe, UserCheck, UserX, ChevronDown, ChevronUp, Cpu, Activity, MapPin, Network } from 'lucide-react';
+import { adminSecurityMonitoringService } from '@/services/AdminSecurityMonitoringSingletonService';
 
 interface PaginationInfo {
   page: number;
@@ -28,8 +29,8 @@ interface SecurityAlert {
   createdAt: string;
   readAt?: string;
   userEmail?: string;
-  userFirstName?: string;
-  userLastName?: string;
+  userFirstName?: string | null;
+  userLastName?: string | null;
 }
 
 export default function SecurityAlerts() {
@@ -49,18 +50,31 @@ export default function SecurityAlerts() {
     try {
       setError(null);
       setLoading(true);
-      const { api } = await import('@/lib/api');
-      const response = await api.get(`/api/admin/security/alerts?page=${page}&limit=${limit}`);
       
-      if (!response.ok) {
+      // Get security alerts using service with automatic caching
+      const alertsData = await adminSecurityMonitoringService.getSecurityAlerts();
+      
+      if (!alertsData) {
         throw new Error('Failed to fetch security alerts');
       }
 
-      const data = await response.json();
-      setAlerts(data.data || []);
-      setPagination(data.pagination || null);
+      // For now, the service doesn't support pagination, so we'll simulate it
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedAlerts = alertsData.slice(startIndex, endIndex);
+      
+      setAlerts(paginatedAlerts);
+      setPagination({
+        page,
+        limit,
+        total: alertsData.length,
+        totalPages: Math.ceil(alertsData.length / limit),
+        hasNext: endIndex < alertsData.length,
+        hasPrev: page > 1
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch alerts');
+      console.error('[SecurityAlerts] Error fetching alerts:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch security alerts');
     } finally {
       setLoading(false);
     }
@@ -72,7 +86,7 @@ export default function SecurityAlerts() {
 
   const handlePageSizeChange = (size: number) => {
     setPageSize(size);
-    setCurrentPage(1); // Reset to first page when changing page size
+    setCurrentPage(1);
   };
 
   const toggleAlertExpansion = (alertId: string) => {

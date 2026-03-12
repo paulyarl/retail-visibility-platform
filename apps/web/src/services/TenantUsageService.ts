@@ -68,6 +68,26 @@ export interface UsageSummary {
 class TenantUsageService extends TenantApiSingleton {
   private static instance: TenantUsageService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-usage-service*',
+      'usage-statistics*',
+      'tenant-metrics*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tenant-usage-service*');
+    await this.invalidateCachePattern('usage-statistics*');
+    await this.invalidateCachePattern('tenant-metrics*');
+  }
+
   private constructor() {
     super('tenant-usage-service', {
       ttl: 5 * 60 * 1000 // 5 minutes for usage data

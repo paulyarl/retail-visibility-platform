@@ -4,6 +4,9 @@
  * Extends FlexibleApiSingleton with tenant-specific defaults
  * Handles tenant context validation and enhanced request processing
  * Provides tenant-specific caching and header management
+ * 
+ * PILOT: Cache invalidation contract implementation
+ * All tenant services must declare their cache patterns and invalidation methods
  */
 
 import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, TenantRequestOptions, TenantApiResponse, PublicRequestOptions } from './FlexibleApiSingleton';
@@ -26,6 +29,52 @@ export abstract class TenantApiSingleton extends FlexibleApiSingleton {
       ttl: 10 * 60 * 1000, // 10 minutes for tenant operations
       ...cacheOptions
     });
+  }
+
+  /**
+   * PILOT: Abstract cache contract for tenant services
+   * Each tenant service MUST implement to declare its cache keys
+   * This enables automatic cache management and documentation
+   */
+  public abstract getServiceCachePatterns(): string[];
+
+  /**
+   * PILOT: Abstract public cache invalidation method
+   * Each tenant service MUST implement to provide its invalidation contract
+   * Other services can call this to invalidate tenant-specific caches
+   */
+  public abstract invalidateServiceCaches(tenantId?: string, ...params: any[]): Promise<void>;
+
+  /**
+   * PILOT: Optional cross-service cache dependencies
+   * Services can declare what other services' caches they want to invalidate
+   * Default: no cross-service dependencies
+   */
+  public getCrossServiceInvalidations(): Array<{service: () => any, method: string, params: any[]}> {
+    return [];
+  }
+
+  /**
+   * PILOT: Enhanced invalidation with cross-service dependencies
+   * Invalidates this service's caches plus any declared cross-service dependencies
+   */
+  public async invalidateWithDependencies(tenantId?: string, ...params: any[]): Promise<void> {
+    // 1. Invalidate this service's caches
+    await this.invalidateServiceCaches(tenantId, ...params);
+    
+    // 2. Invalidate dependent service caches
+    const dependencies = this.getCrossServiceInvalidations();
+    await Promise.all(
+      dependencies.map(({ service, method, params: depParams }) => {
+        try {
+          const serviceInstance = service();
+          return serviceInstance[method](...depParams);
+        } catch (error) {
+          console.warn(`[TenantApiSingleton] Failed to invalidate cross-service cache:`, error);
+          return Promise.resolve(); // Don't fail the main invalidation
+        }
+      })
+    );
   }
 
   /**

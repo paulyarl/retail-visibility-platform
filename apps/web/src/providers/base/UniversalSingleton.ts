@@ -13,6 +13,7 @@
 import cacheManager, { CacheManager } from '../../utils/cacheManager';
 import { contextAwareCacheService, ContextAwareCacheOptions } from '../../services/contextAwareCacheService';
 import { AutoUserCacheOptions } from '../../utils/userIdentification';
+import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
 
 // ====================
 // INTERFACES
@@ -429,9 +430,129 @@ export abstract class UniversalSingleton {
   }
 
   /**
+   * Enhanced cache invalidation with pattern matching for dynamic keys
+   * Supports patterns like 'ticker-config*' or 'variant-*' to match context-aware keys
+   */
+  protected async invalidateCachePattern(pattern: string): Promise<void> {
+    try {
+      // Handle wildcard patterns
+      if (pattern.includes('*')) {
+        const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+        
+        // Clear matching keys from memory cache
+        for (const key of this.cache.keys()) {
+          if (regex.test(key)) {
+            this.cache.delete(key);
+            await this.cacheManager.remove(key);
+          }
+        }
+      } else {
+        // Exact match - use existing clearCache
+        await this.clearCache(pattern);
+      }
+    } catch (error) {
+      console.warn(`[${this.constructor.name}] Enhanced cache invalidation failed for pattern '${pattern}':`, error);
+    }
+  }
+
+  /**
+   * Context-aware cache invalidation with type safety
+   * Invalidate cache for specific base key within specific context/isolation
+   * 
+   * Uses base class defaults when context/isolation not provided
+   * 
+   * Examples:
+   * - invalidateCacheWithContext('tier-system-tiers', AppContext.ADMIN, CacheIsolation.ADMIN) -> clears 'tier-system-tiers:admin:admin'
+   * - invalidateCacheWithContext('tier-system-tiers', AppContext.ADMIN, null) -> clears all admin context keys
+   * - invalidateCacheWithContext('tier-system-tiers', null, CacheIsolation.ADMIN) -> clears all admin isolation keys
+   * - invalidateCacheWithContext('tier-system-tiers', null, null) -> clears using base class defaults
+   */
+  protected async invalidateCacheWithContext(
+    baseKey: string, 
+    context?: AppContext | null, 
+    isolation?: CacheIsolation | null
+  ): Promise<void> {
+    try {
+      let pattern = baseKey;
+      
+      if (context && isolation) {
+        // Target specific context and isolation
+        pattern = `${baseKey}:${context}:${isolation}`;
+      } else if (context) {
+        // Target specific context (any isolation)
+        pattern = `${baseKey}:${context}:*`;
+      } else if (isolation) {
+        // Target specific isolation (any context)
+        pattern = `${baseKey}:*:${isolation}`;
+      } else {
+        // Use base class defaults for backward compatibility
+        const defaultContext = (this as any).defaultContext;
+        const defaultIsolation = (this as any).defaultIsolation;
+        
+        if (defaultContext && defaultIsolation) {
+          // Target default context and isolation from base class
+          pattern = `${baseKey}:${defaultContext}:${defaultIsolation}`;
+        } else {
+          // Fallback: target all contexts and isolations
+          pattern = `${baseKey}*`;
+        }
+      }
+      
+      await this.invalidateCachePattern(pattern);
+    } catch (error) {
+      console.warn(`[${this.constructor.name}] Context-aware cache invalidation failed for baseKey '${baseKey}', context '${context}', isolation '${isolation}':`, error);
+    }
+  }
+
+  /**
+   * Invalidate cache for multiple contexts with type safety
+   * Useful for admin operations that should clear both admin and system caches
+   * 
+   * Uses base class defaults when contexts array is empty
+   */
+  protected async invalidateCacheAcrossContexts(
+    baseKey: string, 
+    contexts?: AppContext[], 
+    isolations?: CacheIsolation[]
+  ): Promise<void> {
+    try {
+      // Use base class defaults for backward compatibility
+      if (!contexts || contexts.length === 0) {
+        const defaultContext = (this as any).defaultContext;
+        const defaultIsolation = (this as any).defaultIsolation;
+        
+        if (defaultContext && defaultIsolation) {
+          // Use default context and isolation
+          await this.invalidateCacheWithContext(baseKey, defaultContext, defaultIsolation);
+        } else {
+          // Fallback: target all contexts and isolations
+          await this.invalidateCachePattern(`${baseKey}*`);
+        }
+        return;
+      }
+      
+      const promises: Promise<void>[] = [];
+      
+      for (const context of contexts) {
+        if (isolations && isolations.length > 0) {
+          for (const isolation of isolations) {
+            promises.push(this.invalidateCacheWithContext(baseKey, context, isolation));
+          }
+        } else {
+          promises.push(this.invalidateCacheWithContext(baseKey, context, null));
+        }
+      }
+      
+      await Promise.all(promises);
+    } catch (error) {
+      console.warn(`[${this.constructor.name}] Multi-context cache invalidation failed for baseKey '${baseKey}':`, error);
+    }
+  }
+
+  /**
    * Invalidate cache (alias for clearCache)
    */
-  public invalidateCache(key?: string): Promise<void> {
+  public async invalidateCache(key?: string): Promise<void> {
     return this.clearCache(key);
   }
 

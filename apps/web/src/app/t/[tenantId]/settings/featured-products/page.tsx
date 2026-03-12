@@ -5,7 +5,7 @@ import SetTenantId from '@/components/client/SetTenantId';
 import FeaturedProductsManager from '@/components/tenant/FeaturedProductsManager';
 import { ArrowLeft, Star } from 'lucide-react';
 import Link from 'next/link';
-import { apiRequest } from '@/lib/api';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic';
@@ -80,15 +80,13 @@ export default function FeaturedProductsSettings({
         
         console.log('FeaturedProductsSettings: Fetching tenant', id);
         
-        const response = await apiRequest(`/api/tenants/${id}`);
-        if (response.ok) {
-          const data = await response.json();
-          console.log('FeaturedProductsSettings: Tenant data received', data);
-          setTenant(data);
+        const tenantData = await tenantInfoService.getTenantInfo(id);
+        if (tenantData) {
+          console.log('FeaturedProductsSettings: Tenant data received', tenantData);
+          setTenant(tenantData);
         } else {
-          const errorText = await response.text();
-          console.error('FeaturedProductsSettings: Failed to load tenant', errorText);
-          setError(`Failed to load tenant information: ${response.status}`);
+          console.error('FeaturedProductsSettings: Failed to load tenant');
+          setError('Failed to load tenant information');
         }
       } catch (err) {
         console.error('FeaturedProductsSettings: Error loading tenant', err);

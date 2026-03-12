@@ -27,6 +27,26 @@ export interface SyncResult {
 export class IntegrationService extends TenantApiSingleton {
   private static instance: IntegrationService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'integration-service*',
+      'clover-integration*',
+      'sync-status*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('integration-service*');
+    await this.invalidateCachePattern('clover-integration*');
+    await this.invalidateCachePattern('sync-status*');
+  }
+
   private constructor() {
     super('integration-service', {
       ttl: 15 * 60 * 1000 // 15 minutes for integration status

@@ -35,6 +35,26 @@ export interface CategoryFormData {
 class TenantCategoriesService extends TenantApiSingleton {
   private static instance: TenantCategoriesService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-categories-service*',
+      'tenant-categories*',
+      'category-management*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tenant-categories-service*');
+    await this.invalidateCachePattern('tenant-categories*');
+    await this.invalidateCachePattern('category-management*');
+  }
+
   // Different TTL for different category operations
   private readonly CATEGORIES_TTL = 5 * 60 * 1000; // 5 minutes for categories
   private readonly ALIGNMENT_TTL = 2 * 60 * 1000; // 2 minutes for alignment status

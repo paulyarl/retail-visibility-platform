@@ -38,6 +38,26 @@ interface GBPCategory {
 class GBPCategoryService extends TenantApiSingleton {
   private static instance: GBPCategoryService | null = null;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'gbp-categories*',
+      'category-mappings*',
+      'gbp-taxonomy*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('gbp-categories*');
+    await this.invalidateCachePattern('category-mappings*');
+    await this.invalidateCachePattern('gbp-taxonomy*');
+  }
+
   private constructor() {
     super('gbp-category');
   }

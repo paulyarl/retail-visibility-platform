@@ -32,6 +32,26 @@ export interface ScanResult {
 export class InventoryScanService extends TenantApiSingleton {
   private static instance: InventoryScanService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'inventory-scan*',
+      'scan-sessions*',
+      'scan-results*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('inventory-scan*');
+    await this.invalidateCachePattern('scan-sessions*');
+    await this.invalidateCachePattern('scan-results*');
+  }
+
   private constructor() {
     super('InventoryScanService');
   }

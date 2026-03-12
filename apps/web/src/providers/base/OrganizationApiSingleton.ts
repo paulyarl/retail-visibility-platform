@@ -211,10 +211,21 @@ export class OrganizationValidationError extends Error {
 }
 
 export abstract class OrganizationApiSingleton extends TenantApiSingleton {
-
-    protected defaultRequestType: RequestType = RequestType.TENANT;
-    protected defaultRequestTarget: RequestTarget = RequestTarget.API;
+  protected defaultRequestType: RequestType = RequestType.TENANT;
+  protected defaultRequestTarget: RequestTarget = RequestTarget.API;
   protected options: OrganizationServiceOptions;
+
+  /**
+   * PILOT: Abstract cache contract for organization services
+   * Each organization service MUST implement to declare its cache keys
+   */
+  public abstract getServiceCachePatterns(): string[];
+
+  /**
+   * PILOT: Abstract public cache invalidation method for organization services
+   * Each organization service MUST implement to provide its invalidation contract
+   */
+  public abstract invalidateServiceCaches(organizationId?: string, ...params: any[]): Promise<void>;
 
   protected constructor(singletonKey: string, options?: Partial<OrganizationServiceOptions>) {
     // Create proper cache options for parent class

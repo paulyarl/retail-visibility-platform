@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import TenantAppShell from '@/components/app-shell/TenantAppShell';
-import { apiRequest } from '@/lib/api';
+import { directoryService } from '@/services/DirectorySingletonService';
 
 interface DynamicTenantSidebarProps {
   tenantId: string;
@@ -32,17 +32,17 @@ export default function DynamicTenantSidebar({ tenantId, slug, children }: Dynam
   useEffect(() => {
     const fetchDirectoryStatus = async () => {
       try {
-        // Use the same approach as storefront page
-        const res = await apiRequest(`/api/directory/${tenantId}`);
-        if (res.ok) {
-          const data = await res.json();
+        // Use the directory service to get tenant directory info
+        const directoryInfo = await directoryService.getTenantDirectorySlug(tenantId);
+        
+        if (directoryInfo) {
           setListing({
-            id: data.listing?.id || tenantId,
+            id: tenantId,
             tenantId: tenantId,
-            slug: slug || data.listing?.slug,
+            slug: slug || directoryInfo.slug,
             isPublished: true,
             businessProfile: {
-              slug: data.listing?.slug,
+              slug: directoryInfo.slug,
             },
           });
         } else {

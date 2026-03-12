@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { geocodeAddress } from '@/lib/validation/businessProfile';
-import { api } from '@/lib/api';
+import { tenantDirectoryManagementService } from '@/services/TenantDirectoryManagementService';
 
 interface DirectoryListing {
   id: string;
@@ -72,10 +72,13 @@ export default function DirectoryMap({
       if (coordinates) {
         console.log('[DirectoryMap] Got coordinates for', store.businessName, ':', coordinates);
         
-        // Update the store coordinates via API
-        const response = await api.patch(`/api/tenants/${store.id}/coordinates`, coordinates);
+        // Update the store coordinates using service with automatic cache invalidation
+        const updatedListing = await tenantDirectoryManagementService.updateDirectoryListing(store.id, {
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude
+        });
 
-        if (response.ok) {
+        if (updatedListing) {
           console.log('[DirectoryMap] Successfully updated coordinates for', store.businessName);
           return coordinates;
         } else {

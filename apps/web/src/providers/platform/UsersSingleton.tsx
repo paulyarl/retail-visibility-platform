@@ -93,6 +93,26 @@ export interface UpdateUserRequest {
 class UsersSingleton extends TenantApiSingleton {
   private static instance: UsersSingleton;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'users-singleton*',
+      'tenant-users*',
+      'user-profiles*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('users-singleton*');
+    await this.invalidateCachePattern('tenant-users*');
+    await this.invalidateCachePattern('user-profiles*');
+  }
+
   constructor() {
     super('users-singleton');
     this.cacheTTL = 15 * 60 * 1000; // 15 minutes for user data

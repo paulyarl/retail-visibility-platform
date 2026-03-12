@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@mantine/core';
 import { MapPin, Truck, Package, Clock, DollarSign } from 'lucide-react';
+import { publicFulfillmentService, type FulfillmentSettings } from '@/services/PublicFulfillmentService';
 
 export type FulfillmentMethod = 'pickup' | 'delivery' | 'shipping';
 
@@ -11,20 +12,6 @@ interface FulfillmentMethodFormProps {
   subtotal: number;
   onSubmit: (method: FulfillmentMethod, fee: number) => void;
   initialMethod?: FulfillmentMethod;
-}
-
-interface FulfillmentSettings {
-  pickup_enabled: boolean;
-  pickup_instructions: string | null;
-  pickup_ready_time_minutes: number;
-  delivery_enabled: boolean;
-  delivery_radius_miles: number | null;
-  delivery_fee_cents: number;
-  delivery_min_free_cents: number | null;
-  delivery_time_hours: number;
-  shipping_enabled: boolean;
-  shipping_flat_rate_cents: number | null;
-  shipping_handling_days: number;
 }
 
 export default function FulfillmentMethodForm({
@@ -44,24 +31,19 @@ export default function FulfillmentMethodForm({
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const { apiRequest } = await import('@/lib/api');
-      const response = await apiRequest(`/public/tenant/${tenantId}/fulfillment-settings`, {
-        skipAuth: true // Skip authentication for public endpoint
-      });
       
-      if (!response.ok) throw new Error('Failed to fetch settings');
+      const settings = await publicFulfillmentService.getFulfillmentSettings(tenantId);
       
-      const data = await response.json();
-      if (data.success && data.settings) {
-        setSettings(data.settings);
+      if (settings) {
+        setSettings(settings);
         
         // Auto-select first available method if none selected
         if (!selectedMethod) {
-          if (data.settings.pickup_enabled) {
+          if (settings.pickup_enabled) {
             setSelectedMethod('pickup');
-          } else if (data.settings.delivery_enabled) {
+          } else if (settings.delivery_enabled) {
             setSelectedMethod('delivery');
-          } else if (data.settings.shipping_enabled) {
+          } else if (settings.shipping_enabled) {
             setSelectedMethod('shipping');
           }
         }
@@ -75,13 +57,7 @@ export default function FulfillmentMethodForm({
 
   const getDeliveryFee = (): number => {
     if (!settings) return 0;
-    
-    // Check if order qualifies for free delivery
-    if (settings.delivery_min_free_cents && subtotal >= settings.delivery_min_free_cents) {
-      return 0;
-    }
-    
-    return settings.delivery_fee_cents;
+    return publicFulfillmentService.calculateDeliveryFee(settings, subtotal * 100); // Convert dollars to cents
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -102,9 +78,7 @@ export default function FulfillmentMethodForm({
   const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`;
   
   const formatTime = (minutes: number) => {
-    if (minutes < 60) return `${minutes} minutes`;
-    const hours = Math.floor(minutes / 60);
-    return hours === 1 ? '1 hour' : `${hours} hours`;
+    return publicFulfillmentService['formatTime'](minutes); // Access private method via service
   };
 
   if (loading) {

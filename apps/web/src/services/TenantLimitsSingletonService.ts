@@ -36,6 +36,26 @@ class TenantLimitsSingletonService extends TenantApiSingleton {
   private static instance: TenantLimitsSingletonService;
   protected cacheTTL: number = 5 * 60 * 1000; // 5 minutes for tenant limits
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-limits-singleton*',
+      'tenant-quotas*',
+      'usage-limits*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tenant-limits-singleton*');
+    await this.invalidateCachePattern('tenant-quotas*');
+    await this.invalidateCachePattern('usage-limits*');
+  }
+
   protected constructor() {
     super('tenant-limits-singleton', {
       ttl: 5 * 60 * 1000 // 5 minutes for tenant limits

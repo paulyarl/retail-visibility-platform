@@ -82,6 +82,27 @@ class TenantSettingsSingleton extends TenantApiSingleton {
   private readonly CACHE_TTL = 15 * 60 * 1000; // 15 minutes
   private readonly tenantId: string;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      `tenant-settings-${this.tenantId}*`,
+      'tenant-preferences*',
+      'tenant-configuration*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    const targetTenantId = tenantId || this.tenantId;
+    await this.invalidateCachePattern(`tenant-settings-${targetTenantId}*`);
+    await this.invalidateCachePattern('tenant-preferences*');
+    await this.invalidateCachePattern('tenant-configuration*');
+  }
+
   private constructor(tenantId: string) {
     super(`tenant-settings-${tenantId}`);
     this.tenantId = tenantId;

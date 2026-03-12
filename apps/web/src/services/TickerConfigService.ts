@@ -151,9 +151,9 @@ class TickerConfigService extends AdminApiSingleton {
         return this.createResponse(false, undefined, result.error);
       }
 
-      // Clear cache to force refresh
-      await this.clearCache('ticker-config');
-      await this.clearCache('active-ticker-messages');
+      // Clear cache to force refresh - use pattern matching for dynamic keys
+      await this.invalidateCachePattern('ticker-config*');
+      await this.invalidateCachePattern('active-ticker-messages*');
 
       return this.createResponse(true, result.data);
     } catch (error) {
@@ -190,9 +190,9 @@ class TickerConfigService extends AdminApiSingleton {
         return this.createResponse(false, undefined, result.error);
       }
 
-      // Clear cache to force refresh
-      await this.clearCache('ticker-config');
-      await this.clearCache('active-ticker-messages');
+      // Clear cache to force refresh - use pattern matching for dynamic keys
+      await this.invalidateCachePattern('ticker-config*');
+      await this.invalidateCachePattern('active-ticker-messages*');
 
       return this.createResponse(true, result.data);
     } catch (error) {
@@ -224,9 +224,9 @@ class TickerConfigService extends AdminApiSingleton {
         return this.createResponse(false, undefined, result.error);
       }
 
-      // Clear cache to force refresh
-      await this.clearCache('ticker-config');
-      await this.clearCache('active-ticker-messages');
+      // Clear cache to force refresh - use pattern matching for dynamic keys
+      await this.invalidateCachePattern('ticker-config*');
+      await this.invalidateCachePattern('active-ticker-messages*');
 
       return this.createResponse(true);
     } catch (error) {

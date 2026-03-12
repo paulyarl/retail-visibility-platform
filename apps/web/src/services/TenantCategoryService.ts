@@ -41,6 +41,26 @@ export interface CategoryAnalytics {
 export class TenantCategoryService extends TenantApiSingleton {
   private static instance: TenantCategoryService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-category-service*',
+      'category-analytics*',
+      'category-performance*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tenant-category-service*');
+    await this.invalidateCachePattern('category-analytics*');
+    await this.invalidateCachePattern('category-performance*');
+  }
+
   private constructor(singletonKey: string, cacheOptions?: any) {
     super(singletonKey, {
       ttl: 10 * 60 * 1000, // 10 minutes cache for categories

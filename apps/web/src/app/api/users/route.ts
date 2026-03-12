@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server';
-import { proxyGet } from '@/lib/api-proxy';
+import { adminUsersService } from '@/services/AdminUsersService';
 
 export async function GET(req: Request) {
   try {
-    const res = await proxyGet(req, '/users');
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    // Get users using service with automatic caching
+    const users = await adminUsersService.getUsers();
+    
+    return NextResponse.json(users);
   } catch (error) {
-    console.error('[API Proxy /users] Error:', error);
+    console.error('[Users API] Error:', error);
     return NextResponse.json(
-      { error: 'proxy_failed', message: 'Failed to fetch users' },
+      { 
+        error: 'internal_server_error',
+        message: 'Failed to fetch users' 
+      },
       { status: 500 }
     );
   }

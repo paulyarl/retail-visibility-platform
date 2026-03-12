@@ -89,7 +89,22 @@ export default function TierSystemPage() {
       const tiers = await platformHomeService.getTierSystemTiers(showInactiveTiers);
       console.log('[TierSystem] Loaded tiers:', tiers?.length, 'Inactive toggle:', showInactiveTiers);
       
-      setTiers(tiers || []); // Handle null return
+      // Fix corrupted prices from API and ensure proper number format
+      const correctedTiers = (tiers || []).map((tier: any) => {
+        // Handle nested response structure
+        const actualTier = tier?.tier || tier;
+        
+        // Get price from either priceMonthly or price field, convert to number
+        const rawPrice = actualTier?.priceMonthly ?? (actualTier as any)?.price ?? 0;
+        const numericPrice = typeof rawPrice === 'string' ? parseFloat(rawPrice) : Number(rawPrice);
+        
+        return {
+          ...actualTier,
+          priceMonthly: numericPrice
+        };
+      });
+      
+      setTiers(correctedTiers); // Handle null return
     } catch (err) {
       console.error('Failed to load tiers:', err);
       setError('Failed to load tiers');
@@ -204,13 +219,38 @@ export default function TierSystemPage() {
     }
   };
 
-  const handleEditChange = (field: keyof Tier, value: string | number | boolean | null) => {
-    if (editingData) {
-      setEditingData({
-        ...editingData,
-        [field]: value
-      });
+  // Type-safe price validation
+  const validateAndFormatPrice = (price: any): number => {
+    // Convert to number if it's a string
+    let numericPrice = typeof price === 'string' ? parseFloat(price) : price;
+    
+    // Validate it's a number
+    if (isNaN(numericPrice) || numericPrice === null || numericPrice === undefined) {
+      return 0;
     }
+    
+    // Ensure it's non-negative
+    if (numericPrice < 0) {
+      numericPrice = 0;
+    }
+    
+    // Round to 2 decimal places to prevent floating point issues
+    return Math.round(numericPrice * 100) / 100;
+  };
+
+  const handleEditChange = (field: keyof Tier, value: string | number | boolean | null) => {
+    if (!editingData) return;
+    
+    // Special handling for price field with validation
+    let processedValue = value;
+    if (field === 'priceMonthly') {
+      processedValue = validateAndFormatPrice(value);
+    }
+    
+    setEditingData({
+      ...editingData,
+      [field]: processedValue
+    });
   };
 
   const getLowerSortOrderTiers = (currentSortOrder: number) => {
@@ -402,9 +442,15 @@ export default function TierSystemPage() {
   };
 
   const handleNewTierChange = (field: keyof Tier, value: string | number | boolean | null) => {
+    // Special handling for price field with validation
+    let processedValue = value;
+    if (field === 'priceMonthly') {
+      processedValue = validateAndFormatPrice(value);
+    }
+    
     setNewTier({
       ...newTier,
-      [field]: value
+      [field]: processedValue
     });
   };
 
@@ -570,12 +616,15 @@ export default function TierSystemPage() {
                               />
                             </div>
                             <div>
-                              <label className="block text-sm font-medium mb-1">Price Monthly</label>
+                              <label className="block text-sm font-medium mb-1">Price Monthly ($)</label>
                               <Input
                                 type="number"
-                                value={editingData?.priceMonthly || 0}
-                                onChange={(e) => handleEditChange('priceMonthly', parseFloat(e.target.value) || 0)}
-                                placeholder="0"
+                                value={editingData?.priceMonthly ?? ''}
+                                onChange={(e) => handleEditChange('priceMonthly', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
+                                onFocus={(e) => e.target.select()}
+                                placeholder="44.00"
+                                step="1"
+                                min="0"
                               />
                             </div>
                             <div>
@@ -624,7 +673,7 @@ export default function TierSystemPage() {
                           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                             <div>
                               <span className="font-medium">Price:</span>
-                              <span className="ml-2">${tier.priceMonthly}/month</span>
+                              <span className="ml-2">${tier.priceMonthly.toFixed(2)}/month</span>
                             </div>
                             <div>
                               <span className="font-medium">Max SKUs:</span>
@@ -1048,11 +1097,14 @@ export default function TierSystemPage() {
               <label className="block text-sm font-medium mb-1">Price Monthly ($)</label>
               <Input
                 type="number"
-                value={newTier.priceMonthly || 0}
-                onChange={(e) => handleNewTierChange('priceMonthly', parseFloat(e.target.value) || 0)}
-                placeholder="199"
+                value={newTier.priceMonthly ?? ''}
+                onChange={(e) => handleNewTierChange('priceMonthly', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
+                placeholder="44.00"
+                step="1"
+                min="0"
               />
-              <p className="text-xs text-gray-500 mt-1">Enter price in dollars (e.g., 199 = $199.00)</p>
+              <p className="text-xs text-gray-500 mt-1">Enter price in dollars (e.g., 44 = $44.00/month)</p>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Max SKUs</label>

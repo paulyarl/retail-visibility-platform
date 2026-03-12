@@ -108,6 +108,26 @@ export interface UpgradeEligibility {
 class TiersSingleton extends TenantApiSingleton {
   private static instance: TiersSingleton;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tiers-singleton*',
+      'tier-system*',
+      'tier-upgrades*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tiers-singleton*');
+    await this.invalidateCachePattern('tier-system*');
+    await this.invalidateCachePattern('tier-upgrades*');
+  }
+
   constructor() {
     super('tiers-singleton');
     this.cacheTTL = 30 * 60 * 1000; // 30 minutes for tier data (changes rarely)

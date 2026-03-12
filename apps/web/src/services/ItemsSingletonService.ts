@@ -75,6 +75,26 @@ export interface ItemsCompleteParams {
 class ItemsSingletonService extends TenantApiSingleton {
   private static instance: ItemsSingletonService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'items-singleton*',
+      'inventory-items*',
+      'item-details*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('items-singleton*');
+    await this.invalidateCachePattern('inventory-items*');
+    await this.invalidateCachePattern('item-details*');
+  }
+
   private constructor() {
     super('items-singleton', {
       ttl: 15 * 60 * 1000 // 15 minutes for items data (moderate cache)

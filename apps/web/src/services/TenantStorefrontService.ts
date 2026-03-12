@@ -64,6 +64,26 @@ export interface StorefrontCategoriesResponse {
 class TenantStorefrontService extends TenantApiSingleton {
   private static instance: TenantStorefrontService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-storefront-service*',
+      'storefront-config*',
+      'storefront-operations*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tenant-storefront-service*');
+    await this.invalidateCachePattern('storefront-config*');
+    await this.invalidateCachePattern('storefront-operations*');
+  }
+
   private constructor() {
     super('tenant-storefront', {
       ttl: 5 * 60 * 1000 // 5 minutes for storefront data

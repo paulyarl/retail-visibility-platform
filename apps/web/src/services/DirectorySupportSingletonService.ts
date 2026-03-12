@@ -53,6 +53,26 @@ export interface DirectoryNote {
 class DirectorySupportSingletonService extends TenantApiSingleton {
   protected cacheTTL = 5 * 60 * 1000; // 5 minutes for support data
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'directory-support*',
+      'support-tickets*',
+      'directory-issues*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('directory-support*');
+    await this.invalidateCachePattern('support-tickets*');
+    await this.invalidateCachePattern('directory-issues*');
+  }
+
   private static instance: DirectorySupportSingletonService;
 
   static getInstance(): DirectorySupportSingletonService {

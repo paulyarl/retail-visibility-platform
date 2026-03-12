@@ -76,6 +76,26 @@ export interface TenantProfile {
 class TenantManagementService extends TenantApiSingleton {
   private static instance: TenantManagementService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-management-service*',
+      'tenant-settings*',
+      'tenant-operations*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tenant-management-service*');
+    await this.invalidateCachePattern('tenant-settings*');
+    await this.invalidateCachePattern('tenant-operations*');
+  }
+
   // Different TTL for different management operations
   private readonly PROFILE_TTL = 5 * 60 * 1000; // 5 minutes for profile
   private readonly USAGE_TTL = 2 * 60 * 1000; // 2 minutes for usage

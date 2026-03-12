@@ -95,9 +95,9 @@ class VariantOperationsSingletonService extends AdminApiSingleton {
         response.data.message = `Successfully updated featured type for ${response.data.processed} variants${response.data.failed > 0 ? ` (${response.data.failed} failed)` : ''}`;
       }
 
-      // Invalidate cache for affected variants
+      // Invalidate cache for affected variants - use pattern matching for dynamic keys
       operation.variantIds.forEach(variantId => {
-        this.invalidateCache(`variant-${variantId}`);
+        this.invalidateCachePattern(`variant-${variantId}*`);
       });
 
       return response.data || null;
@@ -138,9 +138,9 @@ class VariantOperationsSingletonService extends AdminApiSingleton {
         response.data.message = `Successfully updated sale price for ${response.data.processed} variants${response.data.failed > 0 ? ` (${response.data.failed} failed)` : ''}`;
       }
 
-      // Invalidate cache for affected variants
+      // Invalidate cache for affected variants - use pattern matching for dynamic keys
       operation.variantIds.forEach(variantId => {
-        this.invalidateCache(`variant-${variantId}`);
+        this.invalidateCachePattern(`variant-${variantId}*`);
       });
 
       return response.data || null;
@@ -180,9 +180,9 @@ class VariantOperationsSingletonService extends AdminApiSingleton {
         response.data.message = `Successfully updated inventory for ${response.data.processed} variants${response.data.failed > 0 ? ` (${response.data.failed} failed)` : ''}`;
       }
 
-      // Invalidate cache for affected variants
+      // Invalidate cache for affected variants - use pattern matching for dynamic keys
       operation.variantIds.forEach(variantId => {
-        this.invalidateCache(`variant-${variantId}`);
+        this.invalidateCachePattern(`variant-${variantId}*`);
       });
 
       return response.data || null;

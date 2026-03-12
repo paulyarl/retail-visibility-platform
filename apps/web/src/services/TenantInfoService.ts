@@ -35,6 +35,44 @@ export interface BusinessHours {
 class TenantInfoService extends TenantApiSingleton {
   private static _instance: TenantInfoService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   * Documents all cache keys that this service manages
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-gateways-{tenantId}*',
+      'tenant-subdomain-{tenantId}*',
+      'tenant-update-subdomain-{tenantId}*',
+      'tenant-delete-subdomain-{tenantId}*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   * Other services can call this to invalidate tenant info caches
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    if (tenantId) {
+      // Invalidate specific tenant info caches
+      await this.invalidateCachePattern(`tenant-gateways-${tenantId}*`);
+      await this.invalidateCachePattern(`tenant-subdomain-${tenantId}*`);
+    } else {
+      // Invalidate all tenant info caches
+      await this.invalidateCachePattern('tenant*');
+    }
+  }
+
+  /**
+   * PILOT: Declare cross-service cache dependencies
+   * Tenant info service depends on platform service for complete tenant data
+   */
+  public getCrossServiceInvalidations(): Array<{service: () => any, method: string, params: any[]}> {
+    return [
+      // Note: This will be called with tenantId parameter when needed
+    ];
+  }
+
   protected constructor(singletonKey: string, cacheOptions?: any) {
     super(singletonKey, {
       encrypt: false,
@@ -887,8 +925,11 @@ class TenantInfoService extends TenantApiSingleton {
         throw error;
       }
 
-      // Invalidate tenant complete cache for this tenant
-      await platformHomeService.invalidateCache(`platform-tenant-complete-${tenantId}`);
+      // Invalidate tenant complete cache for this tenant - use service contract
+      await this.invalidateServiceCaches(tenantId);
+      
+      // Also invalidate platform service caches via cross-service dependency
+      await platformHomeService.invalidateTenantCaches(tenantId);
       
       // Invalidate platform dashboard cache since tenant subdomain affects stats
       await platformDashboardService.invalidateStatsCache();
@@ -921,8 +962,11 @@ class TenantInfoService extends TenantApiSingleton {
         throw error;
       }
 
-      // Invalidate tenant complete cache for this tenant
-      await platformHomeService.invalidateCache(`platform-tenant-complete-${tenantId}`);
+      // Invalidate tenant complete cache for this tenant - use service contract
+      await this.invalidateServiceCaches(tenantId);
+      
+      // Also invalidate platform service caches via cross-service dependency
+      await platformHomeService.invalidateTenantCaches(tenantId);
       
       // Invalidate platform dashboard cache since tenant subdomain affects stats
       await platformDashboardService.invalidateStatsCache();

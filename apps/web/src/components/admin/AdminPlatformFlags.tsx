@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { api } from '@/lib/api';
+import { adminPlatformFlagsService } from '@/services/AdminPlatformFlagsService';
 
 type FlagRow = { id: string; flag: string; enabled: boolean; description?: string | null; rollout?: string | null; allowTenantOverride?: boolean };
 type EffectiveRow = {
@@ -59,201 +59,385 @@ const FLAG_DESCRIPTIONS: Record<string, { title: string; description: string }> 
     title: 'CSRF Protection',
     description: 'Enforce CSRF token validation on write operations',
   },
+  FF_PRODUCT_ENRICHMENT: {
+    title: 'Product Enrichment',
+    description: 'AI-powered product description and metadata enhancement',
+  },
+  FF_AI_SUGGESTIONS: {
+    title: 'AI Suggestions',
+    description: 'AI-powered product suggestions and recommendations',
+  },
+  FF_ANALYTICS_DASHBOARD: {
+    title: 'Analytics Dashboard',
+    description: 'Advanced analytics dashboard with insights and metrics',
+  },
+  FF_BULK_OPERATIONS: {
+    title: 'Bulk Operations',
+    description: 'Enable bulk operations for items, categories, and more',
+  },
+  FF_REAL_TIME_SYNC: {
+    title: 'Real-Time Sync',
+    description: 'Real-time synchronization across all platforms',
+  },
+  FF_MULTI_TENANT_SUPPORT: {
+    title: 'Multi-Tenant Support',
+    description: 'Advanced multi-tenant management features',
+  },
+  FF_API_RATE_LIMITING: {
+    title: 'API Rate Limiting',
+    description: 'Advanced API rate limiting and throttling',
+  },
+  FF_ADVANCED_SEARCH: {
+    title: 'Advanced Search',
+    description: 'Advanced search with filters and faceting',
+  },
+  FF_MOBILE_OPTIMIZED: {
+    title: 'Mobile Optimized',
+    description: 'Mobile-first design and performance optimizations',
+  },
+  FF_PWA_SUPPORT: {
+    title: 'PWA Support',
+    description: 'Progressive Web App features and offline support',
+  },
+  FF_SOCIAL_SHARING: {
+    title: 'Social Sharing',
+    description: 'Social media sharing integrations',
+  },
+  FF_EMAIL_NOTIFICATIONS: {
+    title: 'Email Notifications',
+    description: 'Advanced email notification system',
+  },
+  FF_WEBHOOKS: {
+    title: 'Webhooks',
+    description: 'Webhook integrations and automation',
+  },
+  FF_CUSTOM_BRANDING: {
+    title: 'Custom Branding',
+    description: 'Custom branding and white-label options',
+  },
+  FF_ADVANCED_REPORTING: {
+    title: 'Advanced Reporting',
+    description: 'Advanced reporting and analytics',
+  },
+  FF_INTEGRATION_MARKETPLACE: {
+    title: 'Integration Marketplace',
+    description: 'Third-party integration marketplace',
+  },
+  FF_AI_COPILOT: {
+    title: 'AI Co-Pilot',
+    description: 'AI-powered assistant for enhanced productivity',
+  },
+  FF_VOICE_COMMANDS: {
+    title: 'Voice Commands',
+    description: 'Voice command interface for hands-free operation',
+  },
+  FF_BLOCKCHAIN_INTEGRATION: {
+    title: 'Blockchain Integration',
+    description: 'Blockchain and cryptocurrency integrations',
+  }
 };
-
-
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export default function AdminPlatformFlags() {
   const [rows, setRows] = useState<FlagRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [effective, setEffective] = useState<Record<string, EffectiveRow>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [debug, setDebug] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const editRef = useRef<HTMLTableRowElement>(null);
 
+  // Load flags and effective flags
   const load = async () => {
     setLoading(true);
     setError(null);
+    setDebug(false);
     try {
-      const r = await api.get(`/api/admin/platform-flags`);
-      const j = await r.json();
-      if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
-      setRows(j.data || []);
-
-      // load effective
-      const e = await api.get(`/api/admin/effective-flags`);
-      const ej = await e.json();
-      if (!e.ok || !ej?.success) throw new Error(ej?.error || `HTTP ${e.status}`);
-      const map: Record<string, EffectiveRow> = {};
-      for (const it of (ej.data || [])) map[it.flag] = it;
-      setEffective(map);
-    } catch (e: any) {
-      setError(e?.message || String(e));
+      const [flagsData, effectiveData] = await Promise.all([
+        adminPlatformFlagsService.getPlatformFlags(),
+        adminPlatformFlagsService.getEffectiveFlags()
+      ]);
+      setRows(flagsData);
+      setEffective(effectiveData);
+    } catch (err) {
+      console.error('[AdminPlatformFlags] Error loading data:', err);
+      setError('Failed to load platform flags');
     } finally {
       setLoading(false);
     }
   };
 
-  const didInit = useRef(false);
   useEffect(() => {
-    if (didInit.current) return;
-    didInit.current = true;
     load();
   }, []);
 
-  const upsert = async (flag: string, next: Partial<FlagRow>) => {
-    setSaving(flag);
+  const handleSave = async (flag: string, next: Partial<FlagRow>) => {
+    setSaving(prev => ({ ...prev, [flag]: true }));
     setError(null);
     try {
-      const r = await api.put(`/api/admin/platform-flags/${encodeURIComponent(flag)}`, {
-        enabled: next.enabled,
-        description: next.description ?? null,
-        rollout: next.rollout ?? null,
-        allowTenantOverride: next.allowTenantOverride
-      });
-      const j = await r.json();
-      if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
-      await load();
-    } catch (e: any) {
-      setError(e?.message || String(e));
+      // Filter out null values for the service
+      const updateData: any = {};
+      if (next.enabled !== undefined) updateData.enabled = next.enabled;
+      if (next.description !== undefined && next.description !== null) updateData.description = next.description;
+      if (next.rollout !== undefined) updateData.rollout = next.rollout;
+      if (next.allowTenantOverride !== undefined) updateData.allowTenantOverride = next.allowTenantOverride;
+      
+      const updatedFlag = await adminPlatformFlagsService.updatePlatformFlag(flag, updateData);
+      if (updatedFlag) {
+        setRows(prev => prev.map(row => row.flag === flag ? { ...row, ...next } : row));
+      }
+    } catch (err) {
+      console.error('[AdminPlatformFlags] Error saving flag:', err);
+      setError(`Failed to update flag: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
-      setSaving(null);
+      setSaving(prev => ({ ...prev, [flag]: false }));
     }
-  };
-
-  const addFlag = async () => {
-    const flag = prompt("Enter flag key (e.g., FF_TENANT_URLS)")?.trim();
-    if (!flag) return;
-    await upsert(flag, { enabled: true });
   };
 
   const setOverride = async (flag: string, value: boolean | null) => {
-    try {
-      setSaving(flag);
-      const r = await api.post(`/api/admin/flags/override/platform/${encodeURIComponent(flag)}`, { value });
-      const j = await r.json();
-      if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
-      await load();
-    } catch (e: any) {
-      setError(e?.message || String(e));
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  const deleteFlag = async (flag: string) => {
-    const confirmed = confirm(
-      `⚠️ Delete Feature Flag?\n\n` +
-      `Flag: ${flag}\n\n` +
-      `This will delete the platform flag and all tenant overrides.\n` +
-      `This action cannot be undone.\n\n` +
-      `Are you sure?`
-    );
-    
-    if (!confirmed) return;
-    
-    setSaving(flag);
+    setSaving(prev => ({ ...prev, [flag]: true }));
     setError(null);
     try {
-      const r = await api.delete(`/api/admin/platform-flags`, { 
-        body: JSON.stringify({ flag }),
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const j = await r.json();
-      if (!r.ok || !j?.success) throw new Error(j?.error || `HTTP ${r.status}`);
-      if (j.tenantUsageCount > 0) {
-        alert(`✅ Deleted flag and ${j.tenantUsageCount} tenant override(s)`);
-      }
-      await load();
-    } catch (e: any) {
-      setError(e?.message || String(e));
+      await adminPlatformFlagsService.setFlagOverride(flag, value);
+      await load(); // Reload to get updated effective flags
+    } catch (err) {
+      console.error('[AdminPlatformFlags] Error setting override:', err);
+      setError(`Failed to set override: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
-      setSaving(null);
+      setSaving(prev => ({ ...prev, [flag]: false }));
     }
   };
 
-  if (loading) return <div className="text-sm text-gray-500">Loading flags…</div>;
-  if (error) return <div className="text-sm text-red-600">{error}</div>;
+  const resetOverride = async (flag: string) => {
+    setSaving(prev => ({ ...prev, [flag]: true }));
+    setError(null);
+    try {
+      await adminPlatformFlagsService.resetFlagOverride(flag);
+      await load(); // Reload to get updated effective flags
+    } catch (err) {
+      console.error('[AdminPlatformFlags] Error resetting override:', err);
+      setError(`Failed to reset override: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSaving(prev => ({ ...prev, [flag]: false }));
+    }
+  };
+
+  const handleDelete = async (flag: string) => {
+    if (!confirm(`Are you sure you want to delete the "${flag}" flag? This action cannot be undone.`)) {
+      return;
+    }
+    
+    setSaving(prev => ({ ...prev, [flag]: true }));
+    setError(null);
+    try {
+      const success = await adminPlatformFlagsService.deletePlatformFlag(flag);
+      if (success) {
+        setRows(prev => prev.filter(row => row.flag !== flag));
+        await load(); // Reload to get updated effective flags
+      }
+    } catch (err) {
+      console.error('[AdminPlatformFlags] Error deleting flag:', err);
+      setError(`Failed to delete flag: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSaving(prev => ({ ...prev, [flag]: false }));
+    }
+  };
+
+  const getFlagInfo = (flag: string) => {
+    return FLAG_DESCRIPTIONS[flag] || { title: flag, description: 'No description available' };
+  };
+
+  const getEffectiveInfo = (flag: string) => {
+    const info = effective[flag];
+    if (!info) return null;
+    return {
+      source: info.effectiveSource,
+      color: info.effectiveOn ? 'text-green-600' : 'text-gray-400',
+      icon: info.effectiveOn ? '✓' : '✗',
+      description: `Effective: ${info.effectiveSource} (${info.effectiveOn ? 'ON' : 'OFF'})`
+    };
+  };
+
+  const getFlagStatusColor = (enabled: boolean) => {
+    return enabled ? 'text-green-600' : 'text-gray-400';
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Platform Feature Flags</h2>
-        <button className="bg-black text-white px-3 py-1 rounded" onClick={addFlag}>Add Flag</button>
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Platform Flags</h1>
+        <button
+          onClick={load}
+          disabled={loading}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400"
+        >
+          {loading ? 'Loading...' : 'Refresh'}
+        </button>
       </div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-gray-500">
-            <th className="py-2">Flag</th>
-            <th className="py-2">Enabled</th>
-            <th className="py-2">Allow Tenant Override</th>
-            <th className="py-2">Description</th>
-            <th className="py-2">Rollout</th>
-            <th className="py-2">Live</th>
-            <th className="py-2">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => {
-            const hardcodedDesc = FLAG_DESCRIPTIONS[r.flag];
-            const displayDesc = r.description || hardcodedDesc?.description;
-            return (
-            <tr key={r.id} className="border-t">
-              <td className="py-2 pr-4">
-                <div className="font-mono text-sm">{r.flag}</div>
-                {displayDesc && (
-                  <div className="mt-1">
-                    {hardcodedDesc?.title && <div className="text-xs font-semibold text-gray-700">{hardcodedDesc.title}</div>}
-                    <div className="text-xs text-gray-500">{displayDesc}</div>
-                  </div>
-                )}
-              </td>
-              <td className="py-2 pr-4">
-                <input type="checkbox" checked={r.enabled} onChange={(e) => upsert(r.flag, { enabled: e.target.checked })} disabled={saving === r.flag} />
-              </td>
-              <td className="py-2 pr-4">
-                <input type="checkbox" checked={r.allowTenantOverride ?? false} onChange={(e) => upsert(r.flag, { allowTenantOverride: e.target.checked })} disabled={saving === r.flag} />
-              </td>
-              <td className="py-2 pr-4">
-                <input className="border px-2 py-1 rounded w-64" placeholder="Feature description..." defaultValue={r.description || ''} onBlur={(e) => upsert(r.flag, { description: e.target.value })} disabled={saving === r.flag} />
-              </td>
-              <td className="py-2 pr-4">
-                <input className="border px-2 py-1 rounded w-64" placeholder="Rollout strategy..." defaultValue={r.rollout || ''} onBlur={(e) => upsert(r.flag, { rollout: e.target.value })} disabled={saving === r.flag} />
-              </td>
-              <td className="py-2 pr-4">
-                {effective[r.flag] ? (
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded text-xs ${effective[r.flag].effectiveOn ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-neutral-700'}`}>
-                      {effective[r.flag].effectiveOn ? 'On' : 'Off'}
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">
-                      {effective[r.flag].effectiveSource}
-                    </span>
-                  </div>
-                ) : (
-                  <span className="text-neutral-400">—</span>
-                )}
-              </td>
-              <td className="py-2 pr-4">
-                <div className="flex items-center gap-2">
-                  <button className="px-2 py-1 text-xs rounded bg-red-600 text-white" disabled={saving === r.flag} onClick={() => setOverride(r.flag, false)}>Kill</button>
-                  <button className="px-2 py-1 text-xs rounded bg-green-600 text-white" disabled={saving === r.flag} onClick={() => setOverride(r.flag, true)}>Force On</button>
-                  <button className="px-2 py-1 text-xs rounded bg-neutral-200" disabled={saving === r.flag} onClick={() => setOverride(r.flag, null)}>Clear</button>
-                  <button className="px-2 py-1 text-xs rounded bg-red-800 text-white hover:bg-red-900" disabled={saving === r.flag} onClick={() => deleteFlag(r.flag)} title="Delete flag permanently">🗑️ Delete</button>
-                </div>
-              </td>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="text-red-600 font-medium mb-2">Error</div>
+          <div className="text-red-800 text-sm">{error}</div>
+        </div>
+      )}
+
+      {debug && (
+        <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="text-gray-600 font-medium mb-2">Debug Info</div>
+          <div className="text-gray-800 text-sm">
+            <div>Flags loaded: {rows.length}</div>
+            <div>Effective flags: {Object.keys(effective).length}</div>
+            <div>Cached: {rows.length > 0 ? 'Yes' : 'No'}</div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+        <table className="min-w-full">
+          <thead>
+            <tr className="bg-gray-50 border-b">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Flag
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Enabled
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Description
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Rollout
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Override
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
             </tr>
-          );
-          })}
-          {rows.length === 0 && (
-            <tr><td colSpan={7} className="py-4 text-gray-500">No flags yet.</td></tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const flagInfo = getFlagInfo(row.flag);
+              const effectiveInfo = getEffectiveInfo(row.flag);
+              const isSaving = saving[row.flag];
+              const hasOverride = effectiveInfo?.source !== 'platform_db';
+              
+              return (
+                <tr key={row.id} className="border-b hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <div className="font-mono text-sm text-gray-900">{row.flag}</div>
+                    <div className="text-xs text-gray-500 mt-1">{flagInfo.title}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() => handleSave(row.flag, { enabled: !row.enabled })}
+                      disabled={isSaving}
+                      className={`relative inline-flex h-6 w-11 rounded-full border-2 transition-colors focus:outline-none ${getFlagStatusColor(row.enabled)} ${
+                        isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-100'
+                      }`}
+                    >
+                      <div
+                        className={`inline-flex h-5 w-5 rounded-full border-2 transition-colors ${
+                          row.enabled ? 'bg-blue-600 border-blue-600' : 'bg-gray-200 border-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-flex h-5 w-5 rounded-full border-2 transition-colors ${
+                            row.enabled ? 'bg-blue-600 border-blue-600' : 'bg-gray-200 border-gray-200'
+                          }`}
+                          style={{
+                            transform: row.enabled ? 'translateX(-50%)' : 'translateX(0)',
+                            transition: 'transform 0.2s ease-in-out'
+                          }}
+                        >
+                          <span
+                            className={`inline-block w-2 h-2 rounded-full bg-white transition-transform ${
+                              row.enabled ? 'translate-x-1' : 'translate-x-0'
+                            }`}
+                            style={{
+                              transform: row.enabled ? 'translateX(0)' : 'translateX(-1)'
+                            }}
+                          />
+                        </span>
+                      </div>
+                    </button>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-900">{row.description || 'No description'}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm text-gray-500">
+                      {row.rollout || 'Not set'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {hasOverride && effectiveInfo ? (
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${effectiveInfo.color}`}>
+                          {effectiveInfo.icon}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {effectiveInfo.description}
+                        </span>
+                        <button
+                          onClick={() => resetOverride(row.flag)}
+                          disabled={isSaving}
+                          className="text-xs text-blue-600 hover:text-blue-800 underline"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-500">No override</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setEditing(row.flag)}
+                        disabled={isSaving}
+                        className="text-blue-600 hover:text-blue-800 underline text-sm"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(row.flag)}
+                        disabled={isSaving}
+                        className="text-red-600 hover:text-red-800 underline text-sm"
+                      >
+                        Delete
+                      </button>
+                      {hasOverride && (
+                        <button
+                          onClick={() => setOverride(row.flag, null)}
+                          disabled={isSaving}
+                          className="text-orange-600 hover:text-orange-800 underline text-sm"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-6 flex items-center justify-between text-sm text-gray-500">
+        <div>
+          {rows.length} flags loaded • {Object.values(effective).filter(f => f.effectiveOn).length} effective
+        </div>
+        <button
+          onClick={() => setDebug(!debug)}
+          className="text-xs text-gray-400 hover:text-gray-600 underline"
+        >
+          {debug ? 'Hide Debug' : 'Show Debug'}
+        </button>
+      </div>
     </div>
   );
 }

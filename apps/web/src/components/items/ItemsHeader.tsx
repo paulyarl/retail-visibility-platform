@@ -2,8 +2,8 @@ import { Button } from '@mantine/core';
 import { Badge } from '@/components/ui';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import { useState, useEffect } from 'react';
-import { apiRequest } from '@/lib/api';
 import TenantSKUPrefix from './TenantSKUPrefix';
+import { googleIntegrationService } from '@/services/GoogleIntegrationService';
 
 interface ItemsHeaderProps {
   stats: {
@@ -44,14 +44,11 @@ export default function ItemsHeader({
     if (!tenantId) return;
     const checkGmcStatus = async () => {
       try {
-        const res = await apiRequest(`/api/google/merchant/sync-status?tenantId=${tenantId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setGmcStatus({
-            isReady: data.data?.hasGMCConnection && data.data?.hasMerchantLink,
-            syncing: false,
-          });
-        }
+        const status = await googleIntegrationService.getStatus(tenantId);
+        setGmcStatus({
+          isReady: status.isConnected,
+          syncing: false,
+        });
       } catch (err) {
         console.error('[ItemsHeader] Failed to check GMC status:', err);
       }
@@ -65,27 +62,18 @@ export default function ItemsHeader({
     setSyncingToGoogle(true);
     setGmcStatus(prev => prev ? { ...prev, syncing: true, lastResult: undefined } : null);
     try {
-      const res = await apiRequest(`/api/google/merchant/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setGmcStatus(prev => prev ? { 
-          ...prev, 
-          syncing: false, 
-          lastResult: `✓ ${data.data?.synced || 0} products synced` 
-        } : null);
-      } else {
-        setGmcStatus(prev => prev ? { 
-          ...prev, 
-          syncing: false, 
-          lastResult: `✗ ${data.message || 'Sync failed'}` 
-        } : null);
-      }
+      await googleIntegrationService.syncBusinessProfile(tenantId);
+      setGmcStatus(prev => prev ? { 
+        ...prev, 
+        syncing: false, 
+        lastResult: '✓ Business profile synced' 
+      } : null);
     } catch (err) {
-      setGmcStatus(prev => prev ? { ...prev, syncing: false, lastResult: '✗ Sync error' } : null);
+      setGmcStatus(prev => prev ? { 
+        ...prev, 
+        syncing: false, 
+        lastResult: '✗ Sync failed' 
+      } : null);
     } finally {
       setSyncingToGoogle(false);
     }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Item } from '@/services/itemsDataService';
 import CategorySelector from './CategorySelector';
-import { apiRequest } from '@/lib/api';
+import { tenantCategoriesService } from '@/services/TenantCategoriesService';
 
 interface CategoryAssignmentModalProps {
   item: Item;
@@ -34,37 +34,23 @@ export default function CategoryAssignmentModal({
         // Get the category name (last part of path)
         const categoryName = googleCategoryPath.split(' > ').pop() || 'Unknown Category';
 
-        // Create category with Google taxonomy ID
-        const createResponse = await apiRequest(`/api/v1/tenants/${tenantId}/categories/from-enrichment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: categoryName,
-            googleCategoryId: googleTaxonomyId,
-            googleCategoryPath: googleCategoryPath, // Add the full path
-          }),
-        });
+        // Create category with Google taxonomy ID using service
+        const newCategory = await tenantCategoriesService.createCategory(tenantId, {
+          name: categoryName,
+          googleCategoryId: googleTaxonomyId,
+          sortOrder: 0, // Default sort order
+        } as any);
 
-        if (createResponse.ok) {
-          const createResult = await createResponse.json();
-          setSelectedCategoryId(createResult.data.id);
-        } else {
-          const errorText = await createResponse.text();
-          console.error('[CategoryAssignment] Category creation failed:', {
-            status: createResponse.status,
-            statusText: createResponse.statusText,
-            errorText
-          });
-          setSelectedCategoryId(categoryId);
+        if (newCategory) {
+          setSelectedCategoryId(newCategory.id);
         }
-      } catch (error) {
-        console.error('[CategoryAssignment] Error creating category from Google taxonomy:', error);
-        setSelectedCategoryId(categoryId);
+      } catch (err) {
+        console.error('[CategoryAssignmentModal] Error creating category:', err);
+        // Could show error to user here
       } finally {
         setIsCreatingCategory(false);
       }
     } else {
-      // Regular tenant category selection
       setSelectedCategoryId(categoryId);
     }
   };
@@ -75,9 +61,9 @@ export default function CategoryAssignmentModal({
     try {
       await onSave(item.id, selectedCategoryId);
       onClose();
-    } catch (error) {
-      console.error('Failed to save category:', error);
-      // Error will be handled by the parent component
+    } catch (err) {
+      console.error('[CategoryAssignmentModal] Error saving category:', err);
+      // Could show error to user here
     }
   };
 

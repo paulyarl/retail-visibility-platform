@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { apiRequest } from '@/lib/api';
 import TenantSettingsSingleton from '@/lib/singletons/TenantSettingsSingleton';
 import TenantSKUPrefix from './TenantSKUPrefix';
 import { Button, Badge } from '@/components/ui';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
+import { googleIntegrationService } from '@/services/GoogleIntegrationService';
 
 interface StoreInventoryHeaderProps {
   stats: {
@@ -93,20 +93,15 @@ export default function StoreInventoryHeader({
     if (!tenantId) return;
     const checkGmcStatus = async () => {
       try {
-        const res = await apiRequest(`/api/google/merchant/sync-status?tenantId=${tenantId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setGmcStatus({
-            isReady: data.data?.hasGMCConnection && data.data?.hasMerchantLink,
-            syncing: data.data?.syncing || false,
-            lastResult: data.data?.lastResult,
-          });
-        }
-      } catch (error) {
-        console.error('Failed to check GMC status:', error);
+        const status = await googleIntegrationService.getStatus(tenantId);
+        setGmcStatus({
+          isReady: status.isConnected,
+          syncing: false,
+        });
+      } catch (err) {
+        console.error('[StoreInventoryHeader] Failed to check GMC status:', err);
       }
     };
-
     checkGmcStatus();
   }, [tenantId]);
 
@@ -115,24 +110,11 @@ export default function StoreInventoryHeader({
     
     setSyncingToGoogle(true);
     try {
-      const res = await apiRequest(`/api/google/merchant/sync?tenantId=${tenantId}`, {
-        method: 'POST',
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setGmcStatus(prev => prev ? ({
-          ...prev,
-          syncing: false,
-          lastResult: data.success ? 'Sync completed successfully' : 'Sync failed',
-        }) : null);
-      }
-    } catch (error) {
-      console.error('Google sync failed:', error);
+      await googleIntegrationService.syncBusinessProfile(tenantId);
       setGmcStatus(prev => prev ? ({
         ...prev,
         syncing: false,
-        lastResult: 'Sync failed',
+        lastResult: `✓ Business profile synced`
       }) : null);
     } finally {
       setSyncingToGoogle(false);

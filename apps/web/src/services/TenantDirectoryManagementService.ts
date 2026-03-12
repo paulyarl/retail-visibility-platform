@@ -13,6 +13,26 @@ import { DirectoryListing } from './DirectoryListingSingletonService';
 export class TenantDirectoryManagementService extends TenantApiSingleton {
   private static instance: TenantDirectoryManagementService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-directory-management*',
+      'directory-listings*',
+      'directory-operations*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tenant-directory-management*');
+    await this.invalidateCachePattern('directory-listings*');
+    await this.invalidateCachePattern('directory-operations*');
+  }
+
   private constructor() {
     super('tenant-directory-management');
     this.cacheTTL = 10 * 60 * 1000; // 10 minutes for directory listing data

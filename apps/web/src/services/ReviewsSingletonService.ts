@@ -47,6 +47,26 @@ export interface HelpfulVoteRequest {
 class ReviewsSingletonService extends TenantApiSingleton {
   private static instance: ReviewsSingletonService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'reviews-singleton*',
+      'tenant-reviews*',
+      'review-management*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('reviews-singleton*');
+    await this.invalidateCachePattern('tenant-reviews*');
+    await this.invalidateCachePattern('review-management*');
+  }
+
   private constructor() {
     super('reviews-singleton', {
       ttl: 5 * 60 * 1000 // 5 minutes for reviews data

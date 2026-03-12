@@ -13,7 +13,6 @@ import { usePlatformSettings } from "@/contexts/PlatformSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { publicPlatformHomeService } from '@/services/PublicPlatformHomeService';
-import { cachedFetch } from '@/lib/api-cache';
 import { hoursStatusService } from '@/services/HoursStatusService';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { platformPublicService } from '@/services/PlatformPublicService';

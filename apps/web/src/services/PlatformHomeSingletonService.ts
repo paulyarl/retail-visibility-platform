@@ -5,9 +5,11 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
+import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 import { BusinessProfile } from '../lib/validation/businessProfile';
+import TenantApiSingleton from '@/providers/base/TenantApiSingleton';
 
 export interface Tenant {
   id: string;
@@ -616,21 +618,77 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     return result.data || null;
   }
 
-  private async invalidateTenantCaches(tenantId: string) {
-    await this.invalidateCache(`platform-tenant-complete-${tenantId}`);
+  /**
+   * PILOT: Get all cache patterns for this service
+   * Documents all cache keys that this service manages
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'platform-tenant-complete-{tenantId}*',
+      'platform-tenant-profile-{tenantId}*',
+      'platform-tenant-{tenantId}*',
+      'platform-tenant-logo-{tenantId}*',
+      'platform-tenant-fulfillment-settings-{tenantId}*',
+      'public-shops*',
+      'platform-tenants*',
+      'platform-dashboard-complete*',
+      'platform-organizations*',
+      'platform-tier-system-tiers*',
+      'platform-tier-system-tiers-{tierId}*',
+      'platform-platform-categories*',
+      'platform-featured-products*',
+      'platform-admin-directory-listings*',
+      'platform-admin-directory-stats*',
+      'platform-upgrade-requests-{tenantId}*',
+      'platform-pending-request-{tenantId}*',
+      'platform-pending-request*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   * Other services can call this to invalidate platform-related caches
+   */
+  public async invalidateServiceCaches(tenantId?: string, tierId?: string): Promise<void> {
+    if (tenantId) {
+      // Invalidate specific tenant caches
+      await this.invalidateTenantCaches(tenantId);
+    } else {
+      // Invalidate all platform caches
+      await this.invalidateCachePattern('platform-*');
+    }
+    
+    if (tierId) {
+      // Invalidate specific tier caches
+      await this.invalidateTierCaches(tierId);
+    }
+  }
+
+  /**
+   * PILOT: Declare cross-service cache dependencies
+   * Platform service depends on dashboard service for stats
+   */
+  public getCrossServiceInvalidations(): Array<{service: () => any, method: string, params: any[]}> {
+    return [
+      { service: () => platformDashboardService, method: 'invalidateStatsCache', params: [] }
+    ];
+  }
+
+  public async invalidateTenantCaches(tenantId: string) {
+    // Use enhanced pattern matching for dynamic keys
+    await this.invalidateCachePattern(`platform-tenant-complete-${tenantId}*`);
     // Invalidate tenant profile cache (exact key, no wildcard)
-    await this.invalidateCache(`platform-tenant-profile-${tenantId}`);
+    await this.invalidateCachePattern(`platform-tenant-profile-${tenantId}*`);
     // Invalidate tenant cache (slug is stored on tenant record)
-    await this.invalidateCache(`platform-tenant-${tenantId}`);
-    await this.invalidateCache('public-shops');
-    await this.invalidateCache('public-shops*');     
+    await this.invalidateCachePattern(`platform-tenant-${tenantId}*`);
+    await this.invalidateCachePattern('public-shops*');
     // Invalidate tenants cache
-    await this.invalidateCache('platform-tenants*');    
+    await this.invalidateCachePattern('platform-tenants*');    
     // Invalidate platform dashboard cache since tenants affect stats
-    await this.invalidateCache('platform-dashboard-complete'); 
-    await this.invalidateCache(`platform-tenant-logo-${tenantId}*`);
-    await this.invalidateCache(`platform-tenant-fulfillment-settings-${tenantId}*`);
-    await this.invalidateCache('platform-organizations*');
+    await this.invalidateCachePattern('platform-dashboard-complete*'); 
+    await this.invalidateCachePattern(`platform-tenant-logo-${tenantId}*`);
+    await this.invalidateCachePattern(`platform-tenant-fulfillment-settings-${tenantId}*`);
+    await this.invalidateCachePattern('platform-organizations*');
 
     // Non-blocking MV refresh for tenant-related views only
     // this.refreshMaterializedView(['mv_global_discovery', 'directory_category_listings', 'directory_gbp_listings']).catch(err => {
@@ -795,8 +853,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw result.error;
     }
 
-    // Invalidate featured products cache
-    await this.invalidateCache('platform-featured-products*');
+    // Invalidate featured products cache - use enhanced pattern matching
+    await this.invalidateCachePattern('platform-featured-products*');
   }
 
   /**
@@ -836,8 +894,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw result.error;
     }
 
-    // Invalidate platform categories cache
-    await this.invalidateCache('platform-platform-categories*');
+    // Invalidate platform categories cache - use enhanced pattern matching
+    await this.invalidateCachePattern('platform-platform-categories*');
 
     return result.data || null;
   }
@@ -864,8 +922,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw result.error;
     }
 
-    // Invalidate platform categories cache
-    await this.invalidateCache('platform-platform-categories*');
+    // Invalidate platform categories cache - use enhanced pattern matching
+    await this.invalidateCachePattern('platform-platform-categories*');
 
     return result.data || null;
   }
@@ -889,8 +947,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw result.error;
     }
 
-    // Invalidate platform categories cache
-    await this.invalidateCache('platform-platform-categories*');
+    // Invalidate platform categories cache - use enhanced pattern matching
+    await this.invalidateCachePattern('platform-platform-categories*');
   }
 
   /**
@@ -911,8 +969,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw result.error;
     }
 
-    // Invalidate platform categories cache
-    await this.invalidateCache('platform-platform-categories*');
+    // Invalidate platform categories cache - use enhanced pattern matching
+    await this.invalidateCachePattern('platform-platform-categories*');
   }
 
   /**
@@ -933,8 +991,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw result.error;
     }
 
-    // Invalidate platform categories cache
-    await this.invalidateCache('platform-platform-categories*');
+    // Invalidate platform categories cache - use enhanced pattern matching
+    await this.invalidateCachePattern('platform-platform-categories*');
 
     return result.data;
   }
@@ -957,8 +1015,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         'platform-create-category-from-google'
       );
 
-      // Invalidate platform categories cache
-      await this.invalidateCache('platform-platform-categories*');
+      // Invalidate platform categories cache - use enhanced pattern matching
+      await this.invalidateCachePattern('platform-platform-categories*');
 
       return result;
     } catch (error) {
@@ -978,7 +1036,11 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       url,
       {},
       cacheKey,
-      this.cacheTTL
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
     );
 
     if (!result.success) {
@@ -1035,7 +1097,12 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
           reason
         })
       },
-      `platform-update-tier-status-${tierId}`
+      `platform-update-tier-status-${tierId}`,
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
     );
 
     if (!result.success) {
@@ -1050,10 +1117,13 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   }
 
   private async invalidateTierCaches(tierId: string) {
-    await this.invalidateCache('platform-tier-system-tiers*');
-    await this.invalidateCache(`platform-tier-system-tiers-${tierId}`);
-    await this.invalidateCache('platform-tier-system-tiers');
-    await this.invalidateCache('/api/admin/tiers/tiers');
+    // Use context-aware invalidation for tier system
+    // Clear admin, system, and tenant contexts since tier changes affect all levels
+    await this.invalidateCacheAcrossContexts('platform-tier-system-tiers', [AppContext.ADMIN, AppContext.SYSTEM, AppContext.TENANT], [CacheIsolation.ADMIN, CacheIsolation.TENANT, CacheIsolation.USER]);
+    
+    // Also clear specific tier-based patterns
+    await this.invalidateCachePattern(`platform-tier-system-tiers-${tierId}*`);
+    await this.invalidateCachePattern('/api/admin/tiers/tiers*');
     
     await this.refreshMaterializedView(undefined, true);
   }
@@ -1078,7 +1148,12 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         method: 'PUT',
         body: JSON.stringify(updatePayload)
       },
-      `platform-update-tier-${tierId}`
+      `platform-update-tier-${tierId}`,
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
     );
 
     if (!result.success) {
@@ -1106,7 +1181,12 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         method: 'PATCH',
         body: JSON.stringify({ sortOrder })
       },
-      `platform-update-tier-sort-order-${tierId}`
+      `platform-update-tier-sort-order-${tierId}`,
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
     );
 
     if (!result.success) {
@@ -1134,7 +1214,12 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
           updatedAt: new Date().toISOString()
         })
       },
-      `platform-create-tier-${tierData.tierKey}`
+      `platform-create-tier-${tierData.tierKey}`,
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
     );
 
     if (!result.success) {
@@ -1159,7 +1244,12 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     const result = await this.makeDefaultRequest<void>(
       `/api/admin/tier-system/tiers/${tierId}`,
       { method: 'DELETE' },
-      `platform-delete-tier-${tierId}`
+      `platform-delete-tier-${tierId}`,
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
     );
 
     if (!result.success) {
@@ -1179,7 +1269,11 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       '/api/admin/directory/stats',
       {},
       'platform-admin-directory-stats',
-      this.cacheTTL
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
     );
 
     if (!result.success) {
@@ -1222,7 +1316,11 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       `/api/admin/directory/listings?${params}`,
       {},
       'platform-admin-directory-listings',
-      this.cacheTTL
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
     );
 
     if (!result.success) {
@@ -1254,9 +1352,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-feature-directory-listing-${tenantId}`
       );
 
-      // Invalidate directory listings cache
-      await this.invalidateCache('platform-admin-directory-listings*');
-      await this.invalidateCache('platform-admin-directory-stats*');
+      // Invalidate directory listings cache - use enhanced pattern matching
+      await this.invalidateCachePattern('platform-admin-directory-listings*');
+      await this.invalidateCachePattern('platform-admin-directory-stats*');
     } catch (error) {
       console.error('[PlatformHomeSingleton] Failed to feature directory listing:', error);
       throw error;
@@ -1278,9 +1376,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-unfeature-directory-listing-${tenantId}`
       );
 
-      // Invalidate directory listings cache
-      await this.invalidateCache('platform-admin-directory-listings*');
-      await this.invalidateCache('platform-admin-directory-stats*');
+      // Invalidate directory listings cache - use enhanced pattern matching
+      await this.invalidateCachePattern('platform-admin-directory-listings*');
+      await this.invalidateCachePattern('platform-admin-directory-stats*');
     } catch (error) {
       console.error('[PlatformHomeSingleton] Failed to unfeature directory listing:', error);
       throw error;
@@ -1295,7 +1393,11 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       `/api/admin/enrichment/analytics?_t=${Date.now()}`,
       {},
       'platform-admin-enrichment-analytics',
-      this.cacheTTL
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
     );
 
     if (!result.success) {
@@ -1365,7 +1467,11 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       '/api/analytics/subdomain-stats',
       {},
       'platform-admin-subdomain-stats',
-      this.cacheTTL
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
     );
 
     if (!result.success) {
@@ -1475,7 +1581,12 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         method: 'PUT',
         body: JSON.stringify({ name })
       },
-      `platform-update-tenant-name-${tenantId}`
+      `platform-update-tenant-name-${tenantId}`,
+      this.cacheTTL,
+      {
+        context: AppContext.ADMIN,
+        isolation: CacheIsolation.ADMIN
+      }
     );
 
     if (!result.success) {
@@ -1515,9 +1626,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-update-tenant-profile-branding-${tenantId}`
       );
 
-      // Invalidate tenant cache
-      await this.invalidateCache(`platform-tenant-${tenantId}*`);
-      await this.invalidateCache(`platform-tenant-profile-${tenantId}*`);
+      // Invalidate tenant cache - use enhanced pattern matching
+    await this.invalidateCachePattern(`platform-tenant-${tenantId}*`);
+    await this.invalidateCachePattern(`platform-tenant-profile-${tenantId}*`);
 
       return result;
     } catch (error) {
@@ -2417,8 +2528,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw result.error;
     }
 
-    // Invalidate upgrade requests cache
-    await this.invalidateCache(`platform-upgrade-requests-${requestData.tenantId}*`);
+    // Invalidate upgrade requests cache - use enhanced pattern matching
+    await this.invalidateCachePattern(`platform-upgrade-requests-${requestData.tenantId}*`);
 
     return result.data || null;
   }
@@ -2497,8 +2608,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw result.error;
     }
 
-    // Invalidate pending request cache
-    await this.invalidateCache(`platform-pending-request-${requestData.tenantId}*`);
+    // Invalidate pending request cache - use enhanced pattern matching
+    await this.invalidateCachePattern(`platform-pending-request-${requestData.tenantId}*`);
 
     return result.data || null;
   }
@@ -2518,8 +2629,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         `platform-delete-pending-request-${requestId}`
       );
 
-      // Invalidate pending request cache
-      await this.invalidateCache(`platform-pending-request-*`);
+      // Invalidate pending request cache - use enhanced pattern matching
+      await this.invalidateCachePattern(`platform-pending-request-*`);
     } catch (error) {
       console.error('[PlatformHomeSingleton] Failed to delete pending request:', error);
       throw error;
@@ -2548,8 +2659,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw result.error;
     }
 
-    // Invalidate pending request cache
-    await this.invalidateCache(`platform-pending-request-*`);
+    // Invalidate pending request cache - use enhanced pattern matching
+    await this.invalidateCachePattern(`platform-pending-request-*`);
 
     return result.data || null;
   }

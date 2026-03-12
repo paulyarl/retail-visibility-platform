@@ -42,6 +42,26 @@ export interface VariantResult {
 class VariantsSingleton extends TenantApiSingleton {
   protected static instances: Map<string, VariantsSingleton> = new Map();
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'variants*',
+      'product-variants*',
+      'variant-operations*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('variants*');
+    await this.invalidateCachePattern('product-variants*');
+    await this.invalidateCachePattern('variant-operations*');
+  }
+
   private constructor(tenantId: string) {
     super(`variants-service-${tenantId}`);
   }

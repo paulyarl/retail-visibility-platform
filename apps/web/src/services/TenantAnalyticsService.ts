@@ -50,6 +50,26 @@ export interface TenantAnalytics {
 export class TenantAnalyticsService extends TenantApiSingleton {
   private static instance: TenantAnalyticsService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-analytics*',
+      'usage-statistics*',
+      'performance-metrics*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tenant-analytics*');
+    await this.invalidateCachePattern('usage-statistics*');
+    await this.invalidateCachePattern('performance-metrics*');
+  }
+
   private constructor(singletonKey: string, cacheOptions?: any) {
     super(singletonKey, {
       ttl: 5 * 60 * 1000, // 5 minutes cache for analytics

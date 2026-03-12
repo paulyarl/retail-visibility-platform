@@ -107,6 +107,27 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
   private initialized = false;
   private tenantTier: string = 'starter';
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      `tenant-featured-products-${this.tenantId}*`,
+      `featured-products-state-${this.tenantId}*`,
+      `tenant-featured-config-${this.tenantId}*`
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    const targetTenantId = tenantId || this.tenantId;
+    await this.invalidateCachePattern(`tenant-featured-products-${targetTenantId}*`);
+    await this.invalidateCachePattern(`featured-products-state-${targetTenantId}*`);
+    await this.invalidateCachePattern(`tenant-featured-config-${targetTenantId}*`);
+  }
+
   // ProductSingleton integration
   private productSingleton: any = null;
 

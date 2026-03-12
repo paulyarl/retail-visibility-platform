@@ -34,6 +34,28 @@ export interface SpecialHoursData {
 class TenantHoursSingleton extends TenantApiSingleton {
   private static instances = new Map<string, TenantHoursSingleton>();
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-hours*',
+      'shop-hours*',
+      'business-hours*',
+      'special-hours*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tenant-hours*');
+    await this.invalidateCachePattern('shop-hours*');
+    await this.invalidateCachePattern('business-hours*');
+    await this.invalidateCachePattern('special-hours*');
+  }
+
   constructor(tenantId: string) {
     super('tenant-hours');
     this.setCurrentTenant(tenantId);

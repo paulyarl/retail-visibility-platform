@@ -171,6 +171,26 @@ class TenantProfileSingleton extends TenantApiSingleton {
   }> = [];
   private updateInterval: NodeJS.Timeout | null = null;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'tenant-profile*',
+      'tenant-profile-analytics*',
+      'tenant-profile-updates*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('tenant-profile*');
+    await this.invalidateCachePattern('tenant-profile-analytics*');
+    await this.invalidateCachePattern('tenant-profile-updates*');
+  }
+
   private constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     super(singletonKey, cacheOptions);
     this.initializeProfileManagement();

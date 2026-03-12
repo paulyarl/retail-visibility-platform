@@ -46,6 +46,26 @@ export interface Tenant {
 export class OrganizationService extends OrganizationApiSingleton {
   private static instance: OrganizationService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'organization-service*',
+      'organization-details*',
+      'organization-members*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(organizationId?: string): Promise<void> {
+    await this.invalidateCachePattern('organization-service*');
+    await this.invalidateCachePattern('organization-details*');
+    await this.invalidateCachePattern('organization-members*');
+  }
+
   private constructor() {
     super('organization-service', {
       defaultOrganizationValidation: {
@@ -102,6 +122,89 @@ export class OrganizationService extends OrganizationApiSingleton {
     await this.invalidateCache(`platform-pending-request-${requestData.tenantId}*`);
 
     return result.data || null;
+  }
+
+  /**
+   * Get organization requests
+   */
+  async getOrganizationRequests(params: {
+    status?: string;
+    tenantId?: string;
+    organizationId?: string;
+    page?: number;
+    limit?: number;
+  } = {}): Promise<PendingRequest[]> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params.status) queryParams.set('status', params.status);
+      if (params.tenantId) queryParams.set('tenantId', params.tenantId);
+      if (params.organizationId) queryParams.set('organizationId', params.organizationId);
+      if (params.page) queryParams.set('page', params.page.toString());
+      if (params.limit) queryParams.set('limit', params.limit.toString());
+
+      const queryString = queryParams.toString();
+      const endpoint = `/organization-requests${queryString ? `?${queryString}` : ''}`;
+
+      const result = await this.makeDefaultRequest<PendingRequest[]>(
+        endpoint,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'max-age=300', // 5 minutes for requests
+            'X-Service-Worker': 'org-cache',
+            'X-Platform-Cache': 'enabled'
+          }
+        },
+        `organization-requests-${JSON.stringify(params)}`
+      );
+
+      if (!result.success) {
+        console.error('[OrganizationService] Failed to get organization requests:', result.error);
+        throw result.error;
+      }
+
+      return result.data || [];
+    } catch (error) {
+      console.error('[OrganizationService] Failed to get organization requests:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get specific organization request
+   */
+  async getOrganizationRequest(requestId: string): Promise<PendingRequest | null> {
+    if (!requestId) {
+      console.error('[OrganizationService] Request ID is required');
+      return null;
+    }
+
+    try {
+      const result = await this.makeDefaultRequest<PendingRequest>(
+        `/organization-requests/${requestId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'max-age=300', // 5 minutes for request details
+            'X-Service-Worker': 'org-cache',
+            'X-Platform-Cache': 'enabled'
+          }
+        },
+        `organization-request-${requestId}`
+      );
+
+      if (!result.success) {
+        console.error('[OrganizationService] Failed to get organization request:', result.error);
+        return null;
+      }
+
+      return result.data || null;
+    } catch (error) {
+      console.error('[OrganizationService] Failed to get organization request:', error);
+      return null;
+    }
   }
 
   /**

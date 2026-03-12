@@ -7,7 +7,6 @@ import {
   Layers, Package, AlertCircle, Calendar, Tag, Award, DollarSign, TrendingUp, Check, 
   ShoppingBag, Download, FileText, Edit2, X, Power, Pause, Play, Edit 
 } from 'lucide-react';
-import { apiRequest } from '@/lib/api';
 import Image from 'next/image';
 import { Button } from '@mantine/core';
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -15,6 +14,7 @@ import { useTenantFeaturedProducts } from '@/hooks/useTenantFeaturedProducts';
 import { FeaturedProduct, FeaturedType } from '@/lib/singletons/TenantFeaturedProductsSingleton';
 import QuickStockEditor from '@/components/shared/QuickStockEditor';
 import { StockUpdateService } from '@/services/stockUpdateService';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic';
@@ -356,10 +356,9 @@ export default function ProductFeaturingPage() {
 
   const fetchTenant = async () => {
     try {
-      const response = await apiRequest(`/api/tenants/${tenantId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setTenant(data);
+      const tenantData = await tenantInfoService.getTenantInfo(tenantId);
+      if (tenantData) {
+        setTenant(tenantData);
       }
     } catch (error) {
       console.error('Error fetching tenant:', error);

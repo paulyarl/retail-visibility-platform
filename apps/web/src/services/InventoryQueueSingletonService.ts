@@ -58,6 +58,26 @@ export interface QueueOperation {
 class InventoryQueueSingletonService extends TenantApiSingleton {
   private static instance: InventoryQueueSingletonService;
   
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'inventory-queue*',
+      'queue-status*',
+      'processing-jobs*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('inventory-queue*');
+    await this.invalidateCachePattern('queue-status*');
+    await this.invalidateCachePattern('processing-jobs*');
+  }
+  
   // Different TTLs for different data types
   private readonly CACHE_TTL_SHORT = 2 * 60 * 1000; // 2 minutes for real-time queue data
   private readonly CACHE_TTL_MEDIUM = 5 * 60 * 1000; // 5 minutes for stats

@@ -3,7 +3,7 @@
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui';
 import { useState, useEffect } from 'react';
 import TenantCategorySelector from '@/components/items/TenantCategorySelector';
-import { apiRequest } from '@/lib/api';
+import { tenantCategoriesService } from '@/services/TenantCategoriesService';
 
 // Helper component to display category name by ID
 function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
@@ -23,15 +23,12 @@ function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
       if (!tenantId) return;
       
       try {
-        const response = await apiRequest(`/api/tenant/${tenantId}/categories`);
-        if (response.ok) {
-          const result = await response.json();
-          const category = result.data?.find((c: any) => c.id === categoryId);
-          if (category) {
-            setCategoryName(category.name);
-            if (category.googleCategoryId) {
-              setCategoryName(`${category.name} (${category.googleCategoryId})`);
-            }
+        const categories = await tenantCategoriesService.getTenantCategories(tenantId);
+        const category = categories.find((c: any) => c.id === categoryId);
+        if (category) {
+          setCategoryName(category.name);
+          if (category.googleCategoryId) {
+            setCategoryName(`${category.name} (${category.googleCategoryId})`);
           }
         }
       } catch (error) {
@@ -419,34 +416,21 @@ export default function EnrichmentPreview({
                         const tenantId = window.location.pathname.match(/\/t\/([^/]+)/)?.[1];
                         if (!tenantId) throw new Error('Could not extract tenant ID');
 
-                        // Create category with Google taxonomy ID
-                        const createResponse = await apiRequest(`/api/v1/tenants/${tenantId}/categories/from-enrichment`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
+                        // Create category with Google taxonomy ID using service
+                        const { tenantCategoriesService } = await import('@/services/TenantCategoriesService');
+                        const createResponse = await tenantCategoriesService.createCategory(tenantId, {
                             name: categoryName,
                             googleCategoryId: googleTaxonomyId,
-                          }),
+                            sortOrder: 0, // Add required sortOrder
                         });
 
-                        console.log('[EnrichmentPreview] Category creation response:', {
-                          ok: createResponse.ok,
-                          status: createResponse.status,
-                          statusText: createResponse.statusText
-                        });
+                        console.log('[EnrichmentPreview] Category creation response:', createResponse);
 
-                        if (createResponse.ok) {
-                          const createResult = await createResponse.json();
-                          console.log('[EnrichmentPreview] Category created successfully:', createResult);
-                          onEdit('tenantCategoryId', createResult.data.id);
+                        if (createResponse) {
+                          console.log('[EnrichmentPreview] Category created successfully:', createResponse);
+                          onEdit('tenantCategoryId', createResponse.id);
                         } else {
-                          const errorText = await createResponse.text();
-                          console.error('[EnrichmentPreview] Category creation failed:', {
-                            status: createResponse.status,
-                            statusText: createResponse.statusText,
-                            errorText
-                          });
-                          // Don't set tenantCategoryId to avoid storing invalid Google taxonomy IDs
+                          console.error('[EnrichmentPreview] Category creation failed');
                           alert(`Failed to create category from Google taxonomy. Please try selecting a different category or contact support.`);
                         }
                       } catch (error) {

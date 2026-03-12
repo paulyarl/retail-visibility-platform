@@ -47,6 +47,26 @@ export interface CloneProductResponse {
 class ItemsService extends TenantApiSingleton {
   private static instance: ItemsService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'items-service*',
+      'tenant-items*',
+      'item-management*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('items-service*');
+    await this.invalidateCachePattern('tenant-items*');
+    await this.invalidateCachePattern('item-management*');
+  }
+
   // TTL constants for different data types
   private readonly ITEMS_TTL = 5 * 60 * 1000; // 5 minutes for items
   private readonly CLONE_TTL = 0; // No caching for write operations

@@ -35,6 +35,26 @@ export interface OrganizationsResponse {
 class OrganizationsSingletonService extends TenantApiSingleton {
   private static instance: OrganizationsSingletonService;
 
+  /**
+   * PILOT: Get all cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'organizations-singleton*',
+      'tenant-organizations*',
+      'org-management*'
+    ];
+  }
+
+  /**
+   * PILOT: Public cache invalidation method for this service
+   */
+  public async invalidateServiceCaches(tenantId?: string): Promise<void> {
+    await this.invalidateCachePattern('organizations-singleton*');
+    await this.invalidateCachePattern('tenant-organizations*');
+    await this.invalidateCachePattern('org-management*');
+  }
+
   private constructor() {
     super('organizations-singleton', {
       ttl: 15 * 60 * 1000 // 15 minutes for organizations (changes rarely)
