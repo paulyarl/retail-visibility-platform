@@ -64,7 +64,7 @@ async function loadTiers(): Promise<Map<string, TierWithFeatures>> {
       tier_key: tier.tier_key,
       name: tier.name,
       display_name: tier.display_name,
-      price_monthly: tier.price_monthly,
+      price_monthly: Number(tier.price_monthly),
       max_skus: tier.max_skus,
       max_locations: tier.max_locations,
       tier_type: tier.tier_type,
