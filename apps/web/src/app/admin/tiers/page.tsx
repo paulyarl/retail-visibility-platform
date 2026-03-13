@@ -399,7 +399,7 @@ export default function AdminTiersPage() {
                         {/* Quick Actions - Cleaner Dropdown Approach */}
                         <div className="flex-shrink-0 flex flex-col gap-2">
                           {/* Tier Dropdown */}
-                          <div className="min-w-[200px]" onClick={(e) => e.stopPropagation()}>
+                          <div className="w-40" onClick={(e) => e.stopPropagation()}>
                             <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 block">
                               Subscription Tier
                             </label>
@@ -418,7 +418,7 @@ export default function AdminTiersPage() {
                           </div>
 
                           {/* Status Dropdown */}
-                          <div className="min-w-[200px]" onClick={(e) => e.stopPropagation()}>
+                          <div className="w-40" onClick={(e) => e.stopPropagation()}>
                             <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 block">
                               Status
                             </label>
