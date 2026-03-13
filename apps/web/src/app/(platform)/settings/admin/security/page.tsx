@@ -6,11 +6,6 @@
 import { SecurityDashboard } from '@/components/security/monitoring/SecurityDashboard';
 import { Button } from '@mantine/core';
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Security Dashboard | Admin Settings',

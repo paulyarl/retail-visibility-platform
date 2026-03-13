@@ -235,7 +235,7 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
                     availability: product.availability as 'in_stock' | 'out_of_stock' | 'preorder' | undefined,
                     has_active_payment_gateway: product.hasActivePaymentGateway,
                     payment_gateway_type: product.defaultGatewayType,
-                    featuredTypes: product.featuredTypes as ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[],
+                    featuredTypes: product.featuredTypes as string[],
                   }}
                 />
               ))}

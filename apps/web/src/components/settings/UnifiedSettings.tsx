@@ -10,9 +10,6 @@ import SettingsSearch from '@/components/SettingsSearch';
 import { Loader2 } from 'lucide-react';
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 

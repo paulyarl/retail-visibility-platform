@@ -4,11 +4,6 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export interface TooltipProps {
   content: string;

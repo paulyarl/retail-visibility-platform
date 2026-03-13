@@ -7,10 +7,8 @@ import SpecialHoursCalendar from "@/components/hours/SpecialHoursCalendar";
 import SyncStateBadge from "@/components/hours/SyncStateBadge";
 import TimezonePicker from "@/components/hours/TimezonePicker";
 import HoursPreview from "@/components/hours/HoursPreview";
+import { useParams } from 'next/navigation';
 
-
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';

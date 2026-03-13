@@ -2,30 +2,26 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, ToastContainer, Alert } from '@/components/ui';
 import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { tenantTierService } from '@/services/TenantTierService';
-
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
+import { tenantTierService, type Tenant as ServiceTenant } from '@/services/TenantTierService';
+import { useToast } from '@/components/ui/use-toast';
 
 type Tenant = {
   id: string;
   name: string;
-  subscriptionTier?: string;
-  subscriptionStatus?: string;
-  trialEndsAt?: string;
-  subscriptionEndsAt?: string;
-  createdAt?: string;
+  subscription_tier?: string;
+  subscription_status?: string;
+  trial_ends_at?: string;
+  subscription_ends_at?: string;
+  created_at?: string;
   metadata?: {
     businessName?: string;
     city?: string;
     state?: string;
   };
+  organization_id?: string;
   organization?: {
     id: string;
     name: string;
@@ -60,8 +56,8 @@ export default function AdminTiersPage() {
   const [tiersLoading, setTiersLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const { toast, toasts, removeToast } = useToast();
 
   useEffect(() => {
     loadTenants();
@@ -130,7 +126,6 @@ export default function AdminTiersPage() {
     try {
       setUpdating(tenantId);
       setError(null);
-      setSuccess(null);
 
       console.log(`[Tier Management] Updating tenant ${tenantId} to tier: ${tier}, status: ${status}`);
 
@@ -147,28 +142,40 @@ export default function AdminTiersPage() {
 
       console.log(`[Tier Management] Update response:`, responseData);
 
-      setSuccess(`Successfully updated tier for location`);
+      // 🎯 Use the response data to update the local state immediately
+      const updatedTenant = responseData;
       
-      // Wait a moment for cache invalidation to complete
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Force refresh to get latest data
-      console.log(`[Tier Management] Refreshing tenant data...`);
-      await loadTenants();
-      
-      // Log the updated state for debugging
-      setTimeout(() => {
-        const updatedTenant = tenants.find(t => t.id === tenantId);
-        console.log(`[Tier Management] Updated tenant state:`, {
-          tenantId,
-          newTier: updatedTenant?.subscriptionTier,
-          newStatus: updatedTenant?.subscriptionStatus
-        });
-      }, 100);
+      // Update the specific tenant in the local state
+      setTenants(prevTenants => 
+        prevTenants.map(tenant => 
+          tenant.id === tenantId 
+            ? {
+                ...tenant,
+                subscriptionTier: updatedTenant.subscription_tier,
+                subscriptionStatus: updatedTenant.subscription_status,
+                trialEndsAt: updatedTenant.trial_ends_at,
+                subscriptionEndsAt: updatedTenant.subscription_ends_at,
+                // Update any other fields that might have changed
+                metadata: updatedTenant.metadata,
+                organization: updatedTenant.organization_id ? {
+                  id: updatedTenant.organization_id,
+                  name: updatedTenant.organization?.name || 'Unknown Organization'
+                } : null,
+              }
+            : tenant
+        )
+      );
+
+      // 🎯 Show detailed success toast using the response data
+      const tenantName = updatedTenant.name || updatedTenant.metadata?.businessName || 'Location';
+      toast(`Successfully updated ${tenantName}`, { variant: 'success' });
       
     } catch (err: any) {
       console.error('Update tier error:', err);
       setError(err.message || 'Failed to update tier');
+      
+      // Show error toast
+      toast(err.message || 'Failed to update tier', { variant: 'error' });
     } finally {
       setUpdating(null);
     }
@@ -241,12 +248,6 @@ export default function AdminTiersPage() {
         {error && (
           <Alert variant="error" className="mb-6" onClose={() => setError(null)}>
             {error}
-          </Alert>
-        )}
-
-        {success && (
-          <Alert variant="success" className="mb-6" onClose={() => setSuccess(null)}>
-            {success}
           </Alert>
         )}
 
@@ -340,8 +341,8 @@ export default function AdminTiersPage() {
                   {tenants
                     .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
                     .map(tenant => {
-                  const tierInfo = getTierInfo(tenant.subscriptionTier);
-                  const statusInfo = getStatusInfo(tenant.subscriptionStatus);
+                  const tierInfo = getTierInfo(tenant.subscription_tier);
+                  const statusInfo = getStatusInfo(tenant.subscription_status);
                   const isUpdating = updating === tenant.id;
 
                   return (
@@ -386,11 +387,11 @@ export default function AdminTiersPage() {
                             {tenant.metadata?.city && tenant.metadata?.state && (
                               <p>Location: {tenant.metadata.city}, {tenant.metadata.state}</p>
                             )}
-                            {tenant.trialEndsAt && (
-                              <p>Trial Ends: {new Date(tenant.trialEndsAt).toLocaleDateString()}</p>
+                            {tenant.trial_ends_at && (
+                              <p>Trial Ends: {new Date(tenant.trial_ends_at).toLocaleDateString()}</p>
                             )}
-                            {tenant.subscriptionEndsAt && (
-                              <p>Subscription Ends: {new Date(tenant.subscriptionEndsAt).toLocaleDateString()}</p>
+                            {tenant.subscription_ends_at && (
+                              <p>Subscription Ends: {new Date(tenant.subscription_ends_at).toLocaleDateString()}</p>
                             )}
                           </div>
                         </div>
@@ -403,8 +404,8 @@ export default function AdminTiersPage() {
                               Subscription Tier
                             </label>
                             <select
-                              value={tenant.subscriptionTier || 'starter'}
-                              onChange={(e) => updateTier(tenant.id, e.target.value, tenant.subscriptionStatus || 'active')}
+                              value={tenant.subscription_tier || 'starter'}
+                              onChange={(e) => updateTier(tenant.id, e.target.value, tenant.subscription_status || 'active')}
                               disabled={isUpdating}
                               className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50"
                             >
@@ -422,8 +423,8 @@ export default function AdminTiersPage() {
                               Status
                             </label>
                             <select
-                              value={tenant.subscriptionStatus || 'active'}
-                              onChange={(e) => updateTier(tenant.id, tenant.subscriptionTier || 'starter', e.target.value)}
+                              value={tenant.subscription_status || 'active'}
+                              onChange={(e) => updateTier(tenant.id, tenant.subscription_tier || 'starter', e.target.value)}
                               disabled={isUpdating}
                               className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50"
                             >
@@ -496,6 +497,7 @@ export default function AdminTiersPage() {
           </CardContent>
         </Card>
       </div>
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }

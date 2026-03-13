@@ -5,12 +5,6 @@ import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { Plus, Edit2, Trash2, GripVertical, Save, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
-
 interface PlatformCategory {
   id: string;
   name: string;

@@ -7,11 +7,6 @@ interface SyncStatusIndicatorProps {
   showDetails?: boolean;
 }
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 import { Button } from '@mantine/core';
 

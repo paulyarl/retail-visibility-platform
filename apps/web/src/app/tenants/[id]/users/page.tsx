@@ -9,11 +9,6 @@ import { motion } from 'framer-motion';
 import { tenantUserService, type User } from '@/services/TenantUserService';
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 type TenantUser = User;
 

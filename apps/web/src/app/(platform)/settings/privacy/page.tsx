@@ -8,11 +8,6 @@ import { DataExportWidget } from '@/components/security/gdpr/DataExportWidget';
 import { DangerZone } from '@/components/security/gdpr/DangerZone';
 import { Card } from '@mantine/core';
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Privacy & Data Settings',

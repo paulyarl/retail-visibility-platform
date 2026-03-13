@@ -531,7 +531,11 @@ class DirectorySingletonService extends PublicApiSingleton {
       `/api/directory/tenant/${tenantId}`,
       {},
       `tenant-directory-slug-${tenantId}`,
-      this.CACHE_TTL_MEDIUM
+      this.CACHE_TTL_MEDIUM,{
+        context: AppContext.TENANT,
+        isolation: CacheIsolation.TENANT
+      }
+
     );
 
     if (!response.success) {

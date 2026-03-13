@@ -40,11 +40,6 @@ function parseTimeToMinutes(time: string): number | null {
 }
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export default function HoursEditor({ tenantId, timezone: externalTimezone }: { tenantId: string; timezone?: string }) {
   const [timezone, setTimezone] = useState("America/New_York");

@@ -11,7 +11,7 @@ export interface FeaturedProduct {
   id: string;
   inventoryItemId?: string;
   tenantId: string;
-  featuredType: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  featuredType: string;
   priority: number;
   featuredAt: Date;
   expiresAt?: Date;
@@ -43,14 +43,14 @@ export interface FeaturedProductStats {
 export interface FeaturedProductCreateRequest {
   inventoryItemId?: string;
   tenantId: string;
-  featuredType: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  featuredType: string;
   priority?: number;
   expiresAt?: Date;
   autoUnfeature?: boolean;
 }
 
 export interface FeaturedProductUpdateRequest {
-  featuredType?: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  featuredType?: string;
   priority?: number;
   expiresAt?: Date;
   autoUnfeature?: boolean;

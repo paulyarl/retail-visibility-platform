@@ -2447,6 +2447,52 @@ model ticker_messages {
   @@index([type], map: "idx_ticker_messages_type")
 }
 
+model feature_override_details {
+  id                   String            @id @default(dbgenerated("gen_random_uuid()"))
+  override_id          String
+  detail_type          String
+  detail_key           String
+  detail_value         String
+  detail_numeric_value Decimal?          @db.Decimal(10, 2)
+  detail_boolean_value Boolean?
+  created_at           DateTime          @default(now()) @db.Timestamptz(6)
+  feature_overrides    feature_overrides @relation(fields: [override_id], references: [id], onDelete: Cascade, map: "fk_feature_override_details_override")
+
+  @@index([detail_key], map: "idx_feature_override_details_detail_key")
+  @@index([detail_type], map: "idx_feature_override_details_detail_type")
+  @@index([override_id], map: "idx_feature_override_details_override_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model feature_overrides {
+  id                       String                     @id
+  organization_id          String?
+  tenant_id                String?
+  override_type            String
+  status                   String                     @default("active")
+  reason                   String?
+  expires_at               DateTime?                  @db.Timestamptz(6)
+  granted_by               String
+  approved_by              String?
+  approved_at              DateTime?                  @db.Timestamptz(6)
+  created_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  subscription_tier        String?
+  original_limit           Int?
+  custom_limit             Int?
+  custom_price             Decimal?                   @db.Decimal(10, 2)
+  currency                 String?                    @default("USD")
+  feature_override_details feature_override_details[]
+
+  @@index([organization_id, override_type, status], map: "idx_feature_overrides_org_type_status")
+  @@index([organization_id], map: "idx_feature_overrides_organization_id")
+  @@index([override_type], map: "idx_feature_overrides_override_type")
+  @@index([status], map: "idx_feature_overrides_status")
+  @@index([subscription_tier], map: "idx_feature_overrides_subscription_tier")
+  @@index([tenant_id], map: "idx_feature_overrides_tenant_id")
+  @@index([tenant_id, override_type, status], map: "idx_feature_overrides_tenant_type_status")
+}
+
 enum action {
   create
   update

@@ -10,11 +10,6 @@ import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import Image from 'next/image';
 import ChainPropagationCallout from '@/components/ChainPropagationCallout';
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 const features = [
   {

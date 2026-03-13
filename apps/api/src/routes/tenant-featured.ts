@@ -1,5 +1,6 @@
 import express from 'express';
 import { prisma } from '../prisma';
+import { isValidFeaturedType, getValidFeaturedTypes } from '../services/FeaturedProductsService';
 import { authenticateToken } from '../middleware/auth';
 
 interface FeaturedProduct {
@@ -79,11 +80,10 @@ router.put('/tenants/:tenantId/featured/:type', authenticateToken, async (req, r
     const { productIds, priorities } = req.body;
 
     // Validate featured type
-    const validTypes = ['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick'];
-    if (!validTypes.includes(type)) {
+    if (!isValidFeaturedType(type)) {
       return res.status(400).json({
-        success: false,
-        error: 'Invalid featured type'
+        error: 'invalid_featured_type',
+        validTypes: getValidFeaturedTypes()
       });
     }
 

@@ -10,7 +10,7 @@ import { useProduct } from '@/providers/ProductProvider';
 interface FeaturedProductsSectionProps {
   tenantId: string;
   maxProducts?: number;
-  showType?: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  showType?: string;
   title?: string;
 }
 

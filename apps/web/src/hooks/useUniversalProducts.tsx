@@ -11,7 +11,7 @@ export interface UniversalProduct extends PublicProduct {
   salePrice?: number; // Computed from salePriceCents
   currency: string;
   // Featured products specific fields
-  featuredBucket?: 'staff_pick' | 'seasonal' | 'sale' | 'new_arrival' | 'store_selection';
+  featuredBucket?: string;
   featuredBucketPriority?: number;
   // Enhanced display fields
   featuredBadgeInfo?: {
@@ -26,7 +26,7 @@ export interface UniversalProduct extends PublicProduct {
 
 // Enhanced featured product with bucket information
 interface EnhancedFeaturedProduct extends FeaturedProduct {
-  featuredBucket?: 'staff_pick' | 'seasonal' | 'sale' | 'new_arrival' | 'store_selection';
+  featuredBucket?: string;
   featuredBucketPriority?: number;
 }
 

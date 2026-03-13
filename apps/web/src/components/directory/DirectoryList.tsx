@@ -13,11 +13,6 @@ interface DirectoryListProps {
 }
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export default function DirectoryList({ listings, loading, contextCategory, showLogo = true }: DirectoryListProps) {
   const [storeStats, setStoreStats] = useState<Record<string, any>>({});

@@ -32,7 +32,7 @@ export default function StorefrontIntegrationTest({ onTestComplete }: Storefront
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [currentTest, setCurrentTest] = useState('');
   const [tenantId] = useState('test-tenant-123');
-  const [showType, setShowType] = useState<'staff_pick' | 'seasonal' | 'sale' | 'new_arrival' | 'store_selection'>('staff_pick');
+  const [showType, setShowType] = useState<string>('staff_pick');
   const [maxProducts] = useState(8);
 
   const runTest = async (testName: string, testFunction: () => Promise<TestResult>) => {

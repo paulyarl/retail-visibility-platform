@@ -49,11 +49,6 @@ interface ProductDisplayProps {
   showPageSizeControl?: boolean; // Show page size selector
 }
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export default function ProductDisplay({ 
   products, 

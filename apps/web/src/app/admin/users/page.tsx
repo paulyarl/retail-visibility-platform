@@ -11,12 +11,6 @@ import { canManageUsers, canViewUsers } from '@/lib/auth/access-control';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
-
 interface User {
   id: string;
   email: string;

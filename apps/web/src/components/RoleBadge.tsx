@@ -26,11 +26,6 @@ interface RoleBadgeProps {
  * <RoleBadge tenantId="tenant-123" />
  */
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export function RoleBadge({ tenantId, showPlatformRole = false, className }: RoleBadgeProps) {
   const { user } = useAuth();

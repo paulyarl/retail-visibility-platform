@@ -17,8 +17,8 @@ import { PublicProduct } from '@/providers/data/ProductSingleton';
 // Import StorefrontService for API calls
 import { storefrontService } from '@/services/StorefrontService';
 
-// FeaturedType union
-export type FeaturedType = 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+// FeaturedType union - now dynamic to support all types
+export type FeaturedType = string;
 
 // Import the existing UniversalProduct interface
 interface UniversalProduct {

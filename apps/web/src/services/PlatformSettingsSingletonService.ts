@@ -6,6 +6,7 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface PlatformSettings {
   platformName: string;
@@ -62,7 +63,12 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
       const result = await this.makeDefaultRequest<PlatformSettings>(
         '/api/platform-settings',
         {},
-        'platform-settings'
+        'platform-settings',
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT
+        }
       );
       
       // The /api/platform-settings endpoint returns data directly, not wrapped in ApiResponse

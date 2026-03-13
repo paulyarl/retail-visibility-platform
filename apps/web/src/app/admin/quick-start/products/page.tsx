@@ -8,11 +8,6 @@ import { motion } from 'framer-motion';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { itemsService } from '@/services/ItemsService';
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 interface Tenant {
   id: string;

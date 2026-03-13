@@ -56,6 +56,7 @@ export interface UpdateOrganizationData {
   subscription_tier: string;
   subscription_status: string;
   max_locations: number;
+  reason?: string;
 }
 
 class TenantOrganizationsSingleton extends TenantApiSingleton {
@@ -242,7 +243,7 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
     }
   }
 
-  async updateOrganization(orgId: string, data: UpdateOrganizationData): Promise<void> {
+  async updateOrganization(orgId: string, data: UpdateOrganizationData): Promise<any> {
     this.setState({ processing: true, error: null });
     
     try {
@@ -250,11 +251,7 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
       
       const result = await this.makeDefaultRequest<Organization>(`/api/organizations/${orgId}/self-update`, {
         method: 'PUT',
-        body: JSON.stringify({
-          subscription_tier: data.subscription_tier,
-          subscription_status: data.subscription_status,
-          max_locations: data.max_locations,
-        }),
+        body: JSON.stringify(data),
       }, `organizations-${this.tenantId}`);
 
       if (!result.success) {
@@ -266,6 +263,9 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
       
       // Refresh organizations list
       await this.fetchOrganizations();
+      
+      // 🎯 Return the response data for immediate UI updates
+      return updatedOrg;
     } catch (error) {
       console.error('TenantOrganizationsSingleton: Error updating organization:', error);
       this.setState({ error: error instanceof Error ? error.message : 'Failed to update organization' });
@@ -275,7 +275,7 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
     }
   }
 
-  async addTenantToOrganization(orgId: string, tenantId: string): Promise<void> {
+  async addTenantToOrganization(orgId: string, tenantId: string): Promise<any> {
     this.setState({ processing: true, error: null });
     
     try {
@@ -295,6 +295,9 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
       
       // Refresh organizations list
       await this.fetchOrganizations();
+      
+      // 🎯 Return the response data for immediate UI updates
+      return responseData;
     } catch (error) {
       console.error('TenantOrganizationsSingleton: Error adding tenant to organization:', error);
       this.setState({ error: error instanceof Error ? error.message : 'Failed to add tenant to organization' });
@@ -304,7 +307,7 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
     }
   }
 
-  async removeTenantFromOrganization(orgId: string, tenantId: string): Promise<void> {
+  async removeTenantFromOrganization(orgId: string, tenantId: string): Promise<any> {
     this.setState({ processing: true, error: null });
     
     try {
@@ -318,10 +321,14 @@ class TenantOrganizationsSingleton extends TenantApiSingleton {
         throw new Error(getErrorMessage(result.error) || 'Failed to remove tenant from organization');
       }
 
-      //console.log('TenantOrganizationsSingleton: Tenant removed from organization successfully');
+      const responseData = result.data;
+      //console.log('TenantOrganizationsSingleton: Tenant removed from organization successfully:', responseData);
       
       // Refresh organizations list
       await this.fetchOrganizations();
+      
+      // 🎯 Return the response data for immediate UI updates
+      return responseData;
     } catch (error) {
       console.error('TenantOrganizationsSingleton: Error removing tenant from organization:', error);
       this.setState({ error: error instanceof Error ? error.message : 'Failed to remove tenant from organization' });

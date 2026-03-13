@@ -5,11 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@mantine/core';
 import { Spinner } from '@/components/ui';
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 function OnboardingContent() {
   const router = useRouter();

@@ -6,11 +6,6 @@ import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { getAdminEmail, type EmailCategory } from '@/lib/admin-emails';
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 interface ContactCategory {
   id: EmailCategory;

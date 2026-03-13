@@ -7,11 +7,6 @@ import { NavigationHelpers } from '@/lib/navigation/NavigationHelpers';
 import { NavigationData } from '@/lib/navigation/NavigationData';
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export interface ContextualBreadcrumbItem {
   label: string;

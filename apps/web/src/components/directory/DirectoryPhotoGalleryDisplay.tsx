@@ -21,11 +21,6 @@ interface DirectoryPhotoGalleryDisplayProps {
 }
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export default function DirectoryPhotoGalleryDisplay({ listing }: DirectoryPhotoGalleryDisplayProps) {
   const [photos, setPhotos] = useState<DirectoryPhoto[]>([]);

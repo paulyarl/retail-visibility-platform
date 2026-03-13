@@ -5,9 +5,6 @@ import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { MantineProvider, createTheme, Button, TextInput, Card, Badge } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { ModalsProvider } from "@mantine/modals";
-// import { SpotlightProvider } from "@mantine/spotlight"; // Spotlight not available
-
-type ThemeProviderProps = React.ComponentProps<typeof NextThemesProvider>;
 
 // Custom Mantine theme matching platform design
 const theme = createTheme({
@@ -88,13 +85,11 @@ const theme = createTheme({
     Button: Button.extend({
       defaultProps: {
         radius: 'md',
-        // Remove size constraint to allow natural width
       },
       styles: {
         root: {
           fontWeight: 500,
           transition: 'all 0.2s ease',
-          // Allow natural width by not setting min-width or width constraints
         },
       },
     }),
@@ -127,13 +122,14 @@ const theme = createTheme({
   },
 });
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
+type ThemeProviderProps = React.ComponentProps<typeof NextThemesProvider>;
 
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+  // Never render during SSR - this is the root cause
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
   return (
     <NextThemesProvider {...props}>
       <MantineProvider theme={theme}>

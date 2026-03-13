@@ -12,25 +12,15 @@ import {
 import SettingsFooter from '@/components/SettingsFooter';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 import { AdminNavContent } from '@/components/navigation/AdminNavContent';
-
-
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
+import { ReactNode } from 'react';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
-
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const { settings } = usePlatformSettings();
+export default function AdminLayout({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
+  const { settings } = usePlatformSettings();
+  
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Top Header */}

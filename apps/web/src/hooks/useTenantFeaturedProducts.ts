@@ -131,17 +131,20 @@ export function useTenantFeaturedProducts(
   useEffect(() => {
     if (context === 'directory' && contextFeaturedTypes.length > 0) {
       const storeSelectionType = contextFeaturedTypes.find(t => t.id === 'store_selection');
-      if (storeSelectionType && !state.selectedType) {
+      // Set to store_selection if either no type is selected OR current type is not valid for directory context
+      if (storeSelectionType && (!state.selectedType || !contextFeaturedTypes.find(t => t.id === state.selectedType))) {
         singleton.setSelectedType('store_selection');
       }
     } else if (context === 'admin' && contextFeaturedTypes.length > 0) {
       const firstType = contextFeaturedTypes[0];
-      if (firstType && !state.selectedType) {
+      // Set to first available type if current type is not valid for admin context
+      if (firstType && (!state.selectedType || !contextFeaturedTypes.find(t => t.id === state.selectedType))) {
         singleton.setSelectedType(firstType.id);
       }
     } else if (context === 'storefront' && contextFeaturedTypes.length > 0) {
       const newArrivalType = contextFeaturedTypes.find(t => t.id === 'new_arrival');
-      if (newArrivalType && !state.selectedType) {
+      // Set to new_arrival if current type is not valid for storefront context
+      if (newArrivalType && (!state.selectedType || !contextFeaturedTypes.find(t => t.id === state.selectedType))) {
         singleton.setSelectedType('new_arrival');
       }
     }

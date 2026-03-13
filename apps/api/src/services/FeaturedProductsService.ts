@@ -1,11 +1,41 @@
 import { prisma } from '../prisma';
 import { triggerRevalidate } from '../utils/revalidate';
 
+// Dynamic featured type validation
+const VALID_FEATURED_TYPES = [
+  'store_selection',
+  'new_arrival', 
+  'seasonal',
+  'sale',
+  'staff_pick',
+  'bestseller',
+  'clearance',
+  'trending',
+  'featured',
+  'recommended'
+] as const;
+
+export type FeaturedType = typeof VALID_FEATURED_TYPES[number];
+
+/**
+ * Validates if a featured type is supported
+ */
+export function isValidFeaturedType(type: string): type is FeaturedType {
+  return VALID_FEATURED_TYPES.includes(type as FeaturedType);
+}
+
+/**
+ * Gets all valid featured types
+ */
+export function getValidFeaturedTypes(): FeaturedType[] {
+  return [...VALID_FEATURED_TYPES];
+}
+
 export interface FeaturedProduct {
   id: string;
   inventory_item_id: string;
   tenant_id: string;
-  featured_type: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' | 'bestseller' | 'clearance' | 'trending' | 'featured' | 'recommended';
+  featured_type: FeaturedType;
   featured_priority: number;
   featured_at: Date;
   featured_expires_at: Date | null;
@@ -633,7 +663,7 @@ export class FeaturedProductsService {
     items: Array<{
       inventory_item_id: string;
       tenant_id: string;
-      featured_type: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' | 'bestseller' | 'clearance' | 'trending' | 'featured' | 'recommended';
+      featured_type: FeaturedType;
       featured_priority?: number;
       featured_expires_at?: Date | string | null;
       auto_unfeature?: boolean;

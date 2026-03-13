@@ -9,13 +9,8 @@ import { SquareConnectionCard } from '@/components/square';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import { AlertTriangle, Lock } from 'lucide-react';
 
-
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
-
 
 export default function IntegrationsPage() {
   const params = useParams();

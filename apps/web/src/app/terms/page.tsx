@@ -5,11 +5,6 @@ import PublicFooter from '@/components/PublicFooter';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 
 export default function TermsPage() {

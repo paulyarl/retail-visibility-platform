@@ -8,11 +8,6 @@ import { MANAGED_SERVICES, type ServiceLevel } from '@/lib/managed-services';
 import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export default function OfferingsPage() {
   return (

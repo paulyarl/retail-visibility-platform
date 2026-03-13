@@ -18,7 +18,6 @@
     "jsx": "react-jsx",
     "downlevelIteration": true,
     "types": [
-      "next/types",
       "@types/node"
     ],
     "plugins": [

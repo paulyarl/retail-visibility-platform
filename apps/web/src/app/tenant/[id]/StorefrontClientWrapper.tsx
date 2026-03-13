@@ -126,13 +126,7 @@ export default function StorefrontClientWrapper({
   // console.log('[StorefrontClientWrapper] Tenant metadata phone:', tenant.metadata?.phone);
   // console.log('[StorefrontClientWrapper] Tenant metadata email:', tenant.metadata?.email);
   
-  const [featuredCounts, setFeaturedCounts] = useState({
-    staffPick: 0,
-    seasonal: 0,
-    sale: 0,
-    newArrival: 0,
-    storeSelection: 0,
-  });
+  const [featuredCounts, setFeaturedCounts] = useState<Record<string, number>>({});
 
   const [isFullWidth, setIsFullWidth] = useState(fullWidthLayout);
   const [featuredData, setFeaturedData] = useState<any>(null);
@@ -190,14 +184,8 @@ export default function StorefrontClientWrapper({
           
           setFeaturedData(transformedData);
           
-          // Set featured counts
-          setFeaturedCounts({
-            staffPick: transformedData.bucketCounts.staff_pick,
-            seasonal: transformedData.bucketCounts.seasonal,
-            sale: transformedData.bucketCounts.sale,
-            newArrival: transformedData.bucketCounts.new_arrival,
-            storeSelection: transformedData.bucketCounts.store_selection,
-          });
+          // Set featured counts dynamically from API response
+          setFeaturedCounts(transformedData.bucketCounts || {});
         }
       } catch (err) {
         console.error('Failed to load featured counts:', err);
@@ -496,87 +484,94 @@ export default function StorefrontClientWrapper({
       </div>
 
       {/* Featured Navigation Controls - Top of Page */}
-      {featuredData && (featuredCounts.staffPick > 0 || featuredCounts.newArrival > 0 || featuredCounts.sale > 0 || featuredCounts.seasonal > 0 || featuredCounts.storeSelection > 0) && (
+      {featuredData && Object.keys(featuredCounts).length > 0 && Object.values(featuredCounts).some(count => count > 0) && (
         <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
           <div className="py-4 border-b border-neutral-200 dark:border-neutral-700 sticky top-[60px] z-30 bg-white dark:bg-neutral-900">
             {/* First Row - Product Categories */}
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400 whitespace-nowrap">Quick Jump:</span>
               
-              {/* Staff Picks */}
-              {featuredCounts.staffPick > 0 && (
-                <button
-                  onClick={() => {
-                    const element = document.getElementById('staff_pick-section');
-                    element?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-600 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors whitespace-nowrap"
-                  title="Jump to Staff Picks"
-                >
-                  <span>⭐</span>
-                  <span>Staff Picks ({featuredCounts.staffPick})</span>
-                </button>
-              )}
-
-              {/* New Arrivals */}
-              {featuredCounts.newArrival > 0 && (
-                <button
-                  onClick={() => {
-                    const element = document.getElementById('new_arrival-section');
-                    element?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
-                  title="Jump to New Arrivals"
-                >
-                  <span>✨</span>
-                  <span>New Arrivals ({featuredCounts.newArrival})</span>
-                </button>
-              )}
-
-              {/* Sale Items */}
-              {featuredCounts.sale > 0 && (
-                <button
-                  onClick={() => {
-                    const element = document.getElementById('sale-section');
-                    element?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-600 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors whitespace-nowrap"
-                  title="Jump to Sale Items"
-                >
-                  <span>💰</span>
-                  <span>Sale Items ({featuredCounts.sale})</span>
-                </button>
-              )}
-
-              {/* Seasonal Specials */}
-              {featuredCounts.seasonal > 0 && (
-                <button
-                  onClick={() => {
-                    const element = document.getElementById('seasonal-section');
-                    element?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-600 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors whitespace-nowrap"
-                  title="Jump to Seasonal Specials"
-                >
-                  <span>�</span>
-                  <span>Seasonal ({featuredCounts.seasonal})</span>
-                </button>
-              )}
-
-              {/* Store Selection */}
-              {featuredCounts.storeSelection > 0 && (
-                <button
-                  onClick={() => {
-                    const element = document.getElementById('store_selection-section');
-                    element?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
-                  title="Jump to Store Selection"
-                >
-                  <span>🏪</span>
-                  <span>Store Selection ({featuredCounts.storeSelection})</span>
-                </button>
-              )}
+              {/* Dynamic Featured Type Buttons */}
+              {Object.entries(featuredCounts).map(([type, count]) => {
+                if (count === 0) return null;
+                
+                // Get button styling based on type
+                const getButtonStyle = (type: string) => {
+                  switch (type) {
+                    case 'staff_pick':
+                      return {
+                        bgClass: 'bg-amber-100 dark:bg-amber-900/30',
+                        textClass: 'text-amber-700 dark:text-amber-300',
+                        borderClass: 'border-amber-300 dark:border-amber-600',
+                        hoverClass: 'hover:bg-amber-200 dark:hover:bg-amber-900/50',
+                        icon: '⭐',
+                        label: 'Staff Picks'
+                      };
+                    case 'new_arrival':
+                      return {
+                        bgClass: 'bg-green-100 dark:bg-green-900/30',
+                        textClass: 'text-green-700 dark:text-green-300',
+                        borderClass: 'border-green-300 dark:border-green-600',
+                        hoverClass: 'hover:bg-green-200 dark:hover:bg-green-900/50',
+                        icon: '✨',
+                        label: 'New Arrivals'
+                      };
+                    case 'sale':
+                      return {
+                        bgClass: 'bg-red-100 dark:bg-red-900/30',
+                        textClass: 'text-red-700 dark:text-red-300',
+                        borderClass: 'border-red-300 dark:border-red-600',
+                        hoverClass: 'hover:bg-red-200 dark:hover:bg-red-900/50',
+                        icon: '💰',
+                        label: 'Sale Items'
+                      };
+                    case 'seasonal':
+                      return {
+                        bgClass: 'bg-orange-100 dark:bg-orange-900/30',
+                        textClass: 'text-orange-700 dark:text-orange-300',
+                        borderClass: 'border-orange-300 dark:border-orange-600',
+                        hoverClass: 'hover:bg-orange-200 dark:hover:bg-orange-900/50',
+                        icon: '🎃',
+                        label: 'Seasonal'
+                      };
+                    case 'store_selection':
+                      return {
+                        bgClass: 'bg-purple-100 dark:bg-purple-900/30',
+                        textClass: 'text-purple-700 dark:text-purple-300',
+                        borderClass: 'border-purple-300 dark:border-purple-600',
+                        hoverClass: 'hover:bg-purple-200 dark:hover:bg-purple-900/50',
+                        icon: '🏪',
+                        label: 'Store Selection'
+                      };
+                    default:
+                      return {
+                        bgClass: 'bg-blue-100 dark:bg-blue-900/30',
+                        textClass: 'text-blue-700 dark:text-blue-300',
+                        borderClass: 'border-blue-300 dark:border-blue-600',
+                        hoverClass: 'hover:bg-blue-200 dark:hover:bg-blue-900/50',
+                        icon: '⭐',
+                        label: type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' ')
+                      };
+                  }
+                };
+                
+                const style = getButtonStyle(type);
+                
+                return (
+                  <button
+                    key={type}
+                    onClick={() => {
+                      const element = document.getElementById(`${type}-section`);
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${style.bgClass} ${style.textClass} ${style.borderClass} ${style.hoverClass} transition-colors whitespace-nowrap`}
+                    title={`Jump to ${style.label}`}
+                  >
+                    <span>{style.icon}</span>
+                    <span>{style.label} ({count})</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Second Row - Store Information */}

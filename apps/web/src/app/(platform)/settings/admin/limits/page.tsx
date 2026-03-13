@@ -9,6 +9,9 @@ import { Input, Badge, ToastContainer } from '@/components/ui';
 import { adminTenantLimitsService, type LimitsData, type FeaturedProductsLimit, type TierSystemTier } from '@/services/AdminTenantLimitsSingletonService';
 import { useToast } from '@/components/ui/use-toast';
 
+// Skip prerendering since this page uses Mantine components
+export const dynamic = 'force-dynamic';
+
 export default function AdminLimitsPage() {
   const [limitsData, setLimitsData] = useState<LimitsData | null>(null);
   const [allTierLimits, setAllTierLimits] = useState<Record<string, FeaturedProductsLimit> | null>(null);
@@ -359,17 +362,27 @@ export default function AdminLimitsPage() {
         setEditValue('');
         // console.log(`[FocusedSave] Edit state cleared`);
         
+        // 🎯 Show success toast for tenant limits updates
+        const tierDisplayName = limitsData?.tiers.find(t => t.tierKey === tierKey)?.displayName || tierKey;
+        success(`✅ Successfully updated ${field} for "${tierDisplayName}"`);
+        
       } else {
         // console.log(`[FocusedSave] Save failed`);
         setError('Failed to update tier');
         setFocusedEdit(null);
         setEditValue('');
+        
+        // 🎯 Show error toast
+        showError('Failed to update tier. Please try again.');
       }
     } catch (err) {
       console.error(`[FocusedSave] Exception occurred:`, err);
       setError('Failed to update tier');
       setFocusedEdit(null);
       setEditValue('');
+      
+      // 🎯 Show error toast for exceptions
+      showError('Failed to update tier. Please try again.');
     } finally {
       setSaving(false);
       // console.log(`[FocusedSave] Save process completed`);

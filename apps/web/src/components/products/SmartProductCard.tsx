@@ -104,7 +104,7 @@ function FeaturedTypeIcon({ type }: { type: string }) {
 }
 
 // Get all featured types for a product (supports multiple badges)
-const getFeaturedTypes = (product: ProductData): ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[] => {
+const getFeaturedTypes = (product: ProductData): string[] => {
   // If multiple types are explicitly provided, use them
   if (product.featuredTypes && product.featuredTypes.length > 0) {
     return product.featuredTypes;
@@ -161,8 +161,8 @@ interface ProductData {
   availability?: 'in_stock' | 'out_of_stock' | 'preorder';
   itemStatus?: string;
   isFeatured?: boolean;
-  featuredType?: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
-  featuredTypes?: ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[]; // Support multiple types
+  featuredType?: string;
+  featuredTypes?: string[]; // Support multiple types
   featuredPriority?: number;
   featuredAt?: string;
   featuredExpiresAt?: string;

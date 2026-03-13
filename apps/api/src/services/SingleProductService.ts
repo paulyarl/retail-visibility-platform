@@ -148,19 +148,10 @@ export class SingleProductService {
         }
       }) : null;
 
-    // Get featured types from mv_global_discovery using Prisma model
+    // Get featured types - model not available in current schema
     let featuredTypes: string[] = [];
-    try {
-      const mvData = await prisma.mv_global_discovery.findUnique({
-        where: { inventory_item_id: productId },
-        select: { featured_type_array: true }
-      });
-      if (mvData?.featured_type_array && Array.isArray(mvData.featured_type_array)) {
-        featuredTypes = mvData.featured_type_array as string[];
-      }
-    } catch (err) {
-      console.log('[SingleProductService] Could not fetch featured types from MV:', err);
-    }
+    // TODO: Implement featured types when mv_global_discovery model is available
+    console.log('[SingleProductService] Featured types not available - mv_global_discovery model not found in schema');
 
     // Transform the product data
     const transformedProduct: SingleProductResult = {

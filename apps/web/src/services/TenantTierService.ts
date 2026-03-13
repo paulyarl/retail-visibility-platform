@@ -34,7 +34,21 @@ export interface Tier {
 export interface Tenant {
   id: string;
   name: string;
-  // ... other tenant properties
+  subscription_tier?: string;
+  subscription_status?: string;
+  trial_ends_at?: string;
+  subscription_ends_at?: string;
+  created_at?: string;
+  metadata?: {
+    businessName?: string;
+    city?: string;
+    state?: string;
+  };
+  organization_id?: string;
+  organization?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 /**

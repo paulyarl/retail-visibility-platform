@@ -11,10 +11,6 @@ import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageB
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
 export default function TenantAccountPage() {
   const { tenantId } = useParams();
   const { user } = useAuth();

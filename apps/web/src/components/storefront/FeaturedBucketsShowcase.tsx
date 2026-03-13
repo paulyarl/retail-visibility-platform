@@ -3,20 +3,9 @@
 import FeaturedBucket from './FeaturedBucket';
 
 interface FeaturedBucketsShowcaseProps {
-  featuredData: {
+  featuredData: Record<string, any> & {
     totalCount: number;
-    staffPick: any[];
-    seasonal: any[];
-    sale: any[];
-    newArrival: any[];
-    storeSelection: any[];
-    bucketCounts: {
-      staff_pick: number;
-      seasonal: number;
-      sale: number;
-      new_arrival: number;
-      store_selection: number;
-    };
+    bucketCounts: Record<string, number>;
   };
   tenantId: string;
   // Payment gateway status from parent page
@@ -40,58 +29,77 @@ export default function FeaturedBucketsShowcase({
     return null;
   }
 
-  // Featured bucket configurations
-  const bucketConfigs = [
-    {
-      key: 'storeSelection',
-      title: 'Featured Products',
-      icon: '⭐',
-      gradient: 'from-blue-500 to-cyan-500',
-      products: featuredData.storeSelection,
-      totalCount: featuredData.bucketCounts?.store_selection || 0,
-      bucketType: 'store_selection'
-    },
-    {
-      key: 'newArrival',
-      title: 'New Arrivals',
-      icon: '✨',
-      gradient: 'from-green-500 to-emerald-500',
-      products: featuredData.newArrival,
-      totalCount: featuredData.bucketCounts?.new_arrival || 0,
-      bucketType: 'new_arrival'
-    },
-    {
-      key: 'seasonal',
-      title: 'Seasonal Specials',
-      icon: '🗓️',
-      gradient: 'from-orange-500 to-red-500',
-      products: featuredData.seasonal,
-      totalCount: featuredData.bucketCounts?.seasonal || 0,
-      bucketType: 'seasonal'
-    },
-    {
-      key: 'sale',
-      title: 'Sale Items',
-      icon: '🏷️',
-      gradient: 'from-red-500 to-pink-500',
-      products: featuredData.sale,
-      totalCount: featuredData.bucketCounts?.sale || 0,
-      bucketType: 'sale'
-    },
-    {
-      key: 'staffPick',
-      title: 'Staff Picks',
-      icon: '👥',
-      gradient: 'from-purple-500 to-indigo-500',
-      products: featuredData.staffPick,
-      totalCount: featuredData.bucketCounts?.staff_pick || 0,
-      bucketType: 'staff_pick'
-    }
-  ];
+  // Dynamic bucket configurations from API data
+  const bucketConfigs = Object.entries(featuredData.bucketCounts || {}).map(([bucketType, count]) => {
+    if (!count || count === 0) return null;
+    
+    // Get bucket styling and data based on type
+    const getBucketConfig = (type: string) => {
+      switch (type) {
+        case 'store_selection':
+          return {
+            key: 'storeSelection',
+            title: 'Featured Products',
+            icon: '⭐',
+            gradient: 'from-blue-500 to-cyan-500',
+            products: featuredData.storeSelection
+          };
+        case 'new_arrival':
+          return {
+            key: 'newArrival',
+            title: 'New Arrivals',
+            icon: '✨',
+            gradient: 'from-green-500 to-emerald-500',
+            products: featuredData.newArrival
+          };
+        case 'seasonal':
+          return {
+            key: 'seasonal',
+            title: 'Seasonal Specials',
+            icon: '🗓️',
+            gradient: 'from-orange-500 to-red-500',
+            products: featuredData.seasonal
+          };
+        case 'sale':
+          return {
+            key: 'sale',
+            title: 'Sale Items',
+            icon: '🏷️',
+            gradient: 'from-red-500 to-pink-500',
+            products: featuredData.sale
+          };
+        case 'staff_pick':
+          return {
+            key: 'staffPick',
+            title: 'Staff Picks',
+            icon: '👥',
+            gradient: 'from-purple-500 to-indigo-500',
+            products: featuredData.staffPick
+          };
+        default:
+          return {
+            key: type,
+            title: type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' '),
+            icon: '⭐',
+            gradient: 'from-blue-500 to-cyan-500',
+            products: featuredData[type] || []
+          };
+      }
+    };
+    
+    const config = getBucketConfig(bucketType);
+    
+    return {
+      ...config,
+      totalCount: count,
+      bucketType
+    };
+  }).filter(Boolean); // Remove null entries
 
   // Filter buckets that have products
-  const bucketsWithProducts = bucketConfigs.filter(bucket => 
-    bucket.products && bucket.products.length > 0
+  const bucketsWithProducts = bucketConfigs.filter(
+    (bucket): bucket is NonNullable<typeof bucket> => 
+      bucket && bucket.products && bucket.products.length > 0
   );
 
   // Don't render if no buckets have products
@@ -103,13 +111,13 @@ export default function FeaturedBucketsShowcase({
     <div className="featured-buckets-showcase space-y-12">
       {bucketsWithProducts.map((bucket) => (
         <FeaturedBucket
-          key={bucket.key}
-          title={bucket.title}
-          icon={bucket.icon}
-          gradient={bucket.gradient}
-          products={bucket.products}
-          totalCount={bucket.totalCount}
-          bucketType={bucket.bucketType}
+          key={bucket.key || bucket.bucketType}
+          title={bucket.title || 'Featured Products'}
+          icon={bucket.icon || '⭐'}
+          gradient={bucket.gradient || 'from-blue-500 to-cyan-500'}
+          products={bucket.products || []}
+          totalCount={bucket.totalCount || 0}
+          bucketType={bucket.bucketType || 'featured'}
           tenantId={tenantId}
           initialLimit={3}
           hasActivePaymentGateway={hasActivePaymentGateway}

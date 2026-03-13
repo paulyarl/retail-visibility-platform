@@ -6,6 +6,7 @@
  */
 
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 interface Category {
   id: string;
@@ -85,6 +86,9 @@ interface UpgradeRequest {
 }
 
 class ApiQueriesSingletonService extends AuthenticatedApiSingleton {
+
+    protected defaultContext: AppContext = AppContext.TENANT;
+    protected defaultIsolation: CacheIsolation = CacheIsolation.TENANT;
   private static instance: ApiQueriesSingletonService;
 
   private constructor() {
@@ -110,7 +114,7 @@ class ApiQueriesSingletonService extends AuthenticatedApiSingleton {
 
     console.log('[ApiQueriesSingleton] Fetching billing counters for organization:', organizationId);
     
-    const result = await this.makeAuthenticatedRequest<OrganizationData>(
+    const result = await this.makeDefaultRequest<OrganizationData>(
       `/api/organization/billing/counters?organizationId=${organizationId}`,
       {},
       `org-billing-counters-${organizationId}`
@@ -135,7 +139,7 @@ class ApiQueriesSingletonService extends AuthenticatedApiSingleton {
    * Get tenant by ID
    */
   async getTenant(tenantId: string): Promise<Tenant> {
-    const result = await this.makeAuthenticatedRequest<Tenant>(
+    const result = await this.makeDefaultRequest<Tenant>(
       `/api/tenants/${tenantId}`,
       {},
       `tenant-${tenantId}`
@@ -153,7 +157,7 @@ class ApiQueriesSingletonService extends AuthenticatedApiSingleton {
    * Get tenant categories
    */
   async getTenantCategories(tenantId: string): Promise<Category[]> {
-    const result = await this.makeAuthenticatedRequest<Category[]>(
+    const result = await this.makeDefaultRequest<Category[]>(
       `/api/tenant/${tenantId}/categories`,
       {},
       `tenant-categories-${tenantId}`
@@ -177,7 +181,7 @@ class ApiQueriesSingletonService extends AuthenticatedApiSingleton {
 
     const cacheKey = `upgrade-requests-${tenantId || 'all'}-${status || 'all'}`;
     
-    const result = await this.makeAuthenticatedRequest<UpgradeRequest[]>(
+    const result = await this.makeDefaultRequest<UpgradeRequest[]>(
       `/api/upgrade-requests?${params.toString()}`,
       {},
       cacheKey

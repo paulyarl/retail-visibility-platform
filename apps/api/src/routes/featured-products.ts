@@ -1,6 +1,6 @@
 import express from 'express';
 import { authenticateToken, checkTenantAccess } from '../auth/auth.middleware';
-import { FeaturedProductsService } from '../services/FeaturedProductsService';
+import { FeaturedProductsService, isValidFeaturedType } from '../services/FeaturedProductsService';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 
@@ -8,18 +8,7 @@ const router = express.Router();
 
 // Validation schemas
 const addFeaturedTypeSchema = z.object({
-  featured_type: z.enum([
-    'store_selection', 
-    'new_arrival', 
-    'seasonal', 
-    'sale', 
-    'staff_pick',
-    'bestseller',
-    'clearance',
-    'trending',
-    'featured',
-    'recommended'
-  ]),
+  featured_type: z.string().refine(isValidFeaturedType),
   featured_priority: z.number().int().min(0).max(100).optional(),
   featured_expires_at: z.string().datetime().nullable().optional(),
   auto_unfeature: z.boolean().optional(),
@@ -218,7 +207,7 @@ router.put('/items/:itemId/featured-types/:featuredType', authenticateToken, asy
     }
 
     // Validate featured_type
-    if (!['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick'].includes(featuredType)) {
+    if (!isValidFeaturedType(featuredType)) {
       return res.status(400).json({ error: 'invalid_featured_type' });
     }
 
@@ -392,7 +381,7 @@ router.patch('/items/:itemId/featured-types/:featuredType', authenticateToken, a
     }
 
     // Validate featured_type
-    if (!['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick'].includes(featuredType)) {
+    if (!isValidFeaturedType(featuredType)) {
       return res.status(400).json({ error: 'invalid_featured_type' });
     }
 
@@ -456,7 +445,7 @@ router.delete('/items/:itemId/featured-types/:featuredType', authenticateToken, 
     const { itemId, featuredType } = req.params;
 
     // Validate featured_type
-    if (!['store_selection', 'new_arrival', 'seasonal', 'sale', 'staff_pick'].includes(featuredType)) {
+    if (!isValidFeaturedType(featuredType)) {
       return res.status(400).json({ error: 'invalid_featured_type' });
     }
 

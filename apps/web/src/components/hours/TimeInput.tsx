@@ -9,11 +9,6 @@ interface TimeInputProps {
 }
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export default function TimeInput({ value, onChange, placeholder }: TimeInputProps) {
   const [hour, setHour] = useState<number>(9);

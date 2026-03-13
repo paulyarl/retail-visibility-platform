@@ -3,11 +3,6 @@ import React, { useEffect, useState } from "react";
 import { tenantManagementService } from "@/services/TenantManagementService";
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export default function SyncStateBadge({ tenantId }: { tenantId: string }) {
   const [status, setStatus] = useState<{ in_sync: boolean; last_synced_at?: string; attempts?: number } | null>(null);

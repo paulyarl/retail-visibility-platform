@@ -13,11 +13,6 @@ interface TierGainsWelcomeProps {
  * Shows what major pillars/capabilities the user now has access to
  */
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export default function TierGainsWelcome({ currentTier, tierDisplayName }: TierGainsWelcomeProps) {
   // Define tier-specific gains (what they unlocked by being on this tier)

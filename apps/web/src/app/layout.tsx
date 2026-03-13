@@ -2,19 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 // import { Analytics } from "@vercel/analytics/react"; // Disabled - not configured in Vercel
 import "./globals.css";
-import ErrorBoundary from "@/components/ErrorBoundary";
-import { AuthProvider as CustomAuthProvider } from "@/contexts/AuthContext";
-import { CartWidgetProvider } from "@/contexts/CartWidgetContext";
-import { ProductLayoutProvider } from "@/contexts/ProductLayoutContext";
-import DynamicFavicon from "@/components/DynamicFavicon";
-import { QueryClientWrapper } from "@/components/QueryClientWrapper";
-import { GlobalAlertProvider } from "@/components/ui/GlobalAlertProvider";
-import { FloatingCartWidget } from "@/components/cart/FloatingCartWidget";
-import { UniversalProvider } from "@/providers/UniversalProvider";
-import { PlatformThemeProvider } from "@/contexts/PlatformThemeProvider";
-import { ThemeProvider } from "@/components/ThemeProvider";
-// Import contextCacheManager to ensure it loads and makes test available globally
-import "@/utils/contextCacheManager";
+import { ClientRootLayout } from "@/components/ClientRootLayout";
+
+// Prevent static generation for all routes (Mantine requires dynamic rendering)
+export const dynamic = 'force-dynamic';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,45 +19,24 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
   display: "swap",
-  fallback: ["Monaco", "Menlo", "Consolas", "Liberation Mono", "Courier New", "monospace"],
-  preload: false, // Disable preload to avoid connection issues
+  fallback: ["JetBrains Mono", "monospace"],
+  preload: false,
 });
 
 export const metadata: Metadata = {
-  title: "Visible Shelf",
-  description: "Retail visibility platform empowering local businesses with AI-powered inventory management, automated product enrichment, Google Business Profile sync, customizable digital storefronts, and a public directory connecting customers to local merchants—all designed to increase discoverability and drive sales.",
+  title: "VisibleShelf",
+  description: "Product visibility platform for retail",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <DynamicFavicon />
-      </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh bg-white text-neutral-900`}
-        suppressHydrationWarning
-      >
-        <QueryClientWrapper>
-          <ThemeProvider>
-            <PlatformThemeProvider>
-              <CustomAuthProvider>
-                <CartWidgetProvider>
-                  <ProductLayoutProvider>
-                    <GlobalAlertProvider>
-                      <UniversalProvider>
-                        <ErrorBoundary>
-                          {children}
-                        </ErrorBoundary>
-                        <FloatingCartWidget />
-                      </UniversalProvider>
-                    </GlobalAlertProvider>
-                  </ProductLayoutProvider>
-                </CartWidgetProvider>
-              </CustomAuthProvider>
-            </PlatformThemeProvider>
-          </ThemeProvider>
-        </QueryClientWrapper>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh bg-white text-neutral-900`} suppressHydrationWarning>
+      <body>
+        <ClientRootLayout>{children}</ClientRootLayout>
         {/* <Analytics /> */}
       </body>
     </html>

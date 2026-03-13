@@ -4,11 +4,6 @@ import React, { useEffect, useState } from "react";
 import { tenantManagementService } from "@/services/TenantManagementService";
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export default function TimezonePicker({ tenantId, onTimezoneChange }: { tenantId: string; onTimezoneChange?: (timezone: string) => void }) {
   const [loading, setLoading] = useState(true);

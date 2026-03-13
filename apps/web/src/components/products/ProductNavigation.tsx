@@ -10,11 +10,6 @@ interface ProductNavigationProps {
 }
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export function ProductNavigation({ tenantId, directorySlug }: ProductNavigationProps) {
   // Try to get auth context, but don't fail if not available

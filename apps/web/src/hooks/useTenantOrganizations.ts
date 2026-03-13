@@ -25,9 +25,9 @@ interface UseTenantOrganizationsOptions {
 interface UseTenantOrganizationsReturn extends OrganizationsState {
   // Actions
   createOrganization: (data: CreateOrganizationData) => Promise<void>;
-  updateOrganization: (orgId: string, data: UpdateOrganizationData) => Promise<void>;
-  addTenantToOrganization: (orgId: string, tenantId: string) => Promise<void>;
-  removeTenantFromOrganization: (orgId: string, tenantId: string) => Promise<void>;
+  updateOrganization: (orgId: string, data: UpdateOrganizationData) => Promise<any>;
+  addTenantToOrganization: (orgId: string, tenantId: string) => Promise<any>;
+  removeTenantFromOrganization: (orgId: string, tenantId: string) => Promise<any>;
   refresh: () => Promise<void>;
   refreshTenants: () => Promise<void>;
   clearError: () => void;
@@ -94,15 +94,15 @@ export function useTenantOrganizations(
   }, [singleton]);
 
   const updateOrganization = useCallback(async (orgId: string, data: UpdateOrganizationData) => {
-    await singleton.updateOrganization(orgId, data);
+    return await singleton.updateOrganization(orgId, data);
   }, [singleton]);
 
   const addTenantToOrganization = useCallback(async (orgId: string, tenantId: string) => {
-    await singleton.addTenantToOrganization(orgId, tenantId);
+    return await singleton.addTenantToOrganization(orgId, tenantId);
   }, [singleton]);
 
   const removeTenantFromOrganization = useCallback(async (orgId: string, tenantId: string) => {
-    await singleton.removeTenantFromOrganization(orgId, tenantId);
+    return await singleton.removeTenantFromOrganization(orgId, tenantId);
   }, [singleton]);
 
   const refresh = useCallback(async () => {

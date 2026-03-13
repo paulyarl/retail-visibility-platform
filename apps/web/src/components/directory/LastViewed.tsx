@@ -102,11 +102,6 @@ interface LastViewedProps {
   showEmptyState?: boolean;
 }
 
-// Force edge runtime to prevent prerendering issues
-// export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-// export const dynamic = 'force-dynamic';
 
 export default function LastViewed({
   title = "Recently Viewed",
@@ -386,7 +381,7 @@ export default function LastViewed({
                             productReviewsApprovedLive: productData.productReviewsApprovedLive,
                             
                             // Featured data
-                            featuredType: productData.featuredType as 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' | undefined,
+                            featuredType: productData.featuredType,
                             featuredPriority: productData.featuredPriority,
                             featuredAt: productData.featuredAt,
                             isFeaturedActive: productData.isFeaturedActive,

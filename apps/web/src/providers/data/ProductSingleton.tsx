@@ -27,7 +27,7 @@ export interface PublicProduct {
   availability: 'in_stock' | 'out_of_stock' | 'preorder' | 'discontinued';
   hasVariants?: boolean;
   category?: ProductCategory;
-  featuredType?: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  featuredType?: string;
   featuredPriority?: number;
   featuredAt?: string;
   featuredExpiresAt?: string;
@@ -387,33 +387,40 @@ export class ProductSingleton extends PublicApiSingleton {
   }
   
   // Helper method to map featured types from mv_global_discovery to our interface
-  private mapFeaturedType(type: string): 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick' {
-    const typeMap: Record<string, 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick'> = {
+  private mapFeaturedType(type: string): string {
+    const typeMap: Record<string, string> = {
       'featured': 'store_selection',
-      'trending': 'store_selection',
+      'trending': 'trending',
       'new': 'new_arrival',
       'premium': 'seasonal',
       'staff_pick': 'staff_pick',
-      'bestseller': 'store_selection',
+      'bestseller': 'bestseller',
       'gift_idea': 'seasonal',
-      'popular': 'store_selection'
+      'popular': 'store_selection',
+      'clearance': 'clearance',
+      'recommended': 'recommended'
     };
     
-    return typeMap[type] || 'store_selection';
+    return typeMap[type] || type; // Return original type if not in map
   }
   
   // Helper method to generate random featured types for variety
-  private generateRandomFeaturedTypes(): ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[] {
-    const allTypes: ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[] = [
+  private generateRandomFeaturedTypes(): string[] {
+    const allTypes: string[] = [
       'store_selection',
       'new_arrival', 
       'seasonal',
       'sale',
-      'staff_pick'
+      'staff_pick',
+      'bestseller',
+      'clearance',
+      'trending',
+      'featured',
+      'recommended'
     ];
     
     // Always include store_selection as primary
-    const types: ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[] = ['store_selection'];
+    const types: string[] = ['store_selection'];
     
     // Randomly add 1-2 additional types for variety
     const additionalCount = Math.floor(Math.random() * 2) + 1; // 1-2 additional types

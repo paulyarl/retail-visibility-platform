@@ -7,6 +7,8 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { prisma } from '../prisma';
+import { isValidFeaturedType, getValidFeaturedTypes } from '../services/FeaturedProductsService';
 import { getDirectPool } from '../utils/db-pool';
 
 const router = Router();
@@ -312,9 +314,8 @@ router.get('/:tenantId/featured-products/:type', async (req: Request, res: Respo
     const showExpired = includeExpired === 'true';
     
     // Validate featured type
-    const validTypes = ['staff_pick', 'seasonal', 'sale', 'new_arrival', 'store_selection'];
-    if (!validTypes.includes(type)) {
-      return res.status(400).json({ error: 'invalid_featured_type', validTypes });
+    if (!isValidFeaturedType(type)) {
+      return res.status(400).json({ error: 'invalid_featured_type', validTypes: getValidFeaturedTypes() });
     }
     
     // Query specific bucket using mv_global_discovery with ALL columns

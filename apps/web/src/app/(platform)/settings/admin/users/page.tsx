@@ -15,9 +15,6 @@ import { canManageUsers, canViewUsers } from '@/lib/auth/access-control';
 import { adminUsersService } from '@/services/AdminUsersService';
 import { adminUserService } from '@/services/AdminUserService';
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
 
 interface User {
   id: string;

@@ -9,11 +9,6 @@ interface HoursPreviewProps {
   tenantId: string;
 }
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export default function HoursPreview({ tenantId }: HoursPreviewProps) {
   const { status, loading } = useStoreStatus(tenantId, false); // Private scope

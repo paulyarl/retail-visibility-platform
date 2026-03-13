@@ -6,11 +6,6 @@ import Link from 'next/link';
 import { Card, CardContent, Button } from '@/components/ui';
 import { userManagementService } from '@/services/UserManagementService';
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 function AccessDeniedContent() {
   const searchParams = useSearchParams();

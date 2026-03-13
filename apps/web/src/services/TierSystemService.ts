@@ -11,24 +11,21 @@ import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
 export interface Tier {
   id: string;
   name: string;
-  slug: string;
+  displayName: string;
   description?: string;
-  price: number;
-  currency: string;
-  billingInterval: 'monthly' | 'yearly';
-  features: Record<string, any>;
-  limits: {
-    skus: number;
-    locations: number;
-    users: number;
-    storage: number;
-    bandwidth: number;
-  };
-  isActive: boolean;
-  sortOrder: number;
+  price: string; // API returns as string, not number
+  maxSkus: number; // Direct property, not nested under limits
+  maxLocations: number; // Direct property, not nested under limits
   type: 'individual' | 'organization';
-  createdAt: string;
-  updatedAt: string;
+  features: string[];
+  sortOrder: number;
+  isActive: boolean;
+  // Optional properties that might exist but not in current API response
+  currency?: string;
+  billingInterval?: 'monthly' | 'yearly';
+  slug?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /**

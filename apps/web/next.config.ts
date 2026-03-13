@@ -165,12 +165,5 @@ const sentryWebpackPluginOptions = {
 };
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
-
-
 // Make sure adding Sentry options is the last code to run before exporting
 export default withSentryConfig(nextConfig, sentryWebpackPluginOptions);

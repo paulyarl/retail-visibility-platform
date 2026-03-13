@@ -1,17 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner, Input, Modal } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, Alert, Spinner, Input, Modal, ToastContainer } from '@/components/ui';
 import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { Edit2, Save, X, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
-
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
+import { useToast } from '@/components/ui/use-toast';
 
 interface Tier {
   id: string;
@@ -62,6 +57,7 @@ export default function TierSystemPage() {
   const [deactivatingTier, setDeactivatingTier] = useState<Tier | null>(null);
   const [deactivationReason, setDeactivationReason] = useState('');
   const [showInactiveTiers, setShowInactiveTiers] = useState(false);
+  const { toast, toasts, removeToast } = useToast();
   const [newTier, setNewTier] = useState<Partial<Tier>>({
     tierKey: '',
     name: '',
@@ -134,19 +130,31 @@ export default function TierSystemPage() {
     // Direct activation (no confirmation needed)
     try {
       setError(null);
-      setSuccess(null);
       
-      const tier = await platformHomeService.updateTierStatus(tierId, isActive);
+      const updatedTier = await platformHomeService.updateTierStatus(tierId, isActive);
       
-      if (tier) {
-        setSuccess(`Tier activated successfully`);
-        loadTiers(); // Reload to show updated state
+      if (updatedTier) {
+        // 🎯 Use the response data to update the local state immediately
+        setTiers(prevTiers => 
+          prevTiers.map(tier => 
+            tier.id === tierId 
+              ? { ...tier, isActive: true }
+              : tier
+          )
+        );
+
+        // 🎯 Show success toast
+        const tierName = tiers.find(t => t.id === tierId)?.displayName || 'Tier';
+        toast(`✅ Successfully activated "${tierName}"`, { variant: 'success' });
       } else {
-        setError('Failed to update tier');
+        throw new Error('Failed to update tier');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to toggle tier:', err);
-      setError('Failed to update tier');
+      setError(err.message || 'Failed to update tier');
+      
+      // Show error toast
+      toast(err.message || 'Failed to update tier', { variant: 'error' });
     }
   };
 
@@ -158,22 +166,34 @@ export default function TierSystemPage() {
 
     try {
       setError(null);
-      setSuccess(null);
       setSaving(true);
       
-      const tier = await platformHomeService.updateTierStatus(deactivatingTier.id, false, deactivationReason.trim());
+      const updatedTier = await platformHomeService.updateTierStatus(deactivatingTier.id, false, deactivationReason.trim());
       
-      if (tier) {
-        setSuccess(`Tier "${deactivatingTier.displayName}" deactivated successfully`);
+      if (updatedTier) {
+        // 🎯 Use the response data to update the local state immediately
+        setTiers(prevTiers => 
+          prevTiers.map(tier => 
+            tier.id === deactivatingTier.id 
+              ? { ...tier, isActive: false }
+              : tier
+          )
+        );
+
+        // 🎯 Show success toast
+        toast(`✅ Successfully deactivated "${deactivatingTier.displayName}"`, { variant: 'success' });
+        
         setDeactivatingTier(null);
         setDeactivationReason('');
-        loadTiers(); // Reload to show updated state
       } else {
-        setError('Failed to deactivate tier');
+        throw new Error('Failed to deactivate tier');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to deactivate tier:', err);
-      setError('Failed to deactivate tier');
+      setError(err.message || 'Failed to deactivate tier');
+      
+      // Show error toast
+      toast(err.message || 'Failed to deactivate tier', { variant: 'error' });
     } finally {
       setSaving(false);
     }
@@ -201,19 +221,44 @@ export default function TierSystemPage() {
       setSaving(true);
       setError(null);
       
-      const tier = await platformHomeService.updateTier(editingData.id, editingData);
+      console.log('[TierSystem] Updating tier:', editingData.id, editingData);
       
-      if (tier) {
-        setSuccess('Tier updated successfully');
+      // 🎯 Use tierKey for API calls (remove tier_ prefix if present)
+      const tierId = editingData.id.startsWith('tier_') ? editingData.tierKey : editingData.id;
+      console.log('[TierSystem] Using tierId for API call:', tierId);
+      
+      const updatedTier = await platformHomeService.updateTier(tierId, editingData);
+      
+      if (updatedTier) {
+        console.log('[TierSystem] Update response:', updatedTier);
+        
+        // 🎯 Use the response data to update the local state immediately
+        setTiers(prevTiers => 
+          prevTiers.map(tier => 
+            tier.id === editingData.id 
+              ? {
+                  ...tier,
+                  ...updatedTier, // Use the returned tier data directly
+                  priceMonthly: updatedTier.priceMonthly || tier.priceMonthly
+                }
+              : tier
+          )
+        );
+
+        // 🎯 Show success toast with detailed information
+        toast(`✅ Successfully updated "${updatedTier.displayName}"`, { variant: 'success' });
+        
         setEditingTier(null);
         setEditingData(null);
-        loadTiers();
       } else {
-        setError('Failed to save tier');
+        throw new Error('Failed to save tier');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save tier:', err);
-      setError('Failed to save tier');
+      setError(err.message || 'Failed to save tier');
+      
+      // Show error toast
+      toast(err.message || 'Failed to save tier', { variant: 'error' });
     } finally {
       setSaving(false);
     }
@@ -488,12 +533,6 @@ export default function TierSystemPage() {
       {error && (
         <Alert variant="error">
           {error}
-        </Alert>
-      )}
-
-      {success && (
-        <Alert variant="success">
-          {success}
         </Alert>
       )}
 
@@ -1219,6 +1258,7 @@ export default function TierSystemPage() {
           </div>
         </div>
       </Modal>
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }

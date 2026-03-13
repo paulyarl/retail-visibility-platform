@@ -4,11 +4,6 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { Card } from '@mantine/core';
 import { Button } from '@mantine/core';
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export default function LocationLimitsPage() {
   return (

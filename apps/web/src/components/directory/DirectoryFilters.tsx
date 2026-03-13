@@ -11,11 +11,6 @@ interface DirectoryFiltersProps {
 }
 
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
 
 export default function DirectoryFilters({ categories, storeTypes = [], locations }: DirectoryFiltersProps) {
   const router = useRouter();

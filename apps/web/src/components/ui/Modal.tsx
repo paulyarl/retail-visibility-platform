@@ -2,14 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from './Button';
-
-
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-
-// Force dynamic rendering to prevent prerendering issues
-export const dynamic = 'force-dynamic';
+import { ReactNode } from 'react';
 
 export interface ModalProps {
   isOpen: boolean;

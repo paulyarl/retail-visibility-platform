@@ -902,8 +902,12 @@ export default function AdminFeaturedProductsPage() {
         </div>
       )}
 
-      {activeTab === 'directory-featured' && (
+      {activeTab === 'store-featured' && (
         <AdminTenantFeaturedManagement selectedTenant={selectedTenant} setSelectedTenant={setSelectedTenant} />
+      )}
+
+      {activeTab === 'directory-featured' && (
+        <AdminDirectoryFeaturedManagement />
       )}
 
     </div>

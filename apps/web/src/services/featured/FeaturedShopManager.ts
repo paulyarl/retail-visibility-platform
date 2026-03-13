@@ -5,7 +5,7 @@
 
 import { Shop } from '@/types/shop';
 
-export type FeaturedType = 'store_selection' | 'new_arrival' | 'trending' | 'seasonal' | 'staff_pick' | 'premium';
+export type FeaturedType = string;
 
 export interface FeaturedShop {
   shopId: string;

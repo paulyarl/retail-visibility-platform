@@ -206,7 +206,7 @@ router.get('/featured-products', authenticateToken, async (req, res) => {
 
     // Get limits from database based on tenant's actual tier
     const tierLimits = await prisma.subscription_tiers_list.findUnique({
-      where: { tier_key: tenant.subscription_tier },
+      where: { tier_key: tenant.subscription_tier || 'starter' },
       select: {
         featured_store_selection: true,
         featured_new_arrival: true,

@@ -5,9 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DeletionRequestsManager } from '@/components/admin/DeletionRequestsManager';
 import { Shield, Users, AlertTriangle } from 'lucide-react';
 
-// Force edge runtime to prevent prerendering issues
-export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
 
 export default function DeletionRequestsPage() {
   return (

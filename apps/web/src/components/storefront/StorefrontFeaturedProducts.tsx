@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Package, Calendar, DollarSign, Star, Tag, Grid, List } from 'lucide-react';
 import Link from 'next/link';
 import SmartProductCard from '@/components/products/SmartProductCard';
@@ -40,7 +40,7 @@ interface FeaturedProduct {
   defaultGatewayType?: string;
   paymentGatewayType?: string;
   isFeatured?: boolean;
-  featuredTypes?: ('store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick')[];
+  featuredTypes?: string[];
 
   // Enhanced fields for rich display
   averageRating?: number;
@@ -150,7 +150,7 @@ interface FeaturedProduct {
   publishedAt?: string;
 
   // Featured system
-  featuredType?: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  featuredType?: string;
   featuredPriority?: number;
   featuredAt?: string;
   featuredExpiresAt?: string;
@@ -168,7 +168,7 @@ interface FeaturedProduct {
 
 interface FeaturedSectionProps {
   tenantId: string;
-  type: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  type: string;
   title: string;
   description: string;
   icon: React.ReactNode;
@@ -262,7 +262,7 @@ function FeaturedTypeBadges({ featuredTypes }: { featuredTypes?: string[] }) {
 
 interface FeaturedSectionWithProductsProps {
   tenantId: string;
-  type: 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick';
+  type: string;
   title: string;
   description: string;
   icon: React.ReactNode;
@@ -277,7 +277,7 @@ interface FeaturedSectionWithProductsProps {
 
 function FeaturedSection({ tenantId, type, title, description, icon, color, products, loading, maxProducts = 8, hasActivePaymentGateway, defaultGatewayType, instanceId = 'default' }: FeaturedSectionWithProductsProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const config = featuredTypeConfig[type];
+  const config = featuredTypeConfig[type as keyof typeof featuredTypeConfig];
   const contextPayment = useTenantPaymentOptional();
   
   // Filter products by type (already done at parent level, but keep for safety)
@@ -496,7 +496,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   publishedAt: product.publishedAt,
                   
                   // Featured system
-                  featuredType: product.featuredType as 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick',
+                  featuredType: product.featuredType,
                   featuredTypes: product.featuredTypes,
                   featuredPriority: product.featuredPriority,
                   featuredAt: product.featuredAt,
@@ -664,7 +664,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   publishedAt: product.publishedAt,
                   
                   // Featured system
-                  featuredType: product.featuredType as 'store_selection' | 'new_arrival' | 'seasonal' | 'sale' | 'staff_pick',
+                  featuredType: product.featuredType,
                   featuredTypes: product.featuredTypes,
                   featuredPriority: product.featuredPriority,
                   featuredAt: product.featuredAt,
@@ -926,82 +926,67 @@ export default function StorefrontFeaturedProducts({
     return null;
   }
 
-  // Filter products by type for each section
-  const productsByType = {
-    new_arrival: allProducts.filter(p => p.featuredType === 'new_arrival' || (p.featuredTypes && p.featuredTypes.includes('new_arrival'))),
-    seasonal: allProducts.filter(p => p.featuredType === 'seasonal' || (p.featuredTypes && p.featuredTypes.includes('seasonal'))),
-    sale: allProducts.filter(p => p.featuredType === 'sale' || (p.featuredTypes && p.featuredTypes.includes('sale'))),
-    staff_pick: allProducts.filter(p => p.featuredType === 'staff_pick' || (p.featuredTypes && p.featuredTypes.includes('staff_pick'))),
-    store_selection: allProducts.filter(p => p.featuredType === 'store_selection' || (p.featuredTypes && p.featuredTypes.includes('store_selection')))
-  };
+  // Get all unique featured types from the products
+  const allFeaturedTypes = useMemo(() => {
+    const types = new Set<string>();
+    allProducts.forEach(product => {
+      if (product.featuredType) {
+        types.add(product.featuredType);
+      }
+      if (product.featuredTypes) {
+        product.featuredTypes.forEach(type => types.add(type));
+      }
+    });
+    return Array.from(types);
+  }, [allProducts]);
+
+  // Filter products by type dynamically
+  const productsByType = useMemo(() => {
+    const byType: Record<string, any[]> = {};
+    allFeaturedTypes.forEach((type: string) => {
+      byType[type] = allProducts.filter(p => 
+        p.featuredType === type || (p.featuredTypes && p.featuredTypes.includes(type))
+      );
+    });
+    return byType;
+  }, [allProducts, allFeaturedTypes]);
+
+  // Get default config for unknown featured types
+  const getDefaultConfig = (type: string) => ({
+    title: type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' '),
+    description: 'Featured products',
+    icon: <Star className="w-5 h-5" />,
+    color: 'blue',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200',
+    textColor: 'text-blue-700',
+    buttonColor: 'bg-blue-600 hover:bg-blue-700',
+    badgeColor: 'bg-blue-100 text-blue-800 border-blue-200'
+  });
 
   return (
     <div className="space-y-0">
-      {productsByType.new_arrival.length > 0 && (
-        <FeaturedSection
-          tenantId={tenantId}
-          type="new_arrival"
-          hasActivePaymentGateway={hasActivePaymentGateway}
-          defaultGatewayType={defaultGatewayType}
-          instanceId={instanceId}
-          {...featuredTypeConfig.new_arrival}
-          products={productsByType.new_arrival}
-          loading={false}
-          maxProducts={8}
-        />
-      )}
-      {productsByType.seasonal.length > 0 && (
-        <FeaturedSection
-          tenantId={tenantId}
-          type="seasonal"
-          hasActivePaymentGateway={hasActivePaymentGateway}
-          defaultGatewayType={defaultGatewayType}
-          instanceId={instanceId}
-          {...featuredTypeConfig.seasonal}
-          products={productsByType.seasonal}
-          loading={false}
-          maxProducts={8}
-        />
-      )}
-      {productsByType.sale.length > 0 && (
-        <FeaturedSection
-          tenantId={tenantId}
-          type="sale"
-          hasActivePaymentGateway={hasActivePaymentGateway}
-          defaultGatewayType={defaultGatewayType}
-          instanceId={instanceId}
-          {...featuredTypeConfig.sale}
-          products={productsByType.sale}
-          loading={false}
-          maxProducts={8}
-        />
-      )}
-      {productsByType.staff_pick.length > 0 && (
-        <FeaturedSection
-          tenantId={tenantId}
-          type="staff_pick"
-          hasActivePaymentGateway={hasActivePaymentGateway}
-          defaultGatewayType={defaultGatewayType}
-          instanceId={instanceId}
-          {...featuredTypeConfig.staff_pick}
-          products={productsByType.staff_pick}
-          loading={false}
-          maxProducts={8}
-        />
-      )}
-      {productsByType.store_selection.length > 0 && (
-        <FeaturedSection
-          tenantId={tenantId}
-          type="store_selection"
-          hasActivePaymentGateway={hasActivePaymentGateway}
-          defaultGatewayType={defaultGatewayType}
-          instanceId={instanceId}
-          {...featuredTypeConfig.store_selection}
-          products={productsByType.store_selection}
-          loading={false}
-          maxProducts={8}
-        />
-      )}
+      {allFeaturedTypes.map(type => {
+        const products = productsByType[type];
+        if (products.length === 0) return null;
+        
+        const config = featuredTypeConfig[type as keyof typeof featuredTypeConfig] || getDefaultConfig(type);
+        
+        return (
+          <FeaturedSection
+            key={type}
+            tenantId={tenantId}
+            type={type}
+            hasActivePaymentGateway={hasActivePaymentGateway}
+            defaultGatewayType={defaultGatewayType}
+            instanceId={instanceId}
+            {...config}
+            products={products}
+            loading={false}
+            maxProducts={8}
+          />
+        );
+      })}
     </div>
   );
 }
