@@ -140,35 +140,95 @@ export default function AnalyticsOverview({ filters }: AnalyticsOverviewProps) {
       </div>
     );
   }
+          change: -3.4,
+          changeType: 'decrease' as const,
+          icon: <Store className="w-5 h-5" />,
+          description: 'Views of individual storefront pages'
+        },
+        {
+          title: 'Directory Traffic',
+          value: '18.5K',
+          change: 15.7,
+          changeType: 'increase' as const,
+          icon: <ShoppingCart className="w-5 h-5" />,
+          description: 'Directory and shops page traffic'
+        },
+        {
+          title: 'Avg. Session Duration',
+          value: '4m 32s',
+          change: 18.3,
+          changeType: 'increase' as const,
+          icon: <Clock className="w-5 h-5" />,
+          description: 'Average time users spend on platform'
+        },
+        {
+          title: 'Bounce Rate',
+          value: '32.4%',
+          change: -5.2,
+          changeType: 'decrease' as const,
+          icon: <Activity className="w-5 h-5" />,
+          description: 'Percentage of single-page sessions'
+        }
+      ];
+      setMetrics(mockMetrics);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="bg-white rounded-lg shadow-sm p-6 animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+            <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {metrics.map((metric, index) => (
-        <div key={index} className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              {metric.icon}
-              <h3 className="ml-2 text-sm font-medium text-gray-600">{metric.title}</h3>
-            </div>
-            <div className={`flex items-center text-sm ${
-              metric.changeType === 'increase' ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {metric.changeType === 'increase' ? (
-                <ArrowUp className="w-4 h-4 mr-1" />
-              ) : (
-                <ArrowDown className="w-4 h-4 mr-1" />
-              )}
-              {Math.abs(metric.change).toFixed(1)}%
-            </div>
-          </div>
-          
-          <div className="mb-2">
-            <div className="text-2xl font-bold text-gray-900">{metric.value}</div>
-          </div>
-          
-          <p className="text-xs text-gray-500">{metric.description}</p>
-        </div>
+        <MetricCard key={index} metric={metric} />
       ))}
+    </div>
+  );
+}
+
+function MetricCard({ metric }: { metric: MetricCard }) {
+  const isPositive = metric.changeType === 'increase';
+  const isGoodChange = metric.title === 'Bounce Rate' ? !isPositive : isPositive;
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow">
+      <div className="flex items-center justify-between mb-4">
+        <div className={`p-2 rounded-lg ${
+          metric.title.includes('Views') ? 'bg-blue-100 text-blue-600' :
+          metric.title.includes('Visitors') ? 'bg-green-100 text-green-600' :
+          metric.title.includes('Storefront') ? 'bg-purple-100 text-purple-600' :
+          metric.title.includes('Directory') ? 'bg-orange-100 text-orange-600' :
+          metric.title.includes('Duration') ? 'bg-pink-100 text-pink-600' :
+          'bg-gray-100 text-gray-600'
+        }`}>
+          {metric.icon}
+        </div>
+        <div className={`flex items-center gap-1 text-sm font-medium ${
+          isGoodChange ? 'text-green-600' : 'text-red-600'
+        }`}>
+          {isPositive ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+          {Math.abs(metric.change)}%
+        </div>
+      </div>
+      
+      <div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-1">{metric.value}</h3>
+        <p className="text-sm font-medium text-gray-600 mb-2">{metric.title}</p>
+        <p className="text-xs text-gray-500">{metric.description}</p>
+      </div>
     </div>
   );
 }

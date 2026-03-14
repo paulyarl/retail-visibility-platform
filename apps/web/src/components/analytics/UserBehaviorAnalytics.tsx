@@ -6,7 +6,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users, MousePointer, Target, Repeat, Clock, TrendingUp } from 'lucide-react';
+import { 
+  Users, 
+  Clock, 
+  TrendingUp, 
+  ArrowUp, 
+  ArrowDown, 
+  Activity,
+  Eye,
+  Target
+} from 'lucide-react';
+import { platformAnalyticsService } from '@/services/analytics/PlatformAnalyticsService';
 
 interface UserBehaviorAnalyticsProps {
   filters: {
@@ -17,14 +27,6 @@ interface UserBehaviorAnalyticsProps {
     entityType?: string;
     region?: string;
   };
-}
-
-interface BehaviorMetric {
-  label: string;
-  value: string | number;
-  description: string;
-  trend: number;
-  icon: React.ReactNode;
 }
 
 interface UserJourney {
@@ -43,237 +45,201 @@ interface EngagementPattern {
 }
 
 export default function UserBehaviorAnalytics({ filters }: UserBehaviorAnalyticsProps) {
-  const [behaviorMetrics, setBehaviorMetrics] = useState<BehaviorMetric[]>([]);
   const [userJourney, setUserJourney] = useState<UserJourney[]>([]);
   const [engagementPatterns, setEngagementPatterns] = useState<EngagementPattern[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const fetchUserBehaviorData = async () => {
+      try {
+        setLoading(true);
+        const data = await platformAnalyticsService.getUserBehaviorAnalytics(filters);
+        setUserJourney(data.journeyFunnel);
+        setEngagementPatterns(data.timeOfDayEngagement);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching user behavior analytics:', err);
+        setError('Failed to load user behavior data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchUserBehaviorData();
   }, [filters]);
 
-  const fetchUserBehaviorData = async () => {
-    setLoading(true);
-    try {
-      // Mock behavior metrics
-      const mockBehaviorMetrics: BehaviorMetric[] = [
-        {
-          label: 'Avg. Pages per Session',
-          value: '4.2',
-          description: 'Pages viewed per session',
-          trend: 8.5,
-          icon: <MousePointer className="w-4 h-4" />
-        },
-        {
-          label: 'Session Duration',
-          value: '4m 32s',
-          description: 'Average time per session',
-          trend: 12.3,
-          icon: <Clock className="w-4 h-4" />
-        },
-        {
-          label: 'Return Visitor Rate',
-          value: '34.7%',
-          description: 'Percentage of returning users',
-          trend: 5.2,
-          icon: <Repeat className="w-4 h-4" />
-        },
-        {
-          label: 'Click-Through Rate',
-          value: '18.9%',
-          description: 'CTR on interactive elements',
-          trend: -2.1,
-          icon: <Target className="w-4 h-4" />
-        }
-      ];
-
-      // Mock user journey data
-      const mockUserJourney: UserJourney[] = [
-        {
-          step: 'Landing Page',
-          users: 8743,
-          conversionRate: 100,
-          avgTime: 45
-        },
-        {
-          step: 'Browse Directory',
-          users: 6234,
-          conversionRate: 71.3,
-          avgTime: 128
-        },
-        {
-          step: 'View Storefront',
-          users: 3421,
-          conversionRate: 39.2,
-          avgTime: 245
-        },
-        {
-          step: 'View Products',
-          users: 2156,
-          conversionRate: 24.7,
-          avgTime: 189
-        },
-        {
-          step: 'Add to Cart',
-          users: 892,
-          conversionRate: 10.2,
-          avgTime: 67
-        },
-        {
-          step: 'Checkout',
-          users: 445,
-          conversionRate: 5.1,
-          avgTime: 312
-        }
-      ];
-
-      // Mock engagement patterns
-      const mockEngagementPatterns: EngagementPattern[] = [
-        { period: 'Morning (6-12)', pageViews: 12400, uniqueUsers: 2100, avgSessionDuration: 272, returnVisitors: 680 },
-        { period: 'Afternoon (12-18)', pageViews: 18900, uniqueUsers: 3200, avgSessionDuration: 298, returnVisitors: 1120 },
-        { period: 'Evening (18-24)', pageViews: 15600, uniqueUsers: 2800, avgSessionDuration: 245, returnVisitors: 980 },
-        { period: 'Night (0-6)', pageViews: 5400, uniqueUsers: 1200, avgSessionDuration: 189, returnVisitors: 340 }
-      ];
-
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setBehaviorMetrics(mockBehaviorMetrics);
-      setUserJourney(mockUserJourney);
-      setEngagementPatterns(mockEngagementPatterns);
-    } catch (error) {
-      console.error('Error fetching user behavior data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Users className="w-5 h-5 text-green-600" />
-          User Behavior Analytics
-        </h3>
-        <div className="space-y-4 animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow-sm p-6 animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
+              <div className="space-y-3">
+                {[...Array(5)].map((_, j) => (
+                  <div key={j} className="h-3 bg-gray-200 rounded"></div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="flex items-center">
+          <Activity className="w-5 h-5 text-red-500 mr-2" />
+          <span className="text-red-700">{error}</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-        <Users className="w-5 h-5 text-green-600" />
-        User Behavior Analytics
-      </h3>
-
-      {/* Behavior Metrics */}
-      <div className="grid grid-cols-2 gap-4 mb-8">
-        {behaviorMetrics.map((metric, index) => (
-          <div key={index} className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2 text-gray-600">
-                {metric.icon}
-                <span className="text-sm font-medium">{metric.label}</span>
-              </div>
-              <div className={`flex items-center gap-1 text-xs font-medium ${
-                metric.trend > 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
-                <TrendingUp className={`w-3 h-3 ${metric.trend < 0 ? 'rotate-180' : ''}`} />
-                {Math.abs(metric.trend)}%
+    <div className="space-y-6">
+      {/* User Journey Funnel */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">User Journey Funnel</h3>
+          <Target className="w-5 h-5 text-gray-500" />
+        </div>
+        
+        <div className="space-y-4">
+          {userJourney.map((step, index) => (
+            <div key={index} className="relative">
+              {index < userJourney.length - 1 && (
+                <div className="absolute left-6 top-12 w-0.5 h-16 bg-gray-300"></div>
+              )}
+              
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-4">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                    index === 0 ? 'bg-green-100' :
+                    index === userJourney.length - 1 ? 'bg-blue-100' :
+                    'bg-yellow-100'
+                  }`}>
+                    <span className={`text-sm font-medium ${
+                      index === 0 ? 'text-green-600' :
+                      index === userJourney.length - 1 ? 'text-blue-600' :
+                      'text-yellow-600'
+                    }`}>
+                      {index + 1}
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-900">{step.step}</h4>
+                    <p className="text-sm text-gray-500">{step.users.toLocaleString()} users</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-6">
+                  <div className="text-right">
+                    <p className="text-sm text-gray-500">Conversion</p>
+                    <p className="font-medium">{step.conversionRate.toFixed(1)}%</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-500">Avg Time</p>
+                    <p className="font-medium">{Math.round(step.avgTime)}s</p>
+                  </div>
+                  <div className={`flex items-center text-sm ${
+                    step.conversionRate >= 50 ? 'text-green-600' : 
+                    step.conversionRate >= 25 ? 'text-yellow-600' : 'text-red-600'
+                  }`}>
+                    {step.conversionRate >= 50 ? (
+                      <ArrowUp className="w-4 h-4 mr-1" />
+                    ) : (
+                      <ArrowDown className="w-4 h-4 mr-1" />
+                    )}
+                    {step.conversionRate.toFixed(1)}%
+                  </div>
+                </div>
               </div>
             </div>
-            <p className="text-xl font-bold text-gray-900 mb-1">{metric.value}</p>
-            <p className="text-xs text-gray-500">{metric.description}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* User Journey */}
-      <div className="mb-8">
-        <h4 className="text-sm font-medium text-gray-700 mb-4">User Journey Funnel</h4>
-        <div className="space-y-2">
-          {userJourney.map((step, index) => (
-            <JourneyStep key={index} step={step} index={index} totalSteps={userJourney.length} />
           ))}
         </div>
       </div>
 
       {/* Engagement Patterns */}
-      <div>
-        <h4 className="text-sm font-medium text-gray-700 mb-4">Engagement by Time of Day</h4>
-        <div className="space-y-2">
-          {engagementPatterns.map((pattern, index) => (
-            <EngagementRow key={index} pattern={pattern} />
-          ))}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900">Time of Day Engagement</h3>
+          <Clock className="w-5 h-5 text-gray-500" />
         </div>
-      </div>
-    </div>
-  );
-}
-
-function JourneyStep({ step, index, totalSteps }: { step: UserJourney; index: number; totalSteps: number }) {
-  const widthPercentage = (step.conversionRate / 100) * 100;
-  
-  return (
-    <div className="relative">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
-            {index + 1}
-          </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Peak Hours */}
           <div>
-            <p className="font-medium text-gray-900 text-sm">{step.step}</p>
-            <p className="text-xs text-gray-500">{step.users.toLocaleString()} users</p>
+            <h4 className="text-sm font-medium text-gray-700 mb-4">Peak Activity Hours</h4>
+            <div className="space-y-3">
+              {engagementPatterns
+                .sort((a, b) => b.pageViews - a.pageViews)
+                .slice(0, 6)
+                .map((pattern, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-2 h-2 rounded-full ${
+                        pattern.pageViews > 100 ? 'bg-green-500' :
+                        pattern.pageViews > 50 ? 'bg-yellow-500' :
+                        'bg-gray-400'
+                      }`}></div>
+                      <span className="font-medium text-gray-900">{pattern.period}</span>
+                    </div>
+                    <div className="flex items-center space-x-4 text-sm">
+                      <span className="text-gray-600">{pattern.pageViews} views</span>
+                      <span className="text-gray-600">{pattern.uniqueUsers} users</span>
+                    </div>
+                  </div>
+                ))}
+            </div>
           </div>
-        </div>
-        <div className="text-right">
-          <p className="font-medium text-gray-900 text-sm">{step.conversionRate}%</p>
-          <p className="text-xs text-gray-500">{Math.floor(step.avgTime / 60)}m {step.avgTime % 60}s</p>
-        </div>
-      </div>
-      
-      {/* Progress bar */}
-      <div className="ml-11">
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-blue-500 transition-all duration-500"
-            style={{ width: `${widthPercentage}%` }}
-          ></div>
-        </div>
-      </div>
-      
-      {/* Connector line */}
-      {index < totalSteps - 1 && (
-        <div className="absolute left-4 top-8 w-0.5 h-8 bg-gray-300"></div>
-      )}
-    </div>
-  );
-}
 
-function EngagementRow({ pattern }: { pattern: EngagementPattern }) {
-  const returnRate = (pattern.returnVisitors / pattern.uniqueUsers) * 100;
-  const avgPagesPerSession = pattern.pageViews / pattern.uniqueUsers;
-  
-  return (
-    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-      <div>
-        <p className="font-medium text-gray-900 text-sm">{pattern.period}</p>
-        <p className="text-xs text-gray-500">{pattern.uniqueUsers.toLocaleString()} users</p>
-      </div>
-      <div className="flex items-center gap-4 text-sm text-right">
-        <div>
-          <p className="font-medium text-gray-900">{pattern.pageViews.toLocaleString()}</p>
-          <p className="text-xs text-gray-500">pages</p>
-        </div>
-        <div>
-          <p className="font-medium text-gray-900">{Math.floor(pattern.avgSessionDuration / 60)}m</p>
-          <p className="text-xs text-gray-500">avg session</p>
-        </div>
-        <div>
-          <p className="font-medium text-gray-900">{returnRate.toFixed(1)}%</p>
-          <p className="text-xs text-gray-500">return rate</p>
+          {/* Engagement Metrics */}
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 mb-4">Engagement Metrics</h4>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <Eye className="w-4 h-4 text-blue-600" />
+                  <span className="font-medium text-gray-900">Avg Session Duration</span>
+                </div>
+                <span className="text-sm font-medium text-blue-600">
+                  {Math.round(
+                    engagementPatterns.reduce((sum, p) => sum + p.avgSessionDuration, 0) / 
+                    engagementPatterns.length
+                  )}s
+                </span>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <Users className="w-4 h-4 text-green-600" />
+                  <span className="font-medium text-gray-900">Return Visitor Rate</span>
+                </div>
+                <span className="text-sm font-medium text-green-600">
+                  {(
+                    (engagementPatterns.reduce((sum, p) => sum + p.returnVisitors, 0) /
+                    engagementPatterns.reduce((sum, p) => sum + p.uniqueUsers, 0)) * 100
+                  ).toFixed(1)}%
+                </span>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <TrendingUp className="w-4 h-4 text-purple-600" />
+                  <span className="font-medium text-gray-900">Peak Hour</span>
+                </div>
+                <span className="text-sm font-medium text-purple-600">
+                  {engagementPatterns.reduce((max, p) => 
+                    p.pageViews > max.pageViews ? p : max
+                  ).period}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
