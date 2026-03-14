@@ -175,17 +175,38 @@ export class PlatformAnalyticsService extends AdminApiSingleton {
       }
     });
 
-    const result = await this.makeDefaultRequest<OverviewMetrics>(
-      `/api/admin/analytics/overview?${queryParams.toString()}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+    try {
+      const result = await this.makeDefaultRequest<OverviewMetrics>(
+        `/api/admin/analytics/overview?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      if (!result || !result.data) {
+        throw new Error('No data received from analytics API');
       }
-    );
-    
-    return result.data;
+      
+      return result.data;
+    } catch (error) {
+      console.error('PlatformAnalyticsService.getOverviewMetrics error:', error);
+      // Return fallback data to prevent UI crashes
+      return {
+        totalPageViews: 0,
+        uniqueVisitors: 0,
+        avgSessionDuration: 0,
+        bounceRate: 0,
+        topPageTypes: [],
+        trends: {
+          pageViewsChange: 0,
+          visitorsChange: 0,
+          durationChange: 0
+        }
+      };
+    }
   }
 
   /**
@@ -200,17 +221,30 @@ export class PlatformAnalyticsService extends AdminApiSingleton {
       }
     });
 
-    const result = await this.makeDefaultRequest<PageTrafficData>(
-      `/api/admin/analytics/page-traffic?${queryParams.toString()}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+    try {
+      const result = await this.makeDefaultRequest<PageTrafficData>(
+        `/api/admin/analytics/page-traffic?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      if (!result || !result.data) {
+        throw new Error('No data received from analytics API');
       }
-    );
-    
-    return result.data;
+      
+      return result.data;
+    } catch (error) {
+      console.error('PlatformAnalyticsService.getPageTrafficAnalytics error:', error);
+      // Return fallback data to prevent UI crashes
+      return {
+        pageTypeBreakdown: [],
+        topPages: []
+      };
+    }
   }
 
   /**
@@ -225,17 +259,36 @@ export class PlatformAnalyticsService extends AdminApiSingleton {
       }
     });
 
-    const result = await this.makeDefaultRequest<UserBehaviorData>(
-      `/api/admin/analytics/user-behavior?${queryParams.toString()}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+    try {
+      const result = await this.makeDefaultRequest<UserBehaviorData>(
+        `/api/admin/analytics/user-behavior?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      if (!result || !result.data) {
+        throw new Error('No data received from analytics API');
       }
-    );
-    
-    return result.data;
+      
+      return result.data;
+    } catch (error) {
+      console.error('PlatformAnalyticsService.getUserBehaviorAnalytics error:', error);
+      // Return fallback data to prevent UI crashes
+      return {
+        journeyFunnel: [],
+        engagementMetrics: {
+          pagesPerSession: 0,
+          sessionDuration: 0,
+          returnVisitorRate: 0,
+          clickThroughRate: 0
+        },
+        timeOfDayEngagement: []
+      };
+    }
   }
 
   /**
@@ -250,17 +303,49 @@ export class PlatformAnalyticsService extends AdminApiSingleton {
       }
     });
 
-    const result = await this.makeDefaultRequest<TimeSeriesData>(
-      `/api/admin/analytics/time-series?${queryParams.toString()}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+    try {
+      const result = await this.makeDefaultRequest<TimeSeriesData>(
+        `/api/admin/analytics/time-series?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      if (!result || !result.data) {
+        throw new Error('No data received from analytics API');
       }
-    );
-    
-    return result.data;
+      
+      return result.data;
+    } catch (error) {
+      console.error('PlatformAnalyticsService.getTimeSeriesAnalytics error:', error);
+      // Return fallback data to prevent UI crashes
+      return {
+        dailyMetrics: [],
+        trends: {
+          currentPeriod: {
+            pageViews: 0,
+            uniqueVisitors: 0,
+            sessions: 0,
+            avgSessionDuration: 0
+          },
+          previousPeriod: {
+            pageViews: 0,
+            uniqueVisitors: 0,
+            sessions: 0,
+            avgSessionDuration: 0
+          },
+          changes: {
+            pageViewsChange: 0,
+            visitorsChange: 0,
+            sessionsChange: 0,
+            durationChange: 0
+          }
+        }
+      };
+    }
   }
 
   /**
@@ -275,17 +360,34 @@ export class PlatformAnalyticsService extends AdminApiSingleton {
       }
     });
 
-    const result = await this.makeDefaultRequest<PopularContentData>(
-      `/api/admin/analytics/popular-content?${queryParams.toString()}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+    try {
+      const result = await this.makeDefaultRequest<PopularContentData>(
+        `/api/admin/analytics/popular-content?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      if (!result || !result.data) {
+        throw new Error('No data received from analytics API');
       }
-    );
-    
-    return result.data;
+      
+      return result.data;
+    } catch (error) {
+      console.error('PlatformAnalyticsService.getPopularContentAnalytics error:', error);
+      // Return fallback data to prevent UI crashes
+      return {
+        contentItems: [],
+        contentByType: {
+          stores: 0,
+          products: 0,
+          categories: 0
+        }
+      };
+    }
   }
 
   /**
@@ -300,17 +402,35 @@ export class PlatformAnalyticsService extends AdminApiSingleton {
       }
     });
 
-    const result = await this.makeDefaultRequest<GeographicData>(
-      `/api/admin/analytics/geographic?${queryParams.toString()}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+    try {
+      const result = await this.makeDefaultRequest<GeographicData>(
+        `/api/admin/analytics/geographic?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      if (!result || !result.data) {
+        throw new Error('No data received from analytics API');
       }
-    );
-    
-    return result.data;
+      
+      return result.data;
+    } catch (error) {
+      console.error('PlatformAnalyticsService.getGeographicAnalytics error:', error);
+      // Return fallback data to prevent UI crashes
+      return {
+        countries: [],
+        cities: [],
+        summary: {
+          totalCountries: 0,
+          totalUsers: 0,
+          avgSessionDuration: 0
+        }
+      };
+    }
   }
 
   /**

@@ -170,7 +170,33 @@ export class AnalyticsService extends BaseService {
 
   private constructor() {
     super();
-    this.cache = new AnalyticsCacheAdapter();
+    try {
+      this.cache = new AnalyticsCacheAdapter();
+    } catch (error) {
+      console.warn('[AnalyticsService] Cache initialization failed, running without cache:', error);
+      // Create a no-op cache fallback
+      this.cache = {
+        get: async () => null,
+        set: async () => {}
+      };
+    }
+  }
+
+  private async safeCacheGet(key: string): Promise<any> {
+    try {
+      return await this.cache.get(key);
+    } catch (error) {
+      console.warn('[AnalyticsService] Cache read failed:', error);
+      return null;
+    }
+  }
+
+  private async safeCacheSet(key: string, data: any, ttlSeconds: number): Promise<void> {
+    try {
+      await this.cache.set(key, data, ttlSeconds);
+    } catch (error) {
+      console.warn('[AnalyticsService] Cache write failed:', error);
+    }
   }
 
   public static getInstance(): AnalyticsService {
@@ -185,7 +211,7 @@ export class AnalyticsService extends BaseService {
    */
   async getOverviewMetrics(filters: AnalyticsFilters): Promise<OverviewMetrics> {
     const cacheKey = `analytics-overview-${JSON.stringify(filters)}`;
-    const cached = await this.cache.get(cacheKey);
+    const cached = await this.safeCacheGet(cacheKey);
     if (cached) return cached;
 
     try {
@@ -254,7 +280,7 @@ export class AnalyticsService extends BaseService {
         trends
       };
 
-      await this.cache.set(cacheKey, result, 300); // Cache for 5 minutes
+      await this.safeCacheSet(cacheKey, result, 300); // Cache for 5 minutes
       return result;
     } catch (error) {
       console.error('[AnalyticsService] Error getting overview metrics:', error);
