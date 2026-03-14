@@ -13,12 +13,32 @@ class AnalyticsCacheAdapter {
   private cacheService = getCacheService();
 
   async get(key: string) {
-    const cached = await this.cacheService.getAnalytics('general', key);
-    return cached?.data || null;
+    try {
+      const cached = await this.cacheService.getAnalytics('general', key);
+      return cached?.data || null;
+    } catch (error) {
+      console.warn('[AnalyticsCacheAdapter] Cache get failed:', error);
+      return null;
+    }
   }
 
   async set(key: string, data: any, ttlSeconds: number) {
-    await this.cacheService.setAnalytics('general', key, data);
+    try {
+      await this.cacheService.setAnalytics('general', key, data);
+    } catch (error) {
+      console.warn('[AnalyticsCacheAdapter] Cache set failed:', error);
+    }
+  }
+}
+
+// No-op cache fallback for when Redis fails
+class NoOpCacheAdapter {
+  async get(key: string) {
+    return null;
+  }
+
+  async set(key: string, data: any, ttlSeconds: number) {
+    // Do nothing
   }
 }
 
@@ -166,7 +186,7 @@ export interface GeographicData {
 
 export class AnalyticsService extends BaseService {
   private static instance: AnalyticsService;
-  private cache: AnalyticsCacheAdapter;
+  private cache: AnalyticsCacheAdapter | NoOpCacheAdapter;
 
   private constructor() {
     super();
@@ -174,11 +194,8 @@ export class AnalyticsService extends BaseService {
       this.cache = new AnalyticsCacheAdapter();
     } catch (error) {
       console.warn('[AnalyticsService] Cache initialization failed, running without cache:', error);
-      // Create a no-op cache fallback
-      this.cache = {
-        get: async () => null,
-        set: async () => {}
-      };
+      // Use no-op cache fallback
+      this.cache = new NoOpCacheAdapter();
     }
   }
 
