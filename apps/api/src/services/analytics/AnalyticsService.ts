@@ -269,19 +269,21 @@ export class AnalyticsService extends BaseService {
       const trends = await this.calculateTrends(filters);
 
       // Calculate bounce rate (simplified: sessions with only 1 page view)
-      const singlePageSessions = await prisma.$queryRaw`
-        SELECT COUNT(*) as bounce_sessions
-        FROM (
-          SELECT session_id
-          FROM user_behavior_simple
-          WHERE ${dateFilter.timestamp ? Prisma.sql`timestamp >= ${dateFilter.timestamp.gte} AND timestamp <= ${dateFilter.timestamp.lte}` : Prisma.sql`true`}
-          GROUP BY session_id
-          HAVING COUNT(*) = 1
-        ) as single_page_sessions
-      `;
+      const singlePageSessions = await prisma.user_behavior_simple.groupBy({
+        by: ['session_id'],
+        where: dateFilter,
+        _count: true,
+        having: {
+          id: {
+            _count: {
+              equals: 1
+            }
+          }
+        }
+      });
 
       const totalSessions = totalMetrics._count?.session_id || 0;
-      const bounceSessions = (singlePageSessions as any)[0]?.bounce_sessions || 0;
+      const bounceSessions = singlePageSessions.length;
       const bounceRate = totalSessions > 0 ? (bounceSessions / totalSessions) * 100 : 0;
 
       const result: OverviewMetrics = {
@@ -290,7 +292,7 @@ export class AnalyticsService extends BaseService {
         avgSessionDuration: totalMetrics._avg?.duration_seconds || 0,
         bounceRate,
         topPageTypes: pageTypeBreakdown.map((pt: any) => ({
-          pageType: pt.pageType || 'unknown',
+          pageType: pt.page_type || 'unknown',
           views: pt._count.id,
           percentage: totalMetrics._count.id > 0 ? (pt._count.id / totalMetrics._count.id) * 100 : 0
         })),
@@ -333,11 +335,11 @@ export class AnalyticsService extends BaseService {
       // Calculate trends for each page type
       const pageTypeBreakdownWithTrends = await Promise.all(
         pageTypeBreakdown.map(async (pt: any) => {
-          const trend = await this.calculatePageTypeTrend(pt.pageType!, filters);
-          const bounceRate = await this.calculateBounceRateForPageType(pt.pageType!, filters);
+          const trend = await this.calculatePageTypeTrend(pt.page_type!, filters);
+          const bounceRate = await this.calculateBounceRateForPageType(pt.page_type!, filters);
 
           return {
-            pageType: pt.pageType || 'unknown',
+            pageType: pt.page_type || 'unknown',
             views: pt._count.id,
             uniqueVisitors: pt._count.user_id || 0,
             avgSessionDuration: pt._avg.duration_seconds || 0,
@@ -350,11 +352,7 @@ export class AnalyticsService extends BaseService {
       // Get top pages
       const topPages = await prisma.user_behavior_simple.groupBy({
         by: ['entity_id', 'entity_name', 'entity_type', 'page_type'],
-        where: {
-          ...dateFilter,
-          entity_id: { not: null },
-          entity_name: { not: null }
-        },
+        where: dateFilter,
         _count: {
           id: true,
           user_id: true
@@ -370,9 +368,12 @@ export class AnalyticsService extends BaseService {
         take: 10
       });
 
+      // Filter out null entity_id and entity_name in JavaScript
+      const filteredTopPages = topPages.filter((page: any) => page.entity_id !== null && page.entity_name !== null);
+
       const result: PageTrafficData = {
         pageTypeBreakdown: pageTypeBreakdownWithTrends,
-        topPages: topPages.map((page: any) => ({
+        topPages: filteredTopPages.map((page: any) => ({
           path: `/${page.page_type}/${page.entity_id}`,
           title: page.entity_name || 'Unknown',
           views: page._count.id,
@@ -526,11 +527,7 @@ export class AnalyticsService extends BaseService {
       // Get popular content by entity type
       const popularContent = await prisma.user_behavior_simple.groupBy({
         by: ['entity_id', 'entity_name', 'entity_type'],
-        where: {
-          ...dateFilter,
-          entity_id: { not: null },
-          entity_name: { not: null }
-        },
+        where: dateFilter,
         _count: {
           id: true,
           user_id: true
@@ -546,9 +543,12 @@ export class AnalyticsService extends BaseService {
         take: 20
       });
 
+      // Filter out null entity_id and entity_name in JavaScript
+      const filteredPopularContent = popularContent.filter((item: any) => item.entity_id !== null && item.entity_name !== null);
+
       // Calculate trends and format content items
       const contentItems = await Promise.all(
-        popularContent.map(async (item: any) => {
+        filteredPopularContent.map(async (item: any) => {
           const trend = await this.calculateContentTrend(item.entity_id!, filters);
 
           return {
@@ -596,65 +596,64 @@ export class AnalyticsService extends BaseService {
     try {
       const dateFilter = this.buildDateFilter(filters);
 
-      // Get geographic data aggregated by location
-      const geoData = await prisma.$queryRaw`
-        SELECT
-          CASE
-            WHEN location_lat BETWEEN 25 AND 49 AND location_lng BETWEEN -125 AND -67 THEN 'North America'
-            WHEN location_lat BETWEEN 35 AND 72 AND location_lng BETWEEN -10 AND 40 THEN 'Europe'
-            WHEN location_lat BETWEEN -50 AND -10 AND location_lng BETWEEN 110 AND 180 THEN 'Australia'
-            ELSE 'Other'
-          END as region,
-          COUNT(DISTINCT user_id) as users,
-          COUNT(*) as page_views,
-          AVG(duration_seconds) as avg_duration
-        FROM user_behavior_simple
-        WHERE location_lat IS NOT NULL
-          AND location_lng IS NOT NULL
-          ${dateFilter.timestamp ? Prisma.sql`AND timestamp >= ${dateFilter.timestamp.gte} AND timestamp <= ${dateFilter.timestamp.lte}` : Prisma.empty}
-        GROUP BY region
-        ORDER BY users DESC
-      ` as any[];
+      // Get geographic data - simplified without raw queries
+      const geoData = await prisma.user_behavior_simple.groupBy({
+        by: ['location_lat', 'location_lng'],
+        where: dateFilter,
+        _count: {
+          user_id: true,
+          id: true
+        },
+        _avg: {
+          duration_seconds: true
+        }
+      });
 
-      // For cities, we'd need reverse geocoding - simplified version
-      const cities = await prisma.$queryRaw`
-        SELECT
-          ROUND(location_lat::numeric, 2) as lat_rounded,
-          ROUND(location_lng::numeric, 2) as lng_rounded,
-          COUNT(DISTINCT user_id) as users,
-          COUNT(*) as page_views,
-          AVG(duration_seconds) as avg_duration
-        FROM user_behavior_simple
-        WHERE location_lat IS NOT NULL
-          AND location_lng IS NOT NULL
-          ${dateFilter.timestamp ? Prisma.sql`AND timestamp >= ${dateFilter.timestamp.gte} AND timestamp <= ${dateFilter.timestamp.lte}` : Prisma.empty}
-        GROUP BY lat_rounded, lng_rounded
-        ORDER BY users DESC
-        LIMIT 20
-      ` as any[];
+      // Filter out null locations in JavaScript
+      const filteredGeoData = geoData.filter((item: any) => item.location_lat !== null && item.location_lng !== null);
+
+      // Simplified region mapping
+      const regionMap = new Map<string, { users: number; pageViews: number; duration: number }>();
+      filteredGeoData.forEach(item => {
+        let region = 'Other';
+        const lat = item.location_lat?.toNumber() || 0;
+        const lng = item.location_lng?.toNumber() || 0;
+        
+        if (lat >= 25 && lat <= 49 && lng >= -125 && lng <= -67) region = 'North America';
+        else if (lat >= 35 && lat <= 72 && lng >= -10 && lng <= 40) region = 'Europe';
+        else if (lat >= -50 && lat <= -10 && lng >= 110 && lng <= 180) region = 'Australia';
+        
+        const current = regionMap.get(region) || { users: 0, pageViews: 0, duration: 0 };
+        regionMap.set(region, {
+          users: current.users + (item._count.user_id || 0),
+          pageViews: current.pageViews + item._count.id,
+          duration: current.duration + (item._avg.duration_seconds || 0)
+        });
+      });
 
       const result: GeographicData = {
-        countries: geoData.map(item => ({
-          country: item.region, // Simplified - would need proper country mapping
-          region: item.region,
-          users: parseInt(item.users),
-          pageViews: parseInt(item.page_views),
-          avgSessionDuration: parseFloat(item.avg_duration) || 0,
-          bounceRate: 0, // Would need more complex calculation
-          trend: 0 // Would need trend calculation
-        })),
-        cities: cities.map(city => ({
-          city: `${city.lat_rounded}, ${city.lng_rounded}`, // Would need reverse geocoding
-          country: 'Unknown', // Would need reverse geocoding
-          users: parseInt(city.users),
-          pageViews: parseInt(city.page_views),
-          avgSessionDuration: parseFloat(city.avg_duration) || 0
+        countries: Array.from(regionMap.entries()).map(([region, data]) => ({
+          country: region,
+          region,
+          users: data.users,
+          pageViews: data.pageViews,
+          avgSessionDuration: data.duration / (geoData.length || 1),
+          bounceRate: 0, // Simplified
+          trend: 0, // Simplified
+        })).sort((a, b) => b.users - a.users).slice(0, 20),
+        cities: filteredGeoData.slice(0, 20).map(item => ({
+          city: `${item.location_lat?.toFixed(2)}, ${item.location_lng?.toFixed(2)}`,
+          country: 'Unknown',
+          users: item._count.user_id || 0,
+          pageViews: item._count.id,
+          avgSessionDuration: item._avg.duration_seconds || 0,
         })),
         summary: {
-          totalCountries: geoData.length,
-          totalUsers: geoData.reduce((sum, item) => sum + parseInt(item.users), 0),
-          avgSessionDuration: geoData.length > 0 ?
-            geoData.reduce((sum, item) => sum + parseFloat(item.avg_duration || 0), 0) / geoData.length : 0
+          totalCountries: regionMap.size,
+          totalUsers: Array.from(regionMap.values()).reduce((sum, d) => sum + d.users, 0),
+          avgSessionDuration: filteredGeoData.length > 0 
+            ? Array.from(regionMap.values()).reduce((sum, d) => sum + d.duration, 0) / filteredGeoData.length 
+            : 0
         }
       };
 
@@ -692,11 +691,11 @@ export class AnalyticsService extends BaseService {
     }
 
     if (filters.pageType && filters.pageType !== 'all') {
-      filter.pageType = filters.pageType;
+      filter.page_type = filters.pageType;
     }
 
     if (filters.entityType && filters.entityType !== 'all') {
-      filter.entityType = filters.entityType;
+      filter.entity_type = filters.entityType;
     }
 
     return filter;
@@ -779,7 +778,7 @@ export class AnalyticsService extends BaseService {
     const metrics = await prisma.user_behavior_simple.aggregate({
       where: {
         ...dateFilter,
-        pageType
+        page_type: pageType
       },
       _count: {
         id: true
@@ -795,17 +794,21 @@ export class AnalyticsService extends BaseService {
     // Simplified bounce rate calculation - sessions with only one page view for this page type
     const dateFilter = this.buildDateFilter(filters);
 
-    const bounceSessions = await prisma.$queryRaw`
-      SELECT COUNT(*) as bounce_count
-      FROM (
-        SELECT session_id
-        FROM user_behavior_simple
-        WHERE page_type = ${pageType}
-          ${dateFilter.timestamp ? Prisma.sql`AND timestamp >= ${dateFilter.timestamp.gte} AND timestamp <= ${dateFilter.timestamp.lte}` : Prisma.empty}
-        GROUP BY session_id
-        HAVING COUNT(*) = 1
-      ) as bounce_sessions
-    ` as any[];
+    const bounceSessions = await prisma.user_behavior_simple.groupBy({
+      by: ['session_id'],
+      where: {
+        ...dateFilter,
+        page_type: pageType
+      },
+      _count: true,
+      having: {
+        id: {
+          _count: {
+            equals: 1
+          }
+        }
+      }
+    });
 
     const totalSessions = await prisma.user_behavior_simple.groupBy({
       by: ['session_id'],
@@ -817,7 +820,7 @@ export class AnalyticsService extends BaseService {
     });
 
     const totalSessionCount = totalSessions.length;
-    const bounceCount = bounceSessions[0]?.bounce_count || 0;
+    const bounceCount = bounceSessions.length;
 
     return totalSessionCount > 0 ? (bounceCount / totalSessionCount) * 100 : 0;
   }
@@ -829,11 +832,11 @@ export class AnalyticsService extends BaseService {
     // Map step names to actual logic - simplified for now
     const stepLogic: Record<string, any> = {
       'Landing Page': {}, // All users
-      'Browse Directory': { pageType: 'directory' },
-      'View Storefront': { pageType: 'storefront' },
-      'View Products': { entityType: 'product' },
-      'Add to Cart': { context: { path: ['add_to_cart'] } }, // Would need JSON path query
-      'Checkout': { context: { path: ['checkout'] } } // Would need JSON path query
+      'Browse Directory': { page_type: 'directory' },
+      'View Storefront': { page_type: 'storefront' },
+      'View Products': { entity_type: 'product' },
+      'Add to Cart': { entity_type: 'product' }, // Simplified - would need context tracking
+      'Checkout': { entity_type: 'product' } // Simplified - would need context tracking
     };
 
     const stepFilter = stepLogic[step] || {};
@@ -863,11 +866,11 @@ export class AnalyticsService extends BaseService {
     const dateFilter = this.buildDateFilter(filters);
     const stepLogic: Record<string, any> = {
       'Landing Page': {},
-      'Browse Directory': { pageType: 'directory' },
-      'View Storefront': { pageType: 'storefront' },
-      'View Products': { entityType: 'product' },
-      'Add to Cart': { context: { path: ['add_to_cart'] } },
-      'Checkout': { context: { path: ['checkout'] } }
+      'Browse Directory': { page_type: 'directory' },
+      'View Storefront': { page_type: 'storefront' },
+      'View Products': { entity_type: 'product' },
+      'Add to Cart': { entity_type: 'product' }, // Simplified
+      'Checkout': { entity_type: 'product' } // Simplified
     };
 
     const stepFilter = stepLogic[step] || {};
@@ -888,29 +891,27 @@ export class AnalyticsService extends BaseService {
   private async calculateEngagementMetrics(filters: AnalyticsFilters): Promise<any> {
     const dateFilter = this.buildDateFilter(filters);
 
-    // Calculate various engagement metrics
-    const sessionMetrics = await prisma.$queryRaw`
-      SELECT
-        AVG(page_count) as pages_per_session,
-        AVG(duration_sum) as avg_session_duration
-      FROM (
-        SELECT
-          session_id,
-          COUNT(*) as page_count,
-          SUM(duration_seconds) as duration_sum
-        FROM user_behavior_simple
-        WHERE ${dateFilter.timestamp ? Prisma.sql`timestamp >= ${dateFilter.timestamp.gte} AND timestamp <= ${dateFilter.timestamp.lte}` : Prisma.sql`true`}
-        GROUP BY session_id
-      ) as session_stats
-    ` as any[];
+    // Calculate various engagement metrics using Prisma methods
+    const sessionStats = await prisma.user_behavior_simple.groupBy({
+      by: ['session_id'],
+      where: dateFilter,
+      _count: true,
+      _sum: {
+        duration_seconds: true
+      }
+    });
+
+    const pagesPerSession = sessionStats.length > 0 
+      ? sessionStats.reduce((sum, s) => sum + s._count, 0) / sessionStats.length 
+      : 0;
+    const avgSessionDuration = sessionStats.length > 0
+      ? sessionStats.reduce((sum, s) => sum + (s._sum.duration_seconds || 0), 0) / sessionStats.length
+      : 0;
 
     // Return visitor calculation (simplified)
     const returnVisitors = await prisma.user_behavior_simple.groupBy({
       by: ['user_id'],
-      where: {
-        ...dateFilter,
-        user_id: { not: null }
-      },
+      where: dateFilter,
       _count: true,
       having: {
         id: {
@@ -921,10 +922,13 @@ export class AnalyticsService extends BaseService {
       }
     });
 
+    // Filter out null user_ids in JavaScript
+    const filteredReturnVisitors = returnVisitors.filter((v: any) => v.user_id !== null);
+
     return {
-      pagesPerSession: sessionMetrics[0]?.pages_per_session || 0,
-      sessionDuration: sessionMetrics[0]?.avg_session_duration || 0,
-      returnVisitorRate: returnVisitors.length, // Simplified - would need proper calculation
+      pagesPerSession,
+      sessionDuration: avgSessionDuration,
+      returnVisitorRate: filteredReturnVisitors.length, // Simplified - would need proper calculation
       clickThroughRate: 0 // Would need more complex logic
     };
   }
@@ -932,26 +936,41 @@ export class AnalyticsService extends BaseService {
   private async getTimeOfDayEngagement(filters: AnalyticsFilters): Promise<any[]> {
     const dateFilter = this.buildDateFilter(filters);
 
-    const hourlyData = await prisma.$queryRaw`
-      SELECT
-        EXTRACT(HOUR FROM timestamp) as hour,
-        COUNT(DISTINCT user_id) as users,
-        COUNT(*) as views,
-        AVG(duration_seconds) as avg_duration
-      FROM user_behavior_simple
-      WHERE ${dateFilter.timestamp ? Prisma.sql`timestamp >= ${dateFilter.timestamp.gte} AND timestamp <= ${dateFilter.timestamp.lte}` : Prisma.sql`true`}
-      GROUP BY EXTRACT(HOUR FROM timestamp)
-      ORDER BY hour
-    ` as any[];
+    // Get hourly data using Prisma methods
+    const hourlyData = await prisma.user_behavior_simple.groupBy({
+      by: ['timestamp'],
+      where: dateFilter,
+      _count: {
+        user_id: true,
+        id: true
+      },
+      _avg: {
+        duration_seconds: true
+      }
+    });
+
+    // Group by hour
+    const hourMap = new Map<number, { users: number; views: number; duration: number }>();
+    hourlyData.forEach(item => {
+      const hour = item.timestamp ? new Date(item.timestamp).getHours() : 0;
+      const current = hourMap.get(hour) || { users: 0, views: 0, duration: 0 };
+      hourMap.set(hour, {
+        users: current.users + (item._count.user_id || 0),
+        views: current.views + item._count.id,
+        duration: current.duration + (item._avg.duration_seconds || 0)
+      });
+    });
 
     // Map to time periods and calculate return visitors (simplified)
-    return hourlyData.map((hour: any) => ({
-      period: `${hour.hour}:00`,
-      pageViews: parseInt(hour.views),
-      uniqueUsers: parseInt(hour.users),
-      avgSessionDuration: parseFloat(hour.avg_duration) || 0,
-      returnVisitors: Math.floor(parseInt(hour.users) * 0.3) // Simplified
-    }));
+    return Array.from(hourMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([hour, data]) => ({
+        period: `${hour}:00`,
+        pageViews: data.views,
+        uniqueUsers: data.users,
+        avgSessionDuration: data.duration / (hourlyData.length || 1),
+        returnVisitors: Math.floor(data.users * 0.3) // Simplified
+      }));
   }
 
   private async calculateBounceRateForDate(dateStr: string, filters: AnalyticsFilters): Promise<number> {
@@ -963,16 +982,18 @@ export class AnalyticsService extends BaseService {
       }
     };
 
-    const bounceSessions = await prisma.$queryRaw`
-      SELECT COUNT(*) as bounce_count
-      FROM (
-        SELECT session_id
-        FROM user_behavior_simple
-        WHERE ${Prisma.sql`timestamp >= ${dateFilter.timestamp.gte} AND timestamp <= ${dateFilter.timestamp.lte}`}
-        GROUP BY session_id
-        HAVING COUNT(*) = 1
-      ) as bounce_sessions
-    ` as any[];
+    const bounceSessions = await prisma.user_behavior_simple.groupBy({
+      by: ['session_id'],
+      where: dateFilter,
+      _count: true,
+      having: {
+        id: {
+          _count: {
+            equals: 1
+          }
+        }
+      }
+    });
 
     const totalSessions = await prisma.user_behavior_simple.groupBy({
       by: ['session_id'],
@@ -981,7 +1002,7 @@ export class AnalyticsService extends BaseService {
     });
 
     const totalSessionCount = totalSessions?.length || 0;
-    const bounceCount = bounceSessions[0]?.bounce_count || 0;
+    const bounceCount = bounceSessions.length;
 
     return totalSessionCount > 0 ? (bounceCount / totalSessionCount) * 100 : 0;
   }
