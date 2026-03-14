@@ -781,7 +781,7 @@ class DirectorySingletonService extends PublicApiSingleton {
     const response = await super.makeDefaultRequest<any>(
       `/api/tenant/${tenantId}/business-hours`,
       {},
-      `business-hours-${tenantId}`,
+      `business-hours-v2-${tenantId}`, // v2 for timezone enhancement
       this.CACHE_TTL_MEDIUM,
       {
         context: AppContext.SHOP,

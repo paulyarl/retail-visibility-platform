@@ -220,7 +220,7 @@ class TenantPublicService extends PublicApiSingleton {
       const response = await this.makeDefaultRequest<any>(
         `/api/business-hours/${tenantId}`,
         {},
-        `business-hours-${tenantId}`,
+        `business-hours-v2-${tenantId}`, // v2 for timezone enhancement
         this.HOURS_TTL
       );
 

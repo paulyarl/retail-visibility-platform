@@ -16,7 +16,23 @@ export default function BusinessHoursDisplay({ businessHours, className = '' }: 
     const [h, m] = time24.split(":").map(Number);
     const period = h >= 12 ? "PM" : "AM";
     const hour12 = h % 12 || 12;
-    return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
+    const mmStr = m.toString().padStart(2, "0");
+    
+    // Add timezone abbreviation if timezone is available
+    if (businessHours?.timezone) {
+      try {
+        const tzAbbrev = new Intl.DateTimeFormat('en-US', { 
+          timeZone: businessHours.timezone, 
+          timeZoneName: 'short' 
+        }).formatToParts(new Date()).find(part => part.type === 'timeZoneName')?.value;
+        return `${hour12}:${mmStr} ${period} ${tzAbbrev || businessHours.timezone}`;
+      } catch (e) {
+        // Fallback to timezone string if abbreviation fails
+        return `${hour12}:${mmStr} ${period} ${businessHours.timezone}`;
+      }
+    }
+    
+    return `${hour12}:${mmStr} ${period}`;
   };
 
   const formatDate = (dateStr: string): string => {
@@ -46,7 +62,7 @@ export default function BusinessHoursDisplay({ businessHours, className = '' }: 
         <Clock className="w-4 h-4 text-gray-500" />
         Store Hours
       </h3>
-      <div className="space-y-0">
+      <div className="space-y-1">
         {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
           const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
           const dayUpper = day.toUpperCase();
@@ -75,23 +91,23 @@ export default function BusinessHoursDisplay({ businessHours, className = '' }: 
           return (
             <div 
               key={day} 
-              className={`flex items-start justify-between py-2.5 px-3 border-b border-gray-100 last:border-b-0 ${
+              className={`flex items-start justify-between py-2 px-3 border-b border-gray-100 last:border-b-0 ${
                 isToday ? 'bg-blue-50' : ''
               }`}
             >
-              <div className="flex items-center gap-2">
-                <span className={`text-sm font-medium ${isToday ? 'text-blue-700' : 'text-gray-800'}`}>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className={`text-sm font-medium ${isToday ? 'text-blue-700' : 'text-gray-800'} min-w-[70px]`}>
                   {day}
                 </span>
-                {isToday && <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">Today</span>}
+                {isToday && <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded whitespace-nowrap">Today</span>}
               </div>
-              <div className={`text-right text-xs ${
+              <div className={`text-right text-sm flex-shrink-0 ml-2 ${
                 isToday 
                   ? 'text-blue-600' 
                   : hasHours ? 'text-gray-500' : 'text-gray-400'
               }`}>
                 {hasHours ? (
-                  <span>{displayText}</span>
+                  <span className="whitespace-nowrap">{displayText}</span>
                 ) : (
                   <span>Closed</span>
                 )}
@@ -115,8 +131,8 @@ export default function BusinessHoursDisplay({ businessHours, className = '' }: 
             {todayHours.map((sh, idx) => (
               <div key={`today-${sh.date}-${idx}`} className="flex flex-col gap-1 p-2 bg-amber-50 rounded border border-amber-200">
                 <div className="flex justify-between items-start">
-                  <span className="font-medium text-amber-900">Today</span>
-                  <span className="text-amber-800">
+                  <span className="font-medium text-amber-900 flex-shrink-0">Today</span>
+                  <span className="text-amber-800 whitespace-nowrap">
                     {sh.isClosed ? 'Closed' : `${formatTime(sh.open!)} - ${formatTime(sh.close!)}`}
                   </span>
                 </div>
@@ -130,10 +146,10 @@ export default function BusinessHoursDisplay({ businessHours, className = '' }: 
             {upcomingHours.map((sh, idx) => (
               <div key={`upcoming-${sh.date}-${idx}`} className="flex flex-col gap-1 p-2 bg-blue-50 rounded border border-blue-200">
                 <div className="flex justify-between items-start">
-                  <span className="font-medium text-blue-900">
+                  <span className="font-medium text-blue-900 flex-shrink-0">
                     {formatDate(sh.date)} {sh.daysAway && `(in ${sh.daysAway} day${sh.daysAway > 1 ? 's' : ''})`}
                   </span>
-                  <span className="text-blue-800">
+                  <span className="text-blue-800 whitespace-nowrap">
                     {sh.isClosed ? 'Closed' : `${formatTime(sh.open!)} - ${formatTime(sh.close!)}`}
                   </span>
                 </div>

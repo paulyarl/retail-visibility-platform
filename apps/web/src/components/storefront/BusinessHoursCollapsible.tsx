@@ -64,7 +64,23 @@ export default function BusinessHoursCollapsible({
                           const [h, m] = time24.split(":").map(Number);
                           const period = h >= 12 ? "PM" : "AM";
                           const hour12 = h % 12 || 12;
-                          return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
+                          const mmStr = m.toString().padStart(2, "0");
+                          
+                          // Add timezone abbreviation if timezone is available
+                          if (businessHours?.timezone) {
+                            try {
+                              const tzAbbrev = new Intl.DateTimeFormat('en-US', { 
+                                timeZone: businessHours.timezone, 
+                                timeZoneName: 'short' 
+                              }).formatToParts(new Date()).find(part => part.type === 'timeZoneName')?.value;
+                              return `${hour12}:${mmStr} ${period} ${tzAbbrev || businessHours.timezone}`;
+                            } catch (e) {
+                              // Fallback to timezone string if abbreviation fails
+                              return `${hour12}:${mmStr} ${period} ${businessHours.timezone}`;
+                            }
+                          }
+                          
+                          return `${hour12}:${mmStr} ${period}`;
                         };
                         return `${formatTime(period.open)} - ${formatTime(period.close)}`;
                       })
@@ -80,7 +96,23 @@ export default function BusinessHoursCollapsible({
                       const [h, m] = time24.split(":").map(Number);
                       const period = h >= 12 ? "PM" : "AM";
                       const hour12 = h % 12 || 12;
-                      return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
+                      const mmStr = m.toString().padStart(2, "0");
+                      
+                      // Add timezone abbreviation if timezone is available
+                      if (businessHours?.timezone) {
+                        try {
+                          const tzAbbrev = new Intl.DateTimeFormat('en-US', { 
+                            timeZone: businessHours.timezone, 
+                            timeZoneName: 'short' 
+                          }).formatToParts(new Date()).find(part => part.type === 'timeZoneName')?.value;
+                          return `${hour12}:${mmStr} ${period} ${tzAbbrev || businessHours.timezone}`;
+                        } catch (e) {
+                          // Fallback to timezone string if abbreviation fails
+                          return `${hour12}:${mmStr} ${period} ${businessHours.timezone}`;
+                        }
+                      }
+                      
+                      return `${hour12}:${mmStr} ${period}`;
                     };
                     displayText = `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}`;
                   }
@@ -95,19 +127,19 @@ export default function BusinessHoursCollapsible({
                         : 'bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <span className={`font-semibold text-base ${isToday ? 'text-blue-900 dark:text-blue-100' : 'text-neutral-900 dark:text-neutral-100'}`}>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className={`font-semibold text-base ${isToday ? 'text-blue-900 dark:text-blue-100' : 'text-neutral-900 dark:text-neutral-100'} min-w-[80px]`}>
                         {day}
                       </span>
-                      {isToday && <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full font-medium">Today</span>}
+                      {isToday && <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full font-medium whitespace-nowrap">Today</span>}
                     </div>
-                    <div className={`font-medium ${
+                    <div className={`font-medium flex-shrink-0 ml-2 ${
                       isToday
                         ? 'text-blue-700 dark:text-blue-300'
                         : hasHours ? 'text-neutral-700 dark:text-neutral-300' : 'text-neutral-500 dark:text-neutral-400'
                     }`}>
                       {hasHours ? (
-                        <span>{displayText}</span>
+                        <span className="whitespace-nowrap">{displayText}</span>
                       ) : (
                         <span>Closed</span>
                       )}
@@ -130,7 +162,23 @@ export default function BusinessHoursCollapsible({
                 const [h, m] = time24.split(":").map(Number);
                 const period = h >= 12 ? "PM" : "AM";
                 const hour12 = h % 12 || 12;
-                return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
+                const mmStr = m.toString().padStart(2, "0");
+                
+                // Add timezone abbreviation if timezone is available
+                if (businessHours?.timezone) {
+                  try {
+                    const tzAbbrev = new Intl.DateTimeFormat('en-US', { 
+                      timeZone: businessHours.timezone, 
+                      timeZoneName: 'short' 
+                    }).formatToParts(new Date()).find(part => part.type === 'timeZoneName')?.value;
+                    return `${hour12}:${mmStr} ${period} ${tzAbbrev || businessHours.timezone}`;
+                  } catch (e) {
+                    // Fallback to timezone string if abbreviation fails
+                    return `${hour12}:${mmStr} ${period} ${businessHours.timezone}`;
+                  }
+                }
+                
+                return `${hour12}:${mmStr} ${period}`;
               };
 
               const formatDate = (dateStr: string): string => {
@@ -151,8 +199,8 @@ export default function BusinessHoursCollapsible({
                     {todayHours.map((sh, idx) => (
                       <div key={`today-${sh.date}-${idx}`} className="flex flex-col gap-2 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
                         <div className="flex justify-between items-start">
-                          <span className="font-medium text-amber-900 dark:text-amber-100">Today</span>
-                          <span className="text-amber-800 dark:text-amber-200">
+                          <span className="font-medium text-amber-900 dark:text-amber-100 flex-shrink-0">Today</span>
+                          <span className="text-amber-800 dark:text-amber-200 whitespace-nowrap">
                             {sh.isClosed ? 'Closed' : `${formatTime(sh.open!)} - ${formatTime(sh.close!)}`}
                           </span>
                         </div>
@@ -166,10 +214,10 @@ export default function BusinessHoursCollapsible({
                     {upcomingHours.map((sh, idx) => (
                       <div key={`upcoming-${sh.date}-${idx}`} className="flex flex-col gap-2 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                         <div className="flex justify-between items-start">
-                          <span className="font-medium text-blue-900 dark:text-blue-100">
+                          <span className="font-medium text-blue-900 dark:text-blue-100 flex-shrink-0">
                             {formatDate(sh.date)} {sh.daysAway && `(in ${sh.daysAway} day${sh.daysAway > 1 ? 's' : ''})`}
                           </span>
-                          <span className="text-blue-800 dark:text-blue-200">
+                          <span className="text-blue-800 dark:text-blue-200 whitespace-nowrap">
                             {sh.isClosed ? 'Closed' : `${formatTime(sh.open!)} - ${formatTime(sh.close!)}`}
                           </span>
                         </div>
