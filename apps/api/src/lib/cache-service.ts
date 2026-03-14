@@ -45,7 +45,7 @@ export const CacheKeys = {
   
   // Business hours
   BUSINESS_HOURS: (tenantId: string) => `business:${tenantId}:hours`,
-  BUSINESS_HOURS_STATUS: (tenantId: string) => `business:${tenantId}:status`,
+  BUSINESS_HOURS_STATUS: (tenantId: string) => `business:${tenantId}:status_v2`, // v2 for timezone enhancement
   
   // Quick start data
   QUICK_START_PRODUCTS: () => `quickstart:products`,

@@ -19,6 +19,21 @@ function minutesToLabel(mins: number, timeZone?: string): string {
   const period = hour >= 12 ? 'PM' : 'AM';
   const hour12 = hour % 12 || 12;
   const mmStr = min.toString().padStart(2, '0');
+  
+  // Add timezone abbreviation if timezone is provided
+  if (timeZone) {
+    try {
+      const tzAbbrev = new Intl.DateTimeFormat('en-US', { 
+        timeZone, 
+        timeZoneName: 'short' 
+      }).formatToParts(new Date()).find(part => part.type === 'timeZoneName')?.value;
+      return `${hour12}:${mmStr} ${period} ${tzAbbrev || timeZone}`;
+    } catch (e) {
+      // Fallback to timezone string if abbreviation fails
+      return `${hour12}:${mmStr} ${period} ${timeZone}`;
+    }
+  }
+  
   return `${hour12}:${mmStr} ${period}`;
 }
 

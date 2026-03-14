@@ -56,7 +56,7 @@ class HoursStatusService extends PublicApiSingleton {
       return null;
     }
 
-    const cacheKey = `hours-status-${tenantId}`;
+    const cacheKey = `hours-status-v2-${tenantId}`; // v2 for timezone enhancement
     
     const response = await this.makeDefaultRequest<StoreStatus>(
       `/api/public/tenant/${tenantId}/business-hours/status`,

@@ -410,11 +410,9 @@ app.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res) =
     const cachedResult = memoryCache.get(cacheKey)
 
     if (cachedResult) {
-      console.log(`[Business Hours] Public cache hit for tenant ${tenantId}`)
       return res.json(cachedResult)
     }
 
-    console.log(`[Business Hours] Public cache miss for tenant ${tenantId}, fetching from database`)
     // Get business hours data
     const hoursRow = await prisma.business_hours_list.findUnique({ 
       where: { tenant_id: tenantId } 

@@ -145,7 +145,7 @@ export const memoryCache = new MemoryCache()
 
 // Cache key generators
 export const cacheKeys = {
-  businessHoursStatus: (tenantId: string) => `business_hours_status:${tenantId}`,
+  businessHoursStatus: (tenantId: string) => `business_hours_status_v2:${tenantId}`, // v2 for timezone enhancement
   businessHoursData: (tenantId: string) => `business_hours_data:${tenantId}`
 }
 
