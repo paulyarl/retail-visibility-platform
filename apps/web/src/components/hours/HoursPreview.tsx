@@ -152,7 +152,7 @@ export default function HoursPreview({ tenantId }: HoursPreviewProps) {
           <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Storefront</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`inline-block w-2.5 h-2.5 rounded-full ${dotColor}`}></span>
+          <span className={`inline-block w-3 h-2.5 rounded-full ${dotColor}`}></span>
           <span className={`font-bold ${statusColor}`}>{statusText}</span>
           <span className="text-gray-400">•</span>
           <span className="text-sm text-gray-900">{status.label}</span>
@@ -168,7 +168,7 @@ export default function HoursPreview({ tenantId }: HoursPreviewProps) {
           <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Dashboard</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`inline-block w-2.5 h-2.5 rounded-full ${dotColor}`}></span>
+          <span className={`inline-block w-3 h-2.5 rounded-full ${dotColor}`}></span>
           <span className={`font-bold ${statusColor}`}>{statusText}</span>
           <span className="text-gray-400">•</span>
           <span className="text-sm text-gray-900">{status.label}</span>

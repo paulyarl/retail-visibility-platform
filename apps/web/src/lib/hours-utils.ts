@@ -19,11 +19,35 @@ function minutesToLabel(mins: number, timeZone?: string): string {
   const period = hour >= 12 ? 'PM' : 'AM';
   const hour12 = hour % 12 || 12;
   const mmStr = min.toString().padStart(2, '0');
-  return `${hour12}:${mmStr} ${period}`;
+  
+  let timeStr = `${hour12}:${mmStr} ${period}`;
+  
+  // Add timezone abbreviation if timezone is provided
+  if (timeZone) {
+    try {
+      // Create a date at the specified time to get the timezone abbreviation
+      const now = new Date();
+      const timeInZone = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, min);
+      const tzAbbr = new Intl.DateTimeFormat('en-US', {
+        timeZone: timeZone,
+        timeZoneName: 'short'
+      }).formatToParts(timeInZone).find(part => part.type === 'timeZoneName')?.value;
+      
+      if (tzAbbr && tzAbbr !== timeZone) {
+        timeStr += ` ${tzAbbr}`;
+      }
+    } catch (error) {
+      // Fallback: just use the timezone string if abbreviation fails
+      timeStr += ` ${timeZone}`;
+    }
+  }
+  
+  return timeStr;
 }
 
 export function computeStoreStatus(hours: any): { isOpen: boolean; status: 'open' | 'closed' | 'opening-soon' | 'closing-soon'; label: string } | null {
   if (!hours || typeof hours !== 'object') return null;
+  //console.log('[StoreStatus] hours', JSON.stringify(hours, null, 2));
   const now = new Date();
   const locale = 'en-US';
   const timeZone: string | undefined = typeof hours.timezone === 'string' ? hours.timezone : undefined;

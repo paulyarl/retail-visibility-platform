@@ -251,7 +251,7 @@ export default function StorefrontClientWrapper({
                     {businessName || 'Store Name Not Available'}
                   </h1>
                   {/* Store Status Badge */}
-                  <StoreStatusIndicator tenantId={tenantId} />
+                  <StoreStatusIndicator tenantId={tenantId} storeStatus={initialStoreStatus} />
                 </div>
                 {primaryGBPCategory && (
                   <p className="text-sm text-neutral-600 dark:text-neutral-400">

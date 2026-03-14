@@ -6,6 +6,7 @@ import { directoryService } from '@/services/DirectorySingletonService';
 
 interface StoreStatusIndicatorProps {
   tenantId: string;
+  storeStatus?: any; // Optional pre-computed status
 }
 
 async function getBusinessHours(tenantId: string) {
@@ -48,20 +49,23 @@ async function getBusinessHours(tenantId: string) {
   }
 }
 
-export default function StoreStatusIndicator({ tenantId }: StoreStatusIndicatorProps) {
-  const [storeStatus, setStoreStatus] = useState<any>(null);
+export default function StoreStatusIndicator({ tenantId, storeStatus: preComputedStatus }: StoreStatusIndicatorProps) {
+  const [storeStatus, setStoreStatus] = useState<any>(preComputedStatus);
 
   useEffect(() => {
-    const loadStatus = async () => {
-      const hours = await getBusinessHours(tenantId);
-      const status = hours ? computeStoreStatus(hours) : null;
-      setStoreStatus(status);
-    };
+    // Only fetch status if not already provided
+    if (!preComputedStatus) {
+      const loadStatus = async () => {
+        const hours = await getBusinessHours(tenantId);
+        const status = hours ? computeStoreStatus(hours) : null;
+        setStoreStatus(status);
+      };
 
-    if (tenantId) {
-      loadStatus();
+      if (tenantId) {
+        loadStatus();
+      }
     }
-  }, [tenantId]);
+  }, [tenantId, preComputedStatus]);
 
   if (!storeStatus) return null;
 
@@ -99,7 +103,7 @@ export default function StoreStatusIndicator({ tenantId }: StoreStatusIndicatorP
   return (
     <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold backdrop-blur-sm shadow-lg ${styles.bg} ${styles.text}`}>
       <span className={`inline-block w-2 h-2 rounded-full ${styles.dot}`}></span>
-      <span className="truncate max-w-[210px]">{storeStatus.label}</span>
+      <span className="truncate max-w-[280px]">{storeStatus.label}</span>
     </div>
   );
 }
