@@ -6,6 +6,7 @@ import Image from 'next/image';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { useProductSingleton, PublicProduct } from '@/providers/data/ProductSingleton';
+import { useStoreStatus } from '@/hooks/useStoreStatus';
 
 // Enhanced Product interface that includes featured types from singleton
 interface UniversalProduct extends Omit<PublicProduct, 'availability'> {
@@ -80,6 +81,20 @@ export default function ProductDisplay({
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
   const paginatedProducts = enhancedProducts.slice(startIndex, endIndex);
+
+  // store status
+   const { status: hoursStatus } = useStoreStatus(tenantId, true); // Public scope
+    // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
 
   // Initialize view mode on client-side only and listen for URL changes
   useEffect(() => {
@@ -372,6 +387,7 @@ export default function ProductDisplay({
                 {/* Main Image Gallery */}
                 <div className="lg:col-span-2 bg-neutral-50 dark:bg-neutral-900">
                   <div className="relative aspect-square bg-neutral-100 dark:bg-neutral-800">
+                    
                     {getCurrentProductImages().length > 0 ? (
                       <>
                         {/* Main Image */}

@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/Button';
 import { FeaturedTypeBadges } from './FeaturedTypeBadges';
 import { SalePrice } from './SalePrice';
 import { cn } from '@/lib/utils';
+import { useStoreStatus } from '@/hooks/useStoreStatus';
 
 interface ProductDisplayProps {
   product: ProductDisplay;
@@ -59,7 +60,20 @@ export function ProductDisplay({
   const featuredTypeDisplays = getFeaturedTypeDisplay(validatedProduct.featuredType);
   const categoryDisplay = getCategoryDisplay(validatedProduct.category);
   const formattedPrice = formatPrice(validatedProduct.price);
-
+ 
+  const { status: hoursStatus } = useStoreStatus(validatedProduct.tenantId, true); // Public scope
+  console.log(`ProductDisplay hoursStatus: ${JSON.stringify(hoursStatus)}`)
+   // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
   // Handle click behavior
   const handleClick = () => {
     if (onClick) {
@@ -177,6 +191,7 @@ interface ProductCardProps extends ProductDisplay {
   wishlistCount?: number;
   hasGallery?: boolean;
   videoUrl?: string;
+  tenantId?: string;
 }
 
 function ProductCard({
@@ -206,8 +221,22 @@ function ProductCard({
   viewCount,
   wishlistCount,
   hasGallery,
-  videoUrl
+  videoUrl,
+  tenantId
 }: ProductCardProps) {
+    const { status: hoursStatus } = useStoreStatus(tenantId || '', true); // Public scope
+    console.log(`ProductCard hoursStatus: ${JSON.stringify(hoursStatus)}`)
+   // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
   return (
     <div className="group hover:shadow-lg transition-shadow duration-200 cursor-pointer border rounded-lg" onClick={onClick}>
       <div className="p-4">
@@ -237,6 +266,13 @@ function ProductCard({
               />
             </div>
           )}
+          {`${console.log(`hoursStatus: ${JSON.stringify(hoursStatus)}`)}`}
+           {/* {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )} */}
           
           {/* Stock Status Badge */}
           {showStock && (
@@ -386,8 +422,22 @@ function ProductListItem({
   showSKU,
   showFeaturedType,
   showCategory,
-  onClick
+  onClick,
+  tenantId
 }: ProductCardProps) {
+    const { status: hoursStatus } = useStoreStatus(tenantId || '', true); // Public scope
+   // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
+  
   return (
     <div className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer" onClick={onClick}>
       {/* Product Image */}
@@ -460,6 +510,7 @@ function ProductListItem({
               <Badge variant={stockStatus.color as any} className="text-xs mt-1">
                 {stockStatus.label}
               </Badge>
+              
             )}
           </div>
         </div>

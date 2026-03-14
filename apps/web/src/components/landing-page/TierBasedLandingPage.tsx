@@ -13,6 +13,8 @@ import Link from 'next/link';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { Badge, Group } from '@mantine/core';
 import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame, Package, DollarSign, Calendar } from 'lucide-react';
+// Store status
+import { useStoreStatus } from '@/hooks/useStoreStatus';
 
 // Featured Type Badge Component with icons only (subtle display)
 // Aligned with StorefrontFeaturedProducts.tsx featuredTypeConfig
@@ -486,6 +488,8 @@ interface TierBasedLandingPageProps {
 export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fulfillmentPane, slug }: TierBasedLandingPageProps) {
   const { settings: platformSettings } = usePlatformSettings();
   const tier = tenant.subscriptionTier || 'trial';
+  // console.log(`Product Tier: ${JSON.stringify(tier)}`);
+  // console.log(`Product: ${JSON.stringify(product)}`);
   const features = getLandingPageFeatures(tier);
   const branding = product.customBranding;
 
@@ -509,6 +513,22 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   const displayLogo = enterpriseLogo || businessLogo || (tier !== 'trial' && tier !== 'starter' ? platformLogo : null);
   const displayName = metadata?.businessName || tenant.name || platformSettings?.platformName;
   const showLogo = !!displayLogo;
+  const { status: hoursStatus } = useStoreStatus(tenant.id, true); // Public scope
+  // console.log(`Hours status: ${JSON.stringify(hoursStatus)}`);
+  // console.log(`Tenant: ${JSON.stringify(tenant)}`);
+
+  // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-neutral-50">

@@ -45,6 +45,9 @@ import { computeStoreStatus } from '@/lib/hours-utils';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { useMultiCart } from '@/hooks/useMultiCart';
 
+// store status
+import { useStoreStatus } from '@/hooks/useStoreStatus';
+
 interface StorefrontClientWrapperProps {
   tenantId: string;
   tenant: any;
@@ -136,6 +139,19 @@ export default function StorefrontClientWrapper({
   // Handle view cart
   const handleViewCart = () => {
     router.push('/carts');
+  };
+   const { status: hoursStatus } = useStoreStatus(tenantId, true); // Public scope
+
+   // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
   };
 
   // Fetch featured data on mount

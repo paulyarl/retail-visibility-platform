@@ -70,6 +70,7 @@ export interface ProductDisplay {
   seoDescription?: string;
   seoKeywords?: string[];
   metadata?: any;
+  tenantId?: string;
 }
 
 // ====================
@@ -179,6 +180,7 @@ export interface ProductDisplayProps {
   showCategory?: boolean;
   className?: string;
   onClick?: () => void;
+  tenantId?: string;
 }
 
 // ====================
@@ -226,7 +228,8 @@ export function validateProductDisplay(product: any): ProductDisplay {
     dimensions: product.dimensions,
     tags: product.tags || [],
     createdAt: product.createdAt,
-    updatedAt: product.updatedAt
+    updatedAt: product.updatedAt,
+    tenantId: product.tenantId
   };
 }
 

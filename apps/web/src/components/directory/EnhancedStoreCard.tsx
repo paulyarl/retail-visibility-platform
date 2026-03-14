@@ -166,6 +166,7 @@ export default function EnhancedStoreCard({ store, showCategories = false, maxCa
               <span>
                 {store.city}, {store.state}
               </span>
+
               {hoursStatus && (
                 <div 
                   className={`w-2 h-2 rounded-full ml-2 ${
@@ -178,6 +179,7 @@ export default function EnhancedStoreCard({ store, showCategories = false, maxCa
                   title={hoursStatus.label}
                 />
               )}
+              
             </div>
           )}
 

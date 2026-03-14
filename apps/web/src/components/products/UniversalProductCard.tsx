@@ -6,6 +6,7 @@ import { Package, Star, ShoppingCart } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useProductSingleton } from '@/providers/data/ProductSingleton';
 import { useStoreData } from '@/providers/StoreProviderSingleton';
+import { useStoreStatus } from '@/hooks/useStoreStatus';
 
 // ====================
 // UNIVERSAL PRODUCT CARD
@@ -40,6 +41,8 @@ const getFeaturedTypeBadges = (types: string[] | undefined) => {
     .map(type => ({ ...FEATURED_TYPE_CONFIG[type], type }));
 };
 
+
+
 export function UniversalProductCard({ 
   productId, 
   tenantId, 
@@ -51,6 +54,18 @@ export function UniversalProductCard({
   hasActivePaymentGateway: propHasActivePaymentGateway, // From parent page
   defaultGatewayType: propDefaultGatewayType, // From parent page
 }: UniversalProductCardProps) {
+   const { status: hoursStatus } = useStoreStatus(tenantId, true); // Public scope
+    // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
   const { actions } = useProductSingleton();
   const [product, setProduct] = useState<any>(productData || null);
   const [loading, setLoading] = useState(!productData);
@@ -170,6 +185,12 @@ export function UniversalProductCard({
             {/* Product Info */}
             <div className="ml-3 flex-1 min-w-0">
               <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
                 {product.name}
               </h3>
               {/* SKU */}
@@ -257,6 +278,12 @@ export function UniversalProductCard({
               {/* Product Info */}
               <div className="ml-2 flex-1 min-w-0">
                 <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                   {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
                   {product.name}
                 </h3>
                 <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
@@ -319,6 +346,12 @@ export function UniversalProductCard({
         {/* Product Name */}
         <Link href={`/products/${product.id}`}>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-2">
+             {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
             {product.name}
           </h3>
         </Link>

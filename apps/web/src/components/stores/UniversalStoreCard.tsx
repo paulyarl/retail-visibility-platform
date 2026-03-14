@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { MapPin, Star, Package, ChevronRight, ExternalLink } from 'lucide-react';
 import { useStoreData, useStore } from '@/providers/StoreProviderSingleton';
+import { useStoreStatus } from '@/hooks/useStoreStatus';
 
 // ====================
 // UNIVERSAL STORE CARD
@@ -28,7 +29,7 @@ export function UniversalStoreCard({
   className = '' 
 }: UniversalStoreCardProps) {
   const { store, loading, error } = useStoreData(storeId);
-
+  console.log(`Store: ${JSON.stringify(store)}`)
   if (loading) {
     return (
       <div className={`bg-white dark:bg-neutral-800 rounded-lg shadow-sm overflow-hidden ${className}`}>

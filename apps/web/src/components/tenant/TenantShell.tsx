@@ -8,12 +8,25 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext'
 import ContextualBreadcrumbs from '@/components/ContextualBreadcrumbs'
+import { useStoreStatus } from '@/hooks/useStoreStatus';
 
 export default function TenantShell({ tenantId, tenantName, tenantLogoUrl, nav, tenants, children }: { tenantId: string; tenantName?: string; tenantLogoUrl?: string; nav: { label: string; href: string }[]; tenants: TenantOption[]; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const [startX, setStartX] = useState<number | null>(null)
   const [currentX, setCurrentX] = useState<number | null>(null)
   const { settings } = usePlatformSettings()
+  const { status: hoursStatus } = useStoreStatus(tenantId, false); // Public scope
+   // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
 
   // Handle touch start for swipe gesture
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -69,6 +82,12 @@ export default function TenantShell({ tenantId, tenantName, tenantLogoUrl, nav, 
         {/* Switcher Row */}
         <div className="border-t border-gray-200 bg-gray-50">
           <div className="px-6 py-2 flex items-center justify-end gap-3 overflow-x-auto">
+            {hoursStatus && (
+              <div
+                className={`w-2 h-2 rounded-full ${getStatusColor()}`}
+                title={hoursStatus.label}
+              />
+            )}
             <TenantSwitcher currentTenantId={tenantId} tenants={tenants} />
             <SettingsSwitcher />
           </div>

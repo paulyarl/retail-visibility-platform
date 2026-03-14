@@ -11,6 +11,7 @@ import { Star, Sparkles, Calendar, Tag, Award } from 'lucide-react';
 import { VariantBadge, PriceRangeDisplay } from '@/components/variants';
 import type { PriceRange, AvailableAttributes } from '@/types/variants';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+import { useStoreStatus } from '@/hooks/useStoreStatus';
 
 // Helper functions for storefront featured type badges
 const getStorefrontBadgeStyle = (typeId: string): string => {
@@ -342,6 +343,18 @@ export default function SmartProductCard({
   // Priority: context > props > product data (from MV) > individual API fetch
   const effectiveCanPurchase = contextPayment?.canPurchase ?? propHasActivePaymentGateway ?? product.has_active_payment_gateway ?? canPurchase;
   const effectiveGatewayType = propDefaultGatewayType ?? product.payment_gateway_type ?? contextPayment?.defaultGatewayType ?? defaultGatewayType;
+  const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
+   // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
 
   // Log effective values
  /*  console.log('[SMARTCARD-DEBUG] Effective Payment Gateway Values:', {
@@ -408,7 +421,12 @@ export default function SmartProductCard({
   }, [effectiveCanPurchase, product.id, variant, propHasActivePaymentGateway, product.has_active_payment_gateway, contextPayment?.canPurchase, canPurchase]);*/
 
   const displayTitle = product.title || product.name;
+  
   const displayBrand = product.brand || '';
+
+  // console.log(`[SmartProductCard] product: ${JSON.stringify(product, null, 2)}`)
+ 
+  // console.log(`[SmartProductCard] hoursStatus: ${JSON.stringify(hoursStatus, null, 2)}`)
 
   // Featured variant - Prominent styling for conversion optimization
   if (variant === 'featured') {
@@ -522,6 +540,12 @@ export default function SmartProductCard({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
+                 {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
               </Link>
             )}
             
@@ -711,6 +735,12 @@ export default function SmartProductCard({
           <div className="flex-1 min-w-0">
             <Link href={`/products/${product.id}`}>
               <h4 className="font-medium text-sm text-neutral-900 dark:text-white truncate">
+                 {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
                 {displayTitle}
               </h4>
             </Link>
@@ -983,6 +1013,12 @@ export default function SmartProductCard({
                 )}
                 <Link href={`/products/${product.id}`}>
                   <h3 className="font-semibold text-lg text-neutral-900 dark:text-white mb-2 hover:text-primary-600 dark:hover:text-primary-400">
+                     {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
                     {displayTitle}
                   </h3>
                 </Link>
@@ -1112,6 +1148,12 @@ export default function SmartProductCard({
         
         <Link href={`/products/${product.id}`}>
           <h3 className="font-semibold text-lg text-neutral-900 dark:text-white mb-2 hover:text-primary-600 dark:hover:text-primary-400">
+            {hoursStatus && (
+              <div
+                className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                title={hoursStatus.label}
+              />
+            )}
             {displayTitle}
           </h3>
         </Link>

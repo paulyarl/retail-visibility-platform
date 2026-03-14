@@ -6,8 +6,6 @@ import Image from 'next/image';
 import { Badge } from '@/components/ui/Badge';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 import { MapPin, Star, Package, ExternalLink, Heart, Phone, Store } from 'lucide-react';
-import { computeStoreStatus } from '@/lib/hours-utils';
-
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 
 export interface DirectoryListing {
@@ -88,6 +86,8 @@ export function UnifiedStoreCard({
 }: UnifiedStoreCardProps) {
   // Use centralized status hook instead of complex local logic
   const { status: hoursStatus } = useStoreStatus(listing.tenantId, true); // Public scope
+  // console.log(`UnifiedStoreCard - hoursStatus:`, hoursStatus);
+  // console.log(`UnifiedStoreCard - listing:`, listing);
   
   // Use enhanced stats if available, otherwise fall back to basic listing data
   const ratingAvg = enhancedStats?.ratingAvg || (typeof listing.ratingAvg === 'number' ? listing.ratingAvg : parseFloat(listing.ratingAvg || '0')) || 0;
@@ -389,16 +389,59 @@ export function UnifiedStoreCard({
             )}
 
             {/* Hours Badge - Status */}
-            {hoursStatus?.status === 'open' && (
-              <MantineBadge 
-                color="teal"
-                variant="light"
-                size="xs"
-                className="animate-pulse"
-              >
-                🟢 Open Now
-              </MantineBadge>
-            )}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
           </Group>
         </Card.Section>
 

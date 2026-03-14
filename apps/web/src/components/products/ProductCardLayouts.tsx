@@ -12,6 +12,8 @@ import { Package, ShoppingCart, Star, Store } from 'lucide-react';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
+import { useStoreStatus } from '@/hooks/useStoreStatus';
+
 
 // Common data interface for all layouts
 interface ProductData {
@@ -62,7 +64,7 @@ interface ProductCardProps {
     searchQuery?: string;
   };
 }
-
+  
 /**
  * Classic Layout - Original design with all essential fields
  */
@@ -70,7 +72,18 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
   const formattedPrice = (product.priceCents / 100).toFixed(2);
   const formattedSalePrice = product.salePriceCents ? (product.salePriceCents / 100).toFixed(2) : null;
   const isOnSale = product.salePriceCents && product.salePriceCents < product.priceCents;
-
+ const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
+  // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
   const handleProductClick = () => {
     if (trackingContext) {
       trackBehaviorClient({
@@ -120,9 +133,16 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
 
       {/* Product Info */}
       <div className="p-4">
+        
         {/* Shop Info */}
         {(product.tenantName || product.shopName) && (
           <div className="flex items-center mb-2">
+                {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
             {(tenantLogo || product.tenantLogoUrl) ? (
               <Image
                 src={tenantLogo || product.tenantLogoUrl || ''}
@@ -142,7 +162,7 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
             </Link>
           </div>
         )}
-        
+       
         {/* Product Name */}
         <Link href={`/products/${product.id}`} onClick={handleProductClick}>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-2">
@@ -320,6 +340,18 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
   const formattedPrice = (product.priceCents / 100).toFixed(2);
   const formattedSalePrice = product.salePriceCents ? (product.salePriceCents / 100).toFixed(2) : null;
   const isOnSale = product.salePriceCents && product.salePriceCents < product.priceCents;
+    const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
+  // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
 
   const handleProductClick = () => {
     if (trackingContext) {
@@ -337,6 +369,18 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
         },
         pageType: trackingContext.source === 'storefront' ? 'storefront' : 'directory_home'
       });
+
+       // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
     }
   };
 
@@ -431,10 +475,17 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
       </div>
 
       {/* Enhanced Product Info */}
-      <div className="p-5">
+      <div className="p-5">       
+
         {/* Shop Info */}
         {(product.tenantName || product.shopName) && (
           <div className="flex items-center mb-3">
+                {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
             {(tenantLogo || product.tenantLogoUrl) ? (
               <Image
                 src={tenantLogo || product.tenantLogoUrl || ''}
@@ -450,11 +501,13 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
               href={`/shops/${product.tenantSlug || product.shopSlug || product.tenantId}`}
               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 uppercase tracking-wide"
             >
-              {product.tenantName || product.shopName}
+              {product.tenantName || product.shopName} 
             </Link>
-          </div>
+            
+          </div>       
+         
         )}
-        
+       
         {/* Header with Brand and Rating */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
@@ -583,6 +636,18 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
   const formattedPrice = (product.priceCents / 100).toFixed(2);
   const formattedSalePrice = product.salePriceCents ? (product.salePriceCents / 100).toFixed(2) : null;
   const isOnSale = product.salePriceCents && product.salePriceCents < product.priceCents;
+   const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
+    // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
 
   const handleProductClick = () => {
     if (trackingContext) {
@@ -677,9 +742,16 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
           
           {/* Product Info */}
           <div className="ml-3 flex-1 min-w-0">
+             
             {/* Shop Info */}
             {(product.tenantName || product.shopName) && (
               <div className="flex items-center mb-1">
+                {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
                 {(tenantLogo || product.tenantLogoUrl) ? (
                   <Image
                     src={tenantLogo || product.tenantLogoUrl || ''}
@@ -695,11 +767,11 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
                   href={`/shops/${product.tenantSlug || product.shopSlug || product.tenantId}`}
                   className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium truncate"
                 >
-                  {product.tenantName || product.shopName}
+                  {product.tenantName || product.shopName} 
                 </Link>
               </div>
             )}
-            
+           
             <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
               {product.name}
             </h3>
@@ -806,6 +878,18 @@ function PremiumLayout({ product, className = '', trackingContext, tenantId, ten
   const formattedPrice = (product.priceCents / 100).toFixed(2);
   const formattedSalePrice = product.salePriceCents ? (product.salePriceCents / 100).toFixed(2) : null;
   const isOnSale = product.salePriceCents && product.salePriceCents < product.priceCents;
+   const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
+    // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400 ';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500  ';
+      case 'closed': return 'bg-red-500  ';
+      case 'opening-soon': return 'bg-blue-500  ';
+      case 'closing-soon': return 'bg-yellow-500  ';
+      default: return 'bg-gray-400  ';
+    }
+  };
 
   const handleProductClick = () => {
     if (trackingContext) {
@@ -920,15 +1004,25 @@ function PremiumLayout({ product, className = '', trackingContext, tenantId, ten
 
       {/* Premium Product Info */}
       <div className="p-6">
+
+        
         {/* Shop Info */}
         {(product.tenantName || product.shopName) && (
           <div className="flex items-center mb-4">
+                {hoursStatus && (
+                  <div
+                    className={`w-4 h-4 rounded-full ml-4 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+
+                  />
+                )}
             {(tenantLogo || product.tenantLogoUrl) ? (
               <Image
                 src={tenantLogo || product.tenantLogoUrl || ''}
-                alt={product.tenantName || product.shopName || 'Shop'}
-                width={32}
-                height={32}
+                alt={product.tenantName ? product.tenantName : product.shopName ? product.shopName : 'Shop'}
+                width={40}
+                height={40}
+                style={{ borderRadius: '50%', padding: '2px' }}
                 className="rounded-full mr-3 border-2 border-white shadow-sm"
               />
             ) : (
@@ -942,6 +1036,7 @@ function PremiumLayout({ product, className = '', trackingContext, tenantId, ten
             </Link>
           </div>
         )}
+       
         
         {/* Brand and Name */}
         <div className="mb-4">
@@ -1098,6 +1193,8 @@ export default function ProductCard({
     ?? (product as any).defaultGatewayType 
     ?? product.payment_gateway_type
     ?? contextPayment?.defaultGatewayType;
+     // Status indicator color
+ 
 
   // Data integrity check - ensure all required fields are present
   if (!product || !product.id || !product.name || !product.priceCents) {
@@ -1129,6 +1226,21 @@ export default function ProductCard({
       </div>
     );
   }
+  // console.log('ProductCard - product:', JSON.stringify(product, null, 2));
+  // console.log('ProductCard - effectiveGatewayType:', effectiveGatewayType);
+ const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
+  // Status indicator color
+   
 
   // Render based on variant
   switch (variant) {
@@ -1233,9 +1345,16 @@ export default function ProductCard({
 
           {/* Minimal Info (visible always) - compact */}
           <div className="p-1">
+           
             {/* Shop Info */}
             {(product.tenantName || product.shopName) && (
               <div className="flex items-center mb-1">
+                {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
                 {(tenantLogo || product.tenantLogoUrl) ? (
                   <Image
                     src={tenantLogo || product.tenantLogoUrl || ''}
@@ -1252,10 +1371,11 @@ export default function ProductCard({
                   className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 truncate"
                 >
                   {product.tenantName || product.shopName}
+                   
                 </Link>
               </div>
             )}
-            
+           
             <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">
               {product.name}
             </h3>

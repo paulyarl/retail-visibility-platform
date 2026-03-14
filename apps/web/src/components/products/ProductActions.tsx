@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMultiCart } from '@/hooks/useMultiCart';
+import { useStoreStatus } from '@/hooks/useStoreStatus';
+import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 
 interface Product {
   id: string;
@@ -45,6 +47,18 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
     ? `Check out "${productTitle}" from ${businessName} - $${product.price}`
     : `Check out ${businessName} - great products and deals!`;
   const shareUrl = productUrl;
+   const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
+    // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
 
   // Load favorite status from localStorage
   useEffect(() => {
@@ -193,9 +207,67 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
                   d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
                 />
               </svg>
-              <span className="text-sm font-medium hidden sm:inline">Storefront</span>
+              <span className="text-sm font-medium hidden sm:inline">Storefront
+
+ {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
+
+              </span>
             </a>
           )}
+           
 
           {/* Write Review Button - Only on product pages */}
           {variant === 'product' && (

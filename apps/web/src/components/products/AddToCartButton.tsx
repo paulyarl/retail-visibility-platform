@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { Button } from '@/components/ui/Button';
 import { ShoppingCart, Check, ArrowRight } from 'lucide-react';
+import { useStoreStatus } from '@/hooks/useStoreStatus';
 
 interface ProductVariant {
   id: string;
@@ -55,6 +56,19 @@ export function AddToCartButton({
   const [added, setAdded] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [addedToGateway, setAddedToGateway] = useState<string | null>(null);
+  const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
+  // Status indicator color
+  const getStatusColor = () => {
+    if (!hoursStatus) return 'bg-gray-400';
+    switch (hoursStatus.status) {
+      case 'open': return 'bg-green-500';
+      case 'closed': return 'bg-red-500';
+      case 'opening-soon': return 'bg-blue-500';
+      case 'closing-soon': return 'bg-yellow-500';
+      default: return 'bg-gray-400';
+    }
+  };
+
 
   const handleAddToCart = async () => {
     // Validate variant selection if product has variants
@@ -177,6 +191,12 @@ export function AddToCartButton({
               onClick={() => router.push(`/carts/checkout`)}
               className="text-green-700 hover:text-green-800 hover:bg-green-100 flex-shrink-0"
             >
+              {hoursStatus && (
+                <div
+                  className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                  title={hoursStatus.label}
+                />
+              )}
               View Cart
               <ArrowRight className="ml-1 h-3 w-3" />
             </Button>
@@ -199,6 +219,12 @@ export function AddToCartButton({
           ) : (
             <>
               <ShoppingCart className="mr-2 h-4 w-4" />
+               {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
               Add to Cart
             </>
           )}
@@ -208,6 +234,12 @@ export function AddToCartButton({
           variant="outline"
           className="bg-white text-gray-900 border-gray-300 hover:border-gray-400"
         >
+          {hoursStatus && (
+            <div
+              className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+              title={hoursStatus.label}
+            />
+          )}
           Buy Now
         </Button>
       </div>
