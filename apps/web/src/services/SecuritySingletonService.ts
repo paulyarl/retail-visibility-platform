@@ -36,59 +36,50 @@ class SecuritySingletonService extends AdminApiSingleton {
         'security-active-sessions'
       );
 
-    //  console.log('[SecuritySingletonService] Raw sessions API response:', result);
-
-      // Extract sessions array from nested API response structure
-      const sessionsArray = result?.data || result || [];
-     // console.log('[SecuritySingletonService] Extracted sessions array:', sessionsArray);
-
-      // Ensure we have an array before mapping
-      if (!Array.isArray(sessionsArray)) {
-        console.warn('[SecuritySingletonService] Sessions API response is not an array:', sessionsArray);
+      if (!result.success) {
+        console.error('[SecuritySingletonService] Failed to get active sessions:', result.error);
         return [];
       }
 
-      // Map API response to match LoginSession interface
-      const mappedSessions = sessionsArray.map((session: any): LoginSession => {
-        // Parse deviceInfo JSON string to object
-        let deviceInfoObj: any = {};
-        try {
-          deviceInfoObj = session.deviceInfo ? JSON.parse(session.deviceInfo) : {};
-        } catch (e) {
-          console.warn('[SecuritySingletonService] Failed to parse deviceInfo:', session.deviceInfo);
-        }
-
-        return {
-          id: session.id,
-          device: deviceInfoObj?.type || 'Unknown',
-          deviceInfo: deviceInfoObj ? {
-            type: deviceInfoObj?.type || 'Unknown',
-            browser: deviceInfoObj?.browser || 'Unknown',
-            os: deviceInfoObj?.os || 'Unknown',
-            browserVersion: deviceInfoObj?.browserVersion,
-            osVersion: deviceInfoObj?.osVersion,
-            device: deviceInfoObj?.device,
-          } : {
-            type: 'Unknown',
-            browser: 'Unknown',
-            os: 'Unknown'
-          },
-          location: session.location ? 
-            `${session.location.city}, ${session.location.region}` : 
-            'Unknown',
-          ipAddress: session.ipAddress || 'Unknown',
-          lastActivity: session.lastActive || session.lastActivity || new Date().toISOString(),
-          isCurrent: session.isCurrent || false,
-          userAgent: session.userAgent || 'Unknown',
-          createdAt: session.createdAt || new Date().toISOString(),
-          expiresAt: session.expiresAt
-        };
-      });
-      
-      return mappedSessions;
+      return result.data?.sessions || result.data || [];
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to get active sessions:', error);
+      console.error('[SecuritySingletonService] Error fetching active sessions:', error);
       return [];
+    }
+  }
+
+  /**
+   * Get current session info (compatible with AuthContext)
+   */
+  async getSessionInfo(): Promise<{ isAuthenticated: boolean; user?: any; token?: any; expiresAt?: string; lastActivity?: string }> {
+    try {
+      const result = await this.makeDefaultRequest<any>(
+        '/api/auth/sessions',
+        {},
+        'security-session-info'
+      );
+
+      if (!result.success) {
+        return { isAuthenticated: false };
+      }
+
+      const sessions = result.data?.sessions || result.data || [];
+      const currentSession = sessions[0]; // Get the most recent session
+
+      if (currentSession) {
+        return {
+          isAuthenticated: true,
+          user: currentSession.user,
+          token: currentSession.token,
+          expiresAt: currentSession.expiresAt,
+          lastActivity: currentSession.lastActivity
+        };
+      }
+
+      return { isAuthenticated: false };
+    } catch (error) {
+      console.error('[SecuritySingletonService] Error getting session info:', error);
+      return { isAuthenticated: false };
     }
   }
 
@@ -99,14 +90,13 @@ class SecuritySingletonService extends AdminApiSingleton {
     try {
       await this.makeDefaultRequest<void>(
         `/api/auth/sessions/${sessionId}`,
-        { method: 'DELETE' },
-        `security-revoke-session-${sessionId}`
+        {
+          method: 'DELETE',
+        },
+        'security-revoke-session'
       );
-
-      // Invalidate active sessions cache
-      await this.invalidateCache('security-active-sessions*');
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to revoke session:', error);
+      console.error('[SecuritySingletonService] Error revoking session:', error);
       throw error;
     }
   }
@@ -118,137 +108,13 @@ class SecuritySingletonService extends AdminApiSingleton {
     try {
       await this.makeDefaultRequest<void>(
         '/api/auth/sessions/revoke-all',
-        { method: 'POST' },
+        {
+          method: 'POST',
+        },
         'security-revoke-all-sessions'
       );
-
-      // Invalidate active sessions cache
-      await this.invalidateCache('security-active-sessions*');
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to revoke all sessions:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get security alerts for the current user
-   */
-  async getSecurityAlerts(): Promise<SecurityAlert[]> {
-    try {
-      const result = await this.makeDefaultRequest<any>(
-        '/api/security/security-alerts',
-        {},
-        'security-alerts'
-      );
-
-      console.log('[SecuritySingletonService] Raw API response:', result);
-
-      // Extract alerts array from nested API response structure
-      const alertsArray = result?.data || result || [];
-      console.log('[SecuritySingletonService] Extracted alerts array:', alertsArray);
-
-      // Ensure we have an array before mapping
-      if (!Array.isArray(alertsArray)) {
-        console.warn('[SecuritySingletonService] API response is not an array:', alertsArray);
-        return [];
-      }
-
-      // Map API response to match SecurityAlert interface
-      const mappedAlerts = alertsArray.map((alert: any): SecurityAlert => ({
-        id: alert.id,
-        type: alert.type || 'suspicious_activity',
-        title: alert.title || 'Security Alert',
-        message: alert.message || 'A security event occurred',
-        createdAt: alert.createdAt || new Date().toISOString(),
-        severity: alert.severity || 'warning',
-        read: alert.isRead !== undefined ? alert.isRead : (alert.read !== undefined ? alert.read : false),
-        readAt: alert.readAt,
-        metadata: alert.metadata || alert.details || {},
-        actions: alert.actions,
-        timestamp: alert.timestamp
-      }));
-
-      return mappedAlerts;
-    } catch (error) {
-      console.error('[SecuritySingleton] Failed to get security alerts:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Mark a security alert as read
-   */
-  async markAlertAsRead(alertId: string): Promise<void> {
-    try {
-      await this.makeDefaultRequest<void>(
-        `/api/security/security-alerts/${alertId}/read`,
-        { method: 'PUT' },
-        `security-mark-alert-read-${alertId}`
-      );
-
-      // Invalidate security alerts cache
-      await this.invalidateCache('security-alerts*');
-    } catch (error) {
-      console.error('[SecuritySingleton] Failed to mark alert as read:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Dismiss a security alert
-   */
-  async dismissAlert(alertId: string): Promise<void> {
-    try {
-      await this.makeDefaultRequest<void>(
-        `/api/security/security-alerts/${alertId}`,
-        { method: 'DELETE' },
-        `security-dismiss-alert-${alertId}`
-      );
-
-      // Invalidate security alerts cache
-      await this.invalidateCache('security-alerts*');
-    } catch (error) {
-      console.error('[SecuritySingleton] Failed to dismiss alert:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get security alert preferences
-   */
-  async getAlertPreferences(): Promise<Record<string, boolean>> {
-    try {
-      const result = await this.makeDefaultRequest<Record<string, boolean>>(
-        '/api/security/security-alerts/preferences',
-        {},
-        'security-alert-preferences'
-      );
-
-      return result.data || {};
-    } catch (error) {
-      console.error('[SecuritySingleton] Failed to get alert preferences:', error);
-      return {};
-    }
-  }
-
-  /**
-   * Update security alert preferences
-   */
-  async updateAlertPreferences(preferences: any): Promise<void> {
-    try {
-      await this.makeDefaultRequest<void>(
-        '/api/security/security-alerts/preferences',
-        { 
-          method: 'PUT',
-          body: JSON.stringify(preferences)
-        },
-        'security-update-alert-preferences'
-      );
-
-      // Invalidate alert preferences cache
-      await this.invalidateCache('security-alert-preferences*');
-    } catch (error) {
-      console.error('[SecuritySingleton] Failed to update alert preferences:', error);
+      console.error('[SecuritySingletonService] Error revoking all sessions:', error);
       throw error;
     }
   }
@@ -256,44 +122,48 @@ class SecuritySingletonService extends AdminApiSingleton {
   /**
    * Get MFA status for the current user
    */
-  async getMFAStatus(): Promise<MFAStatus> {
+  async getMFAStatus(): Promise<any> {
     try {
-      const result = await this.makeDefaultRequest<ApiResponse<MFAStatus>>(
-        '/api/auth/mfa/status',
+      const result = await this.makeDefaultRequest<any>(
+        '/api/security/mfa/status',
         {},
-        'security-mfa-status',
-        this.cacheTTL
+        'security-mfa-status'
       );
-
-      if (!result?.data?.data) {
-        throw new Error('No MFA status data returned');
+      
+      if (!result.success) {
+        return { enabled: false };
       }
-
-      return result.data.data;
+      
+      return result.data || { enabled: false };
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to get MFA status:', error);
-      throw error;
+      console.error('[SecuritySingletonService] Error getting MFA status:', error);
+      return { enabled: false };
     }
   }
 
   /**
    * Setup MFA - generates secret and QR code
    */
-  async setupMFA(): Promise<MFASetupData> {
+  async setupMFA(): Promise<any> {
     try {
-      const result = await this.makeDefaultRequest<ApiResponse<MFASetupData>>(
-        '/api/auth/mfa/setup',
-        { method: 'POST' },
+      const result = await this.makeDefaultRequest<any>(
+        '/api/security/mfa/setup',
+        {
+          method: 'POST',
+        },
         'security-mfa-setup'
       );
-
-      if (!result?.data?.data) {
-        throw new Error('No MFA setup data returned');
+      
+      if (!result.success) {
+        const errorMessage = typeof result.error === 'string' ? result.error : 
+                            result.error?.message || 'Failed to setup MFA';
+        console.log(errorMessage);
+        throw new Error(errorMessage);
       }
-
-      return result.data.data;
+      
+      return result.data;
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to setup MFA:', error);
+      console.error('[SecuritySingletonService] Error setting up MFA:', error);
       throw error;
     }
   }
@@ -301,45 +171,53 @@ class SecuritySingletonService extends AdminApiSingleton {
   /**
    * Verify MFA setup with verification code
    */
-  async verifyMFASetup(data: MFASetupFormData): Promise<boolean> {
+  async verifyMFASetup(data: any): Promise<boolean> {
     try {
-      const result = await this.makeDefaultRequest<ApiResponse<{ verified: boolean }>>(
-        '/api/auth/mfa/verify',
-        { 
+      const result = await this.makeDefaultRequest<boolean>(
+        '/api/security/mfa/verify-setup',
+        {
           method: 'POST',
-          body: JSON.stringify({ token: data.verificationCode })
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
         },
         'security-mfa-verify-setup'
       );
-
-      return result.data?.data?.verified || false;
+      
+      return result.success && result.data;
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to verify MFA setup:', error);
-      throw error;
+      console.error('[SecuritySingletonService] Error verifying MFA setup:', error);
+      return false;
     }
   }
 
   /**
    * Verify MFA token during login
    */
-  async verifyMFALogin(token: string, userId: string): Promise<MFAVerificationResult> {
+  async verifyMFALogin(token: string, userId: string): Promise<any> {
     try {
-      const result = await this.makeDefaultRequest<ApiResponse<MFAVerificationResult>>(
-        '/api/auth/mfa/verify-login',
-        { 
+      const result = await this.makeDefaultRequest<any>(
+        '/api/security/mfa/verify-login',
+        {
           method: 'POST',
-          body: JSON.stringify({ token, userId })
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token, userId }),
         },
         'security-mfa-verify-login'
       );
-
-      if (!result?.data?.data) {
-        throw new Error('No data returned from MFA login verification');
+      
+      if (!result.success) {
+        const errorMessage = typeof result.error === 'string' ? result.error : 
+                            result.error?.message || 'Failed to verify MFA login';
+        throw new Error(errorMessage);
       }
-
-      return result.data.data;
+      
+      return result.data;
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to verify MFA login:', error);
+      console.error('[SecuritySingletonService] Error verifying MFA login:', error);
       throw error;
     }
   }
@@ -350,12 +228,14 @@ class SecuritySingletonService extends AdminApiSingleton {
   async disableMFA(): Promise<void> {
     try {
       await this.makeDefaultRequest<void>(
-        '/api/auth/mfa/disable',
-        { method: 'POST' },
+        '/api/security/mfa/disable',
+        {
+          method: 'POST',
+        },
         'security-mfa-disable'
       );
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to disable MFA:', error);
+      console.error('[SecuritySingletonService] Error disabling MFA:', error);
       throw error;
     }
   }
@@ -365,27 +245,131 @@ class SecuritySingletonService extends AdminApiSingleton {
    */
   async regenerateBackupCodes(verificationCode: string): Promise<string[]> {
     try {
-      const result = await this.makeDefaultRequest<ApiResponse<{ backupCodes: string[] }>>(
-        '/api/auth/mfa/regenerate-backup',
-        { 
+      const result = await this.makeDefaultRequest<string[]>(
+        '/api/security/mfa/regenerate-backup-codes',
+        {
           method: 'POST',
-          body: JSON.stringify({ token: verificationCode })
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ verificationCode }),
         },
-        'security-mfa-regenerate-backup'
+        'security-mfa-regenerate-backup-codes'
       );
-
-      return result.data?.data?.backupCodes || [];
+      
+      if (!result.success) {
+        const errorMessage = typeof result.error === 'string' ? result.error : 
+                            result.error?.message || 'Failed to regenerate backup codes';
+        throw new Error(errorMessage);
+      }
+      
+      return result.data || [];
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to regenerate backup codes:', error);
+      console.error('[SecuritySingletonService] Error regenerating backup codes:', error);
       throw error;
     }
   }
 
   /**
-   * Invalidate all security-related cache
+   * Get security alerts for the current user
    */
-  public async invalidateSecurityCache(): Promise<void> {
-    await this.invalidateCache('security-*');
+  async getSecurityAlerts(): Promise<any[]> {
+    try {
+      const result = await this.makeDefaultRequest<any[]>(
+        '/api/security/alerts',
+        {},
+        'security-alerts'
+      );
+      
+      if (!result.success) {
+        return [];
+      }
+      
+      return result.data || [];
+    } catch (error) {
+      console.error('[SecuritySingletonService] Error getting security alerts:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Mark a security alert as read
+   */
+  async markAlertAsRead(alertId: string): Promise<void> {
+    try {
+      await this.makeDefaultRequest<void>(
+        `/api/security/alerts/${alertId}/read`,
+        {
+          method: 'POST',
+        },
+        'security-mark-alert-read'
+      );
+    } catch (error) {
+      console.error('[SecuritySingletonService] Error marking alert as read:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Dismiss a security alert
+   */
+  async dismissAlert(alertId: string): Promise<void> {
+    try {
+      await this.makeDefaultRequest<void>(
+        `/api/security/alerts/${alertId}/dismiss`,
+        {
+          method: 'POST',
+        },
+        'security-dismiss-alert'
+      );
+    } catch (error) {
+      console.error('[SecuritySingletonService] Error dismissing alert:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get security alert preferences
+   */
+  async getAlertPreferences(): Promise<Record<string, boolean>> {
+    try {
+      const result = await this.makeDefaultRequest<Record<string, boolean>>(
+        '/api/security/alerts/preferences',
+        {},
+        'security-alert-preferences'
+      );
+      
+      if (!result.success) {
+        return {};
+      }
+      
+      return result.data || {};
+    } catch (error) {
+      console.error('[SecuritySingletonService] Error getting alert preferences:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Update security alert preferences
+   */
+  async updateAlertPreferences(preferences: Record<string, boolean>): Promise<void> {
+    try {
+      await this.makeDefaultRequest<void>(
+        '/api/security/alerts/preferences',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(preferences),
+        },
+        'security-update-alert-preferences'
+      );
+    } catch (error) {
+      console.error('[SecuritySingletonService] Error updating alert preferences:', error);
+      throw error;
+    }
   }
 
   /**
@@ -394,35 +378,89 @@ class SecuritySingletonService extends AdminApiSingleton {
   async getAdminStabilityInsights(timeframe: string): Promise<any> {
     try {
       const result = await this.makeDefaultRequest<any>(
-        `/api/admin/security/stability-insights?timeframe=${timeframe}`,
+        `/api/security/admin/stability-insights?timeframe=${timeframe}`,
         {},
-        `security-admin-stability-insights-${timeframe}`,
-        this.cacheTTL
+        'security-admin-stability-insights'
       );
-
-      return result;
+      
+      if (!result.success) {
+        return {
+          summary: {
+            totalIncidents: 0,
+            criticalIncidents: 0,
+            warningIncidents: 0,
+            infoIncidents: 0
+          },
+          patterns: {
+            topEndpoints: [],
+            topIPs: [],
+            userBehaviorPatterns: {
+              authenticatedVsAnonymous: { authenticated: 0, anonymous: 0 },
+              userMaturity: { newUsers: 0, establishedUsers: 0 },
+              userTypes: { powerUsers: 0, regularUsers: 0 }
+            },
+            geographicPatterns: {
+              topCountries: [],
+              internationalDistribution: false
+            },
+            temporalPatterns: {
+              hourlyDistribution: {},
+              peakActivityHour: 0
+            }
+          }
+        };
+      }
+      
+      return result.data;
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to get admin stability insights:', error);
-      throw error;
+      console.error('[SecuritySingletonService] Error getting admin stability insights:', error);
+      return {
+        summary: {
+          totalIncidents: 0,
+          criticalIncidents: 0,
+          warningIncidents: 0,
+          infoIncidents: 0
+        },
+        patterns: {
+          topEndpoints: [],
+          topIPs: [],
+          userBehaviorPatterns: {
+            authenticatedVsAnonymous: { authenticated: 0, anonymous: 0 },
+            userMaturity: { newUsers: 0, establishedUsers: 0 },
+            userTypes: { powerUsers: 0, regularUsers: 0 }
+          },
+          geographicPatterns: {
+            topCountries: [],
+            internationalDistribution: false
+          },
+          temporalPatterns: {
+            hourlyDistribution: {},
+            peakActivityHour: 0
+          }
+        }
+      };
     }
   }
 
   /**
-   * Get all tenants for admin
+   * Get admin tenants
    */
   async getAdminTenants(): Promise<any> {
     try {
       const result = await this.makeDefaultRequest<any>(
-        '/api/tenants',
+        '/api/security/admin/tenants',
         {},
-        'security-admin-tenants',
-        this.cacheTTL
+        'security-admin-tenants'
       );
-
-      return result;
+      
+      if (!result.success) {
+        return [];
+      }
+      
+      return result.data || [];
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to get admin tenants:', error);
-      throw error;
+      console.error('[SecuritySingletonService] Error getting admin tenants:', error);
+      return [];
     }
   }
 
@@ -432,16 +470,19 @@ class SecuritySingletonService extends AdminApiSingleton {
   async getAdminSyncStats(): Promise<any> {
     try {
       const result = await this.makeDefaultRequest<any>(
-        '/api/admin/sync-stats',
+        '/api/security/admin/sync-stats',
         {},
-        'security-admin-sync-stats',
-        this.cacheTTL
+        'security-admin-sync-stats'
       );
-
-      return result;
+      
+      if (!result.success) {
+        return { total: 0, successful: 0, failed: 0 };
+      }
+      
+      return result.data || { total: 0, successful: 0, failed: 0 };
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to get admin sync stats:', error);
-      throw error;
+      console.error('[SecuritySingletonService] Error getting admin sync stats:', error);
+      return { total: 0, successful: 0, failed: 0 };
     }
   }
 
@@ -455,16 +496,19 @@ class SecuritySingletonService extends AdminApiSingleton {
       if (params?.offset) queryParams.set('offset', params.offset.toString());
 
       const result = await this.makeDefaultRequest<any>(
-        `/api/admin/security/sessions?${queryParams}`,
+        `/api/security/admin/sessions?${queryParams}`,
         {},
-        'security-admin-sessions',
-        this.cacheTTL
+        'security-admin-sessions'
       );
-
-      return result;
+      
+      if (!result.success) {
+        return { sessions: [], total: 0 };
+      }
+      
+      return result.data || { sessions: [], total: 0 };
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to get admin security sessions:', error);
-      throw error;
+      console.error('[SecuritySingletonService] Error getting admin security sessions:', error);
+      return { sessions: [], total: 0 };
     }
   }
 
@@ -474,35 +518,41 @@ class SecuritySingletonService extends AdminApiSingleton {
   async getAdminSecuritySessionsStats(): Promise<any> {
     try {
       const result = await this.makeDefaultRequest<any>(
-        '/api/admin/security/sessions/stats',
+        '/api/security/admin/sessions/stats',
         {},
-        'security-admin-sessions-stats',
-        this.cacheTTL
+        'security-admin-sessions-stats'
       );
-
-      return result;
+      
+      if (!result.success) {
+        return { total: 0, active: 0, expired: 0 };
+      }
+      
+      return result.data || { total: 0, active: 0, expired: 0 };
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to get admin security sessions stats:', error);
-      throw error;
+      console.error('[SecuritySingletonService] Error getting admin security sessions stats:', error);
+      return { total: 0, active: 0, expired: 0 };
     }
   }
 
   /**
    * Get admin security alerts
    */
-  async getAdminSecurityAlerts(): Promise<any> {
+  async getAdminSecurityAlerts(): Promise<any[]> {
     try {
-      const result = await this.makeDefaultRequest<any>(
-        '/api/admin/security/alerts',
+      const result = await this.makeDefaultRequest<any[]>(
+        '/api/security/admin/alerts',
         {},
-        'security-admin-alerts',
-        this.cacheTTL
+        'security-admin-alerts'
       );
-
-      return result;
+      
+      if (!result.success) {
+        return [];
+      }
+      
+      return result.data || [];
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to get admin security alerts:', error);
-      throw error;
+      console.error('[SecuritySingletonService] Error getting admin security alerts:', error);
+      return [];
     }
   }
 
@@ -512,63 +562,109 @@ class SecuritySingletonService extends AdminApiSingleton {
   async getAdminSecurityAlertsStats(): Promise<any> {
     try {
       const result = await this.makeDefaultRequest<any>(
-        '/api/admin/security/alerts/stats',
+        '/api/security/admin/alerts/stats',
         {},
-        'security-admin-alerts-stats',
-        this.cacheTTL
+        'security-admin-alerts-stats'
       );
-
-      return result;
+      
+      if (!result.success) {
+        return { total: 0, critical: 0, warning: 0, info: 0 };
+      }
+      
+      return result.data || { total: 0, critical: 0, warning: 0, info: 0 };
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to get admin security alerts stats:', error);
-      throw error;
+      console.error('[SecuritySingletonService] Error getting admin security alerts stats:', error);
+      return { total: 0, critical: 0, warning: 0, info: 0 };
     }
   }
 
   /**
    * Get admin failed logins
    */
-  async getAdminFailedLogins(): Promise<any> {
+  async getAdminFailedLogins(): Promise<any[]> {
     try {
-      const result = await this.makeDefaultRequest<any>(
-        '/api/admin/security/failed-logins?limit=20',
+      const result = await this.makeDefaultRequest<any[]>(
+        '/api/security/admin/failed-logins',
         {},
-        'security-admin-failed-logins',
-        this.cacheTTL
+        'security-admin-failed-logins'
       );
-
-      return result;
+      
+      if (!result.success) {
+        return [];
+      }
+      
+      return result.data || [];
     } catch (error) {
-      console.error('[SecuritySingleton] Failed to get admin failed logins:', error);
-      throw error;
+      console.error('[SecuritySingletonService] Error getting admin failed logins:', error);
+      return [];
     }
   }
 
   /**
-   * Get performance metrics
+   * PILOT: Declare cache patterns for this service
    */
-  async getPerformanceMetrics(): Promise<any> {
-    try {
-      const result = await this.makeDefaultRequest<any>(
-        '/api/admin/performance/metrics',
-        {},
-        'security-admin-performance-metrics',
-        this.cacheTTL
-      );
+  public getServiceCachePatterns(): string[] {
+    return [
+      'security-active-sessions',
+      'security-session-info',
+      'security-revoke-session',
+      'security-revoke-all-sessions',
+      'security-mfa-status',
+      'security-mfa-setup',
+      'security-mfa-verify-setup',
+      'security-mfa-verify-login',
+      'security-mfa-disable',
+      'security-mfa-regenerate-backup-codes',
+      'security-alerts',
+      'security-mark-alert-read',
+      'security-dismiss-alert',
+      'security-alert-preferences',
+      'security-update-alert-preferences',
+      'security-admin-stability-insights',
+      'security-admin-tenants',
+      'security-admin-sync-stats',
+      'security-admin-sessions',
+      'security-admin-sessions-stats',
+      'security-admin-alerts',
+      'security-admin-alerts-stats',
+      'security-admin-failed-logins'
+    ];
+  }
 
-      return result;
-    } catch (error) {
-      console.error('[SecuritySingleton] Failed to get performance metrics:', error);
-      throw error;
+  /**
+   * PILOT: Implement cache invalidation contract
+   */
+  public async invalidateServiceCaches(userId?: string, ...params: any[]): Promise<void> {
+    if (userId) {
+      await this.invalidateCache(`security-active-sessions-${userId}`);
+      await this.invalidateCache(`security-session-info-${userId}`);
+    } else {
+      await this.invalidateCache('security-active-sessions');
+      await this.invalidateCache('security-session-info');
+      await this.invalidateCache('security-revoke-session');
+      await this.invalidateCache('security-revoke-all-sessions');
+      await this.invalidateCache('security-mfa-status');
+      await this.invalidateCache('security-mfa-setup');
+      await this.invalidateCache('security-mfa-verify-setup');
+      await this.invalidateCache('security-mfa-verify-login');
+      await this.invalidateCache('security-mfa-disable');
+      await this.invalidateCache('security-mfa-regenerate-backup-codes');
+      await this.invalidateCache('security-alerts');
+      await this.invalidateCache('security-mark-alert-read');
+      await this.invalidateCache('security-dismiss-alert');
+      await this.invalidateCache('security-alert-preferences');
+      await this.invalidateCache('security-update-alert-preferences');
+      await this.invalidateCache('security-admin-stability-insights');
+      await this.invalidateCache('security-admin-tenants');
+      await this.invalidateCache('security-admin-sync-stats');
+      await this.invalidateCache('security-admin-sessions');
+      await this.invalidateCache('security-admin-sessions-stats');
+      await this.invalidateCache('security-admin-alerts');
+      await this.invalidateCache('security-admin-alerts-stats');
+      await this.invalidateCache('security-admin-failed-logins');
     }
   }
 }
 
 // Export singleton instance
-export const securityService = SecuritySingletonService.getInstance();
-
-// Export cache invalidation helper for external use
-export const invalidateSecurityCache = async (): Promise<void> => {
-  const service = SecuritySingletonService.getInstance();
-  await service.invalidateSecurityCache();
-};
+export const securitySingletonService = SecuritySingletonService.getInstance();

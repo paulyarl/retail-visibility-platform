@@ -149,15 +149,15 @@ export default function AdminDirectoryFeaturedManagement() {
         </div>
       )}
 
-      {/* Directory Context Banner */}
+      {/* Featured Context Banner */}
       {selectedTenant && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
           <div className="flex items-center gap-3">
-            <Star className="w-5 h-5 text-blue-600" />
+            <Star className="w-5 h-5 text-indigo-600" />
             <div>
-              <h3 className="font-semibold text-blue-900">Directory Featured Management</h3>
-              <p className="text-sm text-blue-700">
-                Managing directory featured products for {selectedTenantData?.name || 'the tenant'}. These products appear in premium directory listings.
+              <h3 className="font-semibold text-indigo-900">Premium Featured Management</h3>
+              <p className="text-sm text-indigo-700">
+                Managing premium featured products for {selectedTenantData?.name || 'the tenant'}. These products require admin approval and appear in premium placements.
               </p>
             </div>
           </div>
@@ -170,6 +170,7 @@ export default function AdminDirectoryFeaturedManagement() {
           <FeaturedProductsManager 
             tenantId={selectedTenant}
             context="directory"
+            hasFeaturedAccess={selectedTenantData?.featured_access_approved && selectedTenantData?.subscription_status === 'active'}
           />
         </div>
       )}
@@ -180,7 +181,7 @@ export default function AdminDirectoryFeaturedManagement() {
           <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Tenant</h3>
           <p className="text-gray-600">
-            Choose a tenant from the list above to manage their directory featured products.
+            Choose a tenant from the list above to manage their premium featured products.
           </p>
         </div>
       )}

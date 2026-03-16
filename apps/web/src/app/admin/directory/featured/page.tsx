@@ -1,30 +1,175 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card } from '@mantine/core';
 import { Badge } from '@/components/ui';
 import PageHeader from '@/components/PageHeader';
 import Link from 'next/link';
-import { useAdminDirectoryListings } from '@/hooks/admin/useAdminDirectoryListings';
-
+import { TrendingUp, Award, Trophy, Sparkles, RefreshCw, BarChart3, Users, Eye } from 'lucide-react';
+import { directoryService } from '@/services/DirectoryService';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
-export default function AdminFeaturedDirectoryPage() {
-  const { listings, loading, error } = useAdminDirectoryListings({ status: 'featured' });
+interface PremiumFeaturedStats {
+  trending: { count: number; avgScore: number; topProduct: string };
+  recommended: { count: number; avgRating: number; topProduct: string };
+  bestseller: { count: number; totalSales: number; topProduct: string };
+  random_featured: { count: number; diversity: number; topProduct: string };
+}
+
+interface FeaturedProduct {
+  id: string;
+  name: string;
+  brand: string;
+  priceCents: number;
+  storeName: string;
+  storeCity: string;
+  featuredType: 'trending' | 'recommended' | 'bestseller' | 'random_featured';
+  score?: number;
+  rating?: number;
+  sales?: number;
+}
+
+export default function PremiumFeaturedDirectoryPage() {
+  const [stats, setStats] = useState<PremiumFeaturedStats | null>(null);
+  const [recentProducts, setRecentProducts] = useState<FeaturedProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<'trending' | 'recommended' | 'bestseller' | 'random_featured' | 'all'>('all');
+
+  const featuredTypes = [
+    {
+      id: 'trending',
+      name: 'Trending Products',
+      description: 'Products with high engagement and growth velocity',
+      icon: TrendingUp,
+      color: 'pink',
+      gradient: 'from-pink-500 to-rose-500',
+      metric: 'Trending Score'
+    },
+    {
+      id: 'recommended',
+      name: 'Recommended Products', 
+      description: 'AI-curated products based on quality and user preferences',
+      icon: Award,
+      color: 'teal',
+      gradient: 'from-teal-500 to-cyan-500',
+      metric: 'Average Rating'
+    },
+    {
+      id: 'bestseller',
+      name: 'Bestseller Products',
+      description: 'Top-performing products by sales and conversion',
+      icon: Trophy,
+      color: 'amber',
+      gradient: 'from-amber-500 to-yellow-500',
+      metric: 'Total Sales'
+    },
+    {
+      id: 'random_featured',
+      name: 'Discover Products',
+      description: 'Curated random discoveries for product exploration',
+      icon: Sparkles,
+      color: 'cyan',
+      gradient: 'from-cyan-500 to-blue-500',
+      metric: 'Diversity Score'
+    }
+  ] as const;
+
+  useEffect(() => {
+    fetchPremiumFeaturedData();
+  }, []);
+
+  const fetchPremiumFeaturedData = async () => {
+    try {
+      setLoading(true);
+      
+      // MIGRATION: Using DirectoryService instead of direct fetch
+      const statsPromises = featuredTypes.map(async (type) => {
+        return await directoryService.getFeaturedStats(type.id);
+      });
+
+      const statsResults = await Promise.all(statsPromises);
+
+      const combinedStats: PremiumFeaturedStats = {
+        trending: { 
+          count: statsResults[0]?.count || 0, 
+          avgScore: statsResults[0]?.avgScore || 0, 
+          topProduct: statsResults[0]?.topProduct || 'N/A' 
+        },
+        recommended: { 
+          count: statsResults[1]?.count || 0, 
+          avgRating: statsResults[1]?.avgRating || 0, 
+          topProduct: statsResults[1]?.topProduct || 'N/A' 
+        },
+        bestseller: { 
+          count: statsResults[2]?.count || 0, 
+          totalSales: statsResults[2]?.totalSales || 0, 
+          topProduct: statsResults[2]?.topProduct || 'N/A' 
+        },
+        random_featured: { 
+          count: statsResults[3]?.count || 0, 
+          diversity: statsResults[3]?.diversity || 0, 
+          topProduct: statsResults[3]?.topProduct || 'N/A' 
+        }
+      };
+
+      setStats(combinedStats);
+
+      // Fetch recent premium featured products
+      const productsData = await directoryService.getPremiumFeaturedProducts(20);
+      setRecentProducts(productsData.products || []);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch premium featured data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredProducts = selectedType === 'all' 
+    ? recentProducts 
+    : recentProducts.filter(p => p.featuredType === selectedType);
+
+  const getTypeInfo = (typeId: string) => featuredTypes.find(t => t.id === typeId);
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <PageHeader
-        title="Featured Directory Listings"
-        description="Manage featured placements and priorities in the public directory"
+        title="Premium Featured Products"
+        description="Platform-controlled featured product algorithms and performance analytics"
         actions={
-          <Link
-            href="/admin/directory"
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            ← Directory Panel
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={fetchPremiumFeaturedData}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+            <Link
+              href="/admin/directory"
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              ← Directory Panel
+            </Link>
+          </div>
         }
       />
 
@@ -34,79 +179,166 @@ export default function AdminFeaturedDirectoryPage() {
         </div>
       )}
 
-      {loading ? (
-        <div className="animate-pulse space-y-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-          ))}
-        </div>
-      ) : listings.length === 0 ? (
-        <Card className="p-6 rounded-lg">
-          <div className="py-12 text-center">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-              />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
-              No featured listings
-            </h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Featured listings will appear here when tenants upgrade to eligible tiers.
-            </p>
-          </div>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {listings.map((listing) => (
-            <Card key={listing.id} className="p-4 rounded-lg">
-              <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {listing.businessName}
-                      </h3>
-                      <Badge variant="warning">
-                        ⭐ Featured
-                      </Badge>
-                      <Badge variant="default">
-                        Quality: {listing.qualityScore}%
-                      </Badge>
-                    </div>
-                    <div className="mt-1 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                      <span>
-                        🏷️ {listing.tenant.subscriptionTier}
-                      </span>
-                      <span>
-                        📦 {listing.itemCount} items
-                      </span>
-                      {listing.primaryCategory && (
-                        <span>
-                          🏪 {listing.primaryCategory}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/t/${listing.tenant_id}/settings/directory`}
-                      className="px-3 py-1 text-sm font-medium text-blue-600 hover:text-blue-700"
-                    >
-                      View Details
-                    </Link>
-                  </div>
+      {/* Premium Featured Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {featuredTypes.map((type) => {
+          const Icon = type.icon;
+          const typeStats = stats?.[type.id as keyof PremiumFeaturedStats];
+          
+          return (
+            <Card key={type.id} className="p-6 rounded-lg border-0 shadow-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
+              <div className="flex items-center justify-between mb-4">
+                <div className={`p-3 rounded-lg bg-gradient-to-r ${type.gradient}`}>
+                  <Icon className="w-6 h-6 text-white" />
                 </div>
+                <Badge variant="default" className={`bg-${type.color}-100 text-${type.color}-700 border-${type.color}-300`}>
+                  {typeStats?.count || 0} products
+                </Badge>
+              </div>
+              
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                {type.name}
+              </h3>
+              
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                {type.description}
+              </p>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500">{type.metric}:</span>
+                  <span className="text-sm font-medium">
+                    {type.id === 'trending' && (stats as any)?.trending?.avgScore?.toFixed(2)}
+                    {type.id === 'recommended' && (stats as any)?.recommended?.avgRating?.toFixed(1)}
+                    {type.id === 'bestseller' && `${(stats as any)?.bestseller?.totalSales || 0} sales`}
+                    {type.id === 'random_featured' && `${((stats as any)?.random_featured?.diversity * 100 || 0).toFixed(0)}%`}
+                  </span>
+                </div>
+                
+                {typeStats?.topProduct && (
+                  <div className="text-xs text-gray-500 truncate">
+                    Top: {typeStats.topProduct}
+                  </div>
+                )}
+              </div>
             </Card>
+          );
+        })}
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setSelectedType('all')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              selectedType === 'all'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            All Products
+          </button>
+          {featuredTypes.map((type) => (
+            <button
+              key={type.id}
+              onClick={() => setSelectedType(type.id as any)}
+              className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                selectedType === type.id
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <type.icon className="w-4 h-4" />
+              {type.name}
+            </button>
           ))}
-        </div>
+        </nav>
+      </div>
+
+      {/* Recent Products Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredProducts.map((product) => {
+          const typeInfo = getTypeInfo(product.featuredType);
+          const Icon = typeInfo?.icon || Sparkles;
+          
+          return (
+            <Card key={product.id} className="p-4 rounded-lg">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-1 line-clamp-2">
+                    {product.name}
+                  </h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {product.brand}
+                  </p>
+                </div>
+                <div className={`p-2 rounded-lg bg-gradient-to-r ${typeInfo?.gradient || 'from-gray-500 to-gray-600'}`}>
+                  <Icon className="w-4 h-4 text-white" />
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-lg font-bold text-gray-900 dark:text-white">
+                  ${(product.priceCents / 100).toFixed(2)}
+                </span>
+                <Badge variant="default" className={`bg-${typeInfo?.color}-100 text-${typeInfo?.color}-700 border-${typeInfo?.color}-300`}>
+                  {typeInfo?.name}
+                </Badge>
+              </div>
+              
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                <div>{product.storeName}</div>
+                <div>{product.storeCity}</div>
+              </div>
+              
+              {/* Type-specific metrics */}
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex justify-between text-xs">
+                  {product.featuredType === 'trending' && (
+                    <>
+                      <span>Trending Score:</span>
+                      <span className="font-medium">{product.score?.toFixed(2)}</span>
+                    </>
+                  )}
+                  {product.featuredType === 'recommended' && (
+                    <>
+                      <span>Rating:</span>
+                      <span className="font-medium">{product.rating?.toFixed(1)} ⭐</span>
+                    </>
+                  )}
+                  {product.featuredType === 'bestseller' && (
+                    <>
+                      <span>Sales:</span>
+                      <span className="font-medium">{product.sales || 0}</span>
+                    </>
+                  )}
+                  {product.featuredType === 'random_featured' && (
+                    <>
+                      <span>Discovery:</span>
+                      <span className="font-medium">Random</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {filteredProducts.length === 0 && (
+        <Card className="p-12 rounded-lg text-center">
+          <Sparkles className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            No premium featured products
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {selectedType === 'all' 
+              ? 'No premium featured products found. The algorithms may need more data to generate recommendations.'
+              : `No products found in the ${getTypeInfo(selectedType)?.name || selectedType} category.`
+            }
+          </p>
+        </Card>
       )}
     </div>
   );

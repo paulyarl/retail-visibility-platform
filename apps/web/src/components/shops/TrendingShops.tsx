@@ -20,6 +20,10 @@ import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 import { Button } from '@mantine/core';
 
+import { Badge as MantineBadge } from '@mantine/core';
+import { useStoreStatus } from "@/hooks/useStoreStatus";
+
+
 interface TrendingShopsProps {
   limit?: number;
   region?: string;
@@ -285,6 +289,9 @@ function TrendingShopCard({ shop, isActive, position, timeframe }: TrendingShopC
   const growth = getTimeframeGrowth();
   const rankChange = getRankChange();
 
+  
+  const { status: hoursStatus } = useStoreStatus(shop.tenantId, true); // Public scope
+
   return (
     <Link href={shop.urls.canonicalUrl} onClick={handleShopClick}>
       <Card className={cn(
@@ -308,7 +315,9 @@ function TrendingShopCard({ shop, isActive, position, timeframe }: TrendingShopC
 
         {/* Store Status */}
         <div className="absolute top-2 left-2 z-10">
-          <StoreStatusIndicator tenantId={shop.tenantId} />
+          {/* <StoreStatusIndicator tenantId={shop.tenantId} /> */}
+
+          
         </div>
 
         {/* Shop Image */}
@@ -377,6 +386,63 @@ function TrendingShopCard({ shop, isActive, position, timeframe }: TrendingShopC
             <div className="flex items-center gap-1 text-sm text-gray-600">
               <MapPin className="w-3 h-3" />
               <span className="truncate">{shop.location}</span>
+
+              
+            {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
+			
             </div>
 
             {/* Product Count */}

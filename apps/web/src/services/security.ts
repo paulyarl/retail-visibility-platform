@@ -7,14 +7,15 @@
  */
 
 import { LoginSession, SecurityAlert } from '@/types/security';
-import { securityService } from './SecuritySingletonService';
+// import { securitySingletonService } from './SecuritySingletonService';
+import { securitySingletonService } from '@/services/SecuritySingletonService';
 
 /**
  * Get active user sessions
  * @deprecated Use securityService.getActiveSessions() instead
  */
 export async function getActiveSessions(): Promise<LoginSession[]> {
-  return await securityService.getActiveSessions();
+  return await securitySingletonService.getActiveSessions();
 }
 
 /**
@@ -22,7 +23,7 @@ export async function getActiveSessions(): Promise<LoginSession[]> {
  * @deprecated Use securityService.revokeSession() instead
  */
 export async function revokeSession(sessionId: string): Promise<void> {
-  return await securityService.revokeSession(sessionId);
+  return await securitySingletonService.revokeSession(sessionId);
 }
 
 /**
@@ -30,7 +31,7 @@ export async function revokeSession(sessionId: string): Promise<void> {
  * @deprecated Use securityService.revokeAllSessions() instead
  */
 export async function revokeAllSessions(): Promise<void> {
-  return await securityService.revokeAllSessions();
+  return await securitySingletonService.revokeAllSessions();
 }
 
 /**
@@ -38,7 +39,7 @@ export async function revokeAllSessions(): Promise<void> {
  * @deprecated Use securityService.getSecurityAlerts() instead
  */
 export async function getSecurityAlerts(): Promise<SecurityAlert[]> {
-  return await securityService.getSecurityAlerts();
+  return await securitySingletonService.getSecurityAlerts();
 }
 
 /**
@@ -46,7 +47,7 @@ export async function getSecurityAlerts(): Promise<SecurityAlert[]> {
  * @deprecated Use securityService.markAlertAsRead() instead
  */
 export async function markAlertAsRead(alertId: string): Promise<void> {
-  return await securityService.markAlertAsRead(alertId);
+  return await securitySingletonService.markAlertAsRead(alertId);
 }
 
 /**
@@ -54,7 +55,7 @@ export async function markAlertAsRead(alertId: string): Promise<void> {
  * @deprecated Use securityService.dismissAlert() instead
  */
 export async function dismissAlert(alertId: string): Promise<void> {
-  return await securityService.dismissAlert(alertId);
+  return await securitySingletonService.dismissAlert(alertId);
 }
 
 /**
@@ -62,7 +63,7 @@ export async function dismissAlert(alertId: string): Promise<void> {
  * @deprecated Use securityService.getAlertPreferences() instead
  */
 export async function getAlertPreferences(): Promise<Record<string, boolean>> {
-  return await securityService.getAlertPreferences();
+  return await securitySingletonService.getAlertPreferences();
 }
 
 /**
@@ -70,5 +71,5 @@ export async function getAlertPreferences(): Promise<Record<string, boolean>> {
  * @deprecated Use securityService.updateAlertPreferences() instead
  */
 export async function updateAlertPreferences(preferences: Record<string, boolean>): Promise<void> {
-  return await securityService.updateAlertPreferences(preferences);
+  return await securitySingletonService.updateAlertPreferences(preferences);
 }

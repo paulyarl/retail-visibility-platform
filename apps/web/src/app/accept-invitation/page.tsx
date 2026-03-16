@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/Label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { CheckCircle, XCircle, Clock, Mail, Building2, User, Shield } from 'lucide-react';
+import AdminInvitationsService from '@/services/AdminInvitationsService';
 
 
 
@@ -15,12 +16,22 @@ interface InvitationData {
   id: string;
   email: string;
   role: string;
-  tenant: {
+  tenant?: {
     id: string;
     name: string;
   };
-  inviter: {
+  organization?: {
+    id: string;
     name: string;
+  };
+  inviter?: {
+    name: string;
+  };
+  invitedBy?: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
   };
   expiresAt: string;
   createdAt: string;
@@ -57,21 +68,51 @@ function AcceptInvitationContent() {
   const fetchInvitation = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/admin/invitations/${token}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (data.error === 'invitation_expired') {
-          setError('This invitation has expired. Please request a new invitation.');
-        } else if (data.error === 'invitation_already_accepted') {
-          setError('This invitation has already been accepted.');
-        } else {
-          setError(data.message || 'Invalid invitation');
-        }
+      
+      // MIGRATION: Using AdminInvitationsService instead of direct fetch
+      if (!token) {
+        setError('Invalid invitation token');
+        return;
+      }
+      
+      const invitation = await AdminInvitationsService.getInvitationByToken(token);
+      
+      if (!invitation) {
+        setError('Invalid invitation or invitation not found');
         return;
       }
 
-      setInvitation(data.invitation);
+      // Check invitation status
+      if (invitation.status === 'expired') {
+        setError('This invitation has expired. Please request a new invitation.');
+        return;
+      } else if (invitation.status === 'accepted') {
+        setError('This invitation has already been accepted.');
+        return;
+      } else if (invitation.status === 'revoked') {
+        setError('This invitation has been revoked.');
+        return;
+      }
+
+      // Transform invitation data to match the expected interface
+      const transformedInvitation: InvitationData = {
+        id: invitation.id,
+        email: invitation.email,
+        role: invitation.role || 'member',
+        tenant: invitation.organization ? {
+          id: invitation.organization.id,
+          name: invitation.organization.name,
+        } : undefined,
+        organization: invitation.organization,
+        inviter: invitation.invitedBy ? {
+          name: `${invitation.invitedBy.firstName || ''} ${invitation.invitedBy.lastName || ''}`.trim() || invitation.invitedBy.email
+        } : undefined,
+        invitedBy: invitation.invitedBy,
+        expiresAt: invitation.expiresAt,
+        createdAt: invitation.createdAt,
+      };
+
+      setInvitation(transformedInvitation);
       
       // Check if user already exists by trying to determine from the invitation email
       // This is a simple heuristic - in a real app you might have a separate endpoint
@@ -87,7 +128,7 @@ function AcceptInvitationContent() {
   const handleAccept = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!invitation) return;
+    if (!invitation || !token) return;
 
     // Validation for new users
     if (!userExists) {
@@ -111,46 +152,29 @@ function AcceptInvitationContent() {
       setAccepting(true);
       setError('');
 
-      const response = await fetch(`/api/admin/invitations/${token}/accept`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          password: userExists ? undefined : password,
-          firstName: userExists ? undefined : firstName,
-          lastName: userExists ? undefined : lastName,
-        }),
+      // MIGRATION: Using AdminInvitationsService instead of direct fetch
+      const acceptedInvitation = await AdminInvitationsService.acceptInvitation(token, {
+        firstName: userExists ? undefined : firstName,
+        lastName: userExists ? undefined : lastName,
+        password: userExists ? undefined : password,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (data.error === 'invitation_expired') {
-          setError('This invitation has expired. Please request a new invitation.');
-        } else if (data.error === 'invitation_already_accepted') {
-          setError('This invitation has already been accepted.');
-        } else if (data.error === 'user_already_assigned') {
-          setError('You are already a member of this organization.');
-        } else {
-          setError(data.message || 'Failed to accept invitation');
-        }
+      if (!acceptedInvitation) {
+        setError('Failed to accept invitation. Please try again.');
         return;
       }
 
-      setSuccess(data.message);
+      setSuccess('Invitation accepted successfully!');
       
       // Redirect to login or dashboard after a delay
       setTimeout(() => {
-        if (data.userCreated) {
-          router.push('/login?message=Account created successfully. Please log in.');
-        } else {
+        if (acceptedInvitation.status === 'accepted') {
           router.push('/login?message=Invitation accepted. Please log in to access your account.');
         }
       }, 2000);
-
+      
     } catch (err) {
-      setError('Failed to accept invitation');
+      setError('Failed to accept invitation. Please try again.');
     } finally {
       setAccepting(false);
     }
@@ -226,7 +250,7 @@ function AcceptInvitationContent() {
           <Mail className="h-12 w-12 text-blue-500 mx-auto mb-4" />
           <CardTitle>You're Invited!</CardTitle>
           <CardDescription>
-            Accept your invitation to join {invitation?.tenant.name}
+            Accept your invitation to join {invitation?.tenant?.name}
           </CardDescription>
         </CardHeader>
 
@@ -236,7 +260,7 @@ function AcceptInvitationContent() {
             <div className="flex items-center gap-2 text-sm">
               <Building2 className="h-4 w-4 text-gray-500" />
               <span className="font-medium">Organization:</span>
-              <span>{invitation?.tenant.name}</span>
+              <span>{invitation?.tenant?.name}</span>
             </div>
             
             <div className="flex items-center gap-2 text-sm">
@@ -248,7 +272,7 @@ function AcceptInvitationContent() {
             <div className="flex items-center gap-2 text-sm">
               <User className="h-4 w-4 text-gray-500" />
               <span className="font-medium">Invited by:</span>
-              <span>{invitation?.inviter.name}</span>
+              <span>{invitation?.inviter?.name}</span>
             </div>
             
             <div className="flex items-center gap-2 text-sm">

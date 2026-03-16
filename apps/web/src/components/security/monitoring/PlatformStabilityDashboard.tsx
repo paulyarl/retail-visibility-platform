@@ -24,7 +24,8 @@ import {
   Lightbulb,
   RefreshCw
 } from 'lucide-react';
-import { securityService } from '@/services/SecuritySingletonService';
+import { securitySingletonService } from '@/services/SecuritySingletonService';
+// import { securitySingletonService } from '@/services/SecuritySingletonService';
 
 interface StabilityInsights {
   summary: {
@@ -88,7 +89,7 @@ export function PlatformStabilityDashboard() {
     try {
       setLoading(true);
       setError(null);
-      const data = await securityService.getAdminStabilityInsights(timeframe.toString());
+      const data = await securitySingletonService.getAdminStabilityInsights(timeframe.toString());
       setInsights(data);
     } catch (err) {
       console.error('Failed to fetch stability insights:', err);

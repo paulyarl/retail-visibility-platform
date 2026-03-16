@@ -17,8 +17,9 @@ export interface Tenant {
   logoUrl?: string;
   bannerUrl?: string;
   subscriptionTier?: string;
-  status?: string;
   subscriptionStatus?: string;
+  subscription_status?: string; // Database field
+  status?: string;
   createdAt?: string;
   updatedAt?: string;
   region?: string;
@@ -30,6 +31,7 @@ export interface Tenant {
     id: string;
     name: string;
   } | null;
+  featured_access_approved?: boolean;
 }
 
 export interface Organization {

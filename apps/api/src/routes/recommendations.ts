@@ -50,20 +50,36 @@ router.post('/track-batch', async (req: Request, res: Response) => {
           sessionId,
           entityType = 'store',
           entityId,
+          entity_id, // Support snake_case format
           locationLat,
           locationLng,
+          location_lat, // Support snake_case format
+          location_lng, // Support snake_case format
           referrer,
           userAgent,
           ipAddress,
           timestamp,
           pageType,
+          page_type, // Support snake_case format
           context,
           priority
         } = event;
 
-        if (!entityId) {
+        // console.log(`track-batch Request event: ${router.constructor.name} ${req.url} - ${JSON.stringify(event)}`);
+        
+        // console.log(`track-batch Entity ID: ${entityId || entity_id}`);
+
+
+        // Support both camelCase and snake_case formats
+        const finalEntityId = entityId || entity_id;
+        const finalEntityType = entityType || event?.entity_type;
+        const finalLocationLat = locationLat || location_lat;
+        const finalLocationLng = locationLng || location_lng;
+        const finalPageType = pageType || page_type;
+
+        if (!finalEntityId) {
           results.push({
-            entityId,
+            entityId: finalEntityId,
             success: false,
             error: 'entity_id_required'
           });
@@ -74,19 +90,19 @@ router.post('/track-batch', async (req: Request, res: Response) => {
         await trackUserBehavior({
           userId,
           sessionId,
-          entityType,
-          entityId,
-          locationLat,
-          locationLng,
+          entityType: finalEntityType,
+          entityId: finalEntityId,
+          locationLat: finalLocationLat,
+          locationLng: finalLocationLng,
           referrer,
           userAgent,
           ipAddress,
-          pageType,
+          pageType: finalPageType,
           context
         });
 
         results.push({
-          entityId,
+          entityId: finalEntityId,
           success: true,
           priority
         });
@@ -131,7 +147,7 @@ router.post('/track-batch', async (req: Request, res: Response) => {
 
 /**
  * POST /api/recommendations/track
- * Track user behavior for recommendations
+ * Track single user behavior event for recommendations
  */
 router.post('/track', async (req: Request, res: Response) => {
   try {
@@ -140,14 +156,27 @@ router.post('/track', async (req: Request, res: Response) => {
       sessionId,
       entityType = 'store',
       entityId,
+      entity_id, // Support snake_case format
       locationLat,
       locationLng,
+      location_lat, // Support snake_case format
+      location_lng, // Support snake_case format
       referrer,
       userAgent,
       ipAddress
     } = req.body;
 
-    if (!entityId) {
+    // console.log(`track Request event: ${router.constructor.name} ${req.url} - ${JSON.stringify(req.body)}`);
+    // console.log(`track entityId: ${entityId || entity_id}`);
+    // console.log(`track entity_id: ${entity_id}`);
+
+    // Support both camelCase and snake_case formats
+    const finalEntityId = entityId || entity_id;
+    const finalEntityType = entityType || req.body?.entity_type;
+    const finalLocationLat = locationLat || location_lat;
+    const finalLocationLng = locationLng || location_lng;
+
+    if (!finalEntityId) {
       return res.status(400).json({
         error: 'entity_id_required',
         message: 'Entity ID is required for tracking'
@@ -157,10 +186,10 @@ router.post('/track', async (req: Request, res: Response) => {
     await trackUserBehavior({
       userId,
       sessionId,
-      entityType,
-      entityId,
-      locationLat,
-      locationLng,
+      entityType: finalEntityType,
+      entityId: finalEntityId,
+      locationLat: finalLocationLat,
+      locationLng: finalLocationLng,
       referrer,
       userAgent,
       ipAddress
@@ -172,7 +201,7 @@ router.post('/track', async (req: Request, res: Response) => {
     console.error('Error tracking behavior:', error);
     res.status(500).json({
       error: 'tracking_failed',
-      message: 'Failed to track user behavior'
+      message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
@@ -446,7 +475,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
 
     if (currentListing.rows.length === 0) {
       // If no directory listing, fall back to basic recommendations
-      console.log(`[Storefront Recommendations] No directory listing found, using basic fallback`);
+      // console.log(`[Storefront Recommendations] No directory listing found, using basic fallback`);
       const similarStores = await getSimilarStoresInCategory(tenantId, limit);
       
       return res.json({
@@ -695,7 +724,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
 
     // Ensure at least 1 store is always shown (fallback logic)
     if (relatedListings.length === 0) {
-      console.log(`[Storefront Recommendations] No stores found with minimum score, trying fallback`);
+      // console.log(`[Storefront Recommendations] No stores found with minimum score, trying fallback`);
 
       // Fallback: Show featured stores in the same state
       const fallbackFeaturedQuery = `
@@ -746,7 +775,7 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
           relevanceScore: row.relevance_score || 0,
           reason: 'Featured in your area'
         }));
-        console.log(`[Storefront Recommendations] Fallback found ${relatedListings.length} featured stores`);
+        // console.log(`[Storefront Recommendations] Fallback found ${relatedListings.length} featured stores`);
       }
 
       // If still no stores, show any active stores in the same state

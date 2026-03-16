@@ -78,13 +78,20 @@ export interface ProductDisplay {
 // ====================
 
 export type FeaturedType = 
+  // Merchant-controlled types
   | 'new_arrival'
   | 'seasonal' 
   | 'sale'
   | 'staff_pick'
   | 'clearance'
   | 'featured'
-  | 'trending';
+  // Platform-controlled types (algorithmic)
+  | 'trending'
+  | 'recommended'
+  | 'bestseller'
+  | 'random_featured'
+  // Directory type
+  | 'store_selection';
 
 export interface FeaturedTypeInfo {
   type: FeaturedType;
@@ -95,6 +102,7 @@ export interface FeaturedTypeInfo {
 }
 
 export const FEATURED_TYPES: Record<FeaturedType, FeaturedTypeInfo> = {
+  // Merchant-controlled types
   new_arrival: {
     type: 'new_arrival',
     label: 'New Arrival',
@@ -132,17 +140,49 @@ export const FEATURED_TYPES: Record<FeaturedType, FeaturedTypeInfo> = {
   },
   featured: {
     type: 'featured',
-    label: 'Featured',
-    color: 'blue',
+    label: 'Premium',
+    color: 'indigo',
     priority: 6,
-    icon: '✨'
+    icon: '👑'
   },
+  
+  // Platform-controlled types (algorithmic)
   trending: {
     type: 'trending',
     label: 'Trending',
     color: 'pink',
     priority: 7,
     icon: '📈'
+  },
+  recommended: {
+    type: 'recommended',
+    label: 'Recommended',
+    color: 'teal',
+    priority: 8,
+    icon: '🏆'
+  },
+  bestseller: {
+    type: 'bestseller',
+    label: 'Bestseller',
+    color: 'amber',
+    priority: 9,
+    icon: '🥇'
+  },
+  random_featured: {
+    type: 'random_featured',
+    label: 'Discover',
+    color: 'cyan',
+    priority: 10,
+    icon: '✨'
+  },
+  
+  // Directory type
+  store_selection: {
+    type: 'store_selection',
+    label: 'Featured',
+    color: 'blue',
+    priority: 11,
+    icon: '⭐'
   }
 };
 

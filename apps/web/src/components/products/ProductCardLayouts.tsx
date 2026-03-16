@@ -13,6 +13,7 @@ import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
+import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 
 
 // Common data interface for all layouts
@@ -137,12 +138,6 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
         {/* Shop Info */}
         {(product.tenantName || product.shopName) && (
           <div className="flex items-center mb-2">
-                {hoursStatus && (
-                  <div
-                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
-                    title={hoursStatus.label}
-                  />
-                )}
             {(tenantLogo || product.tenantLogoUrl) ? (
               <Image
                 src={tenantLogo || product.tenantLogoUrl || ''}
@@ -160,6 +155,13 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
             >
               {product.tenantName || product.shopName}
             </Link>
+            
+                {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
           </div>
         )}
        
@@ -479,13 +481,7 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
 
         {/* Shop Info */}
         {(product.tenantName || product.shopName) && (
-          <div className="flex items-center mb-3">
-                {hoursStatus && (
-                  <div
-                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
-                    title={hoursStatus.label}
-                  />
-                )}
+          <div className="flex items-center mb-3"> 
             {(tenantLogo || product.tenantLogoUrl) ? (
               <Image
                 src={tenantLogo || product.tenantLogoUrl || ''}
@@ -504,6 +500,12 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
               {product.tenantName || product.shopName} 
             </Link>
             
+                {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
           </div>       
          
         )}
@@ -745,13 +747,7 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
              
             {/* Shop Info */}
             {(product.tenantName || product.shopName) && (
-              <div className="flex items-center mb-1">
-                {hoursStatus && (
-                  <div
-                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
-                    title={hoursStatus.label}
-                  />
-                )}
+              <div className="flex items-center mb-1"> 
                 {(tenantLogo || product.tenantLogoUrl) ? (
                   <Image
                     src={tenantLogo || product.tenantLogoUrl || ''}
@@ -769,6 +765,13 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
                 >
                   {product.tenantName || product.shopName} 
                 </Link>
+                
+                {hoursStatus && (
+                  <div
+                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
+                    title={hoursStatus.label}
+                  />
+                )}
               </div>
             )}
            
@@ -1008,14 +1011,7 @@ function PremiumLayout({ product, className = '', trackingContext, tenantId, ten
         
         {/* Shop Info */}
         {(product.tenantName || product.shopName) && (
-          <div className="flex items-center mb-4">
-                {hoursStatus && (
-                  <div
-                    className={`w-4 h-4 rounded-full ml-4 ${getStatusColor()}`}
-                    title={hoursStatus.label}
-
-                  />
-                )}
+          <div className="flex items-center mb-4"> 
             {(tenantLogo || product.tenantLogoUrl) ? (
               <Image
                 src={tenantLogo || product.tenantLogoUrl || ''}
@@ -1034,6 +1030,14 @@ function PremiumLayout({ product, className = '', trackingContext, tenantId, ten
             >
               {product.tenantName || product.shopName}
             </Link>
+            
+            {hoursStatus && (
+              <div
+                className={`w-4 h-4 rounded-full ml-4 ${getStatusColor()}`}
+                title={hoursStatus.label}
+
+              />
+            )}
           </div>
         )}
        
@@ -1349,12 +1353,7 @@ export default function ProductCard({
             {/* Shop Info */}
             {(product.tenantName || product.shopName) && (
               <div className="flex items-center mb-1">
-                {hoursStatus && (
-                  <div
-                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
-                    title={hoursStatus.label}
-                  />
-                )}
+                
                 {(tenantLogo || product.tenantLogoUrl) ? (
                   <Image
                     src={tenantLogo || product.tenantLogoUrl || ''}
@@ -1373,6 +1372,61 @@ export default function ProductCard({
                   {product.tenantName || product.shopName}
                    
                 </Link>
+                
+               {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
               </div>
             )}
            

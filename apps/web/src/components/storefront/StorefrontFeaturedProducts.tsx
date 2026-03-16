@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Package, Calendar, DollarSign, Star, Tag, Grid, List } from 'lucide-react';
+import { Package, Calendar, DollarSign, Star, Tag, Grid, List, TrendingUp, Award, Sparkles, Crown, Zap } from 'lucide-react';
 import Link from 'next/link';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { Button } from '@/components/ui/Button';
@@ -177,6 +177,7 @@ interface FeaturedSectionProps {
 }
 
 const featuredTypeConfig = {
+  // Merchant-controlled types
   store_selection: {
     title: 'Featured Products',
     description: 'Hand-picked favorites from our collection',
@@ -231,6 +232,74 @@ const featuredTypeConfig = {
     textColor: 'text-purple-700',
     buttonColor: 'bg-purple-600 hover:bg-purple-700',
     badgeColor: 'bg-purple-100 text-purple-800 border-purple-200'
+  },
+  clearance: {
+    title: 'Clearance',
+    description: 'Last chance deals while supplies last',
+    icon: <Tag className="w-5 h-5" />,
+    color: 'yellow',
+    bgColor: 'bg-yellow-50',
+    borderColor: 'border-yellow-200',
+    textColor: 'text-yellow-700',
+    buttonColor: 'bg-yellow-600 hover:bg-yellow-700',
+    badgeColor: 'bg-yellow-100 text-yellow-800 border-yellow-200'
+  },
+  featured: {
+    title: 'Premium Featured',
+    description: 'Special promotional selections',
+    icon: <Crown className="w-5 h-5" />,
+    color: 'indigo',
+    bgColor: 'bg-indigo-50',
+    borderColor: 'border-indigo-200',
+    textColor: 'text-indigo-700',
+    buttonColor: 'bg-indigo-600 hover:bg-indigo-700',
+    badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200'
+  },
+  
+  // Platform-controlled types (algorithmic)
+  trending: {
+    title: 'Trending Now',
+    description: 'Popular products gaining attention',
+    icon: <TrendingUp className="w-5 h-5" />,
+    color: 'pink',
+    bgColor: 'bg-pink-50',
+    borderColor: 'border-pink-200',
+    textColor: 'text-pink-700',
+    buttonColor: 'bg-pink-600 hover:bg-pink-700',
+    badgeColor: 'bg-pink-100 text-pink-800 border-pink-200'
+  },
+  recommended: {
+    title: 'Recommended',
+    description: 'Curated recommendations based on quality',
+    icon: <Award className="w-5 h-5" />,
+    color: 'teal',
+    bgColor: 'bg-teal-50',
+    borderColor: 'border-teal-200',
+    textColor: 'text-teal-700',
+    buttonColor: 'bg-teal-600 hover:bg-teal-700',
+    badgeColor: 'bg-teal-100 text-teal-800 border-teal-200'
+  },
+  bestseller: {
+    title: 'Bestsellers',
+    description: 'Top-selling products loved by customers',
+    icon: <Award className="w-5 h-5" />,
+    color: 'amber',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-200',
+    textColor: 'text-amber-700',
+    buttonColor: 'bg-amber-600 hover:bg-amber-700',
+    badgeColor: 'bg-amber-100 text-amber-800 border-amber-200'
+  },
+  random_featured: {
+    title: 'Discover',
+    description: 'Quality products you might have missed',
+    icon: <Sparkles className="w-5 h-5" />,
+    color: 'cyan',
+    bgColor: 'bg-cyan-50',
+    borderColor: 'border-cyan-200',
+    textColor: 'text-cyan-700',
+    buttonColor: 'bg-cyan-600 hover:bg-cyan-700',
+    badgeColor: 'bg-cyan-100 text-cyan-800 border-cyan-200'
   }
 };
 

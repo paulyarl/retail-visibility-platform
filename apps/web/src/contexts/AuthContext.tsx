@@ -2,6 +2,10 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { securitySingletonService } from '@/services/SecuritySingletonService';
+import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
+import { SingletonCacheOptions } from '@/providers/base/UniversalSingleton';
+import cacheManager from '@/utils/cacheManager';
 
 // User type
 
@@ -35,19 +39,206 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
   getAccessToken: () => string | null;
-  currentTenantId: string | null;
   switchTenant: (tenantId: string) => void;
+  currentTenantId: string | null;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// AuthContext Singleton Class
+class AuthContextSingleton extends ApiSystemSingleton {
+  private static instance: AuthContextSingleton;
+  private context: React.Context<AuthContextType | undefined>;
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  private constructor() {
+    super('auth-context', {
+      enableCache: true,
+      enableEncryption: true, // Enable encryption for user data
+      enablePrivateCache: true,
+      authenticationLevel: 'authenticated',
+      defaultTTL: 60 * 60 * 1000, // 1 hour
+      enableMetrics: true,
+      enableLogging: false
+    });
+    
+    // Create React context
+    this.context = createContext<AuthContextType | undefined>(undefined);
+  }
 
-// Token management
-const TOKEN_KEY = 'access_token';
-const REFRESH_TOKEN_KEY = 'refresh_token';
-const TENANT_KEY = 'current_tenant_id';
-const USER_CACHE_KEY = 'auth_user_cache';
+  static getInstance(): AuthContextSingleton {
+    if (!AuthContextSingleton.instance) {
+      AuthContextSingleton.instance = new AuthContextSingleton();
+    }
+    return AuthContextSingleton.instance;
+  }
+
+  // Get the React context
+  getContext(): React.Context<AuthContextType | undefined> {
+    return this.context;
+  }
+
+  // Override validation for auth-specific user data
+  protected validateCachedUserData(data: any): boolean {
+    return data !== null && 
+           typeof data === 'object' && 
+           data.user && 
+           typeof data.user === 'object' && 
+           data.user.id &&
+           typeof data.user.id === 'string';
+  }
+
+  // Helper method to get cached user data with proper typing
+  async getCachedAuthUser(): Promise<{ user: any } | null> {
+    return await this.getCachedUserData<any>('auth_user_cache');
+  }
+
+  // Helper method to set cached user data
+  async setCachedAuthUser(userData: any): Promise<void> {
+    await this.setCachedUserData('auth_user_cache', { user: userData });
+  }
+
+  // Helper method to clear cached auth data
+  async clearCachedAuthUser(): Promise<void> {
+    await this.clearCachedUserData('auth_user_cache');
+  }
+
+  // ====================
+  // AUTH-SPECIFIC API METHODS
+  // ====================
+
+  // Direct API call for session info (replaces PublicAuthService.getSessionInfo)
+  async getSessionInfo(): Promise<{ isAuthenticated: boolean; user?: any; token?: any; expiresAt?: string }> {
+    // console.log('[AuthContextSingleton] getSessionInfo called');
+    
+    try {
+      const result = await this.makeSystemRequest<{ 
+        isAuthenticated: boolean; 
+        user?: any; 
+        token?: any; 
+        expiresAt?: string 
+      }>(
+        '/api/auth/sessions',
+        {},
+        {
+          cacheKey: 'auth-context-session',
+          ttl: 5 * 60 * 1000 // 5 minutes
+        }
+      );
+      
+      if (!result.success) {
+        // Handle authentication errors gracefully
+        const errorCode = typeof result.error === 'object' ? result.error?.code : undefined;
+        const errorStatus = typeof result.error === 'object' ? result.error?.status : undefined;
+        
+        if (errorCode === 'authentication_required' || errorStatus === 401) {
+          // This is expected for unauthenticated users on public pages
+          return { isAuthenticated: false };
+        }
+        
+        // For other errors, also return unauthenticated state
+        return { isAuthenticated: false };
+      }
+      
+      return result.data || { isAuthenticated: false };
+    } catch (error) {
+      // Handle any unexpected errors
+      console.warn('[AuthContextSingleton] getSessionInfo error:', error);
+      return { isAuthenticated: false };
+    }
+  }
+
+  // Direct API call for token refresh
+  async refreshToken(refreshToken: string): Promise<{ success: boolean; token?: any; message?: string }> {
+    try {
+      const result = await this.makeSystemRequest<{ success: boolean; token?: any; message?: string }>(
+        '/api/auth/refresh',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken })
+        },
+        {
+          cacheKey: 'auth-context-refresh',
+          ttl: 0 // No caching for refresh
+        }
+      );
+      
+      return result.data || { success: false, message: 'Refresh failed' };
+    } catch (error) {
+      console.warn('[AuthContextSingleton] refreshToken error:', error);
+      return { success: false, message: 'Refresh failed' };
+    }
+  }
+
+  // Direct API call for login
+  async login(credentials: { email: string; password: string }): Promise<{ success: boolean; user?: any; token?: any; message?: string }> {
+    try {
+      const result = await this.makeSystemRequest<{ success: boolean; user?: any; token?: any; message?: string }>(
+        '/api/auth/login',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(credentials)
+        },
+        {
+          cacheKey: 'auth-context-login',
+          ttl: 0 // No caching for login
+        }
+      );
+      
+      return result.data || { success: false, message: 'Login failed' };
+    } catch (error) {
+      console.warn('[AuthContextSingleton] login error:', error);
+      return { success: false, message: 'Login failed' };
+    }
+  }
+
+  // Direct API call for register
+  async register(userData: { email: string; password: string; firstName?: string; lastName?: string }): Promise<{ success: boolean; user?: any; token?: any; message?: string }> {
+    try {
+      const result = await this.makeSystemRequest<{ success: boolean; user?: any; token?: any; message?: string }>(
+        '/api/auth/register',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userData)
+        },
+        {
+          cacheKey: 'auth-context-register',
+          ttl: 0 // No caching for register
+        }
+      );
+      
+      return result.data || { success: false, message: 'Registration failed' };
+    } catch (error) {
+      console.warn('[AuthContextSingleton] register error:', error);
+      return { success: false, message: 'Registration failed' };
+    }
+  }
+
+  // Direct API call for logout
+  async logout(): Promise<{ success: boolean; message?: string }> {
+    try {
+      const result = await this.makeSystemRequest<{ success: boolean; message?: string }>(
+        '/api/auth/logout',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        },
+        {
+          cacheKey: 'auth-context-logout',
+          ttl: 0 // No caching for logout
+        }
+      );
+      
+      return result.data || { success: false, message: 'Logout failed' };
+    } catch (error) {
+      console.warn('[AuthContextSingleton] logout error:', error);
+      return { success: false, message: 'Logout failed' };
+    }
+  }
+}
+
+// Create singleton instance
+const authContextSingleton = AuthContextSingleton.getInstance();
 const USER_CACHE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
 
 // Simple encryption/decryption for client-side caching
@@ -75,6 +266,28 @@ interface CachedUser {
 }
 
 
+// Helper function to get user ID from context (reusable across services)
+function getUserIdFromContext(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  // Try localStorage first
+  const userId = localStorage.getItem('userId');
+  if (userId) return userId;
+
+  // Try session storage
+  const sessionUserId = sessionStorage.getItem('userId');
+  if (sessionUserId) return sessionUserId;
+
+  // Try cookie
+  const cookies = document.cookie.split(';');
+  const userIdCookie = cookies.find(cookie => cookie.trim().startsWith('userId='));
+  if (userIdCookie) {
+    return userIdCookie.split('=')[1]?.trim();
+  }
+
+  return null;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,160 +296,191 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Get tokens from localStorage
   const getAccessToken = () => {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(TOKEN_KEY);
+    return localStorage.getItem('access_token');
   };
 
   const getRefreshToken = () => {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(REFRESH_TOKEN_KEY);
+    return localStorage.getItem('refresh_token');
   };
 
   const setTokens = (accessToken: string, refreshToken: string) => {
-    localStorage.setItem(TOKEN_KEY, accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    localStorage.setItem('access_token', accessToken);
+    localStorage.setItem('refresh_token', refreshToken);
     // Also set a non-HttpOnly cookie for SSR guard
     try {
       const isSecure = window.location.protocol === 'https:';
       const cookieString = `access_token=${encodeURIComponent(accessToken)}; path=/; SameSite=Lax${isSecure ? '; Secure' : ''}; max-age=${7 * 24 * 60 * 60}`; // 7 days
       document.cookie = cookieString;
-//      console.log('[AuthContext] Set cookie:', cookieString);
     } catch (error) {
       console.error('[AuthContext] Failed to set cookie:', error);
     }
   };
 
   const clearTokens = () => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(TENANT_KEY);
-    localStorage.removeItem(USER_CACHE_KEY); // Clear cached user data
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('current_tenant_id');
+    
+    // Clear cached user data using the singleton method
+    authContextSingleton.clearCachedAuthUser().catch(error => {
+      console.warn('[AuthContext] Failed to clear cached auth data:', error);
+    });
+    
     try {
       // Expire cookie
       document.cookie = `access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
     } catch {}
   };
 
-  // Cache management functions
-  const getCachedUser = (): CachedUser | null => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const cached = localStorage.getItem(USER_CACHE_KEY);
-      if (!cached) return null;
-      
-      const decrypted = decrypt(cached);
-      const parsed: CachedUser = JSON.parse(decrypted);
-      
-      // Check if cache is expired
-      if (Date.now() - parsed.timestamp > USER_CACHE_TTL) {
-        localStorage.removeItem(USER_CACHE_KEY);
-        return null;
-      }
-      
-      return parsed;
-    } catch {
-      // Clear corrupted cache
-      localStorage.removeItem(USER_CACHE_KEY);
-      return null;
-    }
-  };
-
-  const setCachedUser = (user: User | null, tenantId: string | null) => {
-    if (typeof window === 'undefined' || !user) return;
-    
-    const cached: CachedUser = {
-      user,
-      tenantId,
-      timestamp: Date.now()
-    };
-    
-    try {
-      const encrypted = encrypt(JSON.stringify(cached));
-      localStorage.setItem(USER_CACHE_KEY, encrypted);
-    } catch (error) {
-      console.warn('[AuthContext] Failed to cache user:', error);
-    }
-  };
-
-  // Fetch current user - now uses encrypted caching to minimize API calls
+  // Fetch current user - uses local storage instead of API calls (like behaviorTracking)
   const fetchUser = useCallback(async (forceRefresh = false) => {
-    const token = getAccessToken();
-    if (!token) {
-      setUser(null);
-      setIsLoading(false);
-      return;
-    }
-
-    // Try to use cached user data first (unless force refresh is requested)
-    if (!forceRefresh) {
-      const cached = getCachedUser();
-      if (cached) {
-       // console.log('[AuthContext] Using cached user data (avoiding API call)');
-        setUser(cached.user);
-        setCurrentTenantId(cached.tenantId);
-        setIsLoading(false);
-        return;
-      }
-    }
-
+    // console.log('[AuthContext] fetchUser called', { forceRefresh, pathname: typeof window !== 'undefined' ? window.location.pathname : 'server' });
+    
     try {
-      // Only make API call if no valid cache or force refresh requested
-      console.log('[AuthContext] Fetching fresh user data from API');
-      const data = await tenantInfoService.getCurrentUser();
-
-      // Handle case where user is not authenticated (data is null)
-      if (!data) {
-        console.log('[AuthContext] User not authenticated - no token available');
+      // Only check authentication if we're in an admin context, tenant context, or have authentication tokens
+      const isAdminContext = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+      const isTenantContext = typeof window !== 'undefined' && (
+        window.location.pathname.startsWith('/t/') || 
+        window.location.pathname.startsWith('/dashboard') ||
+        window.location.pathname.startsWith('/tenants')
+      );
+      const hasAuthToken = typeof window !== 'undefined' && !!localStorage.getItem('access_token');
+      
+      // console.log('[AuthContext] Context check', { 
+      //   isAdminContext, 
+      //   isTenantContext,
+      //   hasAuthToken, 
+      //   pathname: typeof window !== 'undefined' ? window.location.pathname : 'server',
+      //   tokenValue: hasAuthToken ? '***TOKEN_PRESENT***' : 'NO_TOKEN',
+      //   localStorageKeys: typeof window !== 'undefined' ? Object.keys(localStorage) : []
+      // });
+      
+      // Skip auth check for public pages without tokens
+      if (!isAdminContext && !isTenantContext && !hasAuthToken) {
+        // console.log('[AuthContext] Skipping auth check - public page without tokens');
         setUser(null);
         setIsLoading(false);
         return;
       }
-
-      // Check if user data exists
-      if (!data.user) {
-        // Don't log as error on public pages - this is normal behavior
-        console.log('[AuthContext] No user data returned from API (user not authenticated)');
+      
+      // Additional check: Skip auth API calls on public pages even if we have tokens
+      // Only make auth API calls if we're in admin context, tenant context, OR explicitly forcing refresh
+      if (!isAdminContext && !isTenantContext && !forceRefresh) {
+        // console.log('[AuthContext] Skipping auth API call - public page (even with tokens)');
+        
+        // Clear any potentially stale tokens on public pages to prevent future issues
+        if (hasAuthToken) {
+          // console.log('[AuthContext] Clearing stale tokens from public page');
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+        }
+        
         setUser(null);
         setIsLoading(false);
         return;
       }
-
-      // Transform API response from snake_case to camelCase
-      const transformedUser = {
-        ...data.user,
-        firstName: data.user.first_name,
-        lastName: data.user.last_name,
-        emailVerified: data.user.email_verified,
-        // Remove snake_case fields
-        first_name: undefined,
-        last_name: undefined,
-        email_verified: undefined,
-      };
-
-      setUser(transformedUser);
       
-      // Cache the authenticated user data
-      setCachedUser(transformedUser, currentTenantId);
+      // FOLLOW BEHAVIOR_TRACKING PATTERN: Use singleton methods for user caching
+      let user: User | null = null;
       
-      // Set current tenant if not set
-      if (!currentTenantId && transformedUser && transformedUser.tenants && transformedUser.tenants.length > 0) {
-        const savedTenantId = localStorage.getItem(TENANT_KEY);
-        const tenantExists = transformedUser.tenants.find((t: any) => t.id === savedTenantId);
-        const newTenantId = tenantExists ? savedTenantId : transformedUser.tenants[0].id;
-        setCurrentTenantId(newTenantId);
-        // Update cache with tenant info
-        setCachedUser(transformedUser, newTenantId);
+      // Try to get cached user data using the singleton method
+      // console.log('[AuthContext] Attempting to get cached user data');
+      const cachedUserData = await authContextSingleton.getCachedAuthUser();
+      // console.log('[AuthContext] Cached user data result', { 
+      //   hasCachedData: !!cachedUserData,
+      //   hasUser: !!cachedUserData?.user,
+      //   userId: cachedUserData?.user?.id || 'NO_USER_ID'
+      // });
+      if (cachedUserData && cachedUserData.user) {
+        const userData = cachedUserData.user;
+        user = {
+          id: userData.id,
+          email: userData.email || '',
+          firstName: userData.firstName || '',
+          lastName: userData.lastName || '',
+          emailVerified: userData.emailVerified || false,
+          role: 'USER' as const,
+          tenants: userData.tenant ? [{
+            id: userData.tenant.id,
+            name: userData.tenant.name || '',
+            role: 'OWNER' as const
+          }] : []
+        };
+      }
+      
+      // If we have cached user and not forcing refresh, use it
+      if (user && !forceRefresh) {
+        setUser(user);
+        setIsLoading(false);
+        return;
+      }
+      
+      // ONLY MAKE API CALL IF: 
+      // 1. We're in admin context, OR
+      // 2. We're in tenant context, OR  
+      // 3. We're forcing refresh (explicit user action)
+      // NOTE: We no longer check for tokens on public pages due to the stricter logic above
+      if (isAdminContext || isTenantContext || forceRefresh) {
+        // console.log('[AuthContext] Making API call', { 
+        //   reason: isAdminContext ? 'admin context' : isTenantContext ? 'tenant context' : 'force refresh',
+        //   isAdminContext, 
+        //   isTenantContext,
+        //   forceRefresh, 
+        //   hasAuthToken, 
+        //   hasCachedUser: !!user 
+        // });
+        
+        const sessionInfo = isAdminContext || isTenantContext || forceRefresh
+          ? await securitySingletonService.getSessionInfo()
+          : await authContextSingleton.getSessionInfo(); // Use singleton method for both admin and tenant contexts
+        
+        if (sessionInfo.isAuthenticated && sessionInfo.user) {
+          // Transform service user to context format
+          const transformedUser: User = {
+            id: sessionInfo.user.id,
+            email: sessionInfo.user.email,
+            firstName: sessionInfo.user.firstName,
+            lastName: sessionInfo.user.lastName,
+            emailVerified: sessionInfo.user.emailVerified,
+            role: 'USER' as const, // Default role, can be enhanced based on roles array
+            // Map service tenants to context format
+            tenants: sessionInfo.user.tenant ? [{
+              id: sessionInfo.user.tenant.id,
+              name: sessionInfo.user.tenant.name,
+              role: 'OWNER' as const // Default role for now
+            }] : []
+          };
+          
+          setUser(transformedUser);
+          
+          // Cache the user data using the singleton method (like behaviorTracking does)
+          await authContextSingleton.setCachedAuthUser(sessionInfo.user);
+        } else {
+          setUser(null);
+        }
+      } else {
+        console.log('[AuthContext] Skipping API call', { 
+          reason: 'no reason to call API',
+          isAdminContext, 
+          forceRefresh, 
+          hasAuthToken, 
+          hasCachedUser: !!user 
+        });
+        setUser(user);
       }
     } catch (error) {
-      // Don't log as error on public pages - authentication failures are normal
+      console.warn('[AuthContext] fetchUser error:', error);
+      console.error('[AuthContext] Failed to fetch user:', error);
       console.log('[AuthContext] Authentication failed (user not authenticated):', error instanceof Error ? error.message : 'Unknown error');
       // Clear invalid tokens and treat as unauthenticated view
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       setUser(null);
     } finally {
       setIsLoading(false);
     }
-  }, [currentTenantId]);
+  }, []);
 
   // Refresh access token
   const refreshToken = useCallback(async () => {
@@ -248,33 +492,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ refreshToken }),
-      });
+      // Use singleton method instead of PublicAuthService
+      const refreshResponse = await authContextSingleton.refreshToken(refresh);
 
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem(TOKEN_KEY, data.accessToken);
+      if (refreshResponse.success && refreshResponse.token) {
+        localStorage.setItem('access_token', refreshResponse.token.accessToken);
         try { 
           const isSecure = window.location.protocol === 'https:';
-          const cookieString = `access_token=${encodeURIComponent(data.accessToken)}; path=/; SameSite=Lax${isSecure ? '; Secure' : ''}; max-age=${7 * 24 * 60 * 60}`;
+          const cookieString = `access_token=${encodeURIComponent(refreshResponse.token.accessToken)}; path=/; SameSite=Lax${isSecure ? '; Secure' : ''}; max-age=${7 * 24 * 60 * 60}`;
           document.cookie = cookieString;
-          console.log('[AuthContext] Refreshed cookie:', cookieString);
+          // console.log('[AuthContext] Refreshed cookie:', cookieString);
         } catch (error) {
           console.error('[AuthContext] Failed to set refresh cookie:', error);
         }
         
         // After token refresh, fetch fresh user data and update cache
-        console.log('[AuthContext] Token refreshed, updating cached user data');
+        // console.log('[AuthContext] Token refreshed, updating cached user data');
         await fetchUser(true); // Force refresh to get updated user data
       } else {
         // Only clear tokens if refresh endpoint explicitly says unauthorized
-        if (response.status === 401) {
+        if (!refreshResponse.success) {
           clearTokens();
         }
         setUser(null);
@@ -289,54 +526,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Login
   const login = async (email: string, password: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
+      // Use singleton method instead of PublicAuthService
+      const authResponse = await authContextSingleton.login({ email, password });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Login failed');
+      if (!authResponse.success) {
+        throw new Error(authResponse.message || 'Login failed');
       }
 
-      const data = await response.json();
-      console.log('[AuthContext] Login response:', { 
-        hasAccessToken: !!data.accessToken, 
-        hasRefreshToken: !!data.refreshToken,
-        hasUser: !!data.user 
-      });
+      // console.log('[AuthContext] Login response:', { 
+      //   hasAccessToken: !!authResponse.token?.accessToken, 
+      //   hasRefreshToken: !!authResponse.token?.refreshToken,
+      //   hasUser: !!authResponse.user 
+      // });
       
-      setTokens(data.accessToken, data.refreshToken);
+      if (authResponse.token) {
+        setTokens(authResponse.token.accessToken, authResponse.token.refreshToken);
+      }
 
-      // Transform API response from snake_case to camelCase
-      const transformedUser = data.user ? {
-        ...data.user,
-        firstName: data.user.first_name,
-        lastName: data.user.last_name,
-        emailVerified: data.user.email_verified,
-        // Remove snake_case fields
-        first_name: undefined,
-        last_name: undefined,
-        email_verified: undefined,
+      // Transform API response from service format to context format
+      const transformedUser = authResponse.user ? {
+        id: authResponse.user.id,
+        email: authResponse.user.email,
+        firstName: authResponse.user.firstName,
+        lastName: authResponse.user.lastName,
+        emailVerified: authResponse.user.emailVerified,
+        role: 'USER' as const, // Default role, can be enhanced based on roles array
+        // Map service tenants to context format
+        tenants: authResponse.user.tenant ? [{
+          id: authResponse.user.tenant.id,
+          name: authResponse.user.tenant.name,
+          role: 'OWNER' as const // Default role for now
+        }] : []
       } : null;
 
       setUser(transformedUser);
       
-      // Cache the authenticated user data immediately after login
-      if (transformedUser) {
-        const tenantId = transformedUser.tenants && transformedUser.tenants.length > 0 ? transformedUser.tenants[0].id : null;
-        setCachedUser(transformedUser, tenantId);
-        setCurrentTenantId(tenantId);
-        if (tenantId) {
-          localStorage.setItem(TENANT_KEY, tenantId);
-        }
+      // Set current tenant if available
+      if (transformedUser && transformedUser.tenants && transformedUser.tenants.length > 0) {
+        setCurrentTenantId(transformedUser.tenants[0].id);
+        localStorage.setItem('current_tenant_id', transformedUser.tenants[0].id);
       }
       
-      console.log('[AuthContext] Tokens and user data cached locally');
+      // console.log('[AuthContext] Tokens and user data cached locally');
     } catch (error) {
       // Don't log to console - error will be caught and displayed in UI
       throw error;
@@ -346,18 +577,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Register
   const register = async (email: string, password: string, firstName?: string, lastName?: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ email, password, firstName, lastName }),
+      // Use singleton method instead of PublicAuthService
+      const authResponse = await authContextSingleton.register({
+        email,
+        password,
+        firstName: firstName || '',
+        lastName: lastName || ''
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Registration failed');
+      if (!authResponse.success) {
+        throw new Error(authResponse.message || 'Registration failed');
       }
 
       // After registration, automatically log in
@@ -370,39 +599,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Logout
   const logout = async () => {
-    const token = getAccessToken();
-    
-    if (token) {
-      try {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          credentials: 'include',
-        });
-      } catch (error) {
-        console.error('[AuthContext] Logout request failed:', error);
+    try {
+      // Use singleton method instead of PublicAuthService
+      const logoutResponse = await authContextSingleton.logout();
+      
+      if (!logoutResponse.success) {
+        console.error('[AuthContext] Logout failed:', logoutResponse.message);
       }
+    } catch (error) {
+      console.error('[AuthContext] Logout request failed:', error);
+    } finally {
+      // Always clear local tokens and user data
+      clearTokens();
+      setUser(null);
+      setCurrentTenantId(null);
     }
-
-    clearTokens();
-    setUser(null);
-    setCurrentTenantId(null);
   };
 
   // Switch tenant
   const switchTenant = (tenantId: string) => {
     if (user?.tenants.find(t => t.id === tenantId)) {
       setCurrentTenantId(tenantId);
-      localStorage.setItem(TENANT_KEY, tenantId);
+      localStorage.setItem('current_tenant_id', tenantId);
     }
   };
 
   // Load user on mount
   useEffect(() => {
+    // console.log('[AuthContext] useEffect triggered - calling fetchUser');
     fetchUser();
-  }, [fetchUser]);
+  }, []); // Empty dependency array - only run once on mount
 
   // Setup token refresh interval - less aggressive with caching
   // Tokens expire in 365 days, so refresh every 6 hours instead of 24
@@ -411,7 +637,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
 
     const interval = setInterval(() => {
-      console.log('[AuthContext] Periodic token refresh (every 6 hours)');
+      // console.log('[AuthContext] Periodic token refresh (every 6 hours)');
       refreshToken();
     }, 6 * 60 * 60 * 1000); // Refresh every 6 hours
 
@@ -431,13 +657,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     switchTenant,
   };
 
+  const AuthContext = authContextSingleton.getContext();
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
+// Export the context for external use if needed
+export { authContextSingleton as AuthContextSingleton };
 
 // Hook to use auth context
 
 export function useAuth() {
-  const context = useContext(AuthContext);
+  const context = useContext(authContextSingleton.getContext());
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }

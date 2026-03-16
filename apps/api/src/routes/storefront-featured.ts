@@ -80,11 +80,16 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
     
     // Divide products by featured_type for component props
     const buckets: Record<string, any[]> = {
-      staff_pick: [],
-      seasonal: [],
-      sale: [],
+      bestseller: [],
+      clearance: [],
+      featured: [],
       new_arrival: [],
-      store_selection: []
+      recommended: [],
+      sale: [],
+      seasonal: [],
+      staff_pick: [],
+      store_selection: [],
+      trending: []
     };
     
     // Track unique products to avoid duplicates in buckets
@@ -277,7 +282,12 @@ router.get('/:tenantId/featured-products', async (req: Request, res: Response) =
       ...transformedBuckets.seasonal,
       ...transformedBuckets.sale,
       ...transformedBuckets.new_arrival,
-      ...transformedBuckets.store_selection
+      ...transformedBuckets.store_selection,
+      ...transformedBuckets.bestseller,
+      ...transformedBuckets.clearance,
+      ...transformedBuckets.featured,
+      ...transformedBuckets.recommended,
+      ...transformedBuckets.trending
     ];
 
     res.json({

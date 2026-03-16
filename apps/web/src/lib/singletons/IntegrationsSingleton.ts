@@ -1,9 +1,11 @@
 /**
  * Integrations Singleton
  * 
- * Manages POS and third-party integration status with automatic caching.
- * Provides tenant-specific integration information with 5-minute cache TTL.
+ * MIGRATION: Now uses TenantIntegrationsService for proper caching and context management
+ * Maintains backward compatibility while leveraging service layer benefits
  */
+
+import TenantIntegrationsService from '@/services/TenantIntegrationsService';
 
 interface CloverIntegration {
   connected: boolean;
@@ -97,19 +99,16 @@ class IntegrationsSingleton {
 
     try {
       console.log(`IntegrationsSingleton: Fetching Clover integration for tenant ${this.tenantId}`);
-      const response = await fetch(`${this.API_BASE_URL}/api/tenants/${this.tenantId}/integrations/clover`);
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch Clover integration: ${response.status}`);
-      }
-
-      const data = await response.json();
+      // MIGRATION: Using TenantIntegrationsService instead of direct fetch
+      const integration = await TenantIntegrationsService.getTenantIntegration(this.tenantId, 'CLOVER');
+      
       const cloverIntegration: CloverIntegration = {
-        connected: data.connected || false,
-        merchantId: data.merchantId,
-        lastSync: data.lastSync,
-        syncStatus: data.syncStatus || 'idle',
-        itemCount: data.itemCount
+        connected: integration?.isConnected || false,
+        merchantId: integration?.config?.merchantId,
+        lastSync: integration?.lastSyncAt,
+        syncStatus: integration?.status === 'CONNECTED' ? 'idle' : integration?.status?.toLowerCase() as any || 'idle',
+        itemCount: 0 // TODO: Add itemCount to integration metadata if needed
       };
 
       this.setState({
@@ -149,19 +148,16 @@ class IntegrationsSingleton {
 
     try {
       console.log(`IntegrationsSingleton: Fetching Square integration for tenant ${this.tenantId}`);
-      const response = await fetch(`${this.API_BASE_URL}/api/tenants/${this.tenantId}/integrations/square`);
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch Square integration: ${response.status}`);
-      }
-
-      const data = await response.json();
+      // MIGRATION: Using TenantIntegrationsService instead of direct fetch
+      const integration = await TenantIntegrationsService.getTenantIntegration(this.tenantId, 'SQUARE');
+      
       const squareIntegration: SquareIntegration = {
-        connected: data.connected || false,
-        locationId: data.locationId,
-        lastSync: data.lastSync,
-        syncStatus: data.syncStatus || 'idle',
-        itemCount: data.itemCount
+        connected: integration?.isConnected || false,
+        locationId: integration?.config?.locationId,
+        lastSync: integration?.lastSyncAt,
+        syncStatus: integration?.status === 'CONNECTED' ? 'idle' : integration?.status?.toLowerCase() as any || 'idle',
+        itemCount: 0 // TODO: Add itemCount to integration metadata if needed
       };
 
       this.setState({

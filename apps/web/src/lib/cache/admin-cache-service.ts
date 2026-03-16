@@ -4,7 +4,8 @@
  * Similar to tenant caching but optimized for admin use cases
  */
 
-import { securityService } from '@/services/SecuritySingletonService';
+// import { securitySingletonService } from '@/services/SecuritySingletonService';
+import { securitySingletonService } from '@/services/SecuritySingletonService';
 import { LocalStorageCache } from './local-storage-cache';
 
 export interface AdminTenantsData {
@@ -165,7 +166,7 @@ export class AdminCacheService {
       }
     }
 
-    const data = await securityService.getAdminTenants();
+    const data = await securitySingletonService.getAdminTenants();
     const tenantsData: AdminTenantsData = {
       tenants: Array.isArray(data) ? data : [],
       total: Array.isArray(data) ? data.length : 0
@@ -189,7 +190,7 @@ export class AdminCacheService {
       }
     }
 
-    const data = await securityService.getAdminSyncStats();
+    const data = await securitySingletonService.getAdminSyncStats();
     const syncStats: AdminSyncStats = {
       totalRuns: data.stats?.totalRuns || 0,
       successRate: data.stats?.successRate || 0,
@@ -219,7 +220,7 @@ export class AdminCacheService {
     if (params?.limit) queryParams.set('limit', params.limit.toString());
     if (params?.offset) queryParams.set('offset', params.offset.toString());
 
-    const data = await securityService.getAdminSecuritySessions(params);
+    const data = await securitySingletonService.getAdminSecuritySessions(params);
     const sessionsData: AdminSecuritySessions = {
       data: data.data || [],
       total: data.total || 0
@@ -243,7 +244,7 @@ export class AdminCacheService {
       }
     }
 
-    const data = await securityService.getAdminSecuritySessionsStats();
+    const data = await securitySingletonService.getAdminSecuritySessionsStats();
     if (!data) {
       return { activeSessions: 0, activeUsers: 0, sessionsLast24h: 0, revokedSessions: 0, deviceBreakdown: [] };
     }
@@ -266,10 +267,10 @@ export class AdminCacheService {
       }
     }
 
-    const data = await securityService.getAdminSecurityAlerts();
+    const data = await securitySingletonService.getAdminSecurityAlerts();
     const alertsData: AdminSecurityAlerts = {
-      data: data.data || [],
-      total: data.total || 0
+      data: Array.isArray(data) ? data : [],
+      total: Array.isArray(data) ? data.length : 0
     };
 
     LocalStorageCache.set(cacheKey, alertsData, { ttl: this.SECURITY_CACHE_TTL });
@@ -290,7 +291,7 @@ export class AdminCacheService {
       }
     }
 
-    const data = await securityService.getAdminSecurityAlertsStats();
+    const data = await securitySingletonService.getAdminSecurityAlertsStats();
 
     LocalStorageCache.set(cacheKey, data, { ttl: this.SECURITY_CACHE_TTL });
 
@@ -310,9 +311,9 @@ export class AdminCacheService {
       }
     }
 
-    const data = await securityService.getAdminFailedLogins();
+    const data = await securitySingletonService.getAdminFailedLogins();
     const failedLoginsData: AdminFailedLogins = {
-      data: data.data || []
+      data: Array.isArray(data) ? data : []
     };
 
     LocalStorageCache.set(cacheKey, failedLoginsData, { ttl: this.SECURITY_CACHE_TTL });

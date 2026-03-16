@@ -51,6 +51,8 @@ import { storefrontService } from '@/services/StorefrontSingletonService';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSingleton';
+import {  Badge as MantineBadge } from '@mantine/core';
+import { useStoreStatus } from "@/hooks/useStoreStatus";
 
 // Types
 interface DirectoryConsolidated {
@@ -557,6 +559,8 @@ export default function ShopProfileClient({ shop, businessHours }: {
     );
   }
 
+  const { status: hoursStatus } = useStoreStatus(shopData.id, true); // Public scope
+  
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Track shop page view */}
@@ -605,7 +609,61 @@ export default function ShopProfileClient({ shop, businessHours }: {
                   Trending
                 </Link>
                  <Divider orientation="vertical" h={24} />
-              <StoreStatusIndicator tenantId={shopData.id} />
+               {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
+			
               </div>
              
             </div>

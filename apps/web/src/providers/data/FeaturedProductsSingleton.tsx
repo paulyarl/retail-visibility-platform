@@ -143,7 +143,7 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
         
         // If cache is from before the API fix, clear it aggressively
         if (cacheTime < apiFixTime) {
-          console.log(`[FeaturedProductsSingleton] Force clearing stale cache from ${(cached as any).lastUpdated}`);
+          // console.log(`[FeaturedProductsSingleton] Force clearing stale cache from ${(cached as any).lastUpdated}`);
           
           // Clear from all cache layers
           await this.cacheManager.remove(cacheKey);
@@ -186,7 +186,7 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
         const apiFixTime = new Date('2026-01-24T11:45:00.000Z').getTime(); // When we fixed the API
         
         if (cacheTime < apiFixTime) {
-          console.log(`[FeaturedProductsSingleton] Detected stale cache from ${data.lastUpdated}, clearing...`);
+          // console.log(`[FeaturedProductsSingleton] Detected stale cache from ${data.lastUpdated}, clearing...`);
           return false; // Clear old cache
         }
       }
@@ -195,7 +195,7 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
       if (data.buckets.length > 0) {
         const firstBucket = data.buckets[0];
         if (!('products' in firstBucket && 'bucketName' in firstBucket)) {
-          console.log(`[FeaturedProductsSingleton] Detected old bucket structure, clearing cache...`);
+          // console.log(`[FeaturedProductsSingleton] Detected old bucket structure, clearing cache...`);
           return false; // Clear old format cache
         }
         
@@ -203,7 +203,7 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
         if (firstBucket.products && firstBucket.products.length > 0) {
           const firstProduct = firstBucket.products[0];
           if (!('featuredTypes' in firstProduct) || !('hasActivePaymentGateway' in firstProduct)) {
-            console.log(`[FeaturedProductsSingleton] Detected old product structure (missing featuredTypes/payment fields), clearing cache...`);
+            // console.log(`[FeaturedProductsSingleton] Detected old product structure (missing featuredTypes/payment fields), clearing cache...`);
             return false; // Clear old format cache
           }
         }

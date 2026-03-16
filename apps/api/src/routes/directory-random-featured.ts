@@ -4,6 +4,79 @@ import CacheService, { CacheKeys, CACHE_TTL } from '../lib/cache-service';
 
 const router = Router();
 
+/**
+ * Advanced merchant diversification using JavaScript utilities
+ * Ensures products are distributed across different merchants rather than grouped
+ */
+function diversifyByMerchant(products: any[], limit: number): any[] {
+  if (!products || products.length === 0) return [];
+  
+  // Group products by merchant
+  const merchantGroups = new Map<string, any[]>();
+  products.forEach(product => {
+    const merchantId = product.tenantId;
+    if (!merchantGroups.has(merchantId)) {
+      merchantGroups.set(merchantId, []);
+    }
+    merchantGroups.get(merchantId)!.push(product);
+  });
+  
+  // Shuffle each merchant's products randomly
+  merchantGroups.forEach(merchantProducts => {
+    // Fisher-Yates shuffle for each merchant's products
+    for (let i = merchantProducts.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [merchantProducts[i], merchantProducts[j]] = [merchantProducts[j], merchantProducts[i]];
+    }
+  });
+  
+  // Create diversified result by taking one product from each merchant in rotation
+  const diversified: any[] = [];
+  const merchantIds = Array.from(merchantGroups.keys());
+  
+  // Shuffle merchant order for additional randomness
+  for (let i = merchantIds.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [merchantIds[i], merchantIds[j]] = [merchantIds[j], merchantIds[i]];
+  }
+  
+  // Round-robin selection from merchants
+  let merchantIndex = 0;
+  let allMerchantsExhausted = false;
+  
+  while (diversified.length < limit && !allMerchantsExhausted) {
+    allMerchantsExhausted = true;
+    
+    for (const merchantId of merchantIds) {
+      if (diversified.length >= limit) break;
+      
+      const merchantProducts = merchantGroups.get(merchantId)!;
+      const productIndex = diversified.length + merchantIndex;
+      
+      if (productIndex < merchantProducts.length) {
+        diversified.push(merchantProducts[productIndex]);
+        allMerchantsExhausted = false;
+      }
+    }
+    
+    merchantIndex++;
+  }
+  
+  // If we still need more products to reach the limit, fill with remaining products
+  if (diversified.length < limit) {
+    const remainingProducts = products.filter(p => !diversified.includes(p));
+    // Shuffle remaining products
+    for (let i = remainingProducts.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [remainingProducts[i], remainingProducts[j]] = [remainingProducts[j], remainingProducts[i]];
+    }
+    // Add remaining products up to the limit
+    diversified.push(...remainingProducts.slice(0, limit - diversified.length));
+  }
+  
+  return diversified.slice(0, limit);
+}
+
 // GET /api/directory/random-featured
 // Returns proximity-weighted random featured products with pagination
 router.get('/', async (req, res) => {
@@ -121,7 +194,7 @@ router.get('/', async (req, res) => {
         offset
       ];
     } else {
-      // Fallback: Simple random without proximity (cached globally) using mv_global_discovery
+      // Fallback: Simple query - let JavaScript handle the randomization
       query = `
         SELECT 
           mv.inventory_item_id as id,
@@ -162,7 +235,6 @@ router.get('/', async (req, res) => {
         WHERE mv.is_actively_featured = true 
           AND mv.has_image = true
           AND mv.in_stock = true
-        ORDER BY RANDOM() 
         LIMIT $1 OFFSET $2
       `;
       queryParams = [limitNum, offset];
@@ -171,7 +243,7 @@ router.get('/', async (req, res) => {
     const result = await pool.query(query, queryParams);
     
     // Transform to match storefront data structure
-    const products = result.rows.map((row: any) => ({
+    let products = result.rows.map((row: any) => ({
       id: row.id,
       tenantId: row.tenant_id,
       sku: row.sku,
@@ -209,6 +281,9 @@ router.get('/', async (req, res) => {
       storeState: row.store_state,
       distanceKm: row.distance_km || null,
     }));
+    
+    // Advanced merchant diversification using JavaScript utilities
+    products = diversifyByMerchant(products, limitNum);
     
     // Get total count for pagination
     let totalCountQuery;
@@ -306,7 +381,7 @@ router.get('/available', async (req, res) => {
     
     const whereClause = whereConditions.join(' AND ');
     
-    // Fallback: Simple random without proximity (cached globally) with rich data from mv_global_discovery
+    // Simple query - let JavaScript handle the randomization
     const query = `
       SELECT 
         mv.inventory_item_id as id,
@@ -354,7 +429,6 @@ router.get('/available', async (req, res) => {
       FROM mv_global_discovery mv
       JOIN directory_listings_list dsl ON dsl.tenant_id = mv.tenant_id
       WHERE ${whereClause}
-      ORDER BY RANDOM()
       LIMIT $1 OFFSET $2
     `;
     
@@ -440,8 +514,11 @@ router.get('/available', async (req, res) => {
       return transformedProduct;
     });
     
+    // Apply merchant diversification for better randomness
+    const diversifiedProducts = diversifyByMerchant(products, limitNum);
+    
     const responseData = {
-      products,
+      products: diversifiedProducts,
       pagination: {
         currentPage: pageNum,
         limit: limitNum,

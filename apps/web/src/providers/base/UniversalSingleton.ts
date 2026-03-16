@@ -80,9 +80,11 @@ export abstract class UniversalSingleton {
   protected lastUpdated: string = '';
   protected enableMetrics: boolean = true;
   protected enableLogging: boolean = true;
+  protected cacheOptions: SingletonCacheOptions;
 
   constructor(singletonKey: string, cacheOptions?: SingletonCacheOptions) {
     this.singletonKey = singletonKey;
+    this.cacheOptions = cacheOptions || {};
     this.cacheManager = new CacheManager(cacheOptions);
     
     // Initialize emergency bust mode from storage
@@ -615,6 +617,122 @@ export abstract class UniversalSingleton {
    */
   protected logMetricsReset(): void {
     console.log(`[${this.constructor.name}] Metrics RESET`);
+  }
+
+  // ====================
+  // USER/SESSION CACHING UTILITIES
+  // ====================
+
+  /**
+   * Get cached user data from local storage (like behaviorTracking pattern)
+   * Automatically handles encryption/decryption and validation
+   */
+  protected async getCachedUserData<T>(cacheKey: string): Promise<T | null> {
+    if (typeof window === 'undefined') return null;
+
+    try {
+      const cachedData = await cacheManager.get<T>(cacheKey, {
+        encrypt: this.cacheOptions.enableEncryption || false,
+        userId: this.cacheOptions.userId
+      });
+
+      if (cachedData) {
+        // Validate the structure of cached data
+        if (this.validateCachedUserData(cachedData)) {
+          return cachedData;
+        } else {
+          console.warn(`[${this.constructor.name}] Invalid cached user data structure, clearing cache`);
+          await this.clearCachedUserData(cacheKey);
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.warn(`[${this.constructor.name}] Failed to get cached user data:`, error);
+      await this.clearCachedUserData(cacheKey);
+      return null;
+    }
+  }
+
+  /**
+   * Set cached user data with encryption (like behaviorTracking pattern)
+   */
+  protected async setCachedUserData<T>(cacheKey: string, userData: T): Promise<void> {
+    if (typeof window === 'undefined') return;
+
+    try {
+      await cacheManager.set(cacheKey, userData, {
+        encrypt: this.cacheOptions.enableEncryption || false,
+        userId: this.cacheOptions.userId,
+        ttl: this.cacheOptions.defaultTTL || 60 * 60 * 1000 // 1 hour default
+      });
+    } catch (error) {
+      console.warn(`[${this.constructor.name}] Failed to cache user data:`, error);
+    }
+  }
+
+  /**
+   * Clear cached user data
+   */
+  protected async clearCachedUserData(cacheKey: string): Promise<void> {
+    if (typeof window === 'undefined') return;
+
+    try {
+      // Remove the specific key from all cache layers
+      await cacheManager.remove(cacheKey);
+    } catch (error) {
+      console.warn(`[${this.constructor.name}] Failed to clear cached user data:`, error);
+    }
+  }
+
+  /**
+   * Get user ID from various context sources (like behaviorTracking)
+   * This is a helper method for services to get current user context
+   */
+  protected getUserIdFromContext(): string | null {
+    if (typeof window === 'undefined') return null;
+
+    // Try localStorage first
+    const userId = localStorage.getItem('userId');
+    if (userId) return userId;
+
+    // Try session storage
+    const sessionUserId = sessionStorage.getItem('userId');
+    if (sessionUserId) return sessionUserId;
+
+    // Try cookie
+    const cookies = document.cookie.split(';');
+    const userIdCookie = cookies.find(cookie => cookie.trim().startsWith('userId='));
+    if (userIdCookie) {
+      return userIdCookie.split('=')[1]?.trim();
+    }
+
+    return null;
+  }
+
+  /**
+   * Get session ID for anonymous users (like behaviorTracking)
+   * This is a helper method for services to get/create session context
+   */
+  protected getSessionIdFromContext(): string | null {
+    if (typeof window === 'undefined') return null;
+
+    // Try session storage
+    let sessionId = sessionStorage.getItem('sessionId');
+    if (!sessionId) {
+      // Generate new session ID
+      sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      sessionStorage.setItem('sessionId', sessionId);
+    }
+    return sessionId;
+  }
+
+  /**
+   * Validate cached user data structure (override in subclasses for specific validation)
+   * Default implementation checks for basic object structure
+   */
+  protected validateCachedUserData(data: any): boolean {
+    return data !== null && typeof data === 'object';
   }
 }
 

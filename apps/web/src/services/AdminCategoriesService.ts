@@ -96,6 +96,44 @@ class AdminCategoriesService extends AdminApiSingleton {
   }
 
   /**
+   * Get premium featured products
+   */
+  async getPremiumFeaturedProducts(limit: number = 20): Promise<{ products: any[] }> {
+    const response = await this.makeDefaultRequest<{ products: any[] }>(
+      `/api/directory/premium-featured-products?limit=${limit}`,
+      {},
+      'directory-premium-featured-products',
+      10 * 60 * 1000 // 10 minutes cache
+    );
+
+    if (!response.success) {
+      console.error('[AdminCategoriesService] Failed to get premium featured products:', response.error);
+      return { products: [] };
+    }
+
+    return response.data || { products: [] };
+  }
+
+  /**
+   * Get GBP seed categories
+   */
+  async getGbpSeedCategories(): Promise<{ categories: any[] }> {
+    const response = await this.makeDefaultRequest<{ categories: any[] }>(
+      '/api/platform/categories/gbp-seed',
+      {},
+      'platform-gbp-seed-categories',
+      30 * 60 * 1000 // 30 minutes cache
+    );
+
+    if (!response.success) {
+      console.error('[AdminCategoriesService] Failed to get GBP seed categories:', response.error);
+      return { categories: [] };
+    }
+
+    return response.data || { categories: [] };
+  }
+
+  /**
    * Get category by ID
    */
   async getCategory(categoryId: string): Promise<AdminCategory | null> {
@@ -295,35 +333,47 @@ class AdminCategoriesService extends AdminApiSingleton {
         categoriesWithGoogleMapping: 0,
         categoriesWithoutGoogleMapping: 0,
         totalProductCount: 0,
-        totalTenantCount: 0
+        totalTenantCount: 0,
       };
-      }
+    }
 
-      return response.data || {
-        totalCategories: 0,
-        activeCategories: 0,
-        inactiveCategories: 0,
-        categoriesWithGoogleMapping: 0,
-        categoriesWithoutGoogleMapping: 0,
-        totalProductCount: 0,
-        totalTenantCount: 0
-      };
+    return response.data || {
+      totalCategories: 0,
+      activeCategories: 0,
+      inactiveCategories: 0,
+      categoriesWithGoogleMapping: 0,
+      categoriesWithoutGoogleMapping: 0,
+      totalProductCount: 0,
+      totalTenantCount: 0,
+    };
   }
 
   /**
-   * Invalidate all categories cache
+   * Get mirror last run summary
    */
-  async invalidateCategoriesCache(): Promise<void> {
-    // Cache invalidation handled automatically by the base class
-    console.log('Categories cache invalidation handled by base class');
-  }
+  async getMirrorLastRunSummary(tenantId?: string): Promise<any> {
+    const qs = new URLSearchParams();
+    if (tenantId) qs.set('tenantId', tenantId);
+    qs.set('strategy', 'platform_to_gbp');
 
-  /**
-   * Invalidate specific category cache
-   */
-  async invalidateCategoryCache(categoryId: string): Promise<void> {
-    // Cache invalidation handled automatically by the base class
-    console.log(`Category ${categoryId} cache invalidation handled by base class`);
+    const response = await this.makeDefaultRequest<any>(
+      `/api/admin/mirror/last-run?${qs.toString()}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+      'admin-mirror-last-run',
+      5 * 60 * 1000 // 5 minutes cache
+    );
+
+    if (!response.success) {
+      console.error('[AdminCategoriesService] Failed to get mirror last run summary:', response.error);
+      return null;
+    }
+
+    return response.data;
   }
 }
 

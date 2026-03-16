@@ -17,6 +17,15 @@ DROP MATERIALIZED VIEW IF EXISTS mv_shop_discovery CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS mv_category_discovery CASCADE;
 DROP MATERIALIZED VIEW IF EXISTS mv_global_discovery CASCADE;
 
+-- NEW: Drop all featured type MVs for future-proofing
+DROP MATERIALIZED VIEW IF EXISTS mv_featured_products CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS mv_staff_pick_products CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS mv_clearance_products CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS mv_store_selection_products CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS mv_recommended_products CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS mv_bestseller_products CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS mv_random_discovery_products CASCADE;
+
 -- Drop the refresh function if it exists
 DROP FUNCTION IF EXISTS refresh_scope_aware_mvs();
 
@@ -329,12 +338,22 @@ SELECT
   
   -- Computed Fields
   CASE 
-    WHEN fp.featured_type = 'trending' THEN 1
-    WHEN fp.featured_type = 'new_arrival' THEN 2
-    WHEN fp.featured_type = 'sale' THEN 3
-    WHEN fp.featured_type = 'seasonal' THEN 4
-    WHEN fp.featured_type = 'staff_pick' THEN 5
-    ELSE 6
+    -- Merchant-controlled types (highest priority for merchant control)
+    WHEN fp.featured_type = 'featured' THEN 1        -- Premium featured
+    WHEN fp.featured_type = 'new_arrival' THEN 2    -- New arrivals
+    WHEN fp.featured_type = 'staff_pick' THEN 3     -- Staff picks
+    WHEN fp.featured_type = 'seasonal' THEN 4       -- Seasonal specials
+    WHEN fp.featured_type = 'sale' THEN 5            -- Sale items
+    WHEN fp.featured_type = 'clearance' THEN 6      -- Clearance items
+    WHEN fp.featured_type = 'store_selection' THEN 7 -- Directory featured
+    
+    -- Platform-controlled types (algorithmic)
+    WHEN fp.featured_type = 'trending' THEN 8       -- Platform trending
+    WHEN fp.featured_type = 'recommended' THEN 9    -- Platform recommended
+    WHEN fp.featured_type = 'bestseller' THEN 10    -- Platform bestseller
+    WHEN fp.featured_type = 'random_featured' THEN 11 -- Platform random discovery
+    
+    ELSE 12
   END as bucket_priority,
   
   -- Trending Score (computed)
@@ -625,6 +644,45 @@ SELECT * FROM mv_category_discovery
 WHERE featured_type = 'seasonal' 
   AND featured_is_active = true;
 
+-- NEW BUCKET-SPECIFIC MVs for all featured types
+
+-- Merchant-controlled types
+CREATE MATERIALIZED VIEW mv_featured_products AS
+SELECT * FROM mv_category_discovery 
+WHERE featured_type = 'featured' 
+  AND featured_is_active = true;
+
+CREATE MATERIALIZED VIEW mv_staff_pick_products AS
+SELECT * FROM mv_category_discovery 
+WHERE featured_type = 'staff_pick' 
+  AND featured_is_active = true;
+
+CREATE MATERIALIZED VIEW mv_clearance_products AS
+SELECT * FROM mv_category_discovery 
+WHERE featured_type = 'clearance' 
+  AND featured_is_active = true;
+
+CREATE MATERIALIZED VIEW mv_store_selection_products AS
+SELECT * FROM mv_category_discovery 
+WHERE featured_type = 'store_selection' 
+  AND featured_is_active = true;
+
+-- Platform-controlled types (algorithmic) - these will be populated dynamically
+CREATE MATERIALIZED VIEW mv_recommended_products AS
+SELECT * FROM mv_category_discovery 
+WHERE featured_type = 'recommended' 
+  AND featured_is_active = true;
+
+CREATE MATERIALIZED VIEW mv_bestseller_products AS
+SELECT * FROM mv_category_discovery 
+WHERE featured_type = 'bestseller' 
+  AND featured_is_active = true;
+
+CREATE MATERIALIZED VIEW mv_random_discovery_products AS
+SELECT * FROM mv_category_discovery 
+WHERE featured_type = 'random_featured' 
+  AND featured_is_active = true;
+
 -- ========================================
 -- INDEXES FOR PERFORMANCE
 -- ========================================
@@ -642,6 +700,15 @@ CREATE UNIQUE INDEX idx_mv_selection_products_unique ON mv_selection_products(in
 CREATE UNIQUE INDEX idx_mv_new_products_unique ON mv_new_products(inventory_item_id, tenant_id);
 CREATE UNIQUE INDEX idx_mv_sale_products_unique ON mv_sale_products(inventory_item_id, tenant_id);
 CREATE UNIQUE INDEX idx_mv_seasonal_products_unique ON mv_seasonal_products(inventory_item_id, tenant_id);
+
+-- New unique indexes for all featured types
+CREATE UNIQUE INDEX idx_mv_featured_products_unique ON mv_featured_products(inventory_item_id, tenant_id);
+CREATE UNIQUE INDEX idx_mv_staff_pick_products_unique ON mv_staff_pick_products(inventory_item_id, tenant_id);
+CREATE UNIQUE INDEX idx_mv_clearance_products_unique ON mv_clearance_products(inventory_item_id, tenant_id);
+CREATE UNIQUE INDEX idx_mv_store_selection_products_unique ON mv_store_selection_products(inventory_item_id, tenant_id);
+CREATE UNIQUE INDEX idx_mv_recommended_products_unique ON mv_recommended_products(inventory_item_id, tenant_id);
+CREATE UNIQUE INDEX idx_mv_bestseller_products_unique ON mv_bestseller_products(inventory_item_id, tenant_id);
+CREATE UNIQUE INDEX idx_mv_random_discovery_products_unique ON mv_random_discovery_products(inventory_item_id, tenant_id);
 
 -- Global discovery indexes
 CREATE INDEX idx_mv_global_discovery_tenant_id ON mv_global_discovery(tenant_id);
@@ -670,6 +737,15 @@ CREATE INDEX idx_mv_new_products_date ON mv_new_products(featured_at DESC);
 CREATE INDEX idx_mv_sale_products_priority ON mv_sale_products(featured_priority DESC);
 CREATE INDEX idx_mv_seasonal_products_priority ON mv_seasonal_products(featured_priority DESC);
 
+-- New performance indexes for all featured types
+CREATE INDEX idx_mv_featured_products_priority ON mv_featured_products(featured_priority DESC);
+CREATE INDEX idx_mv_staff_pick_products_priority ON mv_staff_pick_products(featured_priority DESC);
+CREATE INDEX idx_mv_clearance_products_priority ON mv_clearance_products(featured_priority DESC);
+CREATE INDEX idx_mv_store_selection_products_priority ON mv_store_selection_products(featured_priority DESC);
+CREATE INDEX idx_mv_recommended_products_priority ON mv_recommended_products(featured_priority DESC);
+CREATE INDEX idx_mv_bestseller_products_priority ON mv_bestseller_products(featured_priority DESC);
+CREATE INDEX idx_mv_random_discovery_products_priority ON mv_random_discovery_products(featured_priority DESC);
+
 -- ========================================
 -- INITIAL DATA POPULATION
 -- ========================================
@@ -686,6 +762,15 @@ REFRESH MATERIALIZED VIEW mv_selection_products;
 REFRESH MATERIALIZED VIEW mv_new_products;
 REFRESH MATERIALIZED VIEW mv_sale_products;
 REFRESH MATERIALIZED VIEW mv_seasonal_products;
+
+-- Refresh new featured type MVs
+REFRESH MATERIALIZED VIEW mv_featured_products;
+REFRESH MATERIALIZED VIEW mv_staff_pick_products;
+REFRESH MATERIALIZED VIEW mv_clearance_products;
+REFRESH MATERIALIZED VIEW mv_store_selection_products;
+REFRESH MATERIALIZED VIEW mv_recommended_products;
+REFRESH MATERIALIZED VIEW mv_bestseller_products;
+REFRESH MATERIALIZED VIEW mv_random_discovery_products;
 
 -- ========================================
 -- REFRESH FUNCTIONS
@@ -709,6 +794,15 @@ BEGIN
   REFRESH MATERIALIZED VIEW CONCURRENTLY mv_new_products;
   REFRESH MATERIALIZED VIEW CONCURRENTLY mv_sale_products;
   REFRESH MATERIALIZED VIEW CONCURRENTLY mv_seasonal_products;
+  
+  -- Refresh new featured type MVs
+  REFRESH MATERIALIZED VIEW CONCURRENTLY mv_featured_products;
+  REFRESH MATERIALIZED VIEW CONCURRENTLY mv_staff_pick_products;
+  REFRESH MATERIALIZED VIEW CONCURRENTLY mv_clearance_products;
+  REFRESH MATERIALIZED VIEW CONCURRENTLY mv_store_selection_products;
+  REFRESH MATERIALIZED VIEW CONCURRENTLY mv_recommended_products;
+  REFRESH MATERIALIZED VIEW CONCURRENTLY mv_bestseller_products;
+  REFRESH MATERIALIZED VIEW CONCURRENTLY mv_random_discovery_products;
   
   RAISE NOTICE 'Scope-aware MVs refreshed successfully';
 END;
@@ -751,3 +845,42 @@ WHERE tenant_id = 'tid-123'
   AND featured_type = 'trending'
 ORDER BY shop_rank
 LIMIT 12;
+
+-- NEW USAGE EXAMPLES for all featured types
+
+-- Merchant-controlled types
+SELECT * FROM mv_featured_products 
+WHERE tenant_id = 'tid-123'
+ORDER BY featured_priority DESC, featured_at DESC 
+LIMIT 8;
+
+SELECT * FROM mv_staff_pick_products 
+WHERE tenant_id = 'tid-123'
+ORDER BY featured_priority DESC, featured_at DESC 
+LIMIT 8;
+
+SELECT * FROM mv_clearance_products 
+WHERE tenant_id = 'tid-123'
+ORDER BY featured_priority DESC, featured_at DESC 
+LIMIT 8;
+
+SELECT * FROM mv_store_selection_products 
+WHERE tenant_id = 'tid-123'
+ORDER BY featured_priority DESC, featured_at DESC 
+LIMIT 8;
+
+-- Platform-controlled types (algorithmic)
+SELECT * FROM mv_recommended_products 
+WHERE tenant_id = 'tid-123'
+ORDER BY product_average_rating DESC, product_reviews_count_live DESC 
+LIMIT 8;
+
+SELECT * FROM mv_bestseller_products 
+WHERE tenant_id = 'tid-123'
+ORDER BY units_sold DESC, revenue_cents DESC 
+LIMIT 8;
+
+SELECT * FROM mv_random_discovery_products 
+WHERE tenant_id = 'tid-123'
+ORDER BY RANDOM()
+LIMIT 8;

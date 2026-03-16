@@ -148,10 +148,25 @@ export class SingleProductService {
         }
       }) : null;
 
-    // Get featured types - model not available in current schema
+    // Get featured types from mv_global_discovery materialized view
     let featuredTypes: string[] = [];
-    // TODO: Implement featured types when mv_global_discovery model is available
-    console.log('[SingleProductService] Featured types not available - mv_global_discovery model not found in schema');
+    try {
+      const pool = require('../utils/db-pool').getDirectPool();
+      const featuredResult = await pool.query(
+        `SELECT featured_type 
+         FROM mv_global_discovery 
+         WHERE inventory_item_id = $1 
+           AND is_actively_featured = true`,
+        [productId]
+      );
+      
+      if (featuredResult.rows.length > 0) {
+        featuredTypes = featuredResult.rows.map((row: any) => row.featured_type).filter(Boolean);
+      }
+    } catch (error) {
+      console.log('[SingleProductService] Featured types query failed:', error);
+      // Continue without featured types if query fails
+    }
 
     // Transform the product data
     const transformedProduct: SingleProductResult = {

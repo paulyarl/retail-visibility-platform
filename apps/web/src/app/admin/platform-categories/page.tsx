@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { adminCategoriesService } from '@/services/AdminCategoriesService';
 import { Plus, Edit2, Trash2, GripVertical, Save, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 
@@ -140,17 +141,15 @@ export default function PlatformCategoriesPage() {
     
     setGbpLoading(true);
     try {
-      // Load seed file and filter
-      const response = await fetch('/api/platform/categories/gbp-seed');
-      if (response.ok) {
-        const data = await response.json();
-        const allCategories = data.categories || [];
-        const filtered = allCategories.filter((cat: any) =>
-          cat.name.toLowerCase().includes(query.toLowerCase())
-        );
-        // Show all results (no limit) - admins can handle large result sets
-        setGbpResults(filtered);
-      }
+      // MIGRATION: Using AdminCategoriesService instead of direct fetch
+      const data = await adminCategoriesService.getGbpSeedCategories();
+      const allCategories = data.categories || [];
+      const filtered = allCategories.filter((cat: any) =>
+        cat.name.toLowerCase().includes(query.toLowerCase())
+      );
+      
+      // Show all results (no limit) - admins can handle large result sets
+      setGbpResults(filtered);
     } catch (error) {
       console.error('Failed to search GBP categories:', error);
     } finally {

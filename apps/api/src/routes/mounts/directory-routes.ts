@@ -11,6 +11,9 @@ import directorySupportRoutes from '../directory-support';
 import directoryCategoriesRoutes from '../directory-categories';
 import directoryStoreTypesRoutes from '../directory-store-types';
 import directoryFeaturedProductsRoutes from '../directory-featured-products';
+import directoryRandomFeaturedRoutes from '../directory-random-featured'; // Premium featured with merchant diversification
+import directoryFeaturedStatsRoutes from '../directory-featured-stats'; // Premium featured analytics
+import directoryPremiumFeaturedRoutes from '../directory-premium-featured'; // Premium featured products
 
 /**
  * Mount directory routes
@@ -36,6 +39,12 @@ export function mountDirectoryRoutes(app: Express) {
   // Directory Featured Products routes - NEW for featured products aggregation
   app.use('/api/directory/featured-products', directoryFeaturedProductsRoutes);
   console.log('✅ Directory featured products routes mounted (aggregation service)');
+
+  // Premium Featured Products routes - NEW for platform-controlled featured types
+  app.use('/api/directory/random-featured', directoryRandomFeaturedRoutes); // Enhanced random with merchant diversification
+  app.use('/api/directory/featured-stats', directoryFeaturedStatsRoutes); // Premium featured analytics
+  app.use('/api/directory/premium-featured-products', directoryPremiumFeaturedRoutes); // Premium featured products
+  console.log('✅ Premium featured products routes mounted (platform-controlled algorithms)');
 
   // Directory routes - mount AFTER category routes to avoid conflicts
   // Category routes handle: /api/directory/categories/*

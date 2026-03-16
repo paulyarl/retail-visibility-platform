@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Store, Search, ArrowLeft, Star, Package, Users, Settings, ChevronDown } from 'lucide-react';
+import { Store, Search, ArrowLeft, Star, Package, Users, Settings, ChevronDown, Crown, Key, Shield } from 'lucide-react';
 import FeaturedProductsManager from '@/components/tenant/FeaturedProductsManager';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
@@ -15,6 +15,7 @@ interface Tenant {
   id: string;
   name: string;
   subscription_tier?: string;
+  subscription_status?: string;
   city?: string;
   state?: string;
 }
@@ -56,6 +57,8 @@ export default function AdminTenantFeaturedManagement({ selectedTenant, setSelec
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showTenantDropdown, setShowTenantDropdown] = useState(false);
+  const [featuredAccess, setFeaturedAccess] = useState<Record<string, boolean>>({});
+  const [updatingAccess, setUpdatingAccess] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTenants();
@@ -68,11 +71,37 @@ export default function AdminTenantFeaturedManagement({ selectedTenant, setSelec
       // console.log('[AdminTenantFeaturedManagement] Fetched tenants:', response);
       if (response) {
         setTenants(response);
+        // Initialize featured access state (mock data for now)
+        const accessState: Record<string, boolean> = {};
+        response.forEach(tenant => {
+          accessState[tenant.id] = false; // Default to no access
+        });
+        setFeaturedAccess(accessState);
       }
     } catch (error) {
       console.error('Error fetching tenants:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleFeaturedAccess = async (tenantId: string) => {
+    try {
+      setUpdatingAccess(tenantId);
+      
+      // Mock API call - replace with actual implementation
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setFeaturedAccess(prev => ({
+        ...prev,
+        [tenantId]: !prev[tenantId]
+      }));
+      
+      console.log(`[AdminTenantFeaturedManagement] Toggled featured access for tenant ${tenantId}`);
+    } catch (error) {
+      console.error('Error updating featured access:', error);
+    } finally {
+      setUpdatingAccess(null);
     }
   };
 
@@ -97,6 +126,23 @@ export default function AdminTenantFeaturedManagement({ selectedTenant, setSelec
           <p className="mt-2 text-gray-600">
             Select a tenant to manage their storefront featured products. These products appear in the tenant's storefront and are visible to customers.
           </p>
+        </div>
+
+        {/* Featured Access Management */}
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <Crown className="w-6 h-6 text-amber-600" />
+            <div>
+              <h3 className="text-lg font-semibold text-amber-900">Premium Featured Access</h3>
+              <p className="text-sm text-amber-700">
+                Grant merchants access to the premium "Featured" bucket for promotional placement
+              </p>
+            </div>
+          </div>
+          
+          <div className="text-sm text-amber-800 mb-4">
+            <strong>💎 Pay-to-Play Feature:</strong> Merchants with featured access can add products to the premium "Featured" bucket for enhanced visibility.
+          </div>
         </div>
 
         {/* Tenant Selection */}
@@ -152,8 +198,45 @@ export default function AdminTenantFeaturedManagement({ selectedTenant, setSelec
 
                   <div className="mt-4 pt-3 border-t border-gray-100">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">Click to manage</span>
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                      <div className="flex items-center gap-2">
+                        {featuredAccess[tenant.id] ? (
+                          <div className="flex items-center gap-1 text-xs text-green-600">
+                            <Key className="w-3 h-3" />
+                            <span>Featured Access</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 text-xs text-gray-400">
+                            <Shield className="w-3 h-3" />
+                            <span>No Access</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFeaturedAccess(tenant.id);
+                          }}
+                          disabled={updatingAccess === tenant.id}
+                          className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                            featuredAccess[tenant.id]
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          } ${updatingAccess === tenant.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {updatingAccess === tenant.id ? (
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"></div>
+                              <span>Updating...</span>
+                            </div>
+                          ) : featuredAccess[tenant.id] ? (
+                            'Revoke Access'
+                          ) : (
+                            'Grant Access'
+                          )}
+                        </button>
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -229,6 +312,7 @@ export default function AdminTenantFeaturedManagement({ selectedTenant, setSelec
         <FeaturedProductsManager 
           tenantId={selectedTenant}
           context="storefront"
+          hasFeaturedAccess={featuredAccess[selectedTenant] && tenants.find(t => t.id === selectedTenant)?.subscription_status === 'active'}
         />
       </div>
     </div>

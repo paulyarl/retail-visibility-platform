@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Modal, ModalFooter, Button, Input } from '@/components/ui';
+import PublicCategoriesService from '@/services/PublicCategoriesService';
 
 interface TaxonomyResult {
   id: string;
@@ -93,10 +94,8 @@ export function CategoryEditModal({
         // Fetch current path if category has a Google ID
         if (category.googleCategoryId) {
           setCurrentPathLoading(true);
-          // Use NEXT_PUBLIC_API_BASE_URL for public endpoint (not the passed apiBaseUrl which may be empty)
-          const publicApiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-          fetch(`${publicApiBase}/public/google-taxonomy/${category.googleCategoryId}`)
-            .then(res => res.ok ? res.json() : null)
+          // MIGRATION: Using PublicCategoriesService instead of direct fetch
+          PublicCategoriesService.getGoogleTaxonomyById(category.googleCategoryId)
             .then(data => {
               if (data?.path) {
                 const pathStr = Array.isArray(data.path) ? data.path.join(' > ') : data.path;
@@ -144,11 +143,14 @@ export function CategoryEditModal({
     const timer = setTimeout(async () => {
       setTaxLoading(true);
       try {
-        const res = await fetch(`${apiBaseUrl}/api/taxonomy/search?q=${encodeURIComponent(taxQuery)}&limit=20`);
-        if (res.ok) {
-          const data = await res.json();
-          setTaxResults(data.results || data.data || []);
-        }
+        // MIGRATION: Using PublicCategoriesService instead of direct fetch
+        const result = await PublicCategoriesService.searchTaxonomy(taxQuery, { limit: 20 });
+        setTaxResults(result.nodes.map(node => ({
+          id: node.id,
+          name: node.name,
+          path: node.path.split('/'),
+          hasChildren: node.children && node.children.length > 0
+        })));
       } catch (e) {
         console.error('Taxonomy search failed:', e);
       } finally {
@@ -156,24 +158,36 @@ export function CategoryEditModal({
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [taxQuery, apiBaseUrl]);
+  }, [taxQuery]);
 
   // Load taxonomy browse categories
   const loadTaxBrowseCategories = useCallback(async (path: string[] = []) => {
     setTaxBrowseLoading(true);
     try {
-      const pathParam = path.length > 0 ? `?path=${encodeURIComponent(path.join('/'))}` : '';
-      const res = await fetch(`${apiBaseUrl}/api/taxonomy/browse${pathParam}`);
-      if (res.ok) {
-        const data = await res.json();
-        setTaxBrowseCategories(data.categories || data.data || []);
-      }
+      // MIGRATION: Using PublicCategoriesService instead of direct fetch
+      const nodes = await PublicCategoriesService.getTaxonomyNodes({ 
+        maxDepth: path.length + 1,
+        includeInactive: false 
+      });
+      
+      // Filter nodes by path
+      const pathStr = path.join('/');
+      const filteredNodes = nodes.filter(node => 
+        node.path === pathStr || node.path.startsWith(pathStr + '/')
+      );
+      
+      setTaxBrowseCategories(filteredNodes.map(node => ({
+        id: node.id,
+        name: node.name,
+        path: node.path.split('/'),
+        hasChildren: node.children && node.children.length > 0
+      })));
     } catch (e) {
       console.error('Taxonomy browse failed:', e);
     } finally {
       setTaxBrowseLoading(false);
     }
-  }, [apiBaseUrl]);
+  }, []);
 
   const navigateToPath = (path: string[]) => {
     setTaxBrowsePath(path);

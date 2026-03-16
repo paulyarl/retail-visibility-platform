@@ -6,25 +6,33 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Search, MapPin, Star, Phone, Globe, Clock, Filter, Grid, List, ChevronDown, ChevronLeft, ChevronRight, Store, ShoppingBag, TrendingUp, Sparkles, Tag, Users, Calendar, ArrowLeft, X, Flame, Leaf, Gift, Zap, ShoppingCart } from 'lucide-react';
 import { Button, Container, Grid as MantineGrid, SimpleGrid, Badge, Card, Group, Text, Stack } from '@mantine/core';
+
+// Actions
 import StorefrontActions from '../../components/storefront/StorefrontActions';
 import { directorySingletonService } from '../../services/DirectorySingletonService';
-import { shopsService } from '../../services/ShopsService';
-
-import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
 import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
-import { tenantStorefrontService } from '@/services/TenantStorefrontService';
-import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
-import { Category } from '@/services/StorefrontService';
-import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { usePublicPageTenantContext } from '@/hooks/useTenantContext';
-import { PageProps } from './types';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { StoreList, StoreData } from '@/components/stores';
 import FeaturedStoresList from '@/components/directory/FeaturedStoresList';
 import { StoreSingletonProvider } from '@/providers/data/StoreSingleton';
 import { usePublicBranding } from '@/hooks/usePublicBranding';
 import { useMultiCart } from '@/hooks/useMultiCart';
+
+// defunct
+
+import { shopsService } from '../../services/ShopsService';
+import { tenantStorefrontService } from '@/services/TenantStorefrontService';
+import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
+import { Category } from '@/services/StorefrontService';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+// // import { PageProps } from './types';
+import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
+
+import { Badge as MantineBadge } from '@mantine/core';
+import { useStoreStatus } from "@/hooks/useStoreStatus";
+
 
 interface Shop {
   id: string;
@@ -288,6 +296,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, tenantId, onProductC
 const ShopCard: React.FC<ShopCardProps> = ({ shop, onShopClick }) => {
   const status = shop.hours ? computeStoreStatus(shop.hours) : null;
   const specialHours = shop.hours ? getTodaySpecialHours(shop.hours) : null;
+   const { status: hoursStatus } = useStoreStatus(shop.id, true); // Public scope
   
   return (
     <div 
@@ -323,7 +332,9 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop, onShopClick }) => {
           </div>
         )}
         <div className="absolute top-2 left-2">
-          <StoreStatusIndicator tenantId={shop.id} />
+          {/* <StoreStatusIndicator tenantId={shop.id} /> */}
+
+			
         </div>
       </div>
       
@@ -347,6 +358,61 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop, onShopClick }) => {
             <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
               <MapPin className="h-4 w-4 mr-1" />
               {shop.address}{shop.city && `, ${shop.city}`}{shop.state && `, ${shop.state}`}
+              
+           {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
             </div>
           )}
           
@@ -832,22 +898,6 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
                 <Filter className="h-4 w-4" />
               </Button>
               
-              {/* View Mode */}
-              <div className="hidden md:flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
-                >
-                  <Grid className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 rounded ${viewMode === 'list' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
-                >
-                  <List className="h-4 w-4" />
-                </button>
-              </div>
-              
               {/* Cart Button - Only show if items in cart */}
               {cartTotalItems > 0 && (
                 <button
@@ -1108,6 +1158,7 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
                 <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
                   <Store className="w-5 h-5" />
                 </div>
+                
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                     All Shops
@@ -1131,6 +1182,23 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
                 </select>
               </div>
             </div>
+            
+              {/* View Mode */}
+              <div className="hidden md:flex items-end justify-end bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
+                >
+                  <Grid className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded ${viewMode === 'list' ? 'bg-white dark:bg-gray-600 shadow-sm' : ''}`}
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </div>
+              
             {/* Gradient border line */}
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-transparent" />
           </div>

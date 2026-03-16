@@ -5,7 +5,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { adminSecurityMonitoringService } from '@/services/AdminSecurityMonitoringSingletonService';
-import { securityService } from '@/services/SecuritySingletonService';
+import { securitySingletonService } from '@/services/SecuritySingletonService';
+
 
 interface AdminSession {
   id: string;
@@ -185,7 +186,7 @@ export function useAdminSecurityMonitoring() {
 
   const revokeSession = useCallback(async (sessionId: string) => {
     try {
-      await securityService.revokeSession(sessionId);
+      await securitySingletonService.revokeSession(sessionId);
       
       // Refresh sessions
       await fetchSessions();

@@ -16,6 +16,9 @@ import { Star, MapPin, Phone, Globe, ExternalLink, CheckCircle } from 'lucide-re
 import { cn } from '@/lib/utils';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
+import { Badge as MantineBadge } from '@mantine/core';
+import { useStoreStatus } from "@/hooks/useStoreStatus";
+
 
 interface ShopCardProps {
   shop: Shop;
@@ -115,6 +118,8 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
     canonicalUrl: `/shops/${shop.slug || shop.tenantId}`
   };
 
+  const { status: hoursStatus } = useStoreStatus(shop.tenantId, true); // Public scope
+
   // Different card layouts based on variant
   if (variant === 'compact') {
     return (
@@ -173,6 +178,62 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
               <div className="flex items-center gap-1 text-sm text-gray-600">
                 <MapPin className="w-4 h-4" />
                 <span className="truncate">{shop.location}</span>
+                
+            {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
+			
               </div>
 
               {/* Product Count */}
@@ -187,7 +248,11 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
 
               {/* Store Status */}
               <div className="mt-2">
-                <StoreStatusIndicator tenantId={shop.tenantId} />
+                {/* <StoreStatusIndicator tenantId={shop.tenantId} /> */}
+ 
+
+
+
               </div>
             </div>
           </div>
@@ -263,6 +328,62 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
               <div className="flex items-center gap-2 text-gray-600">
                 <MapPin className="w-4 h-4" />
                 <span>{shop.location}</span>
+                
+            {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
+			
               </div>
               {shop.contact?.email && (
                 <div className="flex items-center gap-2 text-gray-600">
@@ -283,7 +404,7 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
             </div>
 
             {/* Store Status */}
-            <StoreStatusIndicator tenantId={shop.tenantId} />
+            {/* <StoreStatusIndicator tenantId={shop.tenantId} /> */}
 
             {/* URLs */}
             {showUrls && (
@@ -400,6 +521,62 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <MapPin className="w-4 h-4" />
             <span>{shop.location}</span>
+            
+            {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
+			
           </div>
 
           {/* Stats */}
@@ -415,7 +592,9 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
           </div>
 
           {/* Store Status */}
-          <StoreStatusIndicator tenantId={shop.tenantId} />
+          {/* <StoreStatusIndicator tenantId={shop.tenantId} /> */}
+ 
+			
         </div>
       </CardContent>
 

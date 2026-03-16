@@ -102,12 +102,17 @@ export abstract class BaseDiscoveryService {
    */
   protected getBucketName(featuredType: string): string {
     const typeToBucket: Record<string, string> = {
-      'store_selection': 'random',
+      'store_selection': 'store_selection',
       'trending': 'trending', 
       'new_arrival': 'new',
       'sale': 'sale',
       'seasonal': 'seasonal',
       'staff_pick': 'staff',
+      'bestseller': 'bestseller',
+      'clearance': 'clearance',
+      'featured': 'featured', 
+      'random': 'random',
+      'recommended': 'recommended',
       'selection': 'selection'
     };
     

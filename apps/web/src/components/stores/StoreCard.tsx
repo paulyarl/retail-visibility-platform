@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { MapPin, Package, Star, ChevronRight, ShoppingBag, Phone, Globe } from 'lucide-react';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
+import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 
 // ==================== TYPES ====================
 
@@ -233,12 +234,60 @@ export function StoreCard({
               <div className="flex items-center gap-1 mt-2 text-sm text-neutral-600 dark:text-neutral-400">
                 <MapPin className="w-4 h-4" />
                 <span>{store.city}, {store.state}</span>
-                {hoursStatus && (
-                  <div 
-                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
-                    title={hoursStatus.label}
-                  />
-                )}
+                {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
               </div>
             )}
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { 
   Search, Star, Sparkles, Eye, ArrowUp, ArrowDown, AlertTriangle, Timer, Clock, 
@@ -286,7 +286,7 @@ export default function ProductFeaturingPage() {
   const [editingExpiration, setEditingExpiration] = useState<string | null>(null);
   const [expirationDate, setExpirationDate] = useState('');
 
-  // Use singleton for store_selection data only
+  // Use singleton for featured (pay-to-play promotional) data
   const {
     isLoading,
     selectedType,
@@ -305,6 +305,9 @@ export default function ProductFeaturingPage() {
     totalPages,
     outOfStockTotalPages,
     totalAvailableProducts,
+    availableProducts,
+    outOfStockProducts,
+    inactiveProducts,
     setSelectedType,
     setSearchQuery,
     setAvailablePage,
@@ -318,16 +321,30 @@ export default function ProductFeaturingPage() {
     singleton // Get singleton for MV refresh
   } = useTenantFeaturedProducts(tenantId, undefined, { context: 'directory' });
 
+  // Force selection to "featured" type (pay-to-play promotional)
+  const hasInitializedFeatured = useRef(false);
+  useEffect(() => {
+    // Only run once when we have featured types and haven't initialized yet
+    if (featuredTypes.length > 0 && !hasInitializedFeatured.current) {
+      const featuredType = featuredTypes.find(t => t.id === 'featured');
+      if (featuredType) {
+        hasInitializedFeatured.current = true;
+        setSelectedType('featured');
+        console.log('[ProductFeaturingPage] Initialized with featured type:', featuredType);
+      }
+    }
+  }, [featuredTypes]); // Only depend on featuredTypes, not selectedType
+
   // Stock update handler for out-of-stock products
   const handleStockUpdate = async (itemId: string, newStock: number) => {
     try {
-      console.log('[ProductFeaturingPage] Updating stock for item:', itemId, 'to:', newStock);
+      // console.log('[ProductFeaturingPage] Updating stock for item:', itemId, 'to:', newStock);
       
       // Use the StockUpdateService middleware with singleton refresh
       await StockUpdateService.getInstance().updateStock(itemId, newStock, {
         tenantId,
         onSuccess: (updatedStock: number) => {
-          console.log('[ProductFeaturingPage] Stock update successful:', updatedStock);
+          // console.log('[ProductFeaturingPage] Stock update successful:', updatedStock);
           // Force refresh to update product sections
           singleton.forceRefresh();
         },
@@ -341,27 +358,32 @@ export default function ProductFeaturingPage() {
     }
   };
 
-  // Since we're using directory context, featuredTypes only contains store_selection
-  const directoryFeatured = currentFeatured; // All current featured are store_selection
-  const directoryActive = activeFeatured;   // All active featured are store_selection
-  const directoryExpired = expiredFeatured; // All expired featured are store_selection
+  // Since we're using directory context, filter to only show "featured" type products
+  const featuredFeatured = currentFeatured.filter(p => p.featured_type === 'featured'); 
+  const featuredActive = activeFeatured.filter(p => p.featured_type === 'featured');   
+  const featuredExpired = expiredFeatured.filter(p => p.featured_type === 'featured');
 
   // Get inactive products  // Get singleton state for limits
   const singletonState = singleton.getState();
-  const directoryLimit = singletonState.featuredLimits?.store_selection || 8; // Use store_selection limit
-  const isAtLimit = directoryActive.length >= directoryLimit;
-  const allInactiveProducts = singletonState.inactiveProducts || [];
-  const directoryInactive = allInactiveProducts.filter(p => !p.is_active);
+  const featuredLimit = singletonState.featuredLimits?.featured || 8; // Use featured limit
+  const isAtLimit = featuredActive.length >= featuredLimit;
+  const featuredInactive = inactiveProducts.filter(p => !p.is_active && p.featured_type === 'featured');
 
-  // Debug: Show directory context information
-  console.log(`[ProductFeaturingPage] Directory Context:`);
-  console.log(`[ProductFeaturingPage] - featuredTypes count: ${featuredTypes.length}`);
-  console.log(`[ProductFeaturingPage] - featuredTypes:`, featuredTypes.map((t: any) => t.id));
-  console.log(`[ProductFeaturingPage] - directory active: ${directoryActive.length}`);
-  console.log(`[ProductFeaturingPage] - directory limit: ${directoryLimit}`);
+  // Debug: Show featured context information
+  console.log(`[ProductFeaturingPage] Featured Context - Types count: ${featuredTypes.length}`);
+  console.log(`[ProductFeaturingPage] Available types:`, featuredTypes.map((t: any) => ({ id: t.id, name: t.name })));
+  console.log(`[ProductFeaturingPage] Current selectedType: ${selectedType}`);
+  console.log(`[ProductFeaturingPage] Featured active: ${featuredActive.length}`);
+  console.log(`[ProductFeaturingPage] Featured limit: ${featuredLimit}`);
+
+  // Debug: Check what types the singleton has by default
+  console.log(`[ProductFeaturingPage] Singleton state featuredTypes count:`, singletonState.featuredTypes?.length || 0);
+  if (singletonState.featuredTypes) {
+    console.log(`[ProductFeaturingPage] Singleton state types:`, singletonState.featuredTypes.map((t: any) => ({ id: t.id, name: t.name })));
+  }
 
   // Group inactive products by reason
-  const inactiveGroups = groupInactiveProductsByReason(directoryInactive);
+  const inactiveGroups = groupInactiveProductsByReason(featuredInactive);
 
   const fetchTenant = async () => {
     try {
@@ -376,14 +398,7 @@ export default function ProductFeaturingPage() {
 
   useEffect(() => {
     fetchTenant();
-  }, [tenantId]);
-
-  // Set selected type to store_selection for directory page
-  useEffect(() => {
-    if (featuredTypes.length > 0) {
-      setSelectedType('store_selection');
-    }
-  }, [setSelectedType, featuredTypes]);
+  }, [tenantId, featuredTypes]);
 
   useEffect(() => {
     setAvailablePage(1); // Reset to page 1 when search changes
@@ -398,13 +413,18 @@ export default function ProductFeaturingPage() {
     await toggleProductActive(productId, isActive);
   };
 
-  const handleUpdateExpiration = async (productId: string, newExpirationDate: string) => {
+  const handleUpdateExpiration = async (productId: string, newExpirationDate: string, featuredType?: string) => {
     await updateProductExpiration(productId, newExpirationDate);
     setEditingExpiration(null);
     setExpirationDate('');
   };
 
-  const handleUnfeature = async (productId: string) => {
+  const handleUnfeature = async (product: FeaturedProduct) => {
+    const productId = getProductInventoryId(product);
+    if (!productId) {
+      console.error('Cannot unfeature - no inventory_item_id found:', product);
+      return;
+    }
     await unfeatureProduct(productId);
   };
 
@@ -423,7 +443,16 @@ export default function ProductFeaturingPage() {
   };
 
   const handleSetExpiration = async (productId: string) => {
-    await handleUpdateExpiration(productId, expirationDate);
+    // Find the product to get its featured type
+    const allProducts = [...currentFeatured, ...availableProducts, ...outOfStockProducts, ...inactiveProducts];
+    const product = allProducts.find(p => getProductInventoryId(p) === productId);
+    
+    if (product) {
+      await handleUpdateExpiration(productId, expirationDate, product.featured_type);
+    } else {
+      // Fallback to current selected type if product not found
+      await handleUpdateExpiration(productId, expirationDate, selectedType);
+    }
   };
 
   const handleCancelEditExpiration = () => {
@@ -431,9 +460,38 @@ export default function ProductFeaturingPage() {
     setExpirationDate('');
   };
 
+  const handleFeatureProduct = async (productId: string) => {
+    try {
+      // Force the singleton to use "featured" type by setting it directly in state
+      const currentState = singleton.getState();
+      if (currentState.selectedType !== 'featured') {
+        console.log('[ProductFeaturingPage] Setting singleton selectedType to "featured" before API call');
+        singleton.setSelectedType('featured');
+        // Small delay to ensure state is updated
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // Now call the featureProduct method - it should use the correct type
+      await singleton.featureProduct(productId);
+      
+      console.log('[ProductFeaturingPage] Successfully featured product with "featured" type:', productId);
+      
+      // Verify the result
+      const finalState = singleton.getState();
+      console.log('[ProductFeaturingPage] Final singleton state:', {
+        selectedType: finalState.selectedType,
+        featuredProductsCount: Object.keys(finalState.featuredProducts).length
+      });
+      
+    } catch (error) {
+      console.error('[ProductFeaturingPage] Error featuring product:', error);
+      throw error;
+    }
+  };
+
   const handleFeaturePaused = async (productId: string) => {
     // Feature the product and immediately pause it
-    await featureProductInDirectory(productId);
+    await featureProduct(productId);
     // Wait a moment for the feature to complete, then pause
     setTimeout(() => {
       handleToggleActive(productId, false);
@@ -442,22 +500,22 @@ export default function ProductFeaturingPage() {
 
   // Safe handler functions - uses getProductInventoryId for consistency
   const handleSafeToggleActive = (product: FeaturedProduct, isActive: boolean) => {
-    console.log('=== COMPLETE PRODUCT OBJECT DEBUG ===');
-    console.log('Full product object:', JSON.stringify(product, null, 2));
-    console.log('Product keys:', Object.keys(product));
-    console.log('Product values:');
+    // console.log('=== COMPLETE PRODUCT OBJECT DEBUG ===');
+    // console.log('Full product object:', JSON.stringify(product, null, 2));
+    // console.log('Product keys:', Object.keys(product));
+    // console.log('Product values:');
     Object.entries(product).forEach(([key, value]) => {
       console.log(`  ${key}:`, value);
     });
-    console.log('Specific ID fields:');
-    console.log('  product.id:', product.id);
-    console.log('  product.inventory_item_id:', product.inventory_item_id);
-    console.log('Toggle to isActive:', isActive);
-    console.log('=== END COMPLETE DEBUG ===');
+      console.log('Specific ID fields:');
+      console.log('  product.id:', product.id);
+      console.log('  product.inventory_item_id:', product.inventory_item_id);
+      console.log('Toggle to isActive:', isActive);
+    // console.log('=== END COMPLETE DEBUG ===');
     
     const inventoryItemId = getProductInventoryId(product);
     if (inventoryItemId) {
-      console.log('✅ Using inventory_item_id:', inventoryItemId);
+      // console.log('✅ Using inventory_item_id:', inventoryItemId);
       handleToggleActive(inventoryItemId, isActive);
     } else {
       console.error('❌ No valid inventory_item_id found for product:', product);
@@ -484,7 +542,7 @@ export default function ProductFeaturingPage() {
             <div className="flex items-center">
               <div className="flex items-center">
                 <Star className="w-6 h-6 text-blue-600 mr-3" />
-                <h1 className="text-xl font-semibold text-gray-900">Store Selection Featuring</h1>
+                <h1 className="text-xl font-semibold text-gray-900">Premium Featuring</h1>
               </div>
             </div>
             {tenant && <SimpleTierBadge tier={tenant.subscription_tier} />}
@@ -496,29 +554,29 @@ export default function ProductFeaturingPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-700">
-            <strong>Directory Featuring:</strong> Manage products featured in your directory storefront listing
+            <strong>Premium Featuring:</strong> Manage products with premium promotional placement (pay-to-play featuring)
           </p>
         </div>
 
         {/* Current Featured Products */}
-        {directoryActive.length > 0 && (
+        {featuredActive.length > 0 && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">
-                  Currently Featured in Directory
+                  Currently Premium Featured
                 </h2>
                 <div className="mt-2">
                   <FeaturedProductLimitBadge 
-                    current={directoryActive.length} 
-                    limit={directoryLimit} 
+                    current={featuredActive.length} 
+                    limit={featuredLimit} 
                   />
                 </div>
               </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {directoryActive.map((product, index) => (
+              {featuredActive.map((product, index) => (
                 <div key={product.id || index} className="border border-gray-200 rounded-lg p-4">
                   <div className="flex gap-3">
                     <div className="relative w-16 h-16 bg-gray-100 rounded flex-shrink-0">
@@ -611,11 +669,11 @@ export default function ProductFeaturingPage() {
                         </button>
                       </Tooltip>
                       <button
-                        onClick={() => handleUnfeature(product.inventory_item_id)}
+                        onClick={() => handleUnfeature(product)}
                         disabled={processing}
                         className="flex-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
                       >
-                        Remove from Directory
+                        Remove from Premium Featuring
                       </button>
                       {/* Expiration Setting */}
                       <Tooltip content="Set expiration date">
@@ -695,7 +753,7 @@ export default function ProductFeaturingPage() {
                         </button>
                       )}
                       <button
-                        onClick={() => handleUnfeature(product.inventory_item_id)}
+                        onClick={() => handleUnfeature(product)}
                         disabled={processing}
                         className="flex-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
                       >
@@ -712,7 +770,7 @@ export default function ProductFeaturingPage() {
         {/* Available Products */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Add Products to Directory
+            Add Products to Premium Featuring
           </h2>
 
           {/* Search */}
@@ -807,16 +865,16 @@ export default function ProductFeaturingPage() {
                     ) : (
                       <div className="flex gap-2 mt-3">
                         <button
-                          onClick={() => product.id && featureProductInDirectory(product.id)}
+                          onClick={() => product.id && handleFeatureProduct(product.id)}
                           disabled={processing || !product.id || isAtLimit}
                           className={`flex-1 px-3 py-2 text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 ${
                             isAtLimit 
                               ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
                               : 'bg-blue-600 text-white'
                           }`}
-                          title={isAtLimit ? `Limit reached (${directoryActive.length}/${directoryLimit})` : 'Feature in Directory'}
+                          title={isAtLimit ? `Limit reached (${featuredActive.length}/${featuredLimit})` : 'Feature in Premium'}
                         >
-                          {isAtLimit ? 'Limit Reached' : 'Feature in Directory'}
+                          {isAtLimit ? 'Limit Reached' : 'Feature in Premium'}
                         </button>
                         {/* Queue Control */}
                         <button
@@ -920,7 +978,7 @@ export default function ProductFeaturingPage() {
                     </div>
                     <div className="flex gap-2 mt-3">
                       <button
-                        onClick={() => product.id && featureProductInDirectory(product.id)}
+                        onClick={() => product.id && handleFeatureProduct(product.id)}
                         disabled={processing || !product.id}
                         className="flex-1 px-3 py-2 bg-gray-400 text-white text-sm rounded-lg cursor-not-allowed"
                         title="Out of stock products cannot be featured"

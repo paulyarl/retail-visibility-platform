@@ -88,6 +88,33 @@ class AdminUsersService extends AdminApiSingleton {
   }
 
   /**
+   * PILOT: Declare cache patterns for this service
+   */
+  public getServiceCachePatterns(): string[] {
+    return [
+      'admin-users-*',
+      'admin-user-*',
+      'admin-user-tenants-*',
+      'admin-user-stats-*'
+    ];
+  }
+
+  /**
+   * PILOT: Implement cache invalidation contract
+   */
+  public async invalidateServiceCaches(userId?: string, ...params: any[]): Promise<void> {
+    if (userId) {
+      await this.invalidateCache(`admin-user-${userId}`);
+      await this.invalidateCache(`admin-user-tenants-${userId}`);
+    } else {
+      await this.invalidateCache('admin-users-*');
+      await this.invalidateCache('admin-user-*');
+      await this.invalidateCache('admin-user-tenants-*');
+      await this.invalidateCache('admin-user-stats-*');
+    }
+  }
+
+  /**
    * Get all admin users
    */
   async getUsers(): Promise<AdminUser[]> {
@@ -475,6 +502,38 @@ class AdminUsersService extends AdminApiSingleton {
     } catch (error) {
       console.error('[AdminUsersService] Failed to get user tenants:', error);
       return [];
+    }
+  }
+
+  /**
+   * Add tenant to user
+   */
+  async addUserTenant(userId: string, tenantData: any): Promise<any> {
+    try {
+      const response = await this.makeDefaultRequest<any>(
+        `/api/admin/users/${userId}/tenants`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(tenantData),
+        },
+        `user-tenant-add-${userId}`
+      );
+
+      if (!response.success) {
+        console.error('[AdminUsersService] Failed to add user tenant:', response.error);
+        return null;
+      }
+
+      // Invalidate cache after adding tenant
+      await this.invalidateServiceCaches(userId);
+
+      return response.data;
+    } catch (error) {
+      console.error('[AdminUsersService] Failed to add user tenant:', error);
+      return null;
     }
   }
 

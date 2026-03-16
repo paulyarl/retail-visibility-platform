@@ -176,6 +176,63 @@ export function UnifiedStoreCard({
                         </div>
                       )}
 
+                        {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
+                      
+                      <br />
+
                       {/* Popular Categories - from enhanced stats */}
                       {categories.length > 0 && (
                         <div className="flex items-center gap-1 mt-2">
@@ -365,29 +422,7 @@ export function UnifiedStoreCard({
                 ⭐ {ratingAvg.toFixed(1)} Rated
               </MantineBadge>
             )}
-
-            {/* Products Badge - Info */}
-            {totalProducts > 10 && (
-              <MantineBadge 
-                color="purple"
-                variant="light"
-                size="xs"
-              >
-                📦 {totalProducts}+ Items
-              </MantineBadge>
-            )}
-
-            {/* Recommendation Badge - Special */}
-            {listing.reason && (
-              <MantineBadge 
-                color="green"
-                variant="light"
-                size="xs"
-              >
-                💡 {listing.reason}
-              </MantineBadge>
-            )}
-
+            
             {/* Hours Badge - Status */}
             {(() => {
               switch (hoursStatus?.status) {
@@ -442,6 +477,29 @@ export function UnifiedStoreCard({
                   return null;
               }
             })()}
+
+            {/* Products Badge - Info */}
+            {totalProducts > 10 && (
+              <MantineBadge 
+                color="purple"
+                variant="light"
+                size="xs"
+              >
+                📦 {totalProducts}+ Items
+              </MantineBadge>
+            )}
+
+            {/* Recommendation Badge - Special */}
+            {listing.reason && (
+              <MantineBadge 
+                color="green"
+                variant="light"
+                size="xs"
+              >
+                💡 {listing.reason}
+              </MantineBadge>
+            )}
+
           </Group>
         </Card.Section>
 

@@ -8,6 +8,10 @@ import Link from 'next/link';
 import { featuredProductsService } from '@/services/FeaturedProductsService';
 import AdminTenantFeaturedManagement from '@/components/admin/AdminTenantFeaturedManagement';
 import AdminDirectoryFeaturedManagement from '@/components/admin/AdminDirectoryFeaturedManagement';
+import AdminFeaturedApprovalService, { PendingTenant, PendingProduct } from '@/services/AdminFeaturedApprovalService';
+import { notifications } from '@mantine/notifications';
+import { useToast } from '@/components/ui/use-toast';
+import { ToastContainer } from '@/components/ui';
 
 interface FeaturedProduct {
   featured_product_id: string;
@@ -26,10 +30,14 @@ interface FeaturedProduct {
   featured_until?: string;
   auto_unfeature: boolean;
   is_active: boolean;
+  admin_approved?: boolean;
+  approved_by?: string;
+  approved_at?: string;
   tenants: {
     id: string;
     name: string;
     subscription_tier: string;
+    subscription_status?: string;
   };
 }
 
@@ -40,20 +48,29 @@ interface FeaturingStats {
   expiringSoon: number;
 }
 
-export default function AdminFeaturedProductsPage() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'store-featured' | 'directory-featured'>('overview');
+export default function FeaturedProductsManagement() {
+  const { toast, toasts, removeToast } = useToast();
+  const [activeTab, setActiveTab] = useState<'overview' | 'store-featured' | 'directory-featured' | 'featured-approval'>('featured-approval');
   const [selectedTenant, setSelectedTenant] = useState<string>('');
   const [selectedDirectoryTenant, setSelectedDirectoryTenant] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<FeaturingStats | null>(null);
   const [products, setProducts] = useState<FeaturedProduct[]>([]);
+  const [pendingTenants, setPendingTenants] = useState<PendingTenant[]>([]);
+  const [pendingProducts, setPendingProducts] = useState<PendingProduct[]>([]);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
+  const [pendingTotal, setPendingTotal] = useState(0);
   const limit = 20;
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [confirmUnfeature, setConfirmUnfeature] = useState<string | null>(null);
   const [updatingPriority, setUpdatingPriority] = useState<string | null>(null);
+  const [approvingTenant, setApprovingTenant] = useState<string | null>(null);
+  const [rejectingTenant, setRejectingTenant] = useState<string | null>(null);
+  const [approvingProduct, setApprovingProduct] = useState<string | null>(null);
+  const [rejectingProduct, setRejectingProduct] = useState<string | null>(null);
+  const [approvalSubTab, setApprovalSubTab] = useState<'tenant' | 'product'>('tenant');
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -89,7 +106,16 @@ export default function AdminFeaturedProductsPage() {
 
   useEffect(() => {
     fetchData();
-  }, [page, searchQuery, tierFilter, tenantFilter, expirationFilter, featuredTypeFilter, activeStatusFilter]);
+    fetchPendingTenants();
+    fetchPendingProducts();
+  }, [searchQuery, tierFilter, tenantFilter, expirationFilter, featuredTypeFilter, activeStatusFilter]);
+
+  useEffect(() => {
+    if (activeTab === 'featured-approval') {
+      fetchPendingTenants();
+      fetchPendingProducts();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     // Reset to page 0 when filters change
@@ -162,6 +188,26 @@ export default function AdminFeaturedProductsPage() {
     }
   };
 
+  const fetchPendingProducts = async () => {
+    try {
+      const allProducts = await AdminFeaturedApprovalService.getAllFeaturedProducts();
+      setPendingProducts(allProducts);
+    } catch (error) {
+      console.error('Error fetching all featured products:', error);
+      setPendingProducts([]);
+    }
+  };
+
+  const fetchPendingTenants = async () => {
+    try {
+      const allTenants = await AdminFeaturedApprovalService.getAllTenantsWithFeaturedAccessStatus();
+      setPendingTenants(allTenants);
+      setPendingTotal(allTenants.length);
+    } catch (error) {
+      console.error('Error fetching tenants with featured access status:', error);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -216,19 +262,71 @@ export default function AdminFeaturedProductsPage() {
       'trending': 'Trending',
       'featured': 'Featured',
       'recommended': 'Recommended',
-      'store_selection': 'Directory'
+      'store_selection': 'Directory Featured'
     };
     return labels[type] || type;
+  };
+
+  const getFeaturedAccessStatus = (tenant: PendingTenant) => {
+    if (tenant.featured_access_approved === true) {
+      return {
+        status: 'Approved',
+        style: 'bg-green-100 text-green-700',
+        icon: '✓'
+      };
+    } else if (tenant.featured_access_approved === false && tenant.featured_access_rejection_reason) {
+      return {
+        status: 'Rejected',
+        style: 'bg-red-100 text-red-700',
+        icon: '✗'
+      };
+    } else {
+      // Either null or false without rejection reason = Pending Approval
+      return {
+        status: 'Pending Approval',
+        style: 'bg-orange-100 text-orange-700',
+        icon: '⏳'
+      };
+    }
+  };
+
+  const getProductApprovalStatus = (product: PendingProduct) => {
+    if (product.admin_approved === false) {
+      return {
+        status: 'Rejected',
+        style: 'bg-red-100 text-red-700',
+        icon: '✗'
+      };
+    } else {
+      // true, null, or undefined = Approved (default for featured products)
+      return {
+        status: 'Approved',
+        style: 'bg-green-100 text-green-700',
+        icon: '✓'
+      };
+    }
   };
 
   const handleUnfeature = async (featuredProductId: string, tenantId: string) => {
     try {
       await featuredProductsService.unfeatureProduct(featuredProductId);
-      await fetchData();
-      setConfirmUnfeature(null);
+      
+      // Remove from pending products list
+      setPendingProducts(prev => prev.filter(product => product.id !== featuredProductId));
+      
+      // Remove from main products list
+      setProducts(prev => prev.filter(product => product.id !== featuredProductId));
+      
+      // Show success notification
+      toast('🗑️ Product has been removed from featuring!', { variant: 'info' });
     } catch (error) {
       console.error('Error unfeaturing product:', error);
-      alert('Failed to unfeature product');
+      notifications.show({
+        title: 'Unfeature Failed',
+        message: 'Failed to unfeature product. Please try again.',
+        color: 'red',
+        icon: <X size={16} />,
+      });
     }
   };
 
@@ -240,6 +338,161 @@ export default function AdminFeaturedProductsPage() {
     } catch (error) {
       console.error('Error updating priority:', error);
       alert('Failed to update priority');
+    }
+  };
+
+  const handleApproveProduct = async (featuredProductId: string) => {
+    try {
+      setApprovingProduct(featuredProductId);
+      
+      // Find the product to get tenant info
+      const product = pendingProducts.find(p => p.id === featuredProductId);
+      if (!product) {
+        toast('Product not found', { variant: 'error' });
+        return;
+      }
+      
+      // Check if tenant has active subscription
+      if (product.tenants?.subscription_status !== 'active') {
+        toast(`❌ Cannot approve product - Tenant subscription is ${product.tenants?.subscription_status || 'unknown'}. Only active subscriptions can be approved for featured access.`, { variant: 'error' });
+        return;
+      }
+      
+      const updatedProduct = await AdminFeaturedApprovalService.approveProduct(featuredProductId);
+      
+      if (updatedProduct) {
+        // Update the product in the pending products list with new status
+        setPendingProducts(prev => prev.map(product => 
+          product.id === featuredProductId ? { ...product, ...updatedProduct } : product
+        ));
+        
+        // Update the main products list
+        setProducts(prev => prev.map(product => 
+          product.id === featuredProductId ? { ...product, ...updatedProduct } : product
+        ));
+
+        // Show success notification
+        toast('✅ Product has been approved for featuring!', { variant: 'success' });
+      }
+    } catch (error) {
+      console.error('Error approving product:', error);
+      notifications.show({
+        title: 'Approval Failed',
+        message: 'Failed to approve product. Please try again.',
+        color: 'red',
+        icon: <X size={16} />,
+      });
+    } finally {
+      setApprovingProduct(null);
+    }
+  };
+
+  const handleRejectProduct = async (featuredProductId: string, reason?: string) => {
+    
+    try {
+      setRejectingProduct(featuredProductId);
+      const updatedProduct = await AdminFeaturedApprovalService.rejectProduct(featuredProductId, reason);
+      
+      if (updatedProduct) {
+        // Show success notification
+        toast(`❌ Product has been rejected${reason ? ` (${reason})` : ''}!`, { variant: 'error' });
+        
+        // Update the product in the pending products list with new status
+        setPendingProducts(prev => 
+          prev.map(product => 
+            product.id === featuredProductId ? { ...product, ...updatedProduct } : product
+          )
+        );
+        
+        // Update the main products list
+        setProducts(prev => 
+          prev.map(product => 
+            product.id === featuredProductId ? { ...product, ...updatedProduct } : product
+          )
+        );
+      } else {
+        // No updated product returned from service
+      }
+    } catch (error) {
+      console.error('Error rejecting product:', error);
+      notifications.show({
+        title: 'Rejection Failed',
+        message: 'Failed to reject product. Please try again.',
+        color: 'red',
+        icon: <X size={16} />,
+      });
+    } finally {
+      setRejectingProduct(null);
+    }
+  };
+
+  const handleApproveTenant = async (tenantId: string) => {
+    
+    try {
+      setApprovingTenant(tenantId);
+      
+      // Find the tenant to check subscription status
+      const tenant = pendingTenants.find(t => t.id === tenantId);
+      if (!tenant) {
+        toast('Tenant not found', { variant: 'error' });
+        return;
+      }
+      
+      // Check if tenant has active subscription
+      if (tenant.subscription_status !== 'active') {
+        toast(`❌ Cannot approve ${tenant.name} - Subscription is ${tenant.subscription_status || 'unknown'}. Only active subscriptions can be approved for featured access.`, { variant: 'error' });
+        return;
+      }
+      
+      const updatedTenant = await AdminFeaturedApprovalService.approveTenant(tenantId);
+      
+      if (updatedTenant) {
+        // Update the tenant in the pending tenants list
+        setPendingTenants(prev => prev.map(tenant => 
+          tenant.id === tenantId ? { ...tenant, ...updatedTenant } : tenant
+        ));
+
+        // Show success notification
+        toast(`✅ ${updatedTenant.name} has been approved for featured access!`, { variant: 'success' });
+      }
+    } catch (error) {
+      console.error('Error approving tenant:', error);
+      notifications.show({
+        title: 'Approval Failed',
+        message: 'Failed to approve tenant. Please try again.',
+        color: 'red',
+        icon: <X size={16} />,
+      });
+    } finally {
+      setApprovingTenant(null);
+    }
+  };
+
+  const handleRejectTenant = async (tenantId: string, reason?: string) => {
+    
+    try {
+      setRejectingTenant(tenantId);
+      const updatedTenant = await AdminFeaturedApprovalService.rejectTenant(tenantId, reason);
+      
+      if (updatedTenant) {
+        // Update the tenant in the pending tenants list
+        setPendingTenants(prev => prev.map(tenant => 
+          tenant.id === tenantId ? { ...tenant, ...updatedTenant } : tenant
+        ));
+
+        // Show success notification
+        toast(`❌ ${updatedTenant.name} has been rejected${reason ? ` (${reason})` : ''}!`, { variant: 'error' });
+      }
+    } catch (error) {
+      console.error('Error rejecting tenant:', error);
+      notifications.show({
+        title: 'Rejection Failed',
+        message: 'Failed to reject tenant. Please try again.',
+        color: 'red',
+        icon: <X size={16} />,
+      });
+    } finally {
+      setRejectingTenant(null);
     }
   };
 
@@ -280,9 +533,22 @@ export default function AdminFeaturedProductsPage() {
       await Promise.all(promises);
       await fetchData();
       setSelectedProducts(new Set());
+
+      // Show success notification
+      notifications.show({
+        title: 'Products Unfeatured',
+        message: `${selectedProducts.size} product(s) have been removed from featuring`,
+        color: 'blue',
+        icon: <Trash2 size={16} />,
+      });
     } catch (error) {
       console.error('Error bulk unfeaturing:', error);
-      alert('Failed to unfeature some products');
+      notifications.show({
+        title: 'Bulk Action Failed',
+        message: 'Failed to unfeature some products. Please try again.',
+        color: 'red',
+        icon: <X size={16} />,
+      });
     } finally {
       setBulkActionLoading(false);
     }
@@ -314,7 +580,8 @@ export default function AdminFeaturedProductsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
@@ -364,7 +631,25 @@ export default function AdminFeaturedProductsPage() {
             >
               <div className="flex items-center gap-2">
                 <Star className="w-4 h-4" />
-                Directory Featured Management
+                Premium Featured Management
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('featured-approval')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'featured-approval'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <CheckSquare className="w-4 h-4" />
+                Featured Approval
+                {pendingProducts.length > 0 && (
+                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                    {pendingProducts.length}
+                  </span>
+                )}
               </div>
             </button>
           </nav>
@@ -678,6 +963,7 @@ export default function AdminFeaturedProductsPage() {
                                 src={product.image_url}
                                 alt={product.name}
                                 fill
+                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                                 className="object-cover rounded"
                               />
                             ) : (
@@ -910,6 +1196,324 @@ export default function AdminFeaturedProductsPage() {
         <AdminDirectoryFeaturedManagement />
       )}
 
+      {activeTab === 'featured-approval' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Featured Approvals</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Review tenant access requests and individual product approvals
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    fetchPendingTenants();
+                    fetchPendingProducts();
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                >
+                  <Package className="w-4 h-4" />
+                  Refresh All
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-tabs */}
+          <div className="bg-white rounded-lg border border-gray-200">
+            <div className="border-b border-gray-200">
+              <nav className="flex space-x-8 px-6" aria-label="Tabs">
+                <button
+                  onClick={() => setApprovalSubTab('tenant')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    approvalSubTab === 'tenant'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Store className="w-4 h-4" />
+                    Tenant Approval
+                    {pendingTenants.length > 0 && (
+                      <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                        {pendingTenants.length}
+                      </span>
+                    )}
+                  </div>
+                </button>
+                <button
+                  onClick={() => setApprovalSubTab('product')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    approvalSubTab === 'product'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    Product Approval
+                    {pendingProducts.length > 0 && (
+                      <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
+                        {pendingProducts.length}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              </nav>
+            </div>
+
+            {/* Tab Content */}
+            {approvalSubTab === 'tenant' && (
+              <div className="p-6">
+                <div className="mb-4">
+                  <h3 className="text-md font-medium text-gray-900">
+                    Tenant Featured Access ({pendingTenants.length})
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Manage tenant access to premium featuring. Smart buttons show relevant actions based on current status.
+                  </p>
+                </div>
+                
+                {pendingTenants.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <Store className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No tenants found
+                    </h3>
+                    <p className="text-gray-600">
+                      No tenants are available for featured access management.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-200">
+                    {pendingTenants.map((tenant) => (
+                      <div key={tenant.id} className="p-6">
+                        <div className="flex items-start gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h4 className="text-lg font-medium text-gray-900">
+                                  {tenant.name}
+                                </h4>
+                                <p className="text-sm text-gray-600">
+                                  Tenant ID: {tenant.id} • 
+                                  Tier: {tenant.subscription_tier} • 
+                                  Status: {tenant.subscription_status}
+                                </p>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${getFeaturedAccessStatus(tenant).style}`}>
+                                    {getFeaturedAccessStatus(tenant).icon} {getFeaturedAccessStatus(tenant).status}
+                                  </span>
+                                  {tenant.featured_access_approved === true && tenant.featured_access_approved_at && (
+                                    <span className="text-xs text-gray-500">
+                                      Approved {formatDate(tenant.featured_access_approved_at)}
+                                      {tenant.featured_access_approved_by && ` by ${tenant.featured_access_approved_by.slice(0, 8)}...`}
+                                    </span>
+                                  )}
+                                  {tenant.featured_access_approved === false && tenant.featured_access_rejection_reason && (
+                                    <span className="text-xs text-gray-500">
+                                      Reason: {tenant.featured_access_rejection_reason}
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-gray-500">
+                                    Created: {formatDate(tenant.created_at)}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-2">
+                                {/* Show Approve button only for rejected or pending approval tenants */}
+                                {(tenant.featured_access_approved === false || tenant.featured_access_approved === null) && (
+                                  <button
+                                    onClick={() => handleApproveTenant(tenant.id)}
+                                    disabled={approvingTenant === tenant.id}
+                                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                  >
+                                    {approvingTenant === tenant.id ? (
+                                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <CheckSquare className="w-4 h-4" />
+                                    )}
+                                    Approve
+                                  </button>
+                                )}
+                                {/* Show Reject button for approved or pending approval tenants */}
+                                {(tenant.featured_access_approved === true || tenant.featured_access_approved === null) && (
+                                  <button
+                                    onClick={() => handleRejectTenant(tenant.id)}
+                                    disabled={rejectingTenant === tenant.id}
+                                    className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                  >
+                                    {rejectingTenant === tenant.id ? (
+                                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <X className="w-4 h-4" />
+                                    )}
+                                    Reject
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <div className="flex items-center gap-4 text-sm text-gray-600">
+                                <span>
+                                  <strong>Users:</strong> {tenant.user_tenants?.length || 0}
+                                </span>
+                                <span>
+                                  <strong>Products:</strong> {tenant.featured_products?.length || 0} featured products
+                                </span>
+                                <span>
+                                  <strong>Service Level:</strong> {tenant.name || 'N/A'}
+                                </span>
+                              </div>
+                              {tenant.user_tenants?.length > 0 && (
+                                <div className="mt-2 text-sm text-gray-500">
+                                  <strong>Contact:</strong> {tenant.user_tenants[0]?.users?.email}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {approvalSubTab === 'product' && (
+              <div className="p-6">
+                <div className="mb-4">
+                  <h3 className="text-md font-medium text-gray-900">
+                    All Featured Products ({pendingProducts.length})
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Manage all featured products. Approve/reject to control visibility, or unfeatured to remove.
+                  </p>
+                </div>
+                
+                {pendingProducts.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Featured Products</h3>
+                    <p className="text-gray-600">
+                      No products are currently featured.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-200">
+                    {pendingProducts.map((product) => (
+                      <div key={product.id} className="p-6">
+                        <div className="flex items-start gap-4">
+                          {product.inventory_items?.image_url && (
+                            <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+                              <Image
+                                src={product.inventory_items.image_url}
+                                alt={product.inventory_items.name}
+                                width={64}
+                                height={64}
+                                sizes="64px"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h4 className="text-lg font-medium text-gray-900">
+                                  {product.inventory_items?.name}
+                                </h4>
+                                <p className="text-sm text-gray-600">
+                                  SKU: {product.inventory_items?.sku} • 
+                                  Price: ${(product.inventory_items?.price_cents || 0) / 100}
+                                </p>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${getProductApprovalStatus(product).style}`}>
+                                    {getProductApprovalStatus(product).icon} {getProductApprovalStatus(product).status}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    Store: {product.tenants?.name}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-2">
+                                {/* Show Approve button only for rejected products */}
+                                {product.admin_approved === false && (
+                                  <button
+                                    onClick={() => handleApproveProduct(product.id)}
+                                    disabled={approvingProduct === product.id}
+                                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                  >
+                                    {approvingProduct === product.id ? (
+                                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <CheckSquare className="w-4 h-4" />
+                                    )}
+                                    Approve
+                                  </button>
+                                )}
+                                {/* Show Reject button for approved products */}
+                                {product.admin_approved !== false && (
+                                  <button
+                                    onClick={() => handleRejectProduct(product.id)}
+                                    disabled={rejectingProduct === product.id}
+                                    className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                  >
+                                    {rejectingProduct === product.id ? (
+                                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <X className="w-4 h-4" />
+                                    )}
+                                    Reject
+                                  </button>
+                                )}
+                                {/* Unfeatured button for all products */}
+                                <button
+                                  onClick={() => handleUnfeature(product.id, product.tenants?.id || '')}
+                                  disabled={false}
+                                  className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Unfeatured
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <div className="flex items-center gap-4 text-sm text-gray-600">
+                                <span>
+                                  <strong>Tenant:</strong> {product.tenants?.name}
+                                </span>
+                                <span>
+                                  <strong>Featured Type:</strong> {product.featured_type}
+                                </span>
+                                <span>
+                                  <strong>Priority:</strong> {product.featured_priority || 50}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
+    <ToastContainer toasts={toasts} onClose={removeToast} />
+  </>
   );
 }

@@ -1403,6 +1403,10 @@ model tenants {
   platform_fee_waived              Boolean?                           @default(false)
   platform_fee_waived_reason       String?
   platform_fee_waived_until        DateTime?                          @db.Timestamp(6)
+  featured_access_approved         Boolean?                           @default(false)
+  featured_access_approved_by      String?
+  featured_access_approved_at      DateTime?                          @db.Timestamp(6)
+  featured_access_rejection_reason String?
   business_hours_list              business_hours_list?
   business_hours_special_list      business_hours_special_list[]
   category_mirror_runs             category_mirror_runs[]
@@ -1439,6 +1443,7 @@ model tenants {
   fulfillment_settings             tenant_fulfillment_settings?
   payment_gateways                 tenant_payment_gateways[]
   shipping_carriers                tenant_shipping_carriers[]
+  featured_access_approved_by_user users?                             @relation("TenantFeaturedApproval", fields: [featured_access_approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   organizations_list               organizations_list?                @relation(fields: [organization_id], references: [id])
   user_tenants                     user_tenants[]
 
@@ -1455,6 +1460,7 @@ model tenants {
   @@index([service_level], map: "tenant_servicelevel_idx")
   @@index([slug], map: "tenant_slug_idx")
   @@index([subscription_status], map: "tenant_subscriptionstatus_idx")
+  @@index([featured_access_approved, subscription_tier], map: "idx_tenant_featured_approval")
 }
 
 model tier_change_logs_list {
@@ -1525,6 +1531,7 @@ model user_behavior_simple {
   @@index([page_type, timestamp(sort: Desc)], map: "idx_user_behavior_simple_page_type")
   @@index([timestamp(sort: Desc)], map: "idx_user_behavior_simple_timestamp")
   @@index([user_id, timestamp(sort: Desc)], map: "idx_user_behavior_simple_user_timestamp")
+  @@index([timestamp(sort: Desc), page_type, entity_type, entity_id], map: "idx_behavior_timestamp_page_entity")
 }
 
 model user_sessions_list {
@@ -1583,12 +1590,14 @@ model users {
   mfa_verified_at                  DateTime?                          @db.Timestamp(6)
   consent_records                  consent_records[]
   directory_featured_listings_list directory_featured_listings_list[]
+  featured_products                featured_products[]
   invitations                      invitations[]
   login_attempts                   login_attempts[]
   order_status_history             order_status_history[]
   security_alerts                  security_alerts[]
   security_threats                 security_threats[]
   shopping_carts                   shopping_carts[]
+  featured_access_approvals        tenants[]                          @relation("TenantFeaturedApproval")
   user_preferences                 user_preferences[]
   user_sessions_list               user_sessions_list[]
   user_tenants                     user_tenants[]
@@ -2308,6 +2317,10 @@ model featured_products {
   bucket_type         String?         @default("store_selection") @db.VarChar(50)
   shop_scope_id       String?         @db.VarChar(255)
   shops_priority      Int?            @default(0)
+  admin_approved      Boolean?        @default(false)
+  approved_by         String?
+  approved_at         DateTime?       @db.Timestamp(6)
+  users               users?          @relation(fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   inventory_items     inventory_items @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_featured_products_inventory_item")
   tenants             tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_featured_products_tenant")
 
@@ -2319,6 +2332,7 @@ model featured_products {
   @@index([bucket_type, is_active], map: "idx_featured_bucket_type")
   @@index([shop_scope_id, bucket_type, is_active], map: "idx_featured_shop_scope")
   @@index([shops_priority(sort: Desc), is_active], map: "idx_featured_shops_priority")
+  @@index([admin_approved, featured_type], map: "idx_admin_approval")
   @@map("featured_products")
 }
 

@@ -37,11 +37,16 @@ interface FeaturedStore {
   avgReviewRating: number;
   
   // Featured type counts
-  staffPickCount: number;
-  seasonalCount: number;
-  saleCount: number;
+  bestsellerCount: number;
+  clearanceCount: number;
+  featuredCount: number;
   newArrivalCount: number;
+  recommendedCount: number;
+  saleCount: number;
+  seasonalCount: number;
+  staffPickCount: number;
   storeSelectionCount: number;
+  trendingCount: number;
 }
 
 interface FeaturedStoreStats {
@@ -121,6 +126,11 @@ class FeaturedStoresService {
           COALESCE(product_counts.sale_count, 0) as sale_count,
           COALESCE(product_counts.new_arrival_count, 0) as new_arrival_count,
           COALESCE(product_counts.store_selection_count, 0) as store_selection_count,
+          COALESCE(product_counts.bestseller_count, 0) as bestseller_count,
+          COALESCE(product_counts.clearance_count, 0) as clearance_count,
+          COALESCE(product_counts.featured_count, 0) as featured_count,
+          COALESCE(product_counts.recommended_count, 0) as recommended_count,
+          COALESCE(product_counts.trending_count, 0) as trending_count,
           
           -- Store activity indicators
           CASE 
@@ -139,11 +149,16 @@ class FeaturedStoresService {
             ROUND(AVG(mv.price_cents / 100.0)) as avg_price,
             COUNT(*) FILTER (WHERE mv.rating_avg > 0) as products_with_reviews,
             ROUND(AVG(mv.rating_avg)) as avg_review_rating,
-            COUNT(*) FILTER (WHERE mv.featured_type = 'staff_pick') as staff_pick_count,
-            COUNT(*) FILTER (WHERE mv.featured_type = 'seasonal') as seasonal_count,
-            COUNT(*) FILTER (WHERE mv.featured_type = 'sale') as sale_count,
+            COUNT(*) FILTER (WHERE mv.featured_type = 'bestseller') as bestseller_count,
+            COUNT(*) FILTER (WHERE mv.featured_type = 'clearance') as clearance_count,
+            COUNT(*) FILTER (WHERE mv.featured_type = 'featured') as featured_count,
             COUNT(*) FILTER (WHERE mv.featured_type = 'new_arrival') as new_arrival_count,
-            COUNT(*) FILTER (WHERE mv.featured_type = 'store_selection') as store_selection_count
+            COUNT(*) FILTER (WHERE mv.featured_type = 'recommended') as recommended_count,
+            COUNT(*) FILTER (WHERE mv.featured_type = 'sale') as sale_count,
+            COUNT(*) FILTER (WHERE mv.featured_type = 'seasonal') as seasonal_count,
+            COUNT(*) FILTER (WHERE mv.featured_type = 'staff_pick') as staff_pick_count,
+            COUNT(*) FILTER (WHERE mv.featured_type = 'store_selection') as store_selection_count,
+            COUNT(*) FILTER (WHERE mv.featured_type = 'trending') as trending_count
           FROM storefront_products mv
           WHERE mv.item_status = 'active' 
             AND mv.visibility = 'public'
@@ -213,11 +228,16 @@ class FeaturedStoresService {
         avgReviewRating: parseFloat(row.avg_review_rating) || 0,
         
         // Featured type counts
-        staffPickCount: parseInt(row.staff_pick_count) || 0,
-        seasonalCount: parseInt(row.seasonal_count) || 0,
-        saleCount: parseInt(row.sale_count) || 0,
+        bestsellerCount: parseInt(row.bestseller_count) || 0,
+        clearanceCount: parseInt(row.clearance_count) || 0,
+        featuredCount: parseInt(row.featured_count) || 0,
         newArrivalCount: parseInt(row.new_arrival_count) || 0,
-        storeSelectionCount: parseInt(row.store_selection_count) || 0
+        recommendedCount: parseInt(row.recommended_count) || 0,
+        saleCount: parseInt(row.sale_count) || 0,
+        seasonalCount: parseInt(row.seasonal_count) || 0,
+        staffPickCount: parseInt(row.staff_pick_count) || 0,
+        storeSelectionCount: parseInt(row.store_selection_count) || 0,
+        trendingCount: parseInt(row.trending_count) || 0
       }));
       
       // Calculate statistics

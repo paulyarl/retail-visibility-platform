@@ -685,6 +685,214 @@ export default class ShopsFeaturedService extends BaseDiscoveryService {
   }
 
   /**
+   * Get shop recommended products
+   */
+  async getShopRecommendedProducts(options: {
+    tenantId?: string;
+    limit?: number;
+    shopScope?: 'global' | 'shop';
+  } = {}) {
+    const { tenantId, limit = 12, shopScope = 'global' } = options;
+    
+    this.logger.info('[SHOPS FEATURED] Fetching recommended products', {
+      tenantId, limit, shopScope
+    } as any);
+
+    try {
+      const pool = getDirectPool();
+      const whereConditions = [
+        `item_status = 'active'`,
+        `visibility = 'public'`,
+        `featured_type_array @> '"recommended"'::jsonb`,
+        `featured_is_active = true`,
+        `(featured_until IS NULL OR featured_until > NOW())`
+      ];
+
+      const params: any[] = [];
+      if (shopScope === 'shop' && tenantId) {
+        whereConditions.push(`tenant_id = $${params.length + 1}`);
+        params.push(tenantId);
+      }
+
+      const query = `
+        SELECT *
+        FROM mv_trending_products
+        WHERE ${whereConditions.join(' AND ')}
+        ORDER BY featured_priority DESC, featured_at DESC
+        LIMIT $${params.length + 1}
+      `;
+
+      params.push(limit);
+      const result = await pool.query(query, params);
+      
+      this.logger.info('[SHOPS FEATURED] recommended query returned', {
+        count: result.rows.length
+      } as any);
+      
+      return result.rows;
+    } catch (error) {
+      this.logger.error('[SHOPS FEATURED] Error fetching recommended', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get shop bestseller products
+   */
+  async getShopBestsellerProducts(options: {
+    tenantId?: string;
+    limit?: number;
+    shopScope?: 'global' | 'shop';
+  } = {}) {
+    const { tenantId, limit = 12, shopScope = 'global' } = options;
+    
+    this.logger.info('[SHOPS FEATURED] Fetching bestseller products', {
+      tenantId, limit, shopScope
+    } as any);
+
+    try {
+      const pool = getDirectPool();
+      const whereConditions = [
+        `item_status = 'active'`,
+        `visibility = 'public'`,
+        `featured_type_array @> '"bestseller"'::jsonb`,
+        `featured_is_active = true`,
+        `(featured_until IS NULL OR featured_until > NOW())`
+      ];
+
+      const params: any[] = [];
+      if (shopScope === 'shop' && tenantId) {
+        whereConditions.push(`tenant_id = $${params.length + 1}`);
+        params.push(tenantId);
+      }
+
+      const query = `
+        SELECT *
+        FROM mv_trending_products
+        WHERE ${whereConditions.join(' AND ')}
+        ORDER BY featured_priority DESC, featured_at DESC
+        LIMIT $${params.length + 1}
+      `;
+
+      params.push(limit);
+      const result = await pool.query(query, params);
+      
+      this.logger.info('[SHOPS FEATURED] bestseller query returned', {
+        count: result.rows.length
+      } as any);
+      
+      return result.rows;
+    } catch (error) {
+      this.logger.error('[SHOPS FEATURED] Error fetching bestseller', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get shop clearance products
+   */
+  async getShopClearanceProducts(options: {
+    tenantId?: string;
+    limit?: number;
+    shopScope?: 'global' | 'shop';
+  } = {}) {
+    const { tenantId, limit = 12, shopScope = 'global' } = options;
+    
+    this.logger.info('[SHOPS FEATURED] Fetching clearance products', {
+      tenantId, limit, shopScope
+    } as any);
+
+    try {
+      const pool = getDirectPool();
+      const whereConditions = [
+        `item_status = 'active'`,
+        `visibility = 'public'`,
+        `featured_type_array @> '"clearance"'::jsonb`,
+        `featured_is_active = true`,
+        `(featured_until IS NULL OR featured_until > NOW())`
+      ];
+
+      const params: any[] = [];
+      if (shopScope === 'shop' && tenantId) {
+        whereConditions.push(`tenant_id = $${params.length + 1}`);
+        params.push(tenantId);
+      }
+
+      const query = `
+        SELECT *
+        FROM mv_trending_products
+        WHERE ${whereConditions.join(' AND ')}
+        ORDER BY featured_priority DESC, featured_at DESC
+        LIMIT $${params.length + 1}
+      `;
+
+      params.push(limit);
+      const result = await pool.query(query, params);
+      
+      this.logger.info('[SHOPS FEATURED] clearance query returned', {
+        count: result.rows.length
+      } as any);
+      
+      return result.rows;
+    } catch (error) {
+      this.logger.error('[SHOPS FEATURED] Error fetching clearance', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get shop featured products
+   */
+  async getShopFeaturedProducts(options: {
+    tenantId?: string;
+    limit?: number;
+    shopScope?: 'global' | 'shop';
+  } = {}) {
+    const { tenantId, limit = 12, shopScope = 'global' } = options;
+    
+    this.logger.info('[SHOPS FEATURED] Fetching featured products', {
+      tenantId, limit, shopScope
+    } as any);
+
+    try {
+      const pool = getDirectPool();
+      const whereConditions = [
+        `item_status = 'active'`,
+        `visibility = 'public'`,
+        `featured_type_array @> '"featured"'::jsonb`,
+        `featured_is_active = true`,
+        `(featured_until IS NULL OR featured_until > NOW())`
+      ];
+
+      const params: any[] = [];
+      if (shopScope === 'shop' && tenantId) {
+        whereConditions.push(`tenant_id = $${params.length + 1}`);
+        params.push(tenantId);
+      }
+
+      const query = `
+        SELECT *
+        FROM mv_trending_products
+        WHERE ${whereConditions.join(' AND ')}
+        ORDER BY featured_priority DESC, featured_at DESC
+        LIMIT $${params.length + 1}
+      `;
+
+      params.push(limit);
+      const result = await pool.query(query, params);
+      
+      this.logger.info('[SHOPS FEATURED] featured query returned', {
+        count: result.rows.length
+      } as any);
+      
+      return result.rows;
+    } catch (error) {
+      this.logger.error('[SHOPS FEATURED] Error fetching featured', error);
+      return [];
+    }
+  }
+
+  /**
    * Get global random products (alias for shop random products)
    */
   async getGlobalRandomProducts(options: {

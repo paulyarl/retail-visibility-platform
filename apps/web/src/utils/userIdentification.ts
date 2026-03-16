@@ -180,6 +180,7 @@ export interface AutoUserCacheOptions {
   useAutoUser?: boolean; // Auto-detect user/session ID
   userId?: string; // Manual override
   preferSessionId?: boolean; // Use session ID even for authenticated users
+  ttl?: number; // Time to live in milliseconds
 }
 
 /**

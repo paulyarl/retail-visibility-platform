@@ -11,7 +11,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { 
   Search, Star, Sparkles, Eye, ArrowUp, ArrowDown, AlertTriangle, Timer, Clock, 
   Layers, Package, AlertCircle, Calendar, Tag, Award, TrendingUp, Check, 
-  ShoppingBag, FileText, Edit2, X, Power, Pause, Play, Edit, Zap, PowerOff
+  ShoppingBag, FileText, Edit2, X, Power, Pause, Play, Edit, Zap, PowerOff, Lock
 } from 'lucide-react';
 import Image from 'next/image';
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -91,6 +91,16 @@ const getFeaturedBadgeText = (typeId: string, currentTypeName?: string): string 
         return 'Sale';
       case 'staff_pick':
         return 'Staff Pick';
+      case 'clearance':
+        return 'Clearance';
+      case 'bestseller':
+        return 'Bestseller';
+      case 'trending':
+        return 'Trending';
+      case 'featured':
+        return 'Featured';
+      case 'recommended':
+        return 'Recommended';
       default:
         return 'Featured';
     }
@@ -107,6 +117,16 @@ const getFeaturedBadgeText = (typeId: string, currentTypeName?: string): string 
       return 'Sale';
     case 'staff_pick':
       return 'Staff Pick';
+    case 'clearance':
+      return 'Clearance';
+    case 'bestseller':
+      return 'Bestseller';
+    case 'trending':
+      return 'Trending';
+    case 'featured':
+      return 'Featured';
+    case 'recommended':
+      return 'Recommended';
     default:
       return 'Featured';
   }
@@ -183,10 +203,12 @@ const getProductTypeIcon = (productType: string) => {
 
 export default function FeaturedProductsManager({ 
   tenantId, 
-  context = 'storefront' 
+  context = 'storefront',
+  hasFeaturedAccess = false
 }: { 
   tenantId: string; 
   context?: 'storefront' | 'directory' | 'admin';
+  hasFeaturedAccess?: boolean;
 }) {
   // Get ProductSingleton for universal product integration
   const productProvider = useProduct();
@@ -435,6 +457,12 @@ export default function FeaturedProductsManager({
   };
 
   const handleProductFeatureAllTypes = async (product: any) => {
+    // Check if tenant has featured access (includes subscription status validation)
+    if (!hasFeaturedAccess) {
+      alert('Your subscription must be active to feature products. Please contact support if you believe this is an error.');
+      return;
+    }
+    
     if (!confirm(`Are you sure you want to feature "${product.name}" in the current type (${currentType?.name})?`)) {
       return;
     }
@@ -504,38 +532,56 @@ export default function FeaturedProductsManager({
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Select Featured Type</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {featuredTypes.map((type) => (
-            <button
-              key={type.id}
-              onClick={() => setSelectedType(type.id)}
-              className={`p-4 rounded-lg border-2 transition-all ${
-                selectedType === type.id
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <div className={`w-10 h-10 rounded-lg bg-${type.color}-100 flex items-center justify-center`}>
-                  {getFeaturedBadgeIcon(type.id)}
+          {featuredTypes.map((type) => {
+            const isPayToPlay = type.id === 'featured' && (type as any).isPayToPlay;
+            const isLocked = isPayToPlay && !hasFeaturedAccess;
+            
+            return (
+              <button
+                key={type.id}
+                onClick={() => !isLocked && setSelectedType(type.id)}
+                disabled={isLocked}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  selectedType === type.id
+                    ? 'border-blue-500 bg-blue-50'
+                    : isLocked
+                    ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`w-10 h-10 rounded-lg bg-${type.color}-100 flex items-center justify-center relative`}>
+                    {getFeaturedBadgeIcon(type.id)}
+                    {isLocked && (
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                        <Lock className="w-2 h-2 text-white" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="font-semibold text-gray-900">{type.name}</h3>
+                    <p className="text-sm text-gray-500">{type.description}</p>
+                    {isLocked && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        💎 Premium feature - Contact platform admin
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="text-left">
-                  <h3 className="font-semibold text-gray-900">{type.name}</h3>
-                  <p className="text-sm text-gray-500">{type.description}</p>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">
+                    {activeFeaturedByType[type.id]?.length || 0} / {type.maxProducts} products
+                  </span>
+                  <div className="w-20 bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`bg-${type.color}-500 h-2 rounded-full`}
+                      style={{ width: `${Math.min(((activeFeaturedByType[type.id]?.length || 0) / type.maxProducts) * 100, 100)}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">
-                  {activeFeaturedByType[type.id]?.length || 0} / {type.maxProducts} products
-                </span>
-                <div className="w-20 bg-gray-200 rounded-full h-2">
-                  <div 
-                    className={`bg-${type.color}-500 h-2 rounded-full`}
-                    style={{ width: `${Math.min(((activeFeaturedByType[type.id]?.length || 0) / type.maxProducts) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -995,17 +1041,25 @@ export default function FeaturedProductsManager({
                           return;
                         }
                         
+                        // Check if tenant has featured access (includes subscription status validation)
+                        if (!hasFeaturedAccess) {
+                          alert('Your subscription must be active to feature products. Please contact support if you believe this is an error.');
+                          return;
+                        }
+                        
                         handleError(() => featureProduct(product.id!), 'Failed to feature product');
                       }}
-                      disabled={processing || !product.id || isCurrentTypeAtLimit}
+                      disabled={processing || !product.id || isCurrentTypeAtLimit || !hasFeaturedAccess}
                       className={`flex-1 px-3 py-2 text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 ${
                         isCurrentTypeAtLimit 
                           ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                          : !hasFeaturedAccess
+                          ? 'bg-orange-400 text-orange-100 cursor-not-allowed'
                           : 'bg-blue-600 text-white'
                       }`}
-                      title={isCurrentTypeAtLimit ? `Limit reached for ${currentType?.name} (${activeFeaturedByType[selectedType]?.length || 0}/${currentType?.maxProducts})` : `Add to ${currentType?.name}`}
+                      title={isCurrentTypeAtLimit ? `Limit reached for ${currentType?.name} (${activeFeaturedByType[selectedType]?.length || 0}/${currentType?.maxProducts})` : !hasFeaturedAccess ? 'Featured access requires active subscription' : `Add to ${currentType?.name}`}
                     >
-                      {isCurrentTypeAtLimit ? 'Limit Reached' : `Add to ${currentType?.name}`}
+                      {isCurrentTypeAtLimit ? 'Limit Reached' : !hasFeaturedAccess ? 'Subscription Required' : `Add to ${currentType?.name}`}
                     </button>
                   </div>
                 </div>

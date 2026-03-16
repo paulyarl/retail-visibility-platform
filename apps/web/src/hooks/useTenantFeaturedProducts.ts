@@ -21,7 +21,7 @@ import { PublicProduct } from '@/providers/data/ProductSingleton';
 interface UseTenantFeaturedProductsOptions {
   autoInitialize?: boolean;
   autoDestroy?: boolean;
-  context?: 'storefront' | 'directory' | 'admin'; // Context for type filtering
+  context?: 'storefront' | 'directory' | 'admin' | 'featured'; // Context for type filtering
 }
 
 interface UseTenantFeaturedProductsReturn extends FeaturedProductsState {
@@ -115,14 +115,14 @@ export function useTenantFeaturedProducts(
   // Get featured types based on context
   const contextFeaturedTypes = useMemo(() => {
     const types = context === 'directory' 
-      ? singleton.getDirectoryOnlyTypes()
+      ? singleton.getMonetizationControlledTypes() // PFM: Only premium types (featured only)
       : context === 'admin'
-      ? singleton.getAllTypes()
-      : singleton.getStorefrontTypes();
+      ? singleton.getManageableTypes()
+      : context === 'featured'
+      ? singleton.getMonetizationControlledTypes()
+      : [...singleton.getStorefrontTypes(), ...singleton.getMonetizationControlledTypes()]; // SFM: All merchant + premium
     
-      // console.log(`[useTenantFeaturedProducts] Context: ${context}`);
-      // console.log(`[useTenantFeaturedProducts] Available types:`, types.map(t => t.id));
-      // console.log(`[useTenantFeaturedProducts] Selected type: ${state.selectedType}`);
+    // console.log(`[useTenantFeaturedProducts] Context: ${context}, Available types: ${types.map(t => t.id).join(', ')}`);
     
     return types;
   }, [context, singleton, state.selectedType, state.featuredLimits]);
@@ -146,6 +146,12 @@ export function useTenantFeaturedProducts(
       // Set to new_arrival if current type is not valid for storefront context
       if (newArrivalType && (!state.selectedType || !contextFeaturedTypes.find(t => t.id === state.selectedType))) {
         singleton.setSelectedType('new_arrival');
+      }
+    } else if (context === 'featured' && contextFeaturedTypes.length > 0) {
+      const featuredType = contextFeaturedTypes.find(t => t.id === 'featured');
+      // Set to featured if current type is not valid for featured context
+      if (featuredType && (!state.selectedType || !contextFeaturedTypes.find(t => t.id === state.selectedType))) {
+        singleton.setSelectedType('featured');
       }
     }
   }, [context, contextFeaturedTypes, singleton, state.selectedType]);
@@ -241,16 +247,16 @@ export function useTenantFeaturedProducts(
     return singleton.featureProductInDirectory(productId);
   }, [singleton]);
 
-  const unfeatureProduct = useCallback((productId: string) => {
-    return singleton.unfeatureProduct(productId);
+  const unfeatureProduct = useCallback((productId: string, featuredType?: string) => {
+    return singleton.unfeatureProduct(productId, featuredType);
   }, [singleton]);
 
   const toggleProductActive = useCallback((productId: string, isActive: boolean) => {
     return singleton.toggleProductActive(productId, isActive);
   }, [singleton]);
 
-  const updateProductExpiration = useCallback((productId: string, expirationDate: string) => {
-    return singleton.updateProductExpiration(productId, expirationDate);
+  const updateProductExpiration = useCallback((productId: string, expirationDate: string, featuredType?: string) => {
+    return singleton.updateProductExpiration(productId, expirationDate, featuredType);
   }, [singleton]);
 
   const setSelectedType = useCallback((typeId: string) => {

@@ -152,19 +152,29 @@ router.get('/', async (req: Request, res: Response) => {
     
     // Initialize buckets
     const buckets: Record<string, any[]> = {
-      store_selection: [],
+      bestseller: [],
+      clearance: [],
+      featured: [],
       new_arrival: [],
-      seasonal: [],
+      recommended: [],
       sale: [],
-      staff_pick: []
+      seasonal: [],
+      staff_pick: [],
+      store_selection: [],
+      trending: []
     };
     
     const bucketCounts: Record<string, number> = {
-      store_selection: 0,
+      bestseller: 0,
+      clearance: 0,
+      featured: 0,
       new_arrival: 0,
-      seasonal: 0,
+      recommended: 0,
       sale: 0,
-      staff_pick: 0
+      seasonal: 0,
+      staff_pick: 0,
+      store_selection: 0,
+      trending: 0
     };
     
     const featuredShops = new Map<string, { id: string; name: string; slug: string; logo?: string; tier: string }>();
@@ -242,9 +252,20 @@ router.get('/', async (req: Request, res: Response) => {
       const featuredTypesList = mappedProduct.featuredTypes || [];
       let placedInAnyBucket = false;
       
-      if (featuredTypesList.includes('store_selection')) {
-        buckets.store_selection.push(mappedProduct);
-        bucketCounts.store_selection++;
+      	  
+	  if (featuredTypesList.includes('bestseller')) {
+        buckets.bestseller.push(mappedProduct);
+        bucketCounts.bestseller++;
+        placedInAnyBucket = true;
+      }
+      if (featuredTypesList.includes('clearance')) {
+        buckets.clearance.push(mappedProduct);
+        bucketCounts.clearance++;
+        placedInAnyBucket = true;
+      }
+      if (featuredTypesList.includes('featured')) {
+        buckets.featured.push(mappedProduct);
+        bucketCounts.featured++;
         placedInAnyBucket = true;
       }
       if (featuredTypesList.includes('new_arrival')) {
@@ -252,14 +273,19 @@ router.get('/', async (req: Request, res: Response) => {
         bucketCounts.new_arrival++;
         placedInAnyBucket = true;
       }
+      if (featuredTypesList.includes('recommended')) {
+        buckets.recommended.push(mappedProduct);
+        bucketCounts.recommended++;
+        placedInAnyBucket = true;
+      }	  
+	    if (featuredTypesList.includes('sale')) {
+        buckets.sale.push(mappedProduct);
+        bucketCounts.sale++;
+        placedInAnyBucket = true;
+      }
       if (featuredTypesList.includes('seasonal')) {
         buckets.seasonal.push(mappedProduct);
         bucketCounts.seasonal++;
-        placedInAnyBucket = true;
-      }
-      if (featuredTypesList.includes('sale')) {
-        buckets.sale.push(mappedProduct);
-        bucketCounts.sale++;
         placedInAnyBucket = true;
       }
       if (featuredTypesList.includes('staff_pick')) {
@@ -267,25 +293,50 @@ router.get('/', async (req: Request, res: Response) => {
         bucketCounts.staff_pick++;
         placedInAnyBucket = true;
       }
+      if (featuredTypesList.includes('store_selection')) {
+        buckets.store_selection.push(mappedProduct);
+        bucketCounts.store_selection++;
+        placedInAnyBucket = true;
+      }
+      if (featuredTypesList.includes('trending')) {
+        buckets.trending.push(mappedProduct);
+        bucketCounts.trending++;
+        placedInAnyBucket = true;
+      }	  
       
       // Fallback: if no featured types matched, use single featuredType field
       if (!placedInAnyBucket && mappedProduct.featuredType) {
         const singleType = mappedProduct.featuredType;
-        if (singleType === 'store_selection') {
-          buckets.store_selection.push(mappedProduct);
-          bucketCounts.store_selection++;
+        if (singleType === 'bestseller') {
+          buckets.bestseller.push(mappedProduct);
+          bucketCounts.bestseller++;
+        } else if (singleType === 'clearance') {
+          buckets.clearance.push(mappedProduct);
+          bucketCounts.clearance++;
+        } else if (singleType === 'featured') {
+          buckets.featured.push(mappedProduct);
+          bucketCounts.featured++;
         } else if (singleType === 'new_arrival') {
           buckets.new_arrival.push(mappedProduct);
           bucketCounts.new_arrival++;
-        } else if (singleType === 'seasonal') {
-          buckets.seasonal.push(mappedProduct);
-          bucketCounts.seasonal++;
+        } else if (singleType === 'recommended') {
+          buckets.recommended.push(mappedProduct);
+          bucketCounts.recommended++;
         } else if (singleType === 'sale') {
           buckets.sale.push(mappedProduct);
           bucketCounts.sale++;
+        } else if (singleType === 'seasonal') {
+          buckets.seasonal.push(mappedProduct);
+          bucketCounts.seasonal++;
         } else if (singleType === 'staff_pick') {
           buckets.staff_pick.push(mappedProduct);
           bucketCounts.staff_pick++;
+        } else if (singleType === 'store_selection') {
+          buckets.store_selection.push(mappedProduct);
+          bucketCounts.store_selection++;
+        } else if (singleType === 'trending') {
+          buckets.trending.push(mappedProduct);
+          bucketCounts.trending++;
         } else {
           // Unknown type - skip
         }

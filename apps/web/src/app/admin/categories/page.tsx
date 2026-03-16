@@ -242,16 +242,9 @@ export default function AdminCategoriesPage() {
   const loadLastSummary = async () => {
     setSummaryLoading(true);
     try {
-      const qs = new URLSearchParams();
-      if (tenantIdInput.trim()) qs.set('tenantId', tenantIdInput.trim());
-      qs.set('strategy', 'platform_to_gbp');
-      const res = await fetch(apiUrl(`/api/admin/mirror/last-run?${qs.toString()}`), {
-        method: 'GET',
-        headers: { ...getAuthHeader() },
-        credentials: 'include',
-      });
-      const data = await res.json().catch(() => ({}));
-      setLastSummary(data?.data ?? null);
+      // MIGRATION: Using AdminCategoriesService instead of direct fetch
+      const summary = await adminCategoriesService.getMirrorLastRunSummary(tenantIdInput.trim());
+      setLastSummary(summary?.data ?? null);
     } catch (e) {
       setLastSummary(null);
     } finally {

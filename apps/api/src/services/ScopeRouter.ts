@@ -1373,7 +1373,11 @@ export class ScopeRouter extends UniversalSingleton {
       'sale': 'sale',
       'seasonal': 'seasonal',
       'staff': 'staff_pick',
-      'selection': 'store_selection'
+      'selection': 'store_selection',
+      'bestseller': 'bestseller',
+      'clearance': 'clearance',
+      'featured': 'featured',
+      'recommended': 'recommended',
     };
     
     return bucketToFeaturedType[bucketType] || 'store_selection';
@@ -1529,3 +1533,4 @@ export class ScopeRouter extends UniversalSingleton {
     return categoryFilteredShops.slice(0, limit);
   }
 }
+

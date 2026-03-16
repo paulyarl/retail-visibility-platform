@@ -314,6 +314,51 @@ export class DirectoryService extends AdminApiSingleton {
     // Invalidate directory cache
     this.invalidateCache('directory-listings');
   }
+
+  /**
+   * Get featured stats by type
+   */
+  async getFeaturedStats(type: string): Promise<{ count: number; diversity?: number; avgScore?: number; avgRating?: number; totalSales?: number; topProduct: string }> {
+    const response = await this.makeDefaultRequest<{ count: number; diversity?: number; avgScore?: number; avgRating?: number; totalSales?: number; topProduct: string }>(
+      `/api/directory/featured-stats?type=${type}`,
+      {},
+      `directory-featured-stats-${type}`,
+      5 * 60 * 1000 // 5 minutes cache
+    );
+
+    if (!response.success) {
+      console.error('[DirectoryService] Failed to get featured stats:', response.error);
+      // Return appropriate default based on type
+      const defaults: Record<string, any> = {
+        trending: { count: 0, avgScore: 0, topProduct: 'N/A' },
+        recommended: { count: 0, avgRating: 0, topProduct: 'N/A' },
+        bestseller: { count: 0, totalSales: 0, topProduct: 'N/A' },
+        random_featured: { count: 0, diversity: 0, topProduct: 'N/A' }
+      };
+      return defaults[type] || { count: 0, topProduct: 'N/A' };
+    }
+
+    return response.data || { count: 0, topProduct: 'N/A' };
+  }
+
+  /**
+   * Get premium featured products
+   */
+  async getPremiumFeaturedProducts(limit: number = 20): Promise<{ products: any[] }> {
+    const response = await this.makeDefaultRequest<{ products: any[] }>(
+      `/api/directory/premium-featured-products?limit=${limit}`,
+      {},
+      'directory-premium-featured-products',
+      10 * 60 * 1000 // 10 minutes cache
+    );
+
+    if (!response.success) {
+      console.error('[DirectoryService] Failed to get premium featured products:', response.error);
+      return { products: [] };
+    }
+
+    return response.data || { products: [] };
+  }
 }
 
 // Export singleton instance

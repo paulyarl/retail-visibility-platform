@@ -62,6 +62,8 @@ export interface FeaturedType {
   icon: React.ReactNode;
   color: string;
   maxProducts: number;
+  isMerchantControlled?: boolean;
+  isPayToPlay?: boolean;
 }
 
 export interface FeaturedProductsState {
@@ -132,48 +134,46 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
   // ProductSingleton integration
   private productSingleton: any = null;
 
-  // Default featured types (storefront)
-  private defaultFeaturedTypes: FeaturedType[] = [
+  // Default featured types (combined merchant and platform controlled)
+  private defaultFeaturedTypes: FeaturedType[] = [];
+
+  // Merchant-controlled types (storefront management)
+  private merchantControlledTypes: FeaturedType[] = [
     {
       id: 'new_arrival',
       name: 'New Arrivals',
       description: 'Recently added products',
       icon: null,
       color: 'green',
-      maxProducts: 6
+      maxProducts: 8,
+      isMerchantControlled: true
     },
     {
       id: 'seasonal',
-      name: 'Seasonal',
+      name: 'Seasonal Specials',
       description: 'Seasonal product highlights',
       icon: null,
       color: 'orange',
-      maxProducts: 6
-    },
-    {
-      id: 'staff_pick',
-      name: 'Staff Picks',
-      description: 'Hand-picked by our team',
-      icon: null,
-      color: 'purple',
-      maxProducts: 8
+      maxProducts: 8,
+      isMerchantControlled: true
     },
     {
       id: 'sale',
       name: 'Sale Items',
-      description: 'Products on sale or promotion',
+      description: 'Products on sale',
       icon: null,
       color: 'red',
-      maxProducts: 10
+      maxProducts: 8,
+      isMerchantControlled: true
     },
-    // New expansion types
     {
-      id: 'bestseller',
-      name: 'Bestsellers',
-      description: 'Top-selling products',
+      id: 'staff_pick',
+      name: 'Staff Picks',
+      description: 'Staff recommended products',
       icon: null,
-      color: 'amber',
-      maxProducts: 8
+      color: 'purple',
+      maxProducts: 8,
+      isMerchantControlled: true
     },
     {
       id: 'clearance',
@@ -181,49 +181,103 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
       description: 'Discounted clearance items',
       icon: null,
       color: 'yellow',
-      maxProducts: 5
+      maxProducts: 8,
+      isMerchantControlled: true
     },
-    {
-      id: 'trending',
-      name: 'Trending Now',
-      description: 'Currently trending products',
-      icon: null,
-      color: 'pink',
-      maxProducts: 7
-    },
-    {
-      id: 'featured',
-      name: 'Featured',
-      description: 'General featured products',
-      icon: null,
-      color: 'indigo',
-      maxProducts: 10
-    },
-    {
-      id: 'recommended',
-      name: 'Recommended',
-      description: 'AI/customer recommended products',
-      icon: null,
-      color: 'teal',
-      maxProducts: 6
-    }
-  ];
-
-  // Directory-only types (not available in storefront)
-  private directoryOnlyTypes: FeaturedType[] = [
     {
       id: 'store_selection',
       name: 'Directory Featured',
       description: 'Premium placement in directory listings',
       icon: null,
       color: 'blue',
-      maxProducts: 8
+      maxProducts: 8,
+      isMerchantControlled: true,
+      isPayToPlay: false
     }
   ];
 
-  // Get storefront-only types (exclude directory types)
+  // Monetization-controlled types (premium features requiring admin approval)
+  private monetizationControlledTypes: FeaturedType[] = [
+    {
+      id: 'featured',
+      name: 'Featured (Premium)',
+      description: 'Premium promotional placement - Contact platform admin for access',
+      icon: null,
+      color: 'indigo',
+      maxProducts: 8,
+      isPayToPlay: true
+    }
+  ];
+
+  // Platform-controlled types (algorithmic)
+  private platformControlledTypes: FeaturedType[] = [
+    {
+      id: 'trending',
+      name: 'Trending Now',
+      description: 'Currently trending products (platform algorithm)',
+      icon: null,
+      color: 'pink',
+      maxProducts: 8,
+      isMerchantControlled: false
+    },
+    {
+      id: 'recommended',
+      name: 'Recommended',
+      description: 'AI/customer recommended products (platform algorithm)',
+      icon: null,
+      color: 'teal',
+      maxProducts: 8,
+      isMerchantControlled: false
+    },
+    {
+      id: 'bestseller',
+      name: 'Bestsellers',
+      description: 'Top selling products (platform algorithm)',
+      icon: null,
+      color: 'amber',
+      maxProducts: 8,
+      isMerchantControlled: false
+    },
+    {
+      id: 'random_featured',
+      name: 'Random Discovery',
+      description: 'Quality-based random selection (platform algorithm)',
+      icon: null,
+      color: 'cyan',
+      maxProducts: 8,
+      isMerchantControlled: false
+    }
+  ];
+
+  // Directory-only types (not available in storefront)
+  private directoryOnlyTypes: FeaturedType[] = [
+    // Currently empty - all types are either merchant-controlled, monetization-controlled, or platform-controlled
+  ];
+
+  // Get merchant-controlled types (for storefront management)
+  getMerchantControlledTypes(): FeaturedType[] {
+    return this.merchantControlledTypes.map(type => ({
+      ...type,
+      maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
+    }));
+  }
+
+  // Get platform-controlled types (algorithmic)
+  getPlatformControlledTypes(): FeaturedType[] {
+    return this.platformControlledTypes.map(type => ({
+      ...type,
+      maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
+    }));
+  }
+
+  // Get storefront types (merchant-controlled only)
   getStorefrontTypes(): FeaturedType[] {
-    return this.defaultFeaturedTypes.map(type => ({
+    return this.getMerchantControlledTypes();
+  }
+
+  // Get monetization-controlled types (premium features requiring admin approval)
+  getMonetizationControlledTypes(): FeaturedType[] {
+    return this.monetizationControlledTypes.map(type => ({
       ...type,
       maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
     }));
@@ -237,17 +291,17 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
     }));
   }
 
-  // Get all featured types (for admin context)
-  getAllTypes(): FeaturedType[] {
-    const allTypes = [...this.defaultFeaturedTypes, ...this.directoryOnlyTypes];
+  // Get manageable featured types (for admin context - excludes platform-controlled)
+  getManageableTypes(): FeaturedType[] {
+    const manageableTypes = [...this.merchantControlledTypes, ...this.monetizationControlledTypes, ...this.directoryOnlyTypes];
     
     // Apply current database limits to all types
-    const typesWithLimits = allTypes.map(type => ({
+    const typesWithLimits = manageableTypes.map((type: FeaturedType) => ({
       ...type,
       maxProducts: (this.state.featuredLimits as any)?.[type.id] || type.maxProducts
     }));
     
-    console.log('[TenantFeaturedProductsSingleton] getAllTypes returning:', {
+    console.log('[TenantFeaturedProductsSingleton] getManageableTypes returning:', {
       totalTypes: typesWithLimits.length,
       featuredLimits: this.state.featuredLimits,
       typesWithLimits: typesWithLimits.map(t => ({ id: t.id, maxProducts: t.maxProducts }))
@@ -260,6 +314,10 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
     super('tenant-featured-products');
     this.tenantId = tenantId;
     this.setCurrentTenant(tenantId);
+    
+    // Initialize default featured types by combining merchant and platform controlled types
+    this.defaultFeaturedTypes = [...this.merchantControlledTypes, ...this.platformControlledTypes];
+    
     this.state = this.getInitialState();
   }
 
@@ -273,10 +331,20 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         this.tenantTier = data.tier || 'starter';
         
         // Update featured types with tenant-specific limits
-        const updatedFeaturedTypes = this.defaultFeaturedTypes.map(type => ({
+        const updatedFeaturedTypes = this.defaultFeaturedTypes.map((type: FeaturedType) => ({
           ...type,
           maxProducts: data.limits[type.id] || 8
         }));
+        
+        // Force include "featured" type even if not returned by API
+        const hasFeaturedType = updatedFeaturedTypes.some(t => t.id === 'featured');
+        if (!hasFeaturedType) {
+          const featuredType = this.defaultFeaturedTypes.find(t => t.id === 'featured');
+          if (featuredType) {
+            updatedFeaturedTypes.push(featuredType);
+            console.log('[TenantFeaturedProductsSingleton] Force-added "featured" type to featuredTypes');
+          }
+        }
         
         this.setState({ featuredTypes: updatedFeaturedTypes });
       }
@@ -500,11 +568,16 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
         this.setState({ featuredLimits: data.limits });
         
         // Update featuredTypes with actual limits - include ALL types
-        const allTypes = this.getAllTypes(); // Get all 10 types
-        const updatedTypes = allTypes.map(type => ({
+        const allTypes = [...this.merchantControlledTypes, ...this.monetizationControlledTypes, ...this.platformControlledTypes, ...this.directoryOnlyTypes];
+        const updatedTypes = allTypes.map((type: FeaturedType) => ({
           ...type,
           maxProducts: (data.limits as any)[type.id] || type.maxProducts
         }));
+        
+        console.log('[TenantFeaturedProductsSingleton] Featured limits loaded:', {
+          limits: data.limits,
+          updatedTypes: updatedTypes.map((t: FeaturedType) => ({ id: t.id, maxProducts: t.maxProducts }))
+        });
         
         // Update state with all types
         this.setState({ featuredTypes: updatedTypes });
@@ -843,11 +916,14 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
     }
   }
 
-  async unfeatureProduct(productId: string) {
+  async unfeatureProduct(productId: string, featuredType?: string) {
     this.setState({ processing: true });
     
     try {
-      const result = await this.makeDefaultRequest(`/api/items/${productId}/featured-types/${this.state.selectedType}`, {
+      // Use the provided featuredType or fall back to selectedType
+      const targetType = featuredType || this.state.selectedType;
+      
+      const result = await this.makeDefaultRequest(`/api/items/${productId}/featured-types/${targetType}`, {
         method: 'DELETE',
       }, `featured-products-${this.tenantId}`);
 
@@ -946,17 +1022,20 @@ class TenantFeaturedProductsSingleton extends TenantApiSingleton {
     }
   }
 
-  async updateProductExpiration(productId: string, expirationDate: string) {
+  async updateProductExpiration(productId: string, expirationDate: string, featuredType?: string) {
     this.setState({ processing: true });
     
     try {
+      // Use the provided featuredType or fall back to selectedType
+      const targetType = featuredType || this.state.selectedType;
+      
       /* console.log('TenantFeaturedProductsSingleton: Updating product expiration:', {
         productId,
         expirationDate,
-        selectedType: this.state.selectedType
+        selectedType: targetType
       }); */
       
-      const result = await this.makeDefaultRequest(`/api/items/${productId}/featured-types/${this.state.selectedType}`, {
+      const result = await this.makeDefaultRequest(`/api/items/${productId}/featured-types/${targetType}`, {
         method: 'PATCH',
         body: JSON.stringify({ 
           featured_expires_at: expirationDate ? new Date(expirationDate).toISOString() : null

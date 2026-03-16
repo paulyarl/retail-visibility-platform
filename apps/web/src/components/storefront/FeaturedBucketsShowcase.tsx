@@ -36,6 +36,7 @@ export default function FeaturedBucketsShowcase({
     // Get bucket styling and data based on type
     const getBucketConfig = (type: string) => {
       switch (type) {
+        // Merchant-controlled types
         case 'store_selection':
           return {
             key: 'storeSelection',
@@ -76,6 +77,57 @@ export default function FeaturedBucketsShowcase({
             gradient: 'from-purple-500 to-indigo-500',
             products: featuredData.staffPick
           };
+        case 'clearance':
+          return {
+            key: 'clearance',
+            title: 'Clearance',
+            icon: '🔥',
+            gradient: 'from-yellow-500 to-orange-500',
+            products: featuredData.clearance
+          };
+        case 'featured':
+          return {
+            key: 'featured',
+            title: 'Premium Featured',
+            icon: '👑',
+            gradient: 'from-indigo-500 to-purple-500',
+            products: featuredData.featured
+          };
+          
+        // Platform-controlled types (algorithmic)
+        case 'trending':
+          return {
+            key: 'trending',
+            title: 'Trending Now',
+            icon: '📈',
+            gradient: 'from-pink-500 to-rose-500',
+            products: featuredData.trending
+          };
+        case 'recommended':
+          return {
+            key: 'recommended',
+            title: 'Recommended',
+            icon: '🏆',
+            gradient: 'from-teal-500 to-cyan-500',
+            products: featuredData.recommended
+          };
+        case 'bestseller':
+          return {
+            key: 'bestseller',
+            title: 'Bestsellers',
+            icon: '🥇',
+            gradient: 'from-amber-500 to-yellow-500',
+            products: featuredData.bestseller
+          };
+        case 'random_featured':
+          return {
+            key: 'randomFeatured',
+            title: 'Discover',
+            icon: '✨',
+            gradient: 'from-cyan-500 to-blue-500',
+            products: featuredData.randomFeatured
+          };
+          
         default:
           return {
             key: type,

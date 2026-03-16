@@ -232,7 +232,7 @@ router.get('/featured-products', authenticateToken, async (req, res) => {
       seasonal: tierLimits.featured_seasonal || 0,
       sale: tierLimits.featured_sale || 0,
       staff_pick: tierLimits.featured_staff_pick || 0,
-      random_featured: 0, // Legacy field - not used in new schema
+      random_featured: tierLimits.featured_store_selection || 0, // Use store_selection limit as base for random selection
       bestseller: tierLimits.featured_bestseller || 0,
       clearance: tierLimits.featured_clearance || 0,
       trending: tierLimits.featured_trending || 0,
@@ -310,7 +310,7 @@ router.get('/featured-products/all', authenticateToken, async (req, res) => {
         seasonal: tier.featured_seasonal || 0,
         sale: tier.featured_sale || 0,
         staff_pick: tier.featured_staff_pick || 0,
-        random_featured: 0, // Legacy field - not used in new schema
+        random_featured: tier.featured_store_selection || 0, // Use store_selection limit as base for random selection
         bestseller: tier.featured_bestseller || 0,
         clearance: tier.featured_clearance || 0,
         trending: tier.featured_trending || 0,
@@ -385,7 +385,7 @@ router.put('/featured-products', authenticateToken, async (req, res) => {
         seasonal: updatedTier.featured_seasonal,
         sale: updatedTier.featured_sale,
         staff_pick: updatedTier.featured_staff_pick,
-        random_featured: 0, // Legacy field
+        random_featured: updatedTier.featured_store_selection, // Use store_selection limit as base for random selection
         bestseller: updatedTier.featured_bestseller,
         clearance: updatedTier.featured_clearance,
         trending: updatedTier.featured_trending,

@@ -441,6 +441,37 @@ router.get('/featured/store-selection', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/shops/featured/recommended
+ * Get recommended products for shops discovery
+ */
+router.get('/featured/recommended', async (req, res) => {
+  try {
+    const { tenantId, limit, shopScope } = req.query;
+    
+    const products = await shopsService.getShopRecommendedProducts({
+      tenantId: tenantId as string,
+      limit: limit ? parseInt(limit as string) : undefined,
+      shopScope: shopScope as 'global' | 'shop'
+    }) as any[];
+
+    res.json({
+      success: true,
+      data: products,
+      count: products.length,
+      type: 'recommended'
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[SHOPS API] Error fetching recommended products:', errorMessage);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch recommended products',
+      message: errorMessage
+    });
+  }
+});
+
 // ====================
 // SHOPS DISCOVERY ENDPOINTS
 // ====================

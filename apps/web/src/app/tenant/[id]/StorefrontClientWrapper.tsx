@@ -47,6 +47,7 @@ import { useMultiCart } from '@/hooks/useMultiCart';
 
 // store status
 import { useStoreStatus } from '@/hooks/useStoreStatus';
+import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 
 interface StorefrontClientWrapperProps {
   tenantId: string;
@@ -153,6 +154,7 @@ export default function StorefrontClientWrapper({
       default: return 'bg-gray-400';
     }
   };
+  
 
   // Fetch featured data on mount
   useEffect(() => {
@@ -232,6 +234,7 @@ export default function StorefrontClientWrapper({
   };
 
   return (
+    
     <>
       {/* Hero Header - Brand Identity, Status, Navigation, Actions */}
       <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shadow-sm sticky top-0 z-50">
@@ -267,7 +270,62 @@ export default function StorefrontClientWrapper({
                     {businessName || 'Store Name Not Available'}
                   </h1>
                   {/* Store Status Badge */}
-                  <StoreStatusIndicator tenantId={tenantId} storeStatus={initialStoreStatus} />
+                  
+                   {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
+			
                 </div>
                 {primaryGBPCategory && (
                   <p className="text-sm text-neutral-600 dark:text-neutral-400">

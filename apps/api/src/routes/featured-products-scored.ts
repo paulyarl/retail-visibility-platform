@@ -12,6 +12,7 @@ import { getDirectPool } from '../utils/db-pool';
 import { MINIMUM_QUALITY_THRESHOLD, getQualityTier } from '../utils/featured-product-scoring';
 import { prisma } from '../prisma';
 import { FeaturedProductsService } from '../services/FeaturedProductsService';
+import { authenticateToken, requireAdmin } from '../middleware/auth';
 
 const router = Router();
 
@@ -466,6 +467,279 @@ router.get('/score-stats', async (req: Request, res: Response) => {
       error: 'failed_to_fetch_score_stats',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
+  }
+});
+
+// POST /api/featured-products/tenants/:id/approve-featured-access - Approve tenant for featured access (admin only)
+router.post('/tenants/:id/approve-featured-access', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get the authenticated user from JWT token (following NextAuth SSO migration pattern)
+    const requestingUser = (req as any).user;
+
+    console.log('[DEBUG] Requesting user from JWT:', {
+      userId: requestingUser?.userId,
+      user_id: requestingUser?.user_id,
+      email: requestingUser?.email,
+      role: requestingUser?.role
+    });
+
+    if (!requestingUser?.userId) {
+      return res.status(401).json({ error: 'user_not_authenticated' });
+    }
+
+    // Use JWT user ID directly - all platform users should exist in database
+    const approvedTenant = await FeaturedProductsService.approveTenantFeaturedAccess(id, requestingUser.userId);
+
+    res.json({
+      message: 'tenant_featured_access_approved',
+      tenant: approvedTenant
+    });
+
+  } catch (error: any) {
+    console.error('[POST featured-products/tenants/:id/approve-featured-access] Error:', error);
+    res.status(500).json({ error: 'failed_to_approve_tenant_featured_access', message: error.message });
+  }
+});
+
+// POST /api/featured-products/tenants/:id/reject-featured-access - Reject tenant for featured access (admin only)
+router.post('/tenants/:id/reject-featured-access', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    
+    // Get the authenticated user from JWT token (following NextAuth SSO migration pattern)
+    const requestingUser = (req as any).user;
+
+    if (!requestingUser?.userId) {
+      return res.status(401).json({ error: 'user_not_authenticated' });
+    }
+
+    // Use JWT user ID directly - no database validation needed for NextAuth SSO compatibility
+    const rejectedTenant = await FeaturedProductsService.rejectTenantFeaturedAccess(id, requestingUser.userId, reason);
+
+    res.json({
+      message: 'tenant_featured_access_rejected',
+      tenant: rejectedTenant,
+      reason: reason || null
+    });
+
+  } catch (error: any) {
+    console.error('[POST featured-products/tenants/:id/reject-featured-access] Error:', error);
+    res.status(500).json({ error: 'failed_to_reject_tenant_featured_access', message: error.message });
+  }
+});
+
+// GET /api/featured-products/all-featured-products - Get all featured products (both approved and rejected)
+router.get('/all-featured-products', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const allFeaturedProducts = await FeaturedProductsService.getAllFeaturedProducts();
+
+    res.json({
+      featuredProducts: allFeaturedProducts,
+      count: allFeaturedProducts.length
+    });
+
+  } catch (error: any) {
+    console.error('[GET featured-products/all-featured-products] Error:', error);
+    res.status(500).json({ error: 'failed_to_get_all_featured_products', message: error.message });
+  }
+});
+
+// POST /api/featured-products/:productId/approve - Approve a featured product
+router.post('/:productId/approve', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const adminUserId = (req as any).user?.userId;
+
+    if (!adminUserId) {
+      return res.status(401).json({ error: 'admin_user_required', message: 'Admin user ID required' });
+    }
+
+    console.log('[POST featured-products/:productId/approve] Approving product:', productId, 'by admin:', adminUserId);
+
+    const approvedProduct = await FeaturedProductsService.approveFeaturedProduct(productId, adminUserId);
+
+    res.json({
+      message: 'featured_product_approved',
+      featuredProduct: approvedProduct
+    });
+
+  } catch (error: any) {
+    console.error('[POST featured-products/:productId/approve] Error:', error);
+    res.status(500).json({ error: 'failed_to_approve_featured_product', message: error.message });
+  }
+});
+
+// POST /api/featured-products/:productId/reject - Reject a featured product
+router.post('/:productId/reject', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { reason } = req.body;
+    const adminUserId = (req as any).user?.userId;
+
+    if (!adminUserId) {
+      return res.status(401).json({ error: 'admin_user_required', message: 'Admin user ID required' });
+    }
+
+    console.log('[POST featured-products/:productId/reject] Rejecting product:', productId, 'by admin:', adminUserId, 'reason:', reason);
+
+    const rejectedProduct = await FeaturedProductsService.rejectFeaturedProduct(productId, adminUserId, reason);
+
+    res.json({
+      message: 'featured_product_rejected',
+      featuredProduct: rejectedProduct,
+      reason: reason || null
+    });
+
+  } catch (error: any) {
+    console.error('[POST featured-products/:productId/reject] Error:', error);
+    res.status(500).json({ error: 'failed_to_reject_featured_product', message: error.message });
+  }
+});
+
+// GET /api/featured-products/tenants/all-with-featured-access-status - Get all tenants with featured access status
+router.get('/tenants/all-with-featured-access-status', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const allTenants = await FeaturedProductsService.getAllTenantsWithFeaturedAccessStatus();
+
+    res.json({
+      tenants: allTenants,
+      count: allTenants.length
+    });
+
+  } catch (error: any) {
+    console.error('[GET featured-products/tenants/all-with-featured-access-status] Error:', error);
+    res.status(500).json({ error: 'failed_to_get_all_tenants_featured_access_status', message: error.message });
+  }
+});
+
+// GET /api/featured-products/tenants/pending-featured-access - Get tenants pending featured access approval
+router.get('/tenants/pending-featured-access', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pendingTenants = await FeaturedProductsService.getTenantsPendingFeaturedAccess();
+
+    res.json({
+      pendingTenants,
+      count: pendingTenants.length
+    });
+
+  } catch (error: any) {
+    console.error('[GET featured-products/tenants/pending-featured-access] Error:', error);
+    res.status(500).json({ error: 'failed_to_get_pending_tenant_featured_access', message: error.message });
+  }
+});
+
+// GET /api/tenants/:id/featured-access-status - Get tenant's featured access status
+router.get('/tenants/:id/featured-access-status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // TODO: Add proper authentication check
+    // const userId = req.user?.userId;
+    // if (!userId || !req.user?.tenantIds?.includes(id)) {
+    //   return res.status(403).json({ error: 'tenant_access_denied' });
+    // }
+
+    const hasAccess = await FeaturedProductsService.tenantHasFeaturedAccess(id);
+    
+    res.json({
+      hasAccess,
+      tenantId: id,
+      accessType: 'featured',
+      checkedAt: new Date().toISOString()
+    });
+
+  } catch (error: any) {
+    console.error('[GET featured-access-status] Error:', error);
+    res.status(500).json({ error: 'failed_to_get_featured_access_status', message: error.message });
+  }
+});
+
+// GET /api/tenants/:id/featured-products/with-approval - Get tenant's featured products with approval status
+router.get('/tenants/:id/featured-products/with-approval', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { limit = '20', offset = '0' } = req.query;
+    
+    // TODO: Add proper authentication check
+    // const userId = req.user?.userId;
+    // if (!userId || !req.user?.tenantIds?.includes(id)) {
+    //   return res.status(403).json({ error: 'tenant_access_denied' });
+    // }
+
+    // Get tenant's featured products
+    const featuredProducts = await FeaturedProductsService.getFeaturedProductsForTenant(id, {
+      limit: parseInt(limit as string),
+      offset: parseInt(offset as string)
+    });
+
+    // Check if tenant has featured access
+    const hasAccess = await FeaturedProductsService.tenantHasFeaturedAccess(id);
+
+    res.json({
+      featuredProducts,
+      hasFeaturedAccess: hasAccess,
+      tenantId: id,
+      pagination: {
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string),
+        total: featuredProducts.length
+      }
+    });
+
+  } catch (error: any) {
+    console.error('[GET featured-products/with-approval] Error:', error);
+    res.status(500).json({ error: 'failed_to_get_featured_products_with_approval', message: error.message });
+  }
+});
+
+// POST /api/tenants/:id/request-featured-access - Request featured access for tenant
+router.post('/tenants/:id/request-featured-access', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    
+    // TODO: Add proper authentication check
+    // const userId = req.user?.userId;
+    // if (!userId || !req.user?.tenantIds?.includes(id)) {
+    //   return res.status(403).json({ error: 'tenant_access_denied' });
+    // }
+
+    // Check if tenant already has access
+    const hasAccess = await FeaturedProductsService.tenantHasFeaturedAccess(id);
+    if (hasAccess) {
+      return res.status(400).json({ 
+        error: 'already_has_access',
+        message: 'Tenant already has featured access'
+      });
+    }
+
+    // Check if tenant already has a pending request
+    const pendingTenants = await FeaturedProductsService.getTenantsPendingFeaturedAccess();
+    const hasPendingRequest = pendingTenants.some(tenant => tenant.id === id);
+    
+    if (hasPendingRequest) {
+      return res.status(400).json({ 
+        error: 'pending_request_exists',
+        message: 'Tenant already has a pending access request'
+      });
+    }
+
+    // Create a pending request (you could implement a separate table for requests)
+    // For now, we'll just acknowledge the request
+    res.json({
+      message: 'access_request_submitted',
+      tenantId: id,
+      reason: reason || 'No reason provided',
+      status: 'pending_review',
+      submittedAt: new Date().toISOString()
+    });
+
+  } catch (error: any) {
+    console.error('[POST request-featured-access] Error:', error);
+    res.status(500).json({ error: 'failed_to_request_featured_access', message: error.message });
   }
 });
 

@@ -188,7 +188,7 @@ class StorefrontSingletonService extends PublicApiSingleton {
       if (cached && cached.data && cached.data.items && cached.data.items.length > 0) {
         const firstItem = cached.data.items[0];
         if (!('featuredTypes' in firstItem) || !('hasActivePaymentGateway' in firstItem)) {
-          console.log(`[StorefrontSingleton] Clearing old cached data (missing featuredTypes/payment fields)`);
+          // console.log(`[StorefrontSingleton] Clearing old cached data (missing featuredTypes/payment fields)`);
           this.cache.delete(cacheKey);
         }
       }

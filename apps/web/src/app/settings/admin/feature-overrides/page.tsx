@@ -11,7 +11,8 @@ import { Button } from '@mantine/core';
 import { Search, Filter, Plus, Edit, Trash2, Shield, Settings, Zap, X } from 'lucide-react';
 import { featureOverridesService, type Override, type OverrideType, type OverrideStatus } from '@/services/FeatureOverridesService';
 import { tenantTierService, type Tenant, type DbTier } from '@/services/TenantTierService';
-import { organizationService, type Organization } from '@/services/OrganizationService';
+import AdminOrganizationsService, { type Organization } from '@/services/AdminOrganizationsService';
+import TenantLimitsService from '@/services/TenantLimitsService';
 import { notifications } from '@mantine/notifications';
 
 export default function FeatureOverridesPage() {
@@ -83,10 +84,10 @@ export default function FeatureOverridesPage() {
     }
   };
 
-  const fetchOrganizations = async (): Promise<Organization[]> => {
-    const response = await fetch('/api/organizations');
-    if (!response.ok) throw new Error('Failed to fetch organizations');
-    return response.json();
+  const fetchOrganizations = async (): Promise<any[]> => {
+    // MIGRATION: Using AdminOrganizationsService instead of direct fetch
+    const result = await AdminOrganizationsService.getOrganizations();
+    return result.organizations || [];
   };
 
   const fetchTenants = async (): Promise<Tenant[]> => {
@@ -100,15 +101,15 @@ export default function FeatureOverridesPage() {
   };
 
   const fetchFeaturedLimits = async () => {
-    const response = await fetch('/api/tenant-limits/featured-products/all');
-    if (!response.ok) throw new Error('Failed to fetch featured limits');
-    return response.json();
+    // MIGRATION: Using TenantLimitsService for featured product limits instead of direct fetch
+    const result = await TenantLimitsService.getFeaturedProductLimits();
+    return result;
   };
 
   const fetchTenantLimits = async () => {
-    const response = await fetch('/api/tenant-limits/tiers');
-    if (!response.ok) throw new Error('Failed to fetch tenant limits');
-    return response.json();
+    // MIGRATION: Using TenantLimitsService for tenant tiers instead of direct fetch
+    const result = await TenantLimitsService.getTiers();
+    return result;
   };
 
   const fetchOverrides = async () => {

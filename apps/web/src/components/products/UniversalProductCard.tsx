@@ -26,11 +26,20 @@ interface UniversalProductCardProps {
 
 // Featured type configuration
 const FEATURED_TYPE_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
+  // Merchant-controlled types
   staff_pick: { icon: '⭐', label: 'Staff Pick', color: 'from-amber-500 to-yellow-500' },
   new_arrival: { icon: '✨', label: 'New', color: 'from-emerald-500 to-green-500' },
   sale: { icon: '💰', label: 'Sale', color: 'from-red-500 to-rose-500' },
   seasonal: { icon: '🍂', label: 'Seasonal', color: 'from-orange-500 to-amber-500' },
   store_selection: { icon: '🏪', label: 'Featured', color: 'from-blue-500 to-indigo-500' },
+  clearance: { icon: '🔥', label: 'Clearance', color: 'from-yellow-500 to-orange-500' },
+  featured: { icon: '👑', label: 'Premium', color: 'from-indigo-500 to-purple-500' },
+  
+  // Platform-controlled types (algorithmic)
+  trending: { icon: '📈', label: 'Trending', color: 'from-pink-500 to-rose-500' },
+  recommended: { icon: '🏆', label: 'Recommended', color: 'from-teal-500 to-cyan-500' },
+  bestseller: { icon: '🥇', label: 'Bestseller', color: 'from-amber-500 to-yellow-500' },
+  random_featured: { icon: '✨', label: 'Discover', color: 'from-cyan-500 to-blue-500' },
 };
 
 // Get featured type badges to display

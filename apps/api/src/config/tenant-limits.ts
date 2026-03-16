@@ -22,11 +22,16 @@ export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'canceled' | 
  * These limits control how many products can be featured for each type
  */
 export interface FeaturedProductsLimit {
-  store_selection: number;
+   bestseller: number;
+  clearance: number;
+  featured: number;
   new_arrival: number;
-  seasonal: number;
+  recommended: number;
   sale: number;
+  seasonal: number;
   staff_pick: number;
+  store_selection: number;
+  trending: number;
 }
 
 /**
@@ -34,39 +39,64 @@ export interface FeaturedProductsLimit {
  */
 export const FEATURED_PRODUCTS_LIMITS: Record<TenantLimitTier, FeaturedProductsLimit> = {
   google_only: {
-    store_selection: 3,
+    bestseller: 3,
+    clearance: 3,
+    featured: 3,
     new_arrival: 3,
-    seasonal: 2,
+    recommended: 3,
     sale: 3,
+    seasonal: 2,
     staff_pick: 2,
+    store_selection: 3,
+    trending: 3,
   },
   starter: {
-    store_selection: 8,
+    bestseller: 8,
+    clearance: 8,
+    featured: 8,
     new_arrival: 12,
-    seasonal: 6,
+    recommended: 12,
     sale: 10,
+    seasonal: 6,
     staff_pick: 6,
+    store_selection: 8,
+    trending: 8,
   },
   professional: {
-    store_selection: 15,
+    bestseller: 15,
+    clearance: 15,
+    featured: 15,
     new_arrival: 20,
-    seasonal: 12,
+    recommended: 20,
     sale: 15,
+    seasonal: 12,
     staff_pick: 10,
+    store_selection: 15,
+    trending: 15,
   },
   enterprise: {
-    store_selection: 25,
+    bestseller: 25,
+    clearance: 25,
+    featured: 25,
     new_arrival: 30,
-    seasonal: 20,
+    recommended: 30,
     sale: 25,
+    seasonal: 20,
     staff_pick: 15,
+    store_selection: 25,
+    trending: 25,
   },
   organization: {
-    store_selection: 50,
+    bestseller: 50,
+    clearance: 50,
+    featured: 50,
     new_arrival: 50,
-    seasonal: 40,
+    recommended: 50,
     sale: 50,
+    seasonal: 40,
     staff_pick: 30,
+    store_selection: 50,
+    trending: 50,
   },
 };
 

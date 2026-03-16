@@ -161,7 +161,13 @@ class DirectorySingletonService extends PublicApiSingleton {
    * Uses centralized tenant context utility
    */
   private getTenantAwareCacheKey(baseKey: string, tenantId?: string): string {
-    return clientTenantContextManager.getTenantAwareCacheKey(baseKey, tenantId);
+    // Check if we're on the client side before accessing clientTenantContextManager
+    if (typeof window !== 'undefined' && clientTenantContextManager) {
+      return clientTenantContextManager.getTenantAwareCacheKey(baseKey, tenantId);
+    }
+    
+    // Fallback for server side or when context manager is not available
+    return tenantId ? `${baseKey}:${tenantId}` : baseKey;
   }
 
   /**

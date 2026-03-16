@@ -12,7 +12,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import { externalApiService } from '@/services/ExternalApiService';
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
 
 // In-memory cache to prevent race conditions when multiple calls happen simultaneously
 let cachedSessionId: string | null = null;
@@ -20,11 +20,19 @@ let sessionCacheExpiry: number = 0;
 const SESSION_CACHE_TTL_MS = 60000; // 1 minute cache
 
 // Behavior Tracking Singleton Class
-class BehaviorTrackingSingleton extends PublicApiSingleton {
+class BehaviorTrackingSingleton extends ApiSystemSingleton {
   private static instance: BehaviorTrackingSingleton;
 
   private constructor() {
-    super('behavior-tracking', { encrypt: false });
+    super('behavior-tracking', {
+      enableCache: true,
+      enableEncryption: true, // Enable encryption for tracking data
+      enablePrivateCache: true,
+      authenticationLevel: 'public', // Public tracking
+      defaultTTL: 30 * 60 * 1000, // 30 minutes for tracking data
+      enableMetrics: true,
+      enableLogging: false
+    });
   }
 
   public static getInstance(): BehaviorTrackingSingleton {
@@ -34,27 +42,75 @@ class BehaviorTrackingSingleton extends PublicApiSingleton {
     return BehaviorTrackingSingleton.instance;
   }
 
-  async trackRecommendation(userId: string, sessionToken: string, trackingData: any, location?: any): Promise<void> {
-    const response = await this.makeDefaultRequest<any>(
-      `/api/recommendations/track`,
+  async trackRecommendation(trackingData: any, location?: any): Promise<void> {
+    // Get user/session ID from base class methods (like AuthContext)
+    const userId = this.getUserIdFromContext();
+    const sessionId = this.getSessionIdFromContext();
+    
+    const response = await this.makeSystemRequest<any>(
+      '/api/recommendations/track',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          sessionId: sessionToken,
+          sessionId,
           ...trackingData,
           locationLat: location?.latitude,
           locationLng: location?.longitude,
-          referrer: '', // Server-side can't access referrer easily
-          userAgent: '', // Server-side can't access user agent
+          referrer: typeof window !== 'undefined' ? document.referrer : '',
+          userAgent: typeof window !== 'undefined' ? navigator.userAgent : ''
         })
+      },
+      {
+        cacheKey: 'behavior-tracking-recommendation',
+        ttl: 0 // No caching for tracking events
       }
     );
     
     if (!response.success) {
       throw new Error(`Failed to track recommendation: ${response.error || 'Unknown error'}`);
     }
+  }
+
+  // New method for tracking general events
+  async trackEvent(eventType: string, eventData: any): Promise<void> {
+    const userId = this.getUserIdFromContext();
+    const sessionId = this.getSessionIdFromContext();
+    
+    const response = await this.makeSystemRequest<any>(
+      '/api/analytics/track',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventType,
+          userId,
+          sessionId,
+          eventData,
+          timestamp: Date.now(),
+          referrer: typeof window !== 'undefined' ? document.referrer : '',
+          userAgent: typeof window !== 'undefined' ? navigator.userAgent : ''
+        })
+      },
+      {
+        cacheKey: 'behavior-tracking-event',
+        ttl: 0 // No caching for tracking events
+      }
+    );
+    
+    if (!response.success) {
+      throw new Error(`Failed to track event: ${response.error || 'Unknown error'}`);
+    }
+  }
+
+  // Public methods to expose user/session detection for external functions
+  public getUserId(): string | null {
+    return super.getUserIdFromContext();
+  }
+
+  public getSessionId(): string | null {
+    return super.getSessionIdFromContext();
   }
 }
 
@@ -205,7 +261,6 @@ class BehaviorTrackingCache {
     this.saveToStorage();
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
       // Get current location for all events in batch
       const location = await getUserLocationClient();
@@ -432,8 +487,7 @@ export interface TrackingData {
 /**
  * Track user behavior from any page
  */
-export async function trackBehavior(trackingData: TrackingData): Promise<void> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+export async function trackBehavior(trackingData: TrackingData): Promise<void> { 
   
   try {
     // Get user session if available
@@ -453,7 +507,7 @@ export async function trackBehavior(trackingData: TrackingData): Promise<void> {
     const location = await getUserLocationServer();
     
     const trackingSingleton = BehaviorTrackingSingleton.getInstance();
-    await trackingSingleton.trackRecommendation(userId, sessionToken, trackingData, location);
+    await trackingSingleton.trackRecommendation(trackingData, location);
   } catch (error) {
     // Tracking failures should be silent - don't show to users
     console.warn('Silent tracking failure:', error instanceof Error ? error.message : 'Unknown error');
@@ -552,9 +606,10 @@ async function getUserLocationServer(): Promise<{
   state: string;
 } | null> {
   try {
-    // Get user context for unique cache key
-    const userId = getUserIdFromContext();
-    const sessionId = getSessionIdFromContext();
+    // Get user context from base class methods
+    const trackingSingleton = BehaviorTrackingSingleton.getInstance();
+    const userId = trackingSingleton.getUserId();
+    const sessionId = trackingSingleton.getSessionId();
     const userContext = userId || sessionId || 'anonymous';
     
     // Use unique cache key with user context
@@ -580,50 +635,8 @@ async function getUserLocationServer(): Promise<{
 }
 
 /**
- * Get user ID from various context sources
- */
-function getUserIdFromContext(): string | null {
-  // Try localStorage first
-  if (typeof window !== 'undefined') {
-    const userId = localStorage.getItem('userId');
-    if (userId) return userId;
-    
-    // Try session storage
-    const sessionUserId = sessionStorage.getItem('userId');
-    if (sessionUserId) return sessionUserId;
-    
-    // Try cookie
-    const cookies = document.cookie.split(';');
-    const userIdCookie = cookies.find(cookie => cookie.trim().startsWith('userId='));
-    if (userIdCookie) {
-      return userIdCookie.split('=')[1]?.trim();
-    }
-  }
-  
-  return null;
-}
-
-/**
- * Get session ID for anonymous users
- */
-function getSessionIdFromContext(): string | null {
-  if (typeof window !== 'undefined') {
-    // Try session storage
-    let sessionId = sessionStorage.getItem('sessionId');
-    if (!sessionId) {
-      // Generate new session ID
-      sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      sessionStorage.setItem('sessionId', sessionId);
-    }
-    return sessionId;
-  }
-  
-  return null;
-}
-
-/**
  * Client-side behavior tracking (for interactive elements)
- * Now uses caching for better performance and reliability
+ * Now uses base class methods for user/session detection and caching
  */
 // Simple decryption for client-side caching (matches AuthContext)
 function decrypt(text: string): string {
@@ -735,9 +748,10 @@ async function getUserLocationClient(): Promise<{
   
   // Fallback to IP-based location
   try {
-    // Get user context for unique cache key
-    const userId = getUserIdFromContext();
-    const sessionId = getSessionIdFromContext();
+    // Get user context from singleton methods
+    const trackingSingleton = BehaviorTrackingSingleton.getInstance();
+    const userId = trackingSingleton.getUserId();
+    const sessionId = trackingSingleton.getSessionId();
     const userContext = userId || sessionId || 'anonymous';
     
     // Use unique cache key with user context

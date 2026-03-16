@@ -25,7 +25,7 @@ router.get('/tenants/:tenantId/products/featured', authenticateToken, requireInv
 
     // Use singleton service with caching for featured products
     const featuredProducts = await featuredProductsService.getFeaturedProductsByTenant(tenantId, {
-      featuredType: 'store_selection', // Only store_selection managed by this page
+      featuredType: 'featured', // Only featured managed by this page
       isActive: activeOnly === 'true',
       limit: parseInt(limit as string),
       sortBy: 'priority',
@@ -130,11 +130,11 @@ router.get('/tenants/:tenantId/products/featuring/status', authenticateToken, re
     const tier = tenant.subscription_tier || 'trial';
     const limit = FEATURING_LIMITS[tier] || 0;
 
-    // Count current featured products from junction table (only store_selection)
+    // Count current featured products from junction table (only featured)
     const current = await prisma.featured_products.count({
       where: {
         tenant_id: tenantId,
-        featured_type: 'store_selection', // Only count products featured by this manager
+        featured_type: 'featured', // Only count products featured by this manager
         is_active: true,
         OR: [
           { featured_expires_at: null },
@@ -178,7 +178,7 @@ router.post('/tenants/:tenantId/products/:productId/feature', authenticateToken,
     const currentCount = await prisma.featured_products.count({
       where: {
         tenant_id: tenantId,
-        featured_type: 'store_selection', // Only count products featured by this manager
+        featured_type: 'featured  ', // Only count products featured by this manager
         is_active: true,
         OR: [
           { featured_expires_at: null },
@@ -208,12 +208,14 @@ router.post('/tenants/:tenantId/products/:productId/feature', authenticateToken,
       data: {
         inventory_item_id: productId,
         tenant_id: tenantId,
-        featured_type: 'store_selection', // Default to store_selection for legacy system
+        featured_type: 'featured', // Default to featured for legacy system
         featured_priority: parseInt(priority) || 50,
         featured_at: new Date(),
         featured_expires_at: featuredUntil,
         is_active: true,
-        auto_unfeature: true
+        auto_unfeature: true,
+        admin_approved: true, // Auto-approve featured products by default
+        approved_at: new Date()
       },
       include: {
         inventory_items: {
@@ -801,7 +803,7 @@ router.get('/tenants/:tenantId/products/featured/out-of-stock', authenticateToke
     const outOfStockFeatured = await prisma.featured_products.findMany({
       where: {
         tenant_id: tenantId,
-        featured_type: 'store_selection',
+        featured_type: 'featured',
         is_active: true,
         OR: [
           { featured_expires_at: null },
