@@ -104,6 +104,7 @@ const makeBothConventionsAvailable = (obj: any): any => {
 
 /**
  * Middleware to authenticate JWT token
+ * Supports both JWT tokens and Auth0 session headers
  */
 export async function authenticateToken(req: Request, res: Response, next: NextFunction) {
   try {
@@ -112,48 +113,102 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
 
     // console.log('[AUTH] authenticateToken called for:', req.method, req.path, 'Token present:', !!token);
 
-    if (!token) {
-      console.log('[AUTH] No token provided');
-      return res.status(401).json({ error: 'authentication_required', message: 'No token provided' });
+    // Try JWT token authentication first
+    if (token) {
+      //console.log('[AUTH] JWT verification attempted for token:', token.substring(0, 20) + '...');
+      const payload = authService.verifyAccessToken(token);
+      //console.log('[AUTH] Token verified successfully, payload:', { userId: payload.userId, user_id: payload.user_id, email: payload.email, role: payload.role });
+      
+      // Check if the session has been revoked in the database
+      const userId = payload.userId || payload.user_id;
+      if (userId) {
+        try {
+          const { prisma } = await import('../prisma');
+          const session = await prisma.user_sessions_list.findFirst({
+            where: {
+              user_id: userId,
+              is_active: true,
+              expires_at: { gt: new Date() }
+            },
+            select: { id: true }
+          });
+
+          if (!session) {
+            console.log('[AUTH] Session revoked or expired for user:', userId);
+            return res.status(401).json({ error: 'session_revoked', message: 'Your session has been revoked' });
+          }
+        } catch (error) {
+          console.error('[AUTH] Error checking session status:', error);
+          // If database check fails, allow request to proceed (fail open for availability)
+        }
+      }
+      
+      // Apply universal transform to JWT payload to ensure both naming conventions
+      const transformedPayload = makeBothConventionsAvailable(payload);
+      req.user = transformedPayload;
+      return next();
     }
 
-    //console.log('[AUTH] JWT verification attempted for token:', token.substring(0, 20) + '...');
-    const payload = authService.verifyAccessToken(token);
-    //console.log('[AUTH] Token verified successfully, payload:', { userId: payload.userId, user_id: payload.user_id, email: payload.email, role: payload.role });
-    
-    // Check if the session has been revoked in the database
-    const userId = payload.userId || payload.user_id;
-    if (userId) {
-      try {
-        const { prisma } = await import('../prisma');
-        const session = await prisma.user_sessions_list.findFirst({
-          where: {
-            user_id: userId,
-            is_active: true,
-            expires_at: { gt: new Date() }
-          },
-          select: { id: true }
-        });
+    // Fallback to Auth0 session authentication via headers
+    const auth0Id = req.headers['x-auth0-id'] as string;
+    const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
 
-        if (!session) {
-          console.log('[AUTH] Session revoked or expired for user:', userId);
-          return res.status(401).json({ error: 'session_revoked', message: 'Your session has been revoked' });
-        }
-      } catch (error) {
-        console.error('[AUTH] Error checking session status:', error);
-        // If database check fails, allow request to proceed (fail open for availability)
+    if (auth0Id || auth0Email) {
+      const { prisma } = await import('../prisma');
+      
+      let user = null;
+      
+      // Try by auth0_id first (most reliable)
+      if (auth0Id) {
+        user = await prisma.users.findUnique({
+          where: { auth0_id: auth0Id },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            auth0_id: true,
+            user_tenants_list: {
+              select: { tenant_id: true }
+            }
+          }
+        });
+      }
+      
+      // Fallback to email lookup
+      if (!user && auth0Email) {
+        user = await prisma.users.findUnique({
+          where: { email: auth0Email.toLowerCase() },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            auth0_id: true,
+            user_tenants_list: {
+              select: { tenant_id: true }
+            }
+          }
+        });
+      }
+
+      if (user) {
+        // Build JWT-like payload from user data
+        const payload: JWTPayload = {
+          id: user.id,
+          userId: user.id,
+          user_id: user.id,
+          email: user.email,
+          role: user.role as user_role,
+          tenantIds: user.user_tenants_list?.map((ut: any) => ut.tenant_id) || []
+        };
+        
+        req.user = makeBothConventionsAvailable(payload);
+        return next();
       }
     }
-    
-    // Apply universal transform to JWT payload to ensure both naming conventions
-    const transformedPayload = makeBothConventionsAvailable(payload);
-    //console.log('[AUTH] Payload transformed, setting req.user');
-    
-    req.user = transformedPayload;
-    //console.log('[AUTH] req.user set successfully, calling next()');
-    //console.log('[AUTH] About to call next() for route:', req.method, req.path);
-    next();
-    //console.log('[AUTH] next() called successfully - should proceed to next middleware');
+
+    // No valid authentication found
+    console.log('[AUTH] No token or Auth0 session provided');
+    return res.status(401).json({ error: 'authentication_required', message: 'No token provided' });
   } catch (error) {
     console.error('[AUTH] Exception in authenticateToken:', error);
     if (error instanceof Error) {
