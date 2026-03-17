@@ -29,6 +29,7 @@ function OnboardingContent() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [savedProfile, setSavedProfile] = useState<any>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -73,16 +74,8 @@ function OnboardingContent() {
       const result = await userManagementService.completeOnboarding(formData);
 
       if (result.success) {
+        setSavedProfile(result.user);
         setCurrentStep(ONBOARDING_STEPS.length - 1); // Show complete step
-        // Redirect after 2 seconds
-        setTimeout(() => {
-          const tenantId = searchParams.get('tenantId');
-          if (tenantId) {
-            router.replace(`/t/${tenantId}/onboarding`);
-          } else {
-            router.replace('/tenants');
-          }
-        }, 2000);
       } else {
         console.error('Onboarding failed:', result.error);
       }
@@ -90,6 +83,15 @@ function OnboardingContent() {
       console.error('Onboarding failed:', error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleGoToTenants = () => {
+    const tenantId = searchParams.get('tenantId');
+    if (tenantId) {
+      router.replace(`/t/${tenantId}/onboarding`);
+    } else {
+      router.replace('/tenants');
     }
   };
 
@@ -106,7 +108,30 @@ function OnboardingContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 bg-grid-pattern opacity-5" />
+
+      <div className="relative w-full max-w-3xl">
+        {/* Logo/Brand */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-8"
+        >
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-2xl mb-4 shadow-lg">
+            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <h1 className="text-3xl font-bold text-neutral-900 mb-2">
+            Welcome to Visible Shelf
+          </h1>
+          <p className="text-neutral-600">
+            Let's set up your account in just a few steps
+          </p>
+        </motion.div>
+
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex justify-between mb-2">
@@ -231,13 +256,102 @@ function OnboardingContent() {
 
               {/* Complete Step */}
               {currentStep === 3 && (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="text-center py-4">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+                    className="inline-flex items-center justify-center w-24 h-24 bg-success rounded-full mb-6"
+                  >
+                    <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
+                  </motion.div>
+
+                  <h2 className="text-3xl font-bold text-neutral-900 mb-3">
+                    You're all set!
+                  </h2>
+                  <p className="text-neutral-600 mb-6 max-w-md mx-auto">
+                    Your account has been set up. Now let's create your first store location.
+                  </p>
+
+                  {/* Profile Summary Card */}
+                  {savedProfile && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 }}
+                      className="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 max-w-md mx-auto mb-6 text-left"
+                    >
+                      <h3 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Profile Summary
+                      </h3>
+
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+                            <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-neutral-500 uppercase tracking-wide">Name</p>
+                            <p className="text-sm font-medium text-neutral-900">{formData.firstName} {formData.lastName}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                            <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-neutral-500 uppercase tracking-wide">Business</p>
+                            <p className="text-sm font-medium text-neutral-900">{formData.businessName}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-neutral-500 uppercase tracking-wide">Type</p>
+                            <p className="text-sm font-medium text-neutral-900">
+                              {BUSINESS_TYPES.find(t => t.id === formData.businessType)?.label || 'Not set'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center justify-center gap-2 text-sm text-neutral-600">
+                      <svg className="w-5 h-5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Account created</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-sm text-neutral-600">
+                      <svg className="w-5 h-5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Profile configured</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-sm text-neutral-600">
+                      <svg className="w-5 h-5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Ready to create your first store</span>
+                    </div>
                   </div>
-                  <p className="text-neutral-600">Redirecting you to your dashboard...</p>
                 </div>
               )}
 
@@ -260,9 +374,53 @@ function OnboardingContent() {
                   </Button>
                 </div>
               )}
+
+              {/* Complete Step Actions */}
+              {currentStep === 3 && (
+                <div className="mt-8 pt-6 border-t border-neutral-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                    <Button onClick={handleGoToTenants}>
+                      Create Your First Store
+                      <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </Button>
+                    <Button variant="primary" onClick={() => router.push('/tenants')}>
+                      🚀 Quick Start (Recommended)
+                    </Button>
+                  </div>
+
+                  <div className="flex justify-center gap-4">
+                    <Button variant="ghost" onClick={() => router.push('/settings/profile')}>
+                      Edit Profile
+                    </Button>
+                    <Button variant="ghost" onClick={() => router.push('/settings/subscription')}>
+                      View Plans
+                    </Button>
+                  </div>
+                </div>
+              )}
             </AnimatedCard>
           </motion.div>
         </AnimatePresence>
+
+        {/* Footer */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="text-center mt-6 text-sm text-neutral-600"
+        >
+          <p>
+            Need help?{' '}
+            <a
+              href="/settings/contact"
+              className="text-primary-600 hover:text-primary-700 font-medium underline"
+            >
+              Contact support
+            </a>
+          </p>
+        </motion.div>
       </div>
     </div>
   );
