@@ -6612,7 +6612,7 @@ app.use('/api/security/telemetry', securityTelemetryRoutes); // Mount telemetry 
 app.use('/api/security', securityAlertsRoutes);
 app.use('/api/admin/security', adminSecurityMonitoringRoutes);
 app.use('/api/admin/security', authenticateToken, requireAdmin, adminSecurityRoutes);
-console.log('✅ Auth0 sync routes mounted at /api/auth/sync-user');
+console.log('✅ Auth0 sync routes mounted at /api/auth/sync-user - Railway redeploy');
 console.log('✅ Security sessions routes mounted at /api/auth/sessions');
 console.log('✅ Security telemetry routes mounted at /api/security/telemetry (no auth required)');
 console.log('✅ Security alerts routes mounted at /api/security/security-alerts');

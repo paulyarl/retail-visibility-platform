@@ -21,6 +21,8 @@ export const auth0 = new Auth0Client({
   // Custom callback hook to sync user to database after successful login
   onCallback: async (error, ctx, session) => {
     console.log('[Auth0] onCallback triggered', { error: !!error, hasSession: !!session, hasUser: !!session?.user });
+    console.log('[Auth0] Session keys:', session ? Object.keys(session) : 'null');
+    console.log('[Auth0] Session.user keys:', session?.user ? Object.keys(session.user) : 'null');
     
     if (error) {
       console.error('[Auth0] Callback error:', error);
