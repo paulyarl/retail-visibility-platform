@@ -14,7 +14,7 @@ import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 // Behavior Tracking Data Interfaces
 export interface TrackingEvent {
   id: string;
-  userId?: string;
+  // userId removed - server determines from Auth0 session
   tenantId?: string;
   sessionId: string;
   eventType: string;
@@ -29,7 +29,7 @@ export interface TrackingEvent {
 
 export interface TrackingSession {
   id: string;
-  userId?: string;
+  // userId removed - server determines from Auth0 session
   tenantId?: string;
   startTime: string;
   endTime?: string;
@@ -170,12 +170,14 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
 
   /**
    * Track a behavior event
+   * 
+   * Auth0: userId determined server-side from session
    */
   async trackEvent(
     eventType: string,
     eventData: Record<string, any>,
     options: {
-      userId?: string;
+      // userId removed - server determines from Auth0 session
       tenantId?: string;
       priority?: 'low' | 'normal' | 'high' | 'critical';
     } = {}
@@ -185,7 +187,7 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
 
     const event: TrackingEvent = {
       id: this.generateEventId(),
-      userId: options.userId,
+      // userId not included - server determines from Auth0 session
       tenantId: options.tenantId,
       sessionId: this.currentSessionId || 'unknown',
       eventType,
@@ -217,11 +219,13 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
 
   /**
    * Track page view
+   * 
+   * Auth0: userId determined server-side from session
    */
   async trackPageView(
     url: string,
     options: {
-      userId?: string;
+      // userId removed - server determines from Auth0 session
       tenantId?: string;
       referrer?: string;
     } = {}
@@ -244,12 +248,14 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
 
   /**
    * Track user interaction
+   * 
+   * Auth0: userId determined server-side from session
    */
   async trackInteraction(
     interactionType: string,
     target: string,
     options: {
-      userId?: string;
+      // userId removed - server determines from Auth0 session
       tenantId?: string;
       value?: any;
     } = {}
@@ -264,12 +270,14 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
 
   /**
    * Track search query
+   * 
+   * Auth0: userId determined server-side from session
    */
   async trackSearch(
     query: string,
     results: number,
     options: {
-      userId?: string;
+      // userId removed - server determines from Auth0 session
       tenantId?: string;
       category?: string;
     } = {}
@@ -284,12 +292,14 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
 
   /**
    * Track conversion event
+   * 
+   * Auth0: userId determined server-side from session
    */
   async trackConversion(
     conversionType: string,
     value: number,
     options: {
-      userId?: string;
+      // userId removed - server determines from Auth0 session
       tenantId?: string;
       currency?: string;
       productId?: string;
@@ -328,6 +338,8 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
 
   /**
    * Send single event to API
+   * 
+   * Auth0: userId determined server-side from session
    */
   private async sendEvent(event: TrackingEvent): Promise<void> {
     try {
@@ -337,7 +349,7 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
         action: event.eventType,
         data: event.eventData,
         timestamp: event.timestamp,
-        userId: event.userId,
+        // userId not sent - server determines from Auth0 session
         sessionId: event.sessionId,
         tenantId: event.tenantId,
         metadata: {
@@ -355,6 +367,8 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
 
   /**
    * Send batch of events to API
+   * 
+   * Auth0: userId determined server-side from session
    */
   private async sendBatch(events: TrackingEvent[]): Promise<void> {
     try {
@@ -364,7 +378,7 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
         action: event.eventType,
         data: event.eventData,
         timestamp: event.timestamp,
-        userId: event.userId,
+        // userId not sent - server determines from Auth0 session
         sessionId: event.sessionId,
         tenantId: event.tenantId,
         metadata: {
@@ -426,13 +440,15 @@ class BehaviorTrackingSingleton extends ApiSystemSingleton {
 
   /**
    * Send session data to API
+   * 
+   * Auth0: userId determined server-side from session
    */
   private async sendSession(session: TrackingSession): Promise<void> {
     try {
       // Transform session to match service interface
       const serviceSession = {
         id: session.id,
-        userId: session.userId,
+        // userId not sent - server determines from Auth0 session
         tenantId: session.tenantId,
         startTime: session.startTime,
         endTime: session.endTime,

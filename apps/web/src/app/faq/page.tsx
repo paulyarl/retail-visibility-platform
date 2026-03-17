@@ -257,11 +257,11 @@ export default function FAQPage() {
                   Features
                 </button>
               </Link>
-              <Link href="/login">
+              <a href="/auth/login">
                 <button className="text-neutral-600 hover:text-neutral-900 text-sm font-medium">
                   Sign In
                 </button>
-              </Link>
+              </a>
             </div>
           </div>
         </div>
@@ -342,11 +342,11 @@ export default function FAQPage() {
                 Contact Support
               </button>
             </Link>
-            <Link href="/login">
+            <a href="/auth/signup">
               <button className="bg-transparent text-white border-2 border-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-primary-600 transition-colors">
                 Start Free Trial
               </button>
-            </Link>
+            </a>
           </div>
         </div>
       </section>

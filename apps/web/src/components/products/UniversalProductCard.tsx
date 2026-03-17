@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useProductSingleton } from '@/providers/data/ProductSingleton';
 import { useStoreData } from '@/providers/StoreProviderSingleton';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
+import { Badge as MantineBadge } from '@mantine/core';
 
 // ====================
 // UNIVERSAL PRODUCT CARD
@@ -40,14 +41,25 @@ const FEATURED_TYPE_CONFIG: Record<string, { icon: string; label: string; color:
   recommended: { icon: '🏆', label: 'Recommended', color: 'from-teal-500 to-cyan-500' },
   bestseller: { icon: '🥇', label: 'Bestseller', color: 'from-amber-500 to-yellow-500' },
   random_featured: { icon: '✨', label: 'Discover', color: 'from-cyan-500 to-blue-500' },
+  premium: { icon: '💎', label: 'Premium', color: 'from-violet-500 to-purple-500' },
 };
 
-// Get featured type badges to display
+// Get featured type badges to display (with fallback for unknown types)
 const getFeaturedTypeBadges = (types: string[] | undefined) => {
   if (!types || types.length === 0) return [];
-  return types
-    .filter(type => FEATURED_TYPE_CONFIG[type])
-    .map(type => ({ ...FEATURED_TYPE_CONFIG[type], type }));
+  return types.map(type => {
+    // Use configured type or generate fallback
+    if (FEATURED_TYPE_CONFIG[type]) {
+      return { ...FEATURED_TYPE_CONFIG[type], type };
+    }
+    // Fallback for unknown types - format the type name nicely
+    return {
+      icon: '🏷️',
+      label: type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+      color: 'from-gray-500 to-slate-500',
+      type
+    };
+  });
 };
 
 
@@ -194,12 +206,7 @@ export function UniversalProductCard({
             {/* Product Info */}
             <div className="ml-3 flex-1 min-w-0">
               <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                {hoursStatus && (
-                  <div
-                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
-                    title={hoursStatus.label}
-                  />
-                )}
+                
                 {product.name}
               </h3>
               {/* SKU */}
@@ -287,12 +294,7 @@ export function UniversalProductCard({
               {/* Product Info */}
               <div className="ml-2 flex-1 min-w-0">
                 <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">
-                   {hoursStatus && (
-                  <div
-                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
-                    title={hoursStatus.label}
-                  />
-                )}
+                  
                   {product.name}
                 </h3>
                 <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
@@ -355,12 +357,7 @@ export function UniversalProductCard({
         {/* Product Name */}
         <Link href={`/products/${product.id}`}>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-2">
-             {hoursStatus && (
-                  <div
-                    className={`w-2 h-2 rounded-full ml-2 ${getStatusColor()}`}
-                    title={hoursStatus.label}
-                  />
-                )}
+            
             {product.name}
           </h3>
         </Link>
@@ -447,6 +444,60 @@ export function UniversalProductCard({
             {store.city && store.state && (
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {store.city}, {store.state}
+                 {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
               </p>
             )}
           </div>
@@ -478,6 +529,60 @@ export function UniversalProductCard({
             ) : (
               <span className="text-xs text-gray-500 dark:text-gray-400 italic">
                 Contact store for purchase
+                 {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
               </span>
             )}
           </div>

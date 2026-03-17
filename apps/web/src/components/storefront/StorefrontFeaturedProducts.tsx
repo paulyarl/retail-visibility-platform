@@ -313,15 +313,20 @@ function FeaturedTypeBadges({ featuredTypes }: { featuredTypes?: string[] }) {
     <div className="flex flex-wrap gap-1 mt-2">
       {featuredTypes.map((type) => {
         const config = featuredTypeConfig[type as keyof typeof featuredTypeConfig];
-        if (!config) return null;
+        // Use config or fallback for unknown types
+        const displayConfig = config || {
+          badgeColor: 'bg-gray-100 text-gray-800 border-gray-200',
+          icon: <Star className="w-4 h-4" />,
+          title: type.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+        };
         
         return (
           <span
             key={type}
-            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${config.badgeColor}`}
+            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${displayConfig.badgeColor}`}
           >
-            {config.icon}
-            <span className="ml-1">{config.title}</span>
+            {displayConfig.icon}
+            <span className="ml-1">{displayConfig.title}</span>
           </span>
         );
       })}

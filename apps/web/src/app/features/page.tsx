@@ -292,12 +292,12 @@ export default function FeaturesPage() {
               </Link>
             )}
             <div className="flex items-center gap-3">
-              <Link href="/login">
+              <a href="/auth/login">
                 <Button variant="ghost" size="sm">Sign In</Button>
-              </Link>
-              <Link href="/login">
+              </a>
+              <a href="/auth/signup">
                 <Button size="sm">Get Started</Button>
-              </Link>
+              </a>
             </div>
           </div>
         </div>
@@ -320,9 +320,9 @@ export default function FeaturesPage() {
               Everything you need to dominate local search and drive customers to your store. No website developer needed.
             </p>
             <div className="flex items-center justify-center gap-4">
-              <Link href="/login">
+              <a href="/auth/signup">
                 <Button size="lg">Start Free Trial</Button>
-              </Link>
+              </a>
               <Link href="#pricing">
                 <Button variant="secondary" size="lg">View Pricing</Button>
               </Link>
@@ -1277,11 +1277,11 @@ export default function FeaturesPage() {
                   <span className="text-5xl font-bold text-neutral-900">{tier.price}</span>
                   <span className="text-neutral-600">{tier.period}</span>
                 </div>
-                <Link href="/login" className="block mb-6">
+                <a href="/auth/signup" className="block mb-6">
                   <Button className="w-full" variant={tier.popular ? 'primary' : 'secondary'}>
                     {tier.cta}
                   </Button>
-                </Link>
+                </a>
                 <ul className="space-y-3">
                   {tier.features.map((feature) => (
                     <li key={feature} className="flex items-start text-sm text-neutral-700">
@@ -1500,11 +1500,11 @@ export default function FeaturesPage() {
             Join 1,500+ retailers who trust our platform to manage and grow their business.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <Link href="/login">
+            <a href="/auth/signup">
               <Button size="lg" variant="secondary">
                 Start Free Trial
               </Button>
-            </Link>
+            </a>
             <Link href="/settings/contact">
               <Button size="lg" variant="ghost" className="bg-transparent text-white border border-white hover:bg-white hover:text-primary-600">
                 Contact Sales

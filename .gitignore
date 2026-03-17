@@ -52,3 +52,4 @@ Thumbs.db
 !RESET_DATABASE.sql
 !SYNC_*.sql
 !VERIFY_*.sql
+.env*.local

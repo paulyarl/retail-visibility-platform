@@ -10,9 +10,10 @@ import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingl
 // Behavior Tracking Types
 export interface TrackingEvent {
   id: string;
-  userId?: string;
+  userId?: string | null;           // Auth0 user ID if authenticated, null if anonymous
   tenantId?: string;
   sessionId: string;
+  isAuthenticated?: boolean;         // Whether user is authenticated via Auth0
   eventType: string;
   eventData: Record<string, any>;
   timestamp: string;

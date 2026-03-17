@@ -275,8 +275,8 @@ export default function TestPhase1_2() {
             <div>
               <h3 className="font-semibold mb-2">Phase 1: Core Infrastructure</h3>
               <div className="space-y-1">
-                <a href="/login" className="text-blue-600 hover:underline block">→ Login Page</a>
-                <a href="/register" className="text-blue-600 hover:underline block">→ Register Page</a>
+                <a href="/auth/login" className="text-blue-600 hover:underline block">→ Login Page</a>
+                <a href="/auth/signup" className="text-blue-600 hover:underline block">→ Register Page</a>
                 <a href="/tenants" className="text-blue-600 hover:underline block">→ Tenants List</a>
                 <a href="/t/demo-tenant" className="text-blue-600 hover:underline block">→ Demo Tenant</a>
               </div>

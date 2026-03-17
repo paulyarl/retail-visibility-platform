@@ -37,7 +37,7 @@ interface SyncLog {
 export default function SquareIntegrationPage() {
   const params = useParams();
   const tenantId = params?.tenantId as string;
-  const { getAccessToken } = useAuth();
+  // Auth0 handles tokens server-side via HTTP-only cookies
   // State
   const [status, setStatus] = useState<SquareStatus | null>(null);
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);

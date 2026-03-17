@@ -228,7 +228,7 @@ export class DigitalAssetService {
       return {
         size: file.metadata?.size || 0,
         mimeType: file.metadata?.mimetype || 'application/octet-stream',
-        lastModified: file.updated_at || file.created_at,
+        lastModified: file.updated_at || file.created_at || new Date().toISOString(),
       };
     } catch (error) {
       console.error('[DigitalAsset] Metadata error:', error);

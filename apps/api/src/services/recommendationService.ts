@@ -396,10 +396,16 @@ export async function getTrendingNearby(
 /**
  * Track user behavior for recommendations
  * Now supports multiple entity types and page types
+ * 
+ * Auth0 Integration:
+ * - userId: Server-determined from Auth0 session (null if anonymous)
+ * - sessionId: Server-determined (always present)
+ * - isAuthenticated: Whether user is authenticated via Auth0
  */
 export async function trackUserBehavior({
   userId,
   sessionId,
+  isAuthenticated, // Auth0 auth status
   entityType, // 'store', 'product', 'category', 'search'
   entityId,
   entityName,
@@ -412,8 +418,9 @@ export async function trackUserBehavior({
   pageType, // 'directory_detail', 'product_page', 'storefront', 'directory_home'
   durationSeconds
 }: {
-  userId?: string;
+  userId?: string | null;
   sessionId?: string;
+  isAuthenticated?: boolean;
   entityType: string;
   entityId: string;
   entityName?: string;
@@ -432,10 +439,10 @@ export async function trackUserBehavior({
     // entity_id is TEXT column - supports both UUIDs and text slugs
     const query = `
       INSERT INTO user_behavior_simple (
-        user_id, session_id, entity_type, entity_id, entity_name, context,
+        user_id, session_id, is_authenticated, entity_type, entity_id, entity_name, context,
         location_lat, location_lng, referrer, user_agent, ip_address, 
         duration_seconds, page_type
-      ) VALUES ($1, $2, $3::text, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ) VALUES ($1, $2, $3, $4::text, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       ON CONFLICT DO NOTHING
     `;
     
@@ -445,6 +452,7 @@ export async function trackUserBehavior({
     const queryParams = [
       userId || null,
       sessionId || null,
+      isAuthenticated || false,
       entityType,
       actualEntityId,
       entityName || null,

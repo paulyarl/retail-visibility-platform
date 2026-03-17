@@ -1,6 +1,11 @@
 /**
  * Recommendation API Routes
  * MVP Recommendation System
+ * 
+ * Auth0 Integration:
+ * - User identity extracted server-side from Auth0 session
+ * - Supports both authenticated and anonymous users
+ * - userId determined by Auth0 session (not client-provided)
  */
 
 import { Router, Request, Response } from 'express';
@@ -15,12 +20,15 @@ import {
   getSimilarStoresInCategory,
   getLastViewedItems
 } from '../services/recommendationService';
+import { extractTrackingIdentity, TrackingIdentity } from '../utils/auth0Identity';
 
 const router = Router();
 
 /**
  * POST /api/recommendations/track-batch
  * Track multiple user behavior events in batch (for client-side caching)
+ * 
+ * Auth0: User identity extracted server-side, applied to all events
  */
 router.post('/track-batch', async (req: Request, res: Response) => {
   try {
@@ -33,21 +41,17 @@ router.post('/track-batch', async (req: Request, res: Response) => {
       });
     }
 
+    // Extract identity from Auth0 session (server-side)
+    const identity: TrackingIdentity = await extractTrackingIdentity(req);
+
     const results = [];
     let successCount = 0;
     let failureCount = 0;
 
-    // Log batch metadata for analytics dashboard
-   /*  if (batchMetadata) {
-      console.log(`[TrackBatch] Processing batch - Size: ${batchMetadata.batchSize}, Priorities: ${JSON.stringify(batchMetadata.priorityBreakdown)}, Compression: ${batchMetadata.compressionUsed}`);
-    } */
-
-    // Process each event in the batch
+    // Process each event in the batch with server-determined identity
     for (const event of events) {
       try {
         const {
-          userId,
-          sessionId,
           entityType = 'store',
           entityId,
           entity_id, // Support snake_case format
@@ -57,18 +61,12 @@ router.post('/track-batch', async (req: Request, res: Response) => {
           location_lng, // Support snake_case format
           referrer,
           userAgent,
-          ipAddress,
           timestamp,
           pageType,
           page_type, // Support snake_case format
           context,
           priority
         } = event;
-
-        // console.log(`track-batch Request event: ${router.constructor.name} ${req.url} - ${JSON.stringify(event)}`);
-        
-        // console.log(`track-batch Entity ID: ${entityId || entity_id}`);
-
 
         // Support both camelCase and snake_case formats
         const finalEntityId = entityId || entity_id;
@@ -88,15 +86,16 @@ router.post('/track-batch', async (req: Request, res: Response) => {
         }
 
         await trackUserBehavior({
-          userId,
-          sessionId,
+          userId: identity.userId,              // Server-determined (null if anonymous)
+          sessionId: identity.sessionId,        // Server-determined
+          isAuthenticated: identity.isAuthenticated,  // Track auth status
           entityType: finalEntityType,
           entityId: finalEntityId,
           locationLat: finalLocationLat,
           locationLng: finalLocationLng,
           referrer,
           userAgent,
-          ipAddress,
+          ipAddress: req.ip,
           pageType: finalPageType,
           context
         });
@@ -118,8 +117,6 @@ router.post('/track-batch', async (req: Request, res: Response) => {
       }
     }
 
-    //console.log(`[TrackBatch] Processed ${events.length} events: ${successCount} successful, ${failureCount} failed`);
-
     // Include analytics metadata in response for dashboard adjustments
     const responseData = {
       success: failureCount === 0,
@@ -129,6 +126,10 @@ router.post('/track-batch', async (req: Request, res: Response) => {
         successful: successCount,
         failed: failureCount,
         results,
+        identity: {
+          userId: identity.userId,
+          isAuthenticated: identity.isAuthenticated
+        },
         batchMetadata: batchMetadata || null,
         processingTimestamp: new Date().toISOString()
       }
@@ -148,12 +149,15 @@ router.post('/track-batch', async (req: Request, res: Response) => {
 /**
  * POST /api/recommendations/track
  * Track single user behavior event for recommendations
+ * 
+ * Auth0: User identity extracted server-side from session
  */
 router.post('/track', async (req: Request, res: Response) => {
   try {
+    // Extract identity from Auth0 session (server-side)
+    const identity: TrackingIdentity = await extractTrackingIdentity(req);
+    
     const {
-      userId,
-      sessionId,
       entityType = 'store',
       entityId,
       entity_id, // Support snake_case format
@@ -162,13 +166,8 @@ router.post('/track', async (req: Request, res: Response) => {
       location_lat, // Support snake_case format
       location_lng, // Support snake_case format
       referrer,
-      userAgent,
-      ipAddress
+      userAgent
     } = req.body;
-
-    // console.log(`track Request event: ${router.constructor.name} ${req.url} - ${JSON.stringify(req.body)}`);
-    // console.log(`track entityId: ${entityId || entity_id}`);
-    // console.log(`track entity_id: ${entity_id}`);
 
     // Support both camelCase and snake_case formats
     const finalEntityId = entityId || entity_id;
@@ -184,18 +183,26 @@ router.post('/track', async (req: Request, res: Response) => {
     }
 
     await trackUserBehavior({
-      userId,
-      sessionId,
+      userId: identity.userId,              // Server-determined (null if anonymous)
+      sessionId: identity.sessionId,        // Server-determined
+      isAuthenticated: identity.isAuthenticated,  // Track auth status
       entityType: finalEntityType,
       entityId: finalEntityId,
       locationLat: finalLocationLat,
       locationLng: finalLocationLng,
       referrer,
       userAgent,
-      ipAddress
+      ipAddress: req.ip
     });
 
-    res.json({ success: true, tracked: true });
+    res.json({ 
+      success: true, 
+      tracked: true,
+      identity: {
+        userId: identity.userId,
+        isAuthenticated: identity.isAuthenticated
+      }
+    });
 
   } catch (error) {
     console.error('Error tracking behavior:', error);
@@ -324,20 +331,27 @@ router.get('/products-like-this/:productId', async (req: Request, res: Response)
 /**
  * GET /api/recommendations/stores-for-user
  * Get stores in user's favorite categories
+ * 
+ * Auth0: Uses server-determined userId from session
  */
 router.get('/stores-for-user', async (req: Request, res: Response) => {
   try {
-    const { userId, lat, lng, limit = 3 } = req.query;
+    // Extract identity from Auth0 session
+    const identity: TrackingIdentity = await extractTrackingIdentity(req);
+    
+    // Use server-determined userId, fall back to query param for backwards compat
+    const userId = identity.userId || req.query.userId as string;
+    const { lat, lng, limit = 3 } = req.query;
 
     if (!userId) {
       return res.status(400).json({
-        error: 'user_id_required',
-        message: 'User ID is required for personalized recommendations'
+        error: 'authentication_required',
+        message: 'User must be authenticated for personalized recommendations'
       });
     }
 
     const result = await getStoresInUserFavoriteCategories(
-      userId as string,
+      userId,
       lat ? Number(lat) : undefined,
       lng ? Number(lng) : undefined,
       Math.min(Math.max(Number(limit), 1), 10)
@@ -857,17 +871,22 @@ router.get('/for-storefront/:tenantId', async (req: Request, res: Response) => {
 /**
  * GET /api/recommendations/for-directory
  * Get recommendations for directory home page
+ * 
+ * Auth0: Uses server-determined userId for personalized recommendations
  */
 router.get('/for-directory', async (req: Request, res: Response) => {
   try {
-    const { userId, lat, lng, categorySlug } = req.query;
+    // Extract identity from Auth0 session
+    const identity: TrackingIdentity = await extractTrackingIdentity(req);
+    
+    const { lat, lng, categorySlug } = req.query;
 
     const recommendations = [];
 
-    // 1. User favorite categories (if userId provided)
-    if (userId) {
+    // 1. User favorite categories (if authenticated)
+    if (identity.userId) {
       const userFavorites = await getStoresInUserFavoriteCategories(
-        userId as string,
+        identity.userId,
         lat ? Number(lat) : undefined,
         lng ? Number(lng) : undefined,
         5
@@ -926,6 +945,43 @@ router.get('/for-directory', async (req: Request, res: Response) => {
     res.status(500).json({
       error: 'recommendation_failed',
       message: 'Failed to get directory recommendations'
+    });
+  }
+});
+
+/**
+ * GET /api/recommendations/last-viewed
+ * Get recently viewed items for the current user
+ * 
+ * Auth0: Uses server-determined userId (if authenticated) or sessionId (if anonymous)
+ */
+router.get('/last-viewed', async (req: Request, res: Response) => {
+  try {
+    // Extract identity from Auth0 session
+    const identity: TrackingIdentity = await extractTrackingIdentity(req);
+    const limit = Math.min(Number(req.query.limit) || 10, 50);
+    const entityType = (req.query.entityType as 'store' | 'product' | 'all') || 'all';
+    
+    const result = await getLastViewedItems(
+      identity.userId || undefined,
+      identity.sessionId,
+      entityType,
+      limit
+    );
+
+    res.json({
+      success: true,
+      data: result,
+      identity: {
+        isAuthenticated: identity.isAuthenticated
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting last viewed items:', error);
+    res.status(500).json({
+      error: 'recommendation_failed',
+      message: 'Failed to get last viewed items'
     });
   }
 });

@@ -291,15 +291,14 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     size="sm"
                     onClick={async () => {
                       await logout();
-                      router.push('/');
                     }}
                   >
                     Sign Out
                   </Button>
                 ) : (
-                  <Link href="/login">
+                  <a href="/auth/login">
                     <Button variant="secondary" size="sm">Sign In</Button>
-                  </Link>
+                  </a>
                 )}
               </div>
 
@@ -333,15 +332,14 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     onClick={async () => {
                       setMobileMenuOpen(false);
                       await logout();
-                      router.push('/');
                     }}
                   >
                     Sign Out
                   </Button>
                 ) : (
-                  <Link href="/login" className="block" onClick={() => setMobileMenuOpen(false)}>
+                  <a href="/auth/login" className="block" onClick={() => setMobileMenuOpen(false)}>
                     <Button variant="secondary" className="w-full" size="md">Sign In</Button>
-                  </Link>
+                  </a>
                 )}
               </div>
             )}
@@ -639,11 +637,11 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                 Get your products on Google Shopping, create a beautiful storefront, and reach more customers - all in one platform.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-                <Link href="/register" className="w-full sm:w-auto">
+                <a href="/auth/signup" className="w-full sm:w-auto">
                   <Button variant="primary" size="lg" className="w-full sm:w-auto">
                     Start Free Trial →
                   </Button>
-                </Link>
+                </a>
                 <Link href="/features" className="w-full sm:w-auto">
                   <Button variant="secondary" size="lg" className="w-full sm:w-auto">
                     Learn More
@@ -1068,22 +1066,22 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     </div>
                   </div>
                   <div className="space-y-3 sm:space-y-4">
-                    <Link href="/register" className="block">
+                    <a href="/auth/signup" className="block">
                       <Button variant="primary" className="w-full justify-start" size="md">
                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                         </svg>
                         Create Free Account
                       </Button>
-                    </Link>
-                    <Link href="/login" className="block">
+                    </a>
+                    <a href="/auth/login" className="block">
                       <Button variant="secondary" className="w-full justify-start" size="md">
                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                         </svg>
                         Sign In
                       </Button>
-                    </Link>
+                    </a>
                     <div className="pt-3 sm:pt-4 border-t border-neutral-200">
                       <p className="text-xs sm:text-sm text-neutral-600 mb-2">Questions?</p>
                       <Link href="/contact" className="text-xs sm:text-sm text-primary-600 hover:underline">

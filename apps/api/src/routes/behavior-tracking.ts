@@ -1,10 +1,16 @@
 /**
  * Behavior Tracking API Routes
  * Integrates BehaviorTrackingService with Express API
+ * 
+ * Auth0 Integration:
+ * - User identity extracted server-side from Auth0 session
+ * - Supports both authenticated and anonymous users
+ * - userId determined by Auth0 session (not client-provided)
  */
 
 import { Router } from 'express';
 import BehaviorTrackingService from '../services/BehaviorTrackingService';
+import { extractTrackingIdentity, TrackingIdentity } from '../utils/auth0Identity';
 
 const router = Router();
 
@@ -14,14 +20,20 @@ const behaviorService = BehaviorTrackingService.getInstance();
 /**
  * Track a behavior event
  * POST /api/behavior/events
+ * 
+ * Auth0: User identity extracted server-side from session
  */
 router.post('/events', async (req, res) => {
   try {
+    // Extract identity from Auth0 session (server-side)
+    const identity: TrackingIdentity = await extractTrackingIdentity(req);
+    
     const eventData = {
       eventType: req.body.eventType,
-      userId: req.body.userId || req.user?.id,
-      sessionId: req.body.sessionId,
-      tenantId: req.body.tenantId || req.user?.tenantIds?.[0],
+      userId: identity.userId,              // Server-determined (null if anonymous)
+      sessionId: identity.sessionId,        // Server-determined
+      isAuthenticated: identity.isAuthenticated,  // Track auth status
+      tenantId: req.body.tenantId || identity.tenantId,
       url: req.body.url,
       referrer: req.body.referrer,
       userAgent: req.get('User-Agent'),
@@ -36,6 +48,10 @@ router.post('/events', async (req, res) => {
       success: true,
       data: {
         event,
+        identity: {
+          userId: identity.userId,
+          isAuthenticated: identity.isAuthenticated
+        },
         timestamp: new Date().toISOString()
       },
       message: 'Behavior event tracked successfully'
@@ -53,18 +69,41 @@ router.post('/events', async (req, res) => {
 /**
  * Batch track multiple events
  * POST /api/behavior/events/batch
+ * 
+ * Auth0: User identity extracted server-side, applied to all events in batch
  */
 router.post('/events/batch', async (req, res) => {
   try {
     const { events } = req.body;
     
-    await behaviorService.batchEvents(events);
+    if (!Array.isArray(events) || events.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Events array is required and must not be empty'
+      });
+    }
+    
+    // Extract identity once for entire batch
+    const identity: TrackingIdentity = await extractTrackingIdentity(req);
+    
+    // Enrich all events with server-determined identity
+    const enrichedEvents = events.map(event => ({
+      ...event,
+      userId: identity.userId,
+      sessionId: identity.sessionId,
+      isAuthenticated: identity.isAuthenticated
+    }));
+    
+    await behaviorService.batchEvents(enrichedEvents);
     
     res.json({
       success: true,
       data: {
         processed: events.length,
-        events: events,
+        identity: {
+          userId: identity.userId,
+          isAuthenticated: identity.isAuthenticated
+        },
         timestamp: new Date().toISOString()
       },
       message: `${events.length} events batch tracked successfully`

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { SquareStatus } from '@/components/square';
-import { useAuth } from '@/contexts/AuthContext';
 import { squareIntegrationService } from '@/services/SquareIntegrationSingletonService';
 
 interface SquareIntegrationData {
@@ -35,7 +34,6 @@ interface UseSquareIntegrationResult {
 }
 
 export function useSquareIntegration(tenantId: string): UseSquareIntegrationResult {
-  const { getAccessToken } = useAuth();
   const [data, setData] = useState<SquareIntegrationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

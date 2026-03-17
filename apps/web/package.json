@@ -10,6 +10,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@auth0/nextjs-auth0": "~4.16.0",
     "@hookform/resolvers": "^5.2.2",
     "@mantine/carousel": "^8.3.16",
     "@mantine/core": "^8.3.16",
@@ -61,6 +62,7 @@
     "react-leaflet": "^5.0.0",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
+    "vercel": "^50.32.5",
     "zod": "^4.1.12"
   },
   "devDependencies": {

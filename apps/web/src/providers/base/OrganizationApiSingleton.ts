@@ -537,39 +537,10 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
   }
 
   public getCurrentUser(): any {
-    // Check if we're in a browser environment
-    if (typeof window === 'undefined') {
-      console.warn('[OrganizationApiSingleton] Cannot access auth token in server-side environment');
-      return null;
-    }
-    
-    // Use the same token sources as getAuthToken() in FlexibleApiSingleton
-    const token = localStorage.getItem('access_token') || 
-                 sessionStorage.getItem('access_token') ||
-                 document.cookie.split(';').find(c => c.trim().startsWith('access_token='))?.split('=')[1] ||
-                 localStorage.getItem('authToken') ||
-                 sessionStorage.getItem('authToken') ||
-                 document.cookie.split(';').find(c => c.trim().startsWith('authToken='))?.split('=')[1];
-    
-    if (!token) {
-      console.warn('[OrganizationApiSingleton] No auth token found for getCurrentUser');
-      return null;
-    }
-    
-    // Validate token format (same as getAuthToken)
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      console.warn('[OrganizationApiSingleton] Invalid token format in getCurrentUser');
-      return null;
-    }
-    
-    try {
-      // Parse JWT payload
-      return JSON.parse(atob(parts[1]));
-    } catch (error) {
-      console.warn('[OrganizationApiSingleton] Failed to parse JWT in getCurrentUser:', error);
-      return null;
-    }
+    // With Auth0, user info comes from session, not JWT in localStorage
+    // This method should be deprecated - use AuthContext instead
+    console.warn('[OrganizationApiSingleton] getCurrentUser is deprecated - use AuthContext for user info');
+    return null;
   }
 
   public logError(message: string, error: any): void {
@@ -651,41 +622,28 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
   }
 
   // Execute request (delegates to parent implementation)
+  // Auth0 session is handled via HTTP-only cookies (credentials: 'include' in fetchWithCache)
   private async executeRequest<T>(
     endpoint: string,
     options: OrganizationRequestOptions,
     cacheTTL: number,
     cacheKey?: string
   ): Promise<any> {
-    // Get authentication token
-    const token = await this.getAuthToken();
-    
-    // Add authentication to headers
+    // Auth0 handles authentication via HTTP-only cookies
+    // No Bearer token needed - session is passed automatically with credentials: 'include'
+
+    // Add organization context to headers
     let enhancedOptions = {
       ...options,
       headers: {
         ...options.headers,
+        'X-Request-Context': 'organization',
+        'X-Organization-ID': (options.organizationId || this.extractOrganizationId(endpoint)) || '',
+        'X-Organization-Validation': JSON.stringify({
+          validationPassed: true,
+          timestamp: Date.now()
+        })
       }
-    };
-
-    if (token) {
-      (enhancedOptions.headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
-    } else {
-      console.warn('[OrganizationApiSingleton] No auth token available for organization request');
-      // For organization requests, we might want to be more permissive or throw error
-      // depending on the specific operation
-    }
-
-    // Add organization context to headers
-    enhancedOptions.headers = {
-      ...enhancedOptions.headers,
-      'X-Request-Context': 'organization',
-      'X-Organization-ID': (options.organizationId || this.extractOrganizationId(endpoint)) || '',
-      'X-Organization-Validation': JSON.stringify({
-        validationPassed: true,
-        timestamp: Date.now(),
-        userGroups: this.getUserAuthorizationGroups(this.getCurrentUser())
-      })
     };
 
     // Add audit tracking for organization operations
@@ -699,12 +657,6 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
     (enhancedOptions.headers as Record<string, string>)['X-Service'] = this.constructor.name.replace('Service', '');
 
     return super.makeDefaultRequest<T>(endpoint, enhancedOptions, cacheKey, cacheTTL);
-  }
-
-  // Get authentication token (delegate to base class for consistency)
-  protected async getAuthToken(): Promise<string | null> {
-    // Delegate to the base class which has the proper token retrieval logic
-    return super.getAuthToken();
   }
 
   // Generate audit ID for tracking

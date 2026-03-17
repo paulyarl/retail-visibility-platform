@@ -3,10 +3,8 @@
  * 
  * Extends FlexibleApiSingleton with authenticated-specific defaults:
  * - Default request type: AUTHENTICATED
- * - Automatic token handling
- * - Authenticated request headers
+ * - Auth0 session via HTTP-only cookies (credentials: 'include')
  * - Auth-specific TTL (5 minutes)
- * - Token refresh and error handling
  * - Optimized for user-specific data
  */
 
@@ -30,7 +28,7 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
   
   /**
    * Custom hook for authenticated request behavior
-   * SAFER: Override this hook instead of makeAuthenticatedRequest to prevent recursion
+   * Auth0 handles authentication via HTTP-only cookies (credentials: 'include' in fetchWithCache)
    */
   protected async onAuthenticatedRequest<T>(
     url: string,
@@ -39,113 +37,21 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
     ttl?: number,
     isAdminRequest: boolean = false
   ): Promise<RequestInit> {
-    // Add authentication-specific headers and validation
-    const modifiedOptions = { ...options };
-
-    // Add Authorization header with bearer token
-    const token = await this.getAuthToken();
-    if (token) {
-      modifiedOptions.headers = {
-        ...modifiedOptions.headers,
-        'Authorization': `Bearer ${token}`,
-      };
-    } else {
-      console.warn('[AuthenticatedApiSingleton] No auth token available for request');
-    }
-
+    // Auth0 handles authentication via HTTP-only cookies
+    // No Bearer token needed - session is passed automatically with credentials: 'include'
+    
     // Add admin-specific headers if needed
     if (isAdminRequest) {
-      modifiedOptions.headers = {
-        ...modifiedOptions.headers,
-        'X-Admin-Request': 'true',
-      };
-    }
-
-    // Could add other custom logic here like:
-    // - Request signing
-    // - Custom retry logic
-    // - Request logging
-    // - Header validation
-
-    return modifiedOptions;
-  }
-
-  /**
-   * Handle authentication errors with token refresh
-   */
-  private async handleAuthErrorWithRetry<T>(
-    response: Response,
-    url: string,
-    options: RequestInit & { skipAuth?: boolean },
-    cacheKey?: string,
-    customTTL?: number,
-    handle404: boolean = true,
-    isAdminRequest: boolean = false
-  ): Promise<ApiResult<T>> {
-    console.warn(`[AuthenticatedApiSingleton] Authentication error for ${url}`);
-    
-    // Try to refresh token and retry once
-    try {
-      const refreshSuccess = await this.refreshAuthToken();
-      
-      if (refreshSuccess) {
-        console.log(`[AuthenticatedApiSingleton] Token refreshed, retrying request: ${url}`);
-        
-        // Retry the request with new token
-        const requestOptions = isAdminRequest ? { requireAuth: true } : {};
-        return this.makeAuthenticatedRequest<T>(url, options, cacheKey, customTTL, requestOptions);
-      } else {
-        console.warn(`[AuthenticatedApiSingleton] Token refresh failed for ${url}`);
-        
-        // Clear auth-related cache
-        await this.clearAuthCache();
-        
-        return {
-          success: false,
-          data: null as T,
-          error: {
-            status: 401,
-            message: 'Authentication failed - please log in again',
-            code: 'AUTH_FAILED'
-          },
-          status: 401
-        };
-      }
-    } catch (refreshError) {
-      console.error(`[AuthenticatedApiSingleton] Token refresh error:`, refreshError);
-      
-      // Clear auth-related cache
-      await this.clearAuthCache();
-      
       return {
-        success: false,
-        data: null as T,
-        error: {
-          status: 401,
-          message: 'Authentication session expired',
-          code: 'AUTH_EXPIRED'
+        ...options,
+        headers: {
+          ...options.headers,
+          'X-Admin-Request': 'true',
         },
-        status: 401
       };
     }
-  }
 
-  protected async refreshAuthToken(): Promise<boolean> {
-    try {
-      // For now, just clear the token and let the user re-authenticate
-      // In a real implementation, this would call a token refresh endpoint
-      console.warn('[AuthenticatedApiSingleton] Token refresh not implemented - clearing token');
-      
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('[AuthenticatedApiSingleton] Token refresh error:', error);
-      return false;
-    }
+    return options;
   }
 
   /**
@@ -185,9 +91,7 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
       requestType: 'authenticated',
       defaultTTL: this.cacheTTL,
       authenticatedRequests: this.apiCalls,
-      // Note: This is synchronous for metrics, so we can't use async here
-      // In a real implementation, you might want to track this differently
-      hasAuthToken: false // Simplified for metrics
+      authMethod: 'auth0-cookies'
     };
   }
 

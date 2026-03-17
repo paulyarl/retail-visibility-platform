@@ -9,12 +9,13 @@ import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
 import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
 
 // Behavior Tracking Data Interfaces
+// Auth0: userId determined server-side from session
 export interface TrackingEvent {
   type: string;
   action: string;
   data?: Record<string, any>;
   timestamp: string;
-  userId?: string;
+  // userId removed - server determines from Auth0 session
   sessionId?: string;
   tenantId?: string;
   metadata?: Record<string, any>;
@@ -22,7 +23,7 @@ export interface TrackingEvent {
 
 export interface TrackingSession {
   id: string;
-  userId?: string;
+  // userId removed - server determines from Auth0 session
   tenantId?: string;
   startTime: string;
   endTime?: string;

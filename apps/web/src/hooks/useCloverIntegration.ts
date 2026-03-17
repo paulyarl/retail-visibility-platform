@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { CloverStatus } from '@/components/clover';
-import { useAuth } from '@/contexts/AuthContext';
 import { cloverIntegrationService } from '@/services/CloverIntegrationSingletonService';
 
 interface CloverIntegrationData {
@@ -40,7 +39,6 @@ interface UseCloverIntegrationResult {
 }
 
 export function useCloverIntegration(tenantId: string): UseCloverIntegrationResult {
-  const { getAccessToken } = useAuth();
   const [data, setData] = useState<CloverIntegrationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

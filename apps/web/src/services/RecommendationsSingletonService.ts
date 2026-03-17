@@ -332,10 +332,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
   /**
    * Track recommendations behavior
    * Public endpoint for recommendation tracking
+   * 
+   * Auth0: userId and sessionId determined server-side from session
    */
   async trackRecommendations(trackData: any): Promise<boolean> {
     try {
       // Transform camelCase to snake_case for API compatibility
+      // userId and sessionId removed - server determines from Auth0 session
       const transformedTrackData = {
         entity_type: trackData.entityType,
         entity_id: trackData.entityId,
@@ -343,7 +346,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
         context: trackData.context,
         page_type: trackData.pageType,
         duration_seconds: trackData.durationSeconds || null,
-        session_id: trackData.sessionId,
+        // session_id removed - server determines from Auth0 session
         timestamp: trackData.timestamp,
         priority: trackData.priority || 'normal',
         location_lat: trackData.locationLat || null,
@@ -380,28 +383,22 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
   /**
    * Get last viewed recommendations
    * Public endpoint for recommendation tracking
+   * 
+   * Auth0: userId and sessionId determined server-side from session
    */
   async getLastViewed(params?: {
-    sessionId?: string;
-    userId?: string;
     limit?: number;
+    entityType?: 'store' | 'product' | 'all';
   }): Promise<any> {
     try {
-      // Must have either userId or sessionId
-      if (!params?.sessionId && !params?.userId) {
-        console.warn('[RecommendationsSingleton] No sessionId or userId provided for getLastViewed');
-        return null;
-      }
-
       const searchParams = new URLSearchParams();
-      if (params?.sessionId) searchParams.append('sessionId', params.sessionId);
-      if (params?.userId) searchParams.append('userId', params.userId);
       if (params?.limit) searchParams.append('limit', params.limit.toString());
+      if (params?.entityType) searchParams.append('entityType', params.entityType);
 
       const response = await this.makeDefaultRequest<any>(
         `/api/recommendations/last-viewed?${searchParams.toString()}`,
         {},
-        `display:last-viewed-recommendations:${params.sessionId || params.userId || 'anonymous'}`,
+        `display:last-viewed-recommendations`,
         this.PERSONALIZED_TTL // 1 minute for personalized recommendations
       );
 
@@ -796,6 +793,8 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
   /**
    * Track behavior events in batch
    * Uses the /api/recommendations/track-batch endpoint for analytics
+   * 
+   * Auth0: userId and sessionId determined server-side from session
    */
   async trackBehaviorBatch(batchData: {
     events: any[];
@@ -803,6 +802,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
   }): Promise<void> {
     try {
       // Transform camelCase to snake_case for API compatibility
+      // userId and sessionId removed - server determines from Auth0 session
       const transformedBatchData = {
         events: batchData.events.map(event => ({
           entity_type: event.entityType,
@@ -811,14 +811,14 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
           context: event.context,
           page_type: event.pageType,
           duration_seconds: event.durationSeconds || null,
-          session_id: event.sessionId,
+          // session_id removed - server determines from Auth0 session
           timestamp: event.timestamp,
           priority: event.priority || 'normal',
           location_lat: event.locationLat || null,
           location_lng: event.locationLng || null
         })).filter(event => {
           // Filter out events that don't have required fields
-          return event.entity_id && event.entity_type && event.session_id;
+          return event.entity_id && event.entity_type;
         }),
         batch_metadata: batchData.batchMetadata
       };
@@ -876,9 +876,12 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
    * Send tracking data on page unload using beacon API
    * For reliable delivery when page is closing
    * Uses platform-aligned URL construction and base class beacon method
+   * 
+   * Auth0: userId and sessionId determined server-side from session
    */
   sendUnloadTrackingBeacon(events: any[]): void {
     // Transform events to snake_case format for API compatibility
+    // userId and sessionId removed - server determines from Auth0 session
     const transformedEvents = events.map(event => ({
       entity_type: event.entityType,
       entity_id: event.entityId,
@@ -886,7 +889,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       context: event.context,
       page_type: event.pageType,
       duration_seconds: event.durationSeconds || null,
-      session_id: event.sessionId,
+      // session_id removed - server determines from Auth0 session
       timestamp: event.timestamp,
       priority: event.priority || 'normal',
       location_lat: event.locationLat || null,

@@ -14,8 +14,9 @@ interface CachedRequest {
 const requestCache = new Map<string, CachedRequest>();
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes for proper caching
 
-function getCacheKey(url: string, token: string | null): string {
-  return `${url}:${token || 'anonymous'}`;
+function getCacheKey(url: string): string {
+  // Auth0 uses HTTP-only cookies, so no token in cache key
+  return url;
 }
 
 function cleanExpiredCache(): void {
@@ -27,41 +28,9 @@ function cleanExpiredCache(): void {
   }
 }
 
-/**
- * Get access token from localStorage or cookies
- */
-function getAccessToken(): string | null {
-  if (typeof window === 'undefined') return null;
-
-  // Try localStorage first (legacy)
-  const localToken = localStorage.getItem('access_token');
-  if (localToken) {
-    // console.log('[API] Found token in localStorage access_token');
-    return localToken;
-  }
-
-  // Fall back to cookie (current auth system)
-  const cookieToken = getCookie('access_token');
-  if (cookieToken) {
-    console.log('[API] Found token in cookie access_token');
-    return cookieToken;
-  }
-
-  // Debug: Check what auth-related data is actually stored
-  /* console.log('[API] Token retrieval debug:');
-  console.log('- localStorage access_token:', localStorage.getItem('access_token') ? 'present' : 'missing');
-  console.log('- localStorage auth_token:', localStorage.getItem('auth_token') ? 'present' : 'missing');
-  console.log('- Cookie auth_token:', getCookie('auth_token') ? 'present' : 'missing');
-  console.log('- Cookie csrf:', getCookie('csrf') ? 'present' : 'missing');
-  console.log('- All cookies:', document.cookie);
-  console.log('- localStorage keys with auth/token:', Object.keys(localStorage).filter(k => k.toLowerCase().includes('auth') || k.toLowerCase().includes('token') || k.toLowerCase().includes('access')));
- */
-  return null;
-}
-
 function getLastTenantId(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('lastTenantId');
+  return localStorage.getItem('lastTenantId') || localStorage.getItem('current_tenant_id');
 }
 
 function getCookie(name: string): string | null {
@@ -71,17 +40,16 @@ function getCookie(name: string): string | null {
 }
 
 /**
- * Make an authenticated API request with centralized auth handling.
- * - Injects bearer token from localStorage
- * - On 401: clears token and redirects to /login?next=
- * - Deduplicates identical GET requests within 2 second window
+ * Make an authenticated API request with Auth0 session handling.
+ * - Uses HTTP-only cookies for authentication (managed by Auth0 SDK)
+ * - On 401: redirects to Auth0 login
+ * - Deduplicates identical GET requests within cache window
  * Supports both relative URLs (/api/tenants) and absolute URLs (http://...)
  */
 export async function apiRequest(
   endpoint: string,
   options: RequestInit & { skipAuthRedirect?: boolean; skipCache?: boolean; skipAuth?: boolean } = {}
 ): Promise<Response> {
-  const token = getAccessToken();
   const tenantId = getLastTenantId();
   const csrf = getCookie('csrf');
   
@@ -108,16 +76,6 @@ export async function apiRequest(
     headers['Content-Type'] = 'application/json';
   }
 
-  // Add Authorization header if token exists and skipAuth is not set
-  if (token && !options.skipAuth) {
-    headers['Authorization'] = `Bearer ${token}`;
-    // console.log('[API] Adding Authorization header to request:', endpoint);
-  } /* else if (!token) {
-    console.log('[API] No token available for request:', endpoint);
-  } else if (options.skipAuth) {
-    console.log('[API] Skipping Authorization header for public request:', endpoint);
-  } */
-
   // Attach tenant and CSRF headers on write operations
   if (isWrite) {
     if (tenantId) headers['x-tenant-id'] = tenantId;
@@ -139,7 +97,7 @@ export async function apiRequest(
   // Skip cache for write operations or if explicitly disabled
   if (isGet && !options.skipCache) {
     cleanExpiredCache();
-    const cacheKey = getCacheKey(url, token);
+    const cacheKey = getCacheKey(url);
     const cached = requestCache.get(cacheKey);
     
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -148,22 +106,22 @@ export async function apiRequest(
     }
     
     // Create the request promise and cache it
-    const requestPromise = executeRequest(url, options, headers, token);
+    const requestPromise = executeRequest(url, options, headers);
     requestCache.set(cacheKey, { promise: requestPromise, timestamp: Date.now() });
     return requestPromise.then(resp => resp.clone());
   }
   
-  return executeRequest(url, options, headers, token);
+  return executeRequest(url, options, headers);
 }
 
 /**
  * Execute the actual fetch request with retry logic
+ * Auth0 session is passed via HTTP-only cookies (credentials: 'include')
  */
 async function executeRequest(
   url: string,
   options: RequestInit & { skipAuthRedirect?: boolean },
-  headers: Record<string, string>,
-  token: string | null
+  headers: Record<string, string>
 ): Promise<Response> {
 
   // Simple retry/backoff for 429/5xx (max 2 retries), but skip if x-no-retry header is set
@@ -175,7 +133,7 @@ async function executeRequest(
     resp = await fetch(url, {
       ...options,
       headers,
-      credentials: 'include', // Include cookies for cross-origin requests
+      credentials: 'include', // Include cookies for Auth0 session (HTTP-only)
     });
     if (attempt >= maxRetries) break;
     if (resp.status === 429 || (resp.status >= 500 && resp.status <= 599)) {
@@ -187,15 +145,16 @@ async function executeRequest(
     break;
   }
   
-  // Centralized 401 handling (non-destructive)
+  // Centralized 401 handling - redirect to Auth0 login
   if (resp.status === 401 && typeof window !== 'undefined' && !(options as any).skipAuthRedirect) {
     try {
       const pathname = window.location.pathname;
       const alreadyRedirecting = sessionStorage.getItem('auth_redirecting') === '1';
-      if (!alreadyRedirecting && pathname !== '/login') {
+      if (!alreadyRedirecting && pathname !== '/login' && pathname !== '/auth/login') {
         sessionStorage.setItem('auth_redirecting', '1');
-        const next = encodeURIComponent(pathname + window.location.search);
-        window.location.href = `/login?next=${next}`;
+        // Redirect to Auth0 login with return path
+        const returnTo = encodeURIComponent(pathname + window.location.search);
+        window.location.href = `/auth/login?returnTo=${returnTo}`;
       }
     } catch {}
   }

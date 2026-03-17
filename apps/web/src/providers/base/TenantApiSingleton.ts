@@ -127,36 +127,30 @@ export abstract class TenantApiSingleton extends FlexibleApiSingleton {
 
   /**
    * Override hook for tenant request behavior
+   * Auth0 handles authentication via HTTP-only cookies (credentials: 'include' in fetchWithCache)
    */
   protected async onTenantRequest<T>(
     url: string,
     options: RequestInit,
     requestOptions?: TenantRequestOptions
   ): Promise<RequestInit> {
-    const modifiedOptions = { ...options };
-
-    // Add Authorization header with bearer token
-    const token = await this.getAuthToken();
-    if (token) {
-      modifiedOptions.headers = {
-        ...modifiedOptions.headers,
-        'Authorization': `Bearer ${token}`,
-      };
-    } else {
-      console.warn('[TenantApiSingleton] No auth token available for tenant request');
-    }
+    // Auth0 handles authentication via HTTP-only cookies
+    // No Bearer token needed - session is passed automatically with credentials: 'include'
 
     // Add tenant context headers
     const tenantId = requestOptions?.tenantId || this.currentTenantId || await this.getCurrentTenantId();
     if (tenantId) {
-      modifiedOptions.headers = {
-        ...modifiedOptions.headers,
-        'X-Tenant-ID': tenantId,
-        'X-Request-Context': 'tenant',
+      return {
+        ...options,
+        headers: {
+          ...options.headers,
+          'X-Tenant-ID': tenantId,
+          'X-Request-Context': 'tenant',
+        },
       };
     }
 
-    return modifiedOptions;
+    return options;
   }
 
   /**

@@ -29,12 +29,11 @@ export abstract class AdminApiSingleton extends FlexibleApiSingleton {
 
   /**
    * Validate admin privileges
+   * Auth0 session validation happens server-side
    */
   private async validateAdminPrivileges(): Promise<boolean> {
-    // Implementation would validate admin privileges
-    const token = await this.getAuthToken();
-    // Would decode token or make validation call
-    return true; // Simplified for example
+    // Admin validation happens server-side via Auth0 session
+    return true;
   }
 
   /**
@@ -89,32 +88,24 @@ export abstract class AdminApiSingleton extends FlexibleApiSingleton {
 
   /**
    * Override hook for admin request behavior
+   * Auth0 handles authentication via HTTP-only cookies (credentials: 'include' in fetchWithCache)
    */
   protected async onAdminRequest<T>(
     url: string,
     options: RequestInit,
     requestOptions?: AdminRequestOptions
   ): Promise<RequestInit> {
-    const modifiedOptions = { ...options };
-
-    // Add Authorization header with bearer token
-    const token = await this.getAuthToken();
-    if (token) {
-      modifiedOptions.headers = {
-        ...modifiedOptions.headers,
-        'Authorization': `Bearer ${token}`,
-      };
-    } else {
-      console.warn('[AdminApiSingleton] No auth token available for admin request');
-      // Return early if no token - don't make the request
-      throw new Error('No authentication token available');
-    }
+    // Auth0 handles authentication via HTTP-only cookies
+    // No Bearer token needed - session is passed automatically with credentials: 'include'
 
     // Add admin context headers
-    modifiedOptions.headers = {
-      ...modifiedOptions.headers,
-      'X-Request-Context': 'admin',
-      'X-Admin-Roles': 'PLATFORM_ADMIN', // Could be dynamic based on token
+    const modifiedOptions = {
+      ...options,
+      headers: {
+        ...options.headers,
+        'X-Request-Context': 'admin',
+        'X-Admin-Roles': 'PLATFORM_ADMIN', // Could be dynamic based on session
+      },
     };
 
     // Add audit tracking

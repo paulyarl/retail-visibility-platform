@@ -129,7 +129,7 @@ export default function CloverIntegrationPage() {
   const params = useParams();
   const router = useRouter();
   const tenantId = params?.tenantId as string;
-  const { getAccessToken } = useAuth();
+  // Auth0 handles tokens server-side via HTTP-only cookies
 
   // State
   const [status, setStatus] = useState<CloverStatus | null>(null);

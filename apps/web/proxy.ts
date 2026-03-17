@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth0 } from './lib/auth0';
 
 // Environment variables
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.visibleshelf.com';
@@ -45,54 +46,41 @@ function setCookie(res: NextResponse, name: string, value: string, maxAgeSec = 6
 }
 
 /**
- * Check if user is platform admin by calling the API
+ * Check if user is platform admin by checking database role
  */
 async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
   try {
-    // First try to get token from Authorization header (client-side auth)
-    const authHeader = req.headers.get('authorization');
-    let authToken = null;
+    // Get Auth0 session
+    const session = await auth0.getSession();
     
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      authToken = authHeader.substring(7);
-      // console.log('[Proxy] Found token in Authorization header');
-    } else {
-      // Fallback to cookies (server-side auth)
-      authToken = getCookie(req, 'auth_token') || getCookie(req, 'access_token');
-      // console.log('[Proxy] Looking for token in cookies');
-    }
-    
-    if (!authToken) {
-      // console.log('[Proxy] No auth token found in header or cookies');
-      // console.log('[Proxy] Available cookies:', req.headers.get('cookie'));
+    if (!session?.user?.email) {
       return false;
     }
 
-    // console.log('[Proxy] Checking platform admin with token:', authToken.substring(0, 20) + '...');
-
-    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+    // Check database for user role via API
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.visibleshelf.com';
+    const response = await fetch(`${apiBaseUrl}/api/auth/lookup?identifier=${encodeURIComponent(session.user.email)}`, {
       headers: {
-        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
       },
     });
 
     if (!response.ok) {
-      console.log('[Proxy] Auth/me response not OK:', response.status, response.statusText);
+      console.log('[Proxy] Failed to lookup user in database');
       return false;
     }
 
-    const data = await response.json();
-    // console.log('[Proxy] Auth/me response data:', JSON.stringify(data, null, 2));
+    const result = await response.json();
+    const user = result.user;
+
+    if (!user || !user.is_active) {
+      return false;
+    }
+
+    // Check if user has PLATFORM_ADMIN role
+    const isAdmin = user.role === 'PLATFORM_ADMIN' || user.role === 'SUPER_ADMIN';
     
-    const user = data.user || data;
-    // console.log('[Proxy] Extracted user:', JSON.stringify(user, null, 2));
-    // console.log('[Proxy] User role:', user?.role);
-    
-    const isAdmin = user.role === 'PLATFORM_ADMIN' || 
-           user.role === 'ADMIN' || 
-           user.isPlatformAdmin === true;
-    
-    // console.log('[Proxy] Is admin result:', isAdmin, 'for role:', user?.role);
+    console.log('[Proxy] User role check:', user.email, 'role:', user.role, 'isAdmin:', isAdmin);
     
     return isAdmin;
   } catch (error) {
@@ -102,7 +90,29 @@ async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
 }
 
 export async function proxy(req: NextRequest) {
-  const { pathname, hostname, searchParams } = new URL(req.url);
+  const { pathname } = new URL(req.url);
+  
+  // Log auth route attempts
+  if (pathname.startsWith('/auth/')) {
+    console.log('[Proxy] Auth route detected:', pathname);
+  }
+  
+  // First, let Auth0 handle authentication routes
+  const authResponse = await auth0.middleware(req);
+  
+  // If Auth0 handled the request (auth routes), return the response
+  if (authResponse) {
+    console.log('[Proxy] Auth0 handled request:', pathname, 'Status:', authResponse.status);
+    return authResponse;
+  }
+  
+  // Log if auth route was not handled
+  if (pathname.startsWith('/auth/')) {
+    console.log('[Proxy] WARNING: Auth route not handled by Auth0 middleware:', pathname);
+  }
+
+  // Continue with existing proxy logic for non-auth routes
+  const { hostname, searchParams } = new URL(req.url);
 
   // Handle subdomain storefront routing
   const subdomainInfo = isPlatformSubdomain(hostname);

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import SmartProductCard from './SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { storefrontService } from '@/services/StorefrontSingletonService';
-import { Package, Calendar, DollarSign, Star } from 'lucide-react';
+import { Package, Calendar, DollarSign, Star, TrendingUp, Award, Zap, Flame, Crown, ThumbsUp, Sparkles } from 'lucide-react';
 
 interface FeaturedTypeProduct {
   id: string;
@@ -36,7 +36,7 @@ interface FeaturedTypeProductsProps {
   featuredTypes: string[];
 }
 
-// Featured type configuration matching TierBasedLandingPage
+// Featured type configuration - supports all featured types in the system
 const featuredTypeConfig: Record<string, { icon: React.ReactNode; bgColor: string; textColor: string; label: string; description: string }> = {
   store_selection: { 
     icon: <Star className="w-5 h-5" />, 
@@ -67,11 +67,53 @@ const featuredTypeConfig: Record<string, { icon: React.ReactNode; bgColor: strin
     description: 'Great deals on selected products' 
   },
   staff_pick: { 
-    icon: <Star className="w-5 h-5" />, 
+    icon: <ThumbsUp className="w-5 h-5" />, 
     bgColor: 'bg-purple-50', 
     textColor: 'text-purple-700',
     label: 'Staff Picks', 
     description: 'Hand-picked favorites by our team' 
+  },
+  bestseller: { 
+    icon: <Award className="w-5 h-5" />, 
+    bgColor: 'bg-yellow-50', 
+    textColor: 'text-yellow-700',
+    label: 'Bestsellers', 
+    description: 'Our most popular products' 
+  },
+  clearance: { 
+    icon: <Zap className="w-5 h-5" />, 
+    bgColor: 'bg-pink-50', 
+    textColor: 'text-pink-700',
+    label: 'Clearance', 
+    description: 'Last chance to grab these deals' 
+  },
+  trending: { 
+    icon: <TrendingUp className="w-5 h-5" />, 
+    bgColor: 'bg-cyan-50', 
+    textColor: 'text-cyan-700',
+    label: 'Trending', 
+    description: 'Hot products everyone is viewing' 
+  },
+  recommended: { 
+    icon: <Sparkles className="w-5 h-5" />, 
+    bgColor: 'bg-indigo-50', 
+    textColor: 'text-indigo-700',
+    label: 'Recommended', 
+    description: 'Products we think you\'ll love' 
+  },
+  featured: { 
+    icon: <Flame className="w-5 h-5" />, 
+    bgColor: 'bg-rose-50', 
+    textColor: 'text-rose-700',
+    label: 'Featured', 
+    description: 'Spotlight on special products' 
+  },
+  premium: { 
+    icon: <Crown className="w-5 h-5" />, 
+    bgColor: 'bg-violet-50', 
+    textColor: 'text-violet-700',
+    label: 'Premium Selection', 
+    description: 'Top-tier products for discerning buyers' 
   },
 };
 
@@ -191,8 +233,16 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
   return (
     <>
       {Object.entries(productsByType).map(([type, products]) => {
-        const config = featuredTypeConfig[type];
-        if (!config || products.length === 0) return null;
+        // Get config or use fallback for unknown types
+        const config = featuredTypeConfig[type] || {
+          icon: <Star className="w-5 h-5" />,
+          bgColor: 'bg-gray-50',
+          textColor: 'text-gray-700',
+          label: type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+          description: `More ${type.replace(/_/g, ' ')} products`
+        };
+        
+        if (products.length === 0) return null;
 
         return (
           <div key={type} className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8">
