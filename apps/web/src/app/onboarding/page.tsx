@@ -462,14 +462,14 @@ function OnboardingContent() {
                   )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                    <Button variant="secondary" onClick={handleGoToTenants}>
-                      Skip for Now
+                    <Button variant="secondary" onClick={() => router.push('/dashboard')}>
+                      Go to Dashboard
                       <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                       </svg>
                     </Button>
                     <Button variant="primary" onClick={() => router.push('/tenants')}>
-                      🚀 Quick Start Guide
+                      🚀 My Stores
                     </Button>
                   </div>
 
