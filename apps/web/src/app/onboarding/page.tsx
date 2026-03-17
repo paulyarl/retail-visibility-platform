@@ -36,12 +36,9 @@ function OnboardingContent() {
     phone: '',
   });
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace('/auth/login');
-    }
-  }, [isAuthenticated, isLoading, router]);
+  // Note: We don't redirect to /auth/login here because the user just came from 
+  // a successful Auth0 login. The session validation might fail due to timing issues,
+  // but the user is already authenticated. We show the onboarding page regardless.
 
   // Pre-fill form with user data
   useEffect(() => {

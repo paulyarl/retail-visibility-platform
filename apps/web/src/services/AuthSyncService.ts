@@ -6,7 +6,8 @@
  */
 
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
-import { FlexibleApiSingleton, RequestTarget, RequestType } from '../providers/base/FlexibleApiSingleton';
+import { SystemSingleton } from '../providers/base/SystemSingleton';
+import { RequestTarget, RequestType } from '../providers/base/FlexibleApiSingleton';
 
 export interface Auth0User {
   sub: string;
@@ -42,13 +43,13 @@ export interface SyncResult {
 /**
  * Service for syncing Auth0 users to the local database
  * Called after successful Auth0 login to ensure user exists in database
- * Extends FlexibleApiSingleton (not AuthenticatedApiSingleton) because it runs server-side
+ * Extends SystemSingleton for proper server-side requests
  */
-export class AuthSyncService extends FlexibleApiSingleton {
+export default class AuthSyncService extends SystemSingleton {
   protected defaultRequestType: RequestType = RequestType.SYSTEM;
   protected defaultRequestTarget: RequestTarget = RequestTarget.API;
-  protected defaultContext?: AppContext = AppContext.USER;
-  protected defaultIsolation?: CacheIsolation = CacheIsolation.USER;
+  protected defaultContext: AppContext = AppContext.USER;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.USER;
   private static instance: AuthSyncService;
 
   protected constructor() {
@@ -76,86 +77,40 @@ export class AuthSyncService extends FlexibleApiSingleton {
   async syncUser(auth0User: Auth0User): Promise<SyncResult> {
     console.log('[AuthSyncService] syncUser ENTRY POINT - auth0User:', auth0User.email);
     
-    // Get service key for API authentication
-    const serviceKey = process.env.NEXT_PUBLIC_VERCEL_AUTOMATION_BYPASS_SECRET || process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.visibleshelf.store';
-    
-    console.log('[AuthSyncService] syncUser called', { 
-      email: auth0User.email, 
-      hasServiceKey: !!serviceKey,
-      serviceKeyLength: serviceKey?.length,
-      serviceKeyPrefix: serviceKey?.substring(0, 8) + '...',
-      apiUrl,
-      auth0Sub: auth0User.sub
-    });
-    
-    // Use fetch directly to ensure headers are passed correctly
-    // makeDefaultRequest was stripping custom headers
-    
     try {
-      const requestBody = JSON.stringify({
-        auth0Id: auth0User.sub,
-        email: auth0User.email.toLowerCase(),
-        emailVerified: auth0User.email_verified ?? false,
-        firstName: auth0User.given_name || null,
-        lastName: auth0User.family_name || null,
-        name: auth0User.name || null,
-        picture: auth0User.picture || null,
-      });
-      
-      console.log('[AuthSyncService] Making request to:', `${apiUrl}/api/auth/sync-user`);
-      console.log('[AuthSyncService] Request body:', requestBody.substring(0, 200) + '...');
-      console.log('[AuthSyncService] X-Service-Key header:', serviceKey?.substring(0, 8) + '...');
-      
-      // Add timeout to prevent hanging
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
-      const response = await fetch(`${apiUrl}/api/auth/sync-user`, {
+      const result = await this.makeApiRequest<SyncResult>('/api/auth/sync-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Service-Key': serviceKey || '',
+          'X-Service-Key': process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '',
         },
-        body: requestBody,
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
-
-      const data = await response.json();
+        body: JSON.stringify({
+          auth0Id: auth0User.sub,
+          email: auth0User.email.toLowerCase(),
+          emailVerified: auth0User.email_verified ?? false,
+          firstName: auth0User.given_name || null,
+          lastName: auth0User.family_name || null,
+          name: auth0User.name || null,
+          picture: auth0User.picture || null,
+          nickname: auth0User.nickname,
+        }),
+      }, `auth-sync-${auth0User.sub}`, 0); // Don't cache sync operations
       
       console.log('[AuthSyncService] syncUser result:', { 
-        status: response.status,
-        success: data.success, 
-        userId: data.user?.id,
-        error: data.error
+        success: result.success, 
+        userId: result.data?.user?.id, 
+        isNewUser: result.data?.isNewUser 
       });
-
-      if (!response.ok || !data.success) {
-        console.error('[AuthSyncService] Failed to sync user:', data);
-        return {
-          success: false,
-          user: null,
-          isNewUser: false,
-        };
+      
+      if (!result.success || !result.data) {
+        return { success: false, user: null, isNewUser: false };
       }
-
-      console.log('[AuthSyncService] User synced successfully:', data.user?.id);
-      return data;
+      
+      return result.data;
+      
     } catch (error) {
       console.error('[AuthSyncService] syncUser error:', error);
-      
-      // Check if it's a timeout error
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.error('[AuthSyncService] Request timed out after 10 seconds');
-      }
-      
-      return {
-        success: false,
-        user: null,
-        isNewUser: false,
-      };
+      return { success: false, user: null, isNewUser: false };
     }
   }
 
@@ -163,11 +118,11 @@ export class AuthSyncService extends FlexibleApiSingleton {
    * Get user from database by email or identifier
    */
   async getUserByIdentifier(identifier: string): Promise<SyncedUser | null> {
-    const result = await this.makeDefaultRequest<{ success: boolean; user: SyncedUser }>(
+    const result = await this.makeApiRequest<{ success: boolean; user: SyncedUser }>(
       `/api/auth/lookup?identifier=${encodeURIComponent(identifier)}`,
       {},
       `user-lookup-${identifier}`,
-      this.cacheTTL
+      0 // Don't cache user lookups
     );
 
     if (!result.success || !result.data?.user) {
@@ -177,5 +132,3 @@ export class AuthSyncService extends FlexibleApiSingleton {
     return result.data.user;
   }
 }
-
-export default AuthSyncService;

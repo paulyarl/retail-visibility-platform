@@ -98,7 +98,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.location.pathname.startsWith('/t/') || 
         window.location.pathname.startsWith('/dashboard') ||
         window.location.pathname.startsWith('/tenants') ||
-        window.location.pathname.startsWith('/settings')
+        window.location.pathname.startsWith('/settings') ||
+        window.location.pathname.startsWith('/onboarding')
       );
       
       // Skip auth check for public pages

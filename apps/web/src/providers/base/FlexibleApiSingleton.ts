@@ -992,8 +992,53 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
   }
 
   /**
+   * Get Auth0 access token from session storage
+   */
+  protected async getAccessToken(): Promise<string | null> {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    
+    try {
+      // Try to get from sessionStorage (Auth0 stores it there)
+      const token = sessionStorage.getItem('auth0_token');
+      if (token) return token;
+      
+      // Try to get from localStorage
+      const localToken = localStorage.getItem('auth0_token');
+      if (localToken) return localToken;
+      
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Get Auth0 user email from session storage
+   */
+  protected async getAuth0Email(): Promise<string | null> {
+    if (typeof window === 'undefined') return null;
+    
+    try {
+      // Try to get from sessionStorage
+      const email = sessionStorage.getItem('auth0_email');
+      if (email) return email;
+      
+      // Try to get from localStorage
+      const localEmail = localStorage.getItem('auth0_email');
+      if (localEmail) return localEmail;
+      
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Override hook for subclasses to customize authenticated request behavior
    * Auth0 session is handled via HTTP-only cookies (credentials: 'include' in fetchWithCache)
+   * Also add x-auth0-email header for API to identify user
    */
   protected async onAuthenticatedRequest<T>(
     url: string,
@@ -1002,9 +1047,20 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     ttl?: number,
     isAdminRequest?: boolean
   ): Promise<RequestInit> {
-    // Auth0 handles authentication via HTTP-only cookies
-    // No Bearer token needed - session is passed automatically with credentials: 'include'
-    return options;
+    // Add x-auth0-email header for API to identify user
+    const email = await this.getAuth0Email();
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
+    };
+    
+    if (email) {
+      headers['x-auth0-email'] = email;
+    }
+    
+    return {
+      ...options,
+      headers,
+    };
   }
 
   /**
@@ -1015,7 +1071,20 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     options: RequestInit,
     requestOptions?: TenantRequestOptions
   ): Promise<RequestInit> {
-    return options;
+    // Add x-auth0-email header for API to identify user
+    const email = await this.getAuth0Email();
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
+    };
+    
+    if (email) {
+      headers['x-auth0-email'] = email;
+    }
+    
+    return {
+      ...options,
+      headers,
+    };
   }
 
   /**
@@ -1026,7 +1095,20 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     options: RequestInit,
     requestOptions?: AdminRequestOptions
   ): Promise<RequestInit> {
-    return options;
+    // Add x-auth0-email header for API to identify user
+    const email = await this.getAuth0Email();
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
+    };
+    
+    if (email) {
+      headers['x-auth0-email'] = email;
+    }
+    
+    return {
+      ...options,
+      headers,
+    };
   }
 
   /**

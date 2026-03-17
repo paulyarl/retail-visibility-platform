@@ -10,6 +10,9 @@ import { Auth0Client } from '@auth0/nextjs-auth0/server';
 import { NextResponse } from 'next/server';
 import AuthSyncService from '../services/AuthSyncService';
 
+// Cookie name for storing user email for API authentication
+const EMAIL_COOKIE_NAME = 'auth0_email';
+
 export const auth0 = new Auth0Client({
   // Explicit configuration (falls back to AUTH0_* env vars if not provided)
   domain: process.env.AUTH0_DOMAIN,
@@ -33,6 +36,9 @@ export const auth0 = new Auth0Client({
     // Sync user to database if session exists
     if (session?.user) {
       console.log('[Auth0] Session user:', { sub: session.user.sub, email: session.user.email });
+      
+      // Store email in cookie for API authentication
+      const email = session.user.email || '';
       
       try {
         console.log('[Auth0] About to call syncUser...');
@@ -60,7 +66,9 @@ export const auth0 = new Auth0Client({
           if (user && !user.onboarding_completed) {
             // New user - redirect to onboarding wizard
             console.log('[Auth0] New user detected, redirecting to onboarding');
-            return NextResponse.redirect(new URL('/onboarding', ctx.appBaseUrl || '/'));
+            const response = NextResponse.redirect(new URL('/onboarding', ctx.appBaseUrl || '/'));
+            response.cookies.set(EMAIL_COOKIE_NAME, email, { httpOnly: false, path: '/', maxAge: 60 * 60 * 24 });
+            return response;
           }
         } else {
           // Log sync failure but don't block login
@@ -74,6 +82,10 @@ export const auth0 = new Auth0Client({
 
     // Redirect to the return URL or home
     const returnTo = ctx.returnTo || '/';
-    return NextResponse.redirect(new URL(returnTo, ctx.appBaseUrl || '/'));
+    const response = NextResponse.redirect(new URL(returnTo, ctx.appBaseUrl || '/'));
+    if (session?.user?.email) {
+      response.cookies.set(EMAIL_COOKIE_NAME, session.user.email, { httpOnly: false, path: '/', maxAge: 60 * 60 * 24 });
+    }
+    return response;
   },
 });

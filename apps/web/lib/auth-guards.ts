@@ -6,7 +6,7 @@
 
 import { auth0 } from '../src/lib/auth0';
 import { NextResponse } from 'next/server';
-import { AuthSyncService } from '../src/services/AuthSyncService';
+import AuthSyncService from '../src/services/AuthSyncService';
 
 export type UserRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN' | 'PLATFORM_ADMIN';
 

@@ -6,6 +6,7 @@
  */
 
 import { PrismaClient, user_role } from '@prisma/client';
+import { generateUserId } from '../src/lib/id-generator';
 
 const prisma = new PrismaClient();
 
@@ -29,7 +30,9 @@ async function main() {
     // Create the user with PLATFORM_ADMIN role
     user = await prisma.users.create({
       data: {
+        id: generateUserId(),
         email: email.toLowerCase(),
+        password_hash: '', // No password for OAuth users
         first_name: null,
         last_name: null,
         role: user_role.PLATFORM_ADMIN,
@@ -38,7 +41,6 @@ async function main() {
         last_login: new Date(),
         created_at: new Date(),
         updated_at: new Date(),
-        auth0_id: 'manual', // Will be updated when sync works
       },
     });
     

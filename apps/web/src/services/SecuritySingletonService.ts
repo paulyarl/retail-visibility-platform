@@ -5,10 +5,10 @@
  * Uses the platform's singleton architecture for admin authentication and caching
  */
 
-import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
 import { LoginSession, SecurityAlert, ApiResponse, MFAStatus, MFASetupData, MFAVerificationResult, MFASetupFormData } from '@/types/security';
 
-class SecuritySingletonService extends AdminApiSingleton {
+class SecuritySingletonService extends AuthenticatedApiSingleton {
   private static instance: SecuritySingletonService;
 
   private constructor(singletonKey: string, cacheOptions?: any) {

@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, optionalAuth } from '../middleware/auth';
 import { basePrisma } from '../prisma';
 import crypto from 'crypto';
 
@@ -14,7 +14,7 @@ const router = Router();
  * GET /api/auth/sessions
  * Get all active sessions for the current user
  */
-router.get('/sessions', authenticateToken, async (req, res) => {
+router.get('/sessions', optionalAuth, async (req, res) => {
   try {
     const userId = req.user?.user_id;
     if (!userId) {
@@ -67,7 +67,7 @@ router.get('/sessions', authenticateToken, async (req, res) => {
  * DELETE /api/auth/sessions/:sessionId
  * Revoke a specific session
  */
-router.delete('/sessions/:sessionId', authenticateToken, async (req, res) => {
+router.delete('/sessions/:sessionId', optionalAuth, async (req, res) => {
   try {
     const userId = req.user?.user_id;
     const { sessionId } = req.params;
@@ -113,7 +113,7 @@ router.delete('/sessions/:sessionId', authenticateToken, async (req, res) => {
  * POST /api/auth/sessions/revoke-all
  * Revoke all sessions except the current one
  */
-router.post('/sessions/revoke-all', authenticateToken, async (req, res) => {
+router.post('/sessions/revoke-all', optionalAuth, async (req, res) => {
   try {
     const userId = req.user?.user_id;
     if (!userId) {
@@ -169,7 +169,7 @@ router.post('/sessions/revoke-all', authenticateToken, async (req, res) => {
  * PUT /api/auth/sessions/:sessionId/activity
  * Update last activity timestamp for a session
  */
-router.put('/sessions/:sessionId/activity', authenticateToken, async (req, res) => {
+router.put('/sessions/:sessionId/activity', optionalAuth, async (req, res) => {
   try {
     const userId = req.user?.user_id;
     const { sessionId } = req.params;

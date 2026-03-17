@@ -62,7 +62,7 @@ const nextConfig: NextConfig = {
   // Proxy API requests to the external API server
   async rewrites() {
     const apiBaseUrl = process.env.NODE_ENV === 'production' 
-      ? 'https://visibleshelf.store'  // Production API URL
+      ? 'https://aps.visibleshelf.store'  // Production API URL
       : 'http://localhost:4000';     // Development API URL
 
     return [

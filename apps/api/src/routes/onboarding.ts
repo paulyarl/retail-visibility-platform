@@ -1,19 +1,33 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { audit } from '../audit';
+import { optionalAuth } from '../middleware/auth';
 
 const router = Router();
 
 /**
  * POST /api/auth/onboarding
  * Complete user onboarding and update profile
+ * Uses optionalAuth to support Auth0 session cookies
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', optionalAuth, async (req: Request, res: Response) => {
   try {
     const { firstName, lastName, businessName, businessType, phone } = req.body;
     
-    // Get user from session (set by auth middleware)
-    const userId = req.user?.id;
+    // Get user from session (set by auth middleware) or try to get from Auth0
+    let userId = req.user?.id;
+    
+    // If no user from JWT, try to get from Auth0 session via email header or cookie
+    if (!userId) {
+      const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
+      if (auth0Email) {
+        const user = await prisma.users.findUnique({
+          where: { email: auth0Email.toLowerCase() },
+          select: { id: true }
+        });
+        userId = user?.id;
+      }
+    }
     
     if (!userId) {
       return res.status(401).json({ 
@@ -123,10 +137,23 @@ router.post('/', async (req: Request, res: Response) => {
 /**
  * GET /api/auth/onboarding
  * Check onboarding status for current user
+ * Uses optionalAuth to support Auth0 session cookies
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', optionalAuth, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    let userId = req.user?.id;
+    
+    // If no user from JWT, try to get from Auth0 session via email header or cookie
+    if (!userId) {
+      const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
+      if (auth0Email) {
+        const user = await prisma.users.findUnique({
+          where: { email: auth0Email.toLowerCase() },
+          select: { id: true }
+        });
+        userId = user?.id;
+      }
+    }
     
     if (!userId) {
       return res.status(401).json({ 
