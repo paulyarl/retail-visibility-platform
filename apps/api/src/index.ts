@@ -6600,16 +6600,19 @@ app.use('/api/auth/mfa', mfaRoutes);
 console.log('✅ MFA routes mounted (two-factor authentication)');
 
 /* ------------------------------ Security Sessions & Alerts ------------------------------ */
+import authSyncRoutes from './routes/auth-sync';
 import authSessionsRoutes from './routes/auth-sessions';
 import securityAlertsRoutes from './routes/security-alerts';
 import adminSecurityMonitoringRoutes from './routes/admin/security-monitoring';
 import adminSecurityRoutes from './routes/admin-security';
 import securityTelemetryRoutes from './routes/security-telemetry';
+app.use('/api/auth', authSyncRoutes);
 app.use('/api/auth', authSessionsRoutes);
 app.use('/api/security/telemetry', securityTelemetryRoutes); // Mount telemetry first (no auth required)
 app.use('/api/security', securityAlertsRoutes);
 app.use('/api/admin/security', adminSecurityMonitoringRoutes);
 app.use('/api/admin/security', authenticateToken, requireAdmin, adminSecurityRoutes);
+console.log('✅ Auth0 sync routes mounted at /api/auth/sync-user');
 console.log('✅ Security sessions routes mounted at /api/auth/sessions');
 console.log('✅ Security telemetry routes mounted at /api/security/telemetry (no auth required)');
 console.log('✅ Security alerts routes mounted at /api/security/security-alerts');

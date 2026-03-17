@@ -4,7 +4,7 @@
  * Utilities for protecting routes based on user roles
  */
 
-import { auth0 } from './auth0';
+import { auth0 } from '../src/lib/auth0';
 import { NextResponse } from 'next/server';
 import { AuthSyncService } from '../src/services/AuthSyncService';
 

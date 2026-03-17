@@ -8,7 +8,7 @@
 
 import { Auth0Client } from '@auth0/nextjs-auth0/server';
 import { NextResponse } from 'next/server';
-import { AuthSyncService } from '../src/services/AuthSyncService';
+import AuthSyncService from '../services/AuthSyncService';
 
 export const auth0 = new Auth0Client({
   // Explicit configuration (falls back to AUTH0_* env vars if not provided)
@@ -33,6 +33,7 @@ export const auth0 = new Auth0Client({
       console.log('[Auth0] Session user:', { sub: session.user.sub, email: session.user.email });
       
       try {
+        console.log('[Auth0] About to call syncUser...');
         const syncService = AuthSyncService.getInstance();
         console.log('[Auth0] Calling syncUser...');
         
@@ -59,6 +60,9 @@ export const auth0 = new Auth0Client({
             console.log('[Auth0] New user detected, redirecting to onboarding');
             return NextResponse.redirect(new URL('/onboarding', ctx.appBaseUrl || '/'));
           }
+        } else {
+          // Log sync failure but don't block login
+          console.warn('[Auth0] User sync failed, but continuing with login');
         }
       } catch (syncError) {
         // Log but don't fail - user can still use the app

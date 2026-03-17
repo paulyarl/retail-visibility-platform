@@ -58,6 +58,7 @@
     "@google/generative-ai": "^0.24.1",
     "@paypal/paypal-server-sdk": "^2.1.0",
     "@prisma/client": "^6.17.1",
+    "@railway/cli": "^4.31.0",
     "@sendgrid/mail": "^8.1.4",
     "@sentry/node": "^10.38.0",
     "@supabase/supabase-js": "^2.90.1",

@@ -33,15 +33,33 @@ const router = Router();
 router.post('/sync-user', async (req: Request, res: Response) => {
   try {
     // Verify service key
-    const serviceKey = req.headers['x-service-key'];
+    const serviceKeyRaw = req.headers['x-service-key'];
+    const serviceKey = Array.isArray(serviceKeyRaw) ? serviceKeyRaw[0] : serviceKeyRaw;
     const expectedKey = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
     
+    console.log('[AuthSync API] Request received', {
+      hasServiceKey: !!serviceKey,
+      serviceKeyLength: serviceKey?.length,
+      serviceKeyPrefix: serviceKey?.substring(0, 8) + '...',
+      hasExpectedKey: !!expectedKey,
+      expectedKeyLength: expectedKey?.length,
+      expectedKeyPrefix: expectedKey?.substring(0, 8) + '...',
+      body: req.body
+    });
+    
     if (!serviceKey || serviceKey !== expectedKey) {
+      console.log('[AuthSync API] Service key validation failed', {
+        provided: serviceKey?.substring(0, 8) + '...',
+        expected: expectedKey?.substring(0, 8) + '...',
+        match: serviceKey === expectedKey
+      });
       return res.status(401).json({
         success: false,
         error: 'Unauthorized',
       });
     }
+
+    console.log('[AuthSync API] Service key validated successfully');
 
     const { auth0Id, email, emailVerified, firstName, lastName, name, picture } = req.body;
 
