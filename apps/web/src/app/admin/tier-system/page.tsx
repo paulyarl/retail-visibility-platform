@@ -232,8 +232,8 @@ export default function TierSystemPage() {
       if (updatedTier) {
         console.log('[TierSystem] Update response:', updatedTier);
         
-        // Handle both nested {tier: {...}} and flat response structures
-        const tierData = updatedTier.tier || updatedTier;
+        // updatedTier is now the extracted tier data (not nested)
+        const tierData = updatedTier;
         console.log('[TierSystem] Extracted tier data:', tierData);
         console.log('[TierSystem] displayName:', tierData.displayName);
         console.log('[TierSystem] name:', tierData.name);
