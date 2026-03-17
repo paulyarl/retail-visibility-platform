@@ -89,20 +89,21 @@ export abstract class AdminApiSingleton extends FlexibleApiSingleton {
   /**
    * Override hook for admin request behavior
    * Auth0 handles authentication via HTTP-only cookies (credentials: 'include' in fetchWithCache)
+   * Also adds x-auth0-id and x-auth0-email headers for API to identify user
    */
   protected async onAdminRequest<T>(
     url: string,
     options: RequestInit,
     requestOptions?: AdminRequestOptions
   ): Promise<RequestInit> {
-    // Auth0 handles authentication via HTTP-only cookies
-    // No Bearer token needed - session is passed automatically with credentials: 'include'
+    // Call parent to add x-auth0-id and x-auth0-email headers
+    let modifiedOptions = await super.onAdminRequest(url, options, requestOptions);
 
     // Add admin context headers
-    const modifiedOptions = {
-      ...options,
+    modifiedOptions = {
+      ...modifiedOptions,
       headers: {
-        ...options.headers,
+        ...modifiedOptions.headers,
         'X-Request-Context': 'admin',
         'X-Admin-Roles': 'PLATFORM_ADMIN', // Could be dynamic based on session
       },
