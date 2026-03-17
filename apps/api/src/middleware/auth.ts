@@ -167,7 +167,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
             email: true,
             role: true,
             auth0_id: true,
-            user_tenants_list: {
+            user_tenants: {
               select: { tenant_id: true }
             }
           }
@@ -183,7 +183,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
             email: true,
             role: true,
             auth0_id: true,
-            user_tenants_list: {
+            user_tenants: {
               select: { tenant_id: true }
             }
           }
@@ -198,7 +198,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
           user_id: user.id,
           email: user.email,
           role: user.role as user_role,
-          tenantIds: user.user_tenants_list?.map((ut: any) => ut.tenant_id) || []
+          tenantIds: user.user_tenants?.map((ut: any) => ut.tenant_id) || []
         };
         
         req.user = makeBothConventionsAvailable(payload);
