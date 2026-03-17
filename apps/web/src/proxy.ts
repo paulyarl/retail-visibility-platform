@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth0 } from './lib/auth0';
+import { auth0 } from '../lib/auth0';
 
 // Environment variables
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.visibleshelf.com';
@@ -92,9 +92,10 @@ async function isPlatformAdmin(req: NextRequest): Promise<boolean> {
 export async function proxy(req: NextRequest) {
   const { pathname } = new URL(req.url);
   
-  // Log auth route attempts
+  // Log auth route attempts with cookies
   if (pathname.startsWith('/auth/')) {
-    console.log('[Proxy] Auth route detected:', pathname);
+    const hasSession = req.cookies.has('auth0-session') || req.cookies.has('appSession');
+    console.log('[Proxy] Auth route detected:', pathname, 'Has session cookie:', hasSession);
   }
   
   // First, let Auth0 handle authentication routes
@@ -102,7 +103,8 @@ export async function proxy(req: NextRequest) {
   
   // If Auth0 handled the request (auth routes), return the response
   if (authResponse) {
-    console.log('[Proxy] Auth0 handled request:', pathname, 'Status:', authResponse.status);
+    const location = authResponse.headers.get('location');
+    console.log('[Proxy] Auth0 handled request:', pathname, 'Status:', authResponse.status, 'Location:', location);
     return authResponse;
   }
   

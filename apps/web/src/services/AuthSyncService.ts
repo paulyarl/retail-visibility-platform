@@ -64,10 +64,24 @@ export class AuthSyncService extends AuthenticatedApiSingleton {
    * Creates new user or updates existing user on login
    */
   async syncUser(auth0User: Auth0User): Promise<SyncResult> {
+    // Get service key for API authentication
+    const serviceKey = process.env.NEXT_PUBLIC_VERCEL_AUTOMATION_BYPASS_SECRET || process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    
+    console.log('[AuthSyncService] syncUser called', { 
+      email: auth0User.email, 
+      hasServiceKey: !!serviceKey,
+      serviceKeyLength: serviceKey?.length,
+      serviceKeyPrefix: serviceKey?.substring(0, 8) + '...'
+    });
+    
     const result = await this.makeDefaultRequest<SyncResult>(
       '/api/auth/sync-user',
       {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Service-Key': serviceKey || '',
+        },
         body: JSON.stringify({
           auth0Id: auth0User.sub,
           email: auth0User.email.toLowerCase(),
@@ -81,6 +95,12 @@ export class AuthSyncService extends AuthenticatedApiSingleton {
       undefined, // No cache key - sync operations should not be cached
       undefined // No TTL
     );
+
+    console.log('[AuthSyncService] syncUser result:', { 
+      success: result.success, 
+      error: result.error,
+      userId: result.data?.user?.id 
+    });
 
     if (!result.success) {
       console.error('[AuthSyncService] Failed to sync user:', result.error);

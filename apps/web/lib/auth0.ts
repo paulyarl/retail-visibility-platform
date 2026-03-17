@@ -11,8 +11,17 @@ import { NextResponse } from 'next/server';
 import { AuthSyncService } from '../src/services/AuthSyncService';
 
 export const auth0 = new Auth0Client({
+  // Explicit configuration (falls back to AUTH0_* env vars if not provided)
+  domain: process.env.AUTH0_DOMAIN,
+  clientId: process.env.AUTH0_CLIENT_ID,
+  clientSecret: process.env.AUTH0_CLIENT_SECRET,
+  secret: process.env.AUTH0_SECRET,
+  // APP_BASE_URL is inferred from request host for preview deployments
+  
   // Custom callback hook to sync user to database after successful login
   onCallback: async (error, ctx, session) => {
+    console.log('[Auth0] onCallback triggered', { error: !!error, hasSession: !!session, hasUser: !!session?.user });
+    
     if (error) {
       console.error('[Auth0] Callback error:', error);
       // Redirect to home with error
@@ -21,8 +30,12 @@ export const auth0 = new Auth0Client({
 
     // Sync user to database if session exists
     if (session?.user) {
+      console.log('[Auth0] Session user:', { sub: session.user.sub, email: session.user.email });
+      
       try {
         const syncService = AuthSyncService.getInstance();
+        console.log('[Auth0] Calling syncUser...');
+        
         const syncResult = await syncService.syncUser({
           sub: session.user.sub || '',
           email: session.user.email || '',
@@ -33,6 +46,8 @@ export const auth0 = new Auth0Client({
           picture: session.user.picture,
           nickname: session.user.nickname,
         });
+
+        console.log('[Auth0] Sync result:', { success: syncResult.success, userId: syncResult.user?.id });
 
         if (syncResult.success) {
           console.log('[Auth0] User synced to database:', syncResult.user?.id);
