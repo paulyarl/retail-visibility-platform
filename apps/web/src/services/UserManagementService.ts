@@ -301,6 +301,40 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     await this.invalidateCache('platform-user-*');
   }
 
+  /**
+   * Complete user onboarding
+   * Updates user profile with onboarding data
+   */
+  async completeOnboarding(data: {
+    firstName: string;
+    lastName: string;
+    businessName: string;
+    businessType: string;
+    phone: string;
+  }): Promise<{ success: boolean; user?: any; error?: string }> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/auth/onboarding',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      },
+      'platform-onboarding-complete',
+      0 // Don't cache
+    );
+
+    if (!result.success) {
+      console.error('[UserManagementService] Failed to complete onboarding:', result.error);
+      const errorMsg = typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to complete onboarding';
+      return { success: false, error: errorMsg };
+    }
+
+    // Invalidate user caches
+    await this.invalidateCache('platform-user-*');
+
+    return { success: true, user: result.data };
+  }
+
   // Helper methods for onboarding data
   private async getTenantById(tenantId: string): Promise<any> {
     const result = await this.makeDefaultRequest<any>(

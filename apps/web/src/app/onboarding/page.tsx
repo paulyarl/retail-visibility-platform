@@ -6,6 +6,7 @@ import { Button } from '@mantine/core';
 import { Spinner, AnimatedCard, Input } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { userManagementService } from '@/services/UserManagementService';
 
 const ONBOARDING_STEPS = [
   { id: 'welcome', title: 'Welcome to Visible Shelf!', description: 'Let\'s get your account set up' },
@@ -69,13 +70,9 @@ function OnboardingContent() {
   const completeOnboarding = async () => {
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/auth/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+      const result = await userManagementService.completeOnboarding(formData);
 
-      if (response.ok) {
+      if (result.success) {
         setCurrentStep(ONBOARDING_STEPS.length - 1); // Show complete step
         // Redirect after 2 seconds
         setTimeout(() => {
@@ -86,6 +83,8 @@ function OnboardingContent() {
             router.replace('/tenants');
           }
         }, 2000);
+      } else {
+        console.error('Onboarding failed:', result.error);
       }
     } catch (error) {
       console.error('Onboarding failed:', error);
