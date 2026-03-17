@@ -29,6 +29,7 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
   /**
    * Custom hook for authenticated request behavior
    * Auth0 handles authentication via HTTP-only cookies (credentials: 'include' in fetchWithCache)
+   * Also adds x-auth0-id and x-auth0-email headers for API to identify user
    */
   protected async onAuthenticatedRequest<T>(
     url: string,
@@ -37,21 +38,21 @@ export abstract class AuthenticatedApiSingleton extends FlexibleApiSingleton {
     ttl?: number,
     isAdminRequest: boolean = false
   ): Promise<RequestInit> {
-    // Auth0 handles authentication via HTTP-only cookies
-    // No Bearer token needed - session is passed automatically with credentials: 'include'
+    // Call parent to add x-auth0-id and x-auth0-email headers
+    let modifiedOptions = await super.onAuthenticatedRequest(url, options, cacheKey, ttl, isAdminRequest);
     
     // Add admin-specific headers if needed
     if (isAdminRequest) {
-      return {
-        ...options,
+      modifiedOptions = {
+        ...modifiedOptions,
         headers: {
-          ...options.headers,
+          ...modifiedOptions.headers,
           'X-Admin-Request': 'true',
         },
       };
     }
 
-    return options;
+    return modifiedOptions;
   }
 
   /**
