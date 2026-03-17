@@ -22,6 +22,7 @@ export function setCsrfCookie(req: Request, res: Response, next: NextFunction) {
       httpOnly: false,
       sameSite: 'none', // Allow cross-site requests (frontend on Vercel, backend on Railway)
       secure: true, // Required when sameSite=none
+      partitioned: true, // Required for third-party cookies (CHIPS) in modern browsers
       path: '/',
       maxAge: 60 * 60 * 24 * 7,
     });
