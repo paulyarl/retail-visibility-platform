@@ -1015,20 +1015,39 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
   }
 
   /**
-   * Get Auth0 user email from session storage
+   * Get Auth0 user email from cookies (set by Auth0 callback)
    */
-  protected async getAuth0Email(): Promise<string | null> {
-    if (typeof window === 'undefined') return null;
+  protected getAuth0Email(): string | null {
+    if (typeof document === 'undefined') return null;
     
     try {
-      // Try to get from sessionStorage
-      const email = sessionStorage.getItem('auth0_email');
-      if (email) return email;
-      
-      // Try to get from localStorage
-      const localEmail = localStorage.getItem('auth0_email');
-      if (localEmail) return localEmail;
-      
+      const cookies = document.cookie.split(';');
+      for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'auth0_email' && value) {
+          return decodeURIComponent(value);
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Get Auth0 user ID from cookies (set by Auth0 callback)
+   */
+  protected getAuth0Id(): string | null {
+    if (typeof document === 'undefined') return null;
+    
+    try {
+      const cookies = document.cookie.split(';');
+      for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'auth0_id' && value) {
+          return decodeURIComponent(value);
+        }
+      }
       return null;
     } catch {
       return null;
@@ -1038,7 +1057,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
   /**
    * Override hook for subclasses to customize authenticated request behavior
    * Auth0 session is handled via HTTP-only cookies (credentials: 'include' in fetchWithCache)
-   * Also add x-auth0-email header for API to identify user
+   * Also add x-auth0-id and x-auth0-email headers for API to identify user
    */
   protected async onAuthenticatedRequest<T>(
     url: string,
@@ -1047,12 +1066,16 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     ttl?: number,
     isAdminRequest?: boolean
   ): Promise<RequestInit> {
-    // Add x-auth0-email header for API to identify user
-    const email = await this.getAuth0Email();
+    // Add x-auth0-id and x-auth0-email headers for API to identify user
+    const auth0Id = this.getAuth0Id();
+    const email = this.getAuth0Email();
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
     
+    if (auth0Id) {
+      headers['x-auth0-id'] = auth0Id;
+    }
     if (email) {
       headers['x-auth0-email'] = email;
     }
@@ -1071,12 +1094,16 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     options: RequestInit,
     requestOptions?: TenantRequestOptions
   ): Promise<RequestInit> {
-    // Add x-auth0-email header for API to identify user
-    const email = await this.getAuth0Email();
+    // Add x-auth0-id and x-auth0-email headers for API to identify user
+    const auth0Id = this.getAuth0Id();
+    const email = this.getAuth0Email();
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
     
+    if (auth0Id) {
+      headers['x-auth0-id'] = auth0Id;
+    }
     if (email) {
       headers['x-auth0-email'] = email;
     }
@@ -1095,12 +1122,16 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     options: RequestInit,
     requestOptions?: AdminRequestOptions
   ): Promise<RequestInit> {
-    // Add x-auth0-email header for API to identify user
-    const email = await this.getAuth0Email();
+    // Add x-auth0-id and x-auth0-email headers for API to identify user
+    const auth0Id = this.getAuth0Id();
+    const email = this.getAuth0Email();
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
     
+    if (auth0Id) {
+      headers['x-auth0-id'] = auth0Id;
+    }
     if (email) {
       headers['x-auth0-email'] = email;
     }

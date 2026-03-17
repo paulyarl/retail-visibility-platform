@@ -16,7 +16,33 @@ const router = Router();
  */
 router.get('/sessions', optionalAuth, async (req, res) => {
   try {
-    const userId = req.user?.user_id;
+    let userId = req.user?.user_id;
+    
+    // If no user from JWT, try to get from Auth0 session via auth0_id, email header, or cookie
+    if (!userId) {
+      // First try by auth0_id (most reliable)
+      const auth0Id = req.headers['x-auth0-id'] as string;
+      if (auth0Id) {
+        const user = await basePrisma.users.findUnique({
+          where: { auth0_id: auth0Id },
+          select: { id: true }
+        });
+        userId = user?.id;
+      }
+      
+      // Then try by email
+      if (!userId) {
+        const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
+        if (auth0Email) {
+          const user = await basePrisma.users.findUnique({
+            where: { email: auth0Email.toLowerCase() },
+            select: { id: true }
+          });
+          userId = user?.id;
+        }
+      }
+    }
+    
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
