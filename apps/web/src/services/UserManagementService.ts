@@ -311,7 +311,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     businessName: string;
     businessType: string;
     phone: string;
-  }): Promise<{ success: boolean; user?: any; error?: string }> {
+  }): Promise<{ success: boolean; user?: any; tenant?: { id: string; name: string } | null; error?: string }> {
     const result = await this.makeDefaultRequest<any>(
       '/api/auth/onboarding',
       {
@@ -332,7 +332,7 @@ export class UserManagementService extends AuthenticatedApiSingleton {
     // Invalidate user caches
     await this.invalidateCache('platform-user-*');
 
-    return { success: true, user: result.data };
+    return { success: true, user: result.data?.user, tenant: result.data?.tenant };
   }
 
   // Helper methods for onboarding data

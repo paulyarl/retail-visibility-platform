@@ -75,6 +75,10 @@ function OnboardingContent() {
 
       if (result.success) {
         setSavedProfile(result.user);
+        // Store tenant info for redirect
+        if (result.tenant) {
+          setSavedProfile({ ...result.user, tenant: result.tenant });
+        }
         setCurrentStep(ONBOARDING_STEPS.length - 1); // Show complete step
       } else {
         console.error('Onboarding failed:', result.error);
@@ -87,11 +91,20 @@ function OnboardingContent() {
   };
 
   const handleGoToTenants = () => {
-    const tenantId = searchParams.get('tenantId');
+    const tenantId = searchParams.get('tenantId') || savedProfile?.tenant?.id;
     if (tenantId) {
       router.replace(`/t/${tenantId}/onboarding`);
     } else {
       router.replace('/tenants');
+    }
+  };
+
+  const handleContinueToAdvancedProfile = () => {
+    const tenantId = savedProfile?.tenant?.id;
+    if (tenantId) {
+      router.push(`/t/${tenantId}/onboarding`);
+    } else {
+      router.push('/tenants');
     }
   };
 
@@ -378,15 +391,85 @@ function OnboardingContent() {
               {/* Complete Step Actions */}
               {currentStep === 3 && (
                 <div className="mt-8 pt-6 border-t border-neutral-200">
+                  {/* Primary CTA - Continue to Advanced Profile */}
+                  {savedProfile?.tenant?.id && (
+                    <div className="mb-6 p-4 bg-primary-50 rounded-lg border border-primary-200">
+                      <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+                        🎯 Strengthen Your Store Presence
+                      </h3>
+                      <p className="text-sm text-neutral-600 mb-4">
+                        Complete your store profile to help customers find you online.
+                      </p>
+
+                      {/* Required vs Optional Fields */}
+                      <div className="mb-4 text-left">
+                        <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2">Required for Robust Presence</p>
+                        <div className="grid grid-cols-2 gap-1 text-xs text-neutral-700">
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                            Business Hours
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                            Business Location
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                            Business Contact
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                            Business Branding
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                            Slug Selection
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                            Business Category
+                          </span>
+                        </div>
+
+                        <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mt-3 mb-2">Optional Enhancements</p>
+                        <div className="grid grid-cols-2 gap-1 text-xs text-neutral-500">
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
+                            Social Media Links
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
+                            SEO Settings
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
+                            Logo & Banner
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
+                            Google Shopping Sync
+                          </span>
+                        </div>
+                      </div>
+
+                      <Button onClick={handleContinueToAdvancedProfile} className="w-full">
+                        Continue to Advanced Profile Setup
+                        <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                    <Button onClick={handleGoToTenants}>
-                      Create Your First Store
+                    <Button variant="secondary" onClick={handleGoToTenants}>
+                      Skip for Now
                       <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                       </svg>
                     </Button>
                     <Button variant="primary" onClick={() => router.push('/tenants')}>
-                      🚀 Quick Start (Recommended)
+                      🚀 Quick Start Guide
                     </Button>
                   </div>
 
