@@ -542,6 +542,14 @@ router.put('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
       include: { tier_features_list: true },
     });
 
+    // Invalidate tier-related cache entries
+    const { memoryCache } = require('../../utils/cache');
+    memoryCache.deletePattern('tier-system');
+    memoryCache.deletePattern('subscription_tiers');
+    memoryCache.deletePattern('tier_list');
+    
+    // console.log(`[Tier System] Cache invalidated for tier update: ${tierId}`);
+
     // Process features if provided
     if (updateData.features && Array.isArray(updateData.features)) {
       // Delete existing features for this tier

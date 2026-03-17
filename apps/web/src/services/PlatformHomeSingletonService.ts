@@ -1135,18 +1135,18 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
   /**
    * Update tier
    */
-  async updateTier(tierId: string, tierData: Partial<Tier>): Promise<Tier | null> {
+  async updateTier(tierId: string, tierUpdates: Partial<Tier>): Promise<Tier | null> {
     if (!tierId) {
       throw new Error('Tier ID is required');
     }
 
     // Add reason for audit trail
     const updatePayload = {
-      ...tierData,
+      ...tierUpdates,
       reason: `Tier updated via admin interface at ${new Date().toISOString()}`
     };
 
-    const result = await this.makeDefaultRequest<Tier>(
+    const result = await this.makeDefaultRequest<{tier: Tier}>(
       `/api/admin/tier-system/tiers/${tierId}`,
       { 
         method: 'PUT',
@@ -1168,7 +1168,10 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     // Invalidate tier system cache
     await this.invalidateTierCaches(tierId); // Clear the main endpoint cache
 
-    return result.data || null;
+    // Return the nested tier data from response
+    const returnedTier = result.data?.tier || null;
+    console.log('[PlatformHomeSingleton] updateTier returning:', returnedTier);
+    return returnedTier;
   }
 
   /**

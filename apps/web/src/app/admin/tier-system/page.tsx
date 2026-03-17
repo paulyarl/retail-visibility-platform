@@ -232,21 +232,29 @@ export default function TierSystemPage() {
       if (updatedTier) {
         console.log('[TierSystem] Update response:', updatedTier);
         
+        // Handle both nested {tier: {...}} and flat response structures
+        const tierData = updatedTier.tier || updatedTier;
+        console.log('[TierSystem] Extracted tier data:', tierData);
+        console.log('[TierSystem] displayName:', tierData.displayName);
+        console.log('[TierSystem] name:', tierData.name);
+        
         // 🎯 Use the response data to update the local state immediately
         setTiers(prevTiers => 
           prevTiers.map(tier => 
             tier.id === editingData.id 
               ? {
                   ...tier,
-                  ...updatedTier, // Use the returned tier data directly
-                  priceMonthly: updatedTier.priceMonthly || tier.priceMonthly
+                  ...tierData, // Use the extracted tier data
+                  priceMonthly: tierData.priceMonthly || tier.priceMonthly
                 }
               : tier
           )
         );
 
         // 🎯 Show success toast with detailed information
-        toast(`✅ Successfully updated "${updatedTier.displayName}"`, { variant: 'success' });
+        const displayName = tierData.displayName || tierData.name || 'Unknown';
+        console.log('[TierSystem] Toast displayName:', displayName);
+        toast(`✅ Successfully updated "${displayName}"`, { variant: 'success' });
         
         setEditingTier(null);
         setEditingData(null);
