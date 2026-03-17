@@ -300,7 +300,7 @@ app.use(cors({
   origin: [/localhost:\d+$/, /\.vercel\.app$/, /vercel\.app$/ ,/www\.visibleshelf\.com$/, /visibleshelf\.com$/, /\.visibleshelf\.com$/, /visibleshelf\.store$/, /\.visibleshelf\.store$/],
   credentials: true,
   methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
-  allowedHeaders: ['content-type','authorization','x-csrf-token','x-tenant-id','x-no-retry','x-device-info','x-admin-request','x-tenant-request','x-request-group','x-request-groups','x-require-all','x-admin-roles','x-audit-id','x-request-context','x-organization-id','x-organization-validation','x-audit-operation','x-audit-reason','x-service','x-service-key','x-auth0-email'],
+  allowedHeaders: ['content-type','authorization','x-csrf-token','x-tenant-id','x-no-retry','x-device-info','x-admin-request','x-tenant-request','x-request-group','x-request-groups','x-require-all','x-admin-roles','x-audit-id','x-request-context','x-organization-id','x-organization-validation','x-audit-operation','x-audit-reason','x-service','x-service-key','x-auth0-email','x-auth0-id'],
 }));
 
 // IMPORTANT: Webhook routes MUST be mounted BEFORE JSON parsing middleware
