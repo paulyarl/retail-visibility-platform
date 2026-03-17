@@ -72,16 +72,24 @@ router.post('/sync-user', async (req: Request, res: Response) => {
 
     console.log('[AuthSync] Syncing user:', { auth0Id, email });
 
-    // Check if user exists by email
+    // Check if user exists by auth0_id first (preferred), then by email
     let user = await prisma.users.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { auth0_id: auth0Id },
     });
 
+    // If not found by auth0_id, try by email
+    if (!user) {
+      user = await prisma.users.findUnique({
+        where: { email: email.toLowerCase() },
+      });
+    }
+
     if (user) {
-      // Update existing user
+      // Update existing user with auth0_id if not set
       user = await prisma.users.update({
         where: { id: user.id },
         data: {
+          auth0_id: user.auth0_id || auth0Id, // Store auth0_id if not already set
           email_verified: emailVerified,
           last_login: new Date(),
           updated_at: new Date(),
@@ -133,6 +141,7 @@ router.post('/sync-user', async (req: Request, res: Response) => {
       data: {
         id: generateUserId(),
         email: email.toLowerCase(),
+        auth0_id: auth0Id,
         password_hash: '', // No password for OAuth users - they authenticate via Auth0
         first_name: parsedFirstName,
         last_name: parsedLastName,
@@ -202,34 +211,39 @@ router.get('/lookup', async (req: Request, res: Response) => {
       });
     }
 
-    // Try to find by email
-    const user = await prisma.users.findUnique({
-      where: { email: identifier.toLowerCase() },
-      select: {
-        id: true,
-        email: true,
-        first_name: true,
-        last_name: true,
-        role: true,
-        email_verified: true,
-        is_active: true,
-        last_login: true,
-        created_at: true,
-        onboarding_completed: true,
-        onboarding_step: true,
-      },
+    // Try to find by auth0_id first, then by email
+    let user = await prisma.users.findUnique({
+      where: { auth0_id: identifier },
     });
-
+    
+    if (!user) {
+      user = await prisma.users.findUnique({
+        where: { email: identifier.toLowerCase() },
+      });
+    }
+    
     if (!user) {
       return res.status(404).json({
         success: false,
         error: 'User not found',
       });
     }
-
+    
     return res.json({
       success: true,
-      user,
+      user: {
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        role: user.role,
+        email_verified: user.email_verified,
+        is_active: user.is_active,
+        last_login: user.last_login,
+        created_at: user.created_at,
+        onboarding_completed: user.onboarding_completed,
+        onboarding_step: user.onboarding_step,
+      },
     });
   } catch (error: any) {
     console.error('[AuthSync] Error looking up user:', error);

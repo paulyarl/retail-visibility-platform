@@ -10,8 +10,9 @@ import { Auth0Client } from '@auth0/nextjs-auth0/server';
 import { NextResponse } from 'next/server';
 import AuthSyncService from '../services/AuthSyncService';
 
-// Cookie name for storing user email for API authentication
+// Cookie names for storing user info for API authentication
 const EMAIL_COOKIE_NAME = 'auth0_email';
+const AUTH0_ID_COOKIE_NAME = 'auth0_id';
 
 export const auth0 = new Auth0Client({
   // Explicit configuration (falls back to AUTH0_* env vars if not provided)
@@ -37,8 +38,9 @@ export const auth0 = new Auth0Client({
     if (session?.user) {
       console.log('[Auth0] Session user:', { sub: session.user.sub, email: session.user.email });
       
-      // Store email in cookie for API authentication
+      // Store email and auth0_id in cookies for API authentication
       const email = session.user.email || '';
+      const auth0Id = session.user.sub || '';
       
       try {
         console.log('[Auth0] About to call syncUser...');
@@ -68,6 +70,7 @@ export const auth0 = new Auth0Client({
             console.log('[Auth0] New user detected, redirecting to onboarding');
             const response = NextResponse.redirect(new URL('/onboarding', ctx.appBaseUrl || '/'));
             response.cookies.set(EMAIL_COOKIE_NAME, email, { httpOnly: false, path: '/', maxAge: 60 * 60 * 24 });
+            response.cookies.set(AUTH0_ID_COOKIE_NAME, auth0Id, { httpOnly: false, path: '/', maxAge: 60 * 60 * 24 });
             return response;
           }
         } else {
@@ -85,6 +88,9 @@ export const auth0 = new Auth0Client({
     const response = NextResponse.redirect(new URL(returnTo, ctx.appBaseUrl || '/'));
     if (session?.user?.email) {
       response.cookies.set(EMAIL_COOKIE_NAME, session.user.email, { httpOnly: false, path: '/', maxAge: 60 * 60 * 24 });
+    }
+    if (session?.user?.sub) {
+      response.cookies.set(AUTH0_ID_COOKIE_NAME, session.user.sub, { httpOnly: false, path: '/', maxAge: 60 * 60 * 24 });
     }
     return response;
   },

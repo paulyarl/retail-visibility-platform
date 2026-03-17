@@ -1593,6 +1593,7 @@ model users {
   onboarding_completed             Boolean                            @default(false)
   onboarding_step                  String?                            @db.VarChar(50)
   onboarding_data                  Json?
+  auth0_id                         String?                            @unique @db.VarChar(255)
   consent_records                  consent_records[]
   directory_featured_listings_list directory_featured_listings_list[]
   featured_products                featured_products[]

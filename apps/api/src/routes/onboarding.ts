@@ -17,15 +17,28 @@ router.post('/', optionalAuth, async (req: Request, res: Response) => {
     // Get user from session (set by auth middleware) or try to get from Auth0
     let userId = req.user?.id;
     
-    // If no user from JWT, try to get from Auth0 session via email header or cookie
+    // If no user from JWT, try to get from Auth0 session via auth0_id, email header, or cookie
     if (!userId) {
-      const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
-      if (auth0Email) {
+      // First try by auth0_id (most reliable)
+      const auth0Id = req.headers['x-auth0-id'] as string;
+      if (auth0Id) {
         const user = await prisma.users.findUnique({
-          where: { email: auth0Email.toLowerCase() },
+          where: { auth0_id: auth0Id },
           select: { id: true }
         });
         userId = user?.id;
+      }
+      
+      // Then try by email
+      if (!userId) {
+        const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
+        if (auth0Email) {
+          const user = await prisma.users.findUnique({
+            where: { email: auth0Email.toLowerCase() },
+            select: { id: true }
+          });
+          userId = user?.id;
+        }
       }
     }
     
@@ -143,15 +156,28 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
   try {
     let userId = req.user?.id;
     
-    // If no user from JWT, try to get from Auth0 session via email header or cookie
+    // If no user from JWT, try to get from Auth0 session via auth0_id, email header, or cookie
     if (!userId) {
-      const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
-      if (auth0Email) {
+      // First try by auth0_id (most reliable)
+      const auth0Id = req.headers['x-auth0-id'] as string;
+      if (auth0Id) {
         const user = await prisma.users.findUnique({
-          where: { email: auth0Email.toLowerCase() },
+          where: { auth0_id: auth0Id },
           select: { id: true }
         });
         userId = user?.id;
+      }
+      
+      // Then try by email
+      if (!userId) {
+        const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
+        if (auth0Email) {
+          const user = await prisma.users.findUnique({
+            where: { email: auth0Email.toLowerCase() },
+            select: { id: true }
+          });
+          userId = user?.id;
+        }
       }
     }
     
