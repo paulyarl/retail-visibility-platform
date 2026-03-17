@@ -50,33 +50,42 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
 
   /**
    * Get current session info (compatible with AuthContext)
+   * Calls /api/auth/me to get user profile data
    */
   async getSessionInfo(): Promise<{ isAuthenticated: boolean; user?: any; token?: any; expiresAt?: string; lastActivity?: string }> {
     try {
       const result = await this.makeDefaultRequest<any>(
-        '/api/auth/sessions',
+        '/api/auth/me',
         {},
         'security-session-info'
       );
 
-      if (!result.success) {
+      if (!result.success || !result.data?.user) {
         return { isAuthenticated: false };
       }
 
-      const sessions = result.data?.sessions || result.data || [];
-      const currentSession = sessions[0]; // Get the most recent session
-
-      if (currentSession) {
-        return {
-          isAuthenticated: true,
-          user: currentSession.user,
-          token: currentSession.token,
-          expiresAt: currentSession.expiresAt,
-          lastActivity: currentSession.lastActivity
-        };
-      }
-
-      return { isAuthenticated: false };
+      const userData = result.data.user;
+      
+      return {
+        isAuthenticated: true,
+        user: {
+          id: userData.id,
+          email: userData.email,
+          firstName: userData.first_name || userData.firstName,
+          lastName: userData.last_name || userData.lastName,
+          emailVerified: userData.email_verified ?? userData.emailVerified ?? true,
+          role: userData.role,
+          tenants: userData.user_tenants?.map((ut: any) => ({
+            id: ut.tenant_id || ut.tenantId,
+            name: ut.tenants?.name || ut.tenant?.name || 'Unknown',
+            role: ut.role
+          })) || userData.tenants || [],
+          picture: userData.picture,
+          auth0Id: userData.auth0_id || userData.auth0Id,
+          onboardingCompleted: userData.onboarding_completed ?? userData.onboardingCompleted,
+          tenant: userData.tenant
+        }
+      };
     } catch (error) {
       console.error('[SecuritySingletonService] Error getting session info:', error);
       return { isAuthenticated: false };
