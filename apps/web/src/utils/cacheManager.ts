@@ -444,6 +444,89 @@ class CacheManager {
     // console.log('[CacheManager] Removed from all storage:', key);
   }
 
+  /**
+   * Remove all keys matching a pattern from all storage layers
+   * Supports wildcards like 'platform-admin-tier-tenants*'
+   */
+  async removeByPattern(pattern: string): Promise<number> {
+    let removedCount = 0;
+    
+    // Convert wildcard pattern to regex
+    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+    
+    // Remove from memory cache
+    for (const key of Array.from(this.memoryCache.keys())) {
+      if (regex.test(key)) {
+        this.memoryCache.delete(key);
+        removedCount++;
+      }
+    }
+    
+    // Remove from IndexedDB - need to iterate all keys
+    if (this.indexedDBSupported && this.db) {
+      try {
+        const keysToDelete: string[] = [];
+        
+        await new Promise<void>((resolve, reject) => {
+          const transaction = this.db!.transaction([this.storeName], 'readonly');
+          const store = transaction.objectStore(this.storeName);
+          const request = store.openCursor();
+          
+          request.onsuccess = () => {
+            const cursor = request.result;
+            if (cursor) {
+              const key = cursor.key as string;
+              if (regex.test(key)) {
+                keysToDelete.push(key);
+              }
+              cursor.continue();
+            } else {
+              resolve();
+            }
+          };
+          request.onerror = () => reject(request.error);
+        });
+        
+        // Delete matching keys
+        for (const key of keysToDelete) {
+          await this.remove(key);
+          removedCount++;
+        }
+      } catch (error) {
+        console.warn('[CacheManager] IndexedDB pattern remove failed:', error);
+      }
+    }
+    
+    // Remove from localStorage - scan all keys with our prefix
+    if (this.localStorageSupported) {
+      try {
+        const prefix = this.getStorageKey('');
+        const keysToDelete: string[] = [];
+        
+        for (let i = 0; i < localStorage.length; i++) {
+          const storageKey = localStorage.key(i);
+          if (storageKey && storageKey.startsWith(prefix)) {
+            // Extract the actual cache key from the storage key
+            const cacheKey = storageKey.substring(prefix.length);
+            if (regex.test(cacheKey)) {
+              keysToDelete.push(storageKey);
+            }
+          }
+        }
+        
+        for (const storageKey of keysToDelete) {
+          localStorage.removeItem(storageKey);
+          removedCount++;
+        }
+      } catch (error) {
+        console.warn('[CacheManager] localStorage pattern remove failed:', error);
+      }
+    }
+    
+    console.log(`[CacheManager] Removed ${removedCount} entries matching pattern: ${pattern}`);
+    return removedCount;
+  }
+
   async clear(): Promise<void> {
     // Clear memory cache
     this.memoryCache.clear();

@@ -24,7 +24,7 @@ export default function ResetPasswordModal({ isOpen, onClose, userEmail, userId 
     setSuccess('');
 
     try {
-      const success = await adminUsersService.resetPassword(userId);
+      const success = await adminUsersService.resetPassword(userId, newPassword);
       
       if (!success) {
         throw new Error('Failed to reset password');

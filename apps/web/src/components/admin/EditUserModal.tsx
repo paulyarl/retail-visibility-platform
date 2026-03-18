@@ -25,7 +25,7 @@ export default function EditUserModal({ isOpen, onClose, user, onSuccess }: Edit
   const [formData, setFormData] = useState({
     firstName: user.name?.split(' ')[0] || '',
     lastName: user.name?.split(' ').slice(1).join(' ') || '',
-    role: user.role as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'USER' | 'TENANT_OWNER' | 'TENANT_ADMIN' | 'TENANT_MANAGER' | 'TENANT_MEMBER' | 'TENANT_VIEWER',
+    role: user.role as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'USER',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -154,7 +154,7 @@ export default function EditUserModal({ isOpen, onClose, user, onSuccess }: Edit
               {/* Role Field */}
               <div>
                 <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Role <span className="text-red-500">*</span>
+                  Platform Role <span className="text-red-500">*</span>
                 </label>
                 <select
                   id="role"
@@ -167,21 +167,13 @@ export default function EditUserModal({ isOpen, onClose, user, onSuccess }: Edit
                     <option value="PLATFORM_SUPPORT">Platform Support</option>
                     <option value="PLATFORM_VIEWER">Platform Viewer</option>
                   </optgroup>
-                  <optgroup label="Legacy Roles">
-                    <option value="ADMIN">Admin (Legacy)</option>
-                  </optgroup>
                   <optgroup label="Tenant Roles">
-                    <option value="OWNER">Owner</option>
-                    <option value="USER">User</option>
-                    <option value="TENANT_OWNER">Tenant Owner</option>
-                    <option value="TENANT_ADMIN">Tenant Admin</option>
-                    <option value="TENANT_MANAGER">Tenant Manager</option>
-                    <option value="TENANT_MEMBER">Tenant Member</option>
-                    <option value="TENANT_VIEWER">Tenant Viewer</option>
+                    <option value="OWNER">Tenant Owner</option>
+                    <option value="USER">Tenant User</option>
                   </optgroup>
                 </select>
                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  Select the appropriate role for this user. Platform roles have system-wide access.
+                  Platform role controls system-wide access. Tenant-specific roles are managed via "Manage Tenants".
                 </p>
               </div>
 
@@ -210,46 +202,18 @@ export default function EditUserModal({ isOpen, onClose, user, onSuccess }: Edit
                       <p>• Cannot create tenants</p>
                     </>
                   )}
-                  {formData.role === 'ADMIN' && (
+                  {formData.role === 'OWNER' && (
                     <>
-                      <p>• Legacy platform admin role</p>
-                      <p>• Full platform access (deprecated)</p>
-                      <p>• Use PLATFORM_ADMIN instead</p>
-                    </>
-                  )}
-                  {(formData.role === 'OWNER' || formData.role === 'TENANT_OWNER') && (
-                    <>
-                      <p>• Full control over assigned tenants</p>
-                      <p>• Can manage tenant users</p>
+                      <p>• Can create/own tenants</p>
+                      <p>• Full control over owned tenants</p>
                       <p>• Subject to tier-based limits</p>
                     </>
                   )}
-                  {(formData.role === 'USER' || formData.role === 'TENANT_MEMBER') && (
+                  {formData.role === 'USER' && (
                     <>
-                      <p>• Basic tenant access</p>
-                      <p>• Can view and edit inventory</p>
+                      <p>• Basic platform user</p>
+                      <p>• Access only to assigned tenants</p>
                       <p>• No administrative functions</p>
-                    </>
-                  )}
-                  {formData.role === 'TENANT_ADMIN' && (
-                    <>
-                      <p>• Administrative access to tenants</p>
-                      <p>• Can manage tenant operations</p>
-                      <p>• Cannot delete tenants</p>
-                    </>
-                  )}
-                  {formData.role === 'TENANT_MANAGER' && (
-                    <>
-                      <p>• Day-to-day tenant management</p>
-                      <p>• Can manage inventory and orders</p>
-                      <p>• Limited administrative functions</p>
-                    </>
-                  )}
-                  {formData.role === 'TENANT_VIEWER' && (
-                    <>
-                      <p>• Read-only tenant access</p>
-                      <p>• Can view inventory and reports</p>
-                      <p>• No editing capabilities</p>
                     </>
                   )}
                 </div>

@@ -18,7 +18,7 @@ interface UserStatusModalProps {
     created_at: string;
     last_login_at?: string;
   };
-  onSuccess?: () => void;
+  onSuccess?: (updatedUser?: { id: string; is_active: boolean; email_verified: boolean } | null) => void;
 }
 
 interface StatusAction {
@@ -42,17 +42,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
   const [tempFirstName, setTempFirstName] = useState(user.name?.split(' ')[0] || '');
   const [tempLastName, setTempLastName] = useState(user.name?.split(' ').slice(1).join(' ') || '');
 
-  // Debug: Log what we receive
-  console.log('DEBUG: UserStatusModal received user:', {
-    id: user.id,
-    email: user.email,
-    is_active: user.is_active,
-    email_verified: user.email_verified,
-    status: (user as any).status,
-    combined_status: user.is_active && user.email_verified ? 'active' : 
-                   user.is_active && !user.email_verified ? 'active_unverified' :
-                   !user.is_active && user.email_verified ? 'inactive' : 'pending'
-  });
+  // Note: user prop is captured when modal opens, so status reflects state at that time
 
   const getCurrentStatus = () => {
     if (user.is_active && user.email_verified) return 'active';
@@ -300,31 +290,35 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
     setSuccess('');
 
     try {
+      let result: { id: string; is_active: boolean; email_verified: boolean } | null = null;
+      
       switch (action.type) {
         case 'send_verification':
         case 'resend_verification':
           await adminUsersService.sendVerificationEmail(user.id);
           break;
         case 'activate':
-          await adminUsersService.updateUserStatus(user.id, true, user.email_verified);
+          result = await adminUsersService.updateUserStatus(user.id, true, user.email_verified);
           break;
         case 'deactivate':
-          await adminUsersService.updateUserStatus(user.id, false, user.email_verified);
+          result = await adminUsersService.updateUserStatus(user.id, false, user.email_verified);
           break;
         case 'mark_verified':
-          await adminUsersService.updateUserVerificationStatus(user.id, true);
+          result = await adminUsersService.updateUserVerificationStatus(user.id, true);
           break;
         case 'mark_unverified':
-          await adminUsersService.updateUserVerificationStatus(user.id, false);
+          result = await adminUsersService.updateUserVerificationStatus(user.id, false);
           break;
         default:
           throw new Error('Unknown action type');
       }
 
       setSuccess(`✅ ${action.label} completed successfully!`);
+      
+      // Pass updated user data back for instant parent update
       if (onSuccess) {
         setTimeout(() => {
-          onSuccess();
+          onSuccess(result);
           onClose();
         }, 1500);
       }

@@ -14,6 +14,7 @@ import TierBadge from "./TierBadge";
 import UserProfileBadge from "./UserProfileBadge";
 import TenantLimitBadge from "@/components/tenant/TenantLimitBadge";
 import SubscriptionStateBanner from "@/components/subscription/SubscriptionStateBanner";
+import { SubscriptionDisplayCard } from "@/components/subscription/SubscriptionDisplayCard";
 import LocationStatusBanner from "@/components/tenant/LocationStatusBanner";
 import { useState, useEffect } from "react";
 import { computeStoreStatus } from "@/lib/hours-utils";
@@ -50,7 +51,15 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   const { user } = useAuth();
   
   // Consolidated data fetching - replaces 3 separate API calls with 1
-  const { tenant: tenantData, tier, usage, loading: completeLoading, error: completeError, refresh: refreshTenantData } = useTenantComplete(tenantId);
+  const { 
+    tenant: tenantData, 
+    tier, 
+    usage, 
+    organizationTenants,
+    loading: completeLoading, 
+    error: completeError, 
+    refresh: refreshTenantData 
+  } = useTenantComplete({ tenantId, loadSecondary: true });
 
   
   // User profile (still separate since it's user-specific, not tenant-specific)
@@ -283,6 +292,47 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
             Refresh Data
           </button>
         </div>
+
+        {/* Customizable Subscription Display Card */}
+        {tier && (
+          <SubscriptionDisplayCard
+            tenantId={tenantId}
+            tierData={{
+              tier: tier.effective?.id || 'starter',
+              subscriptionStatus: tenantData?.subscriptionStatus || 'active',
+              trialEndsAt: null,
+              subscriptionEndsAt: null,
+              isChain: tier.isChain,
+              organizationId: tier.organizationId,
+              organizationName: tier.organizationName,
+              organizationTenants: organizationTenants,
+              organizationTier: tier.organization ? {
+                tier_key: tier.organization.id,
+                display_name: tier.organization.name,
+                price_monthly: tier.organization.limits?.maxProducts ? 299.99 : 0,
+                max_skus: tier.organization.limits?.maxProducts || 0,
+                max_locations: tier.organization.limits?.maxLocations || 0,
+                features: tier.organization.features?.map(f => ({
+                  feature_key: f.id,
+                  feature_name: f.name,
+                  is_enabled: f.enabled !== false,
+                })),
+              } : undefined,
+              tenantTier: tier.tenant ? {
+                tier_key: tier.tenant.id,
+                display_name: tier.tenant.name,
+                price_monthly: tier.tenant.limits?.maxProducts ? 49 : 0,
+                max_skus: tier.tenant.limits?.maxProducts || 0,
+                max_locations: tier.tenant.limits?.maxLocations || 0,
+                features: tier.tenant.features?.map(f => ({
+                  feature_key: f.id,
+                  feature_name: f.name,
+                  is_enabled: f.enabled !== false,
+                })),
+              } : undefined,
+            }}
+          />
+        )}
 
         {/* Tier Gains Welcome - Celebrate what they unlocked */}
         {tier && tier.effective?.level && tier.effective?.name && (

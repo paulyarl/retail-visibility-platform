@@ -14,7 +14,7 @@ interface ManageTenantsModalProps {
     name?: string;
     role: string;
   };
-  onSuccess?: (addedTenant?: { tenant_id: string; tenantName: string; role: string } | null, removedTenantId?: string) => void;
+  onSuccess?: (addedTenant?: { tenant_id: string; tenantName: string; role: string } | null, removedTenantId?: string, updatedTenant?: { tenant_id: string; tenantName: string; role: string } | null) => void;
 }
 
 interface Tenant {
@@ -183,11 +183,22 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
     setSuccess('');
 
     try {
-      await adminUsersService.updateUserTenantRole(user.id, editingRole.tenantId, editingRole.newRole);
+      const result = await adminUsersService.updateUserTenantRole(user.id, editingRole.tenantId, editingRole.newRole);
 
       setSuccess(`✅ Tenant role updated successfully!`);
       setEditingRole(null);
-      await loadTenantData(); // Reload tenant data
+      
+      // Update local state directly for instant UI update
+      if (result) {
+        setUserTenants(prev => prev.map(t => 
+          t.id === result.tenant_id 
+            ? { ...t, role: result.role }
+            : t
+        ));
+        
+        // Pass the updated tenant data back for instant parent update
+        onSuccess?.(null, undefined, result);
+      }
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update tenant role');

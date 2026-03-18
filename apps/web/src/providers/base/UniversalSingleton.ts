@@ -435,20 +435,14 @@ export abstract class UniversalSingleton {
   /**
    * Enhanced cache invalidation with pattern matching for dynamic keys
    * Supports patterns like 'ticker-config*' or 'variant-*' to match context-aware keys
+   * Now properly clears from all storage layers (memory, IndexedDB, localStorage)
    */
   protected async invalidateCachePattern(pattern: string): Promise<void> {
     try {
       // Handle wildcard patterns
       if (pattern.includes('*')) {
-        const regex = new RegExp(pattern.replace(/\*/g, '.*'));
-        
-        // Clear matching keys from memory cache
-        for (const key of this.cache.keys()) {
-          if (regex.test(key)) {
-            this.cache.delete(key);
-            await this.cacheManager.remove(key);
-          }
-        }
+        // Use the new removeByPattern method that scans all storage layers
+        await this.cacheManager.removeByPattern(pattern);
       } else {
         // Exact match - use existing clearCache
         await this.clearCache(pattern);
@@ -553,9 +547,13 @@ export abstract class UniversalSingleton {
   }
 
   /**
-   * Invalidate cache (alias for clearCache)
+   * Invalidate cache (supports wildcards for pattern matching)
    */
   public async invalidateCache(key?: string): Promise<void> {
+    if (key && key.includes('*')) {
+      // Use pattern matching for wildcard keys
+      return this.invalidateCachePattern(key);
+    }
     return this.clearCache(key);
   }
 

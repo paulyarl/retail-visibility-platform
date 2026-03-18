@@ -148,6 +148,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
       } : null,
       _count: {
         items: tenant._count.inventory_items,
+        users: tenant._count.user_tenants,
       },
     }));
 
@@ -260,6 +261,8 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
         organization_id: true,
         subscription_tier: true,
         subscription_status: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
         location_status: true,
         subdomain: true,
         created_at: true,
@@ -279,6 +282,14 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
             user_tenants: true,
           },
         },
+        // Include organization to determine effective tier
+        organizations_list: {
+          select: {
+            id: true,
+            name: true,
+            subscription_tier: true,
+          },
+        },
       },
     });
 
@@ -291,6 +302,10 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
         error: 'Tenant not found'
       });
     }
+
+    // Determine effective tier (org tier overrides tenant tier for chain members)
+    const effectiveTier = tenant.organizations_list?.subscription_tier || tenant.subscription_tier || 'starter';
+    const isChainMember = !!tenant.organizations_list;
 
     // Check if tenant has active payment gateway for cart feature
     const hasActivePaymentGateway = (tenant as any).payment_gateways?.length > 0;
@@ -306,14 +321,22 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
       id: tenant.id,
       name: tenant.name,
       organizationId: tenant.organization_id,
-      subscriptionTier: tenant.subscription_tier,
+      organization: tenant.organizations_list ? {
+        id: tenant.organizations_list.id,
+        name: tenant.organizations_list.name,
+        tier: tenant.organizations_list.subscription_tier,
+      } : null,
+      subscriptionTier: effectiveTier, // Use effective tier, not raw tenant tier
       subscriptionStatus: tenant.subscription_status,
+      trialEndsAt: tenant.trial_ends_at,
+      subscriptionEndsAt: tenant.subscription_ends_at,
       createdAt: tenant.created_at,
       locationStatus: tenant.location_status,
       hasPublishedDirectory,
       statusInfo: getLocationStatusInfo(tenant.location_status as any),
       logoUrl: (tenant as any).tenant_business_profiles_list?.logo_url || null,
       hasActivePaymentGateway,
+      isChainMember,
       stats: {
         productCount: (tenant as any)._count.inventory_items,
         userCount: (tenant as any)._count.user_tenants,

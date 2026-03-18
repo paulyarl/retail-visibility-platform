@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { tenantInfoService } from '@/services/TenantInfoService';
 import { tenantManagementService } from '@/services/TenantManagementService';
+import { organizationService } from '@/services/OrganizationService';
 import {
   resolveTier,
   ResolvedTier,
@@ -164,18 +165,37 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
         return tenantManagementService.getTenantUsage(tenantId);
       } catch (error) {
         console.warn('[useTenantComplete] Usage fetch failed, returning null:', error);
-        return null; // Return null on error instead of throwing
+        return null;
       }
     },
     staleTime: 30 * 1000,
     gcTime: 2 * 60 * 1000,
-    enabled: loadSecondary && !!tenantId && !!authUser && !!tenantData, // Only if primary succeeded
-    retry: 0, // No retry for secondary
+    enabled: loadSecondary && !!tenantId && !!authUser && !!tenantData,
+    retry: 0,
+    throwOnError: false,
+  });
+
+  // Organization query - fetch organization with tenants
+  const { data: organizationData, isLoading: organizationLoading } = useQuery({
+    queryKey: ['tenant', 'organization', tenantId],
+    queryFn: async () => {
+      if (!tenantId) throw new Error('Tenant ID is required');
+      try {
+        return organizationService.getOrganization(tenantId);
+      } catch (error) {
+        console.warn('[useTenantComplete] Organization fetch failed, returning null:', error);
+        return null;
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    enabled: loadSecondary && !!tenantId && !!authUser && !!tenantData,
+    retry: 0,
     throwOnError: false,
   });
 
   // Combined loading state
-  const isLoading = tenantLoading || (loadSecondary && (tierLoading || usageLoading));
+  const isLoading = tenantLoading || (loadSecondary && (tierLoading || usageLoading || organizationLoading));
   
   // Clear cache function for debugging
   const clearCacheAndRefresh = async () => {
@@ -223,25 +243,60 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
     if (!rawTier || !tenant) return null;
 
     try {
+      // Extract raw tier data from API response
+      const rawTierData = rawTier as any;
+      
+      // Build tenant tier from raw data
       const tenantTier: TierInfo = {
-        id: (rawTier as any).tier || (rawTier as any).name,
-        name: (rawTier as any).name || (rawTier as any).tier,
-        level: mapTierLevel((rawTier as any).tier || (rawTier as any).name),
+        id: rawTierData.tenantTier?.tier_key || rawTierData.tier || 'starter',
+        name: rawTierData.tenantTier?.display_name || rawTierData.name || rawTierData.tier || 'Starter',
+        level: mapTierLevel(rawTierData.tenantTier?.tier_key || rawTierData.tier || 'starter'),
         source: 'tenant',
-        features: [],
+        features: rawTierData.tenantTier?.features?.map((f: any) => ({
+          id: f.feature_key,
+          name: f.feature_name,
+          enabled: f.is_enabled,
+          category: 'general' as const,
+        })) || [],
         limits: {
-          maxProducts: getTierLimit((rawTier as any).tier || (rawTier as any).name, 'products'),
-          maxLocations: getTierLimit((rawTier as any).tier || (rawTier as any).name, 'locations'),
-          maxUsers: getTierLimit((rawTier as any).tier || (rawTier as any).name, 'users'),
+          maxProducts: rawTierData.tenantTier?.max_skus || getTierLimit(rawTierData.tier || 'starter', 'products'),
+          maxLocations: rawTierData.tenantTier?.max_locations || getTierLimit(rawTierData.tier || 'starter', 'locations'),
+          maxUsers: getTierLimit(rawTierData.tier || 'starter', 'users'),
         }
       };
 
+      // Build organization tier if available
+      const orgTier: TierInfo | undefined = rawTierData.organizationTier ? {
+        id: rawTierData.organizationTier.tier_key,
+        name: rawTierData.organizationTier.display_name,
+        level: mapTierLevel(rawTierData.organizationTier.tier_key),
+        source: 'organization',
+        features: rawTierData.organizationTier.features?.map((f: any) => ({
+          id: f.feature_key,
+          name: f.feature_name,
+          enabled: f.is_enabled,
+          category: 'general' as const,
+        })) || [],
+        limits: {
+          maxProducts: rawTierData.organizationTier.max_skus,
+          maxLocations: rawTierData.organizationTier.max_locations,
+          maxUsers: 999,
+        }
+      } : undefined;
+
+      // Determine effective tier (org overrides tenant for chains)
+      const effectiveTier = orgTier || tenantTier;
+      const isChain = !!rawTierData.isChain && !!orgTier;
+
       return {
-        effective: tenantTier,
+        effective: effectiveTier,
         tenant: tenantTier,
-        isChain: false,
+        organization: orgTier,
+        organizationName: rawTierData.organizationName,
+        organizationId: rawTierData.organizationId,
+        isChain,
         canUpgrade: true,
-        upgradeOptions: getUpgradeOptions(tenantTier.level)
+        upgradeOptions: getUpgradeOptions(effectiveTier.level)
       };
     } catch (err) {
       console.warn('[useTenantComplete] Error resolving tier:', err);
@@ -305,6 +360,12 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
     tenant,
     tier,
     usage,
+    organizationTenants: organizationData?.tenants?.map((t: any) => ({
+      id: t.id,
+      name: t.name,
+      subscription_status: t.subscription_status,
+      subscription_tier: t.subscription_tier,
+    })) || [],
     loading,
     error: queryError,
     refresh: clearCacheAndRefresh,

@@ -10,7 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
 import { deriveInternalStatus, type InternalStatus, type MaintenanceState, getMaintenanceState } from '@/lib/subscription-status';
-import { useTenant } from '@/hooks/useApiQueries';
+import { useTenant, useTenantTier } from '@/hooks/useApiQueries';
 import { useItemsStats } from '@/hooks/useApiQueries';
 import { useTenantLimits } from '@/hooks/useTenantLimits';
 
@@ -55,20 +55,36 @@ export interface SubscriptionUsage {
   subscriptionEndsAt?: string;
 }
 
-export function useSubscriptionUsage(tenantIdProp?: string) {
+export interface SubscriptionUsageProps {
+  // Optional: pass known values from parent to avoid separate fetch
+  tier?: string;
+  status?: string;
+  trialEndsAt?: string | null;
+}
+
+export function useSubscriptionUsage(tenantIdProp?: string, props?: SubscriptionUsageProps) {
   // Get tenant ID from prop or localStorage (only on client side)
   const tenantId = tenantIdProp || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null) || undefined;
 
   // Use React Query hooks for cached data
   const { data: tenant, isLoading: tenantLoading, error: tenantError } = useTenant(tenantId || '');
+  const { data: tierData, isLoading: tierLoading } = useTenantTier(tenantId || ''); // Get effective tier
   const { data: itemsStats, isLoading: itemsLoading, error: itemsError } = useItemsStats(tenantId);
   const { status: tenantLimits, loading: limitsLoading, error: limitsError } = useTenantLimits();
 
+  // If props provided, skip loading checks for those values
+  const hasProps = props?.tier;
+
   // Combine data using React Query
   const { data: usage, isLoading: loading, error } = useQuery({
-    queryKey: ['subscription-usage', tenantId],
+    queryKey: ['subscription-usage', tenantId, props?.tier || tierData?.effective?.id],
     queryFn: (): SubscriptionUsage | null => {
+      // If props provided, we don't need tierData
       if (!tenantId || !tenant || !itemsStats || !tenantLimits) {
+        return null;
+      }
+
+      if (!hasProps && !tierData) {
         return null;
       }
 
@@ -80,8 +96,9 @@ export function useSubscriptionUsage(tenantIdProp?: string) {
       const locationIsUnlimited = locationLimit === 'unlimited';
       const locationTierDisplayName = tenantLimits.tierDisplayName || '';
 
-      // Get tier info (handle both camelCase and snake_case from API)
-      const tier = (tenant.subscriptionTier || tenant.subscription_tier || 'starter') as SubscriptionTier;
+      // Get tier info - prefer props, then effective tier from tier endpoint, fallback to tenant tier
+      // This ensures organization members get their org's tier, not individual google_only tier
+      const tier = (props?.tier || tierData?.effective?.id || tenant.subscriptionTier || tenant.subscription_tier || 'starter') as SubscriptionTier;
       const tierInfo = TIER_LIMITS[tier];
       const skuLimit = tierInfo.maxSkus;
       const skuIsUnlimited = skuLimit === Infinity;
@@ -186,7 +203,7 @@ export function useSubscriptionUsage(tenantIdProp?: string) {
     gcTime: 10 * 60 * 1000, // 10 minutes cache
   });
 
-  const combinedLoading = tenantLoading || itemsLoading || limitsLoading || loading;
+  const combinedLoading = tenantLoading || tierLoading || itemsLoading || limitsLoading || loading;
   const combinedError = tenantError || itemsError || limitsError || error;
 
   return { 

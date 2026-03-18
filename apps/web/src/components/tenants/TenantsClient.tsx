@@ -41,11 +41,16 @@ type Tenant = {
   createdAt?: string;
   status?: string;
   subscriptionStatus?: string;
+  subscriptionTier?: string;
   locationStatus?: 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
   organization?: {
     id: string;
     name: string;
   } | null;
+  _count?: {
+    items?: number;
+    users?: number;
+  };
 };
 
 
@@ -311,7 +316,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
 
       <Stack gap="lg">
         {/* Subscription Status Guide: only visible during maintenance or freeze windows */}
-        <SubscriptionStatusGuide />
+        {isViewingSpecificTenant && <SubscriptionStatusGuide tenantId={specificTenantId!} />}
 
         {/* Context Badges */}
         <ContextBadges showPlatformRole contextLabel="Tenants" />
@@ -732,74 +737,116 @@ function TenantRow({ tenant, index, onSelect, onViewItems, onEditProfile, onRena
                 <Button size="sm" variant="light" onClick={() => setEditing(false)}>Cancel</Button>
               </Group>
             ) : (
-              <Button
-                onClick={onSelect}
-                variant="subtle"
-                style={{ width: '100%', padding: 0 }}
-              >
-                <Group gap="md" wrap="nowrap">
-                    {tenant.organization && (
-                        <Badge 
-                          size="xs" 
-                          color="cyan" 
-                          variant="light"
-                          leftSection={
-                            <IconBuilding size={12} />
-                          }
-                        >
-                          <NextLink className="hover:underline" target="_blank" href={`/t/${tenant.id}/settings/organization`}>
-                            {tenant.organization.name}
-                          </NextLink>
-                        </Badge>
-                      )}
-                  <svg style={{ width: 20, height: 20 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" color="gray">
+              <Stack gap="xs">
+                {/* Header row with org and icon */}
+                <Group gap="sm" wrap="nowrap">
+                  {tenant.organization && (
+                    <Badge 
+                      size="xs" 
+                      color="cyan" 
+                      variant="light"
+                      leftSection={
+                        <IconBuilding size={12} />
+                      }
+                    >
+                      <NextLink className="hover:underline" target="_blank" href={`/t/${tenant.id}/settings/organization`}>
+                        {tenant.organization.name}
+                      </NextLink>
+                    </Badge>
+                  )}
+                  <svg style={{ width: 20, height: 20, flexShrink: 0 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" color="gray">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
-                  <Box >
-                    <Group gap="xs" mb="xs">
-                      <Badge 
-                        size="lg" 
-                        color="blue" 
-                        variant="light"
-                        style={{ marginBottom: 2 }}
-                      >
-                        <Text size="sm">{tenant.name}</Text>
-                      </Badge>
-                    
-                      {tenant.locationStatus && tenant.locationStatus !== 'active' && (
-                        <Badge
-                          size="xs"
-                          color={
-                            tenant.locationStatus === 'pending' ? 'yellow' :
-                            tenant.locationStatus === 'inactive' ? 'orange' :
-                            tenant.locationStatus === 'closed' ? 'red' :
-                            'gray'
-                          }
-                          variant="light"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent triggering the parent button
-                            onStatusChange(tenant);
-                          }}
-                          style={{ cursor: 'pointer' }}
-                          leftSection={
-                            <span>
-                              {tenant.locationStatus === 'pending' ? '🚧' :
-                               tenant.locationStatus === 'inactive' ? '⏸️' :
-                               tenant.locationStatus === 'closed' ? '🔒' :
-                               '📦'}
-                            </span>
-                          }
-                        >
-                          {tenant.locationStatus}
-                        </Badge>
-                      )}
-                    </Group>
-                    
-                  </Box>
-                  
+                  <Badge 
+                    size="lg" 
+                    color="blue" 
+                    variant="light"
+                    style={{ cursor: 'pointer' }}
+                    onClick={onSelect}
+                  >
+                    <Text size="sm">{tenant.name}</Text>
+                  </Badge>
                 </Group>
-
-              </Button>
+                
+                {/* Tier and Status badges */}
+                <Group gap="xs">
+                  {/* Subscription Tier */}
+                  {tenant.subscriptionTier && (
+                    <Badge
+                      size="xs"
+                      color={
+                        tenant.subscriptionTier === 'professional' ? 'violet' :
+                        tenant.subscriptionTier === 'enterprise' ? 'indigo' :
+                        tenant.subscriptionTier === 'starter' ? 'teal' :
+                        tenant.subscriptionTier === 'google_only' ? 'orange' :
+                        'gray'
+                      }
+                      variant="light"
+                    >
+                      {tenant.subscriptionTier.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </Badge>
+                  )}
+                  
+                  {/* Subscription Status */}
+                  {tenant.subscriptionStatus && tenant.subscriptionStatus !== 'active' && (
+                    <Badge
+                      size="xs"
+                      color={
+                        tenant.subscriptionStatus === 'trial' ? 'blue' :
+                        tenant.subscriptionStatus === 'past_due' ? 'yellow' :
+                        tenant.subscriptionStatus === 'canceled' ? 'red' :
+                        'gray'
+                      }
+                      variant="light"
+                    >
+                      {tenant.subscriptionStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </Badge>
+                  )}
+                  
+                  {/* Location Status */}
+                  {tenant.locationStatus && tenant.locationStatus !== 'active' && (
+                    <Badge
+                      size="xs"
+                      color={
+                        tenant.locationStatus === 'pending' ? 'yellow' :
+                        tenant.locationStatus === 'inactive' ? 'orange' :
+                        tenant.locationStatus === 'closed' ? 'red' :
+                        'gray'
+                      }
+                      variant="light"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onStatusChange(tenant);
+                      }}
+                      style={{ cursor: 'pointer' }}
+                      leftSection={
+                        <span>
+                          {tenant.locationStatus === 'pending' ? '🚧' :
+                           tenant.locationStatus === 'inactive' ? '⏸️' :
+                           tenant.locationStatus === 'closed' ? '🔒' :
+                           '📦'}
+                        </span>
+                      }
+                    >
+                      {tenant.locationStatus}
+                    </Badge>
+                  )}
+                </Group>
+                
+                {/* Stats Row */}
+                <Group gap="md">
+                  {tenant._count?.items !== undefined && (
+                    <Text size="xs" c="dimmed">
+                      {tenant._count.items} products
+                    </Text>
+                  )}
+                  {tenant._count?.users !== undefined && (
+                    <Text size="xs" c="dimmed">
+                      {tenant._count.users} users
+                    </Text>
+                  )}
+                </Group>
+              </Stack>
             )}
           </Box>
 

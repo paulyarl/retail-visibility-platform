@@ -34,6 +34,8 @@ export interface ResolvedTier {
   effective: TierInfo;
   organization?: TierInfo;
   tenant?: TierInfo;
+  organizationName?: string;
+  organizationId?: string;
   isChain: boolean;
   canUpgrade: boolean;
   upgradeOptions?: string[];

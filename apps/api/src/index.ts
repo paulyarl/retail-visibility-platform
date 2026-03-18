@@ -5260,11 +5260,11 @@ app.get("/google/callback", async (req, res) => {
 
 /**
  * Get Google account status for tenant
- * GET /google/status?tenant_id=xxx
+ * GET /google/status?tenant_id=xxx or ?tenantId=xxx
  */
 app.get("/google/status", async (req, res) => {
   try {
-    const tenant_id = req.query.tenant_id as string;
+    const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
     
     console.log('2810 Expects tenant_id ' + tenant_id);
     if (!tenant_id) {
@@ -5296,11 +5296,11 @@ app.get("/google/status", async (req, res) => {
 
 /**
  * Disconnect Google account
- * DELETE /google/disconnect?tenant_id=xxx
+ * DELETE /google/disconnect?tenant_id=xxx or ?tenantId=xxx
  */
 app.delete("/google/disconnect", async (req, res) => {
   try {
-    const tenant_id = req.query.tenant_id as string;
+    const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
     
     console.log('2846 Expects tenant_id ' + tenant_id);
     if (!tenant_id) {
@@ -5335,11 +5335,11 @@ app.delete("/google/disconnect", async (req, res) => {
 
 /**
  * List merchant accounts
- * GET /google/gmc/accounts?tenant_id=xxx
+ * GET /google/gmc/accounts?tenant_id=xxx or ?tenantId=xxx
  */
 app.get("/google/gmc/accounts", async (req, res) => {
   try {
-    const tenant_id = req.query.tenant_id as string;
+    const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
     
     console.log('2885 Expects tenant_id ' + tenant_id);
     if (!tenant_id) {
@@ -5401,7 +5401,8 @@ app.post("/google/gmc/sync", async (req, res) => {
  */
 app.get("/google/gmc/products", async (req, res) => {
   try {
-    const { tenant_id, merchantId } = req.query;
+    const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
+    const { merchantId } = req.query;
     
     if (!tenant_id || !merchantId) {
       return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
@@ -5429,7 +5430,8 @@ app.get("/google/gmc/products", async (req, res) => {
  */
 app.get("/google/gmc/stats", async (req, res) => {
   try {
-    const { tenant_id, merchantId } = req.query;
+    const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
+    const { merchantId } = req.query;
     
     if (!tenant_id || !merchantId) {
       return res.status(400).json({ error: "tenant_id_and_merchant_id_required" });
@@ -5455,11 +5457,11 @@ app.get("/google/gmc/stats", async (req, res) => {
 
 /**
  * List business locations
- * GET /google/gbp/locations?tenant_id=xxx
+ * GET /google/gbp/locations?tenant_id=xxx or ?tenantId=xxx
  */
 app.get("/google/gbp/locations", async (req, res) => {
   try {
-    const tenant_id = req.query.tenant_id as string;
+    const tenant_id = (req.query.tenant_id || req.query.tenantId) as string;
     
     console.log('3005 Expects tenant_id ' + tenant_id);
     if (!tenant_id) {

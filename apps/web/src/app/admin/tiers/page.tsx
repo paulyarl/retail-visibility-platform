@@ -144,7 +144,17 @@ export default function AdminTiersPage() {
 
       // 🎯 Use the response data to update the local state immediately
       // Response structure: {success: true, tenant: {...}, changes: {...}}
-      const updatedTenant = responseData.tenant || responseData;
+      type ApiTenantResponse = {
+        subscription_tier?: string;
+        subscription_status?: string;
+        trial_ends_at?: string;
+        subscription_ends_at?: string;
+        metadata?: Tenant['metadata'];
+        organization_id?: string;
+        organizations_list?: { name: string };
+        name?: string;
+      };
+      const apiTenant = (responseData as { tenant?: ApiTenantResponse }).tenant || (responseData as ApiTenantResponse);
       
       // Update the specific tenant in the local state
       setTenants(prevTenants => 
@@ -152,15 +162,15 @@ export default function AdminTiersPage() {
           tenant.id === tenantId 
             ? {
                 ...tenant,
-                subscriptionTier: updatedTenant.subscription_tier,
-                subscriptionStatus: updatedTenant.subscription_status,
-                trialEndsAt: updatedTenant.trial_ends_at,
-                subscriptionEndsAt: updatedTenant.subscription_ends_at,
+                subscriptionTier: apiTenant.subscription_tier,
+                subscriptionStatus: apiTenant.subscription_status,
+                trialEndsAt: apiTenant.trial_ends_at,
+                subscriptionEndsAt: apiTenant.subscription_ends_at,
                 // Update any other fields that might have changed
-                metadata: updatedTenant.metadata,
-                organization: updatedTenant.organization_id ? {
-                  id: updatedTenant.organization_id,
-                  name: updatedTenant.organizations_list?.name || 'Unknown Organization'
+                metadata: apiTenant.metadata,
+                organization: apiTenant.organization_id ? {
+                  id: apiTenant.organization_id,
+                  name: apiTenant.organizations_list?.name || 'Unknown Organization'
                 } : null,
               }
             : tenant
@@ -168,7 +178,7 @@ export default function AdminTiersPage() {
       );
 
       // 🎯 Show detailed success toast using the response data
-      const tenantName = updatedTenant.name || updatedTenant.metadata?.businessName || 'Location';
+      const tenantName = apiTenant.name || apiTenant.metadata?.businessName || 'Location';
       toast(`Successfully updated ${tenantName}`, { variant: 'success' });
       
     } catch (err: any) {

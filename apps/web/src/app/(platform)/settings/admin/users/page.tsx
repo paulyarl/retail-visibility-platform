@@ -258,11 +258,26 @@ export default function PlatformUserMaintenancePage() {
       // First remove the existing assignment
       await adminUserService.removeUserFromTenant(userId, tenantId);
 
-      // Then add with new role
-      await adminUserService.addUserToTenant(userId, tenantId, newRole);
+      // Then add with new role - response contains updated tenant data
+      const result = await adminUserService.addUserToTenant(userId, tenantId, newRole);
 
-      // Refresh users to get updated tenant data
-      await loadUsers();
+      // Instant update: update local state with response data
+      if (result) {
+        setUsers(prevUsers => 
+          prevUsers.map(u => 
+            u.id === userId 
+              ? {
+                  ...u,
+                  tenants: (u.tenants || []).map(t => 
+                    t.id === result.tenant_id 
+                      ? { ...t, role: result.role }
+                      : t
+                  ),
+                }
+              : u
+          )
+        );
+      }
       setEditingTenantRole(null);
     } catch (error) {
       console.error('Failed to update tenant role:', error);
@@ -802,7 +817,15 @@ export default function PlatformUserMaintenancePage() {
       <CreateUserModal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        onSuccess={loadUsers}
+        onSuccess={(createdUser) => {
+          // Instant update: add new user to local state
+          if (createdUser) {
+            setUsers(prevUsers => [...prevUsers, createdUser]);
+          } else {
+            // Fallback: reload all users
+            loadUsers();
+          }
+        }}
       />
 
       {editModalOpen.user && (
@@ -839,7 +862,7 @@ export default function PlatformUserMaintenancePage() {
           isOpen={manageTenantsModal.open}
           onClose={() => setManageTenantsModal({ open: false, user: null })}
           user={manageTenantsModal.user}
-          onSuccess={(addedTenant, removedTenantId) => {
+          onSuccess={(addedTenant, removedTenantId, updatedTenant) => {
             // Instant update: update local state with response data
             if (addedTenant) {
               setUsers(prevUsers => {
@@ -868,6 +891,22 @@ export default function PlatformUserMaintenancePage() {
                     : u
                 )
               );
+            } else if (updatedTenant) {
+              // Handle tenant role update
+              setUsers(prevUsers => 
+                prevUsers.map(u => 
+                  u.id === manageTenantsModal.user?.id 
+                    ? {
+                        ...u,
+                        tenants: (u.tenants || []).map(t => 
+                          t.id === updatedTenant.tenant_id 
+                            ? { ...t, role: updatedTenant.role }
+                            : t
+                        ),
+                      }
+                    : u
+                )
+              );
             }
           }}
         />
@@ -888,7 +927,25 @@ export default function PlatformUserMaintenancePage() {
           isOpen={statusModal.open}
           onClose={() => setStatusModal({ open: false, user: null })}
           user={statusModal.user}
-          onSuccess={loadUsers}
+          onSuccess={(updatedUser) => {
+            // Instant update: update local state with response data
+            if (updatedUser) {
+              setUsers(prevUsers => 
+                prevUsers.map(u => 
+                  u.id === updatedUser.id 
+                    ? {
+                        ...u,
+                        is_active: updatedUser.is_active,
+                        email_verified: updatedUser.email_verified,
+                      }
+                    : u
+                )
+              );
+            } else {
+              // Fallback: reload all users
+              loadUsers();
+            }
+          }}
         />
       )}
     </div>

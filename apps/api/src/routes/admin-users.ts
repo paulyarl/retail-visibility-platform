@@ -773,7 +773,7 @@ router.get('/tenants/all', requirePlatformUser, async (req: Request, res: Respon
 router.post('/users/create', requirePlatformUser, async (req: Request, res: Response) => {
   try {
     const requestingUser = (req as any).user;
-    const { email, password, first_name, last_name, tenantId, role } = req.body;
+    const { email, password, first_name, last_name, tenantId, role, platformRole } = req.body;
 
     // Validate input
     if (!email || !password || !tenantId || !role) {
@@ -835,7 +835,7 @@ router.post('/users/create', requirePlatformUser, async (req: Request, res: Resp
           password_hash,
           first_name,
           last_name,
-          role: 'USER', // Default platform role
+          role: platformRole || 'USER', // Platform role (defaults to USER)
           updated_at: new Date(),
         },
         select: {
@@ -848,12 +848,23 @@ router.post('/users/create', requirePlatformUser, async (req: Request, res: Resp
       });
 
       // Automatically assign to the tenant
+      // Map role to valid user_tenant_role enum values
+      const tenantRoleMap: Record<string, string> = {
+        'PLATFORM_ADMIN': 'ADMIN',
+        'PLATFORM_SUPPORT': 'SUPPORT',
+        'PLATFORM_VIEWER': 'VIEWER',
+        'OWNER': 'OWNER',
+        'TENANT_ADMIN': 'ADMIN',
+        'USER': 'MEMBER',
+      };
+      const tenantRole = tenantRoleMap[role] || 'MEMBER';
+      
       await tx.user_tenants.create({
         data: {
           id: generateUserTenantId(newUser.id, tenantId),
           user_id: newUser.id,
           tenant_id: tenantId,
-          role: role,
+          role: tenantRole as any, // Cast to Prisma enum type
           updated_at: new Date(),
         },
       });

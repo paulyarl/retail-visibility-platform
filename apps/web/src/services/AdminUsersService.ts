@@ -10,6 +10,7 @@ import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
 export interface AdminUser {
   id: string;
   email: string;
+  name?: string;
   firstName?: string;
   lastName?: string;
   role: 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'TENANT_ADMIN' | 'USER';
@@ -36,10 +37,12 @@ export interface AdminUserTenant {
 
 export interface CreateUserRequest {
   email: string;
+  password: string;
   firstName?: string;
   lastName?: string;
-  role?: string;
-  tenantIds?: string[];
+  role: string;
+  tenantId: string;
+  platformRole?: string;
 }
 
 export interface UpdateUserRequest {
@@ -184,7 +187,7 @@ class AdminUsersService extends AdminApiSingleton {
    * Create a new admin user
    */
   async createUser(userData: CreateUserRequest): Promise<AdminUser | null> {
-    const response = await this.makeDefaultRequest<AdminUser>(
+    const response = await this.makeDefaultRequest<{ success: boolean; message: string; users: { id: string; email: string; name: string; role: string } }>(
       '/api/admin/users/create',
       {
         method: 'POST',
@@ -202,7 +205,26 @@ class AdminUsersService extends AdminApiSingleton {
     // Invalidate users list cache
     await this.invalidateCache('admin-users-list');
     
-    return response.data || null;
+    // Return the created user - API returns 'users' key
+    const createdUser = response.data?.users;
+    if (createdUser) {
+      return {
+        id: createdUser.id,
+        email: createdUser.email,
+        name: createdUser.name,
+        firstName: createdUser.name?.split(' ')[0] || '',
+        lastName: createdUser.name?.split(' ').slice(1).join(' ') || '',
+        role: createdUser.role as AdminUser['role'],
+        isActive: true,
+        is_active: true,
+        emailVerified: false,
+        email_verified: false,
+        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    return null;
   }
 
   /**
@@ -307,10 +329,13 @@ class AdminUsersService extends AdminApiSingleton {
   /**
    * Reset user password
    */
-  async resetPassword(userId: string): Promise<boolean> {
+  async resetPassword(userId: string, password: string): Promise<boolean> {
     const response = await this.makeDefaultRequest<void>(
-      `/api/admin/users/${userId}/reset-password`,
-      { method: 'POST' },
+      `/api/admin/users/${userId}/password`,
+      { 
+        method: 'PUT',
+        body: JSON.stringify({ password })
+      },
       `admin-reset-password-${userId}`,
       0 // No caching for write operations
     );
@@ -654,9 +679,9 @@ class AdminUsersService extends AdminApiSingleton {
   /**
    * Update user status (activate/deactivate)
    */
-  async updateUserStatus(userId: string, isActive: boolean, emailVerified?: boolean): Promise<any> {
+  async updateUserStatus(userId: string, isActive: boolean, emailVerified?: boolean): Promise<{ id: string; is_active: boolean; email_verified: boolean } | null> {
     try {
-      const response = await this.makeDefaultRequest<any>(
+      const response = await this.makeDefaultRequest<{ success: boolean; message: string; user: { id: string; is_active: boolean; email_verified: boolean } }>(
         `/api/admin/users/${userId}`,
         {
           method: 'PUT',
@@ -672,7 +697,8 @@ class AdminUsersService extends AdminApiSingleton {
       // Invalidate user cache
       await this.invalidateCache(`admin-user-${userId}`);
       
-      return response;
+      // Return the updated user data for instant UI update
+      return response.data?.user || null;
     } catch (error) {
       console.error('[AdminUsersService] Failed to update user status:', error);
       throw error;
@@ -685,7 +711,7 @@ class AdminUsersService extends AdminApiSingleton {
   async sendVerificationEmail(userId: string): Promise<any> {
     try {
       const response = await this.makeDefaultRequest<any>(
-        `/api/admin/users/${userId}/send-verification`,
+        `/api/admin/users/${userId}/send-verification-email`,
         { method: 'POST' },
         'send-verification-email',
         0 // No caching for write operations
@@ -701,9 +727,9 @@ class AdminUsersService extends AdminApiSingleton {
   /**
    * Mark user as verified/unverified
    */
-  async updateUserVerificationStatus(userId: string, emailVerified: boolean): Promise<any> {
+  async updateUserVerificationStatus(userId: string, emailVerified: boolean): Promise<{ id: string; email: string; is_active: boolean; email_verified: boolean } | null> {
     try {
-      const response = await this.makeDefaultRequest<any>(
+      const response = await this.makeDefaultRequest<{ success: boolean; message: string; user: { id: string; email: string; is_active: boolean; email_verified: boolean } }>(
         `/api/admin/users/${userId}`,
         {
           method: 'PUT',
@@ -716,7 +742,8 @@ class AdminUsersService extends AdminApiSingleton {
       // Invalidate user cache
       await this.invalidateCache(`admin-user-${userId}`);
       
-      return response;
+      // Return the updated user data for instant UI update
+      return response.data?.user || null;
     } catch (error) {
       console.error('[AdminUsersService] Failed to update user verification status:', error);
       throw error;
