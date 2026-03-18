@@ -1717,10 +1717,13 @@ router.post('/users/:userId/tenants', requirePlatformAdmin, async (req: Request,
       userRole: (req as any).user?.role
     });
 
-    // Validate input
+    // Validate input - accept both snake_case and camelCase
     const schema = z.object({
-      tenant_id: z.string().min(1, 'Tenant ID is required'),
+      tenant_id: z.string().min(1, 'Tenant ID is required').optional(),
+      tenantId: z.string().min(1, 'Tenant ID is required').optional(),
       role: z.nativeEnum(user_tenant_role),
+    }).refine(data => data.tenant_id || data.tenantId, {
+      message: 'Tenant ID is required',
     });
 
     const validation = schema.safeParse(req.body as any);
@@ -1737,8 +1740,17 @@ router.post('/users/:userId/tenants', requirePlatformAdmin, async (req: Request,
       });
     }
 
-    const { tenant_id, role } = validation.data;
-    const tenantId = tenant_id;
+    const { role } = validation.data;
+    const tenantIdRaw = validation.data.tenant_id || validation.data.tenantId;
+    
+    if (!tenantIdRaw) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tenant ID is required',
+      });
+    }
+    
+    const tenantId: string = tenantIdRaw;
 
     // Check if user exists
     const user = await prisma.users.findUnique({
@@ -1755,7 +1767,7 @@ router.post('/users/:userId/tenants', requirePlatformAdmin, async (req: Request,
 
     // Check if tenant exists
     const tenant = await prisma.tenants.findUnique({
-      where: { id: tenant_id },
+      where: { id: tenantId },
       select: { id: true, name: true },
     });
 
@@ -1787,9 +1799,9 @@ router.post('/users/:userId/tenants', requirePlatformAdmin, async (req: Request,
     // Create assignment
     const assignment = await prisma.user_tenants.create({
       data: {
-        id: generateUserTenantId(user.id, tenant_id),
+        id: generateUserTenantId(user.id, tenantId),
         user_id: userId,
-        tenant_id: tenant_id,
+        tenant_id: tenantId,
         role,
         updated_at: new Date(),
       },
@@ -1806,6 +1818,11 @@ router.post('/users/:userId/tenants', requirePlatformAdmin, async (req: Request,
     res.json({
       success: true,
       message: 'User assigned to tenant successfully',
+      tenant: {
+        tenant_id: tenantId,
+        tenantName: tenant.name,
+        role,
+      },
     });
   } catch (error: any) {
     console.error('[Admin Users] Error assigning user to tenant:', error);

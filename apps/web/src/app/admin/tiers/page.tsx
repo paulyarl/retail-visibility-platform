@@ -11,17 +11,17 @@ import { useToast } from '@/components/ui/use-toast';
 type Tenant = {
   id: string;
   name: string;
-  subscription_tier?: string;
-  subscription_status?: string;
-  trial_ends_at?: string;
-  subscription_ends_at?: string;
-  created_at?: string;
+  subscriptionTier?: string;
+  subscriptionStatus?: string;
+  trialEndsAt?: string;
+  subscriptionEndsAt?: string;
+  createdAt?: string;
   metadata?: {
     businessName?: string;
     city?: string;
     state?: string;
   };
-  organization_id?: string;
+  organizationId?: string;
   organization?: {
     id: string;
     name: string;
@@ -143,7 +143,8 @@ export default function AdminTiersPage() {
       console.log(`[Tier Management] Update response:`, responseData);
 
       // 🎯 Use the response data to update the local state immediately
-      const updatedTenant = responseData;
+      // Response structure: {success: true, tenant: {...}, changes: {...}}
+      const updatedTenant = responseData.tenant || responseData;
       
       // Update the specific tenant in the local state
       setTenants(prevTenants => 
@@ -159,7 +160,7 @@ export default function AdminTiersPage() {
                 metadata: updatedTenant.metadata,
                 organization: updatedTenant.organization_id ? {
                   id: updatedTenant.organization_id,
-                  name: updatedTenant.organization?.name || 'Unknown Organization'
+                  name: updatedTenant.organizations_list?.name || 'Unknown Organization'
                 } : null,
               }
             : tenant
@@ -341,8 +342,8 @@ export default function AdminTiersPage() {
                   {tenants
                     .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
                     .map(tenant => {
-                  const tierInfo = getTierInfo(tenant.subscription_tier);
-                  const statusInfo = getStatusInfo(tenant.subscription_status);
+                  const tierInfo = getTierInfo(tenant.subscriptionTier);
+                  const statusInfo = getStatusInfo(tenant.subscriptionStatus);
                   const isUpdating = updating === tenant.id;
 
                   return (
@@ -387,11 +388,11 @@ export default function AdminTiersPage() {
                             {tenant.metadata?.city && tenant.metadata?.state && (
                               <p>Location: {tenant.metadata.city}, {tenant.metadata.state}</p>
                             )}
-                            {tenant.trial_ends_at && (
-                              <p>Trial Ends: {new Date(tenant.trial_ends_at).toLocaleDateString()}</p>
+                            {tenant.trialEndsAt && (
+                              <p>Trial Ends: {new Date(tenant.trialEndsAt).toLocaleDateString()}</p>
                             )}
-                            {tenant.subscription_ends_at && (
-                              <p>Subscription Ends: {new Date(tenant.subscription_ends_at).toLocaleDateString()}</p>
+                            {tenant.subscriptionEndsAt && (
+                              <p>Subscription Ends: {new Date(tenant.subscriptionEndsAt).toLocaleDateString()}</p>
                             )}
                           </div>
                         </div>
@@ -404,8 +405,8 @@ export default function AdminTiersPage() {
                               Subscription Tier
                             </label>
                             <select
-                              value={tenant.subscription_tier || 'starter'}
-                              onChange={(e) => updateTier(tenant.id, e.target.value, tenant.subscription_status || 'active')}
+                              value={tenant.subscriptionTier || 'starter'}
+                              onChange={(e) => updateTier(tenant.id, e.target.value, tenant.subscriptionStatus || 'active')}
                               disabled={isUpdating}
                               className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50"
                             >
@@ -423,8 +424,8 @@ export default function AdminTiersPage() {
                               Status
                             </label>
                             <select
-                              value={tenant.subscription_status || 'active'}
-                              onChange={(e) => updateTier(tenant.id, tenant.subscription_tier || 'starter', e.target.value)}
+                              value={tenant.subscriptionStatus || 'active'}
+                              onChange={(e) => updateTier(tenant.id, tenant.subscriptionTier || 'starter', e.target.value)}
                               disabled={isUpdating}
                               className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50"
                             >

@@ -14,7 +14,7 @@ interface EditUserModalProps {
     name?: string;
     role: string;
   };
-  onSuccess?: () => void;
+  onSuccess?: (updatedUser?: any) => void;
 }
 
 export default function EditUserModal({ isOpen, onClose, user, onSuccess }: EditUserModalProps) {
@@ -47,10 +47,10 @@ export default function EditUserModal({ isOpen, onClose, user, onSuccess }: Edit
 
       setSuccess(`✅ User updated successfully!`);
       
-      // Close modal after a short delay
+      // Close modal after a short delay and pass updated user data
       setTimeout(() => {
         onClose();
-        onSuccess?.();
+        onSuccess?.(result);
       }, 1500);
       
     } catch (err) {

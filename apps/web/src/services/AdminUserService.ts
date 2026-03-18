@@ -166,12 +166,12 @@ export class AdminUserService extends AdminApiSingleton {
   /**
    * Add user to tenant
    */
-  async addUserToTenant(userId: string, tenantId: string, role?: string): Promise<void> {
+  async addUserToTenant(userId: string, tenantId: string, role?: string): Promise<{ tenant_id: string; tenantName: string; role: string } | null> {
     if (!userId || !tenantId) {
       throw new Error('User ID and Tenant ID are required');
     }
 
-    const result = await this.makeDefaultRequest<void>(
+    const result = await this.makeDefaultRequest<{ tenant_id: string; tenantName: string; role: string }>(
       `/api/admin/users/${userId}/tenants`,
       { 
         method: 'POST',
@@ -186,6 +186,9 @@ export class AdminUserService extends AdminApiSingleton {
     }
 
     console.log(`[AdminUserService] Added user ${userId} to tenant ${tenantId}`);
+    
+    // Return the tenant data from response for instant UI update
+    return result.data || null;
   }
 }
 

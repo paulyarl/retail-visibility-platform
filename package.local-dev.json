@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "dev:local": "vercel dev --debug",
+    "dev:vercel": "doppler run --config local -- vercel --force"
+  }
+}

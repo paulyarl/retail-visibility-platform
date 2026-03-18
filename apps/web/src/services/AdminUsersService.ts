@@ -209,7 +209,7 @@ class AdminUsersService extends AdminApiSingleton {
    * Update an admin user
    */
   async updateUser(userId: string, userData: UpdateUserRequest): Promise<AdminUser | null> {
-    const response = await this.makeDefaultRequest<AdminUser>(
+    const response = await this.makeDefaultRequest<any>(
       `/api/admin/users/${userId}`,
       {
         method: 'PUT',
@@ -227,8 +227,36 @@ class AdminUsersService extends AdminApiSingleton {
     // Invalidate relevant caches
     await this.invalidateCache('admin-users-list');
     await this.invalidateCache(`admin-user-${userId}`);
-    
-    return response.data || null;
+
+    // Response structure: {success: true, message: string, user: {...}}
+    const updatedUser = response.data?.user || response.data;
+
+    // Transform to AdminUser format
+    if (updatedUser) {
+      const firstName = updatedUser.first_name || updatedUser.firstName;
+      const lastName = updatedUser.last_name || updatedUser.lastName;
+      const name = firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || 'Unnamed User';
+
+      return {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name,
+        firstName,
+        lastName,
+        role: updatedUser.role,
+        isActive: updatedUser.is_active ?? updatedUser.isActive,
+        is_active: updatedUser.is_active ?? updatedUser.isActive,
+        emailVerified: updatedUser.email_verified ?? updatedUser.emailVerified,
+        email_verified: updatedUser.email_verified ?? updatedUser.emailVerified,
+        createdAt: updatedUser.created_at || updatedUser.createdAt,
+        created_at: updatedUser.created_at || updatedUser.createdAt,
+        updatedAt: updatedUser.updated_at || updatedUser.updatedAt,
+        lastLogin: updatedUser.last_login || updatedUser.lastLogin,
+        last_login: updatedUser.last_login || updatedUser.lastLogin,
+      };
+    }
+
+    return null;
   }
 
   /**
@@ -562,9 +590,9 @@ class AdminUsersService extends AdminApiSingleton {
   /**
    * Assign tenant to user
    */
-  async assignTenantToUser(userId: string, tenantId: string, role: string): Promise<any> {
+  async assignTenantToUser(userId: string, tenantId: string, role: string): Promise<{ tenant_id: string; tenantName: string; role: string } | null> {
     try {
-      const response = await this.makeDefaultRequest<any>(
+      const response = await this.makeDefaultRequest<{ success: boolean; message: string; tenant: { tenant_id: string; tenantName: string; role: string } }>(
         `/api/admin/users/${userId}/tenants`,
         {
           method: 'POST',
@@ -577,7 +605,8 @@ class AdminUsersService extends AdminApiSingleton {
       // Invalidate user tenants cache
       await this.invalidateCache(`user-tenants-${userId}`);
       
-      return response;
+      // Response structure: {success: true, message: string, tenant: {...}}
+      return response.data?.tenant || null;
     } catch (error) {
       console.error('[AdminUsersService] Failed to assign tenant to user:', error);
       throw error;

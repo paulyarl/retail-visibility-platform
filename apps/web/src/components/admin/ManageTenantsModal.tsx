@@ -14,7 +14,7 @@ interface ManageTenantsModalProps {
     name?: string;
     role: string;
   };
-  onSuccess?: () => void;
+  onSuccess?: (addedTenant?: { tenant_id: string; tenantName: string; role: string } | null, removedTenantId?: string) => void;
 }
 
 interface Tenant {
@@ -110,11 +110,24 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
     setSuccess('');
 
     try {
-      await adminUsersService.assignTenantToUser(user.id, selectedTenant, 'ADMIN');
+      const result = await adminUsersService.assignTenantToUser(user.id, selectedTenant, 'ADMIN');
 
       setSuccess(`✅ Tenant access added successfully!`);
       setSelectedTenant('');
-      await loadTenantData(); // Reload tenant data
+      
+      // Update local state directly with result for instant UI update
+      if (result) {
+        const newTenant: Tenant = {
+          id: result.tenant_id,
+          name: result.tenantName,
+          role: result.role,
+        };
+        setUserTenants(prev => [...prev, newTenant]);
+        setAvailableTenants(prev => prev.filter(t => t.id !== result.tenant_id));
+        
+        // Pass the added tenant data back for instant parent update
+        onSuccess?.(result);
+      }
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add tenant access');
@@ -136,7 +149,16 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
       await adminUsersService.removeTenantFromUser(user.id, tenantId);
 
       setSuccess(`✅ Tenant access removed successfully!`);
-      await loadTenantData(); // Reload tenant data
+      
+      // Update local state directly for instant UI update
+      const removedTenant = userTenants.find(t => t.id === tenantId);
+      setUserTenants(prev => prev.filter(t => t.id !== tenantId));
+      if (removedTenant) {
+        setAvailableTenants(prev => [...prev, removedTenant]);
+      }
+      
+      // Pass the removed tenant ID back for instant parent update
+      onSuccess?.(null, tenantId);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove tenant access');
@@ -184,7 +206,6 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
       setSuccess('');
       setSelectedTenant('');
       onClose();
-      onSuccess?.();
     }
   };
 

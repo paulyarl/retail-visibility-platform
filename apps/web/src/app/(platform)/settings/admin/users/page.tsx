@@ -810,7 +810,27 @@ export default function PlatformUserMaintenancePage() {
           isOpen={editModalOpen.open}
           onClose={() => setEditModalOpen({ open: false, user: null })}
           user={editModalOpen.user}
-          onSuccess={loadUsers}
+          onSuccess={(updatedUser) => {
+            if (updatedUser) {
+              // Instant update: update local state with response data
+              setUsers(prevUsers => 
+                prevUsers.map(u => 
+                  u.id === updatedUser.id 
+                    ? {
+                        ...u,
+                        name: updatedUser.name,
+                        role: updatedUser.role,
+                        is_active: updatedUser.is_active ?? updatedUser.isActive,
+                        email_verified: updatedUser.email_verified ?? updatedUser.emailVerified,
+                      }
+                    : u
+                )
+              );
+            } else {
+              // Fallback: reload all users
+              loadUsers();
+            }
+          }}
         />
       )}
 
@@ -819,7 +839,37 @@ export default function PlatformUserMaintenancePage() {
           isOpen={manageTenantsModal.open}
           onClose={() => setManageTenantsModal({ open: false, user: null })}
           user={manageTenantsModal.user}
-          onSuccess={loadUsers}
+          onSuccess={(addedTenant, removedTenantId) => {
+            // Instant update: update local state with response data
+            if (addedTenant) {
+              setUsers(prevUsers => {
+                return prevUsers.map(u => {
+                  if (u.id === manageTenantsModal.user?.id) {
+                    return {
+                      ...u,
+                      tenants: [...(u.tenants || []), {
+                        id: addedTenant.tenant_id,
+                        name: addedTenant.tenantName,
+                        role: addedTenant.role,
+                      }],
+                    };
+                  }
+                  return u;
+                });
+              });
+            } else if (removedTenantId) {
+              setUsers(prevUsers => 
+                prevUsers.map(u => 
+                  u.id === manageTenantsModal.user?.id 
+                    ? {
+                        ...u,
+                        tenants: (u.tenants || []).filter(t => t.id !== removedTenantId),
+                      }
+                    : u
+                )
+              );
+            }
+          }}
         />
       )}
 
