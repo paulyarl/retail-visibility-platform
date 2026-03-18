@@ -359,7 +359,7 @@ export const PlatformSidebarTemplate = () => {
       children: [
         {
           label: 'Overview',
-          href: '/'
+          href: '/dashboard'
         },
         {
           label: 'Admin Controls',

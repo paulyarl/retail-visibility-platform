@@ -87,7 +87,7 @@ export default function TenantAppShell({ children, navItems }: TenantAppShellPro
   };
 
   const handleBackToPlatform = () => {
-    router.push('/');
+    router.push('/dashboard');
   };
 
   return (

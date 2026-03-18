@@ -74,7 +74,21 @@ export default function DynamicTenantSidebar({ tenantId, slug, children }: Dynam
   useEffect(() => {
     // Base navigation structure
     const baseNav = [
-      { label: 'Dashboard', href: `/t/${tenantId}` },
+      { 
+        label: 'Platform Dashboard', 
+        href: `/`,
+        children: [
+          { label: 'Overview', href: `/dashboard` },
+          { label: 'Appearance', href: `/settings/appearance` },
+          { label: 'Accounts', href: `/settings/account` },
+          { label: 'Subscription', href: `/settings/subscription` },
+          { label: 'Settings', href: `/settings` },
+          { label: 'Directory', href: `/directory` },
+          { label: 'Shops', href: `/shops` },
+          { label: 'Support', href: `/settings/contact` },
+        ]
+      },
+      { label: 'My Dashboard', href: `/t/${tenantId}/dashboard` },
       { 
         label: 'Google Business Profile', 
         href: `/t/${tenantId}/settings/hours`,

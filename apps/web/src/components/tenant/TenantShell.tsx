@@ -70,7 +70,7 @@ export default function TenantShell({ tenantId, tenantName, tenantLogoUrl, nav, 
       <div className="hidden md:block sticky top-0 z-40 bg-white border-b border-gray-200">
         {/* Main Header Row */}
         <div className="flex items-center justify-between px-6 h-14">
-          <Link href="/" className="flex items-center gap-3" aria-label="Platform Dashboard">
+          <Link href="/dashboard" className="flex items-center gap-3" aria-label="Platform Dashboard">
             {settings?.logoUrl ? (
               <Image src={settings.logoUrl} alt={settings.platformName || 'Platform Logo'} width={140} height={32} className="h-8 w-auto object-contain" />
             ) : (

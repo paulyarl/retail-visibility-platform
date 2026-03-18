@@ -24,7 +24,7 @@ export default function SettingsFooter() {
             <a href="#" className="text-neutral-600 hover:text-neutral-900 transition-colors">
               Docs
             </a>
-            <Link href="/" className="text-neutral-600 hover:text-neutral-900 transition-colors">
+            <Link href="/dashboard" className="text-neutral-600 hover:text-neutral-900 transition-colors">
               Dashboard
             </Link>
           </div>
