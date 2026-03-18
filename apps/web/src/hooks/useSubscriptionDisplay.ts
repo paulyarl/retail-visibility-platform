@@ -122,7 +122,7 @@ export function useSubscriptionDisplay(tenantId?: string) {
       // console.log('[useSubscriptionDisplay] Loading from localStorage:', { storageKey, saved });
       if (saved) {
         const parsed = JSON.parse(saved);
-        console.log('[useSubscriptionDisplay] Parsed config:', parsed);
+        // console.log('[useSubscriptionDisplay] Parsed config:', parsed);
         // Merge with defaults to handle new fields
         setConfig({
           ...DEFAULT_CONFIG,
@@ -142,7 +142,7 @@ export function useSubscriptionDisplay(tenantId?: string) {
     if (typeof window === 'undefined') return;
 
     try {
-      console.log('[useSubscriptionDisplay] Saving config:', { storageKey, newConfig });
+      // console.log('[useSubscriptionDisplay] Saving config:', { storageKey, newConfig });
       localStorage.setItem(storageKey, JSON.stringify(newConfig));
       setConfig(newConfig);
     } catch (error) {

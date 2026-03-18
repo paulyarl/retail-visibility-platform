@@ -59,7 +59,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
     loading: completeLoading, 
     error: completeError, 
     refresh: refreshTenantData 
-  } = useTenantComplete({ tenantId, loadSecondary: true });
+  } = useTenantComplete(tenantId, true);
 
   
   // User profile (still separate since it's user-specific, not tenant-specific)

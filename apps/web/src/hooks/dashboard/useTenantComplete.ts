@@ -87,6 +87,14 @@ export interface UseTenantCompleteReturn {
   // Usage data (from /api/tenants/:id/usage)
   usage: TenantUsage | null;
 
+  // Organization tenants (from /api/organizations/:tenantId)
+  organizationTenants: Array<{
+    id: string;
+    name: string;
+    subscription_status: string;
+    subscription_tier: string;
+  }>;
+
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -176,22 +184,27 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
   });
 
   // Organization query - fetch organization with tenants
+  const organizationId = tenantData?.tenant?.organization_id;
   const { data: organizationData, isLoading: organizationLoading } = useQuery({
-    queryKey: ['tenant', 'organization', tenantId],
+    queryKey: ['tenant', 'organization', tenantId, organizationId],
     queryFn: async () => {
-      if (!tenantId) throw new Error('Tenant ID is required');
+      if (!tenantId || !organizationId) return null;
       try {
-        return organizationService.getOrganization(tenantId);
+        // Use tenantInfoService which handles auth properly
+        const result = await tenantInfoService.getOrganization(tenantId);
+        return result?.data || null;
       } catch (error) {
         console.warn('[useTenantComplete] Organization fetch failed, returning null:', error);
         return null;
       }
     },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 15 * 60 * 1000,
-    enabled: loadSecondary && !!tenantId && !!authUser && !!tenantData,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    enabled: loadSecondary && !!tenantId && !!authUser && !!organizationId,
     retry: 0,
-    throwOnError: false,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   // Combined loading state
