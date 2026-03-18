@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import { publicPlatformHomeService } from '@/services/PublicPlatformHomeService';
 import { hoursStatusService } from '@/services/HoursStatusService';
+import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { platformPublicService } from '@/services/PlatformPublicService';
 import Image from "next/image";
@@ -23,6 +24,7 @@ import FeaturesShowcase, { ShowcaseMode } from "@/components/FeaturesShowcase";
 import { computeStoreStatus } from "@/lib/hours-utils";
 import SubscriptionUsageBadge from "@/components/subscription/SubscriptionUsageBadge";
 import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
+import { Badge as MantineBadge } from '@mantine/core';
 
 
 export default function PlatformHomePage() {
@@ -185,6 +187,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
           return; 
         }
         
+
         const hours = profile?.hours;
         let hasHours = false;
         if (Array.isArray(hours)) hasHours = hours.length > 0;
@@ -253,6 +256,9 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
   const listingsCount = useCountUp(stats.active);
   const syncIssuesCount = useCountUp(stats.syncIssues);
   const locationsCount = useCountUp(stats.locations);
+  console.log(`Selected TenantId: ${selectedTenantId}`);
+  const { status: hoursStatus } = useStoreStatus(selectedTenantId || undefined, false); // Public scope
+  
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col">
       {!embedded && (
@@ -364,6 +370,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                 priority
               />
             </div>
+            
           </div>
         )}
 
@@ -378,6 +385,61 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   fill
                   className="object-contain rounded-lg"
                 />
+                {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
+			
               </div>
             )}
             <div>
@@ -890,6 +952,62 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                           </>
                         );
                       })() : <span className="text-sm sm:text-base text-neutral-900">Hours configured</span>}
+
+
+                        {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
                     </div>
                   ) : (
                     <p className="text-sm sm:text-base text-neutral-500">

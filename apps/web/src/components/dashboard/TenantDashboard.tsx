@@ -25,6 +25,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { AnimatedCard } from "@/components/ui";
+import { Badge as MantineBadge } from '@mantine/core';
+import { useStoreStatus } from "@/hooks/useStoreStatus";
 
 // Lazy load secondary components (non-critical for initial render)
 const QuickActions = lazy(() => import("./QuickActions"));
@@ -84,6 +86,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
  // console.log(`${TenantDashboard.name} tenant data`, tenantData);
 
   const slugs = tenantData?.slug || tenantData?.id || tenantId;
+  const { status: hoursStatus } = useStoreStatus(tenantId||tenantData?.id || '', false); // Public scope
 
  // console.log(`${TenantDashboard.name} tenant slugs`, slugs);
   // Fetch business profile for logo
@@ -189,6 +192,8 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
     );
   }
 
+  //const { status: hoursStatus } = useStoreStatus(tenantId, true); // Public scope
+  
   return (
     <div className="min-h-screen bg-neutral-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -278,6 +283,60 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
             <code className="text-xs font-mono text-neutral-700 bg-white px-2 py-0.5 rounded border select-all">
               {tenantId}
             </code>
+              {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
           </div>
           
           {/* Debug Refresh Button */}
@@ -376,22 +435,61 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                 </div>
                 {hoursInfo?.hasHours ? (
                   <div className="flex items-center gap-2 flex-wrap">
-                    {hoursInfo.today ? (() => {
-                      // Parse status from label (e.g., "Open now • Closes at 5:00 PM" or "Closed • Opens today at 9:00 AM")
-                      const isOpen = hoursInfo.today.startsWith('Open');
-                      const dotColor = isOpen ? 'bg-green-500' : 'bg-red-500';
-                      const statusText = isOpen ? 'Open' : 'Closed';
-                      const statusColor = isOpen ? 'text-green-700' : 'text-red-700';
-                      
-                      return (
-                        <>
-                          <span className={`inline-block w-2.5 h-2.5 rounded-full ${dotColor}`}></span>
-                          <span className={`font-semibold ${statusColor}`}>{statusText}</span>
-                          <span className="text-neutral-400">•</span>
-                          <span className="text-sm sm:text-base text-neutral-900">{hoursInfo.today}</span>
-                        </>
-                      );
-                    })() : <span className="text-sm sm:text-base text-neutral-900">Hours configured</span>}
+                    {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="lg"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="lg"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="lg"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="lg"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
+            <h1>{hoursStatus?.label}</h1>
                   </div>
                 ) : (
                   <p className="text-sm sm:text-base text-neutral-500">
