@@ -84,7 +84,7 @@ const initRedis = async (): Promise<void> => {
     isRedisConnected = true;
     console.log('[CacheService] Redis connected successfully');
   } catch (error) {
-    console.warn('[CacheService] Redis connection failed, using fallback cache:', error);
+    // console.warn('[CacheService] Redis connection failed, using fallback cache:', error);
     redisClient = null;
     isRedisConnected = false;
   }
@@ -110,7 +110,7 @@ export const get = async (key: string): Promise<any | null> => {
         return parsed.data;
       }
     } catch (error) {
-      console.warn('[CacheService] Redis get failed, using fallback:', error);
+      // console.warn('[CacheService] Redis get failed, using fallback:', error);
     }
   }
 
@@ -148,7 +148,7 @@ export const set = async (key: string, data: any, ttl?: number): Promise<void> =
       await redisClient.setEx(key, cacheTtl, JSON.stringify({ data, timestamp: Date.now() }));
       return;
     } catch (error) {
-      console.warn('[CacheService] Redis set failed, using fallback:', error);
+      // console.warn('[CacheService] Redis set failed, using fallback:', error);
     }
   }
 
@@ -172,7 +172,7 @@ export const del = async (key: string): Promise<void> => {
       await redisClient.del(key);
       return;
     } catch (error) {
-      console.warn('[CacheService] Redis del failed, using fallback:', error);
+      // console.warn('[CacheService] Redis del failed, using fallback:', error);
     }
   }
 
@@ -199,7 +199,7 @@ export const clear = async (pattern: string): Promise<void> => {
       }
       return;
     } catch (error) {
-      console.warn('[CacheService] Redis clear failed, using fallback:', error);
+      // console.warn('[CacheService] Redis clear failed, using fallback:', error);
     }
   }
 
@@ -227,7 +227,7 @@ export const getStats = async (): Promise<{
       const info = await redisClient.info('memory');
       redisMemory = info.split('\n').find(line => line.startsWith('used_memory:'));
     } catch (error) {
-      console.warn('[CacheService] Redis info failed:', error);
+      // console.warn('[CacheService] Redis info failed:', error);
     }
   }
 

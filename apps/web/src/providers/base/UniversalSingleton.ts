@@ -439,10 +439,10 @@ export abstract class UniversalSingleton {
    */
   protected async invalidateCachePattern(pattern: string): Promise<void> {
     try {
-      console.log(`[${this.constructor.name}] ----------------------------------------`);
-      console.log(`[${this.constructor.name}] start         : invalidateCachePattern`);
-      console.log(`[${this.constructor.name}] pattern       : ${pattern}`);
-      console.log(`[${this.constructor.name}] end           : invalidateCachePattern  `);
+      // console.log(`[${this.constructor.name}] ----------------------------------------`);
+      // console.log(`[${this.constructor.name}] start         : invalidateCachePattern`);
+      // console.log(`[${this.constructor.name}] pattern       : ${pattern}`);
+      // console.log(`[${this.constructor.name}] end           : invalidateCachePattern  `);
       
       // Handle wildcard patterns
       if (pattern.includes('*')) {
@@ -476,12 +476,12 @@ export abstract class UniversalSingleton {
   ): Promise<void> {
     try {
       let pattern = baseKey;
-      console.log(`[${this.constructor.name}] ----------------------------------------`);
-      console.log(`[${this.constructor.name}] start         : invalidateCacheWithContext`);
-      console.log(`[${this.constructor.name}] baseKey       : ${baseKey}`);
-      console.log(`[${this.constructor.name}] context       : ${context}`);
-      console.log(`[${this.constructor.name}] isolation     : ${isolation}`);
-      console.log(`[${this.constructor.name}] end           : invalidateCacheWithContext  `);
+      // console.log(`[${this.constructor.name}] ----------------------------------------`);
+      // console.log(`[${this.constructor.name}] start         : invalidateCacheWithContext`);
+      // console.log(`[${this.constructor.name}] baseKey       : ${baseKey}`);
+      // console.log(`[${this.constructor.name}] context       : ${context}`);
+      // console.log(`[${this.constructor.name}] isolation     : ${isolation}`);
+      // console.log(`[${this.constructor.name}] end           : invalidateCacheWithContext  `);
       
       if (context && isolation) {
         // Target specific context and isolation
@@ -524,12 +524,12 @@ export abstract class UniversalSingleton {
     isolations?: CacheIsolation[]
   ): Promise<void> {
     try {
-      console.log(`[${this.constructor.name}] ----------------------------------------`);
-      console.log(`[${this.constructor.name}] start         : invalidateCacheAcrossContexts`);
-      console.log(`[${this.constructor.name}] baseKey       : ${baseKey}`);
-      console.log(`[${this.constructor.name}] contexts      : ${contexts}`);
-      console.log(`[${this.constructor.name}] isolations    : ${isolations}`);
-      console.log(`[${this.constructor.name}] end           : invalidateCacheAcrossContexts  `);
+      // console.log(`[${this.constructor.name}] ----------------------------------------`);
+      // console.log(`[${this.constructor.name}] start         : invalidateCacheAcrossContexts`);
+      // console.log(`[${this.constructor.name}] baseKey       : ${baseKey}`);
+      // console.log(`[${this.constructor.name}] contexts      : ${contexts}`);
+      // console.log(`[${this.constructor.name}] isolations    : ${isolations}`);
+      // console.log(`[${this.constructor.name}] end           : invalidateCacheAcrossContexts  `);
       
       // Use base class defaults for backward compatibility
       if (!contexts || contexts.length === 0) {
@@ -568,10 +568,10 @@ export abstract class UniversalSingleton {
    * Invalidate cache (supports wildcards for pattern matching)
    */
   public async invalidateCache(key?: string): Promise<void> {
-    console.log(`[${this.constructor.name}] ----------------------------------------`);
-    console.log(`[${this.constructor.name}] start         : invalidateCache`);
-    console.log(`[${this.constructor.name}] key           : ${key}`);
-    console.log(`[${this.constructor.name}] end           : invalidateCache  `);
+    // console.log(`[${this.constructor.name}] ----------------------------------------`);
+    // console.log(`[${this.constructor.name}] start         : invalidateCache`);
+    // console.log(`[${this.constructor.name}] key           : ${key}`);
+    // console.log(`[${this.constructor.name}] end           : invalidateCache  `);
     
     if (key && key.includes('*')) {
       // Use pattern matching for wildcard keys
