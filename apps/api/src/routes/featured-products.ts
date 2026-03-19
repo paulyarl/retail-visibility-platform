@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticateToken, checkTenantAccess } from '../auth/auth.middleware';
+import { authenticateToken, checkTenantAccess } from '../middleware/auth';
 import { FeaturedProductsService, isValidFeaturedType } from '../services/FeaturedProductsService';
 import { z } from 'zod';
 import { prisma } from '../prisma';
@@ -444,6 +444,7 @@ router.delete('/items/:itemId/featured-types/:featuredType', authenticateToken, 
   try {
     const { itemId, featuredType } = req.params;
 
+    
     // Validate featured_type
     if (!isValidFeaturedType(featuredType)) {
       return res.status(400).json({ error: 'invalid_featured_type' });

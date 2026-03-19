@@ -108,6 +108,10 @@ const makeBothConventionsAvailable = (obj: any): any => {
  */
 export async function authenticateToken(req: Request, res: Response, next: NextFunction) {
   try {
+
+    // console.log(`Request body: ${JSON.stringify(req.body)}`);
+    // console.log(`Request headers: ${JSON.stringify(req.headers)}`);
+
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -121,6 +125,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
       
       // Check if the session has been revoked in the database
       const userId = payload.userId || payload.user_id;
+
       if (userId) {
         try {
           const { prisma } = await import('../prisma');
@@ -154,6 +159,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
 
     if (auth0Id || auth0Email) {
+
       const { prisma } = await import('../prisma');
       
       let user = null;

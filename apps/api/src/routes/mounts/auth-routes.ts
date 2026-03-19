@@ -1,5 +1,5 @@
 import { Express } from 'express';
-import authRoutes from '../../auth/auth.routes';
+//import authRoutes from '../../auth/auth.routes';
 import authSyncRoutes from '../auth-sync';
 import onboardingRoutes from '../onboarding';
 
@@ -11,8 +11,8 @@ export function mountAuthRoutes(app: Express) {
   console.log('🔐 Mounting authentication routes...');
   
   // Mount auth routes (no authentication required for these endpoints)
-  app.use('/auth', authRoutes);
-  app.use('/api/auth', authRoutes);
+  // app.use('/auth', authRoutes);
+  // app.use('/api/auth', authRoutes);
   
   // Auth sync routes (for Auth0 user synchronization)
   app.use('/api/auth', authSyncRoutes);

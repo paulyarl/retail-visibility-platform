@@ -330,7 +330,7 @@ export default function ProductFeaturingPage() {
       if (featuredType) {
         hasInitializedFeatured.current = true;
         setSelectedType('featured');
-        console.log('[ProductFeaturingPage] Initialized with featured type:', featuredType);
+        // console.log('[ProductFeaturingPage] Initialized with featured type:', featuredType);
       }
     }
   }, [featuredTypes]); // Only depend on featuredTypes, not selectedType
@@ -370,16 +370,16 @@ export default function ProductFeaturingPage() {
   const featuredInactive = inactiveProducts.filter(p => !p.is_active && p.featured_type === 'featured');
 
   // Debug: Show featured context information
-  console.log(`[ProductFeaturingPage] Featured Context - Types count: ${featuredTypes.length}`);
-  console.log(`[ProductFeaturingPage] Available types:`, featuredTypes.map((t: any) => ({ id: t.id, name: t.name })));
-  console.log(`[ProductFeaturingPage] Current selectedType: ${selectedType}`);
-  console.log(`[ProductFeaturingPage] Featured active: ${featuredActive.length}`);
-  console.log(`[ProductFeaturingPage] Featured limit: ${featuredLimit}`);
+  // console.log(`[ProductFeaturingPage] Featured Context - Types count: ${featuredTypes.length}`);
+  // console.log(`[ProductFeaturingPage] Available types:`, featuredTypes.map((t: any) => ({ id: t.id, name: t.name })));
+  // console.log(`[ProductFeaturingPage] Current selectedType: ${selectedType}`);
+  // console.log(`[ProductFeaturingPage] Featured active: ${featuredActive.length}`);
+  // console.log(`[ProductFeaturingPage] Featured limit: ${featuredLimit}`);
 
   // Debug: Check what types the singleton has by default
-  console.log(`[ProductFeaturingPage] Singleton state featuredTypes count:`, singletonState.featuredTypes?.length || 0);
+  // console.log(`[ProductFeaturingPage] Singleton state featuredTypes count:`, singletonState.featuredTypes?.length || 0);
   if (singletonState.featuredTypes) {
-    console.log(`[ProductFeaturingPage] Singleton state types:`, singletonState.featuredTypes.map((t: any) => ({ id: t.id, name: t.name })));
+    // console.log(`[ProductFeaturingPage] Singleton state types:`, singletonState.featuredTypes.map((t: any) => ({ id: t.id, name: t.name })));
   }
 
   // Group inactive products by reason
@@ -474,15 +474,15 @@ export default function ProductFeaturingPage() {
       // Now call the featureProduct method - it should use the correct type
       await singleton.featureProduct(productId);
       
-      console.log('[ProductFeaturingPage] Successfully featured product with "featured" type:', productId);
+      // console.log('[ProductFeaturingPage] Successfully featured product with "featured" type:', productId);
       
       // Verify the result
       const finalState = singleton.getState();
-      console.log('[ProductFeaturingPage] Final singleton state:', {
-        selectedType: finalState.selectedType,
-        featuredProductsCount: Object.keys(finalState.featuredProducts).length
-      });
-      
+      // console.log('[ProductFeaturingPage] Final singleton state:', {
+      //     selectedType: finalState.selectedType,
+      //     featuredProductsCount: Object.keys(finalState.featuredProducts).length
+      //   });
+        
     } catch (error) {
       console.error('[ProductFeaturingPage] Error featuring product:', error);
       throw error;
@@ -505,12 +505,12 @@ export default function ProductFeaturingPage() {
     // console.log('Product keys:', Object.keys(product));
     // console.log('Product values:');
     Object.entries(product).forEach(([key, value]) => {
-      console.log(`  ${key}:`, value);
+      // console.log(`  ${key}:`, value);
     });
-      console.log('Specific ID fields:');
-      console.log('  product.id:', product.id);
-      console.log('  product.inventory_item_id:', product.inventory_item_id);
-      console.log('Toggle to isActive:', isActive);
+      // console.log('Specific ID fields:');
+      // console.log('  product.id:', product.id);
+      // console.log('  product.inventory_item_id:', product.inventory_item_id);
+      // console.log('Toggle to isActive:', isActive);
     // console.log('=== END COMPLETE DEBUG ===');
     
     const inventoryItemId = getProductInventoryId(product);

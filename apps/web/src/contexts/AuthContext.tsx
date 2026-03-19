@@ -92,6 +92,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fetch current user - checks Auth0 session via API
   const fetchUser = useCallback(async (forceRefresh = false) => {
     try {
+
+      
+      // Check Auth0 session via API (uses HTTP-only cookies automatically)
+      const sessionInfo = await securitySingletonService.getSessionInfo();
+
       // Only check authentication if we're in an admin context, tenant context, or have authentication tokens
       const isAdminContext = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
       const isTenantContext = typeof window !== 'undefined' && (
@@ -103,22 +108,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
 
       
-      console.log(`AuthContext fetchUser isAdminContext: ${isAdminContext}`);
-      console.log(`AuthContext fetchUser isTenantContext: ${isTenantContext}`);
-      console.log(`AuthContext fetchUser forceRefresh: ${forceRefresh}`);
+      // console.log(`AuthContext fetchUser isAdminContext: ${isAdminContext}`);
+      // console.log(`AuthContext fetchUser isTenantContext: ${isTenantContext}`);
+      // console.log(`AuthContext fetchUser forceRefresh: ${forceRefresh}`);
       
       
       // Skip auth check for public pages
-      if (!isAdminContext && !isTenantContext && !forceRefresh) {
+      if (!isAdminContext && !isTenantContext && !forceRefresh && !sessionInfo.isAuthenticated) {
         setUser(null);
         setIsLoading(false);
         // return;
       }
       
-      // Check Auth0 session via API (uses HTTP-only cookies automatically)
-      const sessionInfo = await securitySingletonService.getSessionInfo();
 
-      console.log(`AuthContext fetchUser sessionInfo: ${JSON.stringify(sessionInfo)}`);
+      // console.log(`AuthContext fetchUser sessionInfo: ${JSON.stringify(sessionInfo)}`);
       
       
       if (sessionInfo.isAuthenticated && sessionInfo.user) {
@@ -140,7 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           onboardingCompleted: sessionInfo.user.onboardingCompleted,
         };
         
-        console.log(`AuthContext fetchUser transformedUser: ${JSON.stringify(transformedUser)}`);
+        // console.log(`AuthContext fetchUser transformedUser: ${JSON.stringify(transformedUser)}`);
       
         
         setUser(transformedUser);
