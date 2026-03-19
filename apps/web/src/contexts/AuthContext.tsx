@@ -101,16 +101,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.location.pathname.startsWith('/settings') ||
         window.location.pathname.startsWith('/onboarding')
       );
+
+      
+      console.log(`AuthContext fetchUser isAdminContext: ${isAdminContext}`);
+      console.log(`AuthContext fetchUser isTenantContext: ${isTenantContext}`);
+      console.log(`AuthContext fetchUser forceRefresh: ${forceRefresh}`);
+      
       
       // Skip auth check for public pages
       if (!isAdminContext && !isTenantContext && !forceRefresh) {
         setUser(null);
         setIsLoading(false);
-        return;
+        // return;
       }
       
       // Check Auth0 session via API (uses HTTP-only cookies automatically)
       const sessionInfo = await securitySingletonService.getSessionInfo();
+
+      console.log(`AuthContext fetchUser sessionInfo: ${JSON.stringify(sessionInfo)}`);
+      
       
       if (sessionInfo.isAuthenticated && sessionInfo.user) {
         // Transform service user to context format
@@ -130,6 +139,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           auth0Id: sessionInfo.user.auth0Id,
           onboardingCompleted: sessionInfo.user.onboardingCompleted,
         };
+        
+        console.log(`AuthContext fetchUser transformedUser: ${JSON.stringify(transformedUser)}`);
+      
         
         setUser(transformedUser);
         

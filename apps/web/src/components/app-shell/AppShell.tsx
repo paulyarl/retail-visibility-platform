@@ -31,8 +31,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   
   // Use extracted hooks for navigation and session restore
   const { links, tenantScopedLinksOn, hydrated } = useAppNavigation({ 
-    tenantId, 
-    isAuthenticated: !!user 
+    tenantId
   });
   const restoreToast = useSessionRestore(tenantName);
 
