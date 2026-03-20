@@ -513,6 +513,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       if (!result.success) {
         return { sessions: [], total: 0 };
       }
+      console.log('[SecuritySingletonService] Admin security sessions result:', JSON.stringify(result.data, null, 2));
       
       return result.data || { sessions: [], total: 0 };
     } catch (error) {

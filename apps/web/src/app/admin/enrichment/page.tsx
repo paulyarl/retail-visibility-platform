@@ -68,10 +68,43 @@ export default function EnrichmentDashboardPage() {
     try {
       const analytics = await platformHomeService.getAdminEnrichmentAnalytics();
       console.log('[Enrichment] Popular products:', analytics?.popularProducts);
-      setAnalytics(analytics);
+      // Ensure analytics has default structure if undefined
+      setAnalytics(analytics || {
+        totalProducts: 0,
+        popularProducts: [],
+        dataQuality: {
+          withNutrition: 0,
+          withImages: 0,
+          withEnvironmental: 0,
+          nutritionPercentage: '0',
+          imagesPercentage: '0',
+          environmentalPercentage: '0'
+        },
+        sourceBreakdown: [],
+        recentAdditions: 0,
+        apiCallsSaved: 0,
+        estimatedCostSavings: '0'
+      });
     } catch (error) {
       console.error('Failed to load analytics:', error);
       setError('Failed to load analytics');
+      // Set default analytics on error
+      setAnalytics({
+        totalProducts: 0,
+        popularProducts: [],
+        dataQuality: {
+          withNutrition: 0,
+          withImages: 0,
+          withEnvironmental: 0,
+          nutritionPercentage: '0',
+          imagesPercentage: '0',
+          environmentalPercentage: '0'
+        },
+        sourceBreakdown: [],
+        recentAdditions: 0,
+        apiCallsSaved: 0,
+        estimatedCostSavings: '0'
+      });
     } finally {
       setLoading(false);
     }
@@ -86,11 +119,14 @@ export default function EnrichmentDashboardPage() {
         source: sourceFilter,
       });
       
-      console.log('[Enrichment] Products:', data.products);
-      setProducts(data.products);
-      setTotalPages(data.pagination?.totalPages || 1);
+      console.log('[Enrichment] Products:', data?.products);
+      // Ensure products is always an array
+      setProducts(data?.products || []);
+      setTotalPages(data?.pagination?.totalPages || 1);
     } catch (error) {
       console.error('Failed to load products:', error);
+      // Set empty array on error
+      setProducts([]);
     } finally {
       setSearchLoading(false);
     }
@@ -173,7 +209,7 @@ export default function EnrichmentDashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <TrendingUp className="w-8 h-8 text-green-600" />
               <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                {analytics?.apiCallsSaved.toLocaleString()}
+                {analytics?.apiCallsSaved?.toLocaleString() || '0'}
               </span>
             </div>
             <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">API Calls Saved</h3>
@@ -201,12 +237,12 @@ export default function EnrichmentDashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <BarChart3 className="w-8 h-8 text-purple-600" />
               <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                {analytics?.dataQuality.nutritionPercentage}%
+                {analytics?.dataQuality?.nutritionPercentage || 0}%
               </span>
             </div>
             <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Nutrition Data</h3>
             <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-              {analytics?.dataQuality.withNutrition.toLocaleString()} products
+              {analytics?.dataQuality?.withNutrition ? analytics.dataQuality.withNutrition.toLocaleString() : '0'} products
             </p>
           </div>
         </div>
@@ -222,16 +258,16 @@ export default function EnrichmentDashboardPage() {
                   <Package className="w-5 h-5 text-blue-600" />
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Nutrition Facts</span>
                 </div>
-                <span className="text-sm font-bold text-blue-600">{analytics?.dataQuality.nutritionPercentage}%</span>
+                <span className="text-sm font-bold text-blue-600">{analytics?.dataQuality?.nutritionPercentage || 0}%</span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div 
                   className="bg-blue-600 h-2 rounded-full transition-all"
-                  style={{ width: `${analytics?.dataQuality.nutritionPercentage}%` }}
+                  style={{ width: `${analytics?.dataQuality?.nutritionPercentage || 0}%` }}
                 />
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {analytics?.dataQuality.withNutrition.toLocaleString()} products
+                {analytics?.dataQuality?.withNutrition?.toLocaleString() || '0'} products
               </p>
             </div>
 
@@ -242,16 +278,16 @@ export default function EnrichmentDashboardPage() {
                   <ImageIcon className="w-5 h-5 text-purple-600" />
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Product Images</span>
                 </div>
-                <span className="text-sm font-bold text-purple-600">{analytics?.dataQuality.imagesPercentage}%</span>
+                <span className="text-sm font-bold text-purple-600">{analytics?.dataQuality?.imagesPercentage || 0}%</span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div 
                   className="bg-purple-600 h-2 rounded-full transition-all"
-                  style={{ width: `${analytics?.dataQuality.imagesPercentage}%` }}
+                  style={{ width: `${analytics?.dataQuality?.imagesPercentage || 0}%` }}
                 />
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {analytics?.dataQuality.withImages.toLocaleString()} products
+                {analytics?.dataQuality?.withImages?.toLocaleString() || '0'} products
               </p>
             </div>
 
@@ -262,16 +298,16 @@ export default function EnrichmentDashboardPage() {
                   <Leaf className="w-5 h-5 text-green-600" />
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Environmental Data</span>
                 </div>
-                <span className="text-sm font-bold text-green-600">{analytics?.dataQuality.environmentalPercentage}%</span>
+                <span className="text-sm font-bold text-green-600">{analytics?.dataQuality?.environmentalPercentage || 0}%</span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div 
                   className="bg-green-600 h-2 rounded-full transition-all"
-                  style={{ width: `${analytics?.dataQuality.environmentalPercentage}%` }}
+                  style={{ width: `${analytics?.dataQuality?.environmentalPercentage || 0}%` }}
                 />
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {analytics?.dataQuality.withEnvironmental.toLocaleString()} products
+                {analytics?.dataQuality?.withEnvironmental?.toLocaleString() || '0'} products
               </p>
             </div>
           </div>
@@ -281,7 +317,7 @@ export default function EnrichmentDashboardPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 mb-8">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Most Popular Products</h2>
           <div className="space-y-3">
-            {analytics?.popularProducts.map((product: PopularProduct, idx: number) => (
+            {analytics?.popularProducts?.map((product: PopularProduct, idx: number) => (
               <div key={product.barcode} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
@@ -354,7 +390,7 @@ export default function EnrichmentDashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {products.map((product: any) => (
+                    {products?.map((product: any) => (
                       <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">

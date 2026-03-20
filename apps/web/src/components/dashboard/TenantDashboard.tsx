@@ -27,6 +27,7 @@ import { motion } from "framer-motion";
 import { AnimatedCard } from "@/components/ui";
 import { Badge as MantineBadge } from '@mantine/core';
 import { useStoreStatus } from "@/hooks/useStoreStatus";
+import { trackBehaviorClient } from '@/utils/behaviorTracking';
 
 // Lazy load secondary components (non-critical for initial render)
 const QuickActions = lazy(() => import("./QuickActions"));
@@ -89,6 +90,22 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   const { status: hoursStatus } = useStoreStatus(tenantId||tenantData?.id || '', false); // Public scope
 
  // console.log(`${TenantDashboard.name} tenant slugs`, slugs);
+  
+  // Track tenant dashboard view
+  useEffect(() => {
+    if (tenantId) {
+      trackBehaviorClient({
+        entityType: 'dashboard',
+        entityId: `tenant_dashboard_${tenantId}`,
+        entityName: 'Tenant Dashboard',
+        pageType: 'tenant_dashboard',
+        context: {
+          tenantId
+        }
+      });
+    }
+  }, [tenantId]);
+  
   // Fetch business profile for logo
   useEffect(() => {
     const fetchBusinessProfile = async () => {

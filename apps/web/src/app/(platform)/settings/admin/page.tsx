@@ -10,6 +10,7 @@ import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 import { useAdminData } from '@/hooks/useAdminData';
+import { trackBehaviorClient } from '@/utils/behaviorTracking';
 
 type AdminSection = {
   title: string;
@@ -42,6 +43,22 @@ export default function AdminDashboardPage() {
 
   // Use cached admin data hook
   const { tenants, syncStats, loading: adminDataLoading, error: adminDataError } = useAdminData();
+
+  // Track admin panel access
+  useEffect(() => {
+    if (hasAccess && isPlatformAdmin) {
+      trackBehaviorClient({
+        entityType: 'admin',
+        entityId: 'platform_admin_dashboard',
+        entityName: 'Platform Admin Dashboard',
+        pageType: 'admin_panel',
+        context: {
+          isAdmin: true,
+          isPlatformAdmin
+        }
+      });
+    }
+  }, [hasAccess, isPlatformAdmin]);
 
   const adminGroups: AdminGroup[] = [
     {

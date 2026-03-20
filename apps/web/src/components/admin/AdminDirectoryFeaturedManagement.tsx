@@ -6,16 +6,23 @@ import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 import FeaturedProductsManager from '@/components/tenant/FeaturedProductsManager';
 import { Tenant } from '@/services/PlatformHomeSingletonService';
 
-export default function AdminDirectoryFeaturedManagement() {
-  const [selectedTenant, setSelectedTenant] = useState<string>('');
-  const [tenants, setTenants] = useState<Tenant[]>([]);
+interface AdminDirectoryFeaturedManagementProps {
+  pendingTenants?: Array<{id: string, name: string, featured_access_approved?: boolean, subscription_status?: string}>;
+}
+
+export default function AdminDirectoryFeaturedManagement({ pendingTenants = [] }: AdminDirectoryFeaturedManagementProps) {
+  // State variables
+  const [selectedTenant, setSelectedTenant] = useState<string | null>(null);
   const [selectedTenantData, setSelectedTenantData] = useState<Tenant | null>(null);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    fetchTenants();
-  }, []);
+  // Get featured access status from the actual tenant approval data
+  const getTenantFeaturedAccess = (tenantId: string): boolean => {
+    const tenant = pendingTenants.find(t => t.id === tenantId);
+    return tenant?.featured_access_approved === true && tenant?.subscription_status === 'active';
+  };
 
   useEffect(() => {
     if (selectedTenant && tenants.length > 0) {
@@ -27,18 +34,20 @@ export default function AdminDirectoryFeaturedManagement() {
   }, [selectedTenant, tenants]);
 
   const fetchTenants = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const result = await platformHomeService.getAdminTierTenants();
-      if (result) {
-        setTenants(result);
-      }
+      const result = await platformHomeService.getTenants();
+      setTenants(result || []);
     } catch (error) {
-      console.error('Error fetching tenants:', error);
+      console.error('Failed to fetch tenants:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchTenants();
+  }, []);
 
   const filteredTenants = tenants.filter(tenant =>
     tenant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -46,23 +55,22 @@ export default function AdminDirectoryFeaturedManagement() {
   );
 
   const getTierColor = (tier: string) => {
-    const colors: Record<string, string> = {
-      'starter': 'bg-gray-100 text-gray-700',
-      'professional': 'bg-blue-100 text-blue-700',
-      'enterprise': 'bg-purple-100 text-purple-700'
-    };
-    return colors[tier] || 'bg-gray-100 text-gray-700';
+    switch (tier) {
+      case 'starter': return 'bg-gray-100 text-gray-800';
+      case 'professional': return 'bg-blue-100 text-blue-800';
+      case 'premium': return 'bg-purple-100 text-purple-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Tenant Selection */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Directory Featured Management</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Manage directory featured products for tenants. Directory featured products appear in premium directory listings.
+              Manage featured products for any tenant from the directory context
             </p>
           </div>
           <div className="flex items-center gap-2 text-sm text-blue-600">
@@ -71,19 +79,17 @@ export default function AdminDirectoryFeaturedManagement() {
           </div>
         </div>
 
-        {/* Search */}
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
             type="text"
-            placeholder="Search tenants..."
+            placeholder="Search tenants by name or ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
 
-        {/* Tenant List */}
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-8">
@@ -122,19 +128,17 @@ export default function AdminDirectoryFeaturedManagement() {
         </div>
       </div>
 
-      {/* Selected Tenant Info */}
-      {selectedTenant && (
+      {selectedTenant && selectedTenantData && (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">
-                {selectedTenantData?.name || 'Selected Tenant'}
+                {selectedTenantData.name || 'Selected Tenant'}
               </h3>
               <p className="text-sm text-gray-600 mt-1">
-                Managing directory featured products for this tenant
+                Managing featured products for this tenant
               </p>
             </div>
-
             {selectedTenantData && (
               <div className="flex items-center gap-3">
                 <span className={`px-3 py-1 text-sm font-medium rounded-full ${getTierColor(selectedTenantData.subscriptionTier || 'starter')}`}>
@@ -149,7 +153,6 @@ export default function AdminDirectoryFeaturedManagement() {
         </div>
       )}
 
-      {/* Featured Context Banner */}
       {selectedTenant && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
           <div className="flex items-center gap-3">
@@ -164,27 +167,27 @@ export default function AdminDirectoryFeaturedManagement() {
         </div>
       )}
 
-      {/* Featured Products Manager */}
       {selectedTenant && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <FeaturedProductsManager 
+          <FeaturedProductsManager
             tenantId={selectedTenant}
             context="directory"
-            hasFeaturedAccess={selectedTenantData?.featured_access_approved && selectedTenantData?.subscription_status === 'active'}
+            hasFeaturedAccess={getTenantFeaturedAccess(selectedTenant)}
           />
         </div>
       )}
 
-      {/* No Tenant Selected */}
       {!selectedTenant && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-12 text-center">
           <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Tenant</h3>
           <p className="text-gray-600">
-            Choose a tenant from the list above to manage their premium featured products.
+            Choose a tenant from the list above to manage their featured products
           </p>
         </div>
       )}
     </div>
   );
 }
+
+                                                  

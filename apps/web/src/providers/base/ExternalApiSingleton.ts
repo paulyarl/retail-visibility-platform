@@ -26,6 +26,7 @@ export abstract class ExternalApiSingleton extends FlexibleApiSingleton {
   
   protected defaultRequestType: RequestType = RequestType.EXTERNAL;
   protected defaultRequestTarget: RequestTarget = RequestTarget.EXTERNAL;
+  protected defaultIncludeCredentials: boolean = false; // External APIs don't need credentials by default
   protected cacheTTL: number = 15 * 60 * 1000; // 15 minutes for external data
   
   constructor(singletonKey: string, cacheOptions?: ExternalSingletonCacheOptions) {
@@ -47,19 +48,32 @@ export abstract class ExternalApiSingleton extends FlexibleApiSingleton {
     const cacheKey = requestOptions?.cacheKey || `external-${url}`;
     const ttl = requestOptions?.ttl || this.cacheTTL;
 
-    // Use makeDefaultRequest with EXTERNAL type
-    const result = await this.makeDefaultRequest<T>(
-      url,
-      options,
-      cacheKey,
-      ttl,
-      {
-        requestType: this.defaultRequestType,
-        requestTarget: this.defaultRequestTarget
-      }
-    );
+    // Temporarily override includeCredentials if specified in requestOptions
+    const originalDefault = this.defaultIncludeCredentials;
+    if (requestOptions?.includeCredentials !== undefined) {
+      this.defaultIncludeCredentials = requestOptions.includeCredentials;
+    }
 
-    return result as ExternalApiResponse<T>;
+    try {
+      // Use makeDefaultRequest with EXTERNAL type
+      const result = await this.makeDefaultRequest<T>(
+        url,
+        options,
+        cacheKey,
+        ttl,
+        {
+          requestType: this.defaultRequestType,
+          requestTarget: this.defaultRequestTarget
+        }
+      );
+
+      return result as ExternalApiResponse<T>;
+    } finally {
+      // Restore original default
+      if (requestOptions?.includeCredentials !== undefined) {
+        this.defaultIncludeCredentials = originalDefault;
+      }
+    }
   }
 
   /**

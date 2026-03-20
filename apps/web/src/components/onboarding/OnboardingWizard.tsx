@@ -12,6 +12,7 @@ import { ContextBadges } from '@/components/ContextBadges';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
 import { useOnboardingSteps } from '@/hooks/useOnboardingSteps';
 import { useOnboardingSave } from '@/hooks/useOnboardingSave';
+import { trackBehaviorClient } from '@/utils/behaviorTracking';
 
 interface OnboardingWizardProps {
   tenantId: string;
@@ -93,6 +94,23 @@ export default function OnboardingWizard({
   
   // Feature flags
   const [ffCategory, setFfCategory] = useState(false);
+  
+  // Track onboarding flow start
+  useEffect(() => {
+    if (tenantId) {
+      trackBehaviorClient({
+        entityType: 'onboarding',
+        entityId: `onboarding_${tenantId}`,
+        entityName: 'Tenant Onboarding',
+        pageType: 'onboarding_flow',
+        context: {
+          tenantId,
+          currentStep: currentStep,
+          totalSteps: steps.length
+        }
+      });
+    }
+  }, [tenantId, currentStep]);
   
   useEffect(() => {
     try {

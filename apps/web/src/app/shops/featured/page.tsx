@@ -20,6 +20,7 @@ import { shopsService } from '@/services/ShopsService';
 import { FEATURED_TYPES } from '@/types/product-display';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { usePublicBranding } from '@/hooks/usePublicBranding';
+import { trackBehaviorClient } from '@/utils/behaviorTracking';
 
 interface FilterState {
   category: string;
@@ -222,6 +223,14 @@ export default function FeaturedProductsPage() {
 
   useEffect(() => {
     fetchFeaturedProducts();
+    
+    // Track featured shops page view
+    trackBehaviorClient({
+      entityType: 'store',
+      entityId: 'featured_shops',
+      entityName: 'Featured Shops',
+      pageType: 'shop_directory'
+    });
   }, [filters, sortBy]);
 
   // Re-fetch when search query changes (for server-side search in future)

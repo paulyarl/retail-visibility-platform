@@ -176,21 +176,23 @@ export default function UserBehaviorAnalytics({ filters }: UserBehaviorAnalytics
             <h4 className="text-sm font-medium text-gray-700 mb-4">Peak Activity Hours</h4>
             <div className="space-y-3">
               {engagementPatterns
-                .sort((a, b) => b.pageViews - a.pageViews)
+                .sort((a, b) => b.uniqueUsers - a.uniqueUsers)
                 .slice(0, 6)
                 .map((pattern, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className={`w-2 h-2 rounded-full ${
-                        pattern.pageViews > 100 ? 'bg-green-500' :
-                        pattern.pageViews > 50 ? 'bg-yellow-500' :
+                        pattern.uniqueUsers > 30 ? 'bg-green-500' :
+                        pattern.uniqueUsers > 20 ? 'bg-yellow-500' :
                         'bg-gray-400'
                       }`}></div>
                       <span className="font-medium text-gray-900">{pattern.period}</span>
                     </div>
                     <div className="flex items-center space-x-4 text-sm">
-                      <span className="text-gray-600">{pattern.pageViews} views</span>
                       <span className="text-gray-600">{pattern.uniqueUsers} users</span>
+                      <span className="text-gray-400">({pattern.pageViews} views)</span>
+                      <span className="text-blue-600">{pattern.avgSessionDuration}s</span>
+                      <span className="text-green-600">{pattern.returnVisitors} returns</span>
                     </div>
                   </div>
                 ))}
@@ -217,13 +219,20 @@ export default function UserBehaviorAnalytics({ filters }: UserBehaviorAnalytics
               <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <Users className="w-4 h-4 text-green-600" />
-                  <span className="font-medium text-gray-900">Return Visitor Rate</span>
+                  <span className="font-medium text-gray-900">Return Visitors</span>
                 </div>
                 <span className="text-sm font-medium text-green-600">
-                  {(
-                    (engagementPatterns.reduce((sum, p) => sum + p.returnVisitors, 0) /
-                    engagementPatterns.reduce((sum, p) => sum + p.uniqueUsers, 0)) * 100
-                  ).toFixed(1)}%
+                  {engagementPatterns.reduce((sum, p) => sum + p.returnVisitors, 0)} total returns
+                </span>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <TrendingUp className="w-4 h-4 text-purple-600" />
+                  <span className="font-medium text-gray-900">Total Unique Users</span>
+                </div>
+                <span className="text-sm font-medium text-purple-600">
+                  {engagementPatterns.reduce((sum, p) => sum + p.uniqueUsers, 0)} unique users
                 </span>
               </div>
               
@@ -233,9 +242,12 @@ export default function UserBehaviorAnalytics({ filters }: UserBehaviorAnalytics
                   <span className="font-medium text-gray-900">Peak Hour</span>
                 </div>
                 <span className="text-sm font-medium text-purple-600">
-                  {engagementPatterns.reduce((max, p) => 
-                    p.pageViews > max.pageViews ? p : max
-                  ).period}
+                  {(() => {
+                    const peakPattern = engagementPatterns.reduce((max, p) => 
+                      p.uniqueUsers > max.uniqueUsers ? p : max
+                    , engagementPatterns[0]);
+                    return `${peakPattern.period || 'N/A'} - ${peakPattern.uniqueUsers || 0} users`;
+                  })()}
                 </span>
               </div>
             </div>

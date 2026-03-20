@@ -6,6 +6,7 @@ import FeaturedProductsManager from '@/components/tenant/FeaturedProductsManager
 import { ArrowLeft, Star } from 'lucide-react';
 import Link from 'next/link';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { AdminFeaturedApprovalService } from '@/services/AdminFeaturedApprovalService';
 
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,7 @@ export default function FeaturedProductsSettings({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [debug, setDebug] = useState<any>(null);
+  const [featuredAccessApproved, setFeaturedAccessApproved] = useState<boolean>(false);
 
   useEffect(() => {
     async function fetchTenant() {
@@ -84,6 +86,21 @@ export default function FeaturedProductsSettings({
         if (tenantData) {
           console.log('FeaturedProductsSettings: Tenant data received', tenantData);
           setTenant(tenantData);
+          
+          // Fetch featured access approval status
+          try {
+            const approvalService = AdminFeaturedApprovalService.getInstance();
+            const allTenantsWithStatus = await approvalService.getAllTenantsWithFeaturedAccessStatus();
+            const currentTenantStatus = allTenantsWithStatus.find(t => t.id === id);
+            
+            const hasApprovedAccess = currentTenantStatus?.featured_access_approved === true && 
+                                    currentTenantStatus?.subscription_status === 'active';
+            
+            setFeaturedAccessApproved(hasApprovedAccess);
+          } catch (approvalError) {
+            console.error('FeaturedProductsSettings: Error fetching approval status', approvalError);
+            setFeaturedAccessApproved(false); // Default to locked on error
+          }
         } else {
           console.error('FeaturedProductsSettings: Failed to load tenant');
           setError('Failed to load tenant information');
@@ -174,7 +191,10 @@ export default function FeaturedProductsSettings({
               <strong>Storefront Featuring:</strong> Managing storefront featured product types (New Arrivals, Seasonal, Staff Picks, Sale Items, Bestsellers, Clearance, Trending Now, Featured, Recommended)
             </p>
           </div>
-          <FeaturedProductsManager tenantId={tenant.id} />
+          <FeaturedProductsManager 
+            tenantId={tenant.id} 
+            hasFeaturedAccess={featuredAccessApproved}
+          />
         </div>
       </div>
     </div>

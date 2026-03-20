@@ -44,7 +44,8 @@ export interface AnalyticsFilters {
   startDate?: string;
   endDate?: string;
   pageType?: string;
-  entityType?: string;
+  name?: string;
+  type?: 'store' | 'product' | 'category' | 'platform' | 'dashboard' | 'onboarding' | 'admin';
   region?: string;
 }
 
@@ -52,7 +53,6 @@ export default function AnalyticsDashboard() {
   const [filters, setFilters] = useState<AnalyticsFilters>({
     period: 'week',
     pageType: 'all',
-    entityType: 'all',
     region: 'all'
   });
 

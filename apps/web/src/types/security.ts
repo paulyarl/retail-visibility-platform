@@ -215,14 +215,17 @@ export interface BlockedIP {
 }
 
 export interface SecurityHealthStatus {
-  status: 'healthy' | 'warning' | 'critical' | 'error';
-  uptime: string;
-  issues: string[];
-  metrics: SecurityMetrics;
-  timestamp: Date;
-  checks: {
-    threatCount: boolean;
-    loginFailures: boolean;
+  success: boolean;
+  data: {
+    status: 'healthy' | 'warning' | 'critical' | 'error';
+    uptime: string;
+    issues: string[];
+    metrics: SecurityMetrics;
+    timestamp: string; // API returns string, not Date
+    checks: {
+      threatCount: boolean;
+      loginFailures: boolean;
+    };
   };
 }
 

@@ -293,6 +293,10 @@ const adminNavItems: NavItem[] = [
       {
         label: 'Product Intelligence',
         href: '/admin/enrichment'
+      },  
+      {
+        label: 'Traffic Analytics',
+        href: '/admin/analytics'
       },
       {
         label: 'Admin Tools',

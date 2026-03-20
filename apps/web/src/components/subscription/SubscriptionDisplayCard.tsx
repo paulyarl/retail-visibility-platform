@@ -248,16 +248,16 @@ export function SubscriptionDisplayCard({
   const visibleFields = config.visibleFields.filter(f => isFieldVisible(f));
   const displayedFields = visibleFields.map(renderField).filter(Boolean);
   
-  console.log('[SubscriptionDisplayCard] Rendering:', {
-    visibleFields,
-    displayedFieldsCount: displayedFields.length,
-    tierData: {
-      isChain: tierData.isChain,
-      organizationName: tierData.organizationName,
-      tenantTier: tierData.tenantTier,
-      effectiveTier,
-    }
-  });
+  // console.log('[SubscriptionDisplayCard] Rendering:', {
+  //   visibleFields,
+  //   displayedFieldsCount: displayedFields.length,
+  //   tierData: {
+  //     isChain: tierData.isChain,
+  //     organizationName: tierData.organizationName,
+  //     tenantTier: tierData.tenantTier,
+  //     effectiveTier,
+  //   }
+  // });
 
   if (displayedFields.length === 0) {
     return null;

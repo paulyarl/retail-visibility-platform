@@ -78,6 +78,7 @@ export interface ExternalRequestOptions {
   context?: AppContext;
   isolation?: CacheIsolation;
   userId?: string;
+  includeCredentials?: boolean; // Allow controlling credential inclusion for external APIs
 }
 
 export interface SystemRequestOptions {
@@ -96,6 +97,7 @@ export interface RequestOptions {
   headers?: Record<string, string>;
   cacheKey?: string;
   ttl?: number;
+  includeCredentials?: boolean; // Allow controlling credential inclusion
 }
 
 export interface ApiResult<T> {

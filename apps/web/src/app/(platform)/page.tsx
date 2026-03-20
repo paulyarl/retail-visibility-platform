@@ -25,6 +25,7 @@ import { computeStoreStatus } from "@/lib/hours-utils";
 import SubscriptionUsageBadge from "@/components/subscription/SubscriptionUsageBadge";
 import { SubscriptionStatusGuide } from "@/components/subscription/SubscriptionStatusGuide";
 import { Badge as MantineBadge } from '@mantine/core';
+import { trackBehaviorClient } from '@/utils/behaviorTracking';
 
 
 export default function PlatformHomePage() {
@@ -33,6 +34,14 @@ export default function PlatformHomePage() {
   
   useEffect(() => {
     setMounted(true);
+    
+    // Track landing page view
+    trackBehaviorClient({
+      entityType: 'platform',
+      entityId: 'platform_home',
+      entityName: 'Platform Home',
+      pageType: 'platform_home'
+    });
   }, []);
   
   if (!mounted) {
@@ -256,7 +265,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
   const listingsCount = useCountUp(stats.active);
   const syncIssuesCount = useCountUp(stats.syncIssues);
   const locationsCount = useCountUp(stats.locations);
-  console.log(`Selected TenantId: ${selectedTenantId}`);
+  // console.log(`Selected TenantId: ${selectedTenantId}`);
   const { status: hoursStatus } = useStoreStatus(selectedTenantId || undefined, false); // Public scope
   
   return (

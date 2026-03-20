@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Shield, AlertTriangle, Ban, Activity, Users, Bell, Trash2, ExternalLink } from 'lucide-react';
+import { Shield, AlertTriangle, Ban, Activity, Users, Bell, Trash2, ExternalLink, Clock, ShieldCheck, TrendingUp, UserCheck, Zap } from 'lucide-react';
 import { SecurityMetrics } from './SecurityMetrics';
 import { ThreatMonitor } from './ThreatMonitor';
 import { BlockedIPsTable } from './BlockedIPsTable';
@@ -29,6 +29,7 @@ export function SecurityDashboard() {
   const { 
     sessions, 
     alerts, 
+    failedLogins,
     sessionStats, 
     alertStats, 
     loading: adminLoading,
@@ -71,7 +72,7 @@ export function SecurityDashboard() {
   }
 
   const getHealthBadge = (healthStatus: any) => {
-    if (!healthStatus?.status) {
+    if (!healthStatus?.data?.status) {
       return (
         <Badge variant="default">
           Unknown
@@ -87,8 +88,8 @@ export function SecurityDashboard() {
     };
 
     return (
-      <Badge variant={variants[healthStatus.status] || 'default'}>
-        {healthStatus.status.toUpperCase()}
+      <Badge variant={variants[healthStatus.data.status] || 'default'}>
+        {healthStatus.data.status.toUpperCase()}
       </Badge>
     );
   };
@@ -119,12 +120,25 @@ export function SecurityDashboard() {
         <CardContent>
           {healthStatus && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="flex items-center gap-3 p-3 rounded-lg border">
-                  <Activity className="h-5 w-5 text-primary" />
+                  <Clock className="h-5 w-5 text-primary" />
                   <div>
-                    <p className="text-sm text-muted-foreground">Uptime</p>
-                    <p className="font-semibold">{healthStatus.uptime}</p>
+                    <p className="text-sm text-muted-foreground">Last Check</p>
+                    <p className="font-semibold">
+                      {healthStatus?.data?.timestamp ? 
+                        new Date(healthStatus.data.timestamp).toLocaleTimeString() : 
+                        (healthStatus?.data ? 'No timestamp' : 'Loading...')
+                      }
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg border">
+                  <Users className="h-5 w-5 text-blue-500" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Active Users</p>
+                    <p className="font-semibold">{healthStatus.data?.metrics?.activeUsers || 0}</p>
                   </div>
                 </div>
                 
@@ -132,24 +146,58 @@ export function SecurityDashboard() {
                   <AlertTriangle className="h-5 w-5 text-yellow-500" />
                   <div>
                     <p className="text-sm text-muted-foreground">Active Threats</p>
-                    <p className="font-semibold">{threats.filter(t => t.status === 'active').length}</p>
+                    <p className="font-semibold">{healthStatus.data?.metrics?.activeThreats || 0}</p>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-3 p-3 rounded-lg border">
                   <Ban className="h-5 w-5 text-red-500" />
                   <div>
-                    <p className="text-sm text-muted-foreground">Blocked IPs</p>
-                    <p className="font-semibold">{blockedIPs.length}</p>
+                    <p className="text-sm text-muted-foreground">Blocked Requests</p>
+                    <p className="font-semibold">{healthStatus.data?.metrics?.blockedRequests || 0}</p>
                   </div>
                 </div>
               </div>
 
-              {healthStatus?.issues && healthStatus.issues.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="flex items-center gap-3 p-3 rounded-lg border">
+                  <ShieldCheck className="h-5 w-5 text-green-500" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Failed Logins</p>
+                    <p className="font-semibold">{healthStatus.data?.metrics?.failedLoginAttempts || 0}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg border">
+                  <Zap className="h-5 w-5 text-orange-500" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Rate Limit Hits</p>
+                    <p className="font-semibold">{healthStatus.data?.metrics?.rateLimitHits || 0}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg border">
+                  <UserCheck className="h-5 w-5 text-purple-500" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">MFA Adoption</p>
+                    <p className="font-semibold">{healthStatus.data?.metrics?.mfaAdoptionRate || 0}%</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg border">
+                  <TrendingUp className="h-5 w-5 text-cyan-500" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Avg Response</p>
+                    <p className="font-semibold">{healthStatus.data?.metrics?.averageResponseTime || 0}ms</p>
+                  </div>
+                </div>
+              </div>
+
+              {healthStatus.data?.issues && healthStatus.data.issues.length > 0 && (
                 <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-4">
                   <p className="text-sm font-medium text-yellow-600 mb-2">Active Issues:</p>
                   <ul className="text-sm text-muted-foreground space-y-1">
-                    {healthStatus.issues.map((issue, index) => (
+                    {healthStatus.data.issues.map((issue, index) => (
                       <li key={index}>• {issue}</li>
                     ))}
                   </ul>
@@ -202,7 +250,7 @@ export function SecurityDashboard() {
             User Sessions
             {sessionStats && (
               <Badge variant="info" className="ml-1">
-                {sessionStats.activeSessions}
+                {sessionStats.totalActiveSessions}
               </Badge>
             )}
           </TabsTrigger>
@@ -212,6 +260,15 @@ export function SecurityDashboard() {
             {alertStats && alertStats.unreadAlerts > 0 && (
               <Badge variant="error" className="ml-1">
                 {alertStats.unreadAlerts}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="failed-logins" className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Failed Logins
+            {failedLogins && failedLogins.length > 0 && (
+              <Badge variant="warning" className="ml-1">
+                {failedLogins.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -238,28 +295,58 @@ export function SecurityDashboard() {
               <Card>
                 <CardHeader className="pb-2">
                   <CardDescription>Active Sessions</CardDescription>
-                  <CardTitle className="text-2xl">{sessionStats.activeSessions}</CardTitle>
+                  <CardTitle className="text-2xl">{sessionStats.totalActiveSessions}</CardTitle>
                 </CardHeader>
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardDescription>Active Users</CardDescription>
-                  <CardTitle className="text-2xl">{sessionStats.activeUsers}</CardTitle>
+                  <CardDescription>Users Over Limit</CardDescription>
+                  <CardTitle className="text-2xl">{sessionStats.usersOverLimit}</CardTitle>
                 </CardHeader>
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardDescription>Last 24h</CardDescription>
-                  <CardTitle className="text-2xl">{sessionStats.sessionsLast24h}</CardTitle>
+                  <CardDescription>Top Users</CardDescription>
+                  <CardTitle className="text-2xl">{sessionStats.topUsers?.length || 0}</CardTitle>
                 </CardHeader>
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardDescription>Revoked</CardDescription>
-                  <CardTitle className="text-2xl">{sessionStats.revokedSessions}</CardTitle>
+                  <CardDescription>Over Limit Users</CardDescription>
+                  <CardTitle className="text-2xl">{sessionStats.overLimit?.length || 0}</CardTitle>
                 </CardHeader>
               </Card>
             </div>
+          )}
+
+          {/* Top Users Section */}
+          {sessionStats?.topUsers && sessionStats.topUsers.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Users by Session Count</CardTitle>
+                <CardDescription>Users with the most active sessions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {sessionStats.topUsers.map((user, index) => (
+                    <div key={user.email} className="flex items-center justify-between p-3 rounded-lg border">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold text-sm">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <div className="font-medium">{user.email}</div>
+                          <div className="text-sm text-muted-foreground">{user.sessionCount} sessions</div>
+                        </div>
+                      </div>
+                      <Badge variant={user.sessionCount > 5 ? 'warning' : 'default'}>
+                        {user.sessionCount} sessions
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
           
           <Card>
@@ -329,6 +416,52 @@ export function SecurityDashboard() {
             </CardHeader>
             <CardContent>
               <SecurityAlerts />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="failed-logins" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Failed Login Attempts</CardTitle>
+              <CardDescription>Recent failed login attempts across the platform</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {adminLoading ? (
+                <div className="h-32 bg-muted animate-pulse rounded-lg" />
+              ) : !failedLogins || failedLogins.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="font-medium">No failed login attempts</p>
+                  <p className="text-sm">No failed login attempts recorded in the selected time period</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {failedLogins.map((login) => (
+                    <div key={login.id} className="flex items-start gap-3 p-3 rounded-lg border">
+                      <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium">{login.email}</span>
+                          <Badge variant="error" className="text-xs">
+                            {login.reason}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <div>IP: <code className="text-xs bg-muted px-2 py-1 rounded">{login.ipAddress}</code></div>
+                          <div>Time: {new Date(login.createdAt).toLocaleString()}</div>
+                          {login.userAgent && (
+                            <div className="text-xs">Agent: {login.userAgent}</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(login.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

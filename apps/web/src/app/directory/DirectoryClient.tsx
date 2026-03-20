@@ -270,6 +270,14 @@ export default function DirectoryClient() {
     if (savedPageSize && [12, 24, 48, 96].includes(Number(savedPageSize))) {
       setPageSize(Number(savedPageSize));
     }
+    
+    // Track directory page view
+    trackBehaviorClient({
+      entityType: 'category',
+      entityId: 'directory_home',
+      entityName: 'Directory Home',
+      pageType: 'directory_home'
+    });
   }, []);
 
   // Save view mode to localStorage when it changes

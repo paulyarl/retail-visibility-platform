@@ -11,6 +11,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { openStreetMapService } from '@/services/OpenStreetMapService';
 import { externalApiService } from '@/services/ExternalApiService';
 import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
 
@@ -128,17 +129,23 @@ const EVENT_PRIORITY_MAP: Record<string, CachedTrackingEvent['priority']> = {
   'product_purchase': 'critical',
   'user_signup': 'critical',
   'subscription_upgrade': 'critical',
+  'onboarding_complete': 'critical',
   
   // High priority events - send within current batch
   'store_view': 'high',
   'product_view': 'high',
   'category_browse': 'high',
   'search': 'high',
+  'dashboard_view': 'high',
+  'platform_access': 'high',
+  'admin_access': 'high',
   
   // Normal priority - standard batch timing
   'storefront_view': 'normal',
   'directory_detail': 'normal',
   'product_page': 'normal',
+  'onboarding_step': 'normal',
+  'tenant_dashboard_view': 'normal',
   
   // Low priority - can be delayed
   'page_scroll': 'low',
@@ -476,11 +483,11 @@ function getTrackingCache(): BehaviorTrackingCache {
 }
 
 export interface TrackingData {
-  entityType: 'store' | 'product' | 'category' | 'search';
+  entityType: 'store' | 'product' | 'category' | 'search' | 'platform' | 'dashboard' | 'onboarding' | 'admin';
   entityId: string;
   entityName?: string;
   context?: any;
-  pageType: 'directory_detail' | 'product_page' | 'storefront' | 'directory_home' | 'search_results' | 'shop' | 'shop_directory' | 'shop_detail' | 'catalog';
+  pageType: 'directory_detail' | 'product_page' | 'storefront' | 'directory_home' | 'search_results' | 'shop' | 'shop_directory' | 'shop_detail' | 'catalog' | 'platform_home' | 'platform_dashboard' | 'tenant_dashboard' | 'onboarding_flow' | 'admin_panel';
   durationSeconds?: number;
 }
 
@@ -729,48 +736,67 @@ async function getUserLocationClient(): Promise<{
       
       const { latitude, longitude } = position.coords;
       
-      // Reverse geocoding to get city/state using ExternalApiService
-      const geocodingData = await externalApiService.reverseGeocode(latitude, longitude);
-      
-      if (geocodingData && geocodingData.address) {
-        const address = geocodingData.address;
-        const city = address.city || address.town || address.village || 'Unknown';
-        const state = address.state || 'Unknown';
-        return { latitude, longitude, city, state };
+      // Use dedicated OpenStreetMap service with PUBLIC context
+      try {
+        console.log('[BehaviorTracking] Using OpenStreetMap service with PUBLIC context for:', { latitude, longitude });
+        
+        const geocodingData = await openStreetMapService.reverseGeocode(
+          latitude, 
+          longitude, 
+          `behavior-geocode-${latitude}-${longitude}`
+        );
+        
+        if (geocodingData) {
+          const locationData = openStreetMapService.extractLocationData(geocodingData);
+          
+          return {
+            latitude,
+            longitude,
+            city: locationData.city,
+            state: locationData.state
+          };
+        }
+      } catch (proxyError) {
+        console.warn('[BehaviorTracking] OpenStreetMap service failed, using coordinates only:', proxyError);
       }
       
-      // Fallback if geocoding fails
-      return { latitude, longitude, city: 'Unknown', state: 'Unknown' };
-    }
-  } catch (error) {
-    console.warn('Geolocation failed, falling back to IP-based location');
-  }
-  
-  // Fallback to IP-based location
-  try {
-    // Get user context from singleton methods
-    const trackingSingleton = BehaviorTrackingSingleton.getInstance();
-    const userId = trackingSingleton.getUserId();
-    const sessionId = trackingSingleton.getSessionId();
-    const userContext = userId || sessionId || 'anonymous';
-    
-    // Use unique cache key with user context
-    const cacheKey = `ip-geolocation-${userContext}`;
-    
-    const ipLocation = await externalApiService.getIpGeolocation(cacheKey);
-    
-    if (ipLocation && ipLocation.latitude && ipLocation.longitude) {
+      // Fallback to coordinates only if proxy fails
       return {
-        latitude: ipLocation.latitude,
-        longitude: ipLocation.longitude,
-        city: ipLocation.city || 'Unknown',
-        state: ipLocation.region || 'Unknown'
+        latitude,
+        longitude,
+        city: 'Unknown',
+        state: 'Unknown'
       };
+    }
+    
+    // Fallback to IP-based location
+    try {
+      // Get user context from singleton methods
+      const trackingSingleton = BehaviorTrackingSingleton.getInstance();
+      const userId = trackingSingleton.getUserId();
+      const sessionId = trackingSingleton.getSessionId();
+      const userContext = userId || sessionId || 'anonymous';
+      
+      // Use unique cache key with user context
+      const cacheKey = `ip-geolocation-${userContext}`;
+      
+      const ipLocation = await externalApiService.getIpGeolocation(cacheKey);
+      
+      if (ipLocation && ipLocation.latitude && ipLocation.longitude) {
+        return {
+          latitude: ipLocation.latitude,
+          longitude: ipLocation.longitude,
+          city: ipLocation.city || 'Unknown',
+          state: ipLocation.region || 'Unknown'
+        };
+      }
+    } catch (ipError) {
+      console.warn('[BehaviorTracking] Failed to get IP location:', ipError);
     }
     
     return null;
   } catch (error) {
-    console.warn('[BehaviorTracking] Failed to get IP location:', error);
+    console.error('[BehaviorTracking] Failed to get user location:', error);
     return null;
   }
 }

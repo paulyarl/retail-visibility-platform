@@ -1436,7 +1436,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return result;
+      return result.data;
     } catch (error) {
       console.error('[PlatformHomeSingleton] Failed to search admin enrichment products:', error);
       throw error;

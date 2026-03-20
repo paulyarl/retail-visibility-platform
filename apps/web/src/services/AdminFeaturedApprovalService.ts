@@ -75,12 +75,18 @@ export class AdminFeaturedApprovalService extends AdminApiSingleton {
    * Get all tenants with featured access status
    */
   async getAllTenantsWithFeaturedAccessStatus(): Promise<PendingTenant[]> {
+    console.log('[DEBUG] AdminFeaturedApprovalService: Fetching all tenants with featured access status...');
     const result = await this.makeDefaultRequest<{ tenants: PendingTenant[] }>(
       '/api/featured-products/tenants/all-with-featured-access-status',
       {},
       'admin-all-tenants-featured-access'
     );
-    return result.data.tenants || [];
+    
+    const tenants = result.data.tenants || [];
+    console.log('[DEBUG] AdminFeaturedApprovalService: API returned tenants:', tenants.length);
+    console.log('[DEBUG] AdminFeaturedApprovalService: Raw tenant data:', tenants);
+    
+    return tenants;
   }
 
   /**
@@ -114,11 +120,10 @@ export class AdminFeaturedApprovalService extends AdminApiSingleton {
       return null;
     }
     
-    // Invalidate relevant caches
+    // Invalidate the list cache to refresh the approval status
     await this.invalidateCache('admin-all-tenants-featured-access');
-    await this.invalidateCache('admin-approval-pending-products');
     
-    return result.data?.tenant;
+    return result.data.tenant;
   }
 
   /**
@@ -132,7 +137,7 @@ export class AdminFeaturedApprovalService extends AdminApiSingleton {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ rejection_reason: reason }),
       },
       `admin-approval-tenant-${tenantId}`
     );

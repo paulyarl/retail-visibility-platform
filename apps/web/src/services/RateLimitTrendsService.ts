@@ -56,7 +56,7 @@ class RateLimitTrendsService extends AdminApiSingleton {
   async getRateLimitTrends(days: number = 7): Promise<TrendData> {
     try {
       const response = await this.makeDefaultRequest<TrendData>(
-        `/rate-limit-warnings?days=${days}`,
+        `/api/rate-limit-warnings?days=${days}`,
         {},
         `rate-limit-trends-${days}`,
         this.TRENDS_TTL

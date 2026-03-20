@@ -86,18 +86,46 @@ class ExternalApiService extends ExternalApiSingleton {
 
   /**
    * Reverse geocoding to get address from coordinates
-   * Uses OpenStreetMap Nominatim service
+   * Uses OpenStreetMap Nominatim service with PUBLIC context for behavior tracking
    */
-  async reverseGeocode(latitude: number, longitude: number): Promise<ReverseGeocodingResponse | null> {
+  async reverseGeocode(latitude: number, longitude: number, options?: {
+    usePublicContext?: boolean;
+    cacheKey?: string;
+  }): Promise<ReverseGeocodingResponse | null> {
     try {
-      const response = await this.makeExternalRequest<ReverseGeocodingResponse>(
+      // If usePublicContext is true, use makePublicRequest for proper public flow
+      if (options?.usePublicContext) {
+        const result = await this.makeDefaultRequest<ReverseGeocodingResponse>(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+          {
+            method: 'GET',
+            headers: {
+              'User-Agent': 'RVP-Platform/1.0',
+            },
+            signal: AbortSignal.timeout(10000) // 10 seconds timeout
+          },
+          options.cacheKey || `geocode-${latitude}-${longitude}`, // Cache key
+          60 * 60 * 1000, // 1 hour cache
+          {
+            context: AppContext.PUBLIC,
+            isolation: CacheIsolation.PUBLIC
+          }
+        );
+        
+        return result.data || null;
+      }
+      
+      // Original implementation for server-side calls
+      const response = await this.makeDefaultRequest<ReverseGeocodingResponse>(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
         {
           signal: AbortSignal.timeout(10000) // 10 seconds timeout
         },
+        `reverse-geocode-${latitude}-${longitude}`,
+        60 * 60 * 1000, // 1 hour cache
         {
-          cacheKey: `reverse-geocode-${latitude}-${longitude}`,
-          ttl: 60 * 60 * 1000 // 1 hour cache
+          context: AppContext.PUBLIC,
+          isolation: CacheIsolation.PUBLIC
         }
       );
 

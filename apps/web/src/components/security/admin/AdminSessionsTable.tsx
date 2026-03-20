@@ -126,6 +126,7 @@ export function AdminSessionsTable({
                   <div>
                     <div className="font-medium">{getUserDisplay(session)}</div>
                     <div className="text-xs text-muted-foreground">{session.userEmail}</div>
+                    <div className="text-xs text-muted-foreground">ID: {session.userId}</div>
                   </div>
                 </div>
               </TableCell>

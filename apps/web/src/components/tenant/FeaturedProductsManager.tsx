@@ -535,17 +535,20 @@ export default function FeaturedProductsManager({
           {featuredTypes.map((type) => {
             const isPayToPlay = type.id === 'featured' && (type as any).isPayToPlay;
             const isLocked = isPayToPlay && !hasFeaturedAccess;
+            const isPlatformControlled = ['trending', 'recommended'].includes(type.id);
             
             return (
               <button
                 key={type.id}
-                onClick={() => !isLocked && setSelectedType(type.id)}
-                disabled={isLocked}
+                onClick={() => !isLocked && setSelectedType(type.id)} // Allow clicking for viewing
+                disabled={isLocked} // Only locked by premium access
                 className={`p-4 rounded-lg border-2 transition-all ${
                   selectedType === type.id
                     ? 'border-blue-500 bg-blue-50'
                     : isLocked
                     ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                    : isPlatformControlled
+                    ? 'border-gray-200 bg-gray-50 cursor-pointer opacity-75 hover:border-gray-300' // Visual for platform-controlled
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
@@ -557,13 +560,30 @@ export default function FeaturedProductsManager({
                         <Lock className="w-2 h-2 text-white" />
                       </div>
                     )}
+                    {isPlatformControlled && (
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                        <Eye className="w-2 h-2 text-white" />
+                      </div>
+                    )}
                   </div>
                   <div className="text-left flex-1">
-                    <h3 className="font-semibold text-gray-900">{type.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-900">{type.name}</h3>
+                      {isPlatformControlled && (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                          Platform
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500">{type.description}</p>
                     {isLocked && (
                       <p className="text-xs text-amber-600 mt-1">
                         💎 Premium feature - Contact platform admin
+                      </p>
+                    )}
+                    {isPlatformControlled && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        🤖 Algorithmically managed - View only
                       </p>
                     )}
                   </div>
@@ -596,6 +616,19 @@ export default function FeaturedProductsManager({
               {activeFeatured.length} / {currentType?.maxProducts} products
             </span>
           </div>
+          
+          {/* Read-only banner for platform-controlled types */}
+          {['trending', 'recommended'].includes(selectedType) && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Eye className="w-4 h-4 text-blue-600" />
+                <span className="text-sm text-blue-700">
+                  <strong>Platform Managed:</strong> This featured type is algorithmically controlled by the platform. 
+                  Products shown here are what your customers see on public pages.
+                </span>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {activeFeatured.map((product, index) => (
               <div key={`${product.inventory_item_id || product.id || 'unknown'}-${product.featured_type || selectedType}-${index}`} className={`border rounded-lg p-4 relative ${product.is_active === false ? 'border-orange-200 bg-orange-50 opacity-75' : 'border-gray-200'}`}>
@@ -651,106 +684,116 @@ export default function FeaturedProductsManager({
                   </div>
                 </div>
                 <div className="flex gap-2 mt-3">
-                  <button
-                    onClick={() => {
-                      // console.log('=== PAUSE BUTTON CLICKED ===');
-                      // console.log('Product object:', product);
-                      // console.log('Product keys:', Object.keys(product));
-                      // console.log('product.id:', product.id);
-                      // console.log('product.inventory_item_id:', product.inventory_item_id);
-                      // console.log('product.is_active:', product.is_active);
-                      // console.log('=== END DEBUG ===');
-                      
-                      // Featured products MUST use inventory_item_id (the junction table key)
-                      if (!product.inventory_item_id) {
-                        // console.error('Missing inventory_item_id for featured product:', product);
-                        return;
-                      }
-                      handleError(() => toggleProductActive(product.inventory_item_id, product.is_active === false), 'Failed to toggle product status');
-                    }}
-                    disabled={togglingActive || !product.inventory_item_id}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      (product.is_active !== false && product.is_active !== undefined) ? 'bg-green-600' : 'bg-orange-500'
-                    } ${togglingActive ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                    title={(product.is_active !== false && product.is_active !== undefined) ? 'Pause featuring' : 'Resume featuring'}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        (product.is_active !== false && product.is_active !== undefined) ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                    <span className="absolute left-1 top-1/2 -translate-y-1/2">
-                      {(product.is_active !== false && product.is_active !== undefined) ? (
-                        <Play className="w-2 h-2 text-white" />
-                      ) : (
-                        <Pause className="w-2 h-2 text-white" />
-                      )}
-                    </span>
-                  </button>
-                  
-                  {/* Expiration Setting */}
-                  {editingExpiration === (product.inventory_item_id || product.id) ? (
-                    <div className="flex gap-1 items-center">
-                      <input
-                        type="date"
-                        value={expirationDate}
-                        onChange={(e) => setExpirationDate(e.target.value)}
-                        className="px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <button
-                        onClick={() => {
-                          const productId = product.inventory_item_id || product.id;
-                          if (productId) handleSetExpiration(productId);
-                        }}
-                        disabled={processing}
-                        className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50"
-                      >
-                        ✓
-                      </button>
-                      <button
-                        onClick={handleCancelEditExpiration}
-                        className="px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
-                      >
-                        ✕
-                      </button>
+                  {/* Disable controls for platform-controlled types */}
+                  {['trending', 'recommended'].includes(selectedType) ? (
+                    <div className="flex-1 px-3 py-2 bg-gray-100 text-gray-500 text-sm rounded-lg text-center">
+                      <Eye className="w-4 h-4 inline mr-1" />
+                      Platform Managed
                     </div>
                   ) : (
-                    <Tooltip content="Set expiration date">
+                    <>
                       <button
-                        onClick={() => handleStartEditExpiration(product)}
-                        disabled={processing}
-                        className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        onClick={() => {
+                          // console.log('=== PAUSE BUTTON CLICKED ===');
+                          // console.log('Product object:', product);
+                          // console.log('Product keys:', Object.keys(product));
+                          // console.log('product.id:', product.id);
+                          // console.log('product.inventory_item_id:', product.inventory_item_id);
+                          // console.log('product.is_active:', product.is_active);
+                          // console.log('=== END DEBUG ===');
+                          
+                          // Featured products MUST use inventory_item_id (the junction table key)
+                          if (!product.inventory_item_id) {
+                            // console.error('Missing inventory_item_id for featured product:', product);
+                            return;
+                          }
+                          handleError(() => toggleProductActive(product.inventory_item_id, product.is_active === false), 'Failed to toggle product status');
+                        }}
+                        disabled={togglingActive || !product.inventory_item_id}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          (product.is_active !== false && product.is_active !== undefined) ? 'bg-green-600' : 'bg-orange-500'
+                        } ${togglingActive ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        title={(product.is_active !== false && product.is_active !== undefined) ? 'Pause featuring' : 'Resume featuring'}
                       >
-                        <Calendar className="w-3 h-3" />
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            (product.is_active !== false && product.is_active !== undefined) ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="absolute left-1 top-1/2 -translate-y-1/2">
+                          {(product.is_active !== false && product.is_active !== undefined) ? (
+                            <Play className="w-2 h-2 text-white" />
+                          ) : (
+                            <Pause className="w-2 h-2 text-white" />
+                          )}
+                        </span>
                       </button>
-                    </Tooltip>
+                      
+                      {/* Expiration Setting */}
+                      {editingExpiration === (product.inventory_item_id || product.id) ? (
+                        <div className="flex gap-1 items-center">
+                          <input
+                            type="date"
+                            value={expirationDate}
+                            onChange={(e) => setExpirationDate(e.target.value)}
+                            className="px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                          <button
+                            onClick={() => {
+                              const productId = product.inventory_item_id || product.id;
+                              if (productId) handleSetExpiration(productId);
+                            }}
+                            disabled={processing}
+                            className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50"
+                          >
+                            ✓
+                          </button>
+                          <button
+                            onClick={handleCancelEditExpiration}
+                            className="px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <Tooltip content="Set expiration date">
+                          <button
+                            onClick={() => handleStartEditExpiration(product)}
+                            disabled={processing}
+                            className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                          >
+                            <Calendar className="w-3 h-3" />
+                          </button>
+                        </Tooltip>
+                      )}
+                      
+                      {/* Product-level bulk operations */}
+                      <Tooltip content="Pause across all types">
+                        <button
+                          onClick={() => handleProductPauseAllTypes(product)}
+                          disabled={togglingActive}
+                          className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded hover:bg-orange-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        >
+                          <PowerOff className="w-3 h-3" />
+                        </button>
+                      </Tooltip>
+                      
+                      <button
+                        onClick={() => {
+                          // Featured products MUST use inventory_item_id
+                          if (!product.inventory_item_id) {
+                            // console.error('Missing inventory_item_id for featured product:', product);
+                            return;
+                          }
+                          handleError(() => unfeatureProduct(product.inventory_item_id), 'Failed to remove from featured');
+                        }}
+                        disabled={processing || !product.inventory_item_id}
+                        className="flex-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
+                      >
+                        Remove from Featured
+                      </button>
+                    </>
                   )}
-                  
-                  {/* Product-level bulk operations */}
-                  <Tooltip content="Pause across all types">
-                    <button
-                      onClick={() => handleProductPauseAllTypes(product)}
-                      disabled={togglingActive}
-                      className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded hover:bg-orange-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                    >
-                      <PowerOff className="w-3 h-3" />
-                    </button>
-                  </Tooltip>
-                  
-                  <button
-                    onClick={() => {
-                      // Featured products MUST use inventory_item_id
-                      if (!product.inventory_item_id) {
-                        // console.error('Missing inventory_item_id for featured product:', product);
-                        return;
-                      }
-                      handleError(() => unfeatureProduct(product.inventory_item_id), 'Failed to remove from featured');
-                    }}
-                    disabled={processing || !product.inventory_item_id}
-                    className="flex-1 px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
-                  >
-                    Remove from Featured
-                  </button>
                 </div>
               </div>
             ))}
@@ -1028,12 +1071,20 @@ export default function FeaturedProductsManager({
                       </button>
                     </Tooltip>
                     
+                    {/* Disable feature button for platform-controlled types */}
+                  {['trending', 'recommended'].includes(selectedType) ? (
+                    <div className="px-4 py-2 bg-gray-100 text-gray-500 text-sm rounded-lg">
+                      <Eye className="w-4 h-4 inline mr-1" />
+                      Platform Managed
+                    </div>
+                  ) : (
                     <button
                       onClick={() => {
-                        // console.log('=== BUTTON CLICK DEBUG ===');
-                        // console.log('Feature button clicked - product object:', product);
-                        // console.log('Product keys:', Object.keys(product));
-                        // console.log('Product ID:', product.id);
+                        // console.log('=== FEATURE BUTTON CLICK DEBUG ===');
+                        // console.log('Selected type:', selectedType);
+                        // console.log('Current type at limit:', isCurrentTypeAtLimit);
+                        // console.log('Has featured access:', hasFeaturedAccess);
+                        // console.log('Product:', product);
                         // console.log('=== END BUTTON CLICK DEBUG ===');
                         
                         if (!product.id) {
@@ -1061,6 +1112,7 @@ export default function FeaturedProductsManager({
                     >
                       {isCurrentTypeAtLimit ? 'Limit Reached' : !hasFeaturedAccess ? 'Subscription Required' : `Add to ${currentType?.name}`}
                     </button>
+                  )}
                   </div>
                 </div>
               ))}

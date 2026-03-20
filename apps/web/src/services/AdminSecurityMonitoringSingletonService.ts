@@ -52,16 +52,18 @@ interface AdminAlert {
 }
 
 interface SessionStats {
-  totalSessions: number;
-  activeSessions: number;
-  uniqueUsers: number;
-  averageSessionDuration: number;
-  sessionsByDevice: Record<string, number>;
-  sessionsByLocation: Record<string, number>;
-  activeUsers: number;
-  sessionsLast24h: number;
-  revokedSessions: number;
-  deviceBreakdown: Array<{ type: string; count: number }>;
+  totalActiveSessions: number;
+  usersOverLimit: number;
+  topUsers: Array<{
+    email: string;
+    sessionCount: number;
+  }>;
+  overLimit: Array<{
+    email: string;
+    role: string;
+    activeSessions: number;
+    sessionLimit: number;
+  }>;
 }
 
 interface AlertStats {
@@ -121,9 +123,8 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
     });
 
     const result = await this.makeDefaultRequest<{
-      sessions: AdminSession[];
+      data: AdminSession[];
       total: number;
-      hasMore: boolean;
     }>(
       `/api/admin/security/sessions?${params}`,
       {},
@@ -135,7 +136,21 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
       return null;
     }
 
-    return result.data || null;
+    const response = result.data;
+    if (!response) {
+      return null;
+    }
+
+    return {
+      sessions: response.data.map(session => ({
+        ...session,
+        deviceInfo: typeof session.deviceInfo === 'string' 
+          ? JSON.parse(session.deviceInfo) 
+          : session.deviceInfo || {}
+      })),
+      total: response.total,
+      hasMore: (offset + response.data.length) < response.total
+    };
   }
 
   /**
@@ -198,7 +213,10 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
    * Get failed login attempts
    */
   async getFailedLogins(limit: number = 20): Promise<FailedLogin[] | null> {
-    const result = await this.makeDefaultRequest<FailedLogin[]>(
+    const result = await this.makeDefaultRequest<{
+      data: FailedLogin[];
+      pagination: any;
+    }>(
       `/api/admin/security/failed-logins?limit=${limit}`,
       {},
       `admin-security-failed-logins-${limit}`
@@ -209,7 +227,12 @@ class AdminSecurityMonitoringSingletonService extends AdminApiSingleton {
       return null;
     }
 
-    return result.data || null;
+    const response = result.data;
+    if (!response) {
+      return null;
+    }
+
+    return response.data || null;
   }
 
   /**

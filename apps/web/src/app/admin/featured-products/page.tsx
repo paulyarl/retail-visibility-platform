@@ -200,7 +200,21 @@ export default function FeaturedProductsManagement() {
 
   const fetchPendingTenants = async () => {
     try {
+      console.log('[DEBUG] Fetching tenants with featured access status...');
       const allTenants = await AdminFeaturedApprovalService.getAllTenantsWithFeaturedAccessStatus();
+      console.log('[DEBUG] Raw API response:', allTenants);
+      
+      // Log each tenant's approval status
+      allTenants.forEach((tenant, index) => {
+        console.log(`[DEBUG] Tenant ${index + 1}: ${tenant.name}`, {
+          id: tenant.id,
+          featured_access_approved: tenant.featured_access_approved,
+          featured_access_approved_by: tenant.featured_access_approved_by,
+          featured_access_approved_at: tenant.featured_access_approved_at,
+          featured_access_rejection_reason: tenant.featured_access_rejection_reason
+        });
+      });
+      
       setPendingTenants(allTenants);
       setPendingTotal(allTenants.length);
     } catch (error) {
@@ -268,19 +282,32 @@ export default function FeaturedProductsManagement() {
   };
 
   const getFeaturedAccessStatus = (tenant: PendingTenant) => {
+    // DEBUG: Log the tenant data to understand what's happening
+    console.log(`[DEBUG] Tenant: ${tenant.name} (${tenant.id})`, {
+      featured_access_approved: tenant.featured_access_approved,
+      featured_access_approved_by: tenant.featured_access_approved_by,
+      featured_access_approved_at: tenant.featured_access_approved_at,
+      featured_access_rejection_reason: tenant.featured_access_rejection_reason,
+      subscription_tier: tenant.subscription_tier,
+      subscription_status: tenant.subscription_status
+    });
+    
     if (tenant.featured_access_approved === true) {
+      console.log(`[DEBUG] ${tenant.name} - APPROVED ✓`);
       return {
         status: 'Approved',
         style: 'bg-green-100 text-green-700',
         icon: '✓'
       };
     } else if (tenant.featured_access_approved === false && tenant.featured_access_rejection_reason) {
+      console.log(`[DEBUG] ${tenant.name} - REJECTED ✗`);
       return {
         status: 'Rejected',
         style: 'bg-red-100 text-red-700',
         icon: '✗'
       };
     } else {
+      console.log(`[DEBUG] ${tenant.name} - PENDING ⏳ (featured_access_approved: ${tenant.featured_access_approved})`);
       // Either null or false without rejection reason = Pending Approval
       return {
         status: 'Pending Approval',
@@ -447,13 +474,12 @@ export default function FeaturedProductsManagement() {
       const updatedTenant = await AdminFeaturedApprovalService.approveTenant(tenantId);
       
       if (updatedTenant) {
-        // Update the tenant in the pending tenants list
-        setPendingTenants(prev => prev.map(tenant => 
-          tenant.id === tenantId ? { ...tenant, ...updatedTenant } : tenant
-        ));
-
-        // Show success notification
-        toast(`✅ ${updatedTenant.name} has been approved for featured access!`, { variant: 'success' });
+        // Refresh the tenants list to get updated approval status
+        await fetchPendingTenants();
+        
+        toast(`✅ ${tenant.name} has been approved for featured access!`, { variant: 'success' });
+      } else {
+        toast('Failed to approve tenant', { variant: 'error' });
       }
     } catch (error) {
       console.error('Error approving tenant:', error);
@@ -475,10 +501,8 @@ export default function FeaturedProductsManagement() {
       const updatedTenant = await AdminFeaturedApprovalService.rejectTenant(tenantId, reason);
       
       if (updatedTenant) {
-        // Update the tenant in the pending tenants list
-        setPendingTenants(prev => prev.map(tenant => 
-          tenant.id === tenantId ? { ...tenant, ...updatedTenant } : tenant
-        ));
+        // Refresh the tenants list to get updated approval status
+        await fetchPendingTenants();
 
         // Show success notification
         toast(`❌ ${updatedTenant.name} has been rejected${reason ? ` (${reason})` : ''}!`, { variant: 'error' });
@@ -1189,11 +1213,11 @@ export default function FeaturedProductsManagement() {
       )}
 
       {activeTab === 'store-featured' && (
-        <AdminTenantFeaturedManagement selectedTenant={selectedTenant} setSelectedTenant={setSelectedTenant} />
+        <AdminTenantFeaturedManagement selectedTenant={selectedTenant} setSelectedTenant={setSelectedTenant} pendingTenants={pendingTenants} />
       )}
 
       {activeTab === 'directory-featured' && (
-        <AdminDirectoryFeaturedManagement />
+        <AdminDirectoryFeaturedManagement pendingTenants={pendingTenants} />
       )}
 
       {activeTab === 'featured-approval' && (

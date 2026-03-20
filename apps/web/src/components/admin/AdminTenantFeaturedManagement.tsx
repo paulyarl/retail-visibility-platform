@@ -9,6 +9,7 @@ import { platformHomeService } from '@/services/PlatformHomeSingletonService';
 interface AdminTenantFeaturedManagementProps {
   selectedTenant: string;
   setSelectedTenant: (tenantId: string) => void;
+  pendingTenants?: Array<{id: string, name: string, featured_access_approved?: boolean, subscription_status?: string, subscription_tier?: string, city?: string, state?: string}>;
 }
 
 interface Tenant {
@@ -52,13 +53,24 @@ function SimpleTierBadge({ tier }: { tier: string }) {
   );
 }
 
-export default function AdminTenantFeaturedManagement({ selectedTenant, setSelectedTenant }: AdminTenantFeaturedManagementProps) {
+export default function AdminTenantFeaturedManagement({ selectedTenant, setSelectedTenant, pendingTenants = [] }: AdminTenantFeaturedManagementProps) {
+  console.log('[DEBUG] AdminTenantFeaturedManagement rendered:', {
+    selectedTenant,
+    pendingTenantsCount: pendingTenants.length,
+    pendingTenants: pendingTenants.map(t => ({ id: t.id, name: t.name, featured_access_approved: t.featured_access_approved }))
+  });
+  
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showTenantDropdown, setShowTenantDropdown] = useState(false);
-  const [featuredAccess, setFeaturedAccess] = useState<Record<string, boolean>>({});
   const [updatingAccess, setUpdatingAccess] = useState<string | null>(null);
+
+  // Get featured access status from the actual tenant approval data
+  const getTenantFeaturedAccess = (tenantId: string): boolean => {
+    const tenant = pendingTenants.find(t => t.id === tenantId);
+    return tenant?.featured_access_approved === true && tenant?.subscription_status === 'active';
+  };
 
   useEffect(() => {
     fetchTenants();
@@ -71,37 +83,12 @@ export default function AdminTenantFeaturedManagement({ selectedTenant, setSelec
       // console.log('[AdminTenantFeaturedManagement] Fetched tenants:', response);
       if (response) {
         setTenants(response);
-        // Initialize featured access state (mock data for now)
-        const accessState: Record<string, boolean> = {};
-        response.forEach(tenant => {
-          accessState[tenant.id] = false; // Default to no access
-        });
-        setFeaturedAccess(accessState);
       }
     } catch (error) {
       console.error('Error fetching tenants:', error);
+      setTenants([]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const toggleFeaturedAccess = async (tenantId: string) => {
-    try {
-      setUpdatingAccess(tenantId);
-      
-      // Mock API call - replace with actual implementation
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setFeaturedAccess(prev => ({
-        ...prev,
-        [tenantId]: !prev[tenantId]
-      }));
-      
-      console.log(`[AdminTenantFeaturedManagement] Toggled featured access for tenant ${tenantId}`);
-    } catch (error) {
-      console.error('Error updating featured access:', error);
-    } finally {
-      setUpdatingAccess(null);
     }
   };
 
@@ -199,43 +186,20 @@ export default function AdminTenantFeaturedManagement({ selectedTenant, setSelec
                   <div className="mt-4 pt-3 border-t border-gray-100">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        {featuredAccess[tenant.id] ? (
+                        {getTenantFeaturedAccess(tenant.id) ? (
                           <div className="flex items-center gap-1 text-xs text-green-600">
                             <Key className="w-3 h-3" />
                             <span>Featured Access</span>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1 text-xs text-gray-400">
+                          <div className="flex items-center gap-1 text-xs text-gray-500">
                             <Shield className="w-3 h-3" />
-                            <span>No Access</span>
+                            <span>No Featured Access</span>
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFeaturedAccess(tenant.id);
-                          }}
-                          disabled={updatingAccess === tenant.id}
-                          className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                            featuredAccess[tenant.id]
-                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          } ${updatingAccess === tenant.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          {updatingAccess === tenant.id ? (
-                            <div className="flex items-center gap-1">
-                              <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"></div>
-                              <span>Updating...</span>
-                            </div>
-                          ) : featuredAccess[tenant.id] ? (
-                            'Revoke Access'
-                          ) : (
-                            'Grant Access'
-                          )}
-                        </button>
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      <div className="text-xs text-gray-500">
+                        Status: {getTenantFeaturedAccess(tenant.id) ? 'Approved' : 'Not Approved'}
                       </div>
                     </div>
                   </div>
@@ -312,7 +276,7 @@ export default function AdminTenantFeaturedManagement({ selectedTenant, setSelec
         <FeaturedProductsManager 
           tenantId={selectedTenant}
           context="storefront"
-          hasFeaturedAccess={featuredAccess[selectedTenant] && tenants.find(t => t.id === selectedTenant)?.subscription_status === 'active'}
+          hasFeaturedAccess={getTenantFeaturedAccess(selectedTenant)}
         />
       </div>
     </div>

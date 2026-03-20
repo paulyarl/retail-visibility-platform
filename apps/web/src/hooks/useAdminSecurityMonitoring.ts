@@ -53,11 +53,18 @@ interface AdminAlert {
 }
 
 interface SessionStats {
-  activeSessions: number;
-  activeUsers: number;
-  sessionsLast24h: number;
-  revokedSessions: number;
-  deviceBreakdown: Array<{ type: string; count: number }>;
+  totalActiveSessions: number;
+  usersOverLimit: number;
+  topUsers: Array<{
+    email: string;
+    sessionCount: number;
+  }>;
+  overLimit: Array<{
+    email: string;
+    role: string;
+    activeSessions: number;
+    sessionLimit: number;
+  }>;
 }
 
 interface AlertStats {
@@ -105,6 +112,9 @@ export function useAdminSecurityMonitoring() {
         setTotalSessions(0);
         return;
       }
+      // console.log(`Fetched ${response.sessions.length} sessions`);
+      console.log(`Total sessions: ${response.total}`);
+      console.log(`Response:`, response);
       
       setSessions(response.sessions);
       setTotalSessions(response.total);
