@@ -74,13 +74,26 @@ export default function StoreIdentityStep({
       try {
         onboardingProfileSchema.parse(sanitized);
         onValidationChange(true);
-        console.log('[StoreIdentityStep] Pre-populated data is valid');
       } catch (error) {
         // Pre-populated data is incomplete - this is expected for new tenants
-        // User will be prompted to fill in missing fields
+        // Show errors for all incomplete fields
         if (error instanceof z.ZodError) {
-          const missingFields = error.issues.map(i => i.path.join('.')).join(', ');
-          console.log('[StoreIdentityStep] Pre-populated data incomplete. Missing fields:', missingFields);
+          const fieldErrors: Record<string, string> = {};
+          error.issues.forEach(issue => {
+            const fieldName = issue.path.join('.');
+            if (!fieldErrors[fieldName]) {
+              fieldErrors[fieldName] = issue.message;
+            }
+          });
+          setErrors(fieldErrors);
+          // Mark all fields with errors as touched so errors are visible
+          setTouched(prev => {
+            const newTouched = { ...prev };
+            Object.keys(fieldErrors).forEach(key => {
+              newTouched[key] = true;
+            });
+            return newTouched;
+          });
         }
         onValidationChange(false);
       }
@@ -127,12 +140,27 @@ export default function StoreIdentityStep({
     // Check overall validity using onboardingProfileSchema
     try {
       onboardingProfileSchema.parse(newData);
+      setErrors({}); // Clear all errors on valid form
       onValidationChange(true);
-      console.log('[StoreIdentityStep] Form is valid:', newData);
     } catch (error) {
-      console.log('[StoreIdentityStep] Form validation failed:', error);
       if (error instanceof z.ZodError) {
-        console.log('[StoreIdentityStep] Validation errors:', error.issues);
+        // Extract all field errors and display them
+        const fieldErrors: Record<string, string> = {};
+        error.issues.forEach(issue => {
+          const fieldName = issue.path.join('.');
+          if (!fieldErrors[fieldName]) {
+            fieldErrors[fieldName] = issue.message;
+          }
+        });
+        setErrors(fieldErrors);
+        // Mark all fields with errors as touched so errors are visible
+        setTouched(prev => {
+          const newTouched = { ...prev };
+          Object.keys(fieldErrors).forEach(key => {
+            newTouched[key] = true;
+          });
+          return newTouched;
+        });
       }
       onValidationChange(false);
     }

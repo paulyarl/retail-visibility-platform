@@ -143,6 +143,14 @@ export class OnboardingStorageService {
    */
   async load(tenantId: string): Promise<OnboardingProgress | null> {
     if (typeof window === 'undefined') return null;
+    
+    // If coming from phase 1 (fromPhase1=true in URL), don't load saved progress
+    // This allows phase 1 data to be used instead
+    const isFromPhase1 = window.location.search.includes('fromPhase1=true');
+
+    if (isFromPhase1) {
+      return null;
+    }
 
     try {
       const saved = localStorage.getItem(this.getKey(tenantId));
@@ -152,7 +160,6 @@ export class OnboardingStorageService {
       const encryptionKey = await this.getEncryptionKey(tenantId);
       const decryptedJson = await this.decryptData(saved, encryptionKey);
       const data = JSON.parse(decryptedJson);
-      console.log('[OnboardingStorageService] Decrypted data:', data);
       return {
         currentStep: data.currentStep || 1,
         businessData: data.businessData || {},

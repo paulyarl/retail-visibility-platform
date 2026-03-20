@@ -6,6 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button, AnimatedCard, Alert } from '@/components/ui';
 import ProgressSteps, { Step } from './ProgressSteps';
 import StoreIdentityStep from './StoreIdentityStep';
+import BusinessHoursStep from './BusinessHoursStep';
+import BrandingSocialStep from './BrandingSocialStep';
+import AdditionalSettingsStep from './AdditionalSettingsStep';
 import { BusinessProfile } from '@/lib/validation/businessProfile';
 import { isFeatureEnabled } from '@/lib/featureFlags';
 import { ContextBadges } from '@/components/ContextBadges';
@@ -13,37 +16,35 @@ import { useOnboardingData } from '@/hooks/useOnboardingData';
 import { useOnboardingSteps } from '@/hooks/useOnboardingSteps';
 import { useOnboardingSave } from '@/hooks/useOnboardingSave';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import { onboardingStateService } from '@/services/OnboardingStateService';
 
 interface OnboardingWizardProps {
   tenantId: string;
   initialStep?: number;
   onComplete?: (profile: Partial<BusinessProfile>) => void;
+  skipAccountStep?: boolean; // When coming from phase 1
 }
 
-const steps: Step[] = [
-  {
-    id: 'account',
-    title: 'Account',
-    description: 'Create your account',
-  },
-  {
-    id: 'store',
-    title: 'Store Identity',
-    description: 'Business information',
-  },
-  {
-    id: 'complete',
-    title: 'Complete',
-    description: 'All set!',
-  },
+// Full steps (includes account step for standalone use)
+const fullSteps: Step[] = [
+  { id: 'account', title: 'Account', description: 'Create your account' },
+  { id: 'store', title: 'Store Identity', description: 'Business information' },
+  { id: 'hours', title: 'Business Hours', description: 'Operating hours' },
+  { id: 'branding', title: 'Branding & Social', description: 'Logo and social links' },
+  { id: 'settings', title: 'Additional Settings', description: 'SEO and map settings' },
+  { id: 'complete', title: 'Complete', description: 'All set!' },
 ];
+
+// Phase 2 steps (skips account step)
+const phase2Steps: Step[] = fullSteps.slice(1);
 
 
 
 export default function OnboardingWizard({ 
   tenantId,
   initialStep = 1,
-  onComplete 
+  onComplete,
+  skipAccountStep: propSkipAccountStep,
 }: OnboardingWizardProps) {
   const router = useRouter();
   const search = useSearchParams();
@@ -51,6 +52,17 @@ export default function OnboardingWizard({
   // Parse URL params
   const forceParam = search?.get('force');
   const forced = forceParam === '1' || forceParam === 'true';
+  const fromPhase1 = search?.get('fromPhase1') === 'true';
+  
+  // Determine if we should skip account step
+  const isComingFromPhase1 = fromPhase1 || onboardingStateService.isComingFromPhase1();
+  const skipAccountStep = propSkipAccountStep || isComingFromPhase1;
+  
+  // Use appropriate steps array
+  const steps = skipAccountStep ? phase2Steps : fullSteps;
+  
+  // Adjust initial step (if skipping account, start at 0 which maps to 'store')
+  const effectiveInitialStep = skipAccountStep ? Math.max(0, initialStep - 1) : initialStep;
   
   // Load onboarding data
   const { 
@@ -62,7 +74,8 @@ export default function OnboardingWizard({
   } = useOnboardingData({ 
     tenantId, 
     forced, 
-    initialStep 
+    initialStep: effectiveInitialStep,
+    phase1Data: skipAccountStep ? (onboardingStateService.getPhase1DataForPhase2() as Partial<BusinessProfile>) : undefined,
   });
   
   // Manage step navigation
@@ -86,11 +99,16 @@ export default function OnboardingWizard({
     savedProfile
   } = useOnboardingSave({ 
     tenantId,
-    onSuccess: () => setStep(2),
+    onSuccess: () => {}, // Don't auto-advance, let user navigate
   });
   
-  // Validation state
-  const [isValid, setIsValid] = useState(false);
+  // Validation state - default to true so optional steps can proceed
+  const [isValid, setIsValid] = useState(true);
+  
+  // Reset validation when step changes (optional steps default to valid)
+  useEffect(() => {
+    setIsValid(true);
+  }, [currentStep]);
   
   // Feature flags
   const [ffCategory, setFfCategory] = useState(false);
@@ -126,9 +144,11 @@ export default function OnboardingWizard({
   
   // Handlers
   const handleNext = async () => {
-    if (currentStep === 1) {
+    if (currentStep >= 1 && currentStep <= 4) {
+      // Save data at each step, then advance
       await save(businessData);
-    } else if (currentStep === 2) {
+      goNext();
+    } else if (currentStep === 5) {
       handleComplete();
     }
   };
@@ -233,6 +253,57 @@ export default function OnboardingWizard({
             )}
 
             {currentStep === 2 && (
+              <motion.div
+                key="business-hours"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <BusinessHoursStep
+                  tenantId={tenantId}
+                  initialData={businessData}
+                  onDataChange={setBusinessData}
+                  onValidationChange={setIsValid}
+                />
+              </motion.div>
+            )}
+
+            {currentStep === 3 && (
+              <motion.div
+                key="branding-social"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <BrandingSocialStep
+                  tenantId={tenantId}
+                  initialData={businessData}
+                  onDataChange={setBusinessData}
+                  onValidationChange={setIsValid}
+                />
+              </motion.div>
+            )}
+
+            {currentStep === 4 && (
+              <motion.div
+                key="additional-settings"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <AdditionalSettingsStep
+                  tenantId={tenantId}
+                  initialData={businessData}
+                  onDataChange={setBusinessData}
+                  onValidationChange={setIsValid}
+                />
+              </motion.div>
+            )}
+
+            {currentStep === 5 && (
               <motion.div
                 key="complete"
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -358,7 +429,7 @@ export default function OnboardingWizard({
           {/* Navigation Buttons */}
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-neutral-200">
             <div>
-              {currentStep === 1 && (
+              {currentStep >= 1 && currentStep < 5 && (
                 <Button variant="ghost" onClick={handleSkip}>
                   Skip for now
                 </Button>
@@ -366,7 +437,7 @@ export default function OnboardingWizard({
             </div>
             
             <div className="flex items-center gap-3">
-              {currentStep > 0 && currentStep < 2 && (
+              {currentStep > 1 && currentStep <= 5 && (
                 <Button variant="secondary" onClick={goBack} disabled={saving}>
                   <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -375,20 +446,20 @@ export default function OnboardingWizard({
                 </Button>
               )}
               
-              {currentStep === 1 && (
+              {currentStep >= 1 && currentStep < 5 && (
                 <Button 
                   onClick={handleNext} 
                   disabled={!isValid || saving}
                   loading={saving}
                 >
-                  {saving ? 'Saving...' : 'Continue'}
+                  {saving ? 'Saving...' : currentStep === 4 ? 'Complete Setup' : 'Continue'}
                   <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </Button>
               )}
-              
-              {currentStep === 2 && (
+
+              {currentStep === 5 && (
                 <Button onClick={handleNext}>
                   Go to Dashboard
                   <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -399,7 +470,7 @@ export default function OnboardingWizard({
             </div>
           </div>
           
-          {currentStep === 2 && (
+          {currentStep === 5 && (
             <div className="mt-8">
               {/* Primary Actions */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">

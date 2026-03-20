@@ -408,7 +408,7 @@ class TenantManagementService extends TenantApiSingleton {
       },
       `tenant-business-hours-${tenantId}`
     );
-    
+    await this.invalidateCacheWithContext(`tenant-business-hours-${tenantId}`);
     // Invalidate related caches (base cache handles store status automatically)
     await this.invalidateCache(`tenant-profile-${tenantId}`);
     await this.invalidateCache(`tenant-special-hours-${tenantId}`);

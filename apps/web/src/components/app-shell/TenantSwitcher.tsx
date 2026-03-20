@@ -40,7 +40,7 @@ const getStatusBadge = (status?: string) => {
 export default function TenantSwitcher() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [current, setCurrent] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user,isAuthenticated,currentTenantId,switchTenant } = useAuth();
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
   useEffect(() => {
@@ -48,8 +48,13 @@ export default function TenantSwitcher() {
       // Skip if unauthenticated
       if (typeof window === 'undefined') return;
       
-      const token = localStorage.getItem('access_token');
-      if (!token) return;
+      // Skip if on onboarding pages to avoid redirect loops
+      if (window.location.pathname === '/onboarding' || window.location.pathname.includes('/onboarding')) {
+        return;
+      }
+      
+      // const token = localStorage.getItem('access_token');
+      if (!isAuthenticated) return;
       try {
         const data = await platformHomeService.getTenants();
         if (!data) return;
@@ -60,9 +65,10 @@ export default function TenantSwitcher() {
         // Determine current from localStorage or first tenant
         const stored = typeof window !== "undefined" ? localStorage.getItem("tenantId") : null;
         const selected = filtered.find((t) => t.id === stored)?.id || filtered[0]?.id || null;
-        if (selected) {
+        if (selected && selected !== currentTenantId) {
           setCurrent(selected);
           if (stored !== selected) localStorage.setItem("tenantId", selected);
+          if (stored !== selected) switchTenant(selected);
         }
       } catch (e) {
         // ignore for header
@@ -134,8 +140,8 @@ export default function TenantSwitcher() {
                 // Skip if unauthenticated
                 if (typeof window === 'undefined') return;
                 
-                const token = localStorage.getItem('access_token');
-                if (!token) return;
+               // const token = localStorage.getItem('access_token');
+                if (!isAuthenticated) return;
                 try {
                   const data = await platformHomeService.getTenants();
                   if (!data) return;

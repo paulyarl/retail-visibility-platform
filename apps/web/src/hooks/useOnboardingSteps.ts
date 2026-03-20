@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BusinessProfile } from '@/lib/validation/businessProfile';
 import { onboardingStorageService } from '@/services/onboardingStorageService';
 
@@ -27,8 +27,9 @@ export function useOnboardingSteps({
   forced = false,
 }: UseOnboardingStepsOptions): UseOnboardingStepsReturn {
   const [currentStep, setCurrentStep] = useState(initialStep);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Save progress to localStorage when step or data changes
+  // Save progress to localStorage when step changes
   useEffect(() => {
     const saveProgress = async () => {
       if (!forced && Object.keys(businessData).length > 0) {
@@ -42,7 +43,32 @@ export function useOnboardingSteps({
     saveProgress().catch((error) => {
       console.error('[useOnboardingSteps] Failed to save progress:', error);
     });
-  }, [currentStep, businessData, tenantId, forced]);
+  }, [currentStep, tenantId, forced]);
+
+  // Save data to localStorage when businessData changes (debounced)
+  useEffect(() => {
+    // Clear previous timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Debounce save to avoid rapid successive saves
+    saveTimeoutRef.current = setTimeout(async () => {
+      if (!forced && Object.keys(businessData).length > 0) {
+        await onboardingStorageService.save(tenantId, {
+          currentStep,
+          businessData,
+        });
+      }
+    }, 500); // 500ms debounce
+
+    // Cleanup
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [businessData, tenantId, forced]);
 
   const goNext = () => {
     setCurrentStep((prev) => prev + 1);

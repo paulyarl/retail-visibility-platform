@@ -141,61 +141,72 @@ export const onboardingProfileSchema = z.object({
     .max(100, 'Business name must be less than 100 characters')
     .trim(),
   
-  address_line1: z.string()
+  address_line1: z.string({ message: 'Address is required' })
     .min(5, 'Address must be at least 5 characters')
     .max(200, 'Address must be less than 200 characters')
     .trim(),
   
-  address_line2: z.string()
+  address_line2: z.string({ message: 'Address line 2 must be a string' })
     .max(200, 'Address line 2 must be less than 200 characters')
     .trim()
     .optional()
-    .or(z.literal('')),
+    .nullable()
+    .transform(val => val ?? ''),
   
-  city: z.string()
+  city: z.string({ message: 'City is required' })
     .min(2, 'City must be at least 2 characters')
     .max(100, 'City must be less than 100 characters')
     .trim(),
   
-  state: z.string()
+  state: z.string({ message: 'State must be a string' })
     .max(100, 'State must be less than 100 characters')
     .trim()
     .optional()
-    .or(z.literal('')),
+    .nullable()
+    .transform(val => val ?? ''),
   
-  postal_code: z.string()
+  postal_code: z.string({ message: 'Postal code is required' })
     .min(3, 'Postal code must be at least 3 characters')
     .max(20, 'Postal code must be less than 20 characters')
     .trim(),
   
-  country_code: z.string()
+  country_code: z.string({ message: 'Country is required' })
     .length(2, 'Country code must be 2 characters (ISO 3166)')
     .toUpperCase(),
   
-  phone_number: z.string()
+  phone_number: z.string({ message: 'Phone number is required' })
     .min(1, 'Phone number is required')
     .trim(),
   
-  email: z.string()
-    .regex(emailRegex, 'Please enter a valid email address')
+  email: z.string({ message: 'Email must be a string' })
+    .refine((val) => !val || emailRegex.test(val), 'Please enter a valid email address')
     .toLowerCase()
     .trim()
     .optional()
-    .or(z.literal('')),
+    .nullable()
+    .transform(val => val ?? ''),
   
-  website: z.string()
-    .regex(websiteRegex, 'Website must use HTTPS (e.g., https://www.example.com)')
+  website: z.string({ message: 'Website must be a string' })
+    .refine((val) => !val || websiteRegex.test(val), 'Website must use HTTPS (e.g., https://www.example.com)')
     .toLowerCase()
     .trim()
     .optional()
-    .or(z.literal('')),
+    .nullable()
+    .transform(val => val ?? ''),
   
-  contact_person: z.string()
+  contact_person: z.string({ message: 'Contact person must be a string' })
     .min(2, 'Contact person name must be at least 2 characters')
     .max(100, 'Contact person name must be less than 100 characters')
     .trim()
     .optional()
-    .or(z.literal('')),
+    .nullable()
+    .transform(val => val ?? ''),
+  
+  slug: z.string()
+    .min(2, 'Slug must be at least 2 characters')
+    .max(100, 'Slug must be less than 100 characters')
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase letters, numbers, and hyphens only')
+    .optional(),
 });
 
 import { externalApiService } from '@/services/ExternalApiService';

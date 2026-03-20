@@ -76,6 +76,15 @@ export class OnboardingDataService {
       email: '',
       website: '',
       contact_person: '',
+      slug: '',
+      logo_url: '',
+      business_description: '',
+      hours: null,
+      social_links: {},
+      seo_tags: [],
+      latitude: null,
+      longitude: null,
+      admin_email: '',
       ...data,
     };
   }

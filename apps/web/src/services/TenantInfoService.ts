@@ -1017,9 +1017,12 @@ class TenantInfoService extends TenantApiSingleton {
 
       const timestamp = Date.now();
       const result = await this.makeDefaultRequest<any>(
-        `/api/tenants/${tenantId}?_t=${timestamp}`,
+        // `/api/tenants/${tenantId}?_t=${timestamp}`,
+        // {},
+        // `tenant-data-cache-busting-${tenantId}-${timestamp}`
+        `/api/tenants/${tenantId}`,
         {},
-        `tenant-data-cache-busting-${tenantId}-${timestamp}`
+        `tenant-data-${tenantId}`
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to get tenant data with cache busting:', result.error);

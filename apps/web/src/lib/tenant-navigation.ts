@@ -59,9 +59,27 @@ export async function trackCurrentPage(tenantId: string, path: string): Promise<
 
 /**
  * Check if a tenant needs onboarding
+ * Considers both phases of the unified onboarding flow
  */
 export async function checkTenantOnboarding(tenantId: string): Promise<OnboardingCheckResult> {
   try {
+    // Check if user is currently in onboarding flow (any tenant)
+    if (typeof window !== 'undefined') {
+      const globalState = localStorage.getItem('onboarding_global_state');
+      if (globalState) {
+        const state = JSON.parse(globalState);
+        
+        // If currently in phase 2, don't redirect regardless of tenant
+        if (state.currentPhase === 2) {
+          return { needsOnboarding: false };
+        }
+        // If coming from phase 1 with fromPhase1 flag, don't redirect
+        if (window.location.search.includes('fromPhase1=true')) {
+          return { needsOnboarding: false };
+        }
+      }
+    }
+    
     const p = await platformHomeService.getTenantProfile(tenantId);
     
     if (p) {
@@ -75,9 +93,11 @@ export async function checkTenantOnboarding(tenantId: string): Promise<Onboardin
       const needsOnboarding = !(nameOk && addrOk && cityOk && postalOk && countryOk && emailOk);
       
       if (needsOnboarding) {
+        // Redirect to tenant-scoped onboarding (phase 2)
+        // The OnboardingWizard will detect if user needs phase 1 first
         return {
           needsOnboarding: true,
-          redirectUrl: `/onboarding?tenantId=${encodeURIComponent(tenantId)}`
+          redirectUrl: `/t/${encodeURIComponent(tenantId)}/onboarding`
         };
       }
     }

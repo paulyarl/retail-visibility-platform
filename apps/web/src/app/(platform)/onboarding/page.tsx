@@ -7,6 +7,7 @@ import { Spinner, AnimatedCard, Input } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { userManagementService } from '@/services/UserManagementService';
+import { onboardingStateService } from '@/services/OnboardingStateService';
 
 const ONBOARDING_STEPS = [
   { id: 'welcome', title: 'Welcome to Visible Shelf!', description: 'Let\'s get your account set up' },
@@ -42,16 +43,43 @@ function OnboardingContent() {
   // a successful Auth0 login. The session validation might fail due to timing issues,
   // but the user is already authenticated. We show the onboarding page regardless.
 
-  // Pre-fill form with user data
+  // Initialize/restore phase 1 state
   useEffect(() => {
-    if (user) {
-      setFormData(prev => ({
-        ...prev,
-        firstName: user.firstName || prev.firstName,
-        lastName: user.lastName || prev.lastName,
-      }));
+    // Try to restore existing state
+    const existingState = onboardingStateService.getPhase1();
+    
+    if (existingState) {
+      setFormData({
+        firstName: existingState.firstName || user?.firstName || '',
+        lastName: existingState.lastName || user?.lastName || '',
+        businessName: existingState.businessName || '',
+        businessType: existingState.businessType || '',
+        phone: existingState.phone || '',
+      });
+    } else {
+      // Start new phase 1
+      onboardingStateService.startPhase1();
+      if (user) {
+        setFormData(prev => ({
+          ...prev,
+          firstName: user.firstName || prev.firstName,
+          lastName: user.lastName || prev.lastName,
+        }));
+      }
     }
   }, [user]);
+
+  // Save form data to shared state on change
+  useEffect(() => {
+    onboardingStateService.savePhase1({
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      businessName: formData.businessName,
+      businessType: formData.businessType,
+      phone: formData.phone,
+      email: user?.email,
+    });
+  }, [formData, user?.email]);
 
   const handleNext = async () => {
     if (currentStep < ONBOARDING_STEPS.length - 2) {
@@ -75,9 +103,13 @@ function OnboardingContent() {
 
       if (result.success) {
         setSavedProfile(result.user);
-        // Store tenant info for redirect
+        
+        // Mark phase 1 complete and prepare for phase 2
         if (result.tenant) {
           setSavedProfile({ ...result.user, tenant: result.tenant });
+          onboardingStateService.completePhase1(
+            result.tenant.id
+          );
         }
         setCurrentStep(ONBOARDING_STEPS.length - 1); // Show complete step
       } else {
@@ -102,7 +134,8 @@ function OnboardingContent() {
   const handleContinueToAdvancedProfile = () => {
     const tenantId = savedProfile?.tenant?.id;
     if (tenantId) {
-      router.push(`/t/${tenantId}/onboarding`);
+      // Phase 1 already marked complete, just navigate
+      router.push(`/t/${tenantId}/onboarding?fromPhase1=true`);
     } else {
       router.push('/tenants');
     }
@@ -391,94 +424,92 @@ function OnboardingContent() {
               {/* Complete Step Actions */}
               {currentStep === 3 && (
                 <div className="mt-8 pt-6 border-t border-neutral-200">
-                  {/* Primary CTA - Continue to Advanced Profile */}
-                  {savedProfile?.tenant?.id && (
-                    <div className="mb-6 p-4 bg-primary-50 rounded-lg border border-primary-200">
-                      <h3 className="text-lg font-semibold text-neutral-900 mb-2">
-                        🎯 Strengthen Your Store Presence
-                      </h3>
-                      <p className="text-sm text-neutral-600 mb-4">
-                        Complete your store profile to help customers find you online.
-                      </p>
+                  {/* Back button for last-minute changes */}
+                  <div className="flex justify-start mb-4">
+                    <Button variant="subtle" onClick={handleBack}>
+                      <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Back to Edit
+                    </Button>
+                  </div>
 
-                      {/* Required vs Optional Fields */}
-                      <div className="mb-4 text-left">
-                        <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2">Required for Robust Presence</p>
-                        <div className="grid grid-cols-2 gap-1 text-xs text-neutral-700">
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                            Business Hours
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                            Business Location
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                            Business Contact
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                            Business Branding
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                            Slug Selection
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                            Business Category
-                          </span>
+                  {/* Tenant Selection/Creation */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-neutral-900 mb-4 text-center">
+                      {user?.tenants && user.tenants.length > 0 
+                        ? 'Select a Store to Manage' 
+                        : 'Create Your First Store'}
+                    </h3>
+                    
+                    {/* Existing Tenants */}
+                    {user?.tenants && user.tenants.length > 0 && (
+                      <div className="space-y-2 mb-4">
+                        {user.tenants.map((tenant) => (
+                          <button
+                            key={tenant.id}
+                            onClick={() => {
+                              onboardingStateService.completePhase1(tenant.id);
+                              router.push(`/t/${tenant.id}/onboarding?fromPhase1=true`);
+                            }}
+                            className="w-full p-4 bg-white border border-neutral-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors text-left flex items-center justify-between group"
+                          >
+                            <div>
+                              <p className="font-medium text-neutral-900">{tenant.name}</p>
+                              <p className="text-xs text-neutral-500 capitalize">{tenant.role.toLowerCase()}</p>
+                            </div>
+                            <svg className="w-5 h-5 text-neutral-400 group-hover:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Create New Tenant */}
+                    <div className="p-4 bg-gradient-to-r from-primary-50 to-blue-50 rounded-lg border border-primary-200">
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="flex-shrink-0 w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                          <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
                         </div>
-
-                        <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mt-3 mb-2">Optional Enhancements</p>
-                        <div className="grid grid-cols-2 gap-1 text-xs text-neutral-500">
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
-                            Social Media Links
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
-                            SEO Settings
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
-                            Logo & Banner
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full" />
-                            Google Shopping Sync
-                          </span>
+                        <div>
+                          <p className="font-medium text-neutral-900">
+                            {user?.tenants && user.tenants.length > 0 ? 'Create Another Store' : 'Create Your Store'}
+                          </p>
+                          <p className="text-xs text-neutral-600">
+                            {formData.businessName || 'New Store'}
+                          </p>
                         </div>
                       </div>
-
-                      <Button onClick={handleContinueToAdvancedProfile} className="w-full">
-                        Continue to Advanced Profile Setup
+                      
+                      <Button 
+                        onClick={handleContinueToAdvancedProfile}
+                        className="w-full"
+                      >
+                        {user?.tenants && user.tenants.length > 0 ? 'Create New Store' : 'Set Up My Store'}
                         <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                         </svg>
                       </Button>
                     </div>
-                  )}
+                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                    <Button variant="secondary" onClick={() => router.push('/dashboard')}>
-                      Go to Dashboard
-                      <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                      </svg>
-                    </Button>
-                    <Button variant="primary" onClick={() => router.push('/tenants')}>
-                      🚀 My Stores
+                  {/* Skip for now */}
+                  <div className="text-center mb-4">
+                    <Button variant="ghost" onClick={() => router.push('/dashboard')}>
+                      Skip for now → Dashboard
                     </Button>
                   </div>
 
-                  <div className="flex justify-center gap-4">
-                    <Button variant="ghost" onClick={() => router.push('/settings/profile')}>
+                  {/* Secondary Actions */}
+                  <div className="flex justify-center gap-4 pt-4 border-t border-neutral-100">
+                    <Button variant="subtle" onClick={() => router.push('/settings/account')}>
                       Edit Profile
                     </Button>
-                    <Button variant="ghost" onClick={() => router.push('/settings/subscription')}>
-                      View Plans
+                    <Button variant="subtle" onClick={() => router.push('/tenants')}>
+                      All Stores
                     </Button>
                   </div>
                 </div>
