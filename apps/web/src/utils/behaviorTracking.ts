@@ -738,7 +738,7 @@ async function getUserLocationClient(): Promise<{
       
       // Use dedicated OpenStreetMap service with PUBLIC context
       try {
-        console.log('[BehaviorTracking] Using OpenStreetMap service with PUBLIC context for:', { latitude, longitude });
+        // console.log('[BehaviorTracking] Using OpenStreetMap service with PUBLIC context for:', { latitude, longitude });
         
         const geocodingData = await openStreetMapService.reverseGeocode(
           latitude, 

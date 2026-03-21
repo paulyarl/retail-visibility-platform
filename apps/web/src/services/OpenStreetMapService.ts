@@ -60,7 +60,7 @@ export class OpenStreetMapService extends ExternalApiSingleton {
     cacheKey?: string
   ): Promise<ReverseGeocodingResponse | null> {
     try {
-      console.log('[OpenStreetMapService] Reverse geocoding with PUBLIC context:', { latitude, longitude });
+      // console.log('[OpenStreetMapService] Reverse geocoding with PUBLIC context:', { latitude, longitude });
       
       const result = await this.makeDefaultRequest<ReverseGeocodingResponse>(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
@@ -96,7 +96,7 @@ export class OpenStreetMapService extends ExternalApiSingleton {
    */
   async forwardGeocode(address: string, cacheKey?: string): Promise<any | null> {
     try {
-      console.log('[OpenStreetMapService] Forward geocoding with PUBLIC context:', { address });
+      // console.log('[OpenStreetMapService] Forward geocoding with PUBLIC context:', { address });
       
       const result = await this.makeDefaultRequest<any>(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&addressdetails=1`,

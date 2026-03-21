@@ -98,7 +98,7 @@ export class OverrideCacheService {
         const now = Date.now();
         // Only log errors if we haven't logged recently (to prevent spam)
         if (now - this.lastErrorTime > this.errorCooldown) {
-          console.error('[Cache] Redis connection error:', (error as Error).message);
+          // console.error('[Cache] Redis connection error:', (error as Error).message);
           this.lastErrorTime = now;
         }
         this.connected = false;
