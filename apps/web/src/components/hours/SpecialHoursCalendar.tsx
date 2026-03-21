@@ -103,7 +103,7 @@ export default function SpecialHoursCalendar({ tenantId }: { tenantId: string })
     setSaving(true);
     setMsg(null);
     try {
-      await tenantManagementService.updateSpecialBusinessHours(tenantId, { overrides });
+      await tenantManagementService.updateSpecialBusinessHours(tenantId, overrides);
       setSaving(false);
       setMsg("✓ Saved");
       setTimeout(() => setMsg(null), 2000);

@@ -52,13 +52,12 @@ router.post('/track-batch', async (req: Request, res: Response) => {
     for (const event of events) {
       try {
         const {
-          entityType = 'store',
           entityId,
           entity_id, // Support snake_case format
           locationLat,
-          locationLng,
-          location_lat, // Support snake_case format
           location_lng, // Support snake_case format
+          location_lat, // Support snake_case format
+          locationLng,
           referrer,
           userAgent,
           timestamp,
@@ -69,8 +68,9 @@ router.post('/track-batch', async (req: Request, res: Response) => {
         } = event;
 
         // Support both camelCase and snake_case formats
+        // Check for entity_type/entityType in the raw event first, then default to 'store'
         const finalEntityId = entityId || entity_id;
-        const finalEntityType = entityType || event?.entity_type;
+        const finalEntityType = event?.entity_type || event?.entityType || 'store';
         const finalLocationLat = locationLat || location_lat;
         const finalLocationLng = locationLng || location_lng;
         const finalPageType = pageType || page_type;

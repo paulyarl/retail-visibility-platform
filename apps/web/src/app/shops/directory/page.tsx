@@ -23,6 +23,7 @@ import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { StoreList, StoreData } from '@/components/stores';
 import { usePublicBranding } from '@/hooks/usePublicBranding';
+import LastViewed from '@/components/directory/LastViewed';
 
 interface ShopDirectoryPageProps {
   searchParams?: Promise<{
@@ -594,6 +595,9 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
           />
         </div>
       )}
+
+      {/* Recently Viewed */}
+      <LastViewed />
 
       {/* Platform Branding Footer */}
       <PoweredByFooter />

@@ -33,6 +33,7 @@ import { computeStoreStatus, getTodaySpecialHours } from '@/lib/hours-utils';
 import { Badge as MantineBadge } from '@mantine/core';
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import LastViewed from '@/components/directory/LastViewed';
 
 
 interface Shop {
@@ -1275,6 +1276,9 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
               </div>
             )}
         </div>
+
+        {/* Recently Viewed */}
+        <LastViewed />
 
         {/* Map View */}
         {!showTraditionalListing && mapLocation && (

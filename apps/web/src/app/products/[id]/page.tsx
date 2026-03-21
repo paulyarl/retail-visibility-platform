@@ -131,6 +131,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <ProductViewTracker 
         productId={product.inventory_item_id}
         tenantId={product.tenant_id}
+        productName={product.product_name}
         categoryId={product.product_category}
       />
 

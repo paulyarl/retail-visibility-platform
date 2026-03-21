@@ -23,6 +23,7 @@ import { directoryService } from '@/services/DirectorySingletonService';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
 import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
+import LastViewed from '@/components/directory/LastViewed';
 
 interface StoreDetailPageProps {
   params: {
@@ -447,7 +448,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
       />
 
       {/* Client-side store tracking */}
-      <StoreViewTracker tenantId={listing.tenantId} categories={listing.categories} />
+      <StoreViewTracker tenantId={listing.tenantId} storeName={listing.businessName} categories={listing.categories} />
 
       <div className="min-h-screen bg-gray-50">
         {/* Header with Visit Storefront Banner */}
@@ -818,6 +819,9 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
         limit={3}
         title="Similar Stores"
       />
+
+      {/* Recently Viewed */}
+      <LastViewed />
 
             {/* Platform Branding Footer */}
             <PoweredByFooter />

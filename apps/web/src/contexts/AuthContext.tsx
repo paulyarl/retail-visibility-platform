@@ -92,11 +92,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fetch current user - checks Auth0 session via API
   const fetchUser = useCallback(async (forceRefresh = false) => {
     try {
-
-      
-      // Check Auth0 session via API (uses HTTP-only cookies automatically)
-      const sessionInfo = await securitySingletonService.getSessionInfo();
-
       // Only check authentication if we're in an admin context, tenant context, or have authentication tokens
       const isAdminContext = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
       const isTenantContext = typeof window !== 'undefined' && (
@@ -107,18 +102,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.location.pathname.startsWith('/onboarding')
       );
 
-      
-      // console.log(`AuthContext fetchUser isAdminContext: ${isAdminContext}`);
-      // console.log(`AuthContext fetchUser isTenantContext: ${isTenantContext}`);
-      // console.log(`AuthContext fetchUser forceRefresh: ${forceRefresh}`);
-      
-      
       // Skip auth check for public pages
-      if (!isAdminContext && !isTenantContext && !forceRefresh && !sessionInfo.isAuthenticated) {
+      if (!isAdminContext && !isTenantContext && !forceRefresh) {
         setUser(null);
         setIsLoading(false);
-        // return;
+        return;
       }
+
+      // Check if we have auth cookies before making API call
+      const hasAuthCookies = typeof window !== 'undefined' && 
+        (document.cookie.includes('auth0_email=') || 
+         document.cookie.includes('auth0_id='));
+
+      // If no auth cookies and not forcing refresh, skip API call
+      if (!hasAuthCookies && !forceRefresh) {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      // Check Auth0 session via API (uses HTTP-only cookies automatically)
+      const sessionInfo = await securitySingletonService.getSessionInfo();
       
 
       // console.log(`AuthContext fetchUser sessionInfo: ${JSON.stringify(sessionInfo)}`);

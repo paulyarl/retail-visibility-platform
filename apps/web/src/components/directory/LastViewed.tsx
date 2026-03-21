@@ -118,9 +118,10 @@ export default function LastViewed({
 
   useEffect(() => {
     const fetchLastViewed = async () => {
-      // Don't fetch if we don't have identification yet
+      // Wait for identification - don't return early, just wait
+      // Session ID is set asynchronously from getUserIdentification()
       if (!userId && !sessionId) {
-        setLoading(false);
+        // Keep loading state while waiting for session ID
         return;
       }
 
@@ -147,9 +148,8 @@ export default function LastViewed({
         }
 
         const data = await recommendationsService.getLastViewed({
-          ...(sessionId && { sessionId }),
-          ...(userId && { userId }),
-          limit: 8
+          limit: limit,
+          entityType: entityType
         });
         
         const recommendations = data?.recommendations || [];

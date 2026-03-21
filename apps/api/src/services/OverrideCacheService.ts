@@ -115,7 +115,7 @@ export class OverrideCacheService {
       // Attempt initial connection
       this.connect();
     } catch (error) {
-      console.error('[Cache] Redis initialization failed:', error);
+      // console.error('[Cache] Redis initialization failed:', error);
       this.connected = false;
       // Fallback to memory cache
       this.mode = 'memory';
@@ -129,7 +129,7 @@ export class OverrideCacheService {
     }
     
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.warn('[Cache] Max reconnect attempts reached, switching to memory cache');
+      // console.warn('[Cache] Max reconnect attempts reached, switching to memory cache');
       this.mode = 'memory';
       return;
     }
@@ -138,7 +138,7 @@ export class OverrideCacheService {
       await this.redis.connect();
     } catch (error) {
       this.reconnectAttempts++;
-      console.error(`[Cache] Failed to connect to Redis (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}):`, (error as Error).message);
+      // console.error(`[Cache] Failed to connect to Redis (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}):`, (error as Error).message);
       this.scheduleReconnect();
     }
   }
@@ -188,7 +188,7 @@ export class OverrideCacheService {
         await this.redis.connect();
         return this.connected;
       } catch (error) {
-        console.warn('[Cache] Redis not available, operating without cache');
+        // console.warn('[Cache] Redis not available, operating without cache');
         return false;
       }
     }

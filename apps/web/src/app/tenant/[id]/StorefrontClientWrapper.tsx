@@ -942,6 +942,11 @@ export default function StorefrontClientWrapper({
         </div>
       )}
 
+      {/* Recently Viewed */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <LastViewed />
+      </div>
+
       {/* Tier-Based Footer */}
       <footer className="bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

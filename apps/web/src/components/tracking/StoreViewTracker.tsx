@@ -5,16 +5,17 @@ import { trackBehaviorClient } from '@/utils/behaviorTracking';
 
 interface StoreViewTrackerProps {
   tenantId: string;
+  storeName?: string;
   categories?: Array<{ id: string; slug: string; isPrimary?: boolean }>;
 }
 
-export default function StoreViewTracker({ tenantId, categories = [] }: StoreViewTrackerProps) {
+export default function StoreViewTracker({ tenantId, storeName, categories = [] }: StoreViewTrackerProps) {
   useEffect(() => {
     // Track store view on page load
     trackBehaviorClient({
       entityType: 'store',
       entityId: tenantId,
-      entityName: '', // API will fetch store name
+      entityName: storeName,
       context: {
         category_id: categories.find(c => c.isPrimary)?.id,
         category_slug: categories.find(c => c.isPrimary)?.slug,
@@ -23,7 +24,7 @@ export default function StoreViewTracker({ tenantId, categories = [] }: StoreVie
       },
       pageType: 'directory_detail'
     });
-  }, [tenantId, categories]);
+  }, [tenantId, storeName, categories]);
 
   return null; // This component doesn't render anything
 }

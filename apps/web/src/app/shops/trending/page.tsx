@@ -17,6 +17,7 @@ import { ArrowLeft, TrendingUp, Star, MapPin, Package, Store, Grid, Sparkles } f
 import { useTrendingShops } from '@/lib/shops/shop-hooks';
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import LastViewed from '@/components/directory/LastViewed';
 
 interface TrendingShop {
   id: string;
@@ -293,6 +294,9 @@ function TrendingShopsPageContent() {
           </div>
         )}
       </div>
+
+      {/* Recently Viewed */}
+      <LastViewed />
     </div>
   );
 }

@@ -21,6 +21,7 @@ import { FEATURED_TYPES } from '@/types/product-display';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import { usePublicBranding } from '@/hooks/usePublicBranding';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import LastViewed from '@/components/directory/LastViewed';
 
 interface FilterState {
   category: string;
@@ -866,6 +867,9 @@ export default function FeaturedProductsPage() {
           </div>
         </div>
       </div>
+
+      {/* Recently Viewed */}
+      <LastViewed />
 
       {/* Footer */}
       <PoweredByFooter />

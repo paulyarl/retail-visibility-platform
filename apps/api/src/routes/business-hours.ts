@@ -58,6 +58,9 @@ router.put('/tenant/:tenantId/business-hours',
   // Invalidate cache for this tenant's business hours status
   const cacheKey = CacheKeys.BUSINESS_HOURS(tenantId)
   await CacheService.del(cacheKey);
+  // Also invalidate the status cache
+  const cacheKeyStatus = CacheKeys.BUSINESS_HOURS_STATUS(tenantId)
+  await CacheService.del(cacheKeyStatus);
   console.log(`[Business Hours] Invalidated cache for tenant ${tenantId}`)
 
   // Update business profile hours
@@ -114,6 +117,11 @@ router.put('/tenant/:tenantId/business-hours/special',
   // Invalidate cache for this tenant's business hours status
   const cacheKey = CacheKeys.BUSINESS_HOURS(tenantId)
   await CacheService.del(cacheKey);
+
+  // Also invalidate the status cache
+  const cacheKeyStatus = CacheKeys.BUSINESS_HOURS_STATUS(tenantId)
+  await CacheService.del(cacheKeyStatus);
+  
   console.log(`[Business Hours] Invalidated cache for tenant ${tenantId} (special hours update)`)
 
   res.json({ success: true })
@@ -154,7 +162,7 @@ router.get('/tenant/:tenantId/business-hours/status',
 
   try {
     // Check cache first
-    const cacheKey = CacheKeys.BUSINESS_HOURS(tenantId)
+    const cacheKey = CacheKeys.BUSINESS_HOURS_STATUS(tenantId)
     const cachedResult = await CacheService.get(cacheKey);
 
     if (cachedResult) {
@@ -345,3 +353,4 @@ router.get('/business-hours/status/:tenantId',
   }
 })
 export default router
+

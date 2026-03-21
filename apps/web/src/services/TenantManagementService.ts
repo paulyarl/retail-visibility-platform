@@ -1,3 +1,4 @@
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 
 export interface TenantUsage {
@@ -74,6 +75,9 @@ export interface TenantProfile {
  * Used for tenant management, settings, and administrative operations
  */
 class TenantManagementService extends TenantApiSingleton {
+  protected defaultContext: AppContext = AppContext.TENANT;
+  protected defaultIsolation: CacheIsolation = CacheIsolation.TENANT;
+  
   private static instance: TenantManagementService;
 
   /**
@@ -395,43 +399,63 @@ class TenantManagementService extends TenantApiSingleton {
 
   /**
    * Update business hours for a tenant
+   * Updates both the dedicated business-hours endpoint and the profile
    */
-  async updateBusinessHours(tenantId: string, hours: any): Promise<any> {
+  async updateBusinessHours(tenantId: string, hours: { timezone?: string; periods: any[] }): Promise<any> {
+    console.log('[TenantManagementService] updateBusinessHours', tenantId, hours);
+
+    // 1. Update via dedicated endpoint
     const result = await this.makeDefaultRequest(
+      `/api/tenant/${tenantId}/business-hours`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(hours)
+      },
+      `tenant-business-hours-${tenantId}`
+    );
+
+    // 2. Also update profile hours for backward compatibility
+    await this.makeDefaultRequest(
       '/api/tenant/profile',
       {
         method: 'POST',
         body: JSON.stringify({
           tenant_id: tenantId,
-          hours: hours
+          hours
         })
       },
-      `tenant-business-hours-${tenantId}`
+      `tenant-profile-${tenantId}`
     );
-    await this.invalidateCacheWithContext(`tenant-business-hours-${tenantId}`);
-    // Invalidate related caches (base cache handles store status automatically)
-    await this.invalidateCache(`tenant-profile-${tenantId}`);
-    await this.invalidateCache(`tenant-special-hours-${tenantId}`);
-    await this.invalidateCache(`tenant-store-status-${tenantId}`);
-    
+
+    // Invalidate all related caches
+    await this.invalidateBusinessHoursCaches(tenantId);
+
     return result.data;
   }
 
   /**
    * Update special business hours for a tenant
+   * Updates both the dedicated special-hours endpoint and the profile
    */
-  async updateSpecialBusinessHours(tenantId: string, specialHours: any): Promise<any> {
-    // Get current profile to preserve existing hours data
+  async updateSpecialBusinessHours(tenantId: string, overrides: any[]): Promise<any> {
+    console.log('[TenantManagementService] updateSpecialBusinessHours', tenantId, overrides);
+
+    // 1. Update via dedicated endpoint
+    const result = await this.makeDefaultRequest(
+      `/api/tenant/${tenantId}/business-hours/special`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ overrides })
+      },
+      `tenant-special-hours-${tenantId}`
+    );
+
+    // 2. Also update profile hours for backward compatibility
     const currentProfile = await this.getCurrentTenantProfile(tenantId);
     const currentHours = currentProfile?.hours || {};
-    
-    // Merge special hours into the hours object
-    const updatedHours = {
-      ...currentHours,
-      overrides: specialHours.overrides || specialHours
-    };
+    const updatedHours = { ...currentHours, overrides };
 
-    const result = await this.makeDefaultRequest(
+    await this.makeDefaultRequest(
       '/api/tenant/profile',
       {
         method: 'POST',
@@ -440,15 +464,31 @@ class TenantManagementService extends TenantApiSingleton {
           hours: updatedHours
         })
       },
-      `tenant-special-hours-${tenantId}`
+      `tenant-profile-${tenantId}`
     );
-    
-    // Invalidate related caches (base cache handles store status automatically)
-    await this.invalidateCache(`tenant-profile-${tenantId}`);
-    await this.invalidateCache(`tenant-special-hours-${tenantId}`);
-    await this.invalidateCache(`tenant-store-status-${tenantId}`);
-    
+
+    // Invalidate all related caches
+    await this.invalidateBusinessHoursCaches(tenantId);
+
     return result.data;
+  }
+
+  /**
+   * Helper to invalidate all business hours related caches
+   */
+  private async invalidateBusinessHoursCaches(tenantId: string): Promise<void> {
+    await this.invalidateCache(`tenant-profile-${tenantId}`);
+
+    const cacheKeys = [
+      `/api/${AppContext.TENANT}/${tenantId}/business-hours`,
+      `/api/${AppContext.TENANT}/${tenantId}/business-hours/status`,
+      `/api/${AppContext.PUBLIC}/${AppContext.TENANT}/${tenantId}/business-hours`,
+      `/api/${AppContext.PUBLIC}/${AppContext.TENANT}/${tenantId}/business-hours/status`
+    ];
+
+    for (const key of cacheKeys) {
+      await this.invalidateCacheWithContext(`${key}`);
+    }
   }
 
   /**
@@ -522,8 +562,8 @@ class TenantManagementService extends TenantApiSingleton {
     
     // Invalidate related caches (base cache handles store status automatically)
     await this.invalidateCache(`tenant-profile-${tenantId}`);
-    await this.invalidateCache(`tenant-business-hours-${tenantId}`);
-    await this.invalidateCache(`tenant-store-status-${tenantId}`);
+    // Invalidate all related caches
+    await this.invalidateBusinessHoursCaches(tenantId);
     
     return result.data;
   }
@@ -541,8 +581,8 @@ class TenantManagementService extends TenantApiSingleton {
       `propagation-business-hours-${tenantId}`
     );
     
-    // Invalidate related caches
-    await this.invalidateCache(`tenant-business-hours-*`);
+    // Invalidate all related caches
+    await this.invalidateBusinessHoursCaches(tenantId);
     
     return result.data;
   }
@@ -575,7 +615,8 @@ class TenantManagementService extends TenantApiSingleton {
       },
       `propagation-user-roles-${tenantId}`
     );
-    
+     // Invalidate all related caches
+    await this.invalidateBusinessHoursCaches(tenantId);
     return result.data;
   }
 

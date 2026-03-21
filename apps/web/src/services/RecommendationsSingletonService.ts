@@ -70,7 +70,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
     limit?: number;
   }): Promise<StoreRecommendation[]> {
     if (!tenantId) {
-      console.error('[RecommendationsSingleton] getStorefrontRecommendations: tenantId is required');
+      // console.error('[RecommendationsSingleton] getStorefrontRecommendations: tenantId is required');
       return [];
     }
 
@@ -92,7 +92,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
         }
       );
       if (!result.success) {
-        console.error('[RecommendationsSingleton] Failed to get storefront recommendations:', result.error);
+        // console.error('[RecommendationsSingleton] Failed to get storefront recommendations:', result.error);
         return [];
       }
       
@@ -227,7 +227,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
    */
   async getDirectoryStoreTypes(): Promise<any> {
     try {
-      console.log('[RecommendationsSingleton] before request');
+      // console.log('[RecommendationsSingleton] before request');
       const response = await this.makeDefaultRequest<any>(
         '/api/directory/store-types',
         {},
@@ -372,6 +372,15 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
         }
       );
 
+      const cacheKeys = [
+      `/api/recommendations/track-batch`,
+      `/api/recommendations/last-viewed`
+      ];
+
+      for (const key of cacheKeys) {
+        await this.invalidateCacheWithContext(key);
+      }
+
       return true;
     } catch (error) {
       console.warn('[RecommendationsSingleton] Behavior tracking failed:', error);
@@ -384,22 +393,31 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
    * Get last viewed recommendations
    * Public endpoint for recommendation tracking
    * 
-   * Auth0: userId and sessionId determined server-side from session
+   * Sends session ID header for consistent user tracking
    */
   async getLastViewed(params?: {
     limit?: number;
     entityType?: 'store' | 'product' | 'all';
   }): Promise<any> {
     try {
+      // Get session ID for consistent tracking
+      const sessionId = this.getSessionIdFromContext();
+      
       const searchParams = new URLSearchParams();
       if (params?.limit) searchParams.append('limit', params.limit.toString());
       if (params?.entityType) searchParams.append('entityType', params.entityType);
 
+      // Build headers with session ID
+      const headers: Record<string, string> = {};
+      if (sessionId) {
+        headers['x-session-id'] = sessionId;
+      }
+
       const response = await this.makeDefaultRequest<any>(
         `/api/recommendations/last-viewed?${searchParams.toString()}`,
-        {},
+        { headers },
         `display:last-viewed-recommendations`,
-        this.PERSONALIZED_TTL // 1 minute for personalized recommendations
+        this.PERSONALIZED_TTL
       );
 
       if (!response.success) {
@@ -407,7 +425,8 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
         return null;
       }
 
-      return response.data;
+      // Response structure: { success, data: { recommendations, algorithm, generatedAt } }
+      return response.data?.data || response.data;
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to get last viewed recommendations:', error);
       return null;
@@ -794,77 +813,74 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
    * Track behavior events in batch
    * Uses the /api/recommendations/track-batch endpoint for analytics
    * 
-   * Auth0: userId and sessionId determined server-side from session
+   * Sends session ID header for consistent user tracking across requests
    */
   async trackBehaviorBatch(batchData: {
     events: any[];
     batchMetadata?: any;
   }): Promise<void> {
     try {
+      // Get session ID for consistent tracking
+      const sessionId = this.getSessionIdFromContext();
+      
       // Transform camelCase to snake_case for API compatibility
-      // userId and sessionId removed - server determines from Auth0 session
       const transformedBatchData = {
         events: batchData.events.map(event => ({
           entity_type: event.entityType,
           entity_id: event.entityId,
-          entity_name: event.entityName || null, // Convert empty string to null
+          entity_name: event.entityName || null,
           context: event.context,
           page_type: event.pageType,
           duration_seconds: event.durationSeconds || null,
-          // session_id removed - server determines from Auth0 session
           timestamp: event.timestamp,
           priority: event.priority || 'normal',
           location_lat: event.locationLat || null,
           location_lng: event.locationLng || null
         })).filter(event => {
-          // Filter out events that don't have required fields
           return event.entity_id && event.entity_type;
         }),
         batch_metadata: batchData.batchMetadata
       };
 
-      // Don't send empty batch
       if (transformedBatchData.events.length === 0) {
         console.log('[RecommendationsSingleton] No valid events to track');
         return;
       }
 
-      // Detailed logging for debugging
-      // console.log('[RecommendationsSingleton] === TRACKING DEBUG ===');
-      // console.log('[RecommendationsSingleton] Original batch data:', JSON.stringify(batchData, null, 2));
-      // console.log('[RecommendationsSingleton] Transformed batch data:', JSON.stringify(transformedBatchData, null, 2));
-      // console.log('[RecommendationsSingleton] Events count:', transformedBatchData.events.length);
-      // console.log('[RecommendationsSingleton] First event sample:', transformedBatchData.events[0]);
-      // console.log('[RecommendationsSingleton] Request URL:', '/api/recommendations/track-batch');
-      // console.log('[RecommendationsSingleton] Request method:', 'POST');
-      // console.log('[RecommendationsSingleton] Request headers:', { 'Content-Type': 'application/json' });
-      // console.log('[RecommendationsSingleton] === END DEBUG ===');
+      // Build headers with session ID for tracking continuity
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (sessionId) {
+        headers['x-session-id'] = sessionId;
+      }
 
       const response = await this.makeSystemRequest<void>(
         '/api/recommendations/track-batch',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(transformedBatchData)
         },
         {
           cacheKey: 'recommendations-track',
-          ttl: 0 // No caching for tracking
+          ttl: 0
         }
       );
-      
-      // console.log('[RecommendationsSingleton] === RESPONSE DEBUG ===');
-      // console.log('[RecommendationsSingleton] Response success:', response.success);
-      // console.log('[RecommendationsSingleton] Response data:', response.data);
-      // console.log('[RecommendationsSingleton] Response error:', response.error);
-      // console.log('[RecommendationsSingleton] Response status:', response.status);
-      // console.log('[RecommendationsSingleton] === END RESPONSE DEBUG ===');
       
       if (!response.success) {
         console.log('[RecommendationsSingleton] Failed to track behavior batch:', response.error);
         const errorMessage = typeof response.error === 'string' ? response.error : 
                            (response.error?.message) || 'Tracking failed';
         throw new Error(errorMessage);
+      }
+      const cacheKeys = [
+        `/api/recommendations/track-batch`,
+        `/api/recommendations/last-viewed`
+      ];
+
+      for (const key of cacheKeys) {
+        await this.invalidateCacheWithContext(key);
       }
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to track behavior batch:', error);
@@ -875,13 +891,14 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
   /**
    * Send tracking data on page unload using beacon API
    * For reliable delivery when page is closing
-   * Uses platform-aligned URL construction and base class beacon method
    * 
-   * Auth0: userId and sessionId determined server-side from session
+   * Includes session ID for tracking continuity
    */
   sendUnloadTrackingBeacon(events: any[]): void {
+    // Get session ID for consistent tracking
+    const sessionId = this.getSessionIdFromContext();
+    
     // Transform events to snake_case format for API compatibility
-    // userId and sessionId removed - server determines from Auth0 session
     const transformedEvents = events.map(event => ({
       entity_type: event.entityType,
       entity_id: event.entityId,
@@ -889,29 +906,22 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       context: event.context,
       page_type: event.pageType,
       duration_seconds: event.durationSeconds || null,
-      // session_id removed - server determines from Auth0 session
       timestamp: event.timestamp,
       priority: event.priority || 'normal',
       location_lat: event.locationLat || null,
-      location_lng: event.locationLng || null,
-      referrer: document.referrer,
-      user_agent: navigator.userAgent,
-      unload_tracking: true // Mark as unload tracking for analytics
+      location_lng: event.locationLng || null
     }));
 
     const data = {
       events: transformedEvents,
       batch_metadata: {
-        unload_batch: true,
-        client_timestamp: Date.now(),
-        beacon_used: true
+        batchSize: transformedEvents.length,
+        clientTimestamp: Date.now(),
+        clientVersion: '1.0.0',
+        compressionUsed: false,
+        sessionId // Include session ID in batch metadata for beacon
       }
     };
-
-    // console.log('[RecommendationsSingleton] === BEACON DEBUG ===');
-    // console.log('[RecommendationsSingleton] Beacon data:', JSON.stringify(data, null, 2));
-    // console.log('[RecommendationsSingleton] Beacon URL:', '/api/recommendations/track-batch');
-    // console.log('[RecommendationsSingleton] === END BEACON DEBUG ===');
 
     this.sendBeacon('/api/recommendations/track-batch', data);
   }

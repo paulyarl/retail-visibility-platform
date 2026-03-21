@@ -957,8 +957,26 @@ export async function getLastViewedItems(
           ub.timestamp as last_viewed_at,
           ub.page_type,
           ub.context,
+          -- For deduplication: get the actual tenant_id for stores (in case entity_id varies)
+          CASE 
+            WHEN ub.entity_type = 'store' THEN (
+              SELECT dcl.tenant_id FROM directory_listings_list dcl 
+              WHERE dcl.tenant_id = ub.entity_id OR dcl.slug = ub.entity_id
+              LIMIT 1
+            )
+            ELSE ub.entity_id
+          END as dedup_key,
           ROW_NUMBER() OVER (
-            PARTITION BY ub.entity_id, ub.entity_type 
+            PARTITION BY 
+              CASE 
+                WHEN ub.entity_type = 'store' THEN (
+                  SELECT dcl.tenant_id FROM directory_listings_list dcl 
+                  WHERE dcl.tenant_id = ub.entity_id OR dcl.slug = ub.entity_id
+                  LIMIT 1
+                )
+                ELSE ub.entity_id
+              END,
+              ub.entity_type 
             ORDER BY ub.timestamp DESC
           ) as rn
         FROM user_behavior_simple ub
@@ -971,6 +989,7 @@ export async function getLastViewedItems(
         rv.last_viewed_at,
         rv.page_type,
         rv.context,
+        rv.dedup_key,
         -- Get additional data based on entity type
         CASE
           WHEN rv.entity_type = 'store' THEN (
@@ -993,7 +1012,7 @@ export async function getLastViewedItems(
               'isFeatured', dcl.is_featured
             )
             FROM directory_listings_list dcl
-            WHERE dcl.tenant_id = rv.entity_id
+            WHERE dcl.tenant_id = rv.dedup_key
               AND dcl.is_published = true
             LIMIT 1
           )

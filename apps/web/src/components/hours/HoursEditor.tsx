@@ -132,6 +132,7 @@ export default function HoursEditor({ tenantId, timezone: externalTimezone }: { 
     setSaving(true);
     setMsg(null);
     try {
+      // await tenantManagementService.updateBusinessHours(tenantId, { timezone, periods });
       await tenantManagementService.updateBusinessHours(tenantId, { timezone, periods });
       setSaving(false);
       setMsg("✓ Saved");
