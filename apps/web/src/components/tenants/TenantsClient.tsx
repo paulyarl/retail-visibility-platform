@@ -96,6 +96,12 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   // Status modal state
   const [statusModalTenant, setStatusModalTenant] = useState<Tenant | null>(null);
 
+  // Check for onboarding data passed from /onboarding
+  const onboardingName = searchParams?.get('onboarding_name');
+  const onboardingPhone = searchParams?.get('onboarding_phone');
+  const onboardingBusinessType = searchParams?.get('onboarding_business_type');
+  const hasOnboardingData = !!(onboardingName || onboardingPhone || onboardingBusinessType);
+
   const openStatusModal = async (tenant: Tenant) => {
     // Refresh data first to ensure we have the latest status
     await refresh();
@@ -106,6 +112,25 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     setStatusModalTenant(null);
     // Refresh the tenant list after status change
     refresh();
+  };
+
+  // Auto-open create modal if onboarding data is present
+  useEffect(() => {
+    if (hasOnboardingData && !createModalOpen) {
+      setCreateModalOpen(true);
+    }
+  }, [hasOnboardingData]);
+
+  const handleCreateModalClose = () => {
+    setCreateModalOpen(false);
+    // Clear onboarding params from URL when modal is closed
+    if (hasOnboardingData) {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('onboarding_name');
+      newUrl.searchParams.delete('onboarding_phone');
+      newUrl.searchParams.delete('onboarding_business_type');
+      router.replace(newUrl.pathname + newUrl.search, { scroll: false });
+    }
   };
 
   useEffect(() => {
@@ -247,6 +272,11 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       
       // Refresh tenant list to get the new tenant
       await refresh();
+      
+      // If this was from onboarding flow, redirect to profile page
+      if (hasOnboardingData) {
+        router.replace('/settings/profile');
+      }
       
       //console.log('[TenantsClient] Tenant created successfully:', newTenant.id);
     } catch (err) {
@@ -664,9 +694,14 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       {/* Create Tenant Modal */}
       <CreateTenantModal
         isOpen={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
+        onClose={handleCreateModalClose}
         onCreate={onCreate}
         loading={loading}
+        initialData={hasOnboardingData ? {
+          name: onboardingName || '',
+          phone: onboardingPhone || '',
+          businessType: onboardingBusinessType || '',
+        } : undefined}
       />
     </Container>
   );

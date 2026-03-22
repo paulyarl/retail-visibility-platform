@@ -377,9 +377,9 @@ class TenantManagementService extends TenantApiSingleton {
   async getSpecialBusinessHours(tenantId: string): Promise<any> {
     try {
       const response = await this.makeDefaultRequest(
-        `/api/tenant/${tenantId}/business-hours`,
+        `/api/tenant/${tenantId}/business-hours/special`,
         {},
-        `business-hours-${tenantId}`,
+        `business-hours-special-${tenantId}`,
         this.PROFILE_TTL
       );
       
@@ -388,9 +388,9 @@ class TenantManagementService extends TenantApiSingleton {
         return null;
       }
       
-      // API returns { success: true, data: { timezone, periods, overrides? } }
+      // API returns { success: true, data: { overrides } }
       const data = response.data as any;
-      return data?.data?.overrides || data?.data || data || null;
+      return data?.data || data || null;
     } catch (error) {
       console.error('[TenantManagementService] Error fetching special business hours:', error);
       return null;

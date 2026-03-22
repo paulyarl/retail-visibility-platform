@@ -453,7 +453,13 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
             )}
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900">
-                {isAuthenticated ? (tenantData?.name ? `${tenantData.name} Dashboard` : 'Welcome to Your Dashboard') : 'Platform Overview'}
+                {isAuthenticated 
+                  ? (user?.firstName 
+                      ? `Welcome, ${user.firstName}!` 
+                      : (user?.businessName 
+                          ? `${user.businessName} Dashboard` 
+                          : 'Welcome to Your Dashboard'))
+                  : 'Platform Overview'}
               </h2>
               <p className="text-sm sm:text-base text-neutral-600 mt-1">
                 {isAuthenticated 

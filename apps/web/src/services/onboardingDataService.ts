@@ -76,7 +76,6 @@ export class OnboardingDataService {
       email: '',
       website: '',
       contact_person: '',
-      slug: '',
       logo_url: '',
       business_description: '',
       hours: null,
@@ -86,6 +85,7 @@ export class OnboardingDataService {
       longitude: null,
       admin_email: '',
       ...data,
+      // Don't default slug - only send if explicitly set
     };
   }
 

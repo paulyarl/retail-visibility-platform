@@ -31,6 +31,7 @@ function OnboardingContent() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [savedProfile, setSavedProfile] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -52,19 +53,21 @@ function OnboardingContent() {
       setFormData({
         firstName: existingState.firstName || user?.firstName || '',
         lastName: existingState.lastName || user?.lastName || '',
-        businessName: existingState.businessName || '',
-        businessType: existingState.businessType || '',
-        phone: existingState.phone || '',
+        businessName: existingState.businessName || user?.businessName || '',
+        businessType: existingState.businessType || user?.businessType || '',
+        phone: existingState.phone || user?.phone || '',
       });
     } else {
-      // Start new phase 1
+      // Start new phase 1 - load all available user data
       onboardingStateService.startPhase1();
       if (user) {
-        setFormData(prev => ({
-          ...prev,
-          firstName: user.firstName || prev.firstName,
-          lastName: user.lastName || prev.lastName,
-        }));
+        setFormData({
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          businessName: user.businessName || '',
+          businessType: user.businessType || '',
+          phone: user.phone || '',
+        });
       }
     }
   }, [user]);
@@ -98,6 +101,7 @@ function OnboardingContent() {
 
   const completeOnboarding = async () => {
     setIsSubmitting(true);
+    setError(null);
     try {
       const result = await userManagementService.completeOnboarding(formData);
 
@@ -114,9 +118,21 @@ function OnboardingContent() {
         setCurrentStep(ONBOARDING_STEPS.length - 1); // Show complete step
       } else {
         console.error('Onboarding failed:', result.error);
+        // Check if it's an authentication error
+        if (result.error?.includes('401') || result.error?.includes('Unauthorized') || result.error?.includes('Authentication required')) {
+          setError('Authentication failed. Please ensure cookies are enabled and any ad/privacy blockers are disabled for this site, then try again.');
+        } else {
+          setError(result.error || 'An error occurred. Please try again.');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Onboarding failed:', error);
+      // Check for 401 status
+      if (error?.status === 401 || error?.message?.includes('401')) {
+        setError('Authentication failed. Please ensure cookies are enabled and any ad/privacy blockers are disabled for this site, then try again.');
+      } else {
+        setError('An error occurred. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -127,7 +143,13 @@ function OnboardingContent() {
     if (tenantId) {
       router.replace(`/t/${tenantId}/onboarding`);
     } else {
-      router.replace('/tenants');
+      // Pass onboarding data to /tenants for "Add New Location" modal
+      const params = new URLSearchParams();
+      if (formData.businessName) params.set('onboarding_name', formData.businessName);
+      if (formData.phone) params.set('onboarding_phone', formData.phone);
+      if (formData.businessType) params.set('onboarding_business_type', formData.businessType);
+      const queryString = params.toString();
+      router.replace(`/tenants${queryString ? `?${queryString}` : ''}`);
     }
   };
 
@@ -137,7 +159,13 @@ function OnboardingContent() {
       // Phase 1 already marked complete, just navigate
       router.push(`/t/${tenantId}/onboarding?fromPhase1=true`);
     } else {
-      router.push('/tenants');
+      // Pass onboarding data to /tenants for "Add New Location" modal
+      const params = new URLSearchParams();
+      if (formData.businessName) params.set('onboarding_name', formData.businessName);
+      if (formData.phone) params.set('onboarding_phone', formData.phone);
+      if (formData.businessType) params.set('onboarding_business_type', formData.businessType);
+      const queryString = params.toString();
+      router.push(`/tenants${queryString ? `?${queryString}` : ''}`);
     }
   };
 
@@ -269,6 +297,24 @@ function OnboardingContent() {
               {/* Business Step */}
               {currentStep === 2 && (
                 <div className="space-y-4">
+                  {/* Error message */}
+                  {error && (
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-1.964-1.333-2.732 0L3.732 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <div>
+                          <p className="text-sm font-medium text-red-800">{error}</p>
+                          {(error.includes('cookies') || error.includes('blockers')) && (
+                            <p className="text-xs text-red-600 mt-1">
+                              Tip: Check your browser settings to allow cookies and disable privacy/ad blockers for localhost or visibleshelf.store
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <Input
                     label="Business Name"
                     value={formData.businessName}

@@ -131,6 +131,9 @@ router.get('/profile', async (req, res) => {
         email: true,
         first_name: true,
         last_name: true,
+        business_name: true,
+        business_type: true,
+        phone: true,
         role: true,
         is_active: true,
         email_verified: true,
@@ -189,6 +192,9 @@ router.get('/profile', async (req, res) => {
       name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
       firstName: user.first_name,
       lastName: user.last_name,
+      businessName: user.business_name,
+      businessType: user.business_type,
+      phone: user.phone,
       role: user.role,
       
       // Platform context
@@ -230,6 +236,66 @@ router.get('/profile', async (req, res) => {
   } catch (error) {
     console.error('[GET /user/profile] Error:', error);
     res.status(500).json({ error: 'failed_to_fetch_profile' });
+  }
+});
+
+/**
+ * PATCH /user/profile - Update current user's profile
+ * Users can update their own profile fields
+ */
+router.patch('/profile', async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+
+    const { first_name, last_name, business_name, business_type, phone } = req.body;
+
+    // Build update data with only provided fields
+    const updateData: any = { updated_at: new Date() };
+    if (first_name !== undefined) updateData.first_name = first_name;
+    if (last_name !== undefined) updateData.last_name = last_name;
+    if (business_name !== undefined) updateData.business_name = business_name;
+    if (business_type !== undefined) updateData.business_type = business_type;
+    if (phone !== undefined) updateData.phone = phone;
+
+    const updatedUser = await prisma.users.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        first_name: true,
+        last_name: true,
+        business_name: true,
+        business_type: true,
+        phone: true,
+        role: true,
+        email_verified: true,
+        onboarding_completed: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.first_name,
+        lastName: updatedUser.last_name,
+        businessName: updatedUser.business_name,
+        businessType: updatedUser.business_type,
+        phone: updatedUser.phone,
+        role: updatedUser.role,
+        emailVerified: updatedUser.email_verified,
+        onboardingCompleted: updatedUser.onboarding_completed,
+      },
+    });
+  } catch (error) {
+    console.error('[PATCH /user/profile] Error:', error);
+    res.status(500).json({ error: 'failed_to_update_profile' });
   }
 });
 

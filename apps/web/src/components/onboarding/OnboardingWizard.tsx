@@ -145,8 +145,12 @@ export default function OnboardingWizard({
   // Handlers
   const handleNext = async () => {
     if (currentStep >= 1 && currentStep <= 4) {
-      // Save data at each step, then advance
-      await save(businessData);
+      // Save data at each step, capture response for next step
+      const savedData = await save(businessData);
+      // Update businessData with the server response so next step has accurate data
+      if (savedData) {
+        setBusinessData(savedData);
+      }
       goNext();
     } else if (currentStep === 5) {
       handleComplete();

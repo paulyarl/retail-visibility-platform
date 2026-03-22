@@ -207,6 +207,11 @@ export const onboardingProfileSchema = z.object({
     .max(100, 'Slug must be less than 100 characters')
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase letters, numbers, and hyphens only')
     .optional(),
+  
+  // Map coordinates - required for proper business location display
+  latitude: z.number({ message: 'Latitude is required - click "Get Coordinates" to populate' }),
+  
+  longitude: z.number({ message: 'Longitude is required - click "Get Coordinates" to populate' }),
 });
 
 import { externalApiService } from '@/services/ExternalApiService';

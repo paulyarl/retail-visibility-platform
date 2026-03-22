@@ -365,8 +365,9 @@ export async function checkTenantAccess(req: Request, res: Response, next: NextF
 
 /**
  * Optional authentication - adds user to request if token is valid, but doesn't require it
+ * Supports both JWT tokens and Auth0 session headers
  */
-export function optionalAuth(req: Request, res: Response, next: NextFunction) {
+export async function optionalAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -374,6 +375,62 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
     if (token) {
       const payload = authService.verifyAccessToken(token);
       req.user = payload;
+      return next();
+    }
+
+    // Also check for Auth0 session headers (set by web app from cookies)
+    const auth0Id = req.headers['x-auth0-id'] as string;
+    const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
+
+    if (auth0Id || auth0Email) {
+      const { prisma } = await import('../prisma');
+      
+      let user = null;
+      
+      // Try by auth0_id first (most reliable)
+      if (auth0Id) {
+        user = await prisma.users.findUnique({
+          where: { auth0_id: auth0Id },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            auth0_id: true,
+            user_tenants: {
+              select: { tenant_id: true }
+            }
+          }
+        });
+      }
+      
+      // Fallback to email lookup
+      if (!user && auth0Email) {
+        user = await prisma.users.findUnique({
+          where: { email: auth0Email.toLowerCase() },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            auth0_id: true,
+            user_tenants: {
+              select: { tenant_id: true }
+            }
+          }
+        });
+      }
+
+      if (user) {
+        const payload: JWTPayload = {
+          id: user.id,
+          userId: user.id,
+          user_id: user.id,
+          email: user.email,
+          role: user.role as user_role,
+          tenantIds: user.user_tenants?.map((ut: any) => ut.tenant_id) || []
+        };
+        
+        req.user = makeBothConventionsAvailable(payload);
+      }
     }
   } catch (error) {
     // Silently fail - authentication is optional

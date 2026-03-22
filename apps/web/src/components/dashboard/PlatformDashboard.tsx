@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Card, Button } from '@mantine/core';
+import { Card, Button, Tooltip } from '@mantine/core';
 import { Badge, AnimatedCard } from "@/components/ui";
 import { usePlatformComplete } from "@/hooks/dashboard/usePlatformComplete";
 import { motion } from "framer-motion";
@@ -134,24 +134,32 @@ export default function PlatformDashboard() {
             
             {/* Desktop Navigation */}
             <div className="hidden sm:flex items-center gap-2 md:gap-3">
-              <Link href="/tenants">
-                <Button variant="ghost" size="sm">My Stores</Button>
-              </Link>
-              <Link href="/settings">
-                <Button variant="ghost" size="sm">Settings</Button>
-              </Link>
+              <Tooltip label="Manage your store locations">
+                <Link href="/tenants">
+                  <Button variant="ghost" size="sm">My Stores</Button>
+                </Link>
+              </Tooltip>
+              <Tooltip label="Account and platform settings">
+                <Link href="/settings">
+                  <Button variant="ghost" size="sm">Settings</Button>
+                </Link>
+              </Tooltip>
               {isAuthenticated ? (
-                <Button 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={async () => { await logout(); }}
-                >
-                  Sign Out
-                </Button>
+                <Tooltip label="Sign out of your account">
+                  <Button 
+                    variant="secondary" 
+                    size="sm"
+                    onClick={async () => { await logout(); }}
+                  >
+                    Sign Out
+                  </Button>
+                </Tooltip>
               ) : (
-                <a href="/auth/login">
-                  <Button variant="secondary" size="sm">Sign In</Button>
-                </a>
+                <Tooltip label="Sign in to your account">
+                  <a href="/auth/login">
+                    <Button variant="secondary" size="sm">Sign In</Button>
+                  </a>
+                </Tooltip>
               )}
             </div>
 
@@ -209,7 +217,13 @@ export default function PlatformDashboard() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-2">
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900">
-                {isAuthenticated ? 'Platform Dashboard' : 'Welcome to Visible Shelf'}
+                {isAuthenticated 
+                  ? (user?.firstName 
+                      ? `Welcome, ${user.firstName}! | Platform Dashboard`
+                      : (user?.businessName 
+                          ? `${user.businessName} | Platform Dashboard`
+                          : 'Platform Dashboard'))
+                  : 'Welcome to Visible Shelf'}
               </h2>
               <p className="text-sm sm:text-base text-neutral-600 mt-1">
                 {isAuthenticated 

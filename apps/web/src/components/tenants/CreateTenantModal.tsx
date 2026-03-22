@@ -5,19 +5,22 @@ import { Modal, ModalFooter, Button, Input, Select } from '@/components/ui';
 import SlugPatternSelector from '@/components/shops/SlugPatternSelector';
 import { countries } from '@/lib/validation/businessProfile';
 
-interface CreateTenantModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onCreate: (data: TenantCreationData) => Promise<void>;
-  loading?: boolean;
-}
-
 export interface TenantCreationData {
   name: string;
   slug?: string;
   city?: string;
   state?: string;
   country_code?: string;
+  phone?: string;
+  businessType?: string;
+}
+
+interface CreateTenantModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreate: (data: TenantCreationData) => Promise<void>;
+  loading?: boolean;
+  initialData?: Partial<TenantCreationData>;
 }
 
 export default function CreateTenantModal({
@@ -25,14 +28,17 @@ export default function CreateTenantModal({
   onClose,
   onCreate,
   loading = false,
+  initialData,
 }: CreateTenantModalProps) {
-  const [formData, setFormData] = useState<TenantCreationData>({
-    name: '',
-    slug: '',
-    city: '',
-    state: '',
-    country_code: 'US',
-  });
+  const [formData, setFormData] = useState<TenantCreationData>(() => ({
+    name: initialData?.name || '',
+    slug: initialData?.slug || '',
+    city: initialData?.city || '',
+    state: initialData?.state || '',
+    country_code: initialData?.country_code || 'US',
+    phone: initialData?.phone || '',
+    businessType: initialData?.businessType || '',
+  }));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleChange = (field: keyof TenantCreationData, value: string) => {
@@ -89,6 +95,8 @@ export default function CreateTenantModal({
       city: '',
       state: '',
       country_code: 'US',
+      phone: '',
+      businessType: '',
     });
     setErrors({});
     onClose();
@@ -111,6 +119,25 @@ export default function CreateTenantModal({
           error={errors.name}
           required
         />
+
+        {/* Business Type - from onboarding */}
+        {initialData?.businessType && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <p className="text-sm text-green-800">
+              <strong>Business Type:</strong> {initialData.businessType}
+            </p>
+          </div>
+        )}
+
+        {/* Phone - from onboarding */}
+        {initialData?.phone && (
+          <Input
+            label="Phone"
+            value={initialData.phone}
+            disabled
+            helperText="From onboarding"
+          />
+        )}
 
         {/* Optional Location Details */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

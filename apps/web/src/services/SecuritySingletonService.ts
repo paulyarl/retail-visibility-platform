@@ -75,6 +75,9 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
           email: userData.email,
           firstName: userData.first_name || userData.firstName,
           lastName: userData.last_name || userData.lastName,
+          businessName: userData.business_name || userData.businessName,
+          businessType: userData.business_type || userData.businessType,
+          phone: userData.phone,
           emailVerified: userData.email_verified ?? userData.emailVerified ?? true,
           role: userData.role,
           tenants: userData.user_tenants?.map((ut: any) => ({

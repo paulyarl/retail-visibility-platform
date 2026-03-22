@@ -10,6 +10,12 @@ import { useEffect } from 'react';
  */
 export default function LogoutPage() {
   useEffect(() => {
+    // Clear auth0 cookies before redirecting to Auth0 logout
+    // These cookies are used for API authentication and must be cleared
+    // to prevent automatic re-authentication after logout
+    document.cookie = 'auth0_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    document.cookie = 'auth0_email=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    
     // Redirect to Auth0 logout
     window.location.href = '/auth/logout';
   }, []);

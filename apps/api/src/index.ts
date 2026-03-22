@@ -1401,9 +1401,9 @@ const HTTPS_URL = /^https:\/\//i;
 const tenantProfileSchema = z.object({
   tenant_id: z.string().min(1),
   business_name: z.string().min(1).optional(),
-  slug: z.string().optional(),
+  slug: z.string().optional().nullable().transform(v => v || undefined),
   address_line1: z.string().optional(),
-  address_line2: z.string().optional(),
+  address_line2: z.string().optional().nullable().transform(v => v || undefined),
   city: z.string().optional(),
   state: z.string().optional(),
   postal_code: z.string().optional(),
@@ -1424,7 +1424,9 @@ const tenantProfileSchema = z.object({
         return false; // Invalid URL format
       }
     }, { message: "Invalid URL" })
-    .optional(),
+    .optional()
+    .nullable()
+    .transform(v => v || undefined),
   contact_person: z.string().optional(),
   logo_url: z.string().url().optional().or(z.literal('')).nullable().transform(v => v || undefined),
   banner_url: z.string().url().optional().or(z.literal('')).nullable().transform(v => v || undefined),
@@ -1432,8 +1434,16 @@ const tenantProfileSchema = z.object({
   hours: z.any().optional(),
   social_links: z.any().optional(),
   seo_tags: z.any().optional(),
-  latitude: z.number().optional().nullable().transform(v => v ?? undefined),
-  longitude: z.number().optional().nullable().transform(v => v ?? undefined),
+  latitude: z.union([z.number(), z.string()]).optional().nullable().transform(v => {
+    if (v === null || v === undefined) return undefined;
+    const num = typeof v === 'string' ? parseFloat(v) : v;
+    return isNaN(num) ? undefined : num;
+  }),
+  longitude: z.union([z.number(), z.string()]).optional().nullable().transform(v => {
+    if (v === null || v === undefined) return undefined;
+    const num = typeof v === 'string' ? parseFloat(v) : v;
+    return isNaN(num) ? undefined : num;
+  }),
   display_map: z.boolean().optional(),
   map_privacy_mode: z.enum(["precise","neighborhood"]).optional(),
 });

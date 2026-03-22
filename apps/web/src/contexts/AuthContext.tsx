@@ -19,6 +19,9 @@ export interface User {
   email: string;
   firstName?: string;
   lastName?: string;
+  businessName?: string;
+  businessType?: string;
+  phone?: string;
   role: 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'ADMIN' | 'OWNER' | 'USER';
   emailVerified: boolean;
   tenants: {
@@ -130,6 +133,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: sessionInfo.user.email,
           firstName: sessionInfo.user.firstName,
           lastName: sessionInfo.user.lastName,
+          businessName: sessionInfo.user.businessName,
+          businessType: sessionInfo.user.businessType,
+          phone: sessionInfo.user.phone,
           emailVerified: sessionInfo.user.emailVerified,
           role: sessionInfo.user.role || 'USER',
           tenants: sessionInfo.user.tenants || (sessionInfo.user.tenant ? [{
@@ -187,14 +193,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clear cached auth data
       authContextSingleton.clearCachedAuthUser().catch(() => {});
       
-      // Redirect to Auth0 logout (handled by Auth0 SDK middleware)
+      // Clear auth0 cookies - these are used for API authentication
       if (typeof window !== 'undefined') {
+        // Clear auth0_id cookie
+        document.cookie = 'auth0_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        // Clear auth0_email cookie
+        document.cookie = 'auth0_email=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        
+        // Redirect to Auth0 logout (handled by Auth0 SDK middleware)
         window.location.href = '/auth/logout';
       }
     } catch (error) {
       console.error('[AuthContext] Logout failed:', error);
       // Still redirect to Auth0 logout even if local clear fails
       if (typeof window !== 'undefined') {
+        // Still try to clear cookies
+        document.cookie = 'auth0_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        document.cookie = 'auth0_email=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         window.location.href = '/auth/logout';
       }
     }

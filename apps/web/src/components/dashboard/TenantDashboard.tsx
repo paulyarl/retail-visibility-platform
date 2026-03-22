@@ -2,6 +2,7 @@
 
 import { lazy, Suspense } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
+import { Button, Tooltip } from '@mantine/core';
 // Replace separate hooks with consolidated hook
 import { useTenantComplete } from "@/hooks/dashboard/useTenantComplete";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -213,6 +214,68 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   
   return (
     <div className="min-h-screen bg-neutral-50">
+      {/* Header */}
+      <header className="bg-white border-b border-neutral-200 relative">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            {businessProfile?.logo_url ? (
+              <Link href={`/t/${tenantId}/dashboard`}>
+                <Image
+                  src={businessProfile.logo_url}
+                  alt={tenantData?.name || 'Store Logo'}
+                  width={150}
+                  height={40}
+                  className="object-contain cursor-pointer"
+                />
+              </Link>
+            ) : (
+              <Link href={`/t/${tenantId}/dashboard`}>
+                <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 cursor-pointer hover:text-primary-600 transition-colors">
+                  {tenantData?.name || 'Store Dashboard'}
+                </h1>
+              </Link>
+            )}
+            
+            {/* Desktop Navigation */}
+            <div className="hidden sm:flex items-center gap-2 md:gap-3">
+              <Tooltip label="Store profile and branding">
+                <Link href={`/t/${tenantId}/settings/tenant`}>
+                  <Button variant="ghost" size="sm">Profile</Button>
+                </Link>
+              </Tooltip>
+              <Tooltip label="Manage products and inventory">
+                <Link href={`/t/${tenantId}/items`}>
+                  <Button variant="ghost" size="sm">Inventory</Button>
+                </Link>
+              </Tooltip>
+              <Tooltip label="View and manage orders">
+                <Link href={`/t/${tenantId}/orders`}>
+                  <Button variant="ghost" size="sm">Orders</Button>
+                </Link>
+              </Tooltip>
+              <Tooltip label="Google Business Profile integration">
+                <Link href={`/t/${tenantId}/settings/google`}>
+                  <Button variant="ghost" size="sm">Google</Button>
+                </Link>
+              </Tooltip>
+              <Tooltip label="Data sync and feed status">
+                <Link href={`/t/${tenantId}/settings/sync`}>
+                  <Button variant="ghost" size="sm">Sync</Button>
+                </Link>
+              </Tooltip>
+              <Tooltip label="Store settings and configuration">
+                <Link href={`/t/${tenantId}/settings`}>
+                  <Button variant="ghost" size="sm">Settings</Button>
+                </Link>
+              </Tooltip>
+            </div>
+
+            {/* Mobile Menu Button */}
+            <MobileMenuButton tenantId={tenantId} />
+          </div>
+        </div>
+      </header>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Top Bar: User Profile + Tier Badge + Tenant Limits */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -634,5 +697,54 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
 
       </div>
     </div>
+  );
+}
+
+// Mobile Menu Button Component
+function MobileMenuButton({ tenantId }: { tenantId: string }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        className="sm:hidden p-2 rounded-lg hover:bg-neutral-100 transition-colors"
+        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        aria-label="Toggle menu"
+      >
+        <svg className="h-6 w-6 text-neutral-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          {mobileMenuOpen ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          )}
+        </svg>
+      </button>
+
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div className="sm:hidden absolute top-full left-0 right-0 bg-white border-b border-neutral-200 shadow-lg z-50">
+          <div className="max-w-7xl mx-auto px-3 py-4 space-y-2">
+            <Link href={`/t/${tenantId}/settings/tenant`} className="block" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="subtle" fullWidth size="md">Profile</Button>
+            </Link>
+            <Link href={`/t/${tenantId}/items`} className="block" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="subtle" fullWidth size="md">Inventory</Button>
+            </Link>
+            <Link href={`/t/${tenantId}/orders`} className="block" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="subtle" fullWidth size="md">Orders</Button>
+            </Link>
+            <Link href={`/t/${tenantId}/settings/google`} className="block" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="subtle" fullWidth size="md">Google</Button>
+            </Link>
+            <Link href={`/t/${tenantId}/settings/sync`} className="block" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="subtle" fullWidth size="md">Sync</Button>
+            </Link>
+            <Link href={`/t/${tenantId}/settings`} className="block" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="subtle" fullWidth size="md">Settings</Button>
+            </Link>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

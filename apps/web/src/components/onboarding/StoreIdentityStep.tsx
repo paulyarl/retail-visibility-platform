@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Input, Select, Alert } from '@/components/ui';
-import { BusinessProfile, onboardingProfileSchema, countries, normalizePhoneInput } from '@/lib/validation/businessProfile';
+import { Input, Select, Alert, Button } from '@/components/ui';
+import { BusinessProfile, onboardingProfileSchema, countries, normalizePhoneInput, geocodeAddress } from '@/lib/validation/businessProfile';
 import { addressParser } from '@/lib/address-parser';
 import { z } from 'zod';
 import SlugPatternSelector from '@/components/tenants/SlugPatternSelector';
@@ -41,6 +41,7 @@ export default function StoreIdentityStep({
   const [formData, setFormData] = useState<Partial<BusinessProfile>>(sanitizedInitialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [geocoding, setGeocoding] = useState(false);
   const hasInitializedFromInitialData = useRef(false);
 
   // Update formData when initialData changes (e.g., when API data loads)
@@ -223,6 +224,41 @@ export default function StoreIdentityStep({
     }
   };
 
+  // Handle geocoding to get coordinates from address
+  const handleGeocodeAddress = async () => {
+    if (!formData.address_line1 || !formData.city || !formData.postal_code || !formData.country_code) {
+      return;
+    }
+
+    setGeocoding(true);
+
+    try {
+      const coordinates = await geocodeAddress({
+        address_line1: formData.address_line1,
+        address_line2: formData.address_line2,
+        city: formData.city,
+        state: formData.state,
+        postal_code: formData.postal_code,
+        country_code: formData.country_code,
+      });
+
+      if (coordinates) {
+        console.log('[StoreIdentityStep] Got coordinates:', coordinates);
+        const newData = {
+          ...formData,
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
+        };
+        setFormData(newData);
+        onDataChange(newData);
+      }
+    } catch (err) {
+      console.error('[StoreIdentityStep] Failed to geocode address:', err);
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -295,19 +331,6 @@ export default function StoreIdentityStep({
           </p>
         </div>
 
-        {/* Slug Pattern Selector */}
-        <SlugPatternSelector
-          businessName={formData.business_name || ''}
-          location={{
-            city: formData.city,
-            state: formData.state,
-            country: formData.country_code,
-          }}
-          tenantId={tenantId}
-          selectedSlug={(formData as any).slug || ''}
-          onSlugSelect={(slug) => handleChange('slug' as any, slug)}
-        />
-
         {/* Address Line 1 */}
         <Input
           label="Address Line 1"
@@ -357,6 +380,54 @@ export default function StoreIdentityStep({
             </option>
           ))}
         </Select>
+
+        {/* Slug Pattern Selector */}
+        <SlugPatternSelector
+          businessName={formData.business_name || ''}
+          location={{
+            city: formData.city,
+            state: formData.state,
+            country: formData.country_code,
+          }}
+          tenantId={tenantId}
+          selectedSlug={(formData as any).slug || ''}
+          onSlugSelect={(slug) => handleChange('slug' as any, slug)}
+        />
+
+        {/* Map Coordinates (Geocoding) */}
+        <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-neutral-900 dark:text-white mb-1">
+                Map Coordinates
+              </h4>
+              <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                Get latitude and longitude for map display
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleGeocodeAddress}
+              disabled={geocoding || !formData.address_line1 || !formData.city || !formData.postal_code || !formData.country_code}
+              loading={geocoding}
+            >
+              {geocoding ? 'Getting...' : 'Get Coordinates'}
+            </Button>
+          </div>
+          
+          {formData.latitude && formData.longitude && (
+            <div className="flex items-center gap-2 text-xs text-green-700 dark:text-green-400">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>
+                Coordinates: {Number(formData.latitude).toFixed(6)}, {Number(formData.longitude).toFixed(6)}
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* Phone Number */}
         <Input

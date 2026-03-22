@@ -2,12 +2,28 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card } from '@mantine/core';
-import { Button } from '@mantine/core';
-import { Badge } from '@/components/ui/Badge';
-import { Pagination } from '@/components/ui/Pagination';
-import PageHeader, { Icons } from '@/components/PageHeader';
-import { Shield, User, Building2, Crown, Navigation, ArrowRight } from 'lucide-react';
+import {
+  Card,
+  TextInput,
+  Select,
+  Button,
+  Stack,
+  Group,
+  Title,
+  Text,
+  ThemeIcon,
+  Paper,
+  Divider,
+  Badge,
+  Avatar,
+  Box,
+  Grid,
+  Radio,
+  Spoiler,
+  Loader,
+  rem,
+} from '@mantine/core';
+import { IconUser, IconShield, IconBuilding, IconCrown, IconNavigation, IconCheck, IconLock, IconEdit, IconX, IconDeviceFloppy } from '@tabler/icons-react';
 import TenantLimitBadge from '@/components/tenant/TenantLimitBadge';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 import { useTenantLimits } from '@/hooks/useTenantLimits';
@@ -25,6 +41,30 @@ export default function AccountPage() {
   const [navigationPreference, setNavigationPreference] = useState<'last-visited' | 'current-page'>('last-visited');
   const [savingPreference, setSavingPreference] = useState(false);
 
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    firstName: '',
+    lastName: '',
+    businessName: '',
+    businessType: '',
+    phone: '',
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // Initialize edit form when user data changes
+  useEffect(() => {
+    if (user) {
+      setEditFormData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        businessName: user.businessName || '',
+        businessType: user.businessType || '',
+        phone: user.phone || '',
+      });
+    }
+  }, [user]);
+
   // Load navigation preference from server
   useEffect(() => {
     const loadPreference = async () => {
@@ -34,7 +74,6 @@ export default function AccountPage() {
         const preferences = await userManagementService.getUserPreferences();
         if (preferences?.navigationPreference) {
           setNavigationPreference(preferences.navigationPreference as 'last-visited' | 'current-page');
-          // Also update localStorage for immediate use in tenant switcher
           if (user && user.id) {
             localStorage.setItem(`user-nav-preference-${user.id}`, preferences.navigationPreference);
           }
@@ -57,7 +96,6 @@ export default function AccountPage() {
 
       if (updatedPreferences) {
         setNavigationPreference(preference);
-        // Also update localStorage for immediate use in tenant switcher
         if (user && user.id) {
           localStorage.setItem(`user-nav-preference-${user.id}`, preference);
         }
@@ -75,37 +113,6 @@ export default function AccountPage() {
     return tenantLimitStatus.tenants.find((t: any) => t.id === tenantId);
   };
 
-  // Format tier name for display
-  const formatTierName = (tier: string) => {
-    return tier.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
-  };
-
-  // Get tier badge color
-  const getTierBadgeColor = (tier: string) => {
-    switch (tier) {
-      case 'organization': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
-      case 'enterprise': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
-      case 'professional': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
-      case 'starter': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
-      case 'google_only': return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
-      case 'trial': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300';
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
-    }
-  };
-
-  // Get status badge color
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
-      case 'inactive': return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
-      case 'suspended': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
-      case 'trial': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300';
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
-    }
-  };
-
   // Paginate tenants
   const paginatedTenants = useMemo(() => {
     if (!user?.tenants) return [];
@@ -114,38 +121,19 @@ export default function AccountPage() {
     return user.tenants.slice(startIndex, endIndex);
   }, [user?.tenants, currentPage, pageSize]);
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-        <PageHeader
-          title="Account"
-          description="Your account information and privileges"
-          icon={Icons.Settings}
-        />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-          <Card withBorder padding="lg" radius="md">
-            <div className="py-12 text-center">
-              <p className="text-neutral-600 dark:text-neutral-400">Loading account information...</p>
-            </div>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  const getRoleBadgeColor = (role: string) => {
+  const getRoleColor = (role: string) => {
     switch (role) {
       case 'PLATFORM_ADMIN':
       case 'ADMIN':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400';
+        return 'violet';
       case 'PLATFORM_SUPPORT':
-        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400';
+        return 'amber';
       case 'PLATFORM_VIEWER':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+        return 'gray';
       case 'OWNER':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
+        return 'blue';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+        return 'gray';
     }
   };
 
@@ -153,15 +141,13 @@ export default function AccountPage() {
     switch (role) {
       case 'PLATFORM_ADMIN':
       case 'ADMIN':
-        return <Shield className="w-5 h-5" />;
       case 'PLATFORM_SUPPORT':
-        return <Shield className="w-5 h-5" />;
       case 'PLATFORM_VIEWER':
-        return <Shield className="w-5 h-5" />;
+        return <IconShield style={{ width: rem(20), height: rem(20) }} />;
       case 'OWNER':
-        return <Crown className="w-5 h-5" />;
+        return <IconCrown style={{ width: rem(20), height: rem(20) }} />;
       default:
-        return <User className="w-5 h-5" />;
+        return <IconUser style={{ width: rem(20), height: rem(20) }} />;
     }
   };
 
@@ -235,287 +221,391 @@ export default function AccountPage() {
     }
   };
 
+  const getTierColor = (tier: string) => {
+    switch (tier) {
+      case 'organization': return 'blue';
+      case 'enterprise': return 'indigo';
+      case 'professional': return 'green';
+      case 'starter': return 'yellow';
+      case 'google_only': return 'gray';
+      case 'trial': return 'orange';
+      default: return 'gray';
+    }
+  };
+
+  const formatTierName = (tier: string) => {
+    return tier.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      await userManagementService.updateProfile(editFormData);
+      setIsEditing(false);
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to save profile:', error);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  if (!user) {
+    return (
+      <Stack align="center" justify="center" mih="60vh">
+        <Loader size="lg" />
+        <Text c="dimmed">Loading account information...</Text>
+      </Stack>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      <PageHeader
-        title="Account"
-        description="Your account information and privileges"
-        icon={Icons.Settings}
-      />
+    <Stack gap="lg" maw={900} mx="auto" p="md">
+      {/* Subscription Status Guide */}
+      <SubscriptionStatusGuide />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Subscription Status Guide: only visible during maintenance or freeze windows */}
-        <SubscriptionStatusGuide />
-
-        {/* User Information */}
-        <Card withBorder padding="lg" radius="md">
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                <User className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {user.firstName && user.lastName 
-                    ? `${user.firstName} ${user.lastName}`
-                    : user.email}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{user.email}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">First Name</p>
-                <p className="text-base text-gray-900 dark:text-white">{user.firstName || 'Not set'}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Name</p>
-                <p className="text-base text-gray-900 dark:text-white">{user.lastName || 'Not set'}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Email</p>
-                <p className="text-base text-gray-900 dark:text-white">{user.email}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">User ID</p>
-                <p className="text-xs font-mono text-gray-600 dark:text-gray-400">{user.id}</p>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Navigation Preferences */}
-        <Card withBorder padding="lg" radius="md">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Navigation className="w-5 h-5" />
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Navigation Preferences</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Choose how tenant switching behaves for you across all tenants</p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
-                   onClick={() => saveNavigationPreference('last-visited')}>
-                <div className="mt-1">
-                  <input
-                    type="radio"
-                    name="navigation-preference"
-                    checked={navigationPreference === 'last-visited'}
-                    onChange={() => saveNavigationPreference('last-visited')}
-                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="font-medium text-gray-900 dark:text-white">Navigate to Last Visited Page</p>
-                    <Badge variant="default" className="text-xs">Default</Badge>
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    When switching tenants, go to the last page you visited in that tenant
-                  </p>
-                  <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                    <ArrowRight className="w-3 h-3" />
-                    <span>Example: Switching from Tenant A dashboard to Tenant B shows Tenant B's last visited page</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
-                   onClick={() => saveNavigationPreference('current-page')}>
-                <div className="mt-1">
-                  <input
-                    type="radio"
-                    name="navigation-preference"
-                    checked={navigationPreference === 'current-page'}
-                    onChange={() => saveNavigationPreference('current-page')}
-                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900 dark:text-white mb-1">Stay on Current Page</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    When switching tenants, stay on the same page (if it exists in the new tenant)
-                  </p>
-                  <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                    <ArrowRight className="w-3 h-3" />
-                    <span>Example: Switching from Tenant A dashboard to Tenant B shows Tenant B's dashboard</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {savingPreference && (
-              <div className="flex items-center gap-2 text-sm text-blue-600">
-                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <span>Saving preference...</span>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {/* Platform Role & Privileges */}
-        <Card withBorder padding="lg" radius="md">
-          <div className="space-y-6">
-            {/* Platform Role */}
+      {/* Profile Card */}
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Group justify="space-between" mb="md">
+          <Group>
+            <Avatar size={60} radius="xl" color="blue" variant="gradient" gradient={{ from: 'blue', to: 'violet' }}>
+              <IconUser style={{ width: rem(30), height: rem(30) }} />
+            </Avatar>
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Platform Role</p>
-              <div className="flex items-center gap-3">
-                <div className={`p-3 rounded-lg ${getRoleBadgeColor(user.role)}`}>
-                  {getRoleIcon(user.role)}
-                </div>
-                <div>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{user.role}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{getRoleDescription(user.role)}</p>
-                </div>
-              </div>
+              <Title order={3}>
+                {user.firstName && user.lastName 
+                  ? `${user.firstName} ${user.lastName}`
+                  : user.email}
+              </Title>
+              <Text c="dimmed" size="sm">{user.email}</Text>
             </div>
+          </Group>
+          <Button
+            variant={isEditing ? 'subtle' : 'light'}
+            leftSection={isEditing ? <IconX size={16} /> : <IconEdit size={16} />}
+            onClick={() => {
+              if (isEditing) {
+                setEditFormData({
+                  firstName: user.firstName || '',
+                  lastName: user.lastName || '',
+                  businessName: user.businessName || '',
+                  businessType: user.businessType || '',
+                  phone: user.phone || '',
+                });
+              }
+              setIsEditing(!isEditing);
+            }}
+          >
+            {isEditing ? 'Cancel' : 'Edit Profile'}
+          </Button>
+        </Group>
 
-            {/* Platform Privileges */}
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">Platform Privileges</p>
-              <ul className="space-y-2">
-                {getPlatformPrivileges(user.role).map((privilege, index) => (
-                  <li key={index} className="flex items-start gap-2">
-                    <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{privilege}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </Card>
+        <Divider mb="md" />
 
-        {/* Location Capacity */}
-        <Card withBorder padding="lg" radius="md">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="h-3 w-3 rounded-full bg-blue-500"></div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                  Location Capacity
-                </p>
-                <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
-                  Your location creation limits based on your role and subscription tier
-                </p>
-              </div>
-            </div>
-            <TenantLimitBadge variant="full" showUpgrade={true} />
-          </div>
-        </Card>
-
-        {/* SKU Usage & Current Plan */}
-        <SubscriptionUsageBadge variant="card" showUpgradeLink={true} />
-
-        {/* Tenant Access */}
-        {user.tenants && user.tenants.length > 0 && (
-          <Card withBorder padding="lg" radius="md">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Tenant Access</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Stores and locations you have access to</p>
-                </div>
-                <Badge variant="info">
-                  {user.tenants.length} {user.tenants.length === 1 ? 'Location' : 'Locations'}
-                </Badge>
-              </div>
-              <div className="space-y-3">
-                {paginatedTenants.map((tenant) => {
-                  const tenantDetails = getTenantDetails(tenant.id);
-                  return (
-                    <div
-                      key={tenant.id}
-                      className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                          <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">{tenant.name}</p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 font-mono">{tenant.id}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {tenantDetails && (
-                          <>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getTierBadgeColor(tenantDetails.tier)}`}>
-                              {formatTierName(tenantDetails.tier)}
-                            </span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${getStatusBadgeColor(tenantDetails.status)}`}>
-                              {tenantDetails.status}
-                            </span>
-                          </>
-                        )}
-                        <Badge className={getRoleBadgeColor(tenant.role)}>
-                          {tenant.role}
-                        </Badge>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              {/* Pagination */}
-              {user.tenants.length > 10 && (
-                <div className="mt-6">
-                  <Pagination
-                    currentPage={currentPage}
-                    totalItems={user.tenants.length}
-                    pageSize={pageSize}
-                    onPageChange={setCurrentPage}
-                    onPageSizeChange={(size) => {
-                      setPageSize(size);
-                      setCurrentPage(1);
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          </Card>
+        {isEditing ? (
+          <Stack gap="md">
+            <Grid>
+              <Grid.Col span={{ base: 12, sm: 6 }}>
+                <TextInput
+                  label="First Name"
+                  value={editFormData.firstName}
+                  onChange={(e) => setEditFormData({ ...editFormData, firstName: e.target.value })}
+                  placeholder="Enter first name"
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6 }}>
+                <TextInput
+                  label="Last Name"
+                  value={editFormData.lastName}
+                  onChange={(e) => setEditFormData({ ...editFormData, lastName: e.target.value })}
+                  placeholder="Enter last name"
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6 }}>
+                <TextInput
+                  label="Business Name"
+                  value={editFormData.businessName}
+                  onChange={(e) => setEditFormData({ ...editFormData, businessName: e.target.value })}
+                  placeholder="Enter business name"
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6 }}>
+                <Select
+                  label="Business Type"
+                  value={editFormData.businessType}
+                  onChange={(value) => setEditFormData({ ...editFormData, businessType: value || '' })}
+                  data={[
+                    { value: 'retail', label: 'Retail Store' },
+                    { value: 'restaurant', label: 'Restaurant/Food Service' },
+                    { value: 'service', label: 'Service Business' },
+                    { value: 'ecommerce', label: 'E-commerce' },
+                    { value: 'other', label: 'Other' },
+                  ]}
+                  placeholder="Select business type"
+                  clearable
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6 }}>
+                <TextInput
+                  label="Phone"
+                  value={editFormData.phone}
+                  onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                  placeholder="Enter phone number"
+                />
+              </Grid.Col>
+            </Grid>
+            <Group justify="flex-end">
+              <Button
+                leftSection={<IconDeviceFloppy size={16} />}
+                onClick={handleSaveProfile}
+                loading={savingProfile}
+              >
+                Save Changes
+              </Button>
+            </Group>
+          </Stack>
+        ) : (
+          <Grid>
+            <Grid.Col span={{ base: 12, sm: 6 }}>
+              <Text size="xs" c="dimmed" tt="uppercase" fw={500}>First Name</Text>
+              <Text>{user.firstName || 'Not set'}</Text>
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6 }}>
+              <Text size="xs" c="dimmed" tt="uppercase" fw={500}>Last Name</Text>
+              <Text>{user.lastName || 'Not set'}</Text>
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6 }}>
+              <Text size="xs" c="dimmed" tt="uppercase" fw={500}>Business Name</Text>
+              <Text>{user.businessName || 'Not set'}</Text>
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6 }}>
+              <Text size="xs" c="dimmed" tt="uppercase" fw={500}>Business Type</Text>
+              <Text>
+                {user.businessType === 'retail' ? 'Retail Store' :
+                 user.businessType === 'restaurant' ? 'Restaurant/Food Service' :
+                 user.businessType === 'service' ? 'Service Business' :
+                 user.businessType === 'ecommerce' ? 'E-commerce' :
+                 user.businessType === 'other' ? 'Other' :
+                 user.businessType || 'Not set'}
+              </Text>
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6 }}>
+              <Text size="xs" c="dimmed" tt="uppercase" fw={500}>Phone</Text>
+              <Text>{user.phone || 'Not set'}</Text>
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6 }}>
+              <Text size="xs" c="dimmed" tt="uppercase" fw={500}>Email</Text>
+              <Text>{user.email}</Text>
+            </Grid.Col>
+            <Grid.Col span={12}>
+              <Text size="xs" c="dimmed" tt="uppercase" fw={500}>User ID</Text>
+              <Text size="xs" ff="monospace" c="dimmed">{user.id}</Text>
+            </Grid.Col>
+          </Grid>
         )}
+      </Card>
 
-        {/* Account Status */}
-        <Card withBorder padding="lg" radius="md">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="h-3 w-3 rounded-full bg-green-500"></div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-green-900 dark:text-green-100">
-                  Account Status
-                </p>
-                <p className="text-xs text-green-800 dark:text-green-200 mt-1">
-                  Your account health and activity
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-medium text-green-900 dark:text-green-100">Account Active</p>
-                  <p className="text-xs text-green-700 dark:text-green-300">All systems operational</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Secure</p>
-                  <p className="text-xs text-blue-700 dark:text-blue-300">Authentication verified</p>
-                </div>
-              </div>
-            </div>
+      {/* Navigation Preferences */}
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Group mb="md">
+          <ThemeIcon size="lg" radius="md" variant="light" color="blue">
+            <IconNavigation style={{ width: rem(20), height: rem(20) }} />
+          </ThemeIcon>
+          <div>
+            <Title order={4}>Navigation Preferences</Title>
+            <Text size="sm" c="dimmed">Choose how tenant switching behaves</Text>
           </div>
+        </Group>
+
+        <Stack gap="xs">
+          <Paper
+            p="md"
+            radius="md"
+            withBorder
+            style={{ cursor: 'pointer', borderColor: navigationPreference === 'last-visited' ? 'var(--mantine-color-blue-6)' : undefined }}
+            onClick={() => saveNavigationPreference('last-visited')}
+          >
+            <Group>
+              <Radio checked={navigationPreference === 'last-visited'} onChange={() => {}} />
+              <div style={{ flex: 1 }}>
+                <Group justify="space-between">
+                  <Text fw={500}>Navigate to Last Visited Page</Text>
+                  <Badge size="xs" variant="light">Default</Badge>
+                </Group>
+                <Text size="sm" c="dimmed">When switching tenants, go to the last page you visited in that tenant</Text>
+              </div>
+            </Group>
+          </Paper>
+
+          <Paper
+            p="md"
+            radius="md"
+            withBorder
+            style={{ cursor: 'pointer', borderColor: navigationPreference === 'current-page' ? 'var(--mantine-color-blue-6)' : undefined }}
+            onClick={() => saveNavigationPreference('current-page')}
+          >
+            <Group>
+              <Radio checked={navigationPreference === 'current-page'} onChange={() => {}} />
+              <div style={{ flex: 1 }}>
+                <Text fw={500}>Stay on Current Page</Text>
+                <Text size="sm" c="dimmed">When switching tenants, stay on the same page (if it exists in the new tenant)</Text>
+              </div>
+            </Group>
+          </Paper>
+        </Stack>
+
+        {savingPreference && (
+          <Group gap="xs" mt="sm">
+            <Loader size="xs" />
+            <Text size="sm" c="blue">Saving preference...</Text>
+          </Group>
+        )}
+      </Card>
+
+      {/* Platform Role & Privileges */}
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Title order={4} mb="md">Platform Role & Privileges</Title>
+        
+        <Group mb="lg">
+          <ThemeIcon size="xl" radius="md" color={getRoleColor(user.role)} variant="light">
+            {getRoleIcon(user.role)}
+          </ThemeIcon>
+          <div>
+            <Badge size="lg" color={getRoleColor(user.role)} variant="light">{user.role}</Badge>
+            <Text size="sm" c="dimmed">{getRoleDescription(user.role)}</Text>
+          </div>
+        </Group>
+
+        <Spoiler maxHeight={120} showLabel="Show all privileges" hideLabel="Hide privileges">
+          <Stack gap="xs">
+            {getPlatformPrivileges(user.role).map((privilege, index) => (
+              <Group key={index} gap="xs">
+                <ThemeIcon color="green" size="sm" radius="xl" variant="light">
+                  <IconCheck style={{ width: rem(12), height: rem(12) }} />
+                </ThemeIcon>
+                <Text size="sm">{privilege}</Text>
+              </Group>
+            ))}
+          </Stack>
+        </Spoiler>
+      </Card>
+
+      {/* Location Capacity */}
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Group mb="md">
+          <ThemeIcon size="lg" radius="md" variant="light" color="blue">
+            <IconBuilding style={{ width: rem(20), height: rem(20) }} />
+          </ThemeIcon>
+          <div>
+            <Title order={4}>Location Capacity</Title>
+            <Text size="sm" c="dimmed">Your location creation limits based on your role and subscription tier</Text>
+          </div>
+        </Group>
+        <TenantLimitBadge variant="full" showUpgrade={true} />
+      </Card>
+
+      {/* SKU Usage */}
+      <SubscriptionUsageBadge variant="card" showUpgradeLink={true} />
+
+      {/* Tenant Access */}
+      {user.tenants && user.tenants.length > 0 && (
+        <Card shadow="sm" padding="lg" radius="md" withBorder>
+          <Group justify="space-between" mb="md">
+            <Group>
+              <ThemeIcon size="lg" radius="md" variant="light" color="cyan">
+                <IconBuilding style={{ width: rem(20), height: rem(20) }} />
+              </ThemeIcon>
+              <div>
+                <Title order={4}>Tenant Access</Title>
+                <Text size="sm" c="dimmed">Stores and locations you have access to</Text>
+              </div>
+            </Group>
+            <Badge size="lg" color="cyan" variant="light">
+              {user.tenants.length} {user.tenants.length === 1 ? 'Location' : 'Locations'}
+            </Badge>
+          </Group>
+
+          <Stack gap="xs">
+            {paginatedTenants.map((tenant) => {
+              const tenantDetails = getTenantDetails(tenant.id);
+              return (
+                <Paper key={tenant.id} p="sm" radius="md" withBorder>
+                  <Group justify="space-between">
+                    <Group>
+                      <ThemeIcon size="md" radius="md" variant="light" color="blue">
+                        <IconBuilding style={{ width: rem(16), height: rem(16) }} />
+                      </ThemeIcon>
+                      <div>
+                        <Text fw={500}>{tenant.name}</Text>
+                        <Text size="xs" c="dimmed" ff="monospace">{tenant.id}</Text>
+                      </div>
+                    </Group>
+                    <Group gap="xs">
+                      {tenantDetails && (
+                        <>
+                          <Badge size="sm" color={getTierColor(tenantDetails.tier)} variant="light">
+                            {formatTierName(tenantDetails.tier)}
+                          </Badge>
+                          <Badge size="sm" color={tenantDetails.status === 'active' ? 'green' : 'gray'} variant="light">
+                            {tenantDetails.status}
+                          </Badge>
+                        </>
+                      )}
+                      <Badge size="sm" color={getRoleColor(tenant.role)} variant="light">
+                        {tenant.role}
+                      </Badge>
+                    </Group>
+                  </Group>
+                </Paper>
+              );
+            })}
+          </Stack>
         </Card>
-      </div>
-    </div>
+      )}
+
+      {/* Account Status */}
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Group mb="md">
+          <ThemeIcon size="lg" radius="md" variant="light" color="green">
+            <IconCheck style={{ width: rem(20), height: rem(20) }} />
+          </ThemeIcon>
+          <div>
+            <Title order={4}>Account Status</Title>
+            <Text size="sm" c="dimmed">Your account health and activity</Text>
+          </div>
+        </Group>
+
+        <Grid>
+          <Grid.Col span={{ base: 12, sm: 6 }}>
+            <Paper p="md" radius="md" bg="green.0">
+              <Group>
+                <ThemeIcon color="green" variant="light" radius="xl" size="lg">
+                  <IconCheck style={{ width: rem(16), height: rem(16) }} />
+                </ThemeIcon>
+                <div>
+                  <Text fw={500} c="green.9">Account Active</Text>
+                  <Text size="xs" c="green.7">All systems operational</Text>
+                </div>
+              </Group>
+            </Paper>
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6 }}>
+            <Paper p="md" radius="md" bg="blue.0">
+              <Group>
+                <ThemeIcon color="blue" variant="light" radius="xl" size="lg">
+                  <IconLock style={{ width: rem(16), height: rem(16) }} />
+                </ThemeIcon>
+                <div>
+                  <Text fw={500} c="blue.9">Secure</Text>
+                  <Text size="xs" c="blue.7">Authentication verified</Text>
+                </div>
+              </Group>
+            </Paper>
+          </Grid.Col>
+        </Grid>
+      </Card>
+    </Stack>
   );
 }

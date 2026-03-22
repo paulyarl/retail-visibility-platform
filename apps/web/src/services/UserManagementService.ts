@@ -179,6 +179,43 @@ export class UserManagementService extends AuthenticatedApiSingleton {
   }
 
   /**
+   * Update user profile with onboarding/business fields
+   */
+  async updateProfile(profileData: {
+    firstName?: string;
+    lastName?: string;
+    businessName?: string;
+    businessType?: string;
+    phone?: string;
+  }): Promise<any> {
+    const result = await this.makeDefaultRequest<any>(
+      '/api/user/profile',
+      { 
+        method: 'PATCH',
+        body: JSON.stringify({
+          first_name: profileData.firstName,
+          last_name: profileData.lastName,
+          business_name: profileData.businessName,
+          business_type: profileData.businessType,
+          phone: profileData.phone,
+        })
+      },
+      'platform-update-profile',
+      0 // No cache for profile updates
+    );
+
+    if (!result.success) {
+      console.error('[UserManagementService] Failed to update profile:', result.error);
+      throw result.error;
+    }
+
+    // Invalidate user info cache
+    await this.invalidateCache('platform-user-info*');
+
+    return result.data || null;
+  }
+
+  /**
    * Change user password
    */
   async changePassword(passwordData: {

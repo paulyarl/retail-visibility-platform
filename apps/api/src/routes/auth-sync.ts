@@ -127,6 +127,21 @@ router.post('/sync-user', async (req: Request, res: Response) => {
           first_name: firstName || user.first_name || (name ? name.split(' ')[0] : user.first_name),
           last_name: lastName || user.last_name || (name ? name.split(' ').slice(1).join(' ') : user.last_name),
         },
+        include: {
+          user_tenants: {
+            select: {
+              tenant_id: true,
+              role: true,
+              tenants: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                }
+              }
+            }
+          }
+        }
       });
 
       console.log('[AuthSync] Updated existing user:', user.id);
@@ -151,6 +166,9 @@ router.post('/sync-user', async (req: Request, res: Response) => {
           email: user.email,
           first_name: user.first_name,
           last_name: user.last_name,
+          business_name: user.business_name,
+          business_type: user.business_type,
+          phone: user.phone,
           role: user.role,
           email_verified: user.email_verified,
           is_active: user.is_active,
@@ -187,6 +205,21 @@ router.post('/sync-user', async (req: Request, res: Response) => {
         is_active: true,
         updated_at: new Date(),
       },
+      include: {
+        user_tenants: {
+          select: {
+            tenant_id: true,
+            role: true,
+            tenants: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              }
+            }
+          }
+        }
+      }
     });
 
     console.log('[AuthSync] Created new user:', user.id);
@@ -211,6 +244,9 @@ router.post('/sync-user', async (req: Request, res: Response) => {
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
+        business_name: user.business_name,
+        business_type: user.business_type,
+        phone: user.phone,
         role: user.role,
         email_verified: user.email_verified,
         is_active: user.is_active,

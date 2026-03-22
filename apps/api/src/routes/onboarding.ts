@@ -55,6 +55,9 @@ router.post('/', optionalAuth, async (req: Request, res: Response) => {
       data: {
         first_name: firstName,
         last_name: lastName,
+        business_name: businessName,
+        business_type: businessType,
+        phone: phone,
         onboarding_completed: true,
         onboarding_step: 'complete',
         onboarding_data: {
@@ -131,6 +134,9 @@ router.post('/', optionalAuth, async (req: Request, res: Response) => {
         email: user.email,
         firstName: user.first_name,
         lastName: user.last_name,
+        businessName: user.business_name,
+        businessType: user.business_type,
+        phone: user.phone,
         onboardingCompleted: user.onboarding_completed,
       },
       tenant: tenant ? {
