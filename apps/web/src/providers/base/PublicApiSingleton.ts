@@ -21,6 +21,7 @@ export abstract class PublicApiSingleton extends FlexibleApiSingleton {
   protected defaultRequestTarget: RequestTarget = RequestTarget.API;
   protected defaultContext: AppContext = AppContext.PUBLIC;
   protected defaultIsolation: CacheIsolation = CacheIsolation.PUBLIC;
+  protected defaultIncludeCredentials: boolean = false; // Public requests don't need auth cookies
   protected cacheTTL: number = 15 * 60 * 1000; // 15 minutes for public data
   
   // Resolver cache TTLs
