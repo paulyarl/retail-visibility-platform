@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { securitySingletonService } from '@/services/SecuritySingletonService';
 import { ApiSystemSingleton } from '@/providers/base/ApiSystemSingleton';
 import { SingletonCacheOptions } from '@/providers/base/UniversalSingleton';
@@ -102,27 +103,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.location.pathname.startsWith('/onboarding')
       );
 
-      // Skip auth check for public pages
-      if (!isAdminContext && !isTenantContext && !forceRefresh) {
-        setUser(null);
-        setIsLoading(false);
-        return;
-      }
-
-      // Check if we have auth cookies before making API call
+      // Check for Auth0 cookies (non-HTTP-only) that indicate user might be authenticated
       const hasAuthCookies = typeof window !== 'undefined' && 
         (document.cookie.includes('auth0_email=') || 
          document.cookie.includes('auth0_id='));
 
-      // If no auth cookies and not forcing refresh, skip API call
-      if (!hasAuthCookies && !forceRefresh) {
+      // Skip auth check for public pages only if no auth cookies present
+      // This allows public page components (like reviews) to query isAuthenticated
+      if (!isAdminContext && !isTenantContext && !hasAuthCookies && !forceRefresh) {
         setUser(null);
         setIsLoading(false);
         return;
       }
 
-      // Check Auth0 session via API (uses HTTP-only cookies automatically)
-      const sessionInfo = await securitySingletonService.getSessionInfo();
+      // Always bypass cache to ensure fresh auth state
+      // This is critical after Auth0 login redirects back to the app
+      const sessionInfo = await securitySingletonService.getSessionInfo(true);
       
 
       // console.log(`AuthContext fetchUser sessionInfo: ${JSON.stringify(sessionInfo)}`);
@@ -218,6 +214,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     fetchUser();
   }, []); // Empty dependency array - only run once on mount
+
+  // Re-fetch auth state when navigating to a protected page
+  const pathname = usePathname();
+  
+  useEffect(() => {
+    if (!pathname) return;
+    
+    const isProtected = pathname.startsWith('/admin') ||
+      pathname.startsWith('/t/') ||
+      pathname.startsWith('/dashboard') ||
+      pathname.startsWith('/tenants') ||
+      pathname.startsWith('/settings') ||
+      pathname.startsWith('/onboarding');
+    
+    if (isProtected && !user) {
+      fetchUser();
+    }
+  }, [pathname, user]);
 
   const value: AuthContextType = {
     user,

@@ -52,12 +52,14 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    * Get current session info (compatible with AuthContext)
    * Calls /api/auth/me to get user profile data
    */
-  async getSessionInfo(): Promise<{ isAuthenticated: boolean; user?: any; token?: any; expiresAt?: string; lastActivity?: string }> {
+  async getSessionInfo(bypassCache = false): Promise<{ isAuthenticated: boolean; user?: any; token?: any; expiresAt?: string; lastActivity?: string }> {
     try {
+      const cacheOptions = bypassCache ? { ttl: 0, forceRefresh: true } : {};
       const result = await this.makeDefaultRequest<any>(
         '/api/auth/me',
         {},
-        'security-session-info'
+        bypassCache ? undefined : 'security-session-info',
+        bypassCache ? 0 : undefined
       );
 
       if (!result.success || !result.data?.user) {

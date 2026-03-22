@@ -65,14 +65,25 @@ export const auth0 = new Auth0Client({
           
           // Check if user needs onboarding
           const user = syncResult.user;
-          if (user && !user.onboarding_completed) {
-            // New user - redirect to onboarding wizard
-            console.log('[Auth0] New user detected, redirecting to onboarding');
+          const hasTenants = user?.tenants && user.tenants.length > 0;
+          
+          if (!user?.onboarding_completed || !hasTenants) {
+            // New user or user without tenants - redirect to onboarding wizard
+            console.log('[Auth0] User needs onboarding, redirecting to /onboarding');
             const response = NextResponse.redirect(new URL('/onboarding', ctx.appBaseUrl || '/'));
             response.cookies.set(EMAIL_COOKIE_NAME, email, { httpOnly: false, path: '/', maxAge: 60 * 60 * 24 });
             response.cookies.set(AUTH0_ID_COOKIE_NAME, auth0Id, { httpOnly: false, path: '/', maxAge: 60 * 60 * 24 });
             return response;
           }
+          
+          // User has tenants and completed onboarding - redirect to dashboard
+          const firstTenantId = user.tenants[0]?.id;
+          const redirectPath = firstTenantId ? `/t/${firstTenantId}/dashboard` : '/dashboard';
+          console.log('[Auth0] User has tenants, redirecting to:', redirectPath);
+          const response = NextResponse.redirect(new URL(redirectPath, ctx.appBaseUrl || '/'));
+          response.cookies.set(EMAIL_COOKIE_NAME, email, { httpOnly: false, path: '/', maxAge: 60 * 60 * 24 });
+          response.cookies.set(AUTH0_ID_COOKIE_NAME, auth0Id, { httpOnly: false, path: '/', maxAge: 60 * 60 * 24 });
+          return response;
         } else {
           // Log sync failure but don't block login
           console.warn('[Auth0] User sync failed, but continuing with login');

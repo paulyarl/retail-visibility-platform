@@ -75,12 +75,42 @@ router.post('/sync-user', async (req: Request, res: Response) => {
     // Check if user exists by auth0_id first (preferred), then by email
     let user = await prisma.users.findUnique({
       where: { auth0_id: auth0Id },
+      include: {
+        user_tenants: {
+          select: {
+            tenant_id: true,
+            role: true,
+            tenants: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              }
+            }
+          }
+        }
+      }
     });
 
     // If not found by auth0_id, try by email
     if (!user) {
       user = await prisma.users.findUnique({
         where: { email: email.toLowerCase() },
+        include: {
+          user_tenants: {
+            select: {
+              tenant_id: true,
+              role: true,
+              tenants: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                }
+              }
+            }
+          }
+        }
       });
     }
 
@@ -128,6 +158,12 @@ router.post('/sync-user', async (req: Request, res: Response) => {
           created_at: user.created_at,
           onboarding_completed: user.onboarding_completed,
           onboarding_step: user.onboarding_step,
+          tenants: user.user_tenants?.map((ut: any) => ({
+            id: ut.tenants?.id || ut.tenant_id,
+            name: ut.tenants?.name,
+            slug: ut.tenants?.slug,
+            role: ut.role,
+          })) || [],
         },
         isNewUser: false,
       });
@@ -182,6 +218,7 @@ router.post('/sync-user', async (req: Request, res: Response) => {
         created_at: user.created_at,
         onboarding_completed: user.onboarding_completed,
         onboarding_step: user.onboarding_step,
+        tenants: [], // New users have no tenants
       },
       isNewUser: true,
     });

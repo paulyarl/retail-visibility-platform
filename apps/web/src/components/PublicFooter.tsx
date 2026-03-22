@@ -23,6 +23,7 @@ export default function PublicFooter() {
                 width={150}
                 height={40}
                 className="object-contain mb-4"
+                style={{ width: 'auto', height: 'auto' }}
               />
             ) : (
               <h3 className="text-lg font-bold text-neutral-900 mb-4">
