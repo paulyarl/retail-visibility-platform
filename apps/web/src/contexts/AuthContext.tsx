@@ -90,6 +90,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [currentTenantId, setCurrentTenantId] = useState<string | null>(null);
 
+  // Track fetch errors to prevent infinite retry loops
+  const fetchErrorRef = React.useRef(false);
+
   // Fetch current user - checks Auth0 session via API
   const fetchUser = useCallback(async (forceRefresh = false) => {
     try {
@@ -119,11 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Always bypass cache to ensure fresh auth state
       // This is critical after Auth0 login redirects back to the app
       const sessionInfo = await securitySingletonService.getSessionInfo(true);
-      
 
-      // console.log(`AuthContext fetchUser sessionInfo: ${JSON.stringify(sessionInfo)}`);
-      
-      
       if (sessionInfo.isAuthenticated && sessionInfo.user) {
         // Transform service user to context format
         const transformedUser: User = {
@@ -142,12 +141,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           auth0Id: sessionInfo.user.auth0Id,
           onboardingCompleted: sessionInfo.user.onboardingCompleted,
         };
-        
-        // console.log(`AuthContext fetchUser transformedUser: ${JSON.stringify(transformedUser)}`);
-      
-        
+
         setUser(transformedUser);
-        
+        fetchErrorRef.current = false; // Clear error on success
+
         // Set current tenant if available
         if (transformedUser.tenants && transformedUser.tenants.length > 0 && !currentTenantId) {
           setCurrentTenantId(transformedUser.tenants[0].id);
@@ -158,11 +155,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.warn('[AuthContext] fetchUser error:', error);
+      fetchErrorRef.current = true; // Mark as errored to prevent retry loop
       setUser(null);
     } finally {
       setIsLoading(false);
     }
-  }, [currentTenantId]);
+  }, []); // Remove currentTenantId - it's only used for setting, not fetching
 
   // Login - redirects to Auth0 login
   const login = () => {
@@ -211,9 +209,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Load user on mount
+  const hasFetchedRef = React.useRef(false);
+  
   useEffect(() => {
-    fetchUser();
-  }, []); // Empty dependency array - only run once on mount
+    // Only fetch once on mount
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchUser();
+    }
+  }, [fetchUser]);
 
   // Re-fetch auth state when navigating to a protected page
   const pathname = usePathname();
@@ -228,10 +232,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       pathname.startsWith('/settings') ||
       pathname.startsWith('/onboarding');
     
-    if (isProtected && !user) {
+    // Only fetch if protected, no user, and no previous fetch error (prevents infinite loop on auth failure)
+    if (isProtected && !user && hasFetchedRef.current && !fetchErrorRef.current) {
       fetchUser();
     }
-  }, [pathname, user]);
+  }, [pathname, user, fetchUser]);
 
   const value: AuthContextType = {
     user,

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRateLimitErrorHandler } from './useRateLimitErrorHandler';
+import { useState, useEffect, useRef } from 'react';
 import { hoursStatusService } from '@/services/HoursStatusService';
 import { tenantManagementService } from '@/services/TenantManagementService';
 
@@ -15,68 +14,109 @@ export function useStoreStatus(tenantId?: string, isPublic: boolean = false) {
   const [status, setStatus] = useState<StoreStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const { handleRateLimitError } = useRateLimitErrorHandler();
-
-  // Memoize the rate limit error handler to prevent fetchStatus recreation
-  const memoizedHandleRateLimitError = useCallback(handleRateLimitError, []);
-
-  const fetchStatus = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      if (!tenantId) {
-        setStatus(null);
-        setLoading(false);
-        return;
-      }
-
-      let responseData: StoreStatus | null = null;
-
-      // Use service based on scope prop instead of auth context
-      if (isPublic) {
-        // Public scope - use public endpoint via HoursStatusService
-        responseData = await hoursStatusService.getStoreStatus(tenantId);
-      } else {
-        // Private scope - use private endpoint via TenantManagementService
-        responseData = await tenantManagementService.getStoreStatus(tenantId);
-      }
-
-      if (!responseData) {
-        setStatus(null);
-        setLoading(false);
-        return;
-      }
-
-      setStatus(responseData);
-    } catch (err) {
-      console.error('Failed to fetch store status:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      setStatus(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [tenantId, isPublic, memoizedHandleRateLimitError]);
+  
+  // Use ref to track if we've already fetched for this tenantId
+  const hasFetchedRef = useRef(false);
+  const lastTenantIdRef = useRef<string | undefined>(undefined);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    if (tenantId) {
-      fetchStatus();
+    mountedRef.current = true;
+    
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    // Skip if no tenantId
+    if (!tenantId) {
+      setStatus(null);
+      setLoading(false);
+      return;
     }
-  }, [tenantId, fetchStatus]);
+
+    // Reset fetch state if tenantId changed
+    if (lastTenantIdRef.current !== tenantId) {
+      hasFetchedRef.current = false;
+      lastTenantIdRef.current = tenantId;
+    }
+
+    // Only fetch once per tenantId
+    if (hasFetchedRef.current) {
+      return;
+    }
+    
+    hasFetchedRef.current = true;
+
+    const fetchStatus = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        let responseData: StoreStatus | null = null;
+
+        // Use service based on scope prop
+        if (isPublic) {
+          responseData = await hoursStatusService.getStoreStatus(tenantId);
+        } else {
+          responseData = await tenantManagementService.getStoreStatus(tenantId);
+        }
+
+        // Only update state if still mounted
+        if (mountedRef.current) {
+          if (responseData) {
+            setStatus(responseData);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch store status:', err);
+        if (mountedRef.current) {
+          setError(err instanceof Error ? err.message : 'Unknown error');
+          setStatus(null);
+        }
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchStatus();
+  }, [tenantId, isPublic]); // Remove fetchStatus from deps - defined inside effect
 
   // Only enable refresh for private scope (tenant settings)
   useEffect(() => {
-    if (!tenantId || isPublic) return; // No refresh for public scope
+    if (!tenantId || isPublic) return;
 
-    const interval = setInterval(fetchStatus, 900000); // 15 minutes for private scope
+    const interval = setInterval(async () => {
+      try {
+        const responseData = await tenantManagementService.getStoreStatus(tenantId);
+        if (mountedRef.current && responseData) {
+          setStatus(responseData);
+        }
+      } catch (err) {
+        console.error('Failed to refresh store status:', err);
+      }
+    }, 900000); // 15 minutes
+
     return () => clearInterval(interval);
-  }, [tenantId, isPublic, fetchStatus]);
+  }, [tenantId, isPublic]);
 
   return {
     status,
     loading,
     error,
-    refresh: fetchStatus
+    refresh: async () => {
+      if (!tenantId) return;
+      try {
+        const responseData = isPublic 
+          ? await hoursStatusService.getStoreStatus(tenantId)
+          : await tenantManagementService.getStoreStatus(tenantId);
+        if (mountedRef.current && responseData) setStatus(responseData);
+      } catch (err) {
+        console.error('Failed to refresh store status:', err);
+      }
+    }
   };
 }

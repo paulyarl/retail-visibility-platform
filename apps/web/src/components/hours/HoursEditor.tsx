@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import TimeInput from "./TimeInput";
 import { tenantManagementService } from "@/services/TenantManagementService";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
@@ -47,12 +47,21 @@ export default function HoursEditor({ tenantId, timezone: externalTimezone }: { 
   const [specialHours, setSpecialHours] = useState<SpecialHour[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const mountedRef = useRef(true);
 
   // Use external timezone if provided, otherwise use internal state
   const currentTimezone = externalTimezone || timezone;
 
   // Use centralized status hook instead of local calculation
   const { status: currentStatus } = useStoreStatus(tenantId, false); // Private scope
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Sync with external timezone changes
   useEffect(() => {
@@ -66,11 +75,13 @@ export default function HoursEditor({ tenantId, timezone: externalTimezone }: { 
       try {
         // Load regular business hours
         const hoursData = await tenantManagementService.getBusinessHours(tenantId);
+        if (!mountedRef.current) return;
         setTimezone(hoursData?.timezone || "America/New_York");
         setPeriods(Array.isArray(hoursData?.periods) ? hoursData.periods : []);
         
         // Load special hours
         const specialData = await tenantManagementService.getSpecialBusinessHours(tenantId);
+        if (!mountedRef.current) return;
         setSpecialHours(Array.isArray(specialData?.overrides) ? specialData.overrides : []);
       } catch (error) {
         console.error('Failed to load business hours:', error);

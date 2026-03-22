@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import TimeInput from "./TimeInput";
 import { tenantManagementService } from "@/services/TenantManagementService";
 
@@ -31,12 +31,22 @@ export default function SpecialHoursCalendar({ tenantId }: { tenantId: string })
   const [overrides, setOverrides] = useState<Override[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const load = async () => {
       try {
         const data = await tenantManagementService.getSpecialBusinessHours(tenantId);
-        setOverrides(Array.isArray(data?.overrides) ? data.overrides : []);
+        if (mountedRef.current) {
+          setOverrides(Array.isArray(data?.overrides) ? data.overrides : []);
+        }
       } catch (error) {
         console.error('Failed to load special hours:', error);
       }

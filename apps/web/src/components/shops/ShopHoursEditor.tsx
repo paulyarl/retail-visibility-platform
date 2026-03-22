@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import TimeInput from "../hours/TimeInput";
 import { getTenantHoursSingleton } from "@/lib/singletons/TenantHoursSingleton";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
@@ -52,9 +52,18 @@ export default function ShopHoursEditor({ tenantId, shop, onUpdate, onCancel }: 
   const [specialHours, setSpecialHours] = useState<SpecialHour[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const mountedRef = useRef(true);
 
   // Use centralized status hook
   const { status: currentStatus } = useStoreStatus(tenantId, false); // Private scope for admin
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -63,9 +72,12 @@ export default function ShopHoursEditor({ tenantId, shop, onUpdate, onCancel }: 
 
         // Load shop hours from business profile
         const shopData = await hoursSingleton.loadShopHours(tenantId);
+        
+        if (!mountedRef.current) return;
 
         // Extract timezone from shop data or default
-        const shopTimezone = shopData.timezone || "America/New_York";
+        const tz = shopData.timezone || shopData.hours?.timezone;
+        const shopTimezone = typeof tz === 'string' ? tz : "America/New_York";
         setTimezone(shopTimezone);
 
         // Extract hours from business profile hours field
@@ -83,12 +95,14 @@ export default function ShopHoursEditor({ tenantId, shop, onUpdate, onCancel }: 
 
         setPeriods(shopPeriods);
 
-        // Load special hours from tenant business hours
-        const specialData = await hoursSingleton.loadSpecialHours(tenantId);
-        setSpecialHours(Array.isArray(specialData?.data?.overrides) ? specialData.data.overrides : []);
+        // Use overrides from already-loaded shopData (avoids redundant API call)
+        const overrides = shopData.hours?.overrides || [];
+        setSpecialHours(Array.isArray(overrides) ? overrides : []);
       } catch (error) {
         console.error('Failed to load shop hours:', error);
-        setMsg('Failed to load hours data');
+        if (mountedRef.current) {
+          setMsg('Failed to load hours data');
+        }
       }
     };
     load();

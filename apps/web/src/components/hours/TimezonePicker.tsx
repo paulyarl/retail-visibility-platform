@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { tenantManagementService } from "@/services/TenantManagementService";
 
 
@@ -11,22 +11,35 @@ export default function TimezonePicker({ tenantId, onTimezoneChange }: { tenantI
   const [error, setError] = useState<string | null>(null);
   const [timezone, setTimezone] = useState<string>("");
   const [existingHours, setExistingHours] = useState<any>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
         const profile = await tenantManagementService.getCurrentTenantProfile(tenantId);
+        if (!mountedRef.current) return;
         const tz = profile?.hours?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
         setTimezone(tz);
         // Store existing hours without timezone (timezone is managed separately)
         const { timezone: _, ...hoursWithoutTimezone } = profile?.hours || {};
         setExistingHours(hoursWithoutTimezone);
       } catch (e) {
-        setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
-        setExistingHours({});
+        if (mountedRef.current) {
+          setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+          setExistingHours({});
+        }
       } finally {
-        setLoading(false);
+        if (mountedRef.current) {
+          setLoading(false);
+        }
       }
     };
     load();

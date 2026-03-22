@@ -22,9 +22,7 @@ export interface SpecialHour {
 }
 
 export interface SpecialHoursData {
-  data: {
-    overrides: SpecialHour[];
-  };
+  overrides: SpecialHour[];
 }
 
 /**

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getTodaySpecialHours } from "@/lib/hours-utils";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { tenantManagementService } from "@/services/TenantManagementService";
@@ -13,12 +13,21 @@ interface HoursPreviewProps {
 export default function HoursPreview({ tenantId }: HoursPreviewProps) {
   const { status, loading } = useStoreStatus(tenantId, false); // Private scope
   const [specialHours, setSpecialHours] = useState<any[] | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Fetch special hours using TenantManagementService
   useEffect(() => {
     const fetchSpecialHours = async () => {
       try {
         const data = await tenantManagementService.getSpecialBusinessHours(tenantId);
+        if (!mountedRef.current) return;
         //console.log(`${HoursPreview.name}: Special hours for tenant ${tenantId}:`, data);
         if (data && Array.isArray(data)) {
           // Create a mock hours object for getTodaySpecialHours
@@ -32,7 +41,9 @@ export default function HoursPreview({ tenantId }: HoursPreviewProps) {
             }))
           };
           const todaySpecial = getTodaySpecialHours(mockHours);
-          setSpecialHours(todaySpecial);
+          if (mountedRef.current) {
+            setSpecialHours(todaySpecial);
+          }
         } else if (data && data.overrides && Array.isArray(data.overrides)) {
           // Handle case where data is an object with overrides array
           const mockHours = {
@@ -45,14 +56,20 @@ export default function HoursPreview({ tenantId }: HoursPreviewProps) {
             }))
           };
           const todaySpecial = getTodaySpecialHours(mockHours);
-          setSpecialHours(todaySpecial);
+          if (mountedRef.current) {
+            setSpecialHours(todaySpecial);
+          }
         } else {
           // No special hours data or invalid format
-          setSpecialHours(null);
+          if (mountedRef.current) {
+            setSpecialHours(null);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch special hours:', error);
-        setSpecialHours(null);
+        if (mountedRef.current) {
+          setSpecialHours(null);
+        }
       }
     };
 
