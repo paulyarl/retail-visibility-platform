@@ -259,7 +259,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                 </Link>
               </Tooltip>
               <Tooltip label="Data sync and feed status">
-                <Link href={`/t/${tenantId}/settings/sync`}>
+                <Link href={`/t/${tenantId}/settings/integrations/google/sync-status`}>
                   <Button variant="ghost" size="sm">Sync</Button>
                 </Link>
               </Tooltip>
