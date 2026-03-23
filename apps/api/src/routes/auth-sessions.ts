@@ -1,12 +1,12 @@
 /**
  * Auth Sessions Routes
  * Manages user login sessions and device tracking
+ * Migrated to Auth0 cookie-based authentication
  */
 
 import { Router } from 'express';
 import { authenticateToken, optionalAuth } from '../middleware/auth';
 import { basePrisma } from '../prisma';
-import crypto from 'crypto';
 
 const router = Router();
 
@@ -47,16 +47,17 @@ router.get('/sessions', optionalAuth, async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Get current token hash for comparison
-    const currentToken = req.headers.authorization?.replace('Bearer ', '');
-    const currentTokenHash = currentToken 
-      ? crypto.createHash('sha256').update(currentToken).digest('hex')
+    // Get current Auth0 session ID for comparison
+    const currentAuth0SessionId = req.cookies?.auth0_session || req.cookies?.appSession;
+    const currentSessionIdentifier = currentAuth0SessionId 
+      ? `auth0_${currentAuth0SessionId}`
       : null;
 
     // Fetch active sessions from database
     const sessions = await basePrisma.$queryRaw<any[]>`
       SELECT
         id,
+        token_hash,
         device_info as "deviceInfo",
         ip_address as "ipAddress",
         location,
@@ -71,15 +72,16 @@ router.get('/sessions', optionalAuth, async (req, res) => {
       ORDER BY created_at DESC
     `;
 
-    // Mark current session
+    // Mark current session and parse JSON fields
     const sessionsWithCurrent = sessions.map(session => ({
       ...session,
-      isCurrent: session.isCurrent || (currentTokenHash && session.id.includes(currentTokenHash.substring(0, 8))),
-      deviceInfo: session.deviceInfo || {},
-      location: session.location || {},
+      isCurrent: currentSessionIdentifier && session.token_hash === currentSessionIdentifier,
+      deviceInfo: typeof session.deviceInfo === 'string' ? JSON.parse(session.deviceInfo) : (session.deviceInfo || {}),
+      location: typeof session.location === 'string' ? JSON.parse(session.location) : (session.location || {}),
     }));
 
     res.json({
+      success: true,
       data: sessionsWithCurrent,
       total: sessionsWithCurrent.length,
     });
@@ -146,10 +148,10 @@ router.post('/sessions/revoke-all', optionalAuth, async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Get current token hash
-    const currentToken = req.headers.authorization?.replace('Bearer ', '');
-    const currentTokenHash = currentToken 
-      ? crypto.createHash('sha256').update(currentToken).digest('hex')
+    // Get current Auth0 session ID
+    const currentAuth0SessionId = req.cookies?.auth0_session || req.cookies?.appSession;
+    const currentSessionIdentifier = currentAuth0SessionId 
+      ? `auth0_${currentAuth0SessionId}`
       : null;
 
     // Revoke all sessions except current
@@ -158,13 +160,7 @@ router.post('/sessions/revoke-all', optionalAuth, async (req, res) => {
       SET is_active = false
       WHERE user_id = ${userId}
         AND is_active = true
-        AND id NOT IN (
-          SELECT id FROM user_sessions_list
-          WHERE user_id = ${userId}
-            AND is_active = true
-            AND expires_at > NOW()
-          LIMIT 1
-        )
+        AND (${currentSessionIdentifier}::text IS NULL OR token_hash != ${currentSessionIdentifier}::text)
     `;
 
     // Create security alert

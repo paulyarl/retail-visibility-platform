@@ -1,6 +1,7 @@
 /**
  * Security Monitoring Routes - UniversalSingleton Integration
  * API endpoints for security monitoring using SecurityMonitoringService
+ * Migrated to Auth0 cookie-based authentication
  */
 
 import { Router } from 'express';
@@ -19,10 +20,11 @@ router.use((req, res, next) => {
     securityService.setAuthContext({
       userId: req.user.userId,
       tenantId: req.user.tenantIds?.[0],
-      sessionId: undefined, // Session not available in this context
+      sessionId: req.cookies?.auth0_session || req.cookies?.appSession,
       roles: req.user.role ? [req.user.role] : [],
       permissions: [],
-      token: req.headers.authorization?.replace('Bearer ', '')
+      auth0Id: req.headers['x-auth0-id'] as string,
+      auth0Email: req.headers['x-auth0-email'] as string
     });
   }
   next();

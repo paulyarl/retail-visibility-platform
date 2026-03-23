@@ -16,8 +16,10 @@ export function useSecurity() {
   const fetchSessions = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await securityService.getActiveSessions();
-      setSessions(data);
+      const response = await securityService.getActiveSessions();
+      // Extract the data array from the response
+      const sessions = Array.isArray(response) ? response : (response as any)?.data || [];
+      setSessions(sessions);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch sessions');
@@ -28,8 +30,10 @@ export function useSecurity() {
 
   const fetchAlerts = useCallback(async () => {
     try {
-      const data = await securityService.getSecurityAlerts();
-      setAlerts(data);
+      const response = await securityService.getSecurityAlerts(true); // Bypass cache for now
+      // Extract the data array from the response
+      const alerts = Array.isArray(response) ? response : (response as any)?.data || [];
+      setAlerts(alerts);
     } catch (err) {
       console.error('Failed to fetch alerts:', err);
     }
@@ -85,6 +89,7 @@ export function useSecurity() {
     revokeAllSessions,
     markAlertAsRead,
     dismissAlert,
-    refresh: fetchSessions,
+    refreshSessions: fetchSessions,
+    refreshAlerts: fetchAlerts,
   };
 }

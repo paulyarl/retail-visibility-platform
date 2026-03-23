@@ -7,41 +7,20 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || 'http://localhost:4000';
+import { getAuth0Session, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get auth token from cookies (try both possible names)
-    const authToken = request.cookies.get('auth_token')?.value || 
-                     request.cookies.get('access_token')?.value;
+    // Get optional Auth0 session
+    const auth = await getAuth0Session(request);
+    const accessToken = auth?.accessToken || null;
     
-    // Get all cookies to forward
-    const cookieHeader = request.headers.get('cookie');
-    
-    // Build headers
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    
-    // Add Authorization header if token exists
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`;
-    }
-    
-    // Forward all cookies (includes auth_token, csrf, etc.)
-    if (cookieHeader) {
-      headers['Cookie'] = cookieHeader;
-    }
-    
-    console.log('[GBP Seed Proxy] Forwarding to:', `${API_BASE_URL}/api/platform/categories/gbp-seed`);
-    console.log('[GBP Seed Proxy] Auth token present:', !!authToken);
+    console.log('[GBP Seed Proxy] Forwarding to backend');
+    console.log('[GBP Seed Proxy] Auth token present:', !!accessToken);
     
     // Forward request to backend API
-    const response = await fetch(`${API_BASE_URL}/api/platform/categories/gbp-seed`, {
+    const response = await authenticatedFetch('/api/platform/categories/gbp-seed', accessToken, {
       method: 'GET',
-      headers,
-      credentials: 'include',
     });
     
     console.log('[GBP Seed Proxy] Backend response status:', response.status);

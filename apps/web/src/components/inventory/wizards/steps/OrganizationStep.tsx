@@ -86,19 +86,16 @@ function CategoryNameDisplay({ categoryId, tenantId }: { categoryId: string; ten
       // If not found in tenant categories, try Google taxonomy
       console.log('[OrganizationStep CategoryNameDisplay] Not found in tenant categories, trying Google taxonomy...');
       try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${API_BASE_URL}/public/google-taxonomy/${categoryId}`);
+        const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
+        const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(categoryId);
         
-        if (response.ok) {
-          const data = await response.json();
-          if (data.path && Array.isArray(data.path)) {
-            const pathString = data.path.join(' > ');
-            const finalCategoryName = data.path[data.path.length - 1]; // Get last element
-            console.log('[OrganizationStep CategoryNameDisplay] Found in Google taxonomy:', pathString);
-            setCategoryName(finalCategoryName);
-            setFullCategoryPath(pathString); // Store full path separately
-            return;
-          }
+        if (data && data.path && Array.isArray(data.path)) {
+          const pathString = data.path.join(' > ');
+          const finalCategoryName = data.path[data.path.length - 1]; // Get last element
+          console.log('[OrganizationStep CategoryNameDisplay] Found in Google taxonomy:', pathString);
+          setCategoryName(finalCategoryName);
+          setFullCategoryPath(pathString); // Store full path separately
+          return;
         }
       } catch (error) {
         console.error('[OrganizationStep CategoryNameDisplay] Error fetching Google taxonomy:', error);

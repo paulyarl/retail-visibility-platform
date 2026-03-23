@@ -208,14 +208,13 @@ class SecurityAlertTrackingCache {
     this.saveToStorage();
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       
       // Group events by type for optimized API calls
       const eventsByType = this.groupEventsByType(eventsToSend);
       
       // Send each type group separately
       const sendPromises = Object.entries(eventsByType).map(([type, events]) => 
-        this.sendEventsByType(type, events, apiUrl)
+        this.sendEventsByType(type, events)
       );
 
       await Promise.allSettled(sendPromises);
@@ -279,7 +278,7 @@ class SecurityAlertTrackingCache {
   /**
    * Send events of a specific type
    */
-  private async sendEventsByType(type: string, events: SecurityAlertEvent[], apiUrl: string): Promise<void> {
+  private async sendEventsByType(type: string, events: SecurityAlertEvent[]): Promise<void> {
     try {
       // Transform events to match service interface
       const serviceEvents = events.map(event => ({

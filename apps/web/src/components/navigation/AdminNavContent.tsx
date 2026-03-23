@@ -1,598 +1,700 @@
 "use client";
 
-import { ReactNode, useState, useEffect } from 'react';
+import { ReactNode, useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { NavigationHelpers } from '@/lib/navigation/NavigationHelpers';
+import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRBAC, RBACNavGates } from '@/lib/auth/useRBAC';
 import { cn } from '@/lib/utils';
 
-// NavItem type definition
-type NavItem = { 
-  label: string
-  href: string
-  icon?: React.ReactNode
-  badge?: {
-    text: string
-    variant: 'default' | 'success' | 'warning' | 'error' | 'org'
-  }
-  children?: NavItem[]
-  accessLevel?: 'public' | 'user' | 'admin' | 'owner'
-}
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type NavItem = RBACNavGates & {
+  label: string;
+  href?: string;
+  icon?: ReactNode;
+  badge?: string;
+  badgeVariant?: 'default' | 'success' | 'warning' | 'error' | 'new';
+  children?: NavItem[];
+  dividerBefore?: boolean;
+};
 
 interface AdminNavContentProps {
   children: ReactNode;
+  /** Optional injected links from the Navigation Control Panel */
+  injectedItems?: NavItem[];
 }
 
-const adminNavItems: NavItem[] = [
+// ─── SVG Icons ────────────────────────────────────────────────────────────────
+
+const Icon = {
+  Dashboard: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+    </svg>
+  ),
+  Users: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  ),
+  Building: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+    </svg>
+  ),
+  Shield: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  ),
+  Chart: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    </svg>
+  ),
+  Cog: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+  Globe: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+    </svg>
+  ),
+  Trash: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
+  ),
+  Navigation: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h8m-8 6h16" />
+    </svg>
+  ),
+  ChevronRight: ({ className }: { className?: string }) => (
+    <svg className={cn('w-4 h-4 transition-transform duration-200', className)} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+    </svg>
+  ),
+  Menu: () => (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  ),
+  X: () => (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  ),
+  Admin: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+    </svg>
+  ),
+};
+
+// ─── Nav definition (only real pages) ────────────────────────────────────────
+
+const buildAdminNavItems = (): NavItem[] => [
   {
     label: 'Admin Dashboard',
     href: '/settings/admin',
-    icon: NavigationHelpers.getStandardIcon('PLATFORM_DASHBOARD'),
+    icon: <Icon.Dashboard />,
   },
   {
-    label: 'User Management',
+    label: 'Users',
+    icon: <Icon.Users />,
     href: '/settings/admin/users',
-    icon: NavigationHelpers.getStandardIcon('PLATFORM_USERS'),
     children: [
-      {
-        label: 'All Users',
-        href: '/settings/admin/users'
-      },
-      {
-        label: 'User Groups',
-        href: '/settings/admin/users/groups',
-        children: [
-          {
-            label: 'Admin Groups',
-            href: '/settings/admin/users/groups/admin',
-            children: [
-              {
-                label: 'Super Admins',
-                href: '/settings/admin/users/groups/admin/super'
-              },
-              {
-                label: 'Regular Admins',
-                href: '/settings/admin/users/groups/admin/regular'
-              }
-            ]
-          },
-          {
-            label: 'User Groups',
-            href: '/settings/admin/users/groups/users',
-            children: [
-              {
-                label: 'Power Users',
-                href: '/settings/admin/users/groups/users/power'
-              },
-              {
-                label: 'Basic Users',
-                href: '/settings/admin/users/groups/users/basic'
-              }
-            ]
-          }
-        ]
-      },
-      {
-        label: 'Invitations',
-        href: '/settings/admin/invitations'
-      },
-      {
-        label: 'Permissions',
-        href: '/settings/admin/permissions',
-        children: [
-          {
-            label: 'Role Management',
-            href: '/settings/admin/permissions/roles',
-            children: [
-              {
-                label: 'Create Role',
-                href: '/settings/admin/permissions/roles/create'
-              },
-              {
-                label: 'Edit Roles',
-                href: '/settings/admin/permissions/roles/edit'
-              }
-            ]
-          },
-          {
-            label: 'Access Control',
-            href: '/settings/admin/permissions/access'
-          }
-        ]
-      }
-    ]
+      { label: 'All Users',         href: '/settings/admin/users' },
+      { label: 'Deletion Requests', href: '/settings/admin/deletion-requests' },
+    ],
   },
   {
-    label: 'Tier Management',
-    href: '/admin/tiers',
-    icon: NavigationHelpers.getStandardIcon('PLATFORM_TIERS'),
-    children: [
-      {
-        label: 'Subscription Tiers',
-        href: '/admin/tiers'
-      },
-      {
-        label: 'Tier System Configuration',
-        href: '/admin/tier-system'
-      }
-    ]
-  },
-  {
-    label: 'Tenant Management',
+    label: 'Tenants',
+    icon: <Icon.Building />,
     href: '/settings/admin/tenants',
-    icon: NavigationHelpers.getStandardIcon('STORE'),
     children: [
+      { label: 'All Tenants',       href: '/settings/admin/tenants' },
+      { label: 'Organizations',     href: '/settings/admin/organizations' },
+      { label: 'Tenant Limits',     href: '/settings/admin/limits' },
       {
-        label: 'All Tenants',
-        href: '/settings/admin/tenants'
-      },
-      {
-        label: 'Organizations',
-        href: '/admin/organizations'
-      },
-      {
-        label: 'Tenant Categories',
-        href: '/settings/admin/tenants/categories',
+        label: 'Capacity',
         children: [
-          {
-            label: 'Active Tenants',
-            href: '/settings/admin/tenants/categories/active',
-            children: [
-              {
-                label: 'Premium',
-                href: '/settings/admin/tenants/categories/active/premium'
-              },
-              {
-                label: 'Standard',
-                href: '/settings/admin/tenants/categories/active/standard'
-              }
-            ]
-          },
-          {
-            label: 'Inactive Tenants',
-            href: '/settings/admin/tenants/categories/inactive'
-          }
-        ]
+          { label: 'Overview',        href: '/settings/admin/capacity/overview' },
+          { label: 'Location Limits', href: '/settings/admin/capacity/location-limits' },
+          { label: 'Alerts',          href: '/settings/admin/capacity/alerts' },
+        ],
       },
       {
-        label: 'Tenant Limits',
-        href: '/settings/admin/limits'
-      },
-      {
-        label: 'Capacity Overview',
-        href: '/settings/admin/capacity',
+        label: 'Quick Start',
         children: [
-          {
-            label: 'Overview',
-            href: '/settings/admin/capacity/overview'
-          },
-          {
-            label: 'Location Limits',
-            href: '/settings/admin/capacity/location-limits'
-          },
-          {
-            label: 'Alerts',
-            href: '/settings/admin/capacity/alerts'
-          }
-        ]
-      }
-    ]
+          { label: 'Seed Categories', href: '/settings/admin/quick-start/categories' },
+          { label: 'Seed Products',   href: '/settings/admin/quick-start/products' },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Subscriptions',
+    icon: <Icon.Chart />,
+    href: '/settings/admin/tier-system',
+    children: [
+      { label: 'Tier System',  href: '/settings/admin/tier-system' },
+      { label: 'Tenant Tiers', href: '/settings/admin/tiers' },
+      { label: 'Billing',      href: '/settings/admin/billing' },
+    ],
+  },
+  {
+    label: 'Catalog',
+    icon: <Icon.Cog />,
+    href: '/settings/admin/categories',
+    children: [
+      { label: 'Product Categories',  href: '/settings/admin/categories' },
+      { label: 'Platform Categories', href: '/settings/admin/platform-categories' },
+      { label: 'Enrichment',          href: '/settings/admin/enrichment' },
+    ],
+  },
+  {
+    label: 'Directory',
+    icon: <Icon.Globe />,
+    href: '/settings/admin/directory/listings',
+    children: [
+      { label: 'Listings',          href: '/settings/admin/directory/listings' },
+      { label: 'Featured',          href: '/settings/admin/directory/featured' },
+      { label: 'Featured Products', href: '/settings/admin/featured-products' },
+    ],
+  },
+  {
+    label: 'Content',
+    icon: <Icon.Navigation />,
+    href: '/settings/admin/reviews',
+    children: [
+      { label: 'Reviews',   href: '/settings/admin/reviews' },
+      { label: 'Analytics', href: '/settings/admin/analytics' },
+    ],
   },
   {
     label: 'Security & Platform',
+    icon: <Icon.Shield />,
     href: '/settings/admin/security',
-    icon: NavigationHelpers.getStandardIcon('ADMIN'),
     children: [
-      {
-        label: 'Security Dashboard',
-        href: '/settings/admin/security'
-      },
-      {
-        label: 'Platform Settings',
-        href: '/settings/admin/platform'
-      },
-      {
-        label: 'Sentry Monitoring',
-        href: '/settings/admin/sentry'
-      },
-      {
-        label: 'Feature Management',
-        href: '/settings/admin/features',
-        children: [
-          {
-            label: 'Feature Overrides',
-            href: '/settings/admin/feature-overrides'
-          },
-          {
-            label: 'User Features',
-            href: '/settings/admin/features/users',
-            children: [
-              {
-                label: 'Dashboard Features',
-                href: '/settings/admin/features/users/dashboard'
-              },
-              {
-                label: 'Profile Features',
-                href: '/settings/admin/features/users/profile'
-              }
-            ]
-          },
-          {
-            label: 'Admin Features',
-            href: '/settings/admin/features/admin'
-          }
-        ]
-      },
-      {
-        label: 'Analytics & Monitoring',
-        href: '/settings/admin/analytics',
-        children: [
-          {
-            label: 'Scan Metrics',
-            href: '/settings/admin/scan-metrics'
-          }
-        ]
-      },
-      {
-        label: 'Domain Management',
-        href: '/settings/admin/domains',
-        children: [
-          {
-            label: 'Subdomain Management',
-            href: '/settings/admin/subdomain'
-          }
-        ]
-      }
-    ]
+      { label: 'Security',          href: '/settings/admin/security' },
+      { label: 'Platform Settings', href: '/settings/admin/platform' },
+      { label: 'Sentry Monitoring', href: '/settings/admin/sentry' },
+      { label: 'Feature Overrides', href: '/settings/admin/feature-overrides' },
+      { label: 'Subdomain Mgmt',    href: '/settings/admin/subdomain' },
+      { label: 'Ticker',            href: '/settings/admin/ticker' },
+    ],
   },
   {
-    label: 'Content Management',
-    href: '/admin/categories',
-    icon: NavigationHelpers.getStandardIcon('PLATFORM_CATEGORIES'),
+    label: 'Analytics',
+    icon: <Icon.Chart />,
+    href: '/settings/admin/scan-metrics',
     children: [
-      {
-        label: 'Product Categories',
-        href: '/admin/categories'
-      },
-      {
-        label: 'Platform Categories',
-        href: '/admin/platform-categories'
-      },
-      {
-        label: 'Directory Management',
-        href: '/admin/directory',
-        children: [
-          {
-            label: 'Directory Overview',
-            href: '/admin/directory'
-          },
-          {
-            label: 'All Listings',
-            href: '/admin/directory/listings'
-          },
-          {
-            label: 'Featured Listings',
-            href: '/admin/directory/featured'
-          }
-        ]
-      },
-      {
-        label: 'Featured Products',
-        href: '/admin/featured-products'
-      },
-      {
-        label: 'Review Management',
-        href: '/admin/reviews'
-      }
-    ]
+      { label: 'Scan Metrics', href: '/settings/admin/scan-metrics' },
+    ],
   },
   {
-    label: 'Analytics & Tools',
-    href: '/admin/enrichment',
-    icon: NavigationHelpers.getStandardIcon('PLATFORM_INSIGHTS'),
-    children: [
-      {
-        label: 'Product Intelligence',
-        href: '/admin/enrichment'
-      },  
-      {
-        label: 'Traffic Analytics',
-        href: '/admin/analytics'
-      },
-      {
-        label: 'Admin Tools',
-        href: '/admin/tools',
-        children: [
-          {
-            label: 'Tools Dashboard',
-            href: '/admin/tools'
-          },
-          {
-            label: 'Cached Products',
-            href: '/admin/tools/cached-products'
-          }
-        ]
-      }
-    ]
-  }
+    label: 'Navigation Control',
+    href: '/settings/admin/navigation',
+    icon: <Icon.Navigation />,
+    badge: 'Admin',
+    badgeVariant: 'warning',
+    dividerBefore: true,
+  },
+  {
+    label: 'Account Settings',
+    href: '/settings',
+    icon: <Icon.Admin />,
+    dividerBefore: true,
+  },
 ];
 
-export function AdminNavContent({ children }: AdminNavContentProps) {
-  const pathname = usePathname();
-  const [isMobile, setIsMobile] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+// ─── Auto-expand helper ───────────────────────────────────────────────────────
 
-  // Detect mobile screen size
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768); // md breakpoint
-    };
-
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Auto-expand items that contain the current path
-  useEffect(() => {
-    const itemsToExpand = new Set<string>();
-    
-    const findExpandedItems = (items: NavItem[], currentPath: string, level = 0): string[] => {
-      const expanded: string[] = [];
-      
-      items.forEach(item => {
-        if (item.children && item.children.length > 0) {
-          const hasActiveChild = item.children.some(child => 
-            child.href && (currentPath === child.href || currentPath.startsWith(child.href + '/'))
-          ) || item.children.some(child => {
-            if (child.children) {
-              return findExpandedItems([child], currentPath, level + 1).length > 0
-            }
-            return false
-          })
-          
-          if (hasActiveChild) {
-            expanded.push(item.href || item.label)
-          }
-        }
-      })
-      
-      return expanded
-    }
-    
-    const expanded = findExpandedItems(adminNavItems, pathname)
-    setExpandedItems(new Set(expanded))
-  }, [pathname])
-
-  // Close sidebar when navigating on mobile
-  const handleMobileNavClick = () => {
-    if (isMobile) {
-      setSidebarOpen(false);
-    }
-  };
-
-  // Toggle expand/collapse for nested items
-  const toggleExpand = (itemId: string) => {
-    setExpandedItems(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(itemId)) {
-        newSet.delete(itemId)
-      } else {
-        newSet.add(itemId)
+function computeExpanded(items: NavItem[], pathname: string): Set<string> {
+  const result = new Set<string>();
+  const walk = (nodes: NavItem[]) => {
+    for (const node of nodes) {
+      const key = node.href ?? node.label;
+      if (node.children) {
+        const hasActive = node.children.some(
+          c => c.href && (pathname === c.href || pathname.startsWith(c.href + '/'))
+        );
+        if (hasActive) result.add(key);
+        walk(node.children);
       }
-      return newSet
-    })
-  };
-
-  // Recursive component for rendering navigation items
-  const NavItemComponent = ({ 
-    item, 
-    level = 0,
-    isMobile = false 
-  }: { 
-    item: NavItem
-    level?: number
-    isMobile?: boolean
-  }) => {
-    const isActive = item.href && (pathname === item.href || pathname.startsWith(item.href + '/'))
-    const hasChildren = item.children && item.children.length > 0
-    const isExpanded = expandedItems.has(item.href || item.label)
-    const indent = level * 16
-
-    if (hasChildren) {
-      return (
-        <div className={`${isMobile ? 'mb-2' : 'mb-1'}`}>
-          <button
-            onClick={() => toggleExpand(item.href || item.label)}
-            className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-              isActive 
-                ? 'bg-blue-50 text-blue-700' 
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
-            style={{ paddingLeft: `${12 + indent}px` }}
-          >
-            {item.icon && (
-              <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
-                {item.icon}
-              </span>
-            )}
-            <span className="flex-1 text-left">{item.label}</span>
-            <svg
-              className={`w-4 h-4 transition-transform text-gray-400 ${
-                isExpanded ? 'rotate-90' : ''
-              }`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-          
-          {isExpanded && (
-            <div className="mt-1">
-              {item.children!.map((child) => (
-                <NavItemComponent
-                  key={child.href || child.label}
-                  item={child}
-                  level={level + 1}
-                  isMobile={isMobile}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )
     }
-
-    return (
-      <a
-        href={item.href}
-        onClick={handleMobileNavClick}
-        className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-          isMobile ? 'mb-2' : 'mb-1'
-        } ${
-          isActive 
-            ? 'bg-blue-50 text-blue-700' 
-            : 'text-gray-700 hover:bg-gray-100'
-        }`}
-        style={{ paddingLeft: `${12 + indent}px` }}
-      >
-        {item.icon && (
-          <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
-            {item.icon}
-          </span>
-        )}
-        <span>{item.label}</span>
-        {item.badge && (
-          <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ml-auto ${
-            item.badge.variant === 'default' ? 'bg-gray-100 text-gray-800' :
-            item.badge.variant === 'success' ? 'bg-green-100 text-green-800' :
-            item.badge.variant === 'warning' ? 'bg-yellow-100 text-yellow-800' :
-            item.badge.variant === 'error' ? 'bg-red-100 text-red-800' :
-            'bg-blue-100 text-blue-800'
-          }`}>
-            {item.badge.text}
-          </span>
-        )}
-      </a>
-    )
   };
+  walk(items);
+  return result;
+}
 
-  // Mobile breadcrumb navigation
-  const MobileBreadcrumb = () => {
-    if (!isMobile) return null;
+// ─── Page title from pathname ─────────────────────────────────────────────────
 
-    const currentItem = adminNavItems.find(item => 
-      pathname === item.href || pathname.startsWith(item.href + '/')
-    );
+function pageTitleFromPath(pathname: string): string {
+  const segments = pathname.split('/').filter(Boolean);
+  const last = segments[segments.length - 1] ?? 'Admin';
+  return last.charAt(0).toUpperCase() + last.slice(1).replace(/-/g, ' ');
+}
 
-    if (!currentItem) return null;
+// ─── Badge ────────────────────────────────────────────────────────────────────
 
-    return (
-      <div className="md:hidden bg-white border-b border-neutral-200 px-4 py-3">
-        <div className="flex items-center gap-2 text-sm">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-lg hover:bg-neutral-100 transition-colors"
-            aria-label="Open navigation"
-          >
-            <svg className="h-5 w-5 text-neutral-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <div className="flex items-center gap-2 text-neutral-600">
-            <span>Admin</span>
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            <span className="font-medium text-neutral-900">{currentItem.label}</span>
-          </div>
-        </div>
-      </div>
-    );
+function NavBadge({ text, variant = 'default' }: { text: string; variant?: NavItem['badgeVariant'] }) {
+  const colors: Record<string, string> = {
+    default: 'bg-neutral-100 text-neutral-700',
+    success: 'bg-green-100 text-green-700',
+    warning: 'bg-amber-100 text-amber-700',
+    error:   'bg-red-100 text-red-700',
+    new:     'bg-blue-100 text-blue-700',
   };
+  return (
+    <span className={cn('ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none', colors[variant ?? 'default'])}>
+      {text}
+    </span>
+  );
+}
 
-  // Mobile overlay sidebar
-  const MobileSidebar = () => {
-    if (!isMobile || !sidebarOpen) return null;
+// ─── Single nav item row ──────────────────────────────────────────────────────
 
+function NavItemRow({
+  item,
+  level = 0,
+  pathname,
+  expanded,
+  onToggle,
+  onNavigate,
+}: {
+  item: NavItem;
+  level?: number;
+  pathname: string;
+  expanded: Set<string>;
+  onToggle: (key: string) => void;
+  onNavigate: () => void;
+}) {
+  const key = item.href ?? item.label;
+  const hasChildren = !!(item.children?.length);
+  const isExpanded = expanded.has(key);
+  const isActive = item.href
+    ? pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'))
+    : false;
+  const isParentActive = hasChildren && item.children!.some(
+    c => c.href && (pathname === c.href || pathname.startsWith(c.href + '/'))
+  );
+
+  const paddingLeft = 16 + level * 14;
+
+  const sharedClass = cn(
+    'group flex w-full items-center gap-3 rounded-lg py-2 text-sm font-medium transition-all duration-150',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500',
+    isActive || isParentActive
+      ? 'bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+      : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
+  );
+
+  const iconClass = cn(
+    'flex-shrink-0',
+    isActive || isParentActive
+      ? 'text-amber-600 dark:text-amber-400'
+      : 'text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200'
+  );
+
+  if (hasChildren) {
     return (
-      <>
-        {/* Overlay */}
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-        
-        {/* Mobile Sidebar */}
-        <div className="fixed inset-y-0 left-0 w-80 bg-white shadow-xl z-50 md:hidden transform transition-transform duration-300 ease-in-out">
-          <div className="flex items-center justify-between p-4 border-b border-neutral-200">
-            <h2 className="text-lg font-semibold text-neutral-900">Admin Navigation</h2>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="p-2 rounded-lg hover:bg-neutral-100 transition-colors"
-              aria-label="Close navigation"
-            >
-              <svg className="h-5 w-5 text-neutral-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          
-          {/* Mobile Navigation Items */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {adminNavItems.map((item) => (
-              <NavItemComponent
-                key={item.href || item.label}
-                item={item}
-                isMobile={true}
+      <div>
+        <button
+          onClick={() => onToggle(key)}
+          className={sharedClass}
+          style={{ paddingLeft, paddingRight: 12 }}
+          aria-expanded={isExpanded}
+        >
+          {item.icon && <span className={iconClass}>{item.icon}</span>}
+          <span className="flex-1 text-left truncate">{item.label}</span>
+          {item.badge && <NavBadge text={item.badge} variant={item.badgeVariant} />}
+          <Icon.ChevronRight className={isExpanded ? 'rotate-90 text-neutral-500' : 'text-neutral-400'} />
+        </button>
+        {isExpanded && (
+          <div className="mt-0.5 space-y-0.5">
+            {item.children!.map(child => (
+              <NavItemRow
+                key={child.href ?? child.label}
+                item={child}
+                level={level + 1}
+                pathname={pathname}
+                expanded={expanded}
+                onToggle={onToggle}
+                onNavigate={onNavigate}
               />
             ))}
           </div>
-        </div>
-      </>
-    );
-  };
-
-  if (isMobile) {
-    // Mobile layout: overlay sidebar + full-width content
-    return (
-      <div className="min-h-screen bg-neutral-50">
-        <MobileSidebar />
-        <MobileBreadcrumb />
-        <main className="flex-1">
-          {children}
-        </main>
+        )}
       </div>
     );
   }
 
-  // Desktop layout: sidebar + content
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Desktop Sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 overflow-y-auto">
-        <div className="p-4">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Admin Navigation</h2>
-          <nav className="space-y-1">
-            {adminNavItems.map((item) => (
-              <NavItemComponent
-                key={item.href || item.label}
+    <Link
+      href={item.href!}
+      onClick={onNavigate}
+      className={sharedClass}
+      style={{ paddingLeft, paddingRight: 12 }}
+    >
+      {item.icon && <span className={iconClass}>{item.icon}</span>}
+      <span className="flex-1 truncate">{item.label}</span>
+      {item.badge && <NavBadge text={item.badge} variant={item.badgeVariant} />}
+    </Link>
+  );
+}
+
+// ─── Sidebar content (shared between desktop + mobile drawer) ─────────────────
+
+function SidebarContent({
+  items,
+  pathname,
+  expanded,
+  onToggle,
+  onNavigate,
+  user,
+  collapsed,
+}: {
+  items: NavItem[];
+  pathname: string;
+  expanded: Set<string>;
+  onToggle: (key: string) => void;
+  onNavigate: () => void;
+  user: { email: string; firstName?: string; lastName?: string; role: string } | null;
+  collapsed?: boolean;
+}) {
+  const displayName = user
+    ? user.firstName && user.lastName
+      ? `${user.firstName} ${user.lastName}`
+      : user.email
+    : '';
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Admin identity strip */}
+      <div className={cn(
+        'flex items-center gap-3 px-4 py-4 border-b border-amber-100 dark:border-neutral-800',
+        collapsed && 'justify-center px-2'
+      )}>
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center flex-shrink-0">
+          <span className="text-white text-xs font-bold">
+            {displayName.charAt(0).toUpperCase() || 'A'}
+          </span>
+        </div>
+        {!collapsed && (
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-neutral-900 dark:text-white truncate">{displayName}</p>
+            <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 truncate">{user?.role}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Nav items */}
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+        {items.map(item => (
+          <div key={item.href ?? item.label}>
+            {item.dividerBefore && (
+              <div className="my-2 border-t border-neutral-100 dark:border-neutral-800" />
+            )}
+            {collapsed ? (
+              item.icon ? (
+                <Link
+                  href={item.href ?? (item.children?.[0]?.href ?? '#')}
+                  onClick={onNavigate}
+                  title={item.label}
+                  className={cn(
+                    'flex items-center justify-center w-10 h-10 mx-auto rounded-lg transition-colors',
+                    item.href && (pathname === item.href || pathname.startsWith(item.href + '/'))
+                      ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                      : 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200'
+                  )}
+                >
+                  {item.icon}
+                </Link>
+              ) : null
+            ) : (
+              <NavItemRow
                 item={item}
-                isMobile={false}
+                pathname={pathname}
+                expanded={expanded}
+                onToggle={onToggle}
+                onNavigate={onNavigate}
               />
-            ))}
-          </nav>
+            )}
+          </div>
+        ))}
+      </nav>
+
+      {/* Footer */}
+      {!collapsed && (
+        <div className="px-4 py-3 border-t border-neutral-100 dark:border-neutral-800">
+          <p className="text-xs text-neutral-400">Platform Administration</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Mobile drawer ────────────────────────────────────────────────────────────
+
+function MobileDrawer({
+  open,
+  onClose,
+  items,
+  pathname,
+  expanded,
+  onToggle,
+  user,
+}: {
+  open: boolean;
+  onClose: () => void;
+  items: NavItem[];
+  pathname: string;
+  expanded: Set<string>;
+  onToggle: (key: string) => void;
+  user: { email: string; firstName?: string; lastName?: string; role: string } | null;
+}) {
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = '';
+    };
+  }, [open, onClose]);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-300 md:hidden',
+          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        )}
+        onClick={onClose}
+        aria-hidden
+      />
+      {/* Slide-in panel */}
+      <div
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Admin navigation"
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 w-[280px] bg-white dark:bg-neutral-900 shadow-2xl',
+          'flex flex-col transition-transform duration-300 ease-in-out md:hidden',
+          open ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        <div className="flex items-center justify-between px-4 py-4 border-b border-amber-100 dark:border-neutral-800 bg-amber-50 dark:bg-amber-900/20">
+          <span className="text-base font-semibold text-amber-900 dark:text-amber-200">Admin Panel</span>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-neutral-800 transition-colors"
+            aria-label="Close navigation"
+          >
+            <Icon.X />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <SidebarContent
+            items={items}
+            pathname={pathname}
+            expanded={expanded}
+            onToggle={onToggle}
+            onNavigate={onClose}
+            user={user}
+          />
         </div>
       </div>
-      
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto">
-        <main className="h-full">
+    </>
+  );
+}
+
+// ─── Mobile top bar ───────────────────────────────────────────────────────────
+
+function MobileTopBar({ onOpen, title }: { onOpen: () => void; title: string }) {
+  return (
+    <div className="sticky top-0 z-30 flex items-center gap-3 px-4 h-14 bg-amber-50 dark:bg-neutral-900 border-b border-amber-200 dark:border-neutral-800 md:hidden">
+      <button
+        onClick={onOpen}
+        className="p-2 -ml-2 rounded-lg hover:bg-amber-100 dark:hover:bg-neutral-800 transition-colors"
+        aria-label="Open admin navigation"
+      >
+        <Icon.Menu />
+      </button>
+      <span className="font-semibold text-amber-900 dark:text-amber-200 text-sm truncate">{title}</span>
+      <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-200">
+        Admin
+      </span>
+    </div>
+  );
+}
+
+// ─── Desktop sidebar ──────────────────────────────────────────────────────────
+
+function DesktopSidebar({
+  items,
+  pathname,
+  expanded,
+  onToggle,
+  user,
+}: {
+  items: NavItem[];
+  pathname: string;
+  expanded: Set<string>;
+  onToggle: (key: string) => void;
+  user: { email: string; firstName?: string; lastName?: string; role: string } | null;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <aside
+      className={cn(
+        'hidden md:flex flex-col flex-shrink-0',
+        'bg-white dark:bg-neutral-900',
+        'border-r border-amber-100 dark:border-neutral-800',
+        'transition-all duration-300 ease-in-out relative h-full',
+        collapsed ? 'w-[60px]' : 'w-[240px]'
+      )}
+    >
+      {/* Collapse toggle */}
+      <button
+        onClick={() => setCollapsed(prev => !prev)}
+        className={cn(
+          'absolute -right-3 top-6 z-10 w-6 h-6 rounded-full',
+          'bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700',
+          'flex items-center justify-center shadow-sm',
+          'hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors'
+        )}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        <svg
+          className={cn('w-3 h-3 text-neutral-500 transition-transform duration-300', collapsed ? 'rotate-180' : '')}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      {/* Header */}
+      <div className={cn(
+        'px-4 py-4 border-b border-amber-100 dark:border-neutral-800 bg-amber-50 dark:bg-amber-900/20',
+        collapsed && 'px-2'
+      )}>
+        {collapsed ? (
+          <div className="w-8 h-8 mx-auto rounded-lg bg-amber-500 flex items-center justify-center">
+            <Icon.Cog />
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-amber-900 dark:text-amber-200 tracking-tight">Admin Panel</h2>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-200 leading-none">
+              Platform
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        <SidebarContent
+          items={items}
+          pathname={pathname}
+          expanded={expanded}
+          onToggle={onToggle}
+          onNavigate={() => {}}
+          user={user}
+          collapsed={collapsed}
+        />
+      </div>
+    </aside>
+  );
+}
+
+// ─── Main export ──────────────────────────────────────────────────────────────
+
+export function AdminNavContent({ children, injectedItems = [] }: AdminNavContentProps) {
+  const pathname = usePathname();
+  const { user } = useAuth();
+  const { filterNavItems } = useRBAC();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Merge built-in items with any injected admin links from Navigation Control Panel
+  const rawItems: NavItem[] = [
+    ...buildAdminNavItems(),
+    ...injectedItems,
+  ];
+
+  const items = filterNavItems(rawItems);
+
+  const [expanded, setExpanded] = useState<Set<string>>(() =>
+    computeExpanded(items, pathname)
+  );
+
+  useEffect(() => {
+    setExpanded(computeExpanded(items, pathname));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  const toggleExpanded = (key: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const pageTitle = pageTitleFromPath(pathname);
+
+  const userForSidebar = user
+    ? { email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role }
+    : null;
+
+  return (
+    <div className="flex h-screen bg-neutral-50 dark:bg-neutral-950 overflow-hidden">
+      {/* Desktop sidebar */}
+      <DesktopSidebar
+        items={items}
+        pathname={pathname}
+        expanded={expanded}
+        onToggle={toggleExpanded}
+        user={userForSidebar}
+      />
+
+      {/* Mobile drawer */}
+      <MobileDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        items={items}
+        pathname={pathname}
+        expanded={expanded}
+        onToggle={toggleExpanded}
+        user={userForSidebar}
+      />
+
+      {/* Main content */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        {/* Mobile top bar */}
+        <MobileTopBar onOpen={() => setDrawerOpen(true)} title={pageTitle} />
+
+        {/* Page content */}
+        <main className="flex-1 overflow-y-auto">
           {children}
         </main>
       </div>
     </div>
   );
 }
+
+export default AdminNavContent;

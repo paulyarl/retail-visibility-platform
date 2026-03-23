@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getAuth0Session, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,17 +44,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get Auth0 session for authentication
+    const auth = await getAuth0Session(request);
+    const accessToken = auth?.accessToken || null;
+
     // Exchange code for tokens via backend API
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-    const response = await fetch(`${apiBaseUrl}/square/oauth/exchange`, {
+    const response = await authenticatedFetch('/square/oauth/exchange', accessToken, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Forward auth token if available
-        ...(request.cookies.get('access_token') && {
-          'Authorization': `Bearer ${request.cookies.get('access_token')?.value}`
-        }),
-      },
       body: JSON.stringify({
         code,
         tenantId,

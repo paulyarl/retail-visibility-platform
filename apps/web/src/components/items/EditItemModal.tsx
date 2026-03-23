@@ -3,7 +3,7 @@ import { useParams } from 'next/navigation';
 import { Modal, ModalFooter, Button, Input, Alert } from '@/components/ui';
 import { useFeatureFlag } from '@/lib/featureFlags';
 import { useCategorySingleton } from '@/providers/data/CategorySingleton';
-import CategorySelector from './CategorySelector';
+import CategoryAssignmentModal from './CategoryAssignmentModal';
 import PaymentGatewaySelector from '@/components/products/PaymentGatewaySelector';
 import ProductTypeSelector, { ProductType } from './ProductTypeSelector';
 import DigitalProductConfig, { DigitalProductData } from './DigitalProductConfig';
@@ -52,18 +52,15 @@ function CategoryNameDisplay({ categoryId }: { categoryId: string }) {
 
       // If not found in tenant categories, try Google taxonomy
       try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const response = await fetch(`${API_BASE_URL}/public/google-taxonomy/${categoryId}`);
+        const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
+        const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(categoryId);
         
-        if (response.ok) {
-          const data = await response.json();
-          if (data.path && Array.isArray(data.path)) {
-            const pathString = data.path.join(' > ');
-            const finalCategoryName = data.path[data.path.length - 1]; // Get last element
-            setCategoryName(finalCategoryName);
-            setFullCategoryPath(pathString); // Store full path separately
-            return;
-          }
+        if (data && data.path && Array.isArray(data.path)) {
+          const pathString = data.path.join(' > ');
+          const finalCategoryName = data.path[data.path.length - 1]; // Get last element
+          setCategoryName(finalCategoryName);
+          setFullCategoryPath(pathString); // Store full path separately
+          return;
         }
       } catch (error) {
         console.error('[EditItemModal CategoryNameDisplay] Error fetching Google taxonomy:', error);
@@ -461,6 +458,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
   };
 
   return (
+    <>
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
@@ -914,29 +912,8 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
                 <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
-                {showCategorySelector ? 'Hide Category Selection' : 'Change Category'}
+                Change Category
               </Button>
-
-              {showCategorySelector && (
-                <div className="mt-3 p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-                  <CategorySelector
-                    currentCategory={tenantCategoryId ? [tenantCategoryId] : []}
-                    onCategorySelect={async (categoryPath: string[]) => {
-                      if (categoryPath.length > 0) {
-                        const selectedCategory = categoryPath[categoryPath.length - 1];
-                        // For Google taxonomy, extract the ID and path
-                        const googleCategoryId = selectedCategory;
-                        const googleCategoryPath = categoryPath.join(' > ');
-                        
-                        // Set the tenant category ID (you might need to create tenant category from Google taxonomy)
-                        setTenantCategoryId(googleCategoryId);
-                        setShowCategorySelector(false);
-                      }
-                    }}
-                    onCancel={() => setShowCategorySelector(false)}
-                  />
-                </div>
-              )}
             </div>
           </div>
           <p className="text-xs text-neutral-500 mt-2">
@@ -1044,5 +1021,18 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
         </Button>
       </ModalFooter>
     </Modal>
+
+    {/* Category Assignment Modal */}
+    {showCategorySelector && item && (
+      <CategoryAssignmentModal
+        item={item}
+        onSave={async (itemId, categoryId) => {
+          setTenantCategoryId(categoryId);
+          setShowCategorySelector(false);
+        }}
+        onClose={() => setShowCategorySelector(false)}
+      />
+    )}
+  </>
   );
 }

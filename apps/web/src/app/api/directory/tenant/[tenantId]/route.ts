@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAuth0Session, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function GET(
   request: NextRequest,
@@ -14,18 +15,13 @@ export async function GET(
       );
     }
 
-    // For now, return a basic response to avoid circular dependency
-    // TODO: Implement proper tenant directory lookup logic
-    // This could query the database directly or use a different service
+    // Get optional Auth0 session (public endpoint for directory lookup)
+    const auth = await getAuth0Session(request);
+    const accessToken = auth?.accessToken || null;
     
     // Check if tenant has a published directory by querying tenant profile
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    const profileResponse = await fetch(`${baseUrl}/api/tenant/profile?tenant_id=${tenantId}`, {
+    const profileResponse = await authenticatedFetch(`/api/tenant/profile?tenant_id=${tenantId}`, accessToken, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': request.headers.get('Authorization') || '',
-      },
     });
 
     if (!profileResponse.ok) {

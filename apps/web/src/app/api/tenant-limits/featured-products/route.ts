@@ -1,22 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { requireAuth, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('access_token')?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Require authentication via Auth0 session
+    const authResult = await requireAuth(request);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
+    
+    const { accessToken } = authResult;
 
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    const response = await fetch(`${backendUrl}/api/tenant-limits/featured-products`, {
+    const response = await authenticatedFetch('/api/tenant-limits/featured-products', accessToken, {
       method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
       body: await request.text(),
     });
 

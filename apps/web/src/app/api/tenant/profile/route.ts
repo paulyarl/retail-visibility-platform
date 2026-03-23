@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, authenticatedFetch } from '@/utils/apiAuth';
 
 async function handleProfileRequest(req: NextRequest, method: 'POST' | 'PATCH') {
   try {
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
     const body = await req.json();
-    const res = await fetch(`${base}/api/tenant/profile`, {
+    
+    // Require authentication via Auth0 session
+    const authResult = await requireAuth(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
+    
+    const res = await authenticatedFetch('/api/tenant/profile', accessToken, {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': req.headers.get('authorization') || '',
-      },
       body: JSON.stringify(body),
     });
     
@@ -47,15 +53,21 @@ export async function PATCH(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
     const url = new URL(req.url);
     const tenantId = url.searchParams.get('tenant_id') || url.searchParams.get('tenantId');
     const qs = tenantId ? `?tenant_id=${encodeURIComponent(tenantId)}` : '';
-    const res = await fetch(`${base}/api/tenant/profile${qs}`, {
+    
+    // Require authentication via Auth0 session
+    const authResult = await requireAuth(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
+    
+    const res = await authenticatedFetch(`/api/tenant/profile${qs}`, accessToken, {
       method: 'GET',
-      headers: {
-        'Authorization': req.headers.get('authorization') || '',
-      },
     });
 
     const contentType = res.headers.get('content-type');

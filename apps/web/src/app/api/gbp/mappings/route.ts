@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { authenticatedFetch } from '@/utils/apiAuth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,14 +13,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Forward to backend API
-    const backendUrl = `${API_URL}/api/gbp/mappings?categoryIds=${encodeURIComponent(categoryIds)}`;
-    
-    const response = await fetch(backendUrl, {
+    // Public endpoint - no authentication required for GBP mappings
+    const response = await authenticatedFetch(`/api/gbp/mappings?categoryIds=${encodeURIComponent(categoryIds)}`, null, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
     });
 
     if (!response.ok) {

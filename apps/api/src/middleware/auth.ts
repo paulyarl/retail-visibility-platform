@@ -68,7 +68,7 @@ const toCamel = (str: string): string => {
 /**
  * Transform object to have BOTH naming conventions
  */
-const makeBothConventionsAvailable = (obj: any): any => {
+export const makeBothConventionsAvailable = (obj: any): any => {
   if (obj === null || obj === undefined) return obj;
   
   if (Array.isArray(obj)) {
@@ -103,133 +103,75 @@ const makeBothConventionsAvailable = (obj: any): any => {
 };
 
 /**
- * Middleware to authenticate JWT token
- * Supports both JWT tokens and Auth0 session headers
+ * Middleware to authenticate via Auth0 session
+ * Migrated from legacy JWT Bearer tokens to Auth0 cookie-based authentication
  */
 export async function authenticateToken(req: Request, res: Response, next: NextFunction) {
   try {
-
-    // console.log(`Request body: ${JSON.stringify(req.body)}`);
-    // console.log(`Request headers: ${JSON.stringify(req.headers)}`);
-
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-    // console.log('[AUTH] authenticateToken called for:', req.method, req.path, 'Token present:', !!token);
-
-    // Try JWT token authentication first
-    if (token) {
-      //console.log('[AUTH] JWT verification attempted for token:', token.substring(0, 20) + '...');
-      const payload = authService.verifyAccessToken(token);
-      //console.log('[AUTH] Token verified successfully, payload:', { userId: payload.userId, user_id: payload.user_id, email: payload.email, role: payload.role });
-      
-      // Check if the session has been revoked in the database
-      const userId = payload.userId || payload.user_id;
-
-      if (userId) {
-        try {
-          const { prisma } = await import('../prisma');
-          const session = await prisma.user_sessions_list.findFirst({
-            where: {
-              user_id: userId,
-              is_active: true,
-              expires_at: { gt: new Date() }
-            },
-            select: { id: true }
-          });
-
-          if (!session) {
-            console.log('[AUTH] Session revoked or expired for user:', userId);
-            return res.status(401).json({ error: 'session_revoked', message: 'Your session has been revoked' });
-          }
-        } catch (error) {
-          console.error('[AUTH] Error checking session status:', error);
-          // If database check fails, allow request to proceed (fail open for availability)
-        }
-      }
-      
-      // Apply universal transform to JWT payload to ensure both naming conventions
-      const transformedPayload = makeBothConventionsAvailable(payload);
-      req.user = transformedPayload;
-      return next();
-    }
-
-    // Fallback to Auth0 session authentication via headers
+    // Check for Auth0 session headers (set by web app from cookies)
     const auth0Id = req.headers['x-auth0-id'] as string;
     const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
 
-    if (auth0Id || auth0Email) {
-
-      const { prisma } = await import('../prisma');
-      
-      let user = null;
-      
-      // Try by auth0_id first (most reliable)
-      if (auth0Id) {
-        user = await prisma.users.findUnique({
-          where: { auth0_id: auth0Id },
-          select: {
-            id: true,
-            email: true,
-            role: true,
-            auth0_id: true,
-            user_tenants: {
-              select: { tenant_id: true }
-            }
-          }
-        });
-      }
-      
-      // Fallback to email lookup
-      if (!user && auth0Email) {
-        user = await prisma.users.findUnique({
-          where: { email: auth0Email.toLowerCase() },
-          select: {
-            id: true,
-            email: true,
-            role: true,
-            auth0_id: true,
-            user_tenants: {
-              select: { tenant_id: true }
-            }
-          }
-        });
-      }
-
-      if (user) {
-        // Build JWT-like payload from user data
-        const payload: JWTPayload = {
-          id: user.id,
-          userId: user.id,
-          user_id: user.id,
-          email: user.email,
-          role: user.role as user_role,
-          tenantIds: user.user_tenants?.map((ut: any) => ut.tenant_id) || []
-        };
-        
-        req.user = makeBothConventionsAvailable(payload);
-        return next();
-      }
+    if (!auth0Id && !auth0Email) {
+      console.log('[AUTH] No Auth0 session provided');
+      return res.status(401).json({ error: 'authentication_required', message: 'No Auth0 session provided' });
     }
 
-    // No valid authentication found
-    console.log('[AUTH] No token or Auth0 session provided');
-    return res.status(401).json({ error: 'authentication_required', message: 'No token provided' });
-  } catch (error) {
-    console.error('[AUTH] Exception in authenticateToken:', error);
-    if (error instanceof Error) {
-      console.error('[AUTH] Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack?.substring(0, 500)
+    const { prisma } = await import('../prisma');
+    
+    let user = null;
+    
+    // Try by auth0_id first (most reliable)
+    if (auth0Id) {
+      user = await prisma.users.findUnique({
+        where: { auth0_id: auth0Id },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          auth0_id: true,
+          user_tenants: {
+            select: { tenant_id: true }
+          }
+        }
       });
-      if (error.name === 'TokenExpiredError') {
-        return res.status(401).json({ error: 'token_expired', message: 'Token has expired' });
-      }
-      if (error.name === 'JsonWebTokenError') {
-        return res.status(401).json({ error: 'invalid_token', message: 'Invalid token' });
-      }
     }
+    
+    // Fallback to email lookup
+    if (!user && auth0Email) {
+      user = await prisma.users.findUnique({
+        where: { email: auth0Email.toLowerCase() },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          auth0_id: true,
+          user_tenants: {
+            select: { tenant_id: true }
+          }
+        }
+      });
+    }
+
+    if (!user) {
+      console.log('[AUTH] User not found for Auth0 session');
+      return res.status(401).json({ error: 'user_not_found', message: 'User not found in platform' });
+    }
+
+    // Build JWT-like payload from user data
+    const payload: JWTPayload = {
+      id: user.id,
+      userId: user.id,
+      user_id: user.id,
+      email: user.email,
+      role: user.role as user_role,
+      tenantIds: user.user_tenants?.map((ut: any) => ut.tenant_id) || []
+    };
+    
+    req.user = makeBothConventionsAvailable(payload);
+    return next();
+  } catch (error) {
+    console.error('[AUTH] Auth0 authentication failed:', error);
     return res.status(401).json({ error: 'authentication_failed', message: 'Authentication failed' });
   }
 }
@@ -430,6 +372,25 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
         };
         
         req.user = makeBothConventionsAvailable(payload);
+        
+        // Track session for Auth0 authenticated users
+        const { trackSession } = await import('./session-tracker');
+        const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+                          req.socket.remoteAddress ||
+                          'unknown';
+        const userAgent = req.headers['user-agent'] || 'unknown';
+        const auth0SessionId = req.cookies?.auth0_session || req.cookies?.appSession;
+        
+        trackSession({
+          userId: user.id,
+          auth0SessionId,
+          ipAddress,
+          userAgent,
+          userRole: user.role,
+          req,
+        }).catch(err => {
+          console.error('[optionalAuth] Error tracking session:', err);
+        });
       }
     }
   } catch (error) {

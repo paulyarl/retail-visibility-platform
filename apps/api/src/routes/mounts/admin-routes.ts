@@ -21,6 +21,7 @@ import tickerMessagesRoutes from '../admin/ticker-messages';
 import tiersRoutes from '../admin/tiers';
 import adminAnalyticsRoutes from '../admin-analytics';
 import adminSecurityMonitoringRoutes from '../admin/security-monitoring';
+import navigationLinksRoutes from '../admin/navigation-links';
 
 /**
  * Mount admin routes
@@ -48,6 +49,7 @@ export function mountAdminRoutes(app: Express) {
   app.use('/api/admin/tiers', authenticateToken, requireAdmin, tiersRoutes);
   app.use('/api/admin/analytics', authenticateToken, requireAdmin, adminAnalyticsRoutes);
   app.use('/api/admin/security', authenticateToken, requireAdmin, adminSecurityMonitoringRoutes);
+  app.use('/api/admin/navigation-links', authenticateToken, requireAdmin, navigationLinksRoutes);
   
   // Tenant flags: accessible by platform admins OR store owners of that specific tenant
   app.use('/admin', authenticateToken, tenantFlagsRoutes);

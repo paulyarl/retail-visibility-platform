@@ -6,7 +6,7 @@ import { googleTaxonomyService, type GoogleTaxonomyCategory } from '@/services/G
 
 interface CategorySelectorProps {
   currentCategory: string[];
-  onCategorySelect: (category: string[]) => void;
+  onCategorySelect: (category: { path: string[]; id: string; name: string }) => void;
   onCancel: () => void;
 }
 
@@ -206,7 +206,16 @@ export default function CategorySelector({
   };
 
   const handleConfirmSelection = () => {
-    onCategorySelect(selectedCategory);
+    // Find the selected category to get its id and name
+    const selected = filteredCategories.find(cat => 
+      JSON.stringify(cat.path) === JSON.stringify(selectedCategory)
+    );
+    
+    onCategorySelect({
+      path: selectedCategory,
+      id: selected?.id || selectedCategory[selectedCategory.length - 1],
+      name: selected?.name || selectedCategory[selectedCategory.length - 1]
+    });
   };
 
   const handleClearSelection = () => {

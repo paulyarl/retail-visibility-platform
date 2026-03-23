@@ -58,6 +58,7 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
       console.error('[GoogleTaxonomyService] Failed to browse Google taxonomy:', response.error);
       return null;
     }
+    console.log(`[GoogleTaxonomyService] Browsed Google taxonomy:`, response.data?.categories)
 
     return response.data?.categories || null;
   }

@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { getAuth0Session, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('access_token')?.value;
+    // Get optional Auth0 session (tiers may be public)
+    const auth = await getAuth0Session(request);
+    const accessToken = auth?.accessToken || null;
 
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    const response = await fetch(`${backendUrl}/api/tenant-limits/tiers`, {
+    const response = await authenticatedFetch('/api/tenant-limits/tiers', accessToken, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
     });
 
     if (!response.ok) {

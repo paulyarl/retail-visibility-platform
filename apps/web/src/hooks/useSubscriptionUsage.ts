@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Hook for fetching and managing subscription usage data
  * Provides real-time SKU usage, location usage, and subscription information
@@ -13,6 +15,7 @@ import { deriveInternalStatus, type InternalStatus, type MaintenanceState, getMa
 import { useTenant, useTenantTier } from '@/hooks/useApiQueries';
 import { useItemsStats } from '@/hooks/useApiQueries';
 import { useTenantLimits } from '@/hooks/useTenantLimits';
+import { useTierSystem } from '@/hooks/useTierSystem';
 
 export interface SubscriptionUsage {
   // Tenant info
@@ -71,6 +74,9 @@ export function useSubscriptionUsage(tenantIdProp?: string, props?: Subscription
   const { data: tierData, isLoading: tierLoading } = useTenantTier(tenantId || ''); // Get effective tier
   const { data: itemsStats, isLoading: itemsLoading, error: itemsError } = useItemsStats(tenantId);
   const { status: tenantLimits, loading: limitsLoading, error: limitsError } = useTenantLimits();
+  
+  // Get dynamic tier data
+  const { getTierInfo: getDynamicTierInfo, loading: tiersLoading } = useTierSystem();
 
   // If props provided, skip loading checks for those values
   const hasProps = props?.tier;
@@ -99,8 +105,8 @@ export function useSubscriptionUsage(tenantIdProp?: string, props?: Subscription
       // Get tier info - prefer props, then effective tier from tier endpoint, fallback to tenant tier
       // This ensures organization members get their org's tier, not individual google_only tier
       const tier = (props?.tier || tierData?.effective?.id || tenant.subscriptionTier || tenant.subscription_tier || 'starter') as SubscriptionTier;
-      const tierInfo = TIER_LIMITS[tier];
-      const skuLimit = tierInfo.maxSkus;
+      const tierInfo = getDynamicTierInfo(tier);
+      const skuLimit = tierInfo.maxSkus ?? Infinity;
       const skuIsUnlimited = skuLimit === Infinity;
 
       // Calculate SKU usage percentage
@@ -175,7 +181,7 @@ export function useSubscriptionUsage(tenantIdProp?: string, props?: Subscription
         tier,
         tierName: tierInfo.name,
         tierPrice: tierInfo.price,
-        tierDescription: tierInfo.description,
+        tierDescription: tierInfo.description || '',
         status: subscriptionStatus,
         internalStatus,
         maintenanceState,
@@ -203,7 +209,7 @@ export function useSubscriptionUsage(tenantIdProp?: string, props?: Subscription
     gcTime: 10 * 60 * 1000, // 10 minutes cache
   });
 
-  const combinedLoading = tenantLoading || tierLoading || itemsLoading || limitsLoading || loading;
+  const combinedLoading = tenantLoading || tierLoading || itemsLoading || limitsLoading || tiersLoading || loading;
   const combinedError = tenantError || itemsError || limitsError || error;
 
   return { 

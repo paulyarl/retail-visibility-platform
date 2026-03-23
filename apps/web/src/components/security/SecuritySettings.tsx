@@ -8,9 +8,14 @@
 import { useSecurity } from '@/hooks/useSecurity';
 import { LoginActivityTable } from './shared/LoginActivityTable';
 import { SecurityAlerts } from './shared/SecurityAlerts';
+import { ThreatAnalysis } from './shared/ThreatAnalysis';
+import { LocationAnalysis } from './shared/LocationAnalysis';
+import { DeviceAnalysis } from './shared/DeviceAnalysis';
+import { UserContextAnalysis } from './shared/UserContextAnalysis';
+import { RealTimeMonitoring } from './shared/RealTimeMonitoring';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Shield, Activity, Bell } from 'lucide-react';
+import { Shield, Activity, Bell, Radar, MapPin, ShieldCheck, TrendingUp, Filter, Users } from 'lucide-react';
 
 export function SecuritySettings() {
   const {
@@ -22,6 +27,8 @@ export function SecuritySettings() {
     revokeAllSessions,
     markAlertAsRead,
     dismissAlert,
+    refreshSessions,
+    refreshAlerts,
   } = useSecurity();
 
   if (loading) {
@@ -44,7 +51,8 @@ export function SecuritySettings() {
     );
   }
 
-  const unreadAlerts = alerts.filter(a => !a.read).length;
+  const unreadAlerts = Array.isArray(alerts) ? alerts.filter(a => !a.read).length : 0;
+  const sessionsCount = Array.isArray(sessions) ? sessions.length : 0;
 
   return (
     <div className="space-y-6">
@@ -59,24 +67,44 @@ export function SecuritySettings() {
       </div>
 
       <Tabs defaultValue="sessions" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="sessions" className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
-            Active Sessions
-            {sessions.length > 0 && (
+            Sessions
+            {sessionsCount > 0 && (
               <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs">
-                {sessions.length}
+                {sessionsCount}
               </span>
             )}
           </TabsTrigger>
           <TabsTrigger value="alerts" className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
-            Security Alerts
+            Alerts
             {unreadAlerts > 0 && (
               <span className="ml-1 rounded-full bg-destructive px-2 py-0.5 text-xs text-destructive-foreground">
                 {unreadAlerts}
               </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="threats" className="flex items-center gap-2">
+            <Radar className="h-4 w-4" />
+            Threats
+          </TabsTrigger>
+          <TabsTrigger value="location" className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            Location
+          </TabsTrigger>
+          <TabsTrigger value="devices" className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" />
+            Devices
+          </TabsTrigger>
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Users
+          </TabsTrigger>
+          <TabsTrigger value="monitoring" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Monitor
           </TabsTrigger>
         </TabsList>
 
@@ -114,6 +142,32 @@ export function SecuritySettings() {
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="threats" className="space-y-4">
+          <ThreatAnalysis alerts={alerts} />
+        </TabsContent>
+
+        <TabsContent value="location" className="space-y-4">
+          <LocationAnalysis alerts={alerts} />
+        </TabsContent>
+
+        <TabsContent value="devices" className="space-y-4">
+          <DeviceAnalysis alerts={alerts} />
+        </TabsContent>
+
+        <TabsContent value="users" className="space-y-4">
+          <UserContextAnalysis alerts={alerts} />
+        </TabsContent>
+
+        <TabsContent value="monitoring" className="space-y-4">
+          <RealTimeMonitoring 
+            alerts={alerts} 
+            onRefresh={() => {
+              refreshSessions();
+              refreshAlerts();
+            }}
+          />
         </TabsContent>
       </Tabs>
     </div>

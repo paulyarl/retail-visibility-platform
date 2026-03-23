@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePlatformAdmin, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function PATCH(
   req: NextRequest,
@@ -8,19 +9,18 @@ export async function PATCH(
     const { id: userId, tenantId } = await context.params;
     const body = await req.json();
     
-    // Get auth token from cookies
-    const token = req.cookies.get('access_token')?.value;
-    if (!token) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
     
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/api/admin/users/${encodeURIComponent(userId)}/tenants/${encodeURIComponent(tenantId)}`, {
+    const { accessToken } = authResult;
+    
+    // Make authenticated request to backend
+    const res = await authenticatedFetch(`/api/admin/users/${encodeURIComponent(userId)}/tenants/${encodeURIComponent(tenantId)}`, accessToken, {
       method: 'PATCH',
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(body),
     });
     
@@ -44,18 +44,18 @@ export async function DELETE(
   try {
     const { id: userId, tenantId } = await context.params;
     
-    // Get auth token from cookies
-    const token = req.cookies.get('access_token')?.value;
-    if (!token) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
     
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const res = await fetch(`${base}/api/admin/users/${encodeURIComponent(userId)}/tenants/${encodeURIComponent(tenantId)}`, {
+    const { accessToken } = authResult;
+    
+    // Make authenticated request to backend
+    const res = await authenticatedFetch(`/api/admin/users/${encodeURIComponent(userId)}/tenants/${encodeURIComponent(tenantId)}`, accessToken, {
       method: 'DELETE',
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-      },
     });
     
     if (!res.ok) {

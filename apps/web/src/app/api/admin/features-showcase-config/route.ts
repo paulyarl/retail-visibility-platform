@@ -1,28 +1,22 @@
-import { NextResponse } from 'next/server';
-
-function buildAuthHeaders(req: Request): HeadersInit {
-  const headers: HeadersInit = { 'Content-Type': 'application/json' };
-  const cookie = req.headers.get('cookie') || '';
-  let auth = req.headers.get('authorization') || undefined;
-  if (!auth) {
-    const jar = Object.fromEntries(cookie.split(';').map(p => p.trim()).filter(Boolean).map(kv => {
-      const i = kv.indexOf('=');
-      return i === -1 ? [kv, ''] : [kv.slice(0, i), decodeURIComponent(kv.slice(1 + i))];
-    })) as Record<string, string>;
-    const token = jar['ACCESS_TOKEN'] || jar['access_token'] || jar['token'] || jar['auth_token'];
-    if (token) auth = `Bearer ${token}`;
-  }
-  if (auth) headers['Authorization'] = auth;
-  if (cookie) headers['Cookie'] = cookie;
-  return headers;
-}
+import { NextRequest, NextResponse } from 'next/server';
+import { requirePlatformAdmin, authenticatedFetch } from '@/utils/apiAuth';
 
 // GET - Fetch current showcase configuration
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const headers = buildAuthHeaders(req);
-    const res = await fetch(`${base}/api/admin/features-showcase-config`, { headers, cache: 'no-store' });
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
+    
+    const res = await authenticatedFetch('/api/admin/features-showcase-config', accessToken, {
+      method: 'GET',
+    });
+    
     const ct = res.headers.get('content-type') || '';
     if (!ct.includes('application/json')) {
       const text = await res.text();
@@ -36,16 +30,24 @@ export async function GET(req: Request) {
 }
 
 // POST - Update showcase configuration
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const base = process.env.API_BASE_URL || 'http://localhost:4000';
-    const headers = buildAuthHeaders(req);
-    const res = await fetch(`${base}/api/admin/features-showcase-config`, {
+    
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(req);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
+    
+    const res = await authenticatedFetch('/api/admin/features-showcase-config', accessToken, {
       method: 'POST',
-      headers,
       body: JSON.stringify(body),
     });
+    
     const ct = res.headers.get('content-type') || '';
     if (!ct.includes('application/json')) {
       const text = await res.text();

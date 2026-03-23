@@ -129,7 +129,7 @@ export default function LastViewed({
       setError(null);
 
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        
 
         // Determine query parameters based on authentication status
         const params = new URLSearchParams({

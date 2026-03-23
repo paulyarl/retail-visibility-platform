@@ -1,7 +1,6 @@
 import { ReactNode } from 'react';
 
-// This layout is intentionally empty to avoid double sidebar nesting
-// The parent layout at /settings/layout.tsx handles all navigation
+// Admin sidebar is rendered by SettingsLayoutRouter in the parent settings/layout.tsx
 export default function AdminSettingsLayout({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }

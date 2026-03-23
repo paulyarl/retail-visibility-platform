@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
-import { AdminNavContent } from '@/components/navigation/AdminNavContent';
+import { SettingsLayoutRouter } from '@/components/navigation/SettingsLayoutRouter';
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
-  return <AdminNavContent>{children}</AdminNavContent>;
+  return <SettingsLayoutRouter>{children}</SettingsLayoutRouter>;
 }

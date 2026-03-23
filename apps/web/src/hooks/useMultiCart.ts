@@ -14,7 +14,7 @@ import {
   clearCart,
   getTotalItemCount,
   migrateOldCarts,
-  backfillCartLogos
+  migrateCartLogos
 } from '@/lib/cart/cartManager';
 
 export function useMultiCart(tenantId?: string) {
@@ -33,7 +33,7 @@ export function useMultiCart(tenantId?: string) {
 
       // Backfill tenant logos for existing carts (one-time)
       if (typeof window !== 'undefined' && !sessionStorage.getItem('logos_backfilled')) {
-        await backfillCartLogos();
+        await migrateCartLogos();
         sessionStorage.setItem('logos_backfilled', 'true');
       }
 

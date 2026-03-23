@@ -40,7 +40,6 @@ class IntegrationsSingleton {
   private state: IntegrationsState;
   private listeners: Set<() => void> = new Set();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-  private readonly API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
   private constructor(private tenantId: string) {
     this.state = {

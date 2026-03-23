@@ -44,8 +44,10 @@ export class AuthService {
 
   /**
    * Generate JWT access token
+   * @deprecated Use Auth0 authentication instead. This method is kept for backward compatibility during migration.
    */
   generateAccessToken(payload: JWTPayload): string {
+    console.warn('[DEPRECATED] generateAccessToken called - migrate to Auth0 authentication');
     const token = jwt.sign(payload, JWT_ACCESS_SECRET, {
       expiresIn: JWT_ACCESS_EXPIRY,
     });
@@ -54,8 +56,10 @@ export class AuthService {
 
   /**
    * Generate JWT refresh token
+   * @deprecated Use Auth0 authentication instead. This method is kept for backward compatibility during migration.
    */
   generateRefreshToken(payload: JWTPayload): string {
+    console.warn('[DEPRECATED] generateRefreshToken called - migrate to Auth0 authentication');
     return jwt.sign(payload, JWT_REFRESH_SECRET, {
       expiresIn: JWT_REFRESH_EXPIRY,
     });
@@ -63,15 +67,19 @@ export class AuthService {
 
   /**
    * Verify JWT access token
+   * @deprecated Use Auth0 authentication instead. This method is kept for backward compatibility during migration.
    */
   verifyAccessToken(token: string): JWTPayload {
+    console.warn('[DEPRECATED] verifyAccessToken called - migrate to Auth0 authentication');
     return jwt.verify(token, JWT_ACCESS_SECRET) as JWTPayload;
   }
 
   /**
    * Verify JWT refresh token
+   * @deprecated Use Auth0 authentication instead. This method is kept for backward compatibility during migration.
    */
   verifyRefreshToken(token: string): JWTPayload {
+    console.warn('[DEPRECATED] verifyRefreshToken called - migrate to Auth0 authentication');
     return jwt.verify(token, JWT_REFRESH_SECRET) as JWTPayload;
   }
 

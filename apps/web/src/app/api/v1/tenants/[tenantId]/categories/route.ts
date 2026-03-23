@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+import { getAuth0Session, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function GET(
   request: NextRequest,
@@ -12,22 +11,14 @@ export async function GET(
     // Forward query parameters
     const searchParams = request.nextUrl.searchParams;
     const queryString = searchParams.toString();
+    
+    // Get optional Auth0 session
+    const auth = await getAuth0Session(request);
+    const accessToken = auth?.accessToken || null;
+
     // Backend uses /api/tenant/:tenantId/categories (not /api/v1/tenants)
-    const url = `${API_URL}/api/tenant/${tenantId}/categories${queryString ? `?${queryString}` : ''}`;
-
-    // Forward Authorization header from request
-    const authHeader = request.headers.get('authorization');
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-
-    const response = await fetch(url, {
+    const response = await authenticatedFetch(`/api/tenant/${tenantId}/categories${queryString ? `?${queryString}` : ''}`, accessToken, {
       method: 'GET',
-      headers,
     });
 
     const data = await response.json();
@@ -50,22 +41,13 @@ export async function POST(
     const { tenantId } = await params;
     const body = await request.json();
 
+    // Get optional Auth0 session
+    const auth = await getAuth0Session(request);
+    const accessToken = auth?.accessToken || null;
+
     // Backend uses /api/tenant/:tenantId/categories (not /api/v1/tenants)
-    const url = `${API_URL}/api/tenant/${tenantId}/categories`;
-
-    // Forward Authorization header from request
-    const authHeader = request.headers.get('authorization');
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-
-    const response = await fetch(url, {
+    const response = await authenticatedFetch(`/api/tenant/${tenantId}/categories`, accessToken, {
       method: 'POST',
-      headers,
       body: JSON.stringify(body),
     });
 

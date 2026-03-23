@@ -146,8 +146,6 @@ export default function StoreTypeViewClient({
       setError(null);
 
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-
         // 1. Fetch store type details
         const typeData = await recommendationsService.getStoreTypeDetails(storeTypeSlug);
         if (typeData) {

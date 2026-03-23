@@ -117,13 +117,25 @@ class TenantCategoriesService extends TenantApiSingleton {
    */
   async createCategory(tenantId: string, data: CategoryFormData): Promise<Category | null> {
     try {
-      const response = await this.makeDefaultRequest<Category>(
+      // Generate slug: lowercase, replace spaces with dashes, remove special chars except dashes
+      const generateSlug = (name: string): string => {
+        return name
+          .toLowerCase()
+          .replace(/\s+/g, '-')           // Replace spaces with dashes
+          .replace(/&/g, '-and-')          // Replace & with -and-
+          .replace(/[^a-z0-9-]/g, '')      // Remove any other special chars
+          .replace(/-+/g, '-')             // Collapse multiple dashes
+          .replace(/^-|-$/g, '');           // Remove leading/trailing dashes
+      };
+
+      const response = await this.makeDefaultRequest<{ success: boolean; data: Category }>(
         `/api/v1/tenants/${tenantId}/categories`,
         {
           method: 'POST',
           body: JSON.stringify({
             name: data.name,
-            slug: data.slug || data.name.toLowerCase().replace(/\s+/g, '-'),
+            slug: data.slug || generateSlug(data.name),
+            googleCategoryId: data.googleCategoryId,
             sortOrder: data.sortOrder
           }),
         },
@@ -133,7 +145,12 @@ class TenantCategoriesService extends TenantApiSingleton {
       // Invalidate cached categories
       await this.invalidateCache(`tenant-categories-${tenantId}`);
       
-      return response.data || null;
+      // makeDefaultRequest returns the raw response: { success: true, data: Category }
+      // Extract the Category object from response.data
+      if (response && typeof response === 'object' && 'data' in response) {
+        return (response as any).data;
+      }
+      return null;
     } catch (error) {
       console.error('[TenantCategoriesService] Failed to create category:', error);
       return null;

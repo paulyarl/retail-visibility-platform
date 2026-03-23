@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { requirePlatformAdmin, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function PATCH(
   request: NextRequest,
@@ -8,15 +7,19 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const authHeader = request.headers.get('authorization');
     const body = await request.json();
     
-    const response = await fetch(`${API_URL}/api/admin/platform-categories/${id}`, {
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(request);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
+
+    const response = await authenticatedFetch(`/api/admin/platform-categories/${id}`, accessToken, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authHeader && { 'Authorization': authHeader }),
-      },
       body: JSON.stringify(body),
     });
 
@@ -37,14 +40,18 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const authHeader = request.headers.get('authorization');
     
-    const response = await fetch(`${API_URL}/api/admin/platform-categories/${id}`, {
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(request);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
+
+    const response = await authenticatedFetch(`/api/admin/platform-categories/${id}`, accessToken, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authHeader && { 'Authorization': authHeader }),
-      },
     });
 
     const data = await response.json();

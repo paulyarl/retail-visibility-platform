@@ -35,9 +35,11 @@ export interface AuthContext {
   userId?: string;
   tenantId?: string;
   sessionId?: string;
+  token?: string; // JWT token for legacy compatibility
   roles?: string[];
   permissions?: string[];
-  token?: string;
+  auth0Id?: string; // Auth0 user ID
+  auth0Email?: string; // Auth0 email
 }
 
 // Encryption Options
@@ -422,6 +424,7 @@ abstract class UniversalSingleton {
 
   /**
    * Make authenticated API request
+   * Migrated to Auth0 cookie-based authentication
    */
   protected async makeAuthenticatedRequest<T>(
     url: string,
@@ -433,11 +436,15 @@ abstract class UniversalSingleton {
       throw new Error(`Insufficient authentication level for ${authLevel} request`);
     }
 
-    // Add authentication headers
+    // Add Auth0 authentication headers
     const headers = new Headers(options.headers || {});
     
-    if (this.currentAuthContext?.token) {
-      headers.set('Authorization', `Bearer ${this.currentAuthContext.token}`);
+    if (this.currentAuthContext?.auth0Id) {
+      headers.set('x-auth0-id', this.currentAuthContext.auth0Id);
+    }
+    
+    if (this.currentAuthContext?.auth0Email) {
+      headers.set('x-auth0-email', this.currentAuthContext.auth0Email);
     }
     
     if (this.currentAuthContext?.tenantId) {

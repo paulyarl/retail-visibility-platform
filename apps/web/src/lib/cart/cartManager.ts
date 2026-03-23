@@ -283,13 +283,12 @@ export function getTotalValue(tenantId?: string): number {
 }
 
 /**
- * Backfill tenant logos for existing carts
+ * Migrate cart data to include tenant logos
+ * Fetches missing logos from tenant API
  */
-export async function backfillCartLogos(): Promise<void> {
-  // Check if we're in the browser
+export async function migrateCartLogos(): Promise<void> {
   if (typeof window === 'undefined') return;
   
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
   const carts = getAllCarts();
   
   for (const { cart } of carts) {
@@ -297,17 +296,14 @@ export async function backfillCartLogos(): Promise<void> {
     if (cart.tenant_logo) continue;
     
     try {
-      // Fetch tenant data to get logo
-      const response = await fetch(`${apiBaseUrl}/api/tenants/${cart.tenant_id}`);
-      if (response.ok) {
-        const tenantData = await response.json();
-        const logoUrl = tenantData.metadata?.logo_url;
-        
-        if (logoUrl) {
-          // Update cart with logo
-          cart.tenant_logo = logoUrl;
-          saveCart(cart);
-        }
+      // Use tenantPublicService to fetch tenant data
+      const { tenantPublicService } = await import('@/services/TenantPublicService');
+      const tenantData = await tenantPublicService.getPublicTenantInfo(cart.tenant_id);
+      
+      if (tenantData && tenantData.metadata?.logo_url) {
+        // Update cart with logo
+        cart.tenant_logo = tenantData.metadata.logo_url;
+        saveCart(cart);
       }
     } catch (error) {
       console.error(`[Cart] Failed to fetch logo for tenant ${cart.tenant_id}:`, error);

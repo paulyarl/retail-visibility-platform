@@ -82,24 +82,14 @@ class TenantDirectorySingletonService extends PublicApiSingleton {
     if (isServer) {
       console.log('[TenantDirectorySingleton] Making tenant slug request during SSR');
       try {
-        // For SSR, make a direct fetch request since we can't use the singleton service
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-        const response = await fetch(`${baseUrl}/api/directory/tenant/${tenantId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+        // Use makeDefaultRequest for SSR requests (this is already a PublicApiSingleton)
+        const result = await this.makeDefaultRequest<{ slug: string }>(`/directory/tenant/${tenantId}`, {
+          method: 'GET'
         });
         
-        if (!response.ok) {
-          console.warn('[TenantDirectorySingleton] Failed to fetch tenant slug during SSR:', response.status);
-          return undefined;
-        }
-        
-        const result = await response.json();
-        return result.slug;
+        return result.data?.slug;
       } catch (error) {
-        console.error('[TenantDirectorySingleton] Error fetching tenant slug during SSR:', error);
+        console.warn('[TenantDirectorySingleton] Failed to fetch tenant slug during SSR:', error);
         return undefined;
       }
     }

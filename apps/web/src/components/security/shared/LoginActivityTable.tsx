@@ -76,7 +76,10 @@ export function LoginActivityTable({ sessions, onRevoke, onRevokeAll }: LoginAct
     }
   };
 
-  if (sessions.length === 0) {
+  // Ensure sessions is always an array
+  const sessionsArray = Array.isArray(sessions) ? sessions : [];
+
+  if (sessionsArray.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
         <Monitor className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -85,7 +88,7 @@ export function LoginActivityTable({ sessions, onRevoke, onRevokeAll }: LoginAct
     );
   }
 
-  const otherSessions = sessions.filter(s => !s.isCurrent);
+  const otherSessions = sessionsArray.filter(s => !s.isCurrent);
 
   return (
     <div className="space-y-4">
@@ -115,7 +118,7 @@ export function LoginActivityTable({ sessions, onRevoke, onRevokeAll }: LoginAct
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sessions.map((session) => (
+            {sessionsArray.map((session) => (
               <TableRow key={session.id}>
                 <TableCell>
                   <div className="flex items-center gap-2">

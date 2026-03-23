@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { Card, Badge } from '@mantine/core';
 import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { TIER_LIMITS, type SubscriptionTier, getTierInfo } from '@/lib/tiers';
+import { TIER_LIMITS, type SubscriptionTier } from '@/lib/tiers';
+import { useTierSystem } from '@/hooks/useTierSystem';
 import { isTrialStatus, getTrialEndLabel } from '@/lib/trial';
 import { CHAIN_TIERS, type ChainTier } from '@/lib/chain-tiers';
 import { getAllAdminEmails } from '@/lib/admin-emails';
@@ -59,13 +60,21 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   // Use centralized subscription usage hook
   const { usage: capacityData } = useSubscriptionUsage(tenantId || undefined);
 
+  // Use dynamic tier system hook
+  const { 
+    individualTiers, 
+    organizationTiers, 
+    getTierInfo: getDynamicTierInfo, 
+    loading: tiersLoading 
+  } = useTierSystem();
+
   // Add back missing state variables
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier | ChainTier | null>(null);
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Show loading while user or tenant data is being fetched
-  if (combinedLoading || !user) {
+  // Show loading while user, tenant, or tier data is being fetched
+  if (combinedLoading || !user || tiersLoading) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
         <div className="text-neutral-600">Loading subscription details...</div>
@@ -168,76 +177,149 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
             {/* Individual Plans */}
             <h3 className="text-lg font-semibold text-neutral-900 mb-4">Individual Location Plans</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              {(['starter', 'professional', 'enterprise', 'organization'] as SubscriptionTier[]).map((tier) => {
-                const info = TIER_LIMITS[tier];
-                return (
-                  <Card key={tier} className="border-2 border-neutral-200" withBorder padding="lg" radius="md">
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="text-lg font-semibold">{info.name}</h3>
-                        <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
-                      </div>
-                      <p className="text-sm text-neutral-600">{info.description}</p>
-                      <div className="space-y-2">
-                        <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
-                          <span className="font-semibold text-orange-900">SKUs:</span>{' '}
-                          <span className="text-orange-700 font-medium">
-                            {info.maxSkus === Infinity ? 'Unlimited' : info.maxSkus.toLocaleString()}
-                          </span>
+              {individualTiers.length > 0 ? (
+                individualTiers.map((tier) => {
+                  const info = getDynamicTierInfo(tier.tierKey);
+                  return (
+                    <Card key={tier.id} className="border-2 border-neutral-200" withBorder padding="lg" radius="md">
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">{tier.displayName}</h3>
+                          <div className="text-2xl font-bold text-neutral-900">${tier.priceMonthly}/month</div>
                         </div>
+                        <p className="text-sm text-neutral-600">{tier.description}</p>
+                        <div className="space-y-2">
+                          <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                            <span className="font-semibold text-orange-900">SKUs:</span>{' '}
+                            <span className="text-orange-700 font-medium">
+                              {tier.maxSkus === null || tier.maxSkus === Infinity ? 'Unlimited' : tier.maxSkus.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                        <ul className="space-y-1.5 text-xs">
+                          {(tier.features || info.features)?.slice(0, 4).map((feature, idx) => (
+                            <li key={idx} className="flex items-start gap-1.5">
+                              <span className="text-green-500 mt-0.5">✓</span>
+                              <span className="text-neutral-700">{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                      <ul className="space-y-1.5 text-xs">
-                        {info.features.slice(0, 4).map((feature, idx) => (
-                          <li key={idx} className="flex items-start gap-1.5">
-                            <span className="text-green-500 mt-0.5">✓</span>
-                            <span className="text-neutral-700">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </Card>
-                );
-              })}
+                    </Card>
+                  );
+                })
+              ) : (
+                // Fallback to static tiers if API unavailable
+                (['starter', 'professional', 'enterprise', 'organization'] as SubscriptionTier[]).map((tier) => {
+                  const info = TIER_LIMITS[tier];
+                  return (
+                    <Card key={tier} className="border-2 border-neutral-200" withBorder padding="lg" radius="md">
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">{info.name}</h3>
+                          <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
+                        </div>
+                        <p className="text-sm text-neutral-600">{info.description}</p>
+                        <div className="space-y-2">
+                          <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                            <span className="font-semibold text-orange-900">SKUs:</span>{' '}
+                            <span className="text-orange-700 font-medium">
+                              {info.maxSkus === Infinity ? 'Unlimited' : info.maxSkus.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                        <ul className="space-y-1.5 text-xs">
+                          {info.features.slice(0, 4).map((feature, idx) => (
+                            <li key={idx} className="flex items-start gap-1.5">
+                              <span className="text-green-500 mt-0.5">✓</span>
+                              <span className="text-neutral-700">{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </Card>
+                  );
+                })
+              )}
             </div>
 
             {/* Chain Plans */}
             <h3 className="text-lg font-semibold text-neutral-900 mb-4">Multi-Location Chain Plans</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {(['chain_starter', 'chain_professional', 'chain_enterprise'] as ChainTier[]).map((tier) => {
-                const info = CHAIN_TIERS[tier];
-                return (
-                  <Card key={tier} className="border-2 border-neutral-200" withBorder padding="lg" radius="md">
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="text-lg font-semibold">{info.name}</h3>
-                        <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="text-sm bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
-                          <span className="font-semibold text-amber-900">Locations:</span>{' '}
-                          <span className="text-amber-700 font-medium">
-                            {info.maxLocations === Infinity ? 'Unlimited' : info.maxLocations}
-                          </span>
+              {organizationTiers.length > 0 ? (
+                organizationTiers.map((tier) => {
+                  const info = getDynamicTierInfo(tier.tierKey);
+                  return (
+                    <Card key={tier.id} className="border-2 border-neutral-200" withBorder padding="lg" radius="md">
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">{tier.displayName}</h3>
+                          <div className="text-2xl font-bold text-neutral-900">${tier.priceMonthly}/month</div>
                         </div>
-                        <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
-                          <span className="font-semibold text-orange-900">Total SKUs:</span>{' '}
-                          <span className="text-orange-700 font-medium">
-                            {info.maxTotalSKUs === Infinity ? 'Unlimited' : info.maxTotalSKUs.toLocaleString()}
-                          </span>
+                        <div className="space-y-2">
+                          <div className="text-sm bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                            <span className="font-semibold text-amber-900">Locations:</span>{' '}
+                            <span className="text-amber-700 font-medium">
+                              {tier.maxLocations === null || tier.maxLocations === Infinity ? 'Unlimited' : tier.maxLocations}
+                            </span>
+                          </div>
+                          <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                            <span className="font-semibold text-orange-900">Total SKUs:</span>{' '}
+                            <span className="text-orange-700 font-medium">
+                              {tier.maxSkus === null || tier.maxSkus === Infinity ? 'Unlimited' : tier.maxSkus.toLocaleString()}
+                            </span>
+                          </div>
                         </div>
+                        <ul className="space-y-1.5 text-xs">
+                          {(tier.features || (info as any).features)?.slice(0, 4).map((feature: string, idx: number) => (
+                            <li key={idx} className="flex items-start gap-1.5">
+                              <span className="text-green-500 mt-0.5">✓</span>
+                              <span className="text-neutral-700">{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                      <ul className="space-y-1.5 text-xs">
-                        {info.features.slice(0, 4).map((feature, idx) => (
-                          <li key={idx} className="flex items-start gap-1.5">
-                            <span className="text-green-500 mt-0.5">✓</span>
-                            <span className="text-neutral-700">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </Card>
-                );
-              })}
+                    </Card>
+                  );
+                })
+              ) : (
+                // Fallback to static chain tiers if API unavailable
+                (['chain_starter', 'chain_professional', 'chain_enterprise'] as ChainTier[]).map((tier) => {
+                  const info = CHAIN_TIERS[tier];
+                  return (
+                    <Card key={tier} className="border-2 border-neutral-200" withBorder padding="lg" radius="md">
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">{info.name}</h3>
+                          <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-sm bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                            <span className="font-semibold text-amber-900">Locations:</span>{' '}
+                            <span className="text-amber-700 font-medium">
+                              {info.maxLocations === Infinity ? 'Unlimited' : info.maxLocations}
+                            </span>
+                          </div>
+                          <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                            <span className="font-semibold text-orange-900">Total SKUs:</span>{' '}
+                            <span className="text-orange-700 font-medium">
+                              {info.maxTotalSKUs === Infinity ? 'Unlimited' : info.maxTotalSKUs.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                        <ul className="space-y-1.5 text-xs">
+                          {info.features.slice(0, 4).map((feature, idx) => (
+                            <li key={idx} className="flex items-start gap-1.5">
+                              <span className="text-green-500 mt-0.5">✓</span>
+                              <span className="text-neutral-700">{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </Card>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
@@ -263,7 +345,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
 
   const currentTier = tenant.subscriptionTier || (tenant as any).subscription_tier || 'trial';
   const isChainTier = currentTier.startsWith('chain_');
-  const tierInfo = getTierInfo(currentTier);
+  const tierInfo = getDynamicTierInfo(currentTier);
   
   // Use capacity data from centralized hook
   const skuUsage = capacityData?.skuUsage || 0;
@@ -280,7 +362,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   const handleSubmitChange = async () => {
     try {
       const metadata = tenant.metadata as any;
-      const requestedTierInfo = getTierInfo(selectedTier!);
+      const requestedTierInfo = getDynamicTierInfo(selectedTier!);
       
       // Check for existing active requests
       const existingRequests = await platformHomeService.getUpgradeRequests(tenant.id, 'new,pending');
@@ -347,8 +429,42 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
     }
   };
 
-  const availableTiers: SubscriptionTier[] = ['starter', 'professional', 'enterprise', 'organization'];
-  const availableChainTiers: ChainTier[] = ['chain_starter', 'chain_professional', 'chain_enterprise'];
+  // Use dynamic tiers from API, fallback to static if unavailable
+  const availableTiers = individualTiers.length > 0 ? individualTiers : 
+    (['starter', 'professional', 'enterprise', 'organization'] as SubscriptionTier[]).map(tier => ({
+      id: tier,
+      tierKey: tier,
+      name: tier,
+      displayName: TIER_LIMITS[tier].name,
+      description: TIER_LIMITS[tier].description,
+      priceMonthly: TIER_LIMITS[tier].pricePerMonth,
+      maxSkus: TIER_LIMITS[tier].maxSkus,
+      maxLocations: TIER_LIMITS[tier].maxLocations,
+      tierType: 'individual',
+      isActive: true,
+      sortOrder: ['starter', 'professional', 'enterprise', 'organization'].indexOf(tier),
+      features: TIER_LIMITS[tier].features,
+      createdAt: '',
+      updatedAt: '',
+    }));
+  
+  const availableChainTiers = organizationTiers.length > 0 ? organizationTiers :
+    (['chain_starter', 'chain_professional', 'chain_enterprise'] as ChainTier[]).map(tier => ({
+      id: tier,
+      tierKey: tier,
+      name: tier,
+      displayName: CHAIN_TIERS[tier].name,
+      description: '',
+      priceMonthly: CHAIN_TIERS[tier].pricePerMonth,
+      maxSkus: CHAIN_TIERS[tier].maxTotalSKUs,
+      maxLocations: CHAIN_TIERS[tier].maxLocations,
+      tierType: 'organization',
+      isActive: true,
+      sortOrder: ['chain_starter', 'chain_professional', 'chain_enterprise'].indexOf(tier),
+      features: CHAIN_TIERS[tier].features,
+      createdAt: '',
+      updatedAt: '',
+    }));
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -580,7 +696,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
               </div>
               <div className="space-y-3">
                 {pendingRequests.map((request: PendingRequest) => {
-                  const requestedTierInfo = getTierInfo(request.requestedTier as any);
+                  const requestedTierInfo = getDynamicTierInfo(request.requestedTier as any);
                   const statusColors = {
                     new: 'bg-blue-100 text-blue-800',
                     pending: 'bg-amber-100 text-amber-800',
@@ -657,8 +773,8 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                   </div>
                   <div className="space-y-3">
                     {requestHistory.map((request: PendingRequest) => {
-                      const fromTierInfo = getTierInfo(request.currentTier as any);
-                      const toTierInfo = getTierInfo(request.requestedTier as any);
+                      const fromTierInfo = getDynamicTierInfo(request.currentTier as any);
+                      const toTierInfo = getDynamicTierInfo(request.requestedTier as any);
                       const isApproved = request.status === 'complete';
                       const isDenied = request.status === 'denied';
                       
@@ -757,41 +873,42 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
           <h3 className="text-lg font-semibold text-neutral-900 mb-4">Individual Location Plans</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {availableTiers.map((tier) => {
-              const info = TIER_LIMITS[tier];
-              const isCurrent = tier === currentTier;
+              const tierKey = tier.tierKey || tier.id;
+              const info = getDynamicTierInfo(tierKey);
+              const isCurrent = tierKey === currentTier || tier.name === currentTier;
               
               return (
                 <Card 
-                  key={tier}
+                  key={tier.id}
                   className={`${isCurrent ? 'border-2 border-primary-500 opacity-60 p-6 rounded-lg' : 'border-2 border-neutral-200 hover:border-primary-300 transition-colors p-6 rounded-lg'}`}
                 >
                   <div className="space-y-4">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg">{info.name}</h3>
+                      <h3 className="text-lg">{tier.displayName}</h3>
                       {isCurrent && (
                         <Badge variant="default" className="bg-primary-500 text-white">Current</Badge>
                       )}
                     </div>
-                    <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
-                    <p className="text-sm text-neutral-600">{info.description}</p>
+                    <div className="text-2xl font-bold text-neutral-900">${tier.priceMonthly}/month</div>
+                    <p className="text-sm text-neutral-600">{tier.description || info.description}</p>
                     
                     <div className="space-y-2">
                       <div className="text-sm bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
                         <span className="font-semibold text-amber-900">Locations:</span>{' '}
                         <span className="text-amber-700 font-medium">
-                          {info.maxLocations === Infinity ? 'Unlimited' : info.maxLocations}
+                          {tier.maxLocations === null || tier.maxLocations === Infinity ? 'Unlimited' : tier.maxLocations}
                         </span>
                       </div>
                       <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
                         <span className="font-semibold text-orange-900">SKUs:</span>{' '}
                         <span className="text-orange-700 font-medium">
-                          {info.maxSkus === Infinity ? 'Unlimited' : info.maxSkus.toLocaleString()}
+                          {tier.maxSkus === null || tier.maxSkus === Infinity ? 'Unlimited' : tier.maxSkus.toLocaleString()}
                         </span>
                       </div>
                     </div>
 
                     <ul className="space-y-1.5 text-xs">
-                      {info.features.slice(0, 4).map((feature, idx) => (
+                      {(tier.features || info.features)?.slice(0, 4).map((feature, idx) => (
                         <li key={idx} className="flex items-start gap-1.5">
                           <span className="text-green-500 mt-0.5">✓</span>
                           <span className="text-neutral-700">{feature}</span>
@@ -803,7 +920,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                       variant={isCurrent ? 'secondary' : 'primary'}
                       className="w-full"
                       disabled={isCurrent}
-                      onClick={() => handleRequestChange(tier)}
+                      onClick={() => handleRequestChange(tierKey as any)}
                     >
                       {isCurrent ? 'Current Plan' : 'Request Change'}
                     </Button>
@@ -820,39 +937,40 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {availableChainTiers.map((tier) => {
-              const info = CHAIN_TIERS[tier];
-              const isCurrent = tier === currentTier;
+              const tierKey = tier.tierKey || tier.id;
+              const info = getDynamicTierInfo(tierKey);
+              const isCurrent = tierKey === currentTier || tier.name === currentTier;
               
               return (
                 <Card 
-                  key={tier}
+                  key={tier.id}
                   className={`${isCurrent ? 'border-2 border-primary-500 opacity-60 p-6 rounded-lg' : 'border-2 border-neutral-200 hover:border-primary-300 transition-colors p-6 rounded-lg'}`}
                 >
                   <div className="space-y-4">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg">{info.name}</h3>
+                      <h3 className="text-lg">{tier.displayName}</h3>
                       {isCurrent && (
                         <Badge variant="default" className="bg-primary-500 text-white">Current</Badge>
                       )}
                     </div>
-                    <div className="text-2xl font-bold text-neutral-900">{info.price}</div>
+                    <div className="text-2xl font-bold text-neutral-900">${tier.priceMonthly}/month</div>
                     <div className="space-y-2">
                       <div className="text-sm bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
                         <span className="font-semibold text-amber-900">Locations:</span>{' '}
                         <span className="text-amber-700 font-medium">
-                          {info.maxLocations === Infinity ? 'Unlimited' : info.maxLocations}
+                          {tier.maxLocations === null || tier.maxLocations === Infinity ? 'Unlimited' : tier.maxLocations}
                         </span>
                       </div>
                       <div className="text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
                         <span className="font-semibold text-orange-900">Total SKUs:</span>{' '}
                         <span className="text-orange-700 font-medium">
-                          {info.maxTotalSKUs === Infinity ? 'Unlimited' : info.maxTotalSKUs.toLocaleString()}
+                          {tier.maxSkus === null || tier.maxSkus === Infinity ? 'Unlimited' : tier.maxSkus.toLocaleString()}
                         </span>
                       </div>
                     </div>
 
                     <ul className="space-y-1.5 text-xs">
-                      {info.features.slice(0, 4).map((feature, idx) => (
+                      {(tier.features || (info as any).features)?.slice(0, 4).map((feature: string, idx: number) => (
                         <li key={idx} className="flex items-start gap-1.5">
                           <span className="text-green-500 mt-0.5">✓</span>
                           <span className="text-neutral-700">{feature}</span>
@@ -864,7 +982,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                       variant={isCurrent ? 'secondary' : 'primary'}
                       className="w-full"
                       disabled={isCurrent}
-                      onClick={() => handleRequestChange(tier)}
+                      onClick={() => handleRequestChange(tierKey as any)}
                     >
                       {isCurrent ? 'Current Plan' : 'Request Change'}
                     </Button>
@@ -915,8 +1033,8 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-neutral-900">Requested:</span>
-                    <Badge className={`${getTierInfo(selectedTier).color} font-semibold border-2 border-neutral-300`}>
-                      {getTierInfo(selectedTier).name}
+                    <Badge className={`${getDynamicTierInfo(selectedTier).color} font-semibold border-2 border-neutral-300`}>
+                      {getDynamicTierInfo(selectedTier).name}
                     </Badge>
                   </div>
                 </div>

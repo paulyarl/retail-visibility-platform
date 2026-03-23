@@ -38,8 +38,8 @@ export async function revokeAllSessions(): Promise<void> {
  * Get security alerts for the current user
  * @deprecated Use securityService.getSecurityAlerts() instead
  */
-export async function getSecurityAlerts(): Promise<SecurityAlert[]> {
-  return await securitySingletonService.getSecurityAlerts();
+export async function getSecurityAlerts(bypassCache?: boolean): Promise<SecurityAlert[]> {
+  return await securitySingletonService.getSecurityAlerts(bypassCache);
 }
 
 /**

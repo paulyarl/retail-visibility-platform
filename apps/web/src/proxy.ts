@@ -182,20 +182,21 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // Protect /admin/* routes - require platform admin
-  if (pathname.startsWith('/admin')) {
+  // Protect /admin/* and /settings/admin/* routes - require platform admin (Auth0 session + DB role check)
+  if (pathname.startsWith('/admin') || pathname.startsWith('/settings/admin')) {
+    const session = await auth0.getSession();
+
+    if (!session?.user) {
+      // No Auth0 session — send to login, preserving return path
+      const loginUrl = new URL('/auth/login', req.url);
+      loginUrl.searchParams.set('returnTo', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
     const isAdmin = await isPlatformAdmin(req);
-    
-    // Log all admin access attempts
-    /*  console.log('[Proxy] Admin access attempt:', {
-      path: pathname,
-      allowed: isAdmin,
-      timestamp: new Date().toISOString(),
-      ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
-    }); */
-    
+
     if (!isAdmin) {
-      // Redirect to access denied page with context
+      // Authenticated but lacks PLATFORM_ADMIN role
       const deniedUrl = new URL('/access-denied', req.url);
       deniedUrl.searchParams.set('path', pathname);
       deniedUrl.searchParams.set('timestamp', new Date().toISOString());

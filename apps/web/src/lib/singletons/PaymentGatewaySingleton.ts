@@ -5,6 +5,8 @@
  * Provides tenant-specific gateway information with 5-minute cache TTL.
  */
 
+import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+
 interface PaymentGateway {
   id: string;
   type: string;
@@ -21,14 +23,14 @@ interface PaymentGatewayState {
   lastFetch: number | null;
 }
 
-class PaymentGatewaySingleton {
+class PaymentGatewaySingleton extends PublicApiSingleton {
   private static instances: Map<string, PaymentGatewaySingleton> = new Map();
   private state: PaymentGatewayState;
   private listeners: Set<() => void> = new Set();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-  private readonly API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
   private constructor(private tenantId: string) {
+    super(`payment-gateway-${tenantId}`); // PublicApiSingleton requires singletonKey
     this.state = {
       gateways: [],
       loading: false,
@@ -82,14 +84,13 @@ class PaymentGatewaySingleton {
 
     try {
       console.log(`PaymentGatewaySingleton: Fetching gateways for tenant ${this.tenantId}`);
-      const response = await fetch(`${this.API_BASE_URL}/api/tenants/${this.tenantId}/payment-gateways/public`);
+      const result = await this.makeDefaultRequest<{ gateways: PaymentGateway[] }>(`/tenants/${this.tenantId}/payment-gateways/public`);
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch payment gateways: ${response.status}`);
+      if (!result.success || !result.data) {
+        throw new Error(`Failed to fetch payment gateways`);
       }
 
-      const data = await response.json();
-      const gateways = data.gateways || [];
+      const gateways = result.data.gateways || [];
 
       this.setState({
         gateways,
@@ -125,12 +126,15 @@ class PaymentGatewaySingleton {
     return this.state.gateways.some(g => g.isActive);
   }
 
-  clearCache(): void {
+  async clearCache(key?: string): Promise<void> {
     this.setState({
       gateways: [],
       lastFetch: null,
       error: null
     });
+    
+    // Also clear parent cache
+    await super.clearCache(key);
   }
 }
 

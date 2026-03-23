@@ -1,24 +1,17 @@
-import { Metadata } from 'next';
-import AdminReviewManagement from '@/components/admin/AdminReviewManagement';
+﻿'use client';
 
-export const metadata: Metadata = {
-  title: 'Admin - Review Management',
-  description: 'Platform-wide review moderation for stores and products',
-};
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function AdminReviewsPage() {
+export default function AdminRedirect() {
+  const router = useRouter();
+  useEffect(() => { router.replace('/settings/admin/reviews'); }, [router]);
   return (
-    <div className="space-y-6">
-      <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Review Management
-        </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Moderate and manage customer reviews for stores and products across all locations on the platform.
-        </p>
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Redirecting...</p>
       </div>
-
-      <AdminReviewManagement />
     </div>
   );
 }

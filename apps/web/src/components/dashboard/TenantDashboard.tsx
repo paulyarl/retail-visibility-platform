@@ -254,7 +254,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                 </Link>
               </Tooltip>
               <Tooltip label="Google Business Profile integration">
-                <Link href={`/t/${tenantId}/settings/google`}>
+                <Link href={`/t/${tenantId}/settings/integrations/google`}>
                   <Button variant="ghost" size="sm">Google</Button>
                 </Link>
               </Tooltip>
@@ -733,11 +733,11 @@ function MobileMenuButton({ tenantId }: { tenantId: string }) {
             <Link href={`/t/${tenantId}/orders`} className="block" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="subtle" fullWidth size="md">Orders</Button>
             </Link>
-            <Link href={`/t/${tenantId}/settings/google`} className="block" onClick={() => setMobileMenuOpen(false)}>
-              <Button variant="subtle" fullWidth size="md">Google</Button>
+            <Link href={`/t/${tenantId}/settings/integrations/google`} className="block" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="subtle" fullWidth size="md">Google Merchant</Button>
             </Link>
-            <Link href={`/t/${tenantId}/settings/sync`} className="block" onClick={() => setMobileMenuOpen(false)}>
-              <Button variant="subtle" fullWidth size="md">Sync</Button>
+            <Link href={`/t/${tenantId}/settings/integrations`} className="block" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="subtle" fullWidth size="md">POS Integrations</Button>
             </Link>
             <Link href={`/t/${tenantId}/settings`} className="block" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="subtle" fullWidth size="md">Settings</Button>

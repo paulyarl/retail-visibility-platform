@@ -12,7 +12,8 @@ import { collectEnhancedSecurityContext, createSecuritySummary } from '../utils/
 
 interface SessionInfo {
   userId: string;
-  token: string;
+  auth0SessionId?: string; // Auth0 session identifier
+  token?: string; // JWT token for legacy tracking
   ipAddress: string;
   userAgent: string;
   deviceName?: string;
@@ -100,12 +101,24 @@ async function getLocationFromIP(ipAddress: string): Promise<{
 
 /**
  * Create or update user session
+ * Migrated to Auth0 cookie-based authentication
  */
 export async function trackSession(sessionInfo: SessionInfo & { req?: Request }): Promise<void> {
-  const { userId, token, ipAddress, userAgent, deviceName, userRole, req } = sessionInfo;
+  const { userId, auth0SessionId, ipAddress, userAgent, deviceName, userRole, req } = sessionInfo;
 
   try {
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    // Create session identifier - use Auth0 session ID or fingerprint fallback
+    let sessionIdentifier: string;
+    
+    if (auth0SessionId) {
+      // Auth0: use Auth0 session ID from cookie
+      sessionIdentifier = `auth0_${auth0SessionId}`;
+    } else {
+      // Fallback: generate from user ID + device fingerprint
+      const fingerprint = `${userAgent}_${ipAddress}`;
+      sessionIdentifier = `fp_${crypto.createHash('sha256').update(`${userId}_${fingerprint}`).digest('hex').substring(0, 32)}`;
+    }
+
     const deviceInfo = parseDeviceInfo(userAgent);
 
     // Override device name with browser-provided name if available
@@ -118,7 +131,8 @@ export async function trackSession(sessionInfo: SessionInfo & { req?: Request })
     // Check if session already exists
     const existingSession = await basePrisma.$queryRaw<any[]>`
       SELECT id FROM user_sessions_list
-      WHERE token_hash = ${tokenHash}
+      WHERE token_hash = ${sessionIdentifier}
+        AND user_id = ${userId}
         AND is_active = true
     `;
 
@@ -131,7 +145,7 @@ export async function trackSession(sessionInfo: SessionInfo & { req?: Request })
             ip_address = ${ipAddress},
             user_agent = ${userAgent},
             location = ${JSON.stringify(location)}::jsonb
-        WHERE token_hash = ${tokenHash}
+        WHERE id = ${existingSession[0].id}::uuid
       `;
     } else {
       // Check if this is a new device
@@ -191,7 +205,7 @@ export async function trackSession(sessionInfo: SessionInfo & { req?: Request })
         `;
       }
 
-      // Create new session
+      // Create new session - let database auto-generate UUID id
       await basePrisma.$executeRaw`
         INSERT INTO user_sessions_list (
           user_id,
@@ -204,7 +218,7 @@ export async function trackSession(sessionInfo: SessionInfo & { req?: Request })
           expires_at
         ) VALUES (
           ${userId},
-          ${tokenHash},
+          ${sessionIdentifier},
           ${JSON.stringify(deviceInfo)}::jsonb,
           ${ipAddress},
           ${userAgent},
@@ -267,42 +281,45 @@ export async function trackSession(sessionInfo: SessionInfo & { req?: Request })
 
 /**
  * Middleware to track session activity
+ * Migrated to Auth0 cookie-based authentication
  */
 export function sessionActivityMiddleware(req: Request, res: Response, next: NextFunction) {
   // Only track for authenticated requests
-  if (req.user?.user_id) {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (token) {
-      const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-                        req.socket.remoteAddress ||
-                        'unknown';
-      const userAgent = req.headers['user-agent'] || 'unknown';
+  const userId = req.user?.user_id;
+  
+  if (userId) {
+    const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+                      req.socket.remoteAddress ||
+                      'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
 
-      // Get device info from header if available
-      let deviceName: string | undefined;
-      const deviceInfoHeader = req.headers['x-device-info'] as string;
-      if (deviceInfoHeader) {
-        try {
-          const deviceInfo = JSON.parse(deviceInfoHeader);
-          deviceName = deviceInfo.name;
-        } catch (error) {
-          console.warn('[sessionActivityMiddleware] Failed to parse device info header:', error);
-        }
+    // Get device info from header if available
+    let deviceName: string | undefined;
+    const deviceInfoHeader = req.headers['x-device-info'] as string;
+    if (deviceInfoHeader) {
+      try {
+        const deviceInfo = JSON.parse(deviceInfoHeader);
+        deviceName = deviceInfo.name;
+      } catch (error) {
+        console.warn('[sessionActivityMiddleware] Failed to parse device info header:', error);
       }
-
-      // Track session asynchronously (don't block request)
-      trackSession({
-        userId: req.user.user_id,
-        token,
-        ipAddress,
-        userAgent,
-        deviceName,
-        userRole: req.user?.role,
-        req, // Pass the request object for enhanced security context
-      }).catch(err => {
-        console.error('[sessionActivityMiddleware] Error tracking session:', err);
-      });
     }
+
+    // Get Auth0 session ID from cookie
+    const auth0SessionId = req.cookies?.auth0_session || req.cookies?.appSession;
+
+    // Track session asynchronously (don't block request)
+    trackSession({
+      userId,
+      auth0SessionId,
+      ipAddress,
+      userAgent,
+      deviceName,
+      userRole: req.user?.role,
+      req, // Pass the request object for enhanced security context
+    }).catch(err => {
+      console.error('[sessionActivityMiddleware] Error tracking session:', err);
+    });
   }
 
   next();

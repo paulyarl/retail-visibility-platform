@@ -1,0 +1,661 @@
+"use client";
+
+import { ReactNode, useState, useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRBAC, RBACNavGates } from '@/lib/auth/useRBAC';
+import { cn } from '@/lib/utils';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type NavItem = RBACNavGates & {
+  label: string;
+  href?: string;
+  icon?: ReactNode;
+  badge?: string;
+  badgeVariant?: 'default' | 'success' | 'warning' | 'error' | 'new';
+  children?: NavItem[];
+  adminOnly?: boolean;
+  tenantOnly?: boolean;
+  dividerBefore?: boolean;
+};
+
+interface UniversalNavContentProps {
+  children: ReactNode;
+  /** Optional injected links from the Navigation Control Panel */
+  injectedItems?: NavItem[];
+}
+
+// ─── SVG Icons ───────────────────────────────────────────────────────────────
+
+const Icon = {
+  User: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+  ),
+  Shield: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  ),
+  Lock: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+    </svg>
+  ),
+  Bell: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+    </svg>
+  ),
+  Palette: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2V5a2 2 0 00-2-2h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293H9a2 2 0 00-2 2v12a4 4 0 004 4z" />
+    </svg>
+  ),
+  Globe: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+    </svg>
+  ),
+  CreditCard: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+    </svg>
+  ),
+  Building: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+    </svg>
+  ),
+  Chat: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+    </svg>
+  ),
+  Home: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+    </svg>
+  ),
+  Admin: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+  ChevronRight: ({ className }: { className?: string }) => (
+    <svg className={cn("w-4 h-4 transition-transform duration-200", className)} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+    </svg>
+  ),
+  Menu: () => (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  ),
+  X: () => (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  ),
+  ChevronLeft: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+    </svg>
+  ),
+};
+
+// ─── Nav Definition ───────────────────────────────────────────────────────────
+
+const buildNavItems = (userRole: string, tenants: { id: string; name: string }[]): NavItem[] => {
+  const hasTenants = tenants.length > 0;
+
+  const items: NavItem[] = [
+    {
+      label: 'Platform Home',
+      href: '/',
+      icon: <Icon.Home />,
+    },
+    {
+      label: 'My Account',
+      icon: <Icon.User />,
+      children: [
+        { label: 'Profile', href: '/settings/account' },
+        { label: 'Subscription', href: '/settings/subscription' },
+      ],
+    },
+    {
+      label: 'Security & Privacy',
+      icon: <Icon.Shield />,
+      children: [
+        { label: 'Security', href: '/settings/security' },
+        { label: 'Multi-Factor Auth', href: '/settings/mfa' },
+        { label: 'Privacy', href: '/settings/privacy' },
+      ],
+    },
+    {
+      label: 'Preferences',
+      icon: <Icon.Palette />,
+      children: [
+        { label: 'Appearance', href: '/settings/appearance' },
+        { label: 'Language', href: '/settings/language' },
+      ],
+    },
+    {
+      label: 'Contact & Support',
+      href: '/settings/contact',
+      icon: <Icon.Chat />,
+    },
+  ];
+
+  if (hasTenants) {
+    items.push({
+      label: 'My Locations',
+      icon: <Icon.Building />,
+      dividerBefore: true,
+      requiredGroup: 'IS_TENANT_USER',
+      children: tenants.slice(0, 8).map(t => ({
+        label: t.name,
+        href: `/t/${t.id}/dashboard`,
+      })),
+    });
+  }
+
+  items.push({
+    label: 'Admin Panel',
+    href: '/settings/admin',
+    icon: <Icon.Admin />,
+    badge: 'Admin',
+    badgeVariant: 'warning',
+    dividerBefore: true,
+    adminOnly: true,
+    requiredGroup: 'IS_PLATFORM_ADMIN',
+  });
+
+  return items;
+};
+
+// ─── Badge ────────────────────────────────────────────────────────────────────
+
+function NavBadge({ text, variant = 'default' }: { text: string; variant?: NavItem['badgeVariant'] }) {
+  const colors = {
+    default: 'bg-neutral-100 text-neutral-700',
+    success: 'bg-green-100 text-green-700',
+    warning: 'bg-amber-100 text-amber-700',
+    error: 'bg-red-100 text-red-700',
+    new: 'bg-blue-100 text-blue-700',
+  };
+  return (
+    <span className={cn('ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none', colors[variant ?? 'default'])}>
+      {text}
+    </span>
+  );
+}
+
+// ─── Single Nav Item ──────────────────────────────────────────────────────────
+
+function NavItemRow({
+  item,
+  level = 0,
+  pathname,
+  expanded,
+  onToggle,
+  onNavigate,
+}: {
+  item: NavItem;
+  level?: number;
+  pathname: string;
+  expanded: Set<string>;
+  onToggle: (key: string) => void;
+  onNavigate: () => void;
+}) {
+  const key = item.href ?? item.label;
+  const hasChildren = !!(item.children?.length);
+  const isExpanded = expanded.has(key);
+  const isActive = item.href
+    ? pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'))
+    : false;
+  const isParentActive = hasChildren && item.children!.some(c =>
+    c.href && (pathname === c.href || pathname.startsWith(c.href + '/'))
+  );
+
+  const paddingLeft = 16 + level * 14;
+
+  const sharedClass = cn(
+    'group flex w-full items-center gap-3 rounded-lg py-2 text-sm font-medium transition-all duration-150',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+    isActive || isParentActive
+      ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+      : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
+  );
+
+  if (hasChildren) {
+    return (
+      <div>
+        <button
+          onClick={() => onToggle(key)}
+          className={sharedClass}
+          style={{ paddingLeft, paddingRight: 12 }}
+          aria-expanded={isExpanded}
+        >
+          {item.icon && (
+            <span className={cn('flex-shrink-0', isActive || isParentActive ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200')}>
+              {item.icon}
+            </span>
+          )}
+          <span className="flex-1 text-left truncate">{item.label}</span>
+          {item.badge && <NavBadge text={item.badge} variant={item.badgeVariant} />}
+          <Icon.ChevronRight className={isExpanded ? 'rotate-90 text-neutral-500' : 'text-neutral-400'} />
+        </button>
+
+        {isExpanded && (
+          <div className="mt-0.5 space-y-0.5">
+            {item.children!.map(child => (
+              <NavItemRow
+                key={child.href ?? child.label}
+                item={child}
+                level={level + 1}
+                pathname={pathname}
+                expanded={expanded}
+                onToggle={onToggle}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={item.href!}
+      onClick={onNavigate}
+      className={sharedClass}
+      style={{ paddingLeft, paddingRight: 12 }}
+    >
+      {item.icon && (
+        <span className={cn('flex-shrink-0', isActive ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200')}>
+          {item.icon}
+        </span>
+      )}
+      <span className="flex-1 truncate">{item.label}</span>
+      {item.badge && <NavBadge text={item.badge} variant={item.badgeVariant} />}
+    </Link>
+  );
+}
+
+// ─── Sidebar Content (shared) ─────────────────────────────────────────────────
+
+function SidebarContent({
+  items,
+  pathname,
+  expanded,
+  onToggle,
+  onNavigate,
+  user,
+  collapsed,
+}: {
+  items: NavItem[];
+  pathname: string;
+  expanded: Set<string>;
+  onToggle: (key: string) => void;
+  onNavigate: () => void;
+  user: { email: string; firstName?: string; lastName?: string; role: string } | null;
+  collapsed?: boolean;
+}) {
+  const displayName = user
+    ? user.firstName && user.lastName
+      ? `${user.firstName} ${user.lastName}`
+      : user.email
+    : '';
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* User identity strip */}
+      <div className={cn('flex items-center gap-3 px-4 py-4 border-b border-neutral-100 dark:border-neutral-800', collapsed && 'justify-center px-2')}>
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center flex-shrink-0">
+          <span className="text-white text-xs font-bold">
+            {displayName.charAt(0).toUpperCase() || '?'}
+          </span>
+        </div>
+        {!collapsed && (
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-neutral-900 dark:text-white truncate">{displayName}</p>
+            <p className="text-xs text-neutral-500 truncate">{user?.role}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Nav items */}
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+        {items.map((item, i) => (
+          <div key={item.href ?? item.label}>
+            {item.dividerBefore && (
+              <div className="my-2 border-t border-neutral-100 dark:border-neutral-800" />
+            )}
+            {collapsed ? (
+              // Collapsed: icon-only with tooltip
+              item.icon ? (
+                <Link
+                  href={item.href ?? (item.children?.[0]?.href ?? '#')}
+                  onClick={onNavigate}
+                  title={item.label}
+                  className={cn(
+                    'flex items-center justify-center w-10 h-10 mx-auto rounded-lg transition-colors',
+                    (item.href && (pathname === item.href || pathname.startsWith(item.href + '/')))
+                      ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                      : 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200'
+                  )}
+                >
+                  {item.icon}
+                </Link>
+              ) : null
+            ) : (
+              <NavItemRow
+                item={item}
+                pathname={pathname}
+                expanded={expanded}
+                onToggle={onToggle}
+                onNavigate={onNavigate}
+              />
+            )}
+          </div>
+        ))}
+      </nav>
+
+      {/* Footer */}
+      {!collapsed && (
+        <div className="px-4 py-3 border-t border-neutral-100 dark:border-neutral-800">
+          <p className="text-xs text-neutral-400">Account Settings</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Mobile Bottom Sheet / Drawer ─────────────────────────────────────────────
+
+function MobileDrawer({
+  open,
+  onClose,
+  items,
+  pathname,
+  expanded,
+  onToggle,
+  user,
+}: {
+  open: boolean;
+  onClose: () => void;
+  items: NavItem[];
+  pathname: string;
+  expanded: Set<string>;
+  onToggle: (key: string) => void;
+  user: { email: string; firstName?: string; lastName?: string; role: string } | null;
+}) {
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  // Trap focus and close on Escape
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = '';
+    };
+  }, [open, onClose]);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-300 md:hidden',
+          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        )}
+        onClick={onClose}
+        aria-hidden
+      />
+
+      {/* Slide-in drawer from left */}
+      <div
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 w-[280px] bg-white dark:bg-neutral-900 shadow-2xl',
+          'flex flex-col transition-transform duration-300 ease-in-out md:hidden',
+          open ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        {/* Drawer header */}
+        <div className="flex items-center justify-between px-4 py-4 border-b border-neutral-100 dark:border-neutral-800">
+          <span className="text-base font-semibold text-neutral-900 dark:text-white">Account Settings</span>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            aria-label="Close navigation"
+          >
+            <Icon.X />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          <SidebarContent
+            items={items}
+            pathname={pathname}
+            expanded={expanded}
+            onToggle={onToggle}
+            onNavigate={onClose}
+            user={user}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Mobile Top Bar ───────────────────────────────────────────────────────────
+
+function MobileTopBar({ onOpen, title }: { onOpen: () => void; title: string }) {
+  return (
+    <div className="sticky top-0 z-30 flex items-center gap-3 px-4 h-14 bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 md:hidden">
+      <button
+        onClick={onOpen}
+        className="p-2 -ml-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+        aria-label="Open navigation"
+      >
+        <Icon.Menu />
+      </button>
+      <span className="font-semibold text-neutral-900 dark:text-white text-sm truncate">{title}</span>
+    </div>
+  );
+}
+
+// ─── Desktop Sidebar ──────────────────────────────────────────────────────────
+
+function DesktopSidebar({
+  items,
+  pathname,
+  expanded,
+  onToggle,
+  user,
+}: {
+  items: NavItem[];
+  pathname: string;
+  expanded: Set<string>;
+  onToggle: (key: string) => void;
+  user: { email: string; firstName?: string; lastName?: string; role: string } | null;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <aside
+      className={cn(
+        'hidden md:flex flex-col flex-shrink-0 bg-white dark:bg-neutral-900',
+        'border-r border-neutral-200 dark:border-neutral-800',
+        'transition-all duration-300 ease-in-out relative',
+        collapsed ? 'w-[60px]' : 'w-[240px]'
+      )}
+    >
+      {/* Collapse toggle button */}
+      <button
+        onClick={() => setCollapsed(prev => !prev)}
+        className={cn(
+          'absolute -right-3 top-6 z-10 w-6 h-6 rounded-full',
+          'bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700',
+          'flex items-center justify-center shadow-sm',
+          'hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors'
+        )}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        <svg
+          className={cn('w-3 h-3 text-neutral-500 transition-transform duration-300', collapsed ? 'rotate-180' : '')}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      {/* Header */}
+      <div className={cn('px-4 py-4 border-b border-neutral-100 dark:border-neutral-800', collapsed && 'px-2')}>
+        {collapsed ? (
+          <div className="w-8 h-8 mx-auto rounded-lg bg-primary-600 flex items-center justify-center">
+            <Icon.User />
+          </div>
+        ) : (
+          <h2 className="text-sm font-semibold text-neutral-900 dark:text-white tracking-tight">Account Settings</h2>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        <SidebarContent
+          items={items}
+          pathname={pathname}
+          expanded={expanded}
+          onToggle={onToggle}
+          onNavigate={() => {}}
+          user={user}
+          collapsed={collapsed}
+        />
+      </div>
+    </aside>
+  );
+}
+
+// ─── Auto-expand helper ───────────────────────────────────────────────────────
+
+function computeExpanded(items: NavItem[], pathname: string): Set<string> {
+  const result = new Set<string>();
+  const walk = (nodes: NavItem[]) => {
+    for (const node of nodes) {
+      const key = node.href ?? node.label;
+      if (node.children) {
+        const hasActive = node.children.some(
+          c => c.href && (pathname === c.href || pathname.startsWith(c.href + '/'))
+        );
+        if (hasActive) result.add(key);
+        walk(node.children);
+      }
+    }
+  };
+  walk(items);
+  return result;
+}
+
+// ─── Page title from pathname ─────────────────────────────────────────────────
+
+function pageTitleFromPath(pathname: string): string {
+  const segments = pathname.split('/').filter(Boolean);
+  const last = segments[segments.length - 1] ?? 'Settings';
+  return last.charAt(0).toUpperCase() + last.slice(1).replace(/-/g, ' ');
+}
+
+// ─── Main Export ──────────────────────────────────────────────────────────────
+
+export function UniversalNavContent({ children, injectedItems = [] }: UniversalNavContentProps) {
+  const pathname = usePathname();
+  const { user } = useAuth();
+  const { filterNavItems } = useRBAC();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const rawItems: NavItem[] = [
+    ...(user ? buildNavItems(user.role, user.tenants ?? []) : []),
+    ...injectedItems,
+  ];
+
+  const items = filterNavItems(rawItems);
+
+  const [expanded, setExpanded] = useState<Set<string>>(() =>
+    computeExpanded(items, pathname)
+  );
+
+  // Re-compute expanded items when pathname changes
+  useEffect(() => {
+    setExpanded(computeExpanded(items, pathname));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  const toggleExpanded = (key: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const pageTitle = pageTitleFromPath(pathname);
+
+  const userForSidebar = user
+    ? { email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role }
+    : null;
+
+  return (
+    <div className="flex h-screen bg-neutral-50 dark:bg-neutral-950 overflow-hidden">
+      {/* Desktop Sidebar */}
+      <DesktopSidebar
+        items={items}
+        pathname={pathname}
+        expanded={expanded}
+        onToggle={toggleExpanded}
+        user={userForSidebar}
+      />
+
+      {/* Mobile Drawer */}
+      <MobileDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        items={items}
+        pathname={pathname}
+        expanded={expanded}
+        onToggle={toggleExpanded}
+        user={userForSidebar}
+      />
+
+      {/* Main content area */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        {/* Mobile top bar with hamburger */}
+        <MobileTopBar onOpen={() => setDrawerOpen(true)} title={pageTitle} />
+
+        {/* Page content */}
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export default UniversalNavContent;

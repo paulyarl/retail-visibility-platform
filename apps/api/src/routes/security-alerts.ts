@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { optionalAuth } from '../middleware/auth';
 import { basePrisma } from '../prisma';
 
 const router = Router();
@@ -12,11 +12,11 @@ const router = Router();
 console.log('[Security Alerts Router] Initializing security-alerts routes');
 
 /**
- * GET /api/user/security-alerts
+ * GET /api/security/alerts
  * Get all security alerts for the current user
  */
-router.get('/security-alerts', authenticateToken, async (req, res) => {
-  console.log('[GET /api/user/security-alerts] Route handler called');
+router.get('/alerts', optionalAuth, async (req, res) => {
+  console.log('[GET /api/security/alerts] Route handler called');
   try {
     const userId = req.user?.user_id;
     if (!userId) {
@@ -76,6 +76,7 @@ router.get('/security-alerts', authenticateToken, async (req, res) => {
         `;
 
     res.json({
+      success: true,
       data: alerts.map(alert => ({
         ...alert,
         metadata: alert.metadata || {},
@@ -90,10 +91,10 @@ router.get('/security-alerts', authenticateToken, async (req, res) => {
 });
 
 /**
- * PUT /api/user/security-alerts/:alertId/read
+ * PUT /api/security/alerts/:alertId/read
  * Mark a security alert as read
  */
-router.put('/security-alerts/:alertId/read', authenticateToken, async (req, res) => {
+router.put('/alerts/:alertId/read', optionalAuth, async (req, res) => {
   try {
     const userId = req.user?.user_id;
     const { alertId } = req.params;
@@ -122,10 +123,10 @@ router.put('/security-alerts/:alertId/read', authenticateToken, async (req, res)
 });
 
 /**
- * POST /api/user/security-alerts/mark-all-read
+ * POST /api/security/alerts/mark-all-read
  * Mark all security alerts as read
  */
-router.post('/security-alerts/mark-all-read', authenticateToken, async (req, res) => {
+router.post('/alerts/mark-all-read', optionalAuth, async (req, res) => {
   try {
     const userId = req.user?.user_id;
     if (!userId) {
@@ -152,10 +153,10 @@ router.post('/security-alerts/mark-all-read', authenticateToken, async (req, res
 });
 
 /**
- * DELETE /api/user/security-alerts/:alertId
+ * DELETE /api/security/alerts/:alertId
  * Dismiss (soft delete) a security alert
  */
-router.delete('/security-alerts/:alertId', authenticateToken, async (req, res) => {
+router.delete('/alerts/:alertId', optionalAuth, async (req, res) => {
   try {
     const userId = req.user?.user_id;
     const { alertId } = req.params;
@@ -184,10 +185,10 @@ router.delete('/security-alerts/:alertId', authenticateToken, async (req, res) =
 });
 
 /**
- * GET /api/user/security-alerts/preferences
+ * GET /api/security/alerts/preferences
  * Get user's alert preferences
  */
-router.get('/security-alerts/preferences', authenticateToken, async (req, res) => {
+router.get('/alerts/preferences', optionalAuth, async (req, res) => {
   try {
     const userId = req.user?.user_id;
     if (!userId) {
@@ -217,10 +218,10 @@ router.get('/security-alerts/preferences', authenticateToken, async (req, res) =
 });
 
 /**
- * PUT /api/user/security-alerts/preferences
+ * PUT /api/security/alerts/preferences
  * Update user's alert preferences
  */
-router.put('/security-alerts/preferences', authenticateToken, async (req, res) => {
+router.put('/alerts/preferences', optionalAuth, async (req, res) => {
   try {
     const userId = req.user?.user_id;
     if (!userId) {
@@ -245,10 +246,10 @@ router.put('/security-alerts/preferences', authenticateToken, async (req, res) =
 });
 
 /**
- * POST /api/user/security-alerts/test
+ * POST /api/security/alerts/test
  * Create a test security alert (for development/testing)
  */
-router.post('/security-alerts/test', authenticateToken, async (req, res) => {
+router.post('/alerts/test', optionalAuth, async (req, res) => {
   try {
     const userId = req.user?.user_id;
     if (!userId) {

@@ -1,42 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+import { requirePlatformAdmin, authenticatedFetch } from '@/utils/apiAuth';
 
 // Debug: Log when this file is loaded
 console.log('[Route File] Tier system route.ts loaded');
 
 /**
  * Proxy for /api/admin/tier-system/tiers
- * Forwards requests to the API server with auth token from cookies
+ * Forwards requests to the API server with Auth0 session authentication
  */
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-
-    // Debug: Log all cookies
-    const allCookies = cookieStore.getAll();
-    console.log('[Tier Proxy] All cookies:', allCookies.map(c => c.name));
-
-    const authToken = cookieStore.get('auth_token')?.value;
-    console.log('[Tier Proxy] Auth token present:', !!authToken);
-
-    if (!authToken) {
-      console.log('[Tier Proxy] No auth token found in cookies');
-      return NextResponse.json({ error: 'Unauthorized - No auth token' }, { status: 401 });
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(request);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
+    
+    const { accessToken } = authResult;
 
     const url = new URL(request.url);
     // Extract the path after /api/admin/tier-system/tiers
     const pathSegments = url.pathname.split('/api/admin/tier-system/tiers')[1] || '';
     const queryParams = url.searchParams.toString();
-    const apiUrl = `${API_BASE_URL}/api/admin/tier-system/tiers${pathSegments}${queryParams ? `?${queryParams}` : ''}`;
+    const endpoint = `/api/admin/tier-system/tiers${pathSegments}${queryParams ? `?${queryParams}` : ''}`;
 
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-      },
+    const response = await authenticatedFetch(endpoint, accessToken, {
+      method: 'GET',
     });
 
     const data = await response.json();
@@ -53,32 +43,29 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   console.log('[Tier Proxy POST] Function called!');
   try {
-    const cookieStore = await cookies();
-
-    const authToken = cookieStore.get('auth_token')?.value;
-
-    if (!authToken) {
-      return NextResponse.json({ error: 'Unauthorized - No auth token' }, { status: 401 });
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(request);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
     }
+    
+    const { accessToken } = authResult;
 
     const url = new URL(request.url);
     // Extract the path after /api/admin/tier-system/tiers
     const pathSegments = url.pathname.split('/api/admin/tier-system/tiers')[1] || '';
     const queryParams = url.searchParams.toString();
-    const apiUrl = `${API_BASE_URL}/api/admin/tier-system/tiers${pathSegments}${queryParams ? `?${queryParams}` : ''}`;
+    const endpoint = `/api/admin/tier-system/tiers${pathSegments}${queryParams ? `?${queryParams}` : ''}`;
     
     console.log('[Tier Proxy POST] Request URL:', url.pathname);
     console.log('[Tier Proxy POST] Path segments:', pathSegments);
-    console.log('[Tier Proxy POST] Final API URL:', apiUrl);
+    console.log('[Tier Proxy POST] Final endpoint:', endpoint);
 
     const requestBody = await request.json();
 
-    const response = await fetch(apiUrl, {
+    const response = await authenticatedFetch(endpoint, accessToken, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(requestBody),
     });
 

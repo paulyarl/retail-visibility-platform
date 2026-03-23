@@ -1,121 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
-import Link from 'next/link';
-import { 
-  Rocket, 
-  Home,
-  Menu,
-  X
-} from 'lucide-react';
-import SettingsFooter from '@/components/SettingsFooter';
-import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
-import { AdminNavContent } from '@/components/navigation/AdminNavContent';
+import { useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { ReactNode } from 'react';
 
-// Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { settings } = usePlatformSettings();
-  
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    // Rewrite /admin/* → /settings/admin/*
+    const newPath = pathname.replace(/^\/admin/, '/settings/admin');
+    if (newPath !== pathname) {
+      router.replace(newPath);
+    }
+  }, [pathname, router]);
+
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
-      {/* Top Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14 sm:h-16">
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Mobile Menu Button */}
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                aria-label="Toggle menu"
-              >
-                {mobileMenuOpen ? (
-                  <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                ) : (
-                  <Menu className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                )}
-              </button>
-              
-              {settings?.logoUrl ? (
-                <img 
-                  src={settings.logoUrl} 
-                  alt={settings.platformName || 'Platform Logo'} 
-                  className="h-8 sm:h-10 w-auto object-contain"
-                />
-              ) : (
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Rocket className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                </div>
-              )}
-              <div>
-                <h1 className="text-base sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Platform Admin
-                </h1>
-              </div>
-            </div>
-            <Link
-              href="/settings"
-              className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              <Home className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Back to Platform</span>
-              <span className="sm:hidden">Back</span>
-            </Link>
-          </div>
-        </div>
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Redirecting to Admin Panel...</p>
       </div>
-
-      <div className="flex-1 flex">
-        {/* Desktop Sidebar - Using AdminNavContent */}
-        <div className="hidden md:block w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
-          <AdminNavContent>
-            <div className="p-4">
-              {children}
-            </div>
-          </AdminNavContent>
-        </div>
-
-        {/* Mobile Sidebar Drawer - Using AdminNavContent */}
-        {mobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 z-50">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-            <div className="absolute left-0 top-0 h-full w-full max-w-sm bg-white dark:bg-gray-800 shadow-2xl border-r border-gray-200 dark:border-gray-700 animate-in slide-in-from-left duration-300">
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-900">
-                <div className="font-semibold text-gray-900 dark:text-white text-base">Admin Menu</div>
-                <button 
-                  onClick={() => setMobileMenuOpen(false)} 
-                  className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  aria-label="Close menu"
-                >
-                  <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                </button>
-              </div>
-              <div className="h-[calc(100%-60px)] overflow-auto">
-                <AdminNavContent>
-                  <div className="p-4">
-                    {children}
-                  </div>
-                </AdminNavContent>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Main Content */}
-        <div className="flex-1 overflow-auto">
-          <main className="p-4 sm:p-6 lg:p-8">
-            {children}
-          </main>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <SettingsFooter />
     </div>
   );
 }

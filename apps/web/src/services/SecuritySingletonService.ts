@@ -28,12 +28,14 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
   /**
    * Get active user sessions with caching
    */
-  async getActiveSessions(): Promise<LoginSession[]> {
+  async getActiveSessions(bypassCache = false): Promise<LoginSession[]> {
     try {
+      const cacheOptions = bypassCache ? { ttl: 0, forceRefresh: true } : {};
       const result = await this.makeDefaultRequest<any>(
         '/api/auth/sessions',
         {},
-        'security-active-sessions'
+        bypassCache ? undefined : 'security-active-sessions',
+        bypassCache ? 0 : undefined
       );
 
       if (!result.success) {
@@ -41,7 +43,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
         return [];
       }
 
-      return result.data?.sessions || result.data || [];
+      return result.data || [];
     } catch (error) {
       console.error('[SecuritySingletonService] Error fetching active sessions:', error);
       return [];
@@ -287,12 +289,13 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
   /**
    * Get security alerts for the current user
    */
-  async getSecurityAlerts(): Promise<any[]> {
+  async getSecurityAlerts(bypassCache = false): Promise<any[]> {
     try {
       const result = await this.makeDefaultRequest<any[]>(
         '/api/security/alerts',
         {},
-        'security-alerts'
+        bypassCache ? undefined : 'security-alerts',
+        bypassCache ? 0 : undefined
       );
       
       if (!result.success) {

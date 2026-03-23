@@ -54,6 +54,7 @@ export function SecurityDashboard() {
         setAlertsByType(data);
       } catch (error) {
         console.error('Failed to fetch alerts by type:', error);
+        setAlertsByType([]); // Set empty array on error
       } finally {
         setAlertsByTypeLoading(false);
       }

@@ -209,7 +209,7 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
   /**
    * Get alerts grouped by type with counts and recent examples
    */
-  async getAlertsByType(limit: number = 5, hours: number = 168): Promise<any[]> {
+  async getAlertsByType(limit: number = 5, hours: number = 168, bypassCache = false): Promise<any[]> {
     try {
       const params = new URLSearchParams({
         limit: limit.toString(),
@@ -219,12 +219,14 @@ class SecurityMonitoringSingletonService extends AdminApiSingleton {
       const result = await this.makeDefaultRequest<any>(
         `/api/admin/security/alerts/by-type?${params}`,
         {},
-        `security-alerts-by-type-${limit}-${hours}h`
+        bypassCache ? undefined : `security-alerts-by-type-${limit}-${hours}h`,
+        bypassCache ? 0 : undefined
       );
 
-      // API returns { data: [], totalTypes: 0, timeRange: "...", generatedAt: "..." }
-      // Ensure we always return an array
-      return Array.isArray(result?.data) ? result.data : [];
+      // API returns { success: true, data: { data: [...], totalTypes: 0, timeRange: "...", generatedAt: "..." } }
+      // The actual alerts array is in result.data.data
+      const alertsArray = result?.data?.data;
+      return Array.isArray(alertsArray) ? alertsArray : [];
     } catch (error) {
       console.error('[SecurityMonitoringSingleton] Failed to get alerts by type:', error);
       return [];

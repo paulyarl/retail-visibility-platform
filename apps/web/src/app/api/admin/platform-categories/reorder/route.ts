@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { requirePlatformAdmin, authenticatedFetch } from '@/utils/apiAuth';
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
     const body = await request.json();
     
-    const response = await fetch(`${API_URL}/api/admin/platform-categories/reorder`, {
+    // Require platform admin authentication via Auth0 session
+    const authResult = await requirePlatformAdmin(request);
+    
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response
+    }
+    
+    const { accessToken } = authResult;
+
+    const response = await authenticatedFetch('/api/admin/platform-categories/reorder', accessToken, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authHeader && { 'Authorization': authHeader }),
-      },
       body: JSON.stringify(body),
     });
 
