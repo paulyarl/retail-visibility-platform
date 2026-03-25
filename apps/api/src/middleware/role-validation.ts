@@ -277,7 +277,7 @@ export function requirePermission(permission: PermissionGroup) {
  * Get human-readable description of permission
  */
 function getPermissionDescription(permission: PermissionGroup): string {
-  const descriptions = {
+  const descriptions: Record<PermissionGroup, string> = {
     CAN_MANAGE_TENANT_USERS: 'Tenant user management (add, edit, remove users)',
     CAN_MANAGE_TENANT_BILLING: 'Tenant billing management (subscription, payments, invoices)',
     CAN_MANAGE_TENANT_SETTINGS: 'Tenant settings management (configuration, preferences)',
@@ -291,7 +291,16 @@ function getPermissionDescription(permission: PermissionGroup): string {
     CAN_ACCESS_SYSTEM_TOOLS: 'System tools access (diagnostics, maintenance, utilities)',
     CAN_VIEW_SENSITIVE_DATA: 'Sensitive data access (confidential information, PII)',
     CAN_DELETE_DATA: 'Data deletion permissions (permanent removal, cleanup)',
-    CAN_BULK_OPERATIONS: 'Bulk operations (mass import, export, delete operations)'
+    CAN_BULK_OPERATIONS: 'Bulk operations (mass import, export, delete operations)',
+    // Organization permissions
+    CAN_VIEW_ORGANIZATION: 'View organization details and tenants',
+    CAN_MANAGE_ORGANIZATION: 'Manage organization settings and configuration',
+    CAN_PROPAGATE_ITEMS: 'Propagate items across organization tenants',
+    CAN_MANAGE_MEMBERS: 'Manage organization members and roles',
+    CAN_TRANSFER_OWNERSHIP: 'Transfer organization ownership',
+    CAN_DELETE_ORGANIZATION: 'Delete organization and all associated data',
+    CAN_SUPPORT_TENANTS: 'Provide support for organization tenants',
+    CAN_TROUBLESHOOT: 'Access troubleshooting tools and diagnostics'
   };
   
   return descriptions[permission] || 'Unknown permission';

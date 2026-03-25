@@ -124,25 +124,111 @@ function requirePlatformAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 // GET /organizations - List all organizations
-// Permission: Platform support (view-only operation)
-router.get('/', authenticateToken, requireSupportActions, async (req, res) => {
+// Permission: Authenticated users (filtered by access)
+// - Platform admins see all organizations
+// - Other users see only organizations where they are members
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const organizations = await prisma.organizations_list.findMany({
-      include: {
-        tenants: {
-          select: {
-            id: true,
-            name: true,
-            _count: {
-              select: {
-                inventory_items: true,
+    const user = (req as any).user;
+    const isPlatformAdminUser = isPlatformAdmin(user) || canPerformSupportActions(user);
+
+    // Type for organizations with tenants included for stats
+    type TenantWithCount = { id: string; name: string; _count: { inventory_items: number } };
+    type OrgWithTenants = Awaited<ReturnType<typeof prisma.organizations_list.findMany>>[number] & {
+      tenants: TenantWithCount[];
+    };
+
+    let organizations: OrgWithTenants[];
+
+    if (isPlatformAdminUser) {
+      // Platform admins/support see all organizations
+      organizations = await prisma.organizations_list.findMany({
+        include: {
+          tenants: {
+            select: {
+              id: true,
+              name: true,
+              _count: {
+                select: {
+                  inventory_items: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { created_at: 'desc' },
-    });
+        orderBy: { created_at: 'desc' },
+      });
+    } else {
+      // Regular users see only organizations where they are members
+      // Find tenants where the user is a member
+      const userTenants = await prisma.tenants.findMany({
+        where: {
+          OR: [
+            {
+              user_tenants: {
+                some: {
+                  user_id: user.userId,
+                  role: {
+                    in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+                  }
+                }
+              }
+            },
+            {
+              created_by: user.userId
+            }
+          ]
+        },
+        select: {
+          organization_id: true
+        }
+      });
+
+      // Get unique organization IDs (filter out nulls)
+      const orgIds = [...new Set(userTenants.map(t => t.organization_id).filter((id): id is string => id !== null))];
+
+      if (orgIds.length === 0) {
+        // User is not a member of any organization
+        return res.json([]);
+      }
+
+      organizations = await prisma.organizations_list.findMany({
+        where: {
+          id: { in: orgIds }
+        },
+        include: {
+          tenants: {
+            where: {
+              OR: [
+                {
+                  user_tenants: {
+                    some: {
+                      user_id: user.userId,
+                      role: {
+                        in: [user_tenant_role.OWNER, user_tenant_role.ADMIN, user_tenant_role.MEMBER, user_tenant_role.VIEWER]
+                      }
+                    }
+                  }
+                },
+                {
+                  created_by: user.userId
+                }
+              ]
+            },
+            select: {
+              id: true,
+              name: true,
+              _count: {
+                select: {
+                  inventory_items: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { created_at: 'desc' },
+      });
+    }
 
     // Calculate stats for each organization
     const orgsWithStats = organizations.map(org => {

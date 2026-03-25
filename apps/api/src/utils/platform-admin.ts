@@ -8,9 +8,12 @@
  * - PLATFORM_ADMIN: Full control (create, update, delete)
  * - PLATFORM_SUPPORT: View all + limited actions (password resets, unlock accounts)
  * - PLATFORM_VIEWER: Read-only access (analytics, sales, legal, compliance)
+ * 
+ * NOTE: Now uses centralized USER_ROLES and ROLE_GROUPS from config/role-groups.ts
  */
 
-import { user_role } from '@prisma/client'; 
+import { user_role } from '@prisma/client';
+import { USER_ROLES, isRoleInGroup, hasPermission, isValidRole, type UserRole } from '../config/role-groups';
 
 /**
  * Check if a user has full platform admin privileges
@@ -20,16 +23,21 @@ import { user_role } from '@prisma/client';
  */
 export function isPlatformAdmin(user: { role?: user_role | string } | null | undefined): boolean {
   const role = user?.role;
-  // console.log('[SCAN ALERT] Scan role= ',role);
   if (!role) return false;
 
-  // Check for explicit PLATFORM_ADMIN role or legacy ADMIN role
+  // Normalize role to string for comparison
+  const roleStr = typeof role === 'string' ? role : String(role);
+
+  // Check for valid role and platform admin group membership
+  if (isValidRole(roleStr)) {
+    return isRoleInGroup(roleStr, 'IS_PLATFORM_ADMIN');
+  }
+
+  // Fallback for Prisma enum values
   return role === 'PLATFORM_ADMIN' || 
-  role === 'ADMIN' ||
-  role === 'PLATFORM_SUPPORT' ||
-  role === user_role.PLATFORM_ADMIN ||
-  role === user_role.PLATFORM_SUPPORT ||
-  role === user_role.ADMIN;
+         role === 'ADMIN' ||
+         role === user_role.PLATFORM_ADMIN ||
+         role === user_role.ADMIN;
 }
 
 /**
@@ -42,14 +50,23 @@ export function isPlatformUser(user: { role?: user_role | string } | null | unde
   const role = user?.role;
   if (!role) return false;
 
+  // Normalize role to string for comparison
+  const roleStr = typeof role === 'string' ? role : String(role);
+
+  // Check for valid role and platform support group membership
+  if (isValidRole(roleStr)) {
+    return isRoleInGroup(roleStr, 'IS_PLATFORM_ADMIN') || isRoleInGroup(roleStr, 'IS_PLATFORM_SUPPORT');
+  }
+
+  // Fallback for Prisma enum values
   return role === 'PLATFORM_ADMIN' ||
          role === 'PLATFORM_SUPPORT' ||
          role === 'PLATFORM_VIEWER' ||
-         role === 'ADMIN'||
+         role === 'ADMIN' ||
          role === user_role.PLATFORM_ADMIN ||
          role === user_role.PLATFORM_SUPPORT ||
          role === user_role.PLATFORM_VIEWER ||
-         role === user_role.ADMIN; // Legacy
+         role === user_role.ADMIN;
 }
 
 /**
@@ -82,18 +99,27 @@ export function canPerformSupportActions(user: { role?: user_role | string } | n
   const role = user?.role;
   if (!role) return false;
 
+  // Normalize role to string for comparison
+  const roleStr = typeof role === 'string' ? role : String(role);
+
+  // Check for valid role and platform support group membership
+  if (isValidRole(roleStr)) {
+    return isRoleInGroup(roleStr, 'IS_PLATFORM_ADMIN') || isRoleInGroup(roleStr, 'IS_PLATFORM_SUPPORT');
+  }
+
+  // Fallback for Prisma enum values
   return role === 'PLATFORM_ADMIN' ||
          role === 'PLATFORM_SUPPORT' ||
          role === 'TENANT_OWNER' ||
          role === 'OWNER' ||
          role === 'TENANT_ADMIN' ||
-         role === 'ADMIN'|| // Legacy
+         role === 'ADMIN' ||
          role === user_role.PLATFORM_ADMIN ||
          role === user_role.PLATFORM_SUPPORT ||
          role === user_role.TENANT_OWNER ||
          role === user_role.OWNER ||
          role === user_role.TENANT_ADMIN ||
-         role === user_role.ADMIN; // Legacy
+         role === user_role.ADMIN;
 }
 
 /**
@@ -105,8 +131,10 @@ export function canPerformSupportActions(user: { role?: user_role | string } | n
 export function isPlatformViewer(user: { role?: user_role | string } | null | undefined): boolean {
   const role = user?.role;
   if (!role) return false;
-  return role === 'PLATFORM_VIEWER' || 
-  role === user_role.PLATFORM_VIEWER;
+  
+  const roleStr = typeof role === 'string' ? role : String(role);
+  return roleStr === USER_ROLES.PLATFORM_VIEWER || 
+         role === user_role.PLATFORM_VIEWER;
 }
 
 /**

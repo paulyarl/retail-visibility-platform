@@ -3,16 +3,19 @@
  * 
  * Features:
  * - Smart defaults for makeDefaultRequest
- * - Authorization groups (IS_/CAN_ patterns)
+ * - Authorization groups (IS_/CAN_ patterns) - uses centralized rbac.ts
  * - Platform authority bypass mechanisms
  * - Contextual validation
  * - Backward compatibility with TenantApiSingleton
  */
 
-import { RequestTarget, RequestType } from './EnhancedFlexibleApiSingleton';
+import { FlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, TenantRequestOptions, TenantApiResponse, PublicRequestOptions } from './FlexibleApiSingleton';
 import { TenantApiSingleton } from './TenantApiSingleton';
+import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
+import { ApiResult, ApiEnhancedCacheOptions } from './EnhancedFlexibleApiSingleton';
+import { PERMISSION_GROUPS, ROLE_GROUPS, USER_ROLES, type UserRole } from '@/config/rbac';
 
-// Platform role hierarchy
+// Platform role hierarchy (for role level comparisons)
 export enum PlatformRole {
   PLATFORM_ADMIN = 'PLATFORM_ADMIN',
   OWNER = 'OWNER',
@@ -22,64 +25,32 @@ export enum PlatformRole {
   ANONYMOUS = 'ANONYMOUS'
 }
 
-// Authorization group patterns
-export enum AuthorizationGroup {
-  // IS_ patterns (Identity/Role-based)
-  IS_PLATFORM_ADMIN = 'IS_PLATFORM_ADMIN',
-  IS_PLATFORM_SUPPORT = 'IS_PLATFORM_SUPPORT', 
-  IS_ORGANIZATION_OWNER = 'IS_ORGANIZATION_OWNER',
-  IS_ORGANIZATION_ADMIN = 'IS_ORGANIZATION_ADMIN',
-  IS_TENANT_MEMBER = 'IS_TENANT_MEMBER',
-  
-  // CAN_ patterns (Capability-based)
-  CAN_VIEW_ORGANIZATION = 'CAN_VIEW_ORGANIZATION',
-  CAN_MANAGE_ORGANIZATION = 'CAN_MANAGE_ORGANIZATION',
-  CAN_PROPAGATE_ITEMS = 'CAN_PROPAGATE_ITEMS',
-  CAN_MANAGE_MEMBERS = 'CAN_MANAGE_MEMBERS',
-  CAN_TRANSFER_OWNERSHIP = 'CAN_TRANSFER_OWNERSHIP',
-  CAN_DELETE_ORGANIZATION = 'CAN_DELETE_ORGANIZATION',
-  CAN_SUPPORT_TENANTS = 'CAN_SUPPORT_TENANTS',
-  CAN_TROUBLESHOOT = 'CAN_TROUBLESHOOT'
-}
+// Authorization group type - uses centralized PERMISSION_GROUPS keys
+export type AuthorizationGroup = keyof typeof PERMISSION_GROUPS;
 
-// Authorization group mapping to platform roles
-const AUTHORIZATION_GROUPS = {
-  // IS_ groups (Identity)
-  [AuthorizationGroup.IS_PLATFORM_ADMIN]: [PlatformRole.PLATFORM_ADMIN],
-  [AuthorizationGroup.IS_PLATFORM_SUPPORT]: [PlatformRole.PLATFORM_SUPPORT],
-  [AuthorizationGroup.IS_ORGANIZATION_OWNER]: [PlatformRole.OWNER],
-  [AuthorizationGroup.IS_ORGANIZATION_ADMIN]: [PlatformRole.OWNER, PlatformRole.TENANT_ADMIN],
-  [AuthorizationGroup.IS_TENANT_MEMBER]: [PlatformRole.OWNER, PlatformRole.TENANT_ADMIN, PlatformRole.USER],
+// Re-export for backward compatibility with code that imports AuthorizationGroup
+export const AuthorizationGroup = {
+  // IS_ patterns (from ROLE_GROUPS)
+  IS_PLATFORM_ADMIN: 'IS_PLATFORM_ADMIN' as const,
+  IS_PLATFORM_SUPPORT: 'IS_PLATFORM_SUPPORT' as const,
+  IS_TENANT_ADMIN: 'IS_TENANT_ADMIN' as const,
+  IS_TENANT_OWNER: 'IS_TENANT_OWNER' as const,
+  IS_TENANT_MANAGER: 'IS_TENANT_MANAGER' as const,
+  IS_TENANT_USER: 'IS_TENANT_USER' as const,
   
-  // CAN_ groups (Capabilities)
-  [AuthorizationGroup.CAN_VIEW_ORGANIZATION]: [
-    PlatformRole.PLATFORM_ADMIN, PlatformRole.OWNER, PlatformRole.TENANT_ADMIN, PlatformRole.PLATFORM_SUPPORT
-  ],
-  [AuthorizationGroup.CAN_MANAGE_ORGANIZATION]: [
-    PlatformRole.PLATFORM_ADMIN, PlatformRole.OWNER, PlatformRole.TENANT_ADMIN
-  ],
-  [AuthorizationGroup.CAN_PROPAGATE_ITEMS]: [
-    PlatformRole.PLATFORM_ADMIN, PlatformRole.OWNER, PlatformRole.TENANT_ADMIN, PlatformRole.PLATFORM_SUPPORT
-  ],
-  [AuthorizationGroup.CAN_MANAGE_MEMBERS]: [
-    PlatformRole.PLATFORM_ADMIN, PlatformRole.OWNER, PlatformRole.TENANT_ADMIN
-  ],
-  [AuthorizationGroup.CAN_TRANSFER_OWNERSHIP]: [
-    PlatformRole.PLATFORM_ADMIN, PlatformRole.OWNER
-  ],
-  [AuthorizationGroup.CAN_DELETE_ORGANIZATION]: [
-    PlatformRole.PLATFORM_ADMIN, PlatformRole.OWNER
-  ],
-  [AuthorizationGroup.CAN_SUPPORT_TENANTS]: [
-    PlatformRole.PLATFORM_ADMIN, PlatformRole.PLATFORM_SUPPORT
-  ],
-  [AuthorizationGroup.CAN_TROUBLESHOOT]: [
-    PlatformRole.PLATFORM_ADMIN, PlatformRole.PLATFORM_SUPPORT
-  ]
+  // CAN_ patterns (from PERMISSION_GROUPS)
+  CAN_VIEW_ORGANIZATION: 'CAN_VIEW_ORGANIZATION' as const,
+  CAN_MANAGE_ORGANIZATION: 'CAN_MANAGE_ORGANIZATION' as const,
+  CAN_PROPAGATE_ITEMS: 'CAN_PROPAGATE_ITEMS' as const,
+  CAN_MANAGE_MEMBERS: 'CAN_MANAGE_MEMBERS' as const,
+  CAN_TRANSFER_OWNERSHIP: 'CAN_TRANSFER_OWNERSHIP' as const,
+  CAN_DELETE_ORGANIZATION: 'CAN_DELETE_ORGANIZATION' as const,
+  CAN_SUPPORT_TENANTS: 'CAN_SUPPORT_TENANTS' as const,
+  CAN_TROUBLESHOOT: 'CAN_TROUBLESHOOT' as const,
 };
 
 // Platform role hierarchy
-const PLATFORM_ROLE_HIERARCHY = {
+const PLATFORM_ROLE_HIERARCHY: Record<string, number> = {
   [PlatformRole.PLATFORM_ADMIN]: 5,
   [PlatformRole.OWNER]: 4,
   [PlatformRole.TENANT_ADMIN]: 3,
@@ -90,7 +61,7 @@ const PLATFORM_ROLE_HIERARCHY = {
 
 // Validation interfaces
 export interface OrganizationValidationOptions {
-  // Authorization group-based (preferred)
+  // Authorization group-based (preferred) - uses centralized permission names
   requireAuthorizationGroups?: AuthorizationGroup[];
   requireOneOfGroups?: AuthorizationGroup[][];
   
@@ -214,6 +185,9 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
   protected defaultRequestType: RequestType = RequestType.TENANT;
   protected defaultRequestTarget: RequestTarget = RequestTarget.API;
   protected options: OrganizationServiceOptions;
+  
+  // Flag to prevent infinite recursion during validated request execution
+  private _isExecutingValidatedRequest: boolean = false;
 
   /**
    * PILOT: Abstract cache contract for organization services
@@ -266,12 +240,19 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
   }
 
   // Enhanced makeDefaultRequest with smart organization validation
-  protected async makeDefaultRequest<T>(
+  protected async makeOrganizationEnhancedDefaultRequest<T>(
     endpoint: string,
     options: OrganizationRequestOptions = {},
     cacheKey?: string,
-    cacheTTL: number = this.cacheTTL
+    cacheTTL: number = this.options.cacheTTL || 10 * 60 * 1000
   ): Promise<any> {
+    // Skip validation if already executing a validated request (prevents infinite loop)
+    // This must be checked FIRST before any delegation
+    if (this._isExecutingValidatedRequest) {
+      // Pass through to parent directly
+      return this.makeOrganizationValidatedRequest<T>(endpoint, options, cacheKey, cacheTTL);
+    }
+
     // Auto-detect if this is an organization endpoint
     if (this.isOrganizationEndpoint(endpoint) && this.options.autoValidateOrganization) {
       return this.makeOrganizationValidatedRequest<T>(endpoint, {
@@ -287,15 +268,15 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
     }
     
     // Fall back to parent for non-organization endpoints
-    return super.makeDefaultRequest<T>(endpoint, options, cacheKey, cacheTTL);
+    return this.makeDefaultRequest<T>(endpoint, options, cacheKey, cacheTTL);
   }
 
   // New organization-aware request method
-  protected async makeOrganizationRequest<T>(
+  protected async makeOrganizationDefaultRequest<T>(
     endpoint: string,
     options: OrganizationRequestOptions,
     cacheKey?: string,
-    cacheTTL: number = this.cacheTTL
+    cacheTTL: number = this.options.cacheTTL || 10 * 60 * 1000
   ): Promise<any> {
     // Explicit organization validation with options
     return this.makeOrganizationValidatedRequest<T>(endpoint, options, cacheKey, cacheTTL);
@@ -412,6 +393,17 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
 
     const userGroups = this.getUserAuthorizationGroups(currentUser);
 
+    // If we only have cookie-based auth (placeholder role), skip client-side group validation
+    // The server will handle actual authorization based on database lookup
+    // OAuth IDs contain '|' (e.g., 'google-oauth2|...', 'auth0|...')
+    if (currentUser.role === 'tenant_user' && currentUser.id?.includes('|')) {
+      return {
+        valid: true,
+        userRole: currentUser.role,
+        userGroups
+      };
+    }
+
     // Check if user belongs to required authorization groups
     if (options.requireAuthorizationGroups && options.requireAuthorizationGroups.length > 0) {
       const hasRequiredGroups = options.requireAuthorizationGroups.every(group => 
@@ -524,12 +516,15 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
 
   // Helper methods (public for use by services)
   public getUserAuthorizationGroups(currentUser: any): AuthorizationGroup[] {
-    const userRole = currentUser.role;
+    const userRole = currentUser?.role;
+    if (!userRole) return [];
+    
     const groups: AuthorizationGroup[] = [];
 
-    Object.entries(AUTHORIZATION_GROUPS).forEach(([group, roles]) => {
-      if (roles.includes(userRole)) {
-        groups.push(group as AuthorizationGroup);
+    // Use centralized PERMISSION_GROUPS from rbac.ts
+    Object.entries(PERMISSION_GROUPS).forEach(([permission, roles]) => {
+      if ((roles as readonly string[]).includes(userRole)) {
+        groups.push(permission as AuthorizationGroup);
       }
     });
 
@@ -537,10 +532,22 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
   }
 
   public getCurrentUser(): any {
-    // With Auth0, user info comes from session, not JWT in localStorage
-    // This method should be deprecated - use AuthContext instead
-    console.warn('[OrganizationApiSingleton] getCurrentUser is deprecated - use AuthContext for user info');
-    return null;
+    // Use inherited methods from FlexibleApiSingleton
+    const auth0Id = this.getAuth0Id();
+    const auth0Email = this.getAuth0Email();
+    
+    if (!auth0Id && !auth0Email) {
+      return null;
+    }
+    
+    // Return minimal user object for validation
+    // Role is determined by API based on auth0_id/auth0_email lookup
+    // For client-side validation, we use a placeholder that will pass API auth
+    return {
+      id: auth0Id,
+      email: auth0Email,
+      role: 'tenant_user', // Default role - actual validation happens server-side
+    };
   }
 
   public logError(message: string, error: any): void {
@@ -623,6 +630,7 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
 
   // Execute request (delegates to parent implementation)
   // Auth0 session is handled via HTTP-only cookies (credentials: 'include' in fetchWithCache)
+  // IMPORTANT: Must bypass makeDefaultRequest override to avoid infinite loop
   private async executeRequest<T>(
     endpoint: string,
     options: OrganizationRequestOptions,
@@ -635,6 +643,9 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
     // Add organization context to headers
     let enhancedOptions = {
       ...options,
+      // Provide context to avoid delegation to makeEnhancedDefaultRequest
+      context: this.defaultContext,
+      isolation: this.defaultIsolation,
       headers: {
         ...options.headers,
         'X-Request-Context': 'organization',
@@ -656,11 +667,37 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
     // Add service identification
     (enhancedOptions.headers as Record<string, string>)['X-Service'] = this.constructor.name.replace('Service', '');
 
-    return super.makeDefaultRequest<T>(endpoint, enhancedOptions, cacheKey, cacheTTL);
+    // Set flag to prevent infinite recursion in makeDefaultRequest
+    this._isExecutingValidatedRequest = true;
+    try {
+      // Call super.makeDefaultRequest - providing context prevents delegation to enhanced version
+      return await super.makeDefaultRequest<T>(endpoint, enhancedOptions, cacheKey, cacheTTL);
+    } finally {
+      // Always reset the flag
+      this._isExecutingValidatedRequest = false;
+    }
   }
 
   // Generate audit ID for tracking
   private generateAuditId(): string {
     return `org_audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Override makeDefaultRequest to accept OrganizationRequestOptions
+   * This allows organizationValidation to be passed in options
+   */
+  protected async makeDefaultRequest<T>(
+    endpoint: string,
+    options: OrganizationRequestOptions = {},
+    cacheKey?: string,
+    cacheTTL?: number
+  ): Promise<any> {
+    return this.makeOrganizationEnhancedDefaultRequest<T>(
+      endpoint,
+      options,
+      cacheKey,
+      cacheTTL ?? this.options.cacheTTL ?? 10 * 60 * 1000
+    );
   }
 }

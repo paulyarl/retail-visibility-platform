@@ -2,42 +2,23 @@
  * Scan Products Layout with Tier Gating
  * 
  * Wraps the Scan Products page with tier-based access control.
- * Requires 'product_scanning' feature (Professional tier or higher).
+ * Requires 'barcode_scan' feature (Professional tier or higher).
+ * 
+ * MIGRATED: Now uses useTenantAccess for dynamic database tier data.
  */
 
 'use client';
 
 import { useParams } from 'next/navigation';
 import { TierGate } from '@/components/tier/TierGate';
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { useTenantAccess } from '@/hooks/tenant-access/useTenantAccess';
 
 export default function ScanLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const tenantId = params.tenantId as string;
-  const [tier, setTier] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Fetch tenant tier
-    const fetchTier = async () => {
-      try {
-        const res = await api.get(`/api/tenants/${tenantId}`);
-        
-        if (res.ok) {
-          const data = await res.json();
-          setTier(data.subscriptionTier || 'trial');
-        }
-      } catch (err) {
-        console.error('Failed to fetch tenant tier:', err);
-        setTier('trial'); // Default to trial on error
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTier();
-  }, [tenantId]);
+  
+  // Use new hook for dynamic tier data from database
+  const { tier, loading, hasFeature } = useTenantAccess(tenantId);
 
   if (loading) {
     return (
@@ -47,10 +28,16 @@ export default function ScanLayout({ children }: { children: React.ReactNode }) 
     );
   }
 
+  // Check feature access directly from hook (includes platform admin bypass)
+  if (hasFeature('barcode_scan')) {
+    return <>{children}</>;
+  }
+
+  // Show tier gate for upgrade prompt
   return (
     <TierGate 
-      feature="product_scanning" 
-      tier={tier} 
+      feature="barcode_scan" 
+      tier={tier?.effective?.id || 'starter'} 
       tenantId={tenantId}
     >
       {children}

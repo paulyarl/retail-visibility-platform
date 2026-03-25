@@ -104,9 +104,9 @@ export default function OrganizationPage() {
 
   // Update orgData when organizationData is available
   useEffect(() => {
-    console.log('[OrganizationPage] organizationData:', organizationData);
-    console.log('[OrganizationPage] orgError:', orgError);
-    console.log('[OrganizationPage] organizationId:', organizationId);
+    // console.log('[OrganizationPage] organizationData:', organizationData);
+    // console.log('[OrganizationPage] orgError:', orgError);
+    // console.log('[OrganizationPage] organizationId:', organizationId);
     
     if (organizationData) {
       console.log('[OrganizationPage] Setting orgData from organizationData');

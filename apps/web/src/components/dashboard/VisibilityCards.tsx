@@ -424,7 +424,7 @@ export default function VisibilityCards({
                     style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                   >
                     <Settings className="w-4 h-4" />
-                    Browse Shops Directory
+                    Browse Directory of Shops
                   </Link>
               </div>
             </div>

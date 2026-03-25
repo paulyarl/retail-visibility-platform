@@ -303,7 +303,7 @@ export default function CatalogPage({ params }: { params: Promise<{ tenantId: st
             Complete Catalog
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Browse our entire collection of {totalItems} products
+            Browse your entire collection of {totalItems} products, as displayed on your public storefront.
           </p>
         </div>
 

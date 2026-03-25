@@ -120,6 +120,7 @@ function buildTenantNav(
       children: [
         { label: 'Product Manager', href: `/t/${tenantId}/items` },
         { label: 'Add Product', href: `/t/${tenantId}/items/create` },
+        { label: 'Product Catalog', href: `/t/${tenantId}/catalog` },
         { label: 'Barcode Scan', href: `/t/${tenantId}/scan` },
         { label: 'Quick Start', href: `/t/${tenantId}/quick-start` },
         { label: 'Categories', href: `/t/${tenantId}/categories` },
@@ -149,6 +150,8 @@ function buildTenantNav(
         { label: 'Branding', href: `/t/${tenantId}/settings/branding` },
         { label: 'Store Hours', href: `/t/${tenantId}/settings/hours` },
         { label: 'Business Category', href: `/t/${tenantId}/settings/gbp-category` },
+        { label: 'Location Status', href: `/t/${tenantId}/settings/location-status` },
+        { label: 'Review Management', href: `/t/${tenantId}/reviews` },
         ...(slug ? [{ label: 'My Storefront', href: `/tenant/${slug}` }] : []),
       ],
     },
@@ -171,11 +174,11 @@ function buildTenantNav(
       requiredGroup: 'IS_TENANT_MANAGER',
       children: [
         { label: 'Store Profile', href: `/t/${tenantId}/settings/tenant`, requiredPermission: 'CAN_MANAGE_TENANT_SETTINGS' },
-        { label: 'Reviews', href: `/t/${tenantId}/settings/reviews` },
         { label: 'Team Members', href: `/t/${tenantId}/settings/users`, requiredPermission: 'CAN_MANAGE_TENANT_USERS' },
         { label: 'Appearance', href: `/t/${tenantId}/settings/appearance` },
         { label: 'Language & Region', href: `/t/${tenantId}/settings/language` },
         { label: 'Subscription', href: `/t/${tenantId}/settings/subscription`, requiredPermission: 'CAN_MANAGE_TENANT_BILLING' },
+        { label: 'Onboarding', href: `/t/${tenantId}/settings/onboarding`, requiredPermission: 'CAN_MANAGE_TENANT_SETTINGS' },
         { label: 'Propagation', href: `/t/${tenantId}/settings/propagation`, requiredGroup: 'IS_TENANT_OWNER' },
       ],
     },
@@ -187,6 +190,7 @@ function buildTenantNav(
       children: [
         { label: 'Platform Home', href: '/' },
         { label: 'My Account', href: '/settings/account' },
+        { label: 'My Locations', href: '/tenants' },
         { label: 'Subscription', href: '/settings/subscription' },
         { label: 'Support', href: '/settings/contact' },
       ],

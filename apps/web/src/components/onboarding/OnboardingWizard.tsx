@@ -176,7 +176,7 @@ export default function OnboardingWizard({
   // Show loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center p-4">
+      <div className="relative min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center p-4">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4" />
           <p className="text-neutral-600">Loading your onboarding...</p>
@@ -186,16 +186,7 @@ export default function OnboardingWizard({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center p-4">
-      {/* Context Badges */}
-      <div className="absolute top-4 left-4 right-4 z-10">
-        <ContextBadges 
-          tenant={{ id: tenantId, name: '' }}
-          contextLabel="Onboarding"
-          showBorder={false}
-        />
-      </div>
-      
+    <div className="relative min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center p-4">
       {/* Background Pattern */}
       <div className="absolute inset-0 bg-grid-pattern opacity-5" />
       

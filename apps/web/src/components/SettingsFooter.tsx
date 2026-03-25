@@ -14,7 +14,7 @@ export default function SettingsFooter() {
           <div className="flex items-center gap-4 text-sm text-neutral-600">
             <span>© {currentYear} {settings?.platformName || 'Visible Shell'}</span>
             <span className="hidden sm:inline">•</span>
-            <span className="text-xs bg-neutral-100 px-2 py-1 rounded">v3.5.0</span>
+            <span className="text-xs bg-neutral-100 px-2 py-1 rounded">v4.0.0</span>
           </div>
           
           <div className="flex items-center gap-6 text-sm">

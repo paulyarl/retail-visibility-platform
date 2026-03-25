@@ -113,7 +113,7 @@ export class PropagationService extends OrganizationApiSingleton {
         }
       };
 
-      const result = await this.makeOrganizationRequest<PropagationResult>(
+      const result = await this.makeDefaultRequest<PropagationResult>(
         `/api/organizations/${organizationId}/items/propagate`,
         options
       );
@@ -133,6 +133,7 @@ export class PropagationService extends OrganizationApiSingleton {
    * Get organization tenants for propagation
    */
   async getOrganizationTenants(organizationId: string): Promise<OrganizationTenant[]> {
+    console.log('[PropagationService] getOrganizationTenants called for:', organizationId);
     try {
       if (!organizationId) {
         throw new Error('Organization ID is required');
@@ -147,17 +148,20 @@ export class PropagationService extends OrganizationApiSingleton {
         organizationId
       };
 
-      const result = await this.makeOrganizationRequest<any>(
+      console.log('[PropagationService] Calling makeDefaultRequest');
+      const result = await this.makeDefaultRequest<any>(
         `/api/organizations/${organizationId}`,
         options,
         `org-tenants-${organizationId}`,
         5 * 60 * 1000 // 5 minutes cache
       );
 
+      console.log('[PropagationService] makeDefaultRequest returned:', result);
       // Extract tenants from the organization response
       const organization = result.data;
       const tenants = organization?.tenants || [];
       
+      console.log('[PropagationService] Found tenants:', tenants.length);
       // Transform to match expected OrganizationTenant interface
       return tenants.map((tenant: any) => ({
         id: tenant.id,
@@ -167,6 +171,7 @@ export class PropagationService extends OrganizationApiSingleton {
         }
       }));
     } catch (error) {
+      console.error('[PropagationService] getOrganizationTenants error:', error);
       this.logError('Failed to get organization tenants', error);
       throw error;
     }
@@ -234,7 +239,7 @@ export class PropagationService extends OrganizationApiSingleton {
         }
       };
 
-      const result = await this.makeOrganizationRequest<PropagationResult>(
+      const result = await this.makeDefaultRequest<PropagationResult>(
         `/api/organizations/${organizationId}/items/propagate`,
         options
       );

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { authenticateToken, requireAdmin, checkTenantAccess } from '../middleware/auth';
 import { categoryService } from '../services/CategoryService';
 import { generateProductCatId } from '../lib/id-generator';
 import * as path from 'path';
@@ -132,7 +132,8 @@ router.delete('/categories/:id', authenticateToken, requireAdmin, async (req: Re
 });
 
 // Quick start endpoint for platform categories (aligned with tenant quick-start)
-router.post('/categories/quick-start', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+// Access: Platform users OR tenant members (tenant access)
+router.post('/categories/quick-start', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
   try {
     const { businessType = 'general', categoryCount = 15 } = req.body;
     const { prisma } = await import('../prisma');

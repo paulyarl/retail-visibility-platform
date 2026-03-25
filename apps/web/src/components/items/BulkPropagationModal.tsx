@@ -1,109 +1,112 @@
 /**
- * Platform-Aligned Propagation Modal
- * Uses platform UI components and service patterns
+ * Bulk Propagation Modal
+ * Propagate multiple items to other organization locations
  */
 
 'use client';
 
 import { useState, useEffect } from 'react';
 import { Modal, Alert, Button } from '@/components/ui';
-import { propagationService, type PropagationRequest, type PropagationResult, type OrganizationTenant } from '@/services/PropagationService';
+import { propagationService, type OrganizationTenant } from '@/services/PropagationService';
 
-interface PropagationModalProps {
+interface BulkPropagationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  itemId: string;
-  itemName: string;
+  itemIds: string[];
+  itemNames: string[];
   currentTenantId: string;
   organizationId: string;
   onSuccess?: () => void;
 }
 
-export default function PropagationModal({
+interface BulkPropagationResult {
+  success: boolean;
+  summary: {
+    total: number;
+    created: number;
+    updated: number;
+    failed: number;
+    skipped: number;
+  };
+  errors?: Array<{ item_id: string; error: string }>;
+}
+
+export default function BulkPropagationModal({
   isOpen,
   onClose,
-  itemId,
-  itemName,
+  itemIds,
+  itemNames,
   currentTenantId,
   organizationId,
   onSuccess,
-}: PropagationModalProps) {
+}: BulkPropagationModalProps) {
   const [tenants, setTenants] = useState<OrganizationTenant[]>([]);
   const [selectedTenantIds, setSelectedTenantIds] = useState<string[]>([]);
   const [mode, setMode] = useState<'create_only' | 'update_only' | 'create_or_update'>('create_or_update');
   const [loading, setLoading] = useState(false);
   const [propagating, setPropagating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<PropagationResult | null>(null);
+  const [result, setResult] = useState<BulkPropagationResult | null>(null);
   const [tenantsLoaded, setTenantsLoaded] = useState(false);
 
-  // Load tenants when modal opens - use useEffect to avoid render-phase side effects
+  // Load tenants when modal opens
   useEffect(() => {
-    console.log('[PropagationModal] useEffect triggered', { isOpen, organizationId, tenantsLoaded, loading });
-    if (!isOpen || !organizationId || tenantsLoaded || loading) {
-      console.log('[PropagationModal] Skipping loadTenants');
-      return;
+    if (isOpen && organizationId && !tenantsLoaded && !loading) {
+      loadTenants();
     }
+  }, [isOpen, organizationId, tenantsLoaded, loading]);
 
-    let cancelled = false;
-    
-    const loadTenants = async () => {
-      console.log('[PropagationModal] loadTenants starting');
-      setLoading(true);
-      setError(null);
+  const loadTenants = async () => {
+    if (!organizationId) return;
 
-      try {
-        console.log('[PropagationModal] Calling getOrganizationTenants for:', organizationId);
-        const organizationTenants = await propagationService.getOrganizationTenants(organizationId);
-        console.log('[PropagationModal] Got tenants:', organizationTenants?.length || 0);
-        if (cancelled) return;
-        // Filter out current tenant
-        const otherTenants = organizationTenants.filter(tenant => tenant.id !== currentTenantId);
-        setTenants(otherTenants);
-      } catch (error) {
-        console.error('[PropagationModal] loadTenants error:', error);
-        if (cancelled) return;
-        setError(error instanceof Error ? error.message : 'Failed to load locations');
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-          setTenantsLoaded(true);
-        }
-      }
-    };
+    setLoading(true);
+    setError(null);
 
-    loadTenants();
+    try {
+      const organizationTenants = await propagationService.getOrganizationTenants(organizationId);
+      // Filter out current tenant
+      const otherTenants = organizationTenants.filter(tenant => tenant.id !== currentTenantId);
+      setTenants(otherTenants);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to load locations');
+    } finally {
+      setLoading(false);
+      setTenantsLoaded(true);
+    }
+  };
 
-    return () => {
-      console.log('[PropagationModal] useEffect cleanup');
-      cancelled = true;
-    };
-  }, [isOpen, organizationId, tenantsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Handle propagation
+  // Handle bulk propagation
   const handlePropagate = async () => {
-    if (!organizationId || selectedTenantIds.length === 0) return;
+    if (!organizationId || selectedTenantIds.length === 0 || itemIds.length === 0) return;
 
     setPropagating(true);
     setError(null);
     setResult(null);
 
     try {
-      const request: PropagationRequest = {
-        sourceItemId: itemId,
-        sourceTenantId: currentTenantId,
-        targetTenantIds: selectedTenantIds,
-        mode
-      };
+      const response = await fetch(`/api/organizations/${organizationId}/items/propagate-bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceItemIds: itemIds,
+          targetTenantIds: selectedTenantIds,
+          overrides: { mode },
+        }),
+      });
 
-      const propagationResult = await propagationService.propagateItem(organizationId, request);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to propagate items');
+      }
+
+      const propagationResult = await response.json();
       setResult(propagationResult);
 
       if (propagationResult.summary.created > 0 || propagationResult.summary.updated > 0) {
         onSuccess?.();
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to propagate item');
+      setError(error instanceof Error ? error.message : 'Failed to propagate items');
     } finally {
       setPropagating(false);
     }
@@ -119,17 +122,43 @@ export default function PropagationModal({
     onClose();
   };
 
+  // Select/deselect all tenants
+  const toggleAllTenants = () => {
+    if (selectedTenantIds.length === tenants.length) {
+      setSelectedTenantIds([]);
+    } else {
+      setSelectedTenantIds(tenants.map(t => t.id));
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Propagate Item to Other Locations"
-      description={`Copy "${itemName}" to other locations in your organization`}
+      title={`Propagate ${itemIds.length} Items to Other Locations`}
+      description="Copy selected items to other locations in your organization"
       size="lg"
     >
       <div className="space-y-6">
+        {/* Items Summary */}
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+          <p className="text-sm text-blue-700 dark:text-blue-300">
+            <strong>{itemIds.length} item(s)</strong> selected for propagation
+          </p>
+          {itemNames.length <= 5 && (
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+              {itemNames.join(', ')}
+            </p>
+          )}
+          {itemNames.length > 5 && (
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+              {itemNames.slice(0, 3).join(', ')} and {itemNames.length - 3} more...
+            </p>
+          )}
+        </div>
+
         {/* Mode Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -162,9 +191,16 @@ export default function PropagationModal({
 
         {/* Tenant Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Select Locations ({selectedTenantIds.length} selected)
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Select Locations ({selectedTenantIds.length} selected)
+            </label>
+            {tenants.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={toggleAllTenants}>
+                {selectedTenantIds.length === tenants.length ? 'Deselect All' : 'Select All'}
+              </Button>
+            )}
+          </div>
           
           {loading ? (
             <div className="text-center py-8">
@@ -217,19 +253,19 @@ export default function PropagationModal({
 
         {/* Success Display */}
         {result && (
-          <Alert variant="success" title="Propagation Complete!">
+          <Alert variant="success" title="Bulk Propagation Complete!">
             <div className="space-y-1">
               {result.summary.created > 0 && (
-                <p>✅ Created: {result.summary.created} location{result.summary.created !== 1 ? 's' : ''}</p>
+                <p>✅ Created: {result.summary.created} item(s) across locations</p>
               )}
               {result.summary.updated > 0 && (
-                <p>✅ Updated: {result.summary.updated} location{result.summary.updated !== 1 ? 's' : ''}</p>
+                <p>✅ Updated: {result.summary.updated} item(s) across locations</p>
               )}
               {result.summary.failed > 0 && (
-                <p>❌ Failed: {result.summary.failed} location{result.summary.failed !== 1 ? 's' : ''}</p>
+                <p>❌ Failed: {result.summary.failed} operation(s)</p>
               )}
               {result.summary.skipped > 0 && (
-                <p>⏭️ Skipped: {result.summary.skipped} location{result.summary.skipped !== 1 ? 's' : ''}</p>
+                <p>⏭️ Skipped: {result.summary.skipped} item(s)</p>
               )}
             </div>
           </Alert>
@@ -242,10 +278,10 @@ export default function PropagationModal({
           </Button>
           <Button
             onClick={handlePropagate}
-            disabled={propagating || selectedTenantIds.length === 0}
+            disabled={propagating || selectedTenantIds.length === 0 || itemIds.length === 0}
             loading={propagating}
           >
-            {propagating ? 'Propagating...' : `Propagate to ${selectedTenantIds.length} Location${selectedTenantIds.length !== 1 ? 's' : ''}`}
+            {propagating ? 'Propagating...' : `Propagate ${itemIds.length} Item${itemIds.length !== 1 ? 's' : ''} to ${selectedTenantIds.length} Location${selectedTenantIds.length !== 1 ? 's' : ''}`}
           </Button>
         </div>
       </div>

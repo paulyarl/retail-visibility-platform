@@ -112,24 +112,68 @@ class CacheManager {
   }
 
   private async initIndexedDB(): Promise<void> {
+    if (!this.indexedDBSupported) return;
+
     try {
-      this.db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(this.dbName, 1);
+      // Always try to open with a higher version to trigger onupgradeneeded
+      const version = 1; // Base version
+      const request = indexedDB.open(this.dbName, version);
 
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
+      request.onerror = () => {
+        console.warn('[CacheManager] IndexedDB open failed, falling back to memory only');
+        this.indexedDBSupported = false;
+      };
 
-        request.onupgradeneeded = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result;
-          if (!db.objectStoreNames.contains(this.storeName)) {
-            db.createObjectStore(this.storeName);
-          }
-        };
-      });
+      request.onsuccess = () => {
+        this.db = request.result;
+        
+        // Double-check that our store exists
+        if (!this.db.objectStoreNames.contains(this.storeName)) {
+          console.warn(`[CacheManager] Store '${this.storeName}' missing after initialization, attempting to recreate`);
+          // Close current connection and reopen with higher version
+          this.db.close();
+          this.initIndexedDBWithVersion(version + 1);
+        }
+      };
 
-//      console.log('[CacheManager] IndexedDB initialized successfully');
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          console.log(`[CacheManager] Creating store '${this.storeName}' in database '${this.dbName}'`);
+          db.createObjectStore(this.storeName);
+        }
+      };
     } catch (error) {
       console.warn('[CacheManager] IndexedDB initialization failed, falling back to memory only:', error);
+      this.indexedDBSupported = false;
+    }
+  }
+
+  private async initIndexedDBWithVersion(version: number): Promise<void> {
+    if (!this.indexedDBSupported) return;
+
+    try {
+      const request = indexedDB.open(this.dbName, version);
+
+      request.onerror = () => {
+        console.warn('[CacheManager] IndexedDB version upgrade failed');
+        this.indexedDBSupported = false;
+      };
+
+      request.onsuccess = () => {
+        this.db = request.result;
+        console.log(`[CacheManager] Successfully upgraded database to version ${version}`);
+      };
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          console.log(`[CacheManager] Creating store '${this.storeName}' in database version ${version}`);
+          db.createObjectStore(this.storeName);
+        }
+      };
+    } catch (error) {
+      console.warn('[CacheManager] IndexedDB version upgrade failed:', error);
       this.indexedDBSupported = false;
     }
   }
@@ -176,6 +220,12 @@ class CacheManager {
     if (!this.db || !this.indexedDBSupported) return null;
 
     try {
+      // Check if the store exists before trying to access it
+      if (!this.db.objectStoreNames.contains(this.storeName)) {
+        console.warn(`[CacheManager] Store '${this.storeName}' not found in database, falling back to memory`);
+        return null;
+      }
+
       return await new Promise((resolve, reject) => {
         const transaction = this.db!.transaction([this.storeName], 'readonly');
         const store = transaction.objectStore(this.storeName);
@@ -201,6 +251,12 @@ class CacheManager {
     if (!this.db || !this.indexedDBSupported) return;
 
     try {
+      // Check if the store exists before trying to access it
+      if (!this.db.objectStoreNames.contains(this.storeName)) {
+        console.warn(`[CacheManager] Store '${this.storeName}' not found in database, skipping IndexedDB write`);
+        return;
+      }
+
       await new Promise<void>((resolve, reject) => {
         const transaction = this.db!.transaction([this.storeName], 'readwrite');
         const store = transaction.objectStore(this.storeName);

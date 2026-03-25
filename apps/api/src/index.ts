@@ -2668,12 +2668,23 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
     // Build where clause for items query
     const where: any = {
       tenant_id,
-      item_status: { not: 'trashed' } // Exclude trashed items by default
     };
 
     // Apply status filter
+    // Note: 'syncing' is a computed status meaning active + public, not a Prisma enum value
+    // Note: 'trashed' items are excluded by default unless explicitly requested
     if (statusFilter && statusFilter !== 'all') {
-      where.item_status = statusFilter;
+      if (statusFilter === 'syncing') {
+        // Syncing = active items that are public (visible to sync services)
+        where.item_status = 'active';
+        where.visibility = 'public';
+      } else {
+        // For 'trashed' or any other status, filter directly
+        where.item_status = statusFilter;
+      }
+    } else {
+      // Default: exclude trashed items unless explicitly requested
+      where.item_status = { not: 'trashed' };
     }
 
     // Apply visibility filter

@@ -66,7 +66,7 @@ export interface ItemsCompleteParams {
   page?: number;
   limit?: number;
   q?: string;
-  status?: 'all' | 'active' | 'inactive' | 'syncing' | 'draft' | 'archived';
+  status?: 'all' | 'active' | 'inactive' | 'syncing' | 'draft' | 'archived' | 'trashed';
   visibility?: 'all' | 'public' | 'private';
   categoryId?: string;
   categoryFilter?: 'assigned' | 'unassigned';

@@ -8,10 +8,9 @@ const router = Router();
 
 /**
  * GET /api/platform/dashboard
- * Get complete platform dashboard data
- * Requires platform admin or support role
+ * Get complete platform dashboard data for any authenticated user
  */
-router.get('/dashboard', authenticateToken, authorize(user_role.PLATFORM_ADMIN, user_role.ADMIN, user_role.PLATFORM_SUPPORT), async (req: Request, res: Response) => {
+router.get('/dashboard', authenticateToken, async (req: Request, res: Response) => {
   try {
     console.log('[PLATFORM DASHBOARD] Fetching complete dashboard data');
     
@@ -38,9 +37,9 @@ router.get('/dashboard', authenticateToken, authorize(user_role.PLATFORM_ADMIN, 
 
 /**
  * GET /api/platform/stats
- * Get platform-wide statistics only
+ * Get platform-wide statistics for any authenticated user
  */
-router.get('/stats', authenticateToken, authorize(user_role.PLATFORM_ADMIN, user_role.ADMIN, user_role.PLATFORM_SUPPORT, user_role.PLATFORM_VIEWER), async (req: Request, res: Response) => {
+router.get('/stats', authenticateToken, async (req: Request, res: Response) => {
   try {
     console.log('[PLATFORM STATS] Fetching platform statistics');
     
@@ -64,9 +63,9 @@ router.get('/stats', authenticateToken, authorize(user_role.PLATFORM_ADMIN, user
 
 /**
  * GET /api/platform/tenants/top
- * Get top performing tenants
+ * Get top performing tenants for any authenticated user
  */
-router.get('/tenants/top', authenticateToken, authorize(user_role.PLATFORM_ADMIN, user_role.ADMIN, user_role.PLATFORM_SUPPORT, user_role.PLATFORM_VIEWER), async (req: Request, res: Response) => {
+router.get('/tenants/top', authenticateToken, async (req: Request, res: Response) => {
   try {
     console.log('[PLATFORM TENANTS] Fetching top tenants');
     
@@ -90,9 +89,9 @@ router.get('/tenants/top', authenticateToken, authorize(user_role.PLATFORM_ADMIN
 
 /**
  * GET /api/platform/activity
- * Get recent platform activity
+ * Get recent platform activity for any authenticated user
  */
-router.get('/activity', authenticateToken, authorize(user_role.PLATFORM_ADMIN, user_role.ADMIN, user_role.PLATFORM_SUPPORT, user_role.PLATFORM_VIEWER), async (req: Request, res: Response) => {
+router.get('/activity', authenticateToken, async (req: Request, res: Response) => {
   try {
     console.log('[PLATFORM ACTIVITY] Fetching recent activity');
     

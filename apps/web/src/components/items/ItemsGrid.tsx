@@ -14,6 +14,8 @@ interface ItemsGridProps {
   onVisibilityToggle?: (item: Item) => void;
   onStatusToggle?: (item: Item) => void;
   onStockUpdate?: (itemId: string, newStock: number) => Promise<void>;
+  onRestore?: (item: Item) => void;
+  onPurge?: (item: Item) => void;
   tenantId?: string;
   bulkMode?: boolean;
   selectedItems?: Set<string>;
@@ -38,6 +40,8 @@ export default function ItemsGrid({
   onVisibilityToggle,
   onStatusToggle,
   onStockUpdate,
+  onRestore,
+  onPurge,
   tenantId,
   bulkMode = false,
   selectedItems = new Set(),
@@ -77,6 +81,8 @@ export default function ItemsGrid({
           onVisibilityToggle={onVisibilityToggle}
           onStatusToggle={onStatusToggle}
           onStockUpdate={onStockUpdate}
+          onRestore={onRestore}
+          onPurge={onPurge}
           tenantId={tenantId}
           bulkMode={bulkMode}
           selectedItems={selectedItems}

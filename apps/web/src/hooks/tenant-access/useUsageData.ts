@@ -21,6 +21,19 @@ export function useUsageData(tenantId: string | null): UsageDataResult {
   // Use consolidated data instead of separate API calls
   const { usage: consolidatedUsage, loading, error, refresh } = useTenantComplete(tenantId);
 
+  // Helper function to create standardized usage metrics (defined before use)
+  const createUsageMetric = (current: number, limit: number | null): UsageMetric => {
+    const isUnlimited = limit === null || limit === undefined;
+    const percent = isUnlimited ? 0 : Math.round((current / limit) * 100);
+    
+    return {
+      current,
+      limit,
+      percent,
+      isUnlimited
+    };
+  };
+
   // Transform consolidated usage data to expected format
   const usage: TenantUsage | null = useMemo(() => {
     if (!consolidatedUsage) return null;
@@ -33,19 +46,6 @@ export function useUsageData(tenantId: string | null): UsageDataResult {
       storageGB: createUsageMetric(consolidatedUsage.storageGB, null) // TODO: Get limit from tier data
     };
   }, [consolidatedUsage]);
-
-  // Helper function to create standardized usage metrics
-  const createUsageMetric = (current: number, limit: number | null): UsageMetric => {
-    const isUnlimited = limit === null || limit === undefined;
-    const percent = isUnlimited ? 0 : Math.round((current / limit) * 100);
-    
-    return {
-      current,
-      limit,
-      percent,
-      isUnlimited
-    };
-  };
 
   // Check if a specific limit type is reached
   const isLimitReached = (limitType: keyof TenantUsage): boolean => {

@@ -82,7 +82,7 @@ export const TIER_FEATURES = {
   ],
   chain_professional: [
     'quick_start_wizard',
-    'product_scanning',
+    'barcode_scan',           // Canonically named 'barcode_scan' (not 'product_scanning')
     'gbp_integration',
     'custom_branding',
     'qr_codes_1024',

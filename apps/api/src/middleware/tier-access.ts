@@ -19,42 +19,47 @@ import { getMaintenanceState } from '../utils/subscription-status';
 // LEGACY: Define features available at each tier (cumulative)
 // NOTE: These are now loaded from database via TierService, but kept as fallback
 // NOTE: 'trial' is not a tier - it's a time-limited status that can apply to any tier
+// NOTE: ALL FEATURES ARE COMMENTED OUT - they will be loaded from database via TierService
 export const TIER_FEATURES = {
   google_only: [
-    'manual_barcode',
-    'google_shopping',
-    'bulk_import',
-    'categories',
-    'google_merchant_center',
-    'basic_product_pages',
-    'qr_codes_512',
-    'performance_analytics',
-    'quick_start_wizard',
-    'square_sync',
-    'clover_sync',
+    // 'manual_barcode',
+    // 'google_shopping',
+    // 'bulk_import',
+    // 'categories',
+    // 'google_merchant_center',
+    // 'basic_product_pages',
+    // 'qr_codes_512',
+    // 'performance_analytics',
+    // 'quick_start_wizard',
+    // 'square_sync',
+    // 'clover_sync',
+    // 'category_quick_start',      // Generate starter categories (Starter+)
   ],
   starter: [
-    'manual_barcode',
-    'barcode_scan',
-    'storefront',
-    'product_search',
-    'mobile_responsive',
-    'enhanced_seo',
-    'basic_categories',
+    // 'manual_barcode',
+    // 'barcode_scan',
+    // 'storefront',
+    // 'product_search',
+    // 'mobile_responsive',
+    // 'enhanced_seo',
+    // 'basic_categories',
+    // 'category_quick_start',      // Generate starter categories (Starter+)
   ],
   professional: [
     // ⚠️ CRITICAL REVENUE-PROTECTING FEATURES
-    'quick_start_wizard',       // Saves 400+ hours, worth $10K+
-    'barcode_scan',          // Worth $375/mo in labor
-    'gbp_integration',           // Worth $200-300/mo
-    'custom_branding',
-    'business_logo',
-    'qr_codes_1024',
-    'image_gallery_5',
-    'interactive_maps',
-    'privacy_mode',
-    'custom_marketing_copy',
-    'priority_support',
+    // 'category_quick_start',      // Generate starter categories (Starter+)
+    // 'quick_start_wizard',       // Saves 400+ hours, worth $10K+
+    // 'quick_start_wizard_full',  // Full quick start access
+    // 'barcode_scan',          // Worth $375/mo in labor
+    // 'gbp_integration',           // Worth $200-300/mo
+    // 'custom_branding',
+    // 'business_logo',
+    // 'qr_codes_1024',
+    // 'image_gallery_5',
+    // 'interactive_maps',
+    // 'privacy_mode',
+    // 'custom_marketing_copy',
+    // 'priority_support',
   ],
   enterprise: [
     'unlimited_skus',
@@ -67,6 +72,7 @@ export const TIER_FEATURES = {
     'dedicated_account_manager',
     'sla_guarantee',
     'custom_integrations',
+    'category_quick_start',      // Generate starter categories (Starter+)
   ],
   organization: [
     // Organization-specific features (franchise model)
@@ -85,6 +91,7 @@ export const TIER_FEATURES = {
     'shared_sku_pool',
     'centralized_control',
     'api_access',
+    'category_quick_start',      // Generate starter categories (Starter+)
   ],
   // Chain tiers (similar to individual but multi-location)
   chain_starter: [
@@ -93,6 +100,7 @@ export const TIER_FEATURES = {
     'mobile_responsive',
     'enhanced_seo',
     'multi_location_5',
+    'category_quick_start',      // Generate starter categories (Starter+)
   ],
   chain_professional: [
     'quick_start_wizard',
@@ -103,6 +111,7 @@ export const TIER_FEATURES = {
     'image_gallery_5',
     'multi_location_25',
     'basic_propagation',
+    'category_quick_start',      // Generate starter categories (Starter+)
   ],
   chain_enterprise: [
     'unlimited_skus',
@@ -114,6 +123,7 @@ export const TIER_FEATURES = {
     'unlimited_locations',
     'advanced_propagation',
     'dedicated_account_manager',
+    'category_quick_start',      // Generate starter categories (Starter+)
   ],
 } as const;
 
@@ -132,6 +142,10 @@ const TIER_HIERARCHY: Record<string, string[]> = {
 
 // Feature to minimum required tier mapping
 const FEATURE_TIER_MAP: Record<string, string> = {
+  // Starter tier features
+  category_quick_start: 'starter',
+  category_quick_start_professional: 'professional',
+  
   // Professional tier features (CRITICAL)
   quick_start_wizard: 'professional',
   quick_start_wizard_full: 'professional', // Database uses this key

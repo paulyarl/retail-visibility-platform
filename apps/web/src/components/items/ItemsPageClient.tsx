@@ -18,10 +18,12 @@ import ItemPhotoGallery from "@/components/items/ItemPhotoGallery";
 import CategoryAssignmentModal from "@/components/items/CategoryAssignmentModal";
 import BulkUploadModal from "@/components/items/BulkUploadModal";
 import PropagationModal from '@/components/items/PropagationModal';
+import BulkPropagationModal from '@/components/items/BulkPropagationModal';
 import QuickStartEmptyState from "@/components/items/QuickStartEmptyState";
 import ItemsGuide from "@/components/items/ItemsGuide";
 import { Item } from "@/services/itemsDataService";
 import { itemsService } from '@/services/ItemsService';
+import { itemsSingletonService } from '@/services/ItemsSingletonService';
 
 interface ItemsPageClientProps {
   tenantId: string;
@@ -135,6 +137,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
 
   const [propagateItem, setPropagateItem] = useState<Item | null>(null);
   const [showPropagateModal, setShowPropagateModal] = useState(false);
+  const [showBulkPropagateModal, setShowBulkPropagateModal] = useState(false);
 
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkActionsExpanded, setBulkActionsExpanded] = useState(false);
@@ -283,6 +286,34 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
           await deleteItem(item.id);
         } catch (error) {
           console.error("[ItemsPageClient] Delete failed:", error);
+        }
+      },
+    });
+  };
+
+  const handleRestore = async (item: Item) => {
+    try {
+      await itemsSingletonService.restoreItem(item.id);
+      refresh();
+    } catch (error) {
+      console.error('[ItemsPageClient] Restore failed:', error);
+      alert(error instanceof Error ? error.message : 'Failed to restore item');
+    }
+  };
+
+  const handlePurge = (item: Item) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Permanently Delete Item",
+      message: `Are you sure you want to permanently delete "${item.name}"? This action CANNOT be undone.`,
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          await itemsSingletonService.purgeItem(item.id);
+          refresh();
+        } catch (error) {
+          console.error('[ItemsPageClient] Purge failed:', error);
+          alert(error instanceof Error ? error.message : 'Failed to purge item');
         }
       },
     });
@@ -545,6 +576,13 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
             onClick={() => setStatus("syncing")}
           >
             Syncing
+          </Button>
+          <Button
+            size="sm"
+            variant={status === "trashed" ? "danger" : "ghost"}
+            onClick={() => setStatus("trashed")}
+          >
+            Trashed
           </Button>
 
           <Button
@@ -924,54 +962,145 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                     )}
                   </div>
                   
-                  {/* Propagate (if applicable) */}
+                  {/* Propagate - opens bulk propagation modal */}
                   <Button
                     size="sm"
                     variant="secondary"
                     onClick={() => {
-                      alert('Propagate feature coming soon! This will sync selected items across locations.');
+                      // Check if user has organization access
+                      if (!hasOrganizationAccess) {
+                        alert('Propagation is only available for organization members. Upgrade to an organization plan to enable multi-location management.');
+                        return;
+                      }
+                      if (!organizationData) {
+                        alert('Organization data is still loading. Please try again in a moment.');
+                        return;
+                      }
+                      if (organizationData.tenants.length <= 1) {
+                        alert('Propagation requires multiple locations. Your organization currently has only one location.');
+                        return;
+                      }
+                      setShowBulkPropagateModal(true);
                     }}
+                    disabled={!hasOrganizationAccess || !organizationData || organizationData.tenants.length <= 1}
                     className="font-semibold"
+                    title={
+                      !hasOrganizationAccess
+                        ? 'Propagation requires organization membership'
+                        : !organizationData
+                        ? 'Loading organization data...'
+                        : organizationData?.tenants.length <= 1
+                        ? 'Propagation requires multiple locations'
+                        : 'Propagate selected items to other locations'
+                    }
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                     Propagate
+                    {(!hasOrganizationAccess || !organizationData || (organizationData.tenants?.length ?? 0) <= 1) && (
+                      <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-semibold">
+                        {!hasOrganizationAccess ? 'ORG' : (organizationData?.tenants?.length ?? 0) <= 1 ? '1 LOC' : 'LOAD'}
+                      </span>
+                    )}
                   </Button>
                   
-                  {/* Trash */}
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      setConfirmDialog({
-                        isOpen: true,
-                        title: "Move to Trash",
-                        message: `Are you sure you want to move ${selectedItems.size} item(s) to trash? You can restore them later from the trash bin.`,
-                        variant: "warning",
-                        onConfirm: async () => {
+                  {/* Trash / Restore / Purge - conditional based on current filter */}
+                  {status !== 'trashed' ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setConfirmDialog({
+                          isOpen: true,
+                          title: "Move to Trash",
+                          message: `Are you sure you want to move ${selectedItems.size} item(s) to trash? You can restore them later from the trash bin.`,
+                          variant: "warning",
+                          onConfirm: async () => {
+                            try {
+                              const itemIds = Array.from(selectedItems);
+                              console.log('[Bulk Trash] Moving items to trash:', itemIds);
+                              await Promise.all(itemIds.map(id => updateItem(id, { itemStatus: 'trashed' })));
+                              console.log('[Bulk Trash] Successfully moved items to trash');
+                              clearSelection();
+                              refresh();
+                              alert(`✅ Successfully moved ${itemIds.length} item(s) to trash`);
+                            } catch (error) {
+                              console.error('[Bulk Trash] Error moving items to trash:', error);
+                              alert(`❌ Error moving items to trash: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                            }
+                          },
+                        });
+                      }}
+                      className="font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    >
+                      <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Trash
+                    </Button>
+                  ) : (
+                    <>
+                      {/* Restore - only shown when viewing trashed items */}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={async () => {
                           try {
                             const itemIds = Array.from(selectedItems);
-                            console.log('[Bulk Trash] Moving items to trash:', itemIds);
-                            await Promise.all(itemIds.map(id => updateItem(id, { itemStatus: 'trashed' })));
-                            console.log('[Bulk Trash] Successfully moved items to trash');
+                            console.log('[Bulk Restore] Restoring items:', itemIds);
+                            await Promise.all(itemIds.map(id => updateItem(id, { itemStatus: 'active' })));
+                            console.log('[Bulk Restore] Successfully restored items');
                             clearSelection();
                             refresh();
-                            alert(`✅ Successfully moved ${itemIds.length} item(s) to trash`);
+                            alert(`✅ Successfully restored ${itemIds.length} item(s)`);
                           } catch (error) {
-                            console.error('[Bulk Trash] Error moving items to trash:', error);
-                            alert(`❌ Error moving items to trash: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                            console.error('[Bulk Restore] Error restoring items:', error);
+                            alert(`❌ Error restoring items: ${error instanceof Error ? error.message : 'Unknown error'}`);
                           }
-                        },
-                      });
-                    }}
-                    className="font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                  >
-                    <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Trash
-                  </Button>
+                        }}
+                        className="font-semibold text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20"
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Restore
+                      </Button>
+                      {/* Purge - only shown when viewing trashed items */}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setConfirmDialog({
+                            isOpen: true,
+                            title: "Permanently Delete Items",
+                            message: `Are you sure you want to permanently delete ${selectedItems.size} item(s)? This action CANNOT be undone.`,
+                            variant: "danger",
+                            onConfirm: async () => {
+                              try {
+                                const itemIds = Array.from(selectedItems);
+                                console.log('[Bulk Purge] Purging items:', itemIds);
+                                await itemsSingletonService.emptyTrash(tenantId, itemIds);
+                                console.log('[Bulk Purge] Successfully purged items');
+                                clearSelection();
+                                refresh();
+                                alert(`✅ Successfully purged ${itemIds.length} item(s)`);
+                              } catch (error) {
+                                console.error('[Bulk Purge] Error purging items:', error);
+                                alert(`❌ Error purging items: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                              }
+                            },
+                          });
+                        }}
+                        className="font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Purge
+                      </Button>
+                    </>
+                  )}
                 </div>
                   )}
                   </div>
@@ -1014,6 +1143,8 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                 onVisibilityToggle={handleVisibilityToggle}
                 onStatusToggle={handleStatusToggle}
                 onStockUpdate={handleStockUpdate}
+                onRestore={handleRestore}
+                onPurge={handlePurge}
                 tenantId={tenantId}
                 bulkMode={bulkMode}
                 selectedItems={selectedItems}
@@ -1034,6 +1165,8 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                 onVisibilityToggle={handleVisibilityToggle}
                 onStatusToggle={handleStatusToggle}
                 onStockUpdate={handleStockUpdate}
+                onRestore={handleRestore}
+                onPurge={handlePurge}
                 tenantId={tenantId}
                 bulkMode={bulkMode}
                 selectedItems={selectedItems}
@@ -1158,6 +1291,22 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
           organizationId={organizationData.id}
           onSuccess={() => {
             console.log('[ItemsPageClient] Item propagated successfully');
+            refresh();
+          }}
+        />
+      )}
+
+      {showBulkPropagateModal && organizationData && (
+        <BulkPropagationModal
+          isOpen={showBulkPropagateModal}
+          onClose={() => setShowBulkPropagateModal(false)}
+          itemIds={Array.from(selectedItems)}
+          itemNames={items.filter(item => selectedItems.has(item.id)).map(item => item.name)}
+          currentTenantId={tenantId}
+          organizationId={organizationData.id}
+          onSuccess={() => {
+            console.log('[ItemsPageClient] Bulk propagation completed');
+            clearSelection();
             refresh();
           }}
         />

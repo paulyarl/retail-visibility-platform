@@ -45,6 +45,8 @@ interface EnhancedProductCardProps {
   onVisibilityToggle?: (item: Item) => void;
   onStatusToggle?: (item: Item) => void;
   onStockUpdate?: (itemId: string, newStock: number) => Promise<void>;
+  onRestore?: (item: Item) => void;
+  onPurge?: (item: Item) => void;
   tenantId?: string;
   bulkMode?: boolean;
   selectedItems?: Set<string>;
@@ -74,6 +76,8 @@ export default function EnhancedProductCard({
   onVisibilityToggle,
   onStatusToggle,
   onStockUpdate,
+  onRestore,
+  onPurge,
   tenantId,
   bulkMode = false,
   selectedItems = new Set(),
@@ -114,6 +118,13 @@ export default function EnhancedProductCard({
           icon: Clock,
           label: 'Syncing',
           color: 'text-blue-600 bg-blue-50 border-blue-200'
+        };
+      case 'trashed':
+        return {
+          variant: 'danger' as const,
+          icon: Trash2,
+          label: 'Trashed',
+          color: 'text-red-600 bg-red-50 border-red-200'
         };
       default:
         return {
@@ -423,18 +434,52 @@ export default function EnhancedProductCard({
 
                   <hr className="my-1 border-gray-200 dark:border-gray-700" />
 
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      onDelete(item);
-                      setShowMoreActions(false);
-                    }}
-                    className="w-full justify-start text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-3 h-3 mr-2" />
-                    Delete
-                  </Button>
+                  {/* Show Restore/Purge for trashed items, Delete for others */}
+                  {(item.itemStatus || item.status) === 'trashed' ? (
+                    <>
+                      {onRestore && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            onRestore(item);
+                            setShowMoreActions(false);
+                          }}
+                          className="w-full justify-start text-xs text-green-600 hover:text-green-700 hover:bg-green-50"
+                        >
+                          <CheckCircle className="w-3 h-3 mr-2" />
+                          Restore
+                        </Button>
+                      )}
+                      {onPurge && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            onPurge(item);
+                            setShowMoreActions(false);
+                          }}
+                          className="w-full justify-start text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-3 h-3 mr-2" />
+                          Purge Permanently
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        onDelete(item);
+                        setShowMoreActions(false);
+                      }}
+                      className="w-full justify-start text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-3 h-3 mr-2" />
+                      Delete
+                    </Button>
+                  )}
                 </div>
               </div>
             )}

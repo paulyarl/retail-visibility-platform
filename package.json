@@ -25,6 +25,7 @@
     "dev:vercel-web": "doppler run --config local -- vercel dev --debug",
     "buildapi": "cd apps/api && pnpm build",
     "buildmain": "pnpm build",
+    "checkapi-type": "npx tsc --noEmit -p apps/api/tsconfig.json 2>&1",
     "checkapi": "npx tsc --noEmit --project apps/api 2>&1",
     "checkweb": "npx tsc --noEmit --project apps/web 2>&1",
     "prisma:generate": "npm run -w @rvp/api prisma:generate",
