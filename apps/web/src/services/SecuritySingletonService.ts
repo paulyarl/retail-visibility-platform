@@ -6,7 +6,9 @@
  */
 
 import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { RequestType } from '@/providers/base/FlexibleApiSingleton';
 import { LoginSession, SecurityAlert, ApiResponse, MFAStatus, MFASetupData, MFAVerificationResult, MFASetupFormData } from '@/types/security';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 class SecuritySingletonService extends AuthenticatedApiSingleton {
   private static instance: SecuritySingletonService;
@@ -30,12 +32,19 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
    */
   async getActiveSessions(bypassCache = false): Promise<LoginSession[]> {
     try {
-      const cacheOptions = bypassCache ? { ttl: 0, forceRefresh: true } : {};
+      const cacheOptions = bypassCache ? { 
+        ttl: 0, 
+        forceRefresh: true,
+        context: AppContext.USER,
+        isolation: CacheIsolation.USER,
+        requestType: RequestType.AUTHENTICATED 
+      } : {};
       const result = await this.makeDefaultRequest<any>(
         '/api/auth/sessions',
         {},
         bypassCache ? undefined : 'security-active-sessions',
-        bypassCache ? 0 : undefined
+        bypassCache ? 0 : undefined,
+       cacheOptions
       );
 
       if (!result.success) {

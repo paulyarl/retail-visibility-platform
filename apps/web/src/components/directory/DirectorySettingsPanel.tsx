@@ -32,14 +32,6 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
     }
   }, [listing]);
 
-  // Show success message when listing becomes published
-  useEffect(() => {
-    if (listing?.isPublished && !saveMessage.includes('success')) {
-      setSaveMessage('Listing published successfully!');
-      setTimeout(() => setSaveMessage(''), 3000);
-    }
-  }, [listing?.isPublished]);
-
   const handleSave = async () => {
     try {
       setIsSaving(true);
@@ -67,10 +59,32 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
       return;
     }
 
-    setIsSaving(true);
-    setSaveMessage('');
-    await publish();
-    setIsSaving(false);
+    try {
+      setIsSaving(true);
+      setSaveMessage('');
+      
+      // Store the initial published state
+      const wasPublished = listing?.isPublished || false;
+      
+      await publish();
+      
+      // Check if the listing actually became published
+      // This is more reliable than checking the error state
+      const isNowPublished = listing?.isPublished || false;
+      
+      if (!wasPublished && isNowPublished) {
+        setSaveMessage('Listing published successfully!');
+        setTimeout(() => setSaveMessage(''), 3000);
+      }
+    } catch (err: any) {
+      // This catch block is only for unexpected errors
+      // Validation errors are handled by the hook and displayed via the error state
+      const errorMessage = err?.message || 'Failed to publish listing';
+      setSaveMessage(errorMessage);
+      setTimeout(() => setSaveMessage(''), 5000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleUnpublish = async () => {
@@ -108,13 +122,8 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-        <p className="text-red-800 dark:text-red-200">{error}</p>
-      </div>
-    );
-  }
+  // Don't return early for error - let the page render with error message inline
+  // Only return early if there's no listing data at all
 
   if (!listing) {
     return (
@@ -132,44 +141,6 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
 
   return (
     <div className="space-y-8">
-      {/* Publication Requirements Alert */}
-      {!canPublish && !listing.isPublished && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 rounded-r-lg">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3 flex-1">
-              <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                Complete these requirements to publish your listing
-              </h3>
-              <div className="mt-2 text-sm text-amber-700 dark:text-amber-300">
-                <ul className="list-disc list-inside space-y-1">
-                  {missingBusinessName && (
-                    <li>
-                      <strong>Business Name:</strong> Add your business name in{' '}
-                      <a 
-                        href={`/t/${tenantId}/settings/profile`}
-                        className="underline hover:text-amber-900 dark:hover:text-amber-100"
-                      >
-                        Business Profile Settings
-                      </a>
-                    </li>
-                  )}
-                  {missingPrimaryCategory && (
-                    <li>
-                      <strong>Primary Category:</strong> Select a primary category below
-                    </li>
-                  )}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -333,6 +304,62 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
               </button>
             )}
           </div>
+
+          {/* Publication Requirements Alert */}
+          {(!canPublish && !listing.isPublished) || error ? (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4 rounded-r-lg mt-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3 flex-1">
+                  <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Complete these requirements to publish your listing
+                  </h3>
+                  <div className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                    <ul className="list-disc list-inside space-y-1">
+                      {missingBusinessName && (
+                        <li>
+                          <strong>Business Name:</strong> Add your business name in{' '}
+                          <a 
+                            href={`/t/${tenantId}/settings/tenant`}
+                            className="underline hover:text-amber-900 dark:hover:text-amber-100"
+                          >
+                            Business Profile Settings
+                          </a>
+                        </li>
+                      )}
+                      {missingPrimaryCategory && (
+                        <li>
+                          <strong>Primary Category:</strong> Select a primary category below
+                        </li>
+                      )}
+                      {error && error.includes('city') && (
+                        <li>
+                          <strong>City & State:</strong> Add your business location in{' '}
+                          <a 
+                            href={`/t/${tenantId}/settings/tenant`}
+                            className="underline hover:text-amber-900 dark:hover:text-amber-100"
+                          >
+                            Business Profile Settings
+                          </a>
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mt-3">
+              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            </div>
+          )}
 
           {saveMessage && (
             <p className={`text-sm ${saveMessage.includes('Failed') ? 'text-red-600' : 'text-green-600'}`}>

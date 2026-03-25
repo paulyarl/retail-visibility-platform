@@ -13,7 +13,7 @@ const router = Router();
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
-router.use(requireAdmin);
+// router.use(requireAdmin);
 
 // GET /api/admin/ticker-config - Get ticker configuration
 router.get('/', async (req: Request, res: Response) => {

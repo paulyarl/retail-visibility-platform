@@ -12,6 +12,7 @@ export interface UserProfileData {
   id: string;
   name: string;
   email: string;
+  picture?: string;
   role: UserRole;
   
   // Platform context
@@ -119,6 +120,7 @@ function createFallbackProfile(user: any): UserProfileData {
     id: user.id,
     name: displayName || user.email,
     email: user.email,
+    picture: user.picture,
     role: roleInfo,
     
     isPlatformAdmin,

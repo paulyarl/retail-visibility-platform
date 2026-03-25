@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Shield, Mail, Power, UserCheck, Loader2, AlertTriangle, CheckCircle, Clock, AlertCircle, Edit3, Save } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { adminUsersService } from '@/services/AdminUsersService';
@@ -17,7 +17,7 @@ interface UserStatusModalProps {
     email_verified: boolean;
     created_at: string;
     last_login_at?: string;
-  };
+  } | null;
   onSuccess?: (updatedUser?: { id: string; is_active: boolean; email_verified: boolean } | null) => void;
 }
 
@@ -37,14 +37,24 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
   const [success, setSuccess] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [editingEmail, setEditingEmail] = useState(false);
-  const [tempEmail, setTempEmail] = useState(user.email);
+  const [tempEmail, setTempEmail] = useState('');
   const [editingName, setEditingName] = useState(false);
-  const [tempFirstName, setTempFirstName] = useState(user.name?.split(' ')[0] || '');
-  const [tempLastName, setTempLastName] = useState(user.name?.split(' ').slice(1).join(' ') || '');
+  const [tempFirstName, setTempFirstName] = useState('');
+  const [tempLastName, setTempLastName] = useState('');
+
+  // Update state when user changes
+  useEffect(() => {
+    if (user) {
+      setTempEmail(user.email);
+      setTempFirstName(user.name?.split(' ')[0] || '');
+      setTempLastName(user.name?.split(' ').slice(1).join(' ') || '');
+    }
+  }, [user]);
 
   // Note: user prop is captured when modal opens, so status reflects state at that time
 
   const getCurrentStatus = () => {
+    if (!user) return 'pending';
     if (user.is_active && user.email_verified) return 'active';
     if (user.is_active && !user.email_verified) return 'active_unverified';
     if (!user.is_active && user.email_verified) return 'inactive';
@@ -60,6 +70,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
   ];
 
   const handleSaveEmail = async () => {
+    if (!user) return;
     if (tempEmail === user.email) {
       setEditingEmail(false);
       return;
@@ -94,11 +105,12 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
   };
 
   const handleCancelEdit = () => {
-    setTempEmail(user.email);
+    setTempEmail(user?.email || '');
     setEditingEmail(false);
   };
 
   const handleSaveName = async () => {
+    if (!user) return;
     const newFirstName = tempFirstName.trim();
     const newLastName = tempLastName.trim();
     const currentFirstName = user.name?.split(' ')[0] || '';
@@ -138,8 +150,8 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
   };
 
   const handleCancelEditName = () => {
-    setTempFirstName(user.name?.split(' ')[0] || '');
-    setTempLastName(user.name?.split(' ').slice(1).join(' ') || '');
+    setTempFirstName(user?.name?.split(' ')[0] || '');
+    setTempLastName(user?.name?.split(' ').slice(1).join(' ') || '');
     setEditingName(false);
   };
 
@@ -214,7 +226,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
         icon: <CheckCircle className="w-4 h-4" />,
         color: 'text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300',
         requiresConfirmation: true,
-        confirmationMessage: `Activate user ${user.email}? This will allow them to log in and access the platform.`,
+        confirmationMessage: `Activate user ${user?.email}? This will allow them to log in and access the platform.`,
       });
     } else if (status === 'active_unverified') {
       actions.push({
@@ -224,7 +236,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
         icon: <CheckCircle className="w-4 h-4" />,
         color: 'text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300',
         requiresConfirmation: true,
-        confirmationMessage: `Mark ${user.email}'s email as verified? This will remove the unverified status.`,
+        confirmationMessage: `Mark ${user?.email}'s email as verified? This will remove the unverified status.`,
       });
       actions.push({
         type: 'deactivate',
@@ -233,7 +245,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
         icon: <Power className="w-4 h-4" />,
         color: 'text-yellow-600 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300',
         requiresConfirmation: true,
-        confirmationMessage: `Deactivate user ${user.email}? They will no longer be able to log in.`,
+        confirmationMessage: `Deactivate user ${user?.email}? They will no longer be able to log in.`,
       });
     } else if (status === 'inactive') {
       actions.push({
@@ -243,7 +255,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
         icon: <Power className="w-4 h-4" />,
         color: 'text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300',
         requiresConfirmation: true,
-        confirmationMessage: `Reactivate user ${user.email}? They will be able to log in again.`,
+        confirmationMessage: `Reactivate user ${user?.email}? They will be able to log in again.`,
       });
       actions.push({
         type: 'mark_unverified',
@@ -252,7 +264,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
         icon: <AlertCircle className="w-4 h-4" />,
         color: 'text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300',
         requiresConfirmation: true,
-        confirmationMessage: `Mark ${user.email}'s email as unverified? They will need to verify their email to reactivate.`,
+        confirmationMessage: `Mark ${user?.email}'s email as unverified? They will need to verify their email to reactivate.`,
       });
     } else if (status === 'active') {
       actions.push({
@@ -262,7 +274,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
         icon: <Power className="w-4 h-4" />,
         color: 'text-yellow-600 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300',
         requiresConfirmation: true,
-        confirmationMessage: `Deactivate user ${user.email}? They will no longer be able to log in.`,
+        confirmationMessage: `Deactivate user ${user?.email}? They will no longer be able to log in.`,
       });
       actions.push({
         type: 'mark_unverified',
@@ -271,7 +283,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
         icon: <AlertCircle className="w-4 h-4" />,
         color: 'text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300',
         requiresConfirmation: true,
-        confirmationMessage: `Mark ${user.email}'s email as unverified? This will deactivate their account.`,
+        confirmationMessage: `Mark ${user?.email}'s email as unverified? This will deactivate their account.`,
       });
     }
 
@@ -279,6 +291,8 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
   };
 
   const handleAction = async (action: StatusAction) => {
+    if (!user) return;
+    
     if (action.requiresConfirmation) {
       const confirmed = window.confirm(action.confirmationMessage || `Are you sure you want to ${action.label.toLowerCase()} for ${user.email}?`);
       if (!confirmed) return;
@@ -369,7 +383,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
                 Manage User Status
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {user.email}
+                {user?.email}
               </p>
             </div>
           </div>
@@ -445,7 +459,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="text-gray-900 dark:text-white">
-                        {user.name || 'No name set'}
+                        {user?.name || 'No name set'}
                       </span>
                       <button
                         onClick={() => {
@@ -495,7 +509,7 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="text-gray-900 dark:text-white">
-                        {user.email}
+                        {user?.email}
                       </span>
                       <button
                         onClick={() => {
@@ -517,13 +531,13 @@ export default function UserStatusModal({ isOpen, onClose, user, onSuccess }: Us
                 <div>
                   <span className="text-gray-500 dark:text-gray-400">Created:</span>
                   <span className="text-gray-900 dark:text-white ml-2">
-                    {new Date(user.created_at).toLocaleDateString()}
+                    {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                   </span>
                 </div>
                 <div>
                   <span className="text-gray-500 dark:text-gray-400">Last Login:</span>
                   <span className="text-gray-900 dark:text-white ml-2">
-                    {user.last_login_at 
+                    {user?.last_login_at 
                       ? new Date(user.last_login_at).toLocaleDateString()
                       : 'Never'
                     }

@@ -81,22 +81,22 @@ export default function PlatformUserMaintenancePage() {
       
       const usersWithTenants = await adminUsersService.getUsersWithTenants();
       
-      console.log('DEBUG: Users from service:', usersWithTenants);
-      console.log('DEBUG: First user tenants:', usersWithTenants?.[0]?.tenants);
+      // console.log('DEBUG: Users from service:', usersWithTenants);
+      // console.log('DEBUG: First user tenants:', usersWithTenants?.[0]?.tenants);
       
       // Debug specific user email verification status
       const targetUser = usersWithTenants?.find((u: any) => u.id === 'adminuser-ZQTQ003Q');
-      if (targetUser) {
-        console.log('DEBUG: Target user status:', {
-          id: targetUser.id,
-          email: targetUser.email,
-          is_active: targetUser.is_active,
-          email_verified: targetUser.email_verified,
-          combinedStatus: targetUser.is_active && targetUser.email_verified ? 'active' : 
-                         targetUser.is_active && !targetUser.email_verified ? 'active_unverified' :
-                         !targetUser.is_active && targetUser.email_verified ? 'inactive' : 'pending'
-        });
-      }
+      // if (targetUser) {
+      //   console.log('DEBUG: Target user status:', {
+      //     id: targetUser.id,
+      //     email: targetUser.email,
+      //     is_active: targetUser.is_active,
+      //     email_verified: targetUser.email_verified,
+      //     combinedStatus: targetUser.is_active && targetUser.email_verified ? 'active' : 
+      //                    targetUser.is_active && !targetUser.email_verified ? 'active_unverified' :
+      //                    !targetUser.is_active && targetUser.email_verified ? 'inactive' : 'pending'
+      //   });
+      // }
       
       setUsers(usersWithTenants || []);
     } catch (error) {
@@ -828,126 +828,118 @@ export default function PlatformUserMaintenancePage() {
         }}
       />
 
-      {editModalOpen.user && (
-        <EditUserModal
-          isOpen={editModalOpen.open}
-          onClose={() => setEditModalOpen({ open: false, user: null })}
-          user={editModalOpen.user}
-          onSuccess={(updatedUser) => {
-            if (updatedUser) {
-              // Instant update: update local state with response data
-              setUsers(prevUsers => 
-                prevUsers.map(u => 
-                  u.id === updatedUser.id 
-                    ? {
-                        ...u,
-                        name: updatedUser.name,
-                        role: updatedUser.role,
-                        is_active: updatedUser.is_active ?? updatedUser.isActive,
-                        email_verified: updatedUser.email_verified ?? updatedUser.emailVerified,
-                      }
-                    : u
-                )
-              );
-            } else {
-              // Fallback: reload all users
-              loadUsers();
-            }
-          }}
-        />
-      )}
-
-      {manageTenantsModal.user && (
-        <ManageTenantsModal
-          isOpen={manageTenantsModal.open}
-          onClose={() => setManageTenantsModal({ open: false, user: null })}
-          user={manageTenantsModal.user}
-          onSuccess={(addedTenant, removedTenantId, updatedTenant) => {
+      <EditUserModal
+        isOpen={editModalOpen.open}
+        onClose={() => setEditModalOpen({ open: false, user: null })}
+        user={editModalOpen.user}
+        onSuccess={(updatedUser) => {
+          if (updatedUser) {
             // Instant update: update local state with response data
-            if (addedTenant) {
-              setUsers(prevUsers => {
-                return prevUsers.map(u => {
-                  if (u.id === manageTenantsModal.user?.id) {
-                    return {
+            setUsers(prevUsers => 
+              prevUsers.map(u => 
+                u.id === updatedUser.id 
+                  ? {
                       ...u,
-                      tenants: [...(u.tenants || []), {
-                        id: addedTenant.tenant_id,
-                        name: addedTenant.tenantName,
-                        role: addedTenant.role,
-                      }],
-                    };
-                  }
-                  return u;
-                });
-              });
-            } else if (removedTenantId) {
-              setUsers(prevUsers => 
-                prevUsers.map(u => 
-                  u.id === manageTenantsModal.user?.id 
-                    ? {
-                        ...u,
-                        tenants: (u.tenants || []).filter(t => t.id !== removedTenantId),
-                      }
-                    : u
-                )
-              );
-            } else if (updatedTenant) {
-              // Handle tenant role update
-              setUsers(prevUsers => 
-                prevUsers.map(u => 
-                  u.id === manageTenantsModal.user?.id 
-                    ? {
-                        ...u,
-                        tenants: (u.tenants || []).map(t => 
-                          t.id === updatedTenant.tenant_id 
-                            ? { ...t, role: updatedTenant.role }
-                            : t
-                        ),
-                      }
-                    : u
-                )
-              );
-            }
-          }}
-        />
-      )}
+                      name: updatedUser.name,
+                      role: updatedUser.role,
+                      is_active: updatedUser.is_active ?? updatedUser.isActive,
+                      email_verified: updatedUser.email_verified ?? updatedUser.emailVerified,
+                    }
+                  : u
+              )
+            );
+          } else {
+            // Fallback: reload all users
+            loadUsers();
+          }
+        }}
+      />
 
-      {resetPasswordModal.user && (
-        <ResetPasswordModal
-          isOpen={resetPasswordModal.open}
-          onClose={() => setResetPasswordModal({ open: false, user: null })}
-          userEmail={resetPasswordModal.user.email}
-          userId={resetPasswordModal.user.id}
-        />
-      )}
+      <ManageTenantsModal
+        isOpen={manageTenantsModal.open}
+        onClose={() => setManageTenantsModal({ open: false, user: null })}
+        user={manageTenantsModal.user}
+        onSuccess={(addedTenant, removedTenantId, updatedTenant) => {
+          // Instant update: update local state with response data
+          if (addedTenant) {
+            setUsers(prevUsers => {
+              return prevUsers.map(u => {
+                if (u.id === manageTenantsModal.user?.id) {
+                  return {
+                    ...u,
+                    tenants: [...(u.tenants || []), {
+                      id: addedTenant.tenant_id,
+                      name: addedTenant.tenantName,
+                      role: addedTenant.role,
+                    }],
+                  };
+                }
+                return u;
+              });
+            });
+          } else if (removedTenantId) {
+            setUsers(prevUsers => 
+              prevUsers.map(u => 
+                u.id === manageTenantsModal.user?.id 
+                  ? {
+                      ...u,
+                      tenants: (u.tenants || []).filter(t => t.id !== removedTenantId),
+                    }
+                  : u
+              )
+            );
+          } else if (updatedTenant) {
+            // Handle tenant role update
+            setUsers(prevUsers => 
+              prevUsers.map(u => 
+                u.id === manageTenantsModal.user?.id 
+                  ? {
+                      ...u,
+                      tenants: (u.tenants || []).map(t => 
+                        t.id === updatedTenant.tenant_id 
+                          ? { ...t, role: updatedTenant.role }
+                          : t
+                      ),
+                    }
+                  : u
+              )
+            );
+          }
+        }}
+      />
+
+      <ResetPasswordModal
+        isOpen={resetPasswordModal.open}
+        onClose={() => setResetPasswordModal({ open: false, user: null })}
+        userEmail={resetPasswordModal.user?.email || ''}
+        userId={resetPasswordModal.user?.id || ''}
+      />
 
       {/* User Status Modal */}
-      {statusModal.open && statusModal.user && (
-        <UserStatusModal
-          isOpen={statusModal.open}
-          onClose={() => setStatusModal({ open: false, user: null })}
-          user={statusModal.user}
-          onSuccess={(updatedUser) => {
-            // Instant update: update local state with response data
-            if (updatedUser) {
-              setUsers(prevUsers => 
-                prevUsers.map(u => 
-                  u.id === updatedUser.id 
-                    ? {
-                        ...u,
-                        is_active: updatedUser.is_active,
-                        email_verified: updatedUser.email_verified,
-                      }
-                    : u
-                )
-              );
-            } else {
-              // Fallback: reload all users
-              loadUsers();
-            }
-          }}
-        />
-      )}
+      <UserStatusModal
+        isOpen={statusModal.open}
+        onClose={() => setStatusModal({ open: false, user: null })}
+        user={statusModal.user}
+        onSuccess={(updatedUser) => {
+          // Instant update: update local state with response data
+          if (updatedUser) {
+            setUsers(prevUsers => 
+              prevUsers.map(u => 
+                u.id === updatedUser.id 
+                  ? {
+                      ...u,
+                      is_active: updatedUser.is_active,
+                      email_verified: updatedUser.email_verified,
+                    }
+                  : u
+              )
+            );
+          } else {
+            // Fallback: reload all users
+            loadUsers();
+          }
+        }}
+      />
     </div>
   );
 }

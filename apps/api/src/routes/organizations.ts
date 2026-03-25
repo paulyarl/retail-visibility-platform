@@ -14,6 +14,69 @@ import TierService from '../services/TierService';
 const router = Router();
 
 /**
+ * Generate a unique ID for directory_category
+ */
+function generateCategoryId(): string {
+  return `cat-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+}
+
+/**
+ * Ensure a directory category exists for a target tenant.
+ * If the source item has a category, check if it exists for the target tenant.
+ * If not, create it based on the source category.
+ * Returns the target tenant's category ID (or null if no category).
+ */
+async function ensureCategoryForTargetTenant(
+  sourceCategoryId: string | null,
+  targetTenantId: string
+): Promise<string | null> {
+  if (!sourceCategoryId) {
+    return null;
+  }
+
+  // Get the source category details
+  const sourceCategory = await prisma.directory_category.findUnique({
+    where: { id: sourceCategoryId },
+  });
+
+  if (!sourceCategory) {
+    console.log(`[Propagation] Source category ${sourceCategoryId} not found, skipping category assignment`);
+    return null;
+  }
+
+  // Check if a category with the same slug already exists for the target tenant
+  let targetCategory = await prisma.directory_category.findFirst({
+    where: {
+      tenantId: targetTenantId,
+      slug: sourceCategory.slug,
+    },
+  });
+
+  if (targetCategory) {
+    console.log(`[Propagation] Using existing category for tenant ${targetTenantId}: ${sourceCategory.name} (${targetCategory.id})`);
+    return targetCategory.id;
+  }
+
+  // Create a new category for the target tenant
+  targetCategory = await prisma.directory_category.create({
+    data: {
+      id: generateCategoryId(),
+      tenantId: targetTenantId,
+      name: sourceCategory.name,
+      slug: sourceCategory.slug,
+      parentId: sourceCategory.parentId,
+      googleCategoryId: sourceCategory.googleCategoryId,
+      isActive: true,
+      sortOrder: sourceCategory.sortOrder,
+      updatedAt: new Date(),
+    },
+  });
+
+  console.log(`[Propagation] Created category for tenant ${targetTenantId}: ${sourceCategory.name} (${targetCategory.id})`);
+  return targetCategory.id;
+}
+
+/**
  * Middleware to check if user can perform support actions (admin/support)
  * Used for organization management operations
  */
@@ -663,29 +726,47 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
             continue;
           }
           
+          // Ensure category exists for target tenant before updating
+          const targetCategoryId = await ensureCategoryForTargetTenant(
+            sourceItem.directory_category_id,
+            tenantId
+          );
+          
           // Update mode - update existing item
           const updatedItem = await prisma.inventory_items.update({
             where: { id: existing.id },
             data: {
               name: sourceItem.name,
-              title: sourceItem.title,
-              brand: sourceItem.brand,
-              description: sourceItem.description,
-              price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
               price_cents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.price_cents,
               stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
-              quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
               image_url: sourceItem.image_url, 
-              image_gallery: sourceItem.image_gallery,
-              marketing_description: sourceItem.marketing_description,
               metadata: sourceItem.metadata as any,
+              marketing_description: sourceItem.marketing_description,
+              image_gallery: sourceItem.image_gallery,
+              custom_cta: sourceItem.custom_cta as any,
+              social_links: sourceItem.social_links as any,
+              custom_branding: sourceItem.custom_branding as any,
+              custom_sections: sourceItem.custom_sections as any,
+              landing_page_theme: sourceItem.landing_page_theme,
+              audit_log_id: sourceItem.audit_log_id,
               availability: sourceItem.availability,
+              brand: sourceItem.brand,
               category_path: sourceItem.category_path,
+              directory_category_id: targetCategoryId,
               condition: sourceItem.condition,
               currency: sourceItem.currency,
+              description: sourceItem.description,
+              eligibility_reason: sourceItem.eligibility_reason,
               gtin: sourceItem.gtin,
               item_status: overrides?.itemStatus || sourceItem.item_status,
+              location_id: sourceItem.location_id,
+              merchant_name: sourceItem.merchant_name,
               mpn: sourceItem.mpn,
+              price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
+              quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
+              sync_status: sourceItem.sync_status,
+              synced_at: sourceItem.synced_at,
+              title: sourceItem.title,
               visibility: overrides?.visibility || sourceItem.visibility,
               manufacturer: sourceItem.manufacturer,
               source: sourceItem.source,
@@ -697,6 +778,21 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
               missing_description: sourceItem.missing_description,
               missing_specs: sourceItem.missing_specs,
               missing_brand: sourceItem.missing_brand,
+              sale_price_cents: sourceItem.sale_price_cents,
+              payment_gateway_type: sourceItem.payment_gateway_type,
+              payment_gateway_id: sourceItem.payment_gateway_id,
+              product_type: sourceItem.product_type,
+              digital_delivery_method: sourceItem.digital_delivery_method,
+              digital_assets: sourceItem.digital_assets as any,
+              access_duration_days: sourceItem.access_duration_days,
+              download_limit: sourceItem.download_limit,
+              license_type: sourceItem.license_type,
+              has_variants: sourceItem.has_variants,
+              is_featured: sourceItem.is_featured,
+              featured_at: sourceItem.featured_at,
+              featured_until: sourceItem.featured_until,
+              featured_priority: sourceItem.featured_priority,
+              featured_type: sourceItem.featured_type,
             },
           });
 
@@ -733,32 +829,50 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
           continue;
         }
 
+        // Ensure category exists for target tenant before creating
+        const targetCategoryId = await ensureCategoryForTargetTenant(
+          sourceItem.directory_category_id,
+          tenantId
+        );
+
         // Create mode - create new item
         const newItem = await prisma.inventory_items.create({
           data: {
             id: generateItemId(),
-            updated_at: new Date(),
             tenant_id: tenantId,
             sku: sourceItem.sku,
             name: sourceItem.name,
-            title: sourceItem.title,
-            brand: sourceItem.brand,
-            description: sourceItem.description,
-            price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
             price_cents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.price_cents,
             stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
-            quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
             image_url: sourceItem.image_url,
-            image_gallery: sourceItem.image_gallery,
-            marketing_description: sourceItem.marketing_description,
             metadata: sourceItem.metadata as any,
+            updated_at: new Date(),
+            marketing_description: sourceItem.marketing_description,
+            image_gallery: sourceItem.image_gallery, 
+            custom_cta: sourceItem.custom_cta as any,
+            social_links: sourceItem.social_links as any,
+            custom_branding: sourceItem.custom_branding as any,
+            custom_sections: sourceItem.custom_sections as any,
+            landing_page_theme: sourceItem.landing_page_theme,
+            audit_log_id: sourceItem.audit_log_id,
             availability: sourceItem.availability,
+            brand: sourceItem.brand,
             category_path: sourceItem.category_path,
+            directory_category_id: targetCategoryId,            
             condition: sourceItem.condition,
             currency: sourceItem.currency,
+            description: sourceItem.description,
+            eligibility_reason: sourceItem.eligibility_reason,
             gtin: sourceItem.gtin,
             item_status: overrides?.itemStatus || sourceItem.item_status,
+            location_id: sourceItem.location_id,
+            merchant_name: sourceItem.merchant_name,
             mpn: sourceItem.mpn,
+            price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
+            quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
+            sync_status: sourceItem.sync_status,
+            synced_at: sourceItem.synced_at,
+            title: sourceItem.title,
             visibility: overrides?.visibility || sourceItem.visibility,
             manufacturer: sourceItem.manufacturer,
             source: sourceItem.source,
@@ -770,6 +884,8 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
             missing_description: sourceItem.missing_description,
             missing_specs: sourceItem.missing_specs,
             missing_brand: sourceItem.missing_brand,
+
+
           },
         });
 
@@ -933,42 +1049,61 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
             continue;
           }
 
+          // Ensure category exists for target tenant before creating
+          const targetCategoryId = await ensureCategoryForTargetTenant(
+            sourceItem.directory_category_id,
+            tenantId
+          );
+
           // Create the item for this tenant
           const newItem = await prisma.inventory_items.create({
             data: {
               id: generateItemId(),
               tenant_id: tenantId,
-              sku: sourceItem.sku,
-              name: sourceItem.name,
-              title: sourceItem.title,
-              brand: sourceItem.brand,
-              description: sourceItem.description,
-              price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
-              priceCents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.price_cents,
-              stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
-              quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
-              imageUrl: sourceItem.image_url,
-              imageGallery: sourceItem.image_gallery,
-              marketingDescription: sourceItem.marketing_description,
-              metadata: sourceItem.metadata as any,
-              availability: sourceItem.availability,
-              categoryPath: sourceItem.category_path,
-              condition: sourceItem.condition,
-              currency: sourceItem.currency,
-              gtin: sourceItem.gtin,
-              itemStatus: overrides?.itemStatus || sourceItem.item_status,
-              mpn: sourceItem.mpn,
-              visibility: overrides?.visibility || sourceItem.visibility,
-              manufacturer: sourceItem.manufacturer,
-              source: sourceItem.source,
-              enrichmentStatus: sourceItem.enrichment_status,
-              enrichedAt: sourceItem.enriched_at,
-              enrichedBy: sourceItem.enriched_by,
-              enrichedFromBarcode: sourceItem.enriched_from_barcode,
-              missingImages: sourceItem.missing_images,
-              missingDescription: sourceItem.missing_description,
-              missingSpecs: sourceItem.missing_specs,
-              missingBrand: sourceItem.missing_brand,
+            sku: sourceItem.sku,
+            name: sourceItem.name,
+            price_cents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.price_cents,
+            stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
+            image_url: sourceItem.image_url,
+            metadata: sourceItem.metadata as any,
+            updated_at: new Date(),
+            marketing_description: sourceItem.marketing_description,
+            image_gallery: sourceItem.image_gallery, 
+            custom_cta: sourceItem.custom_cta as any,
+            social_links: sourceItem.social_links as any,
+            custom_branding: sourceItem.custom_branding as any,
+            custom_sections: sourceItem.custom_sections as any,
+            landing_page_theme: sourceItem.landing_page_theme,
+            audit_log_id: sourceItem.audit_log_id,
+            availability: sourceItem.availability,
+            brand: sourceItem.brand,
+            category_path: sourceItem.category_path,
+            directory_category_id: targetCategoryId,            
+            condition: sourceItem.condition,
+            currency: sourceItem.currency,
+            description: sourceItem.description,
+            eligibility_reason: sourceItem.eligibility_reason,
+            gtin: sourceItem.gtin,
+            item_status: overrides?.itemStatus || sourceItem.item_status,
+            location_id: sourceItem.location_id,
+            merchant_name: sourceItem.merchant_name,
+            mpn: sourceItem.mpn,
+            price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
+            quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
+            sync_status: sourceItem.sync_status,
+            synced_at: sourceItem.synced_at,
+            title: sourceItem.title,
+            visibility: overrides?.visibility || sourceItem.visibility,
+            manufacturer: sourceItem.manufacturer,
+            source: sourceItem.source,
+            enrichment_status: sourceItem.enrichment_status,
+            enriched_at: sourceItem.enriched_at,
+            enriched_by: sourceItem.enriched_by,
+            enriched_from_barcode: sourceItem.enriched_from_barcode,
+            missing_images: sourceItem.missing_images,
+            missing_description: sourceItem.missing_description,
+            missing_specs: sourceItem.missing_specs,
+            missing_brand: sourceItem.missing_brand,
             } as any,
           });
 
@@ -1185,38 +1320,50 @@ router.post('/:id/sync-from-hero', requireSupportActions, async (req, res) => {
             data: {
               id: generateItemId(),
               tenant_id: targetTenant.id,
-              sku: sourceItem.sku,
-              name: sourceItem.name,
-              title: sourceItem.title,
-              brand: sourceItem.brand,
-              description: sourceItem.description,
-              price: sourceItem.price,
-              price_cents: sourceItem.price_cents,
-              stock: sourceItem.stock,
-              quantity: sourceItem.quantity,
-              image_url: sourceItem.image_url, 
-              image_gallery: sourceItem.image_gallery,
-              marketing_description: sourceItem.marketing_description,
-              metadata: sourceItem.metadata as any,
-              availability: sourceItem.availability,
-              category_path: sourceItem.category_path,
-              condition: sourceItem.condition,
-              currency: sourceItem.currency,
-              gtin: sourceItem.gtin,
-              item_status: sourceItem.item_status,
-              mpn: sourceItem.mpn,
-              visibility: sourceItem.visibility,
-              manufacturer: sourceItem.manufacturer,
-              source: sourceItem.source,
-              enrichment_status: sourceItem.enrichment_status,
-              enriched_at: sourceItem.enriched_at,
-              enriched_by: sourceItem.enriched_by,
-              enriched_from_barcode: sourceItem.enriched_from_barcode,
-              missing_images: sourceItem.missing_images,
-              missing_description: sourceItem.missing_description,
-              missing_specs: sourceItem.missing_specs,
-              missing_brand: sourceItem.missing_brand,
-              updated_at: new Date(),
+            sku: sourceItem.sku,
+            name: sourceItem.name,
+            price_cents: sourceItem.price_cents,
+            stock: sourceItem.stock,
+            image_url: sourceItem.image_url,
+            metadata: sourceItem.metadata as any,
+            updated_at: new Date(),
+            marketing_description: sourceItem.marketing_description,
+            image_gallery: sourceItem.image_gallery, 
+            custom_cta: sourceItem.custom_cta as any,
+            social_links: sourceItem.social_links as any,
+            custom_branding: sourceItem.custom_branding as any,
+            custom_sections: sourceItem.custom_sections as any,
+            landing_page_theme: sourceItem.landing_page_theme,
+            audit_log_id: sourceItem.audit_log_id,
+            availability: sourceItem.availability,
+            brand: sourceItem.brand,
+            category_path: sourceItem.category_path,
+            directory_category_id: sourceItem.directory_category_id,            
+            condition: sourceItem.condition,
+            currency: sourceItem.currency,
+            description: sourceItem.description,
+            eligibility_reason: sourceItem.eligibility_reason,
+            gtin: sourceItem.gtin,
+            item_status:  sourceItem.item_status,
+            location_id: sourceItem.location_id,
+            merchant_name: sourceItem.merchant_name,
+            mpn: sourceItem.mpn,
+            price:sourceItem.price,
+            quantity: sourceItem.quantity,
+            sync_status: sourceItem.sync_status,
+            synced_at: sourceItem.synced_at,
+            title: sourceItem.title,
+            visibility: sourceItem.visibility,
+            manufacturer: sourceItem.manufacturer,
+            source: sourceItem.source,
+            enrichment_status: sourceItem.enrichment_status,
+            enriched_at: sourceItem.enriched_at,
+            enriched_by: sourceItem.enriched_by,
+            enriched_from_barcode: sourceItem.enriched_from_barcode,
+            missing_images: sourceItem.missing_images,
+            missing_description: sourceItem.missing_description,
+            missing_specs: sourceItem.missing_specs,
+            missing_brand: sourceItem.missing_brand,
             },
           });
 

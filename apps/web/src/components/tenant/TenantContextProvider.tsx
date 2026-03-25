@@ -8,6 +8,7 @@ export type TenantContextShape = {
   tenantId: string | null;
   tenantSlug?: string | null;
   aud?: string | null;
+  hasPublishedDirectory?: boolean | null;
 };
 
 

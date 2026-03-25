@@ -336,9 +336,10 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     url: string, 
     options: RequestInit, 
     cacheKey?: string, 
-    ttl?: number
+    ttl?: number,
+    ssrAuth?: { auth0Email?: string; auth0Id?: string }
   ): Promise<{ options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }> {
-    const modifiedOptions = await this.onAuthenticatedRequest<T>(url, options, cacheKey, ttl);
+    const modifiedOptions = await this.onAuthenticatedRequest<T>(url, options, cacheKey, ttl, false, ssrAuth);
     
     // Don't set Content-Type for FormData - let browser set it with boundary
     const isFormData = modifiedOptions.body instanceof FormData;
@@ -457,15 +458,22 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     
     // Don't set Content-Type for FormData - let browser set it with boundary
     const isFormData = modifiedOptions.body instanceof FormData;
+    // Don't set Content-Type for GET requests - they don't have a body
+    const isGetRequest = !modifiedOptions.method || modifiedOptions.method === 'GET';
     
     return {
       options: {
         ...modifiedOptions,
+        // For external requests, only add headers if absolutely necessary
+        // Many third-party APIs (like Google Maps) don't allow Content-Type in CORS
         headers: isFormData ? {
           ...modifiedOptions.headers,
+        } : isGetRequest ? {
+          // Don't add any default headers for GET requests to external APIs
+          ...modifiedOptions.headers,
         } : {
-          'Content-Type': 'application/json',
-          'User-Agent': 'RVP-Platform/1.0',
+          // Only add Content-Type for POST/PUT/PATCH with JSON body
+          ...(modifiedOptions.body ? { 'Content-Type': 'application/json' } : {}),
           ...modifiedOptions.headers,
         },
       },
@@ -943,7 +951,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         setupResult = await this.setupPublicRequestOptions<T>(url, options || {}, finalCacheKey, ttl);
         break;
       case RequestType.AUTHENTICATED:
-        setupResult = await this.setupAuthenticatedRequestOptions<T>(url, options || {}, finalCacheKey, ttl);
+        setupResult = await this.setupAuthenticatedRequestOptions<T>(url, options || {}, finalCacheKey, ttl, requestOptions?.ssrAuth);
         break;
       case RequestType.TENANT:
         const tenantOptions = { cacheKey: finalCacheKey, ttl, requestTarget } as TenantRequestOptions;
@@ -1061,17 +1069,21 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
    * Override hook for subclasses to customize authenticated request behavior
    * Auth0 session is handled via HTTP-only cookies (credentials: 'include' in fetchWithCache)
    * Also add x-auth0-id and x-auth0-email headers for API to identify user
+   * For SSR, ssrAuth can be passed explicitly to add auth headers
    */
   protected async onAuthenticatedRequest<T>(
     url: string,
     options: RequestInit,
     cacheKey?: string,
     ttl?: number,
-    isAdminRequest?: boolean
+    isAdminRequest?: boolean,
+    ssrAuth?: { auth0Email?: string; auth0Id?: string }
   ): Promise<RequestInit> {
     // Add x-auth0-id and x-auth0-email headers for API to identify user
-    const auth0Id = this.getAuth0Id();
-    const email = this.getAuth0Email();
+    // For client-side: read from document.cookie
+    // For SSR: use ssrAuth parameter
+    const auth0Id = ssrAuth?.auth0Id || this.getAuth0Id();
+    const email = ssrAuth?.auth0Email || this.getAuth0Email();
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
@@ -1164,11 +1176,11 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     options: RequestInit,
     requestOptions?: ExternalRequestOptions
   ): Promise<RequestInit> {
-    // Add external-specific headers and options
+    // Add external-specific options
+    // Note: Don't set User-Agent - it's a forbidden header in browser CORS requests
     const externalOptions = {
       ...options,
       headers: {
-        'User-Agent': 'VisibleShelf-Platform/1.0',
         ...options.headers,
         ...requestOptions?.headers
       },

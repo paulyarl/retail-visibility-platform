@@ -5,7 +5,9 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { RequestTarget, RequestType } from '@/providers/base/EnhancedFlexibleApiSingleton';
 
 export interface TenantLimitsStatus {
   current: number;
@@ -84,7 +86,12 @@ class TenantLimitsSingletonService extends TenantApiSingleton {
         `/api/tenant-limits/featured-products?tenantId=${tenantId}`,
         {},
         `featured-products-limits-${tenantId}`,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.USER,
+          isolation: CacheIsolation.USER,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       if (!result.success){
         console.error('[TenantLimitsSingleton] Failed to get featured products limits:', result.error);
@@ -108,7 +115,12 @@ class TenantLimitsSingletonService extends TenantApiSingleton {
         '/api/tenant-limits/status',
         {},
         'tenant-limits-status',
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.USER,
+          isolation: CacheIsolation.USER,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       if (!result.success){
         console.error('[TenantLimitsSingleton] Failed to get tenant limits status:', result.error);

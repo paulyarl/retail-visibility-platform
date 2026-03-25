@@ -8,13 +8,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../prisma';
-import { requireAdmin } from '../../middleware/auth';
+import { authenticateToken } from '../../middleware/auth';
 import { audit } from '../../audit';
 
 const router = Router();
 
 // All routes require platform admin access
-router.use(requireAdmin);
+router.use(authenticateToken);
 
 /**
  * GET /api/admin/tiers

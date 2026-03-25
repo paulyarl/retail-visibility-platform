@@ -343,6 +343,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
           subtitle="Manage your retail inventory and visibility across platforms"
           storeLogo={businessProfile?.logo_url}
           storeName={tenantData?.name}
+          user={user}
         />
 
         {/* Stats */}
@@ -498,7 +499,9 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
             tenantName={tenantData?.name || 'Your Store'}
             hasStorefront={tenantData?.statusInfo?.showStorefront}
             isInDirectory={tenantData?.statusInfo?.showInDirectory}
-            slug={tenantData?.slug || null}
+            hasPublishedDirectory={tenantData?.hasPublishedDirectory}
+            hasProduct={!!usage?.totalItems && usage.totalItems > 0}
+            slug={tenantData?.slug ?? null}
           />
         </Suspense>
 

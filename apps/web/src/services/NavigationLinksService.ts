@@ -6,7 +6,8 @@
  */
 
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
-import { ApiResult } from '@/providers/base/FlexibleApiSingleton';
+import { ApiResult, RequestType } from '@/providers/base/FlexibleApiSingleton';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,7 +55,13 @@ class NavigationLinksService extends AdminApiSingleton {
     return this.makeDefaultRequest<NavLink[]>(
       '/api/admin/navigation-links',
       {},
-      'navigation-links-all'
+      'navigation-links-all',
+      5 * 60 * 1000, // 5 minutes,
+              {
+                context: AppContext.USER,
+                isolation: CacheIsolation.USER,
+                requestType: RequestType.AUTHENTICATED
+              }
     );
   }
 

@@ -40,6 +40,20 @@ function getCookie(name: string): string | null {
 }
 
 /**
+ * Get Auth0 ID from cookie for API authentication
+ */
+function getAuth0Id(): string | null {
+  return getCookie('auth0_id');
+}
+
+/**
+ * Get Auth0 email from cookie for API authentication
+ */
+function getAuth0Email(): string | null {
+  return getCookie('auth0_email');
+}
+
+/**
  * Make an authenticated API request with Auth0 session handling.
  * - Uses HTTP-only cookies for authentication (managed by Auth0 SDK)
  * - On 401: redirects to Auth0 login
@@ -61,6 +75,12 @@ export async function apiRequest(
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
+
+  // Add Auth0 headers for API authentication (read from non-HTTP-only cookies)
+  const auth0Id = getAuth0Id();
+  const auth0Email = getAuth0Email();
+  if (auth0Id) headers['x-auth0-id'] = auth0Id;
+  if (auth0Email) headers['x-auth0-email'] = auth0Email;
 
   // Add device info header for session tracking
   if (typeof window !== 'undefined') {

@@ -1,4 +1,5 @@
 import { AdminApiSingleton } from '@/providers/base/AdminApiSingleton';
+import { RequestType } from '@/providers/base/FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface TickerMessage {
@@ -65,7 +66,12 @@ class TickerConfigService extends AdminApiSingleton {
         '/api/admin/ticker-config',
         {},
         'ticker-config',
-        5 * 60 * 1000 // 5 minutes cache
+        5 * 60 * 1000, // 5 minutes cache
+        {
+          context: AppContext.USER,
+          isolation: CacheIsolation.USER,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
 
       if (!result.success) {
@@ -108,7 +114,12 @@ class TickerConfigService extends AdminApiSingleton {
         `/api/admin/ticker-messages/active?${params.toString()}`,
         {},
         'active-ticker-messages',
-        2 * 60 * 1000 // 2 minutes cache
+        2 * 60 * 1000, // 2 minutes cache
+        {
+          context: AppContext.USER,
+          isolation: CacheIsolation.USER,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
 
       if (!result.success) {
@@ -287,7 +298,12 @@ class TickerConfigService extends AdminApiSingleton {
         '/api/admin/tiers/list',
         {},
         'available-tiers',
-        10 * 60 * 1000 // 10 minutes cache
+        10 * 60 * 1000, // 10 minutes cache
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
 
       if (!result.success) {
@@ -316,7 +332,12 @@ class TickerConfigService extends AdminApiSingleton {
         '/api/admin/tenants/list',
         {},
         'available-tenants',
-        10 * 60 * 1000 // 10 minutes cache
+        10 * 60 * 1000, // 10 minutes cache
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
 
       if (!result.success) {

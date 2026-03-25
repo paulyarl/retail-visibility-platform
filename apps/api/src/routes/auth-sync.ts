@@ -126,6 +126,8 @@ router.post('/sync-user', async (req: Request, res: Response) => {
           // Update name if provided and not already set
           first_name: firstName || user.first_name || (name ? name.split(' ')[0] : user.first_name),
           last_name: lastName || user.last_name || (name ? name.split(' ').slice(1).join(' ') : user.last_name),
+          // Update picture if provided
+          picture: picture || user.picture,
         },
         include: {
           user_tenants: {
@@ -176,6 +178,7 @@ router.post('/sync-user', async (req: Request, res: Response) => {
           created_at: user.created_at,
           onboarding_completed: user.onboarding_completed,
           onboarding_step: user.onboarding_step,
+          picture: user.picture,
           tenants: user.user_tenants?.map((ut: any) => ({
             id: ut.tenants?.id || ut.tenant_id,
             name: ut.tenants?.name,
@@ -199,6 +202,7 @@ router.post('/sync-user', async (req: Request, res: Response) => {
         password_hash: '', // No password for OAuth users - they authenticate via Auth0
         first_name: parsedFirstName,
         last_name: parsedLastName,
+        picture: picture,
         role: user_role.USER,
         email_verified: emailVerified,
         last_login: new Date(),
@@ -254,6 +258,7 @@ router.post('/sync-user', async (req: Request, res: Response) => {
         created_at: user.created_at,
         onboarding_completed: user.onboarding_completed,
         onboarding_step: user.onboarding_step,
+        picture: user.picture,
         tenants: [], // New users have no tenants
       },
       isNewUser: true,

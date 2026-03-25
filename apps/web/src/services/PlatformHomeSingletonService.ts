@@ -10,6 +10,7 @@ import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
 import { BusinessProfile } from '../lib/validation/businessProfile';
 import TenantApiSingleton from '@/providers/base/TenantApiSingleton';
+import { RequestType } from '@/providers/base/FlexibleApiSingleton';
 
 export interface Tenant {
   id: string;
@@ -491,7 +492,12 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       '/api/tenants',
       {},
       'platform-tenants',
-      this.cacheTTL
+      this.cacheTTL,
+      {
+        context: AppContext.USER,
+        isolation: CacheIsolation.USER,
+        requestType: RequestType.AUTHENTICATED
+      }
     );
 
     if (!result.success) {
@@ -510,7 +516,12 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       '/api/organizations',
       {},
       'platform-organizations',
-      this.cacheTTL
+      this.cacheTTL,
+      {
+        context: AppContext.TENANT,
+        isolation: CacheIsolation.TENANT,
+        requestType: RequestType.AUTHENTICATED
+      }
     );
 
     if (!result.success) {

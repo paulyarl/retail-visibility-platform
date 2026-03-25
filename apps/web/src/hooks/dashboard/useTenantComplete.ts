@@ -33,6 +33,9 @@ interface TenantCompleteResponse {
       userCount: number;
     };
     slug: string | null;
+    hasPublishedDirectory: boolean;
+    hasProduct: boolean;
+    googleProductCount: number;
   };
   tier: {
     tier: string;
@@ -131,6 +134,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
       if (!tenantId) throw new Error('Tenant ID is required');
       try {
         const data = await tenantInfoService.getCompleteTenantInfo(tenantId);
+        // console.log(`[useTenantComplete] Tenant info fetched:`, data);
         return data;
       } catch (error) {
         console.warn('[useTenantComplete] Tenant info fetch failed:', error);
@@ -212,7 +216,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
   
   // Clear cache function for debugging
   const clearCacheAndRefresh = async () => {
-    console.log('[useTenantComplete] Refreshing data...');
+    // console.log('[useTenantComplete] Refreshing data...');
     await refetchTenant();
   };
 
@@ -231,12 +235,16 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
       productCount: usageData?.items || 0,
       userCount: 0
     },
-    slug: tenantData.tenant.slug || null
+    slug: tenantData.tenant.slug || null,
+    hasPublishedDirectory: tenantData.tenant.hasPublishedDirectory || false,
+    googleProductCount:  usageData?.items|| 0,
+    hasProduct: tenantData.tenant.hasProduct || false
   } : null;
 
   // Build resolved tier from secondary query
   const rawTier = tierData;
   const rawUsage = usageData;
+  // console.log('[useTenantComplete] Raw usage data:', rawUsage);
 
   // Transform usage data to expected format
   const usage: TenantUsage | null = rawUsage ? {
@@ -250,6 +258,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
     categories: (rawUsage as any).data?.usage?.categories || 0,
     orders: (rawUsage as any).data?.usage?.orders || 0
   } : null;
+  // console.log('[useTenantComplete] Transformed usage data:', usage);
 
   // Build resolved tier from secondary query data
   const tier: ResolvedTier | null = useMemo(() => {
@@ -300,6 +309,12 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
       // Determine effective tier (org overrides tenant for chains)
       const effectiveTier = orgTier || tenantTier;
       const isChain = !!rawTierData.isChain && !!orgTier;
+
+      // console.log(`[useTenantComplete] Tenant:`, tenant);
+      // console.log(`[useTenantComplete] Usage:`, usage);
+      // console.log(`[useTenantComplete] Tenant tier:`, tenantTier);
+      // console.log(`[useTenantComplete] Organization tier:`, orgTier);
+      // console.log(`[useTenantComplete] Effective tier:`, effectiveTier);
 
       return {
         effective: effectiveTier,

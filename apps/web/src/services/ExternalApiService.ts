@@ -99,9 +99,7 @@ class ExternalApiService extends ExternalApiSingleton {
           `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
           {
             method: 'GET',
-            headers: {
-              'User-Agent': 'RVP-Platform/1.0',
-            },
+            // Don't set User-Agent - it's a forbidden header in browser CORS requests
             signal: AbortSignal.timeout(10000) // 10 seconds timeout
           },
           options.cacheKey || `geocode-${latitude}-${longitude}`, // Cache key

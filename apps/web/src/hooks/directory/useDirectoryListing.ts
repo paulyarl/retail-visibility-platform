@@ -35,7 +35,7 @@ export interface DirectoryListingHook {
 }
 
 export function useDirectoryListing(tenantId: string): DirectoryListingHook {
-  console.log('[useDirectoryListing] Hook called for tenantId:', tenantId);
+  // console.log('[useDirectoryListing] Hook called for tenantId:', tenantId);
   
   const [listing, setListing] = useState<DirectoryListing | null>(null);
   const [loading, setLoading] = useState(false);
@@ -69,12 +69,23 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     try {
       setError(null);
       
-      await tenantDirectoryManagementService.publishDirectoryListing(tenantId);
+      const result = await tenantDirectoryManagementService.publishDirectoryListing(tenantId);
+      
+      if (!result.success) {
+        // Set error message but don't throw - treat as validation
+        setError(result.error || 'Failed to publish');
+        return;
+      }
       
       await fetchListing();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error publishing listing:', err);
-      setError(err instanceof Error ? err.message : 'Failed to publish');
+      
+      // Extract the detailed error message
+      const errorMessage = err?.message || err?.response?.data?.message || err?.response?.data?.error || 'Failed to publish';
+      
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   }, [tenantId, fetchListing]);
 

@@ -165,6 +165,7 @@ export class TenantService {
       console.log(`[TenantService] Getting complete data for tenant: ${tenantId}`);
       
       // Execute all queries in parallel for maximum performance
+      // Use same filtering as /api/items/complete: exclude trashed items
       const [tenant, itemCount, activeItemCount, categoryCount, userCount, orderCount] = await Promise.all([
         // Tenant profile
         prisma.tenants.findUnique({
@@ -179,15 +180,17 @@ export class TenantService {
           }
         }),
         
-        // Usage metrics
+        // Total items (excluding trashed)
         prisma.inventory_items.count({
-          where: { tenant_id: tenantId }
+          where: { tenant_id: tenantId, item_status: { not: 'trashed' } }
         }),
         
+        // Active items (active status, not private)
         prisma.inventory_items.count({
           where: {
             tenant_id: tenantId,
-            availability: 'in_stock'
+            item_status: 'active',
+            visibility: { not: 'private' }
           }
         }),
         

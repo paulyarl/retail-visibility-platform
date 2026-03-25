@@ -210,6 +210,7 @@ class TenantManagementService extends TenantApiSingleton {
       if (response.data?.usage) {
         return response.data.usage;
       }
+      console.log('[TenantManagementService] No usage data found in response:', response.data);
 
       return response.data || null;
     } catch (error) {

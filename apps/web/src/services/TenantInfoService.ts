@@ -6,9 +6,10 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
-import { getErrorMessage } from '@/providers/base/FlexibleApiSingleton';
+import { getErrorMessage, RequestType } from '@/providers/base/FlexibleApiSingleton';
 import { platformHomeService } from './PlatformHomeSingletonService';
 import { platformDashboardService } from './PlatformDashboardSingletonService';
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface PaymentGateway {
   id: string;
@@ -102,7 +103,12 @@ class TenantInfoService extends TenantApiSingleton {
         `/api/tenants/${tenantId}/payment-gateways`,
         {},
         `tenant-gateways-${tenantId}`,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       if (!result.success) {
         console.error('[TenantInfoService] Failed to get payment gateways:', result.error);
@@ -272,8 +278,10 @@ class TenantInfoService extends TenantApiSingleton {
   /**
    * Get tenant information
    * Uses the /api/tenants/:tenantId endpoint
+   * @param tenantId - The tenant ID
+   * @param ssrAuth - Optional SSR auth headers { auth0Email, auth0Id }
    */
-  async getTenantInfo(tenantId: string): Promise<any> {
+  async getTenantInfo(tenantId: string, ssrAuth?: { auth0Email?: string; auth0Id?: string }): Promise<any> {
     try {
       if (!tenantId) {
         console.error('[TenantInfoService] getTenantInfo: tenantId is required');
@@ -284,7 +292,13 @@ class TenantInfoService extends TenantApiSingleton {
         `/api/tenants/${tenantId}`,
         {},
         `tenant-info-${tenantId}`,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED,
+          ssrAuth
+        }
       );
       if (!result.success) {
         console.error('[TenantInfoService] Failed to get tenant info:', result.error);
@@ -324,7 +338,12 @@ class TenantInfoService extends TenantApiSingleton {
         `/api/tenant/${tenantId}/business-hours`,
         {},
         `tenant-business-hours-${tenantId}`,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       
       if (!result.success) {
@@ -382,7 +401,12 @@ class TenantInfoService extends TenantApiSingleton {
         `/api/tenants/${tenantId}/tier`,
         {},
         `tenant-tier-${tenantId}`,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       if (!result.success) {
         console.error('[TenantInfoService] Failed to get tenant tier:', result.error);
@@ -479,7 +503,12 @@ class TenantInfoService extends TenantApiSingleton {
         `/api/oauth/${provider}/status?tenantId=${tenantId}`,
         {},
         `tenant-oauth-${tenantId}-${provider}`,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       if (!result.success) {
         console.error('[TenantInfoService] Failed to get OAuth status:', result.error);
@@ -678,7 +707,12 @@ class TenantInfoService extends TenantApiSingleton {
         `/api/tenants/${tenantId}/users`,
         {},
         `tenant-users-${tenantId}`,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to get users:', result.error);
@@ -777,7 +811,12 @@ class TenantInfoService extends TenantApiSingleton {
         `/api/oauth/${gatewayType}/authorize?tenantId=${tenantId}`,
         {},
         `oauth-authorize-${gatewayType}-${tenantId}`,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to get OAuth authorization URL:', result.error);
@@ -1022,7 +1061,13 @@ class TenantInfoService extends TenantApiSingleton {
         // `tenant-data-cache-busting-${tenantId}-${timestamp}`
         `/api/tenants/${tenantId}`,
         {},
-        `tenant-data-${tenantId}`
+        `tenant-data-${tenantId}`,
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to get tenant data with cache busting:', result.error);
@@ -1113,7 +1158,12 @@ class TenantInfoService extends TenantApiSingleton {
         `/api/google/business/status?tenantId=${tenantId}`,
         {},
         `tenant-gbp-status-${tenantId}`,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to get Google Business Profile status:', result.error);
@@ -1248,7 +1298,12 @@ class TenantInfoService extends TenantApiSingleton {
         '/user/preferences',
         {},
         'user-preferences',
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.USER,
+          isolation: CacheIsolation.USER,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to get user preferences:', result.error);
@@ -1271,7 +1326,12 @@ class TenantInfoService extends TenantApiSingleton {
         '/auth/me',
         {},
         'auth-current-user',
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.USER,
+          isolation: CacheIsolation.USER,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       if (!result.success){
         // Don't log as error - unauthenticated requests are normal on public pages
@@ -1305,7 +1365,12 @@ class TenantInfoService extends TenantApiSingleton {
         `/api/organizations/${organizationId}`,
         {},
         `tenant-organization-${organizationId}`,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       
       if (!result.success) {
@@ -1329,7 +1394,12 @@ class TenantInfoService extends TenantApiSingleton {
         '/api/organizations',
         {},
         'tenant-organizations',
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
       );
       if (!result.success){
         console.error('[TenantInfoService] Failed to get organizations:', result.error);

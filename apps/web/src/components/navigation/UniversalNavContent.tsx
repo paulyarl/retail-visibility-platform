@@ -304,7 +304,7 @@ function SidebarContent({
   expanded: Set<string>;
   onToggle: (key: string) => void;
   onNavigate: () => void;
-  user: { email: string; firstName?: string; lastName?: string; role: string } | null;
+  user: { email: string; firstName?: string; lastName?: string; role: string; picture?: string } | null;
   collapsed?: boolean;
 }) {
   const displayName = user
@@ -317,11 +317,20 @@ function SidebarContent({
     <div className="flex flex-col h-full">
       {/* User identity strip */}
       <div className={cn('flex items-center gap-3 px-4 py-4 border-b border-neutral-100 dark:border-neutral-800', collapsed && 'justify-center px-2')}>
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center flex-shrink-0">
-          <span className="text-white text-xs font-bold">
-            {displayName.charAt(0).toUpperCase() || '?'}
-          </span>
-        </div>
+        {user?.picture ? (
+          <img 
+            src={user.picture} 
+            alt={displayName}
+            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center flex-shrink-0">
+            <span className="text-white text-xs font-bold">
+              {displayName.charAt(0).toUpperCase() || '?'}
+            </span>
+          </div>
+        )}
         {!collapsed && (
           <div className="min-w-0">
             <p className="text-sm font-semibold text-neutral-900 dark:text-white truncate">{displayName}</p>
@@ -394,7 +403,7 @@ function MobileDrawer({
   pathname: string;
   expanded: Set<string>;
   onToggle: (key: string) => void;
-  user: { email: string; firstName?: string; lastName?: string; role: string } | null;
+  user: { email: string; firstName?: string; lastName?: string; role: string; picture?: string } | null;
 }) {
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -493,7 +502,7 @@ function DesktopSidebar({
   pathname: string;
   expanded: Set<string>;
   onToggle: (key: string) => void;
-  user: { email: string; firstName?: string; lastName?: string; role: string } | null;
+  user: { email: string; firstName?: string; lastName?: string; role: string; picture?: string } | null;
 }) {
   const [collapsed, setCollapsed] = useState(false);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Edit2, Loader2, AlertTriangle, Shield } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { adminUsersService } from '@/services/AdminUsersService';
@@ -13,7 +13,7 @@ interface EditUserModalProps {
     email: string;
     name?: string;
     role: string;
-  };
+  } | null;
   onSuccess?: (updatedUser?: any) => void;
 }
 
@@ -23,13 +23,26 @@ export default function EditUserModal({ isOpen, onClose, user, onSuccess }: Edit
   const [success, setSuccess] = useState('');
   
   const [formData, setFormData] = useState({
-    firstName: user.name?.split(' ')[0] || '',
-    lastName: user.name?.split(' ').slice(1).join(' ') || '',
-    role: user.role as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'USER',
+    firstName: '',
+    lastName: '',
+    role: 'USER' as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'USER',
   });
+
+  // Update form data when user changes
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        firstName: user.name?.split(' ')[0] || '',
+        lastName: user.name?.split(' ').slice(1).join(' ') || '',
+        role: user.role as 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT' | 'PLATFORM_VIEWER' | 'OWNER' | 'USER',
+      });
+    }
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
+    
     setLoading(true);
     setError('');
     setSuccess('');
@@ -91,7 +104,7 @@ export default function EditUserModal({ isOpen, onClose, user, onSuccess }: Edit
                 Edit User Role
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {user.email}
+                {user?.email}
               </p>
             </div>
           </div>

@@ -49,9 +49,9 @@ export function useAppNavigation({ tenantId }: UseAppNavigationProps): UseAppNav
     // const tenantUrlsOn = tenantUrlsOverride || isFeatureEnabled('FF_TENANT_URLS', tenantId || undefined);
     const tenantUrlsOn = true;
 
-    console.log(`${useAppNavigation.name} user: ${JSON.stringify(user)}`);
-    console.log(`${useAppNavigation.name} isAuthenticated: ${isAuthenticated}`);
-    console.log(`${useAppNavigation.name} tenantId: ${tenantId}`);
+    // console.log(`${useAppNavigation.name} user: ${JSON.stringify(user)}`);
+    // console.log(`${useAppNavigation.name} isAuthenticated: ${isAuthenticated}`);
+    // console.log(`${useAppNavigation.name} tenantId: ${tenantId}`);
 
 
     // if (tenantUrlsOn && tenantId && isAuthenticated) {

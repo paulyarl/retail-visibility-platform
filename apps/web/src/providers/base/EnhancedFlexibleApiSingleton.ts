@@ -98,6 +98,7 @@ export interface RequestOptions {
   cacheKey?: string;
   ttl?: number;
   includeCredentials?: boolean; // Allow controlling credential inclusion
+  ssrAuth?: { auth0Email?: string; auth0Id?: string }; // SSR: Auth headers for server-side requests
 }
 
 export interface ApiResult<T> {

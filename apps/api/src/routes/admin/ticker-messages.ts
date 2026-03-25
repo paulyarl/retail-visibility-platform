@@ -13,10 +13,9 @@ const router = Router();
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
-router.use(requireAdmin);
 
-// GET /api/admin/ticker-messages - Get all ticker messages
-router.get('/', async (req: Request, res: Response) => {
+// GET /api/admin/ticker-messages - Get all ticker messages (admin only)
+router.get('/', requireAdmin, async (req: Request, res: Response) => {
   try {
     const messages = await prisma.ticker_messages.findMany({
       orderBy: [
@@ -56,7 +55,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/admin/ticker-messages/active - Get active ticker messages
+// GET /api/admin/ticker-messages/active - Get active ticker messages (all authenticated users)
 router.get('/active', async (req: Request, res: Response) => {
   try {
     const { tenantId, tier } = req.query;
@@ -148,8 +147,8 @@ router.get('/active', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/admin/ticker-messages - Create new ticker message
-router.post('/', async (req: Request, res: Response) => {
+// POST /api/admin/ticker-messages - Create new ticker message (admin only)
+router.post('/', requireAdmin, async (req: Request, res: Response) => {
   try {
     const {
       message,
@@ -259,8 +258,8 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/admin/ticker-messages/:id - Update ticker message
-router.put('/:id', async (req: Request, res: Response) => {
+// PUT /api/admin/ticker-messages/:id - Update ticker message (admin only)
+router.put('/:id', requireAdmin, async (req: Request, res: Response) => {
   console.log('[ADMIN TICKER MESSAGES PUT] Request received for ID:', req.params.id);
   console.log('[ADMIN TICKER MESSAGES PUT] Update data:', req.body);
 
@@ -403,8 +402,8 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/admin/ticker-messages/:id - Delete ticker message
-router.delete('/:id', async (req: Request, res: Response) => {
+// DELETE /api/admin/ticker-messages/:id - Delete ticker message (admin only)
+router.delete('/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 

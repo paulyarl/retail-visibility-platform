@@ -1,5 +1,6 @@
+import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { AdminApiSingleton } from '../providers/base/AdminApiSingleton';
-import { getErrorMessage } from '../providers/base/FlexibleApiSingleton';
+import { getErrorMessage, RequestType } from '../providers/base/FlexibleApiSingleton';
 
 export interface DbTier {
   id: string;
@@ -77,7 +78,12 @@ export class TenantTierService extends AdminApiSingleton {
       '/api/admin/tiers/tiers',
       {},
       'platform-admin-tiers',
-      this.cacheTTL
+      this.cacheTTL,
+      {
+        context: AppContext.TENANT,
+        isolation: CacheIsolation.TENANT,
+        requestType: RequestType.AUTHENTICATED
+      }
     );
 
     if (!result.success) {
@@ -101,7 +107,12 @@ export class TenantTierService extends AdminApiSingleton {
       '/api/admin/tiers/tenants',
       {},
       'platform-admin-tier-tenants',
-      this.cacheTTL
+      this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
     );
 
     if (!result.success) {
@@ -170,7 +181,12 @@ export class TenantTierService extends AdminApiSingleton {
       '/api/admin/tiers/tiers',
       {},
       'platform-tier-system-tiers',
-      this.cacheTTL
+      this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
     );
 
     if (!result.success) {
@@ -348,7 +364,12 @@ export class TenantTierService extends AdminApiSingleton {
       `/api/tenants/${tenantId}/tier`,
       {},
       `platform-tenant-tier-${tenantId}`,
-      this.cacheTTL
+      this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
     );
 
     if (!result.success) {

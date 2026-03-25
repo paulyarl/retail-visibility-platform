@@ -291,6 +291,9 @@ export class AuthService {
         email_verified: true,
         last_login: true,
         created_at: true,
+        picture: true,
+        auth0_id: true,
+        onboarding_completed: true,
       },
     });
 
@@ -329,6 +332,9 @@ export class AuthService {
       email_verified: user.email_verified,
       last_login: user.last_login,
       created_at: user.created_at,
+      picture: user.picture,
+      auth0_id: user.auth0_id,
+      onboarding_completed: user.onboarding_completed,
       tenants: userTenants.map((ut) => ({
         id: ut.tenant_id,
         name: ut.tenants?.name || ut.tenant_id,

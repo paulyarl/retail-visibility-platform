@@ -84,11 +84,11 @@ export abstract class ExternalApiSingleton extends FlexibleApiSingleton {
     options: RequestInit,
     requestOptions?: ExternalRequestOptions
   ): Promise<RequestInit> {
-    // Add external-specific headers and options
+    // Add external-specific options
+    // Note: Don't set User-Agent - it's a forbidden header in browser CORS requests
     const externalOptions = {
       ...options,
       headers: {
-        'User-Agent': 'RVP-Platform/1.0',
         ...options.headers,
         ...requestOptions?.headers
       },

@@ -20,6 +20,9 @@ interface VisibilityCardsProps {
   tenantName: string;
   hasStorefront?: boolean;
   isInDirectory?: boolean;
+  hasPublishedDirectory?: boolean;
+  googleProductCount?: number;
+  hasProduct?: boolean;
   storefrontUrl?: string;
   directoryUrl?: string;
   tenantCity?: string;
@@ -35,6 +38,9 @@ export default function VisibilityCards({
   tenantName,
   hasStorefront = true,
   isInDirectory = false,
+  hasPublishedDirectory = false,
+  googleProductCount = 0,
+  hasProduct = googleProductCount > 0,
   storefrontUrl,
   directoryUrl,
   tenantCity,
@@ -56,7 +62,7 @@ export default function VisibilityCards({
     if (tenantCategory) params.append('category', tenantCategory);
     
     const queryString = params.toString();
-    return queryString ? `/directory?${queryString}` : slug ? `/directory/${slug}` : '/directory';
+    return queryString ? `/directory?${queryString}` : hasPublishedDirectory && slug ? `/directory/${slug}` : '/directory';
   };
   
   const buildShopsDirectoryUrl = () => {
@@ -66,7 +72,7 @@ export default function VisibilityCards({
     if (tenantCategory) params.append('category', tenantCategory);
     
     const queryString = params.toString();
-    return queryString ? `/shops?${queryString}` : slug ? `/shops/${slug}` : '/shops';
+    return queryString ? `/shops?${queryString}` : hasPublishedDirectory && slug ? `/shops/${slug}` : '/shops';
   };
   
   const proximityDirectoryUrl = buildDirectoryUrl();
@@ -96,18 +102,18 @@ export default function VisibilityCards({
 
               {/* Status */}
               <div className="flex items-center gap-2 mb-4">
-                {hasStorefront ? (
+                {hasProduct ? (
                   <>
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                     <span className="text-xs font-medium text-green-700 dark:text-green-400">
-                      Live & Active
+                      Listed & Discoverable
                     </span>
                   </>
                 ) : (
                   <>
                     <div className="w-2 h-2 rounded-full bg-amber-500" />
                     <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                      Setup Required
+                      Not Listed Yet
                     </span>
                   </>
                 )}
@@ -115,25 +121,49 @@ export default function VisibilityCards({
 
               {/* Actions */}
               <div className="flex flex-wrap gap-2">
+                {/* Always show Browse Directory - filtered by location and category for proximity viewing */}
                 <Link
-                  href={finalStorefrontUrl}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm pointer-events-auto cursor-pointer"
+                  href={`${hasProduct ? finalStorefrontUrl : `/t/${tenantId}/items`}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors text-sm pointer-events-auto cursor-pointer"
+                  title={tenantCity && tenantCategory ? `Browse ${tenantCategory} stores in ${tenantCity}, ${tenantState}` : 'Browse platform directory'}
                   style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                 >
                   <Eye className="w-4 h-4" />
-                  View Storefront
+                  {hasProduct ? 'View Your Listing' : 'Setup your products'}
                   <ExternalLink className="w-3 h-3" />
                 </Link>
                 
-                <Link
-                  href={`/t/${tenantId}/settings`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-300 text-blue-700 rounded-lg font-medium hover:bg-blue-50 transition-colors text-sm pointer-events-auto cursor-pointer"
-                  style={{ pointerEvents: 'auto', cursor: 'pointer' }}
-                >
-                  <Settings className="w-4 h-4" />
-                  Settings
-                </Link>
-              </div>
+                {/* Get Listed or Settings */}
+                {!hasProduct ? (
+                  <Link
+                    href={`/t/${tenantId}/items`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm pointer-events-auto cursor-pointer"
+                    style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                  >
+                    <MapPin className="w-4 h-4" />
+                    Add Items
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/t/${tenantId}/settings/tenant`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm pointer-events-auto cursor-pointer"
+                    style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                  >
+                    <Settings className="w-4 h-4" />
+                    Store Settings
+                  </Link>
+                )}
+                 {/*Browse Platform Directory*/}
+                 <Link
+                    href={`/directory`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm pointer-events-auto cursor-pointer"
+                    style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                  >
+                    <Settings className="w-4 h-4" />
+                    Browse Platform Directory
+                  </Link>
+              
+            </div>
             </div>
           </div>
         </CardContent>
@@ -153,7 +183,7 @@ export default function VisibilityCards({
             {/* Content */}
             <div className="flex-1 min-w-0">
               <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-1">
-                Directory Listing
+                Your Directory Listing
               </h3>
               <p className="text-sm text-neutral-600 dark:text-neutral-200 mb-4">
                 Get discovered by local shoppers searching for products in your area
@@ -161,7 +191,7 @@ export default function VisibilityCards({
 
               {/* Status */}
               <div className="flex items-center gap-2 mb-4">
-                {isInDirectory ? (
+                {hasPublishedDirectory ? (
                   <>
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                     <span className="text-xs font-medium text-green-700 dark:text-green-400">
@@ -184,16 +214,16 @@ export default function VisibilityCards({
                 <Link
                   href={proximityDirectoryUrl}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors text-sm pointer-events-auto cursor-pointer"
-                  title={tenantCity && tenantCategory ? `Browse ${tenantCategory} stores in ${tenantCity}, ${tenantState}` : 'Browse directory'}
+                  title={tenantCity && tenantCategory ? `Browse ${tenantCategory} stores in ${tenantCity}, ${tenantState}` : 'Browse platform directory'}
                   style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                 >
                   <Eye className="w-4 h-4" />
-                  {isInDirectory ? 'View Your Listing' : 'Browse Directory'}
+                  {hasPublishedDirectory ? 'View Your Listing' : 'Browse PlatformDirectory'}
                   <ExternalLink className="w-3 h-3" />
                 </Link>
                 
                 {/* Get Listed or Settings */}
-                {!isInDirectory ? (
+                {!hasPublishedDirectory ? (
                   <Link
                     href={`/t/${tenantId}/settings/directory`}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm pointer-events-auto cursor-pointer"
@@ -226,40 +256,40 @@ export default function VisibilityCards({
           </div>
         </CardContent>
       </Card>
-      {/* Shops Card */}
-      <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 hover:shadow-lg transition-shadow">
+      {/* Shop Card */}
+      <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900 dark:to-pink-900 hover:shadow-lg transition-shadow">
         <CardContent className="pt-6">
           <div className="flex items-start gap-4">
             {/* Icon */}
             <div className="flex-shrink-0">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                <Store className="w-7 h-7 text-white" />
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                <MapPin className="w-7 h-7 text-white" />
               </div>
             </div>
 
             {/* Content */}
             <div className="flex-1 min-w-0">
               <h3 className="text-lg font-bold text-neutral-900 dark:text-white mb-1">
-                Your Shop
+                Your Shops Listing
               </h3>
               <p className="text-sm text-neutral-600 dark:text-neutral-200 mb-4">
-                Your branded online shop where customers can browse and discover your products
+                Get discovered by local shoppers searching for products in your area
               </p>
 
               {/* Status */}
               <div className="flex items-center gap-2 mb-4">
-                {hasStorefront ? (
+                {hasPublishedDirectory ? (
                   <>
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                     <span className="text-xs font-medium text-green-700 dark:text-green-400">
-                      Live & Active
+                      Listed & Discoverable
                     </span>
                   </>
                 ) : (
                   <>
                     <div className="w-2 h-2 rounded-full bg-amber-500" />
                     <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                      Setup Required
+                      Not Listed Yet
                     </span>
                   </>
                 )}
@@ -267,32 +297,46 @@ export default function VisibilityCards({
 
               {/* Actions */}
               <div className="flex flex-wrap gap-2">
+                {/* Always show Browse Directory - filtered by location and category for proximity viewing */}
                 <Link
-                  href={finalShopUrl}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm pointer-events-auto cursor-pointer"
+                  href={proximityShopsDirectoryUrl}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors text-sm pointer-events-auto cursor-pointer"
+                  title={tenantCity && tenantCategory ? `Browse ${tenantCategory} stores in ${tenantCity}, ${tenantState}` : 'Browse shops directory'}
                   style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                 >
                   <Eye className="w-4 h-4" />
-                  View Shop
+                  {hasPublishedDirectory ? 'View Your Listing' : 'Browse Shops Directory'}
                   <ExternalLink className="w-3 h-3" />
                 </Link>
                 
-                <Link
-                  href={`/t/${tenantId}/dashboard/shops/manage`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-300 text-blue-700 rounded-lg font-medium hover:bg-blue-50 transition-colors text-sm pointer-events-auto cursor-pointer"
-                  style={{ pointerEvents: 'auto', cursor: 'pointer' }}
-                >
-                  <Settings className="w-4 h-4" />
-                  Settings
-                </Link>
-                  {/*Browse Platform Shops*/}
+                {/* Get Listed or Settings */}
+                {!hasPublishedDirectory ? (
+                  <Link
+                    href={`/t/${tenantId}/settings/directory`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm pointer-events-auto cursor-pointer"
+                    style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                  >
+                    <MapPin className="w-4 h-4" />
+                    Get Listed
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/t/${tenantId}/settings/directory`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm pointer-events-auto cursor-pointer"
+                    style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                  >
+                    <Settings className="w-4 h-4" />
+                    Settings
+                  </Link>
+                )}
+                 {/*Browse Platform Directory*/}
                  <Link
                     href={`/shops`}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm pointer-events-auto cursor-pointer"
                     style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                   >
                     <Settings className="w-4 h-4" />
-                    Browse Platform Shops
+                    Browse Shops Directory
                   </Link>
               </div>
             </div>
@@ -322,7 +366,7 @@ export default function VisibilityCards({
 
               {/* Status */}
               <div className="flex items-center gap-2 mb-4">
-                {isInDirectory ? (
+                {hasPublishedDirectory ? (
                   <>
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                     <span className="text-xs font-medium text-green-700 dark:text-green-400">
@@ -345,16 +389,16 @@ export default function VisibilityCards({
                 <Link
                   href={proximityShopsDirectoryUrl}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors text-sm pointer-events-auto cursor-pointer"
-                  title={tenantCity && tenantCategory ? `Browse ${tenantCategory} stores in ${tenantCity}, ${tenantState}` : 'Browse directory'}
+                  title={tenantCity && tenantCategory ? `Browse ${tenantCategory} stores in ${tenantCity}, ${tenantState}` : 'Browse shops directory'}
                   style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                 >
                   <Eye className="w-4 h-4" />
-                  {isInDirectory ? 'View Your Listing' : 'Browse Directory'}
+                  {hasPublishedDirectory ? 'View Your Listing' : 'Browse Shops Directory'}
                   <ExternalLink className="w-3 h-3" />
                 </Link>
                 
                 {/* Get Listed or Settings */}
-                {!isInDirectory ? (
+                {!hasPublishedDirectory ? (
                   <Link
                     href={`/t/${tenantId}/settings/directory`}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-purple-300 text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm pointer-events-auto cursor-pointer"

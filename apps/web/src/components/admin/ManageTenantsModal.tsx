@@ -13,7 +13,7 @@ interface ManageTenantsModalProps {
     email: string;
     name?: string;
     role: string;
-  };
+  } | null;
   onSuccess?: (addedTenant?: { tenant_id: string; tenantName: string; role: string } | null, removedTenantId?: string, updatedTenant?: { tenant_id: string; tenantName: string; role: string } | null) => void;
 }
 
@@ -40,12 +40,14 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
   const [editingRole, setEditingRole] = useState<EditRoleState | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && user) {
       loadTenantData();
     }
-  }, [isOpen, user.id]);
+  }, [isOpen, user?.id]);
 
   const loadTenantData = async () => {
+    if (!user) return;
+    
     setLoadingTenants(true);
     try {
       // Load user's current tenants and all available tenants in parallel
@@ -103,7 +105,7 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
   };
 
   const handleAddTenant = async () => {
-    if (!selectedTenant) return;
+    if (!selectedTenant || !user) return;
     
     setLoading(true);
     setError('');
@@ -137,6 +139,7 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
   };
 
   const handleRemoveTenant = async (tenantId: string) => {
+    if (!user) return;
     if (!confirm('Remove this tenant access? This action cannot be undone.')) {
       return;
     }
@@ -176,7 +179,7 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
   };
 
   const handleSaveRole = async () => {
-    if (!editingRole) return;
+    if (!editingRole || !user) return;
     
     setLoading(true);
     setError('');
@@ -243,7 +246,7 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
                 Manage Tenants
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {user.email}
+                {user?.email}
               </p>
             </div>
           </div>
@@ -375,7 +378,7 @@ export default function ManageTenantsModal({ isOpen, onClose, user, onSuccess }:
                     <p>User Tenants: {userTenants.length}</p>
                     <p>Available Tenants: {availableTenants.length}</p>
                     <p>Loading: {loadingTenants ? 'Yes' : 'No'}</p>
-                    <p>User ID: {user.id}</p>
+                    <p>User ID: {user?.id}</p>
                     <div className="mt-2">
                       <p className="font-medium">User Tenants:</p>
                       {userTenants.map(t => (

@@ -19,9 +19,10 @@ interface BulkConsentActionsProps {
 export function BulkConsentActions({ consents }: BulkConsentActionsProps) {
   const [updating, setUpdating] = useState(false);
 
-  const optionalConsents = consents.filter(c => !c.required);
-  const allOptionalGranted = optionalConsents.every(c => c.consented);
-  const allOptionalRevoked = optionalConsents.every(c => !c.consented);
+  // Ensure consents is an array before filtering
+  const optionalConsents = Array.isArray(consents) ? consents.filter(c => !c.required) : [];
+  const allOptionalGranted = optionalConsents.length > 0 && optionalConsents.every(c => c.consented);
+  const allOptionalRevoked = optionalConsents.length > 0 && optionalConsents.every(c => !c.consented);
 
   const handleAcceptAll = async () => {
     try {

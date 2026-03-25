@@ -18,6 +18,9 @@ export default function LocationStatusBanner({
   tenantId,
   variant = 'compact'
 }: LocationStatusBannerProps) {
+  // State must be declared before any early returns (React Rules of Hooks)
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+
   // Active locations don't need a banner
   if (locationStatus === 'active') {
     return null;
@@ -74,8 +77,6 @@ export default function LocationStatusBanner({
 
   const config = getStatusConfig();
   if (!config) return null;
-
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
   if (variant === 'full') {
     return (

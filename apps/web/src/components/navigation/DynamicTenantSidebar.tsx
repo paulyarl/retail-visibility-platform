@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { useRBAC, RBACNavGates } from '@/lib/auth/useRBAC';
+import { useAuth } from '@/contexts/AuthContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ type NavItem = RBACNavGates & {
 interface DynamicTenantSidebarProps {
   tenantId: string;
   slug?: string;
+  hasPublishedDirectory?: boolean;
   children: ReactNode;
 }
 
@@ -147,7 +149,7 @@ function buildTenantNav(
         { label: 'Branding', href: `/t/${tenantId}/settings/branding` },
         { label: 'Store Hours', href: `/t/${tenantId}/settings/hours` },
         { label: 'Business Category', href: `/t/${tenantId}/settings/gbp-category` },
-        ...(slug ? [{ label: 'My Storefront', href: `/shops/${slug}` }] : []),
+        ...(slug ? [{ label: 'My Storefront', href: `/tenant/${slug}` }] : []),
       ],
     },
     {
@@ -382,6 +384,7 @@ function MobileDrawer({
   expanded,
   onToggle,
   tenantName,
+  user,
 }: {
   open: boolean;
   onClose: () => void;
@@ -390,6 +393,7 @@ function MobileDrawer({
   expanded: Set<string>;
   onToggle: (key: string) => void;
   tenantName: string;
+  user: { email: string; firstName?: string; lastName?: string; role: string; picture?: string } | null;
 }) {
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -455,14 +459,22 @@ function DesktopSidebar({
   expanded,
   onToggle,
   tenantName,
+  user,
 }: {
   items: NavItem[];
   pathname: string;
   expanded: Set<string>;
   onToggle: (key: string) => void;
   tenantName: string;
+  user: { email: string; firstName?: string; lastName?: string; role: string; picture?: string } | null;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  
+  const displayName = user
+    ? user.firstName && user.lastName
+      ? `${user.firstName} ${user.lastName}`
+      : user.email
+    : '';
 
   return (
     <aside
@@ -491,13 +503,27 @@ function DesktopSidebar({
         </svg>
       </button>
 
-      <div className={cn('px-4 py-4 border-b border-neutral-100 dark:border-neutral-800 flex-shrink-0', collapsed && 'px-2')}>
-        {collapsed ? (
-          <div className="w-8 h-8 mx-auto rounded-lg bg-primary-600 flex items-center justify-center">
-            <Icon.Store />
-          </div>
+      {/* User identity strip */}
+      <div className={cn('flex items-center gap-3 px-4 py-4 border-b border-neutral-100 dark:border-neutral-800', collapsed && 'justify-center px-2')}>
+        {user?.picture ? (
+          <img 
+            src={user.picture} 
+            alt={displayName}
+            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+            referrerPolicy="no-referrer"
+          />
         ) : (
-          <h2 className="text-sm font-semibold text-neutral-900 dark:text-white tracking-tight truncate">{tenantName}</h2>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center flex-shrink-0">
+            <span className="text-white text-xs font-bold">
+              {displayName.charAt(0).toUpperCase() || '?'}
+            </span>
+          </div>
+        )}
+        {!collapsed && (
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-neutral-900 dark:text-white truncate">{displayName}</p>
+            <p className="text-xs text-neutral-500 truncate">{user?.role}</p>
+          </div>
         )}
       </div>
 
@@ -543,9 +569,10 @@ function SidebarSkeleton() {
  * - Slide-in mobile drawer with backdrop blur, Escape-to-close, scroll lock
  * - Directory "View in Directory" link shown conditionally based on published status
  */
-export default function DynamicTenantSidebar({ tenantId, slug, children }: DynamicTenantSidebarProps) {
+export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirectory, children }: DynamicTenantSidebarProps) {
   const pathname = usePathname();
   const { filterNavItems } = useRBAC();
+  const { user } = useAuth();
 
   const [directorySlug, setDirectorySlug] = useState<string | undefined>(slug);
   const [isPublished, setIsPublished] = useState(false);
@@ -555,11 +582,20 @@ export default function DynamicTenantSidebar({ tenantId, slug, children }: Dynam
 
   useEffect(() => {
     if (!tenantId) return;
+    // console.log(`[DynamicTenantSidebar] Fetching directory info for tenant: ${tenantId}`);
+    // console.log(`[DynamicTenantSidebar] Has published directory: ${hasPublishedDirectory}`);
+    // console.log(`[DynamicTenantSidebar] Slug: ${slug}`);
     const fetch = async () => {
       try {
+        if (!hasPublishedDirectory) {          
+          setIsPublished(false);          
+          setDirectorySlug(slug);
+          setLoading(false);
+          return;
+        }
         const directoryInfo = await directoryService.getTenantDirectorySlug(tenantId);
         if (directoryInfo) {
-          setDirectorySlug(directoryInfo.slug ?? slug);
+          setDirectorySlug(slug ?? directoryInfo.slug);
           setIsPublished(true);
         }
       } catch {
@@ -569,7 +605,7 @@ export default function DynamicTenantSidebar({ tenantId, slug, children }: Dynam
       }
     };
     fetch();
-  }, [tenantId, slug]);
+  }, [tenantId, slug, hasPublishedDirectory]);
 
   const rawItems = buildTenantNav(tenantId, slug, directorySlug, isPublished);
   const items = filterNavItems(rawItems);
@@ -602,6 +638,7 @@ export default function DynamicTenantSidebar({ tenantId, slug, children }: Dynam
           expanded={expanded}
           onToggle={toggleExpanded}
           tenantName={tenantName}
+          user={user}
         />
       )}
 
@@ -614,6 +651,7 @@ export default function DynamicTenantSidebar({ tenantId, slug, children }: Dynam
         expanded={expanded}
         onToggle={toggleExpanded}
         tenantName={tenantName}
+        user={user}
       />
 
       {/* Content area */}

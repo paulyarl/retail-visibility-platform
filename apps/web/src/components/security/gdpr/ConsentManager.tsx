@@ -43,24 +43,31 @@ export function ConsentManager() {
       },
     };
 
-    consents.forEach((consent) => {
-      if (consent.type === 'marketing') {
-        groups.marketing.consents.push(consent);
-      } else if (consent.type === 'analytics') {
-        groups.analytics.consents.push(consent);
-      } else if (consent.type === 'data_sharing' || consent.type === 'third_party') {
-        groups.sharing.consents.push(consent);
-      } else if (consent.type === 'data_processing') {
-        groups.essential.consents.push(consent);
-      } else {
-        groups.analytics.consents.push(consent);
-      }
-    });
+    // Ensure consents is an array before iterating
+    if (Array.isArray(consents)) {
+      consents.forEach((consent) => {
+        if (consent.type === 'marketing') {
+          groups.marketing.consents.push(consent);
+        } else if (consent.type === 'analytics') {
+          groups.analytics.consents.push(consent);
+        } else if (consent.type === 'data_sharing' || consent.type === 'third_party') {
+          groups.sharing.consents.push(consent);
+        } else if (consent.type === 'data_processing') {
+          groups.essential.consents.push(consent);
+        } else {
+          groups.analytics.consents.push(consent);
+        }
+      });
+    } else {
+      console.warn('[ConsentManager] consents is not an array:', consents);
+    }
 
     return Object.values(groups).filter(group => group.consents.length > 0);
   }, [consents]);
 
   const handleConsentChange = async (consentId: string, consented: boolean) => {
+    if (!Array.isArray(consents)) return;
+    
     const consent = consents.find(c => c.id === consentId);
     if (!consent) return;
 

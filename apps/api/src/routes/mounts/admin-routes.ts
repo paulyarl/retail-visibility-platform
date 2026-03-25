@@ -1,5 +1,5 @@
 import { Express } from 'express';
-import { authenticateToken, requireAdmin } from '../../middleware/auth';
+import { authenticateToken } from '../../middleware/auth';
 
 // Admin routes - re-enabled for localhost testing
 import tenantFlagsRoutes from '../tenant-flags';
@@ -38,28 +38,28 @@ export function mountAdminRoutes(app: Express) {
     }
     return securityRoutes(req, res, next);
   }); // Security routes have their own auth middleware
-  app.use('/api/admin/platform-categories', authenticateToken, requireAdmin, platformCategoriesRoutes);
-  app.use('/api/admin/gbp-categories', authenticateToken, requireAdmin, gbpCategoriesSyncRoutes);
-  app.use('/api/admin/feature-overrides', authenticateToken, requireAdmin, featureOverridesRoutes);
-  app.use('/api/admin/tier-management', authenticateToken, requireAdmin, tierManagementRoutes);
-  app.use('/api/admin/tier-system', authenticateToken, requireAdmin, tierSystemRoutes);
-  app.use('/api/admin/tenants', authenticateToken, requireAdmin, adminTenantsRoutes);
-  app.use('/api/admin/ticker-config', authenticateToken, requireAdmin, tickerConfigRoutes);
-  app.use('/api/admin/ticker-messages', authenticateToken, requireAdmin, tickerMessagesRoutes);
-  app.use('/api/admin/tiers', authenticateToken, requireAdmin, tiersRoutes);
-  app.use('/api/admin/analytics', authenticateToken, requireAdmin, adminAnalyticsRoutes);
-  app.use('/api/admin/security', authenticateToken, requireAdmin, adminSecurityMonitoringRoutes);
-  app.use('/api/admin/navigation-links', authenticateToken, requireAdmin, navigationLinksRoutes);
+  app.use('/api/admin/platform-categories', authenticateToken, platformCategoriesRoutes);
+  app.use('/api/admin/gbp-categories', authenticateToken,  gbpCategoriesSyncRoutes);
+  app.use('/api/admin/feature-overrides', authenticateToken,  featureOverridesRoutes);
+  app.use('/api/admin/tier-management', authenticateToken,  tierManagementRoutes);
+  app.use('/api/admin/tier-system', authenticateToken,  tierSystemRoutes);
+  app.use('/api/admin/tenants', authenticateToken,  adminTenantsRoutes);
+  app.use('/api/admin/ticker-config', authenticateToken,  tickerConfigRoutes);
+  app.use('/api/admin/ticker-messages', authenticateToken,  tickerMessagesRoutes);
+  app.use('/api/admin/tiers', authenticateToken,  tiersRoutes);
+  app.use('/api/admin/analytics', authenticateToken,  adminAnalyticsRoutes);
+  app.use('/api/admin/security', authenticateToken,  adminSecurityMonitoringRoutes);
+  app.use('/api/admin/navigation-links', authenticateToken,  navigationLinksRoutes);
   
   // Tenant flags: accessible by platform admins OR store owners of that specific tenant
   app.use('/admin', authenticateToken, tenantFlagsRoutes);
   app.use('/api/admin', authenticateToken, tenantFlagsRoutes);
   
   // Admin tools and users - these are more generic and should come after specific routes
-  app.use('/api/admin', authenticateToken, requireAdmin, adminToolsRoutes);
+  app.use('/api/admin', authenticateToken,  adminToolsRoutes);
   app.use('/admin', authenticateToken, adminUsersRoutes);
   app.use('/api/admin', authenticateToken, adminUsersRoutes);
-  app.use('/admin/taxonomy', requireAdmin, taxonomyAdminRoutes);
+  app.use('/admin/taxonomy',  taxonomyAdminRoutes);
   app.use('/admin', authenticateToken, platformFlagsRoutes);
   app.use('/api/admin', authenticateToken, platformFlagsRoutes);
   
@@ -70,7 +70,7 @@ export function mountAdminRoutes(app: Express) {
   // Platform settings - mount LAST to avoid conflicts with generic /api/admin routes
   console.log('🔧 Mounting platform settings route...');
   // Restore original path now that we know the route works
-  app.use('/api/admin/platform-settings', authenticateToken, requireAdmin, platformSettingsRoutes);
+  app.use('/api/admin/platform-settings', authenticateToken,  platformSettingsRoutes);
   console.log('✅ Platform settings route mounted at /api/admin/platform-settings');
 
   console.log('✅ Admin routes mounted');

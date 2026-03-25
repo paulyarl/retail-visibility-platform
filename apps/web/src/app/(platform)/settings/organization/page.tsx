@@ -136,13 +136,13 @@ export default function OrganizationPage() {
     }
   };
 
-  const handleSetHeroLocation = async () => {
-    if (!selectedHeroId || !organizationId) return;
+  const handleSetHeroLocation = async (tenantId: string) => {
+    if (!tenantId || !organizationId) return;
 
     setSettingHero(true);
     try {
       // Update hero location using the singleton service
-      const data = await organizationsService.updateHeroLocation(organizationId, selectedHeroId);
+      const data = await organizationsService.updateHeroLocation(organizationId, tenantId);
 
       if (!data) {
         throw new Error('Failed to set hero location');
@@ -408,8 +408,7 @@ export default function OrganizationPage() {
                       <button
                         key={location.tenantId}
                         onClick={() => {
-                          setSelectedHeroId(location.tenantId);
-                          handleSetHeroLocation();
+                          handleSetHeroLocation(location.tenantId);
                           setShowHeroModal(false);
                         }}
                         className={`w-full p-4 text-left rounded-lg border-2 transition-all ${

@@ -1597,6 +1597,7 @@ model users {
   business_name                    String?                            @db.VarChar(255)
   business_type                    String?                            @db.VarChar(100)
   phone                            String?                            @db.VarChar(50)
+  picture                          String?                            @db.VarChar(500)
   consent_records                  consent_records[]
   directory_featured_listings_list directory_featured_listings_list[]
   featured_products                featured_products[]

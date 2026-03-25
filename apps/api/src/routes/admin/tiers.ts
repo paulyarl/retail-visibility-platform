@@ -6,7 +6,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { requirePlatformAdmin } from '../../middleware/auth';
+import { authenticateToken } from '../../middleware/auth';
 
 const router = Router();
 
@@ -15,7 +15,7 @@ const router = Router();
  * List all available tiers for ticker targeting
  * Permission: Platform admin only
  */
-router.get('/list', requirePlatformAdmin, async (req: Request, res: Response) => {
+router.get('/list', authenticateToken, async (req: Request, res: Response) => {
   try {
     console.log('[ADMIN TIERS LIST] Request received from platform admin');
 

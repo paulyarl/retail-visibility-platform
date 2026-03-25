@@ -114,9 +114,9 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
   /**
    * Publish directory listing for the current tenant
    */
-  async publishDirectoryListing(tenantId: string): Promise<boolean> {
+  async publishDirectoryListing(tenantId: string): Promise<{ success: boolean; error?: string }> {
     if (!tenantId) {
-      throw new Error('Tenant ID is required');
+      return { success: false, error: 'Tenant ID is required' };
     }
 
     const result = await this.makeDefaultRequest<void>(
@@ -126,14 +126,22 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
     );
 
     if (!result.success) {
-      console.error('[TenantDirectoryManagement] Failed to publish directory listing:', result.error);
-      return false;
+      let errorMessage = 'Failed to publish directory listing';
+      
+      if (typeof result.error === 'string') {
+        errorMessage = result.error;
+      } else if (result.error && typeof result.error === 'object' && 'message' in result.error) {
+        errorMessage = (result.error as { message: string }).message;
+      }
+      
+      // Return error instead of throwing to treat as validation, not system error
+      return { success: false, error: errorMessage };
     }
 
     // Invalidate directory listing cache
     await this.invalidateCache(`directory-listing-${tenantId}`);
 
-    return true;
+    return { success: true };
   }
 
   /**

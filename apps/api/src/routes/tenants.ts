@@ -703,8 +703,10 @@ router.get('/:id/complete', authenticateToken, checkTenantAccess, async (req: Re
     let usageInfo: any = null;
     try {
       // Calculate usage counts directly from database
-      const [productCount, locationCount, userCount] = await Promise.all([
-        prisma.inventory_items.count({ where: { tenant_id: id } }),
+      // Use same filtering as /api/items/complete: exclude trashed items
+      const [totalItems, activeItems, locationCount, userCount] = await Promise.all([
+        prisma.inventory_items.count({ where: { tenant_id: id, item_status: { not: 'trashed' } } }),
+        prisma.inventory_items.count({ where: { tenant_id: id, item_status: 'active', visibility: { not: 'private' } } }),
         // Count actual locations for this tenant
         prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM locations WHERE tenant_id = $1`, [id])
           .then((result: any) => Number(result[0]?.count || 1))
@@ -713,7 +715,9 @@ router.get('/:id/complete', authenticateToken, checkTenantAccess, async (req: Re
       ]);
 
       usageInfo = {
-        products: productCount,
+        totalItems,
+        activeItems,
+        products: totalItems,
         locations: locationCount,
         users: userCount,
         apiCalls: 0, // Would need to implement API call tracking
@@ -738,7 +742,7 @@ router.get('/:id/complete', authenticateToken, checkTenantAccess, async (req: Re
         logoUrl: (tenant as any).tenant_business_profiles_list?.logo_url || null,
         statusInfo: getLocationStatusInfo(tenant.location_status as any),
         stats: {
-          productCount: tenant._count.inventory_items,
+          productCount: usageInfo?.totalItems || 0,
           userCount: tenant._count.user_tenants,
         },
       },
