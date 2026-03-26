@@ -354,6 +354,11 @@ export function generateShipmentId(): string {
   return `ship-${nanoid()}`;
 }
 
+// Generate variant ID function
+export function generateVariantId(parentItemId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 3);
+  return `vid-${parentItemId}-${nanoid()}`;
+}
 /**
  * Example outputs:
  * 

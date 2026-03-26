@@ -8,25 +8,25 @@
         "status": 400,
         "notImplemented": false
       },
-      "timestamp": "2026-01-26T12:03:22.754Z"
+      "timestamp": "2026-03-26T17:59:11.005Z"
     },
     {
       "name": "Featured Shops API",
       "status": "PASS",
       "result": {
-        "status": 200,
-        "notImplemented": false
+        "status": 404,
+        "notImplemented": true
       },
-      "timestamp": "2026-01-26T12:03:22.935Z"
+      "timestamp": "2026-03-26T17:59:12.104Z"
     },
     {
       "name": "Tier Middleware API",
       "status": "PASS",
       "result": {
-        "status": 404,
-        "notImplemented": true
+        "status": 400,
+        "notImplemented": false
       },
-      "timestamp": "2026-01-26T12:03:23.106Z"
+      "timestamp": "2026-03-26T17:59:12.339Z"
     },
     {
       "name": "Branding API",
@@ -35,7 +35,7 @@
         "status": 404,
         "notImplemented": true
       },
-      "timestamp": "2026-01-26T12:03:23.282Z"
+      "timestamp": "2026-03-26T17:59:12.691Z"
     },
     {
       "name": "Publishing API",
@@ -44,27 +44,19 @@
         "status": 404,
         "notImplemented": true
       },
-      "timestamp": "2026-01-26T12:03:23.453Z"
+      "timestamp": "2026-03-26T17:59:12.946Z"
     },
     {
       "name": "Advanced Features Page",
-      "status": "PASS",
-      "result": {
-        "pageLoads": true,
-        "hasContent": true,
-        "contentSize": 33642
-      },
-      "timestamp": "2026-01-26T12:03:33.180Z"
+      "status": "FAIL",
+      "error": "Advanced features test page not found",
+      "timestamp": "2026-03-26T17:59:39.883Z"
     },
     {
       "name": "Phase 1-2 Test Page",
-      "status": "PASS",
-      "result": {
-        "pageLoads": true,
-        "hasContent": true,
-        "contentSize": 34665
-      },
-      "timestamp": "2026-01-26T12:03:34.847Z"
+      "status": "FAIL",
+      "error": "Phase 1-2 test page not found",
+      "timestamp": "2026-03-26T17:59:50.898Z"
     },
     {
       "name": "Service Initialization",
@@ -73,7 +65,7 @@
         "serviceTestsPresent": false,
         "canTestServices": true
       },
-      "timestamp": "2026-01-26T12:03:34.914Z"
+      "timestamp": "2026-03-26T17:59:52.404Z"
     },
     {
       "name": "Mock Data Availability",
@@ -81,7 +73,7 @@
       "result": {
         "mockDataAvailable": false
       },
-      "timestamp": "2026-01-26T12:03:36.075Z"
+      "timestamp": "2026-03-26T18:00:01.576Z"
     },
     {
       "name": "Error Handling",
@@ -90,7 +82,7 @@
         "errorHandlingWorks": true,
         "properErrorResponse": true
       },
-      "timestamp": "2026-01-26T12:03:36.309Z"
+      "timestamp": "2026-03-26T18:00:02.125Z"
     },
     {
       "name": "TypeScript Compilation",
@@ -99,7 +91,7 @@
         "typescriptCompiles": true,
         "noRuntimeErrors": true
       },
-      "timestamp": "2026-01-26T12:03:36.372Z"
+      "timestamp": "2026-03-26T18:00:03.073Z"
     },
     {
       "name": "Universal Singleton Client",
@@ -108,11 +100,11 @@
         "singletonClientUsed": false,
         "clientIntegration": true
       },
-      "timestamp": "2026-01-26T12:03:37.857Z"
+      "timestamp": "2026-03-26T18:00:39.143Z"
     }
   ],
-  "passed": 12,
-  "failed": 0,
-  "startTime": "2026-01-26T12:03:22.493Z",
-  "endTime": "2026-01-26T12:03:37.858Z"
+  "passed": 10,
+  "failed": 2,
+  "startTime": "2026-03-26T17:59:10.159Z",
+  "endTime": "2026-03-26T18:00:39.219Z"
 }

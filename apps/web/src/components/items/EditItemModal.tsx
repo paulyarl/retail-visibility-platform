@@ -345,17 +345,29 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
         mpn: mpn.trim() || undefined,
         price_cents: price ? Math.round(parseFloat(price) * 100) : 0, // Convert dollars to cents
         price: price ? parseFloat(price) : undefined, // Keep for display
-        salePriceCents: salePrice ? Math.round(parseFloat(salePrice) * 100) : undefined,
+        sale_price_cents: salePrice ? Math.round(parseFloat(salePrice) * 100) : undefined,
         stock: stock ? parseInt(stock) : 0,
         description: description.trim() || undefined,
         metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         itemStatus: status === 'draft' ? 'active' : status, // Map draft to active for API, send as itemStatus
         item_status: status === 'draft' ? 'active' : status, // Also send snake_case version for backend
         tenantCategoryId: tenantCategoryId || null,
+        tenantId: getTenantIdFromUrl() || undefined, // Ensure tenantId is included
         payment_gateway_type: gatewaySelection.gateway_type,
         payment_gateway_id: gatewaySelection.gateway_id,
-        // Include has_variants flag when variants are enabled
-        has_variants: hasVariants && variants.length > 0,
+        // Include variants data when creating item with variants
+        ...(hasVariants && variants.length > 0 ? {
+          has_variants: true,
+          variants: variants.map(v => ({
+            variant_name: v.variant_name,
+            sku: v.sku || '', // Will be auto-generated if empty
+            price_cents: v.price_cents,
+            stock: v.stock,
+            attributes: v.attributes
+          }))
+        } : {
+          has_variants: false
+        }),
         // Digital product fields
         product_type: productType,
         ...(productType === 'digital' || productType === 'hybrid' ? {
@@ -365,12 +377,30 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
           access_duration_days: digitalProductData.accessDurationDays,
           download_limit: digitalProductData.downloadLimit,
         } : {}),
-      } as Item;
+      } as Item & {
+        has_variants?: boolean;
+        variants?: Array<{
+          variant_name: string;
+          sku: string;
+          price_cents: number;
+          stock: number;
+          attributes: Record<string, string>;
+        }>;
+        product_type?: string;
+        digital_delivery_method?: string;
+        digital_assets?: any[];
+        license_type?: string;
+        access_duration_days?: number;
+        download_limit?: number;
+      };
 
       await onSave(updatedItem);
 
-      // Save variants if enabled and item has been created
-      if (hasVariants && variants.length > 0 && updatedItem.id) {
+      // Save variants if enabled and item has been created (only for existing items or if variants weren't included in creation)
+      if (hasVariants && variants.length > 0 && updatedItem.id && !item?.id) {
+        // Skip variant creation for new items - variants were included in the initial request
+        console.log('[EditItemModal] Variants included in item creation, skipping separate variant creation');
+      } else if (hasVariants && variants.length > 0 && updatedItem.id) {
         try {
           const tenantId = getTenantIdFromUrl();
           if (tenantId) {

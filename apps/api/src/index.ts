@@ -7,7 +7,7 @@ import './newrelic';
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
-import { user_role } from '@prisma/client'; 
+import { user_role } from '@prisma/client';
 
 // Fix for Supabase SSL certificate issues in production
 // This allows Node.js to accept Supabase's SSL certificates
@@ -28,6 +28,9 @@ import { createRateLimitingMiddleware } from "./services/RateLimitingService";
 
 // Security middleware imports
 import { validateInput, securityLogger } from "./middleware/security";
+import { generateItemId, generatePhotoId, generateTenantId, generateUserTenantId, generateVariantId } from './lib/id-generator';
+import { propagateVariants } from './utils/variant-propagation';
+
 import { ssrfProtection, basicRateLimit, blockIotRequests } from "./middleware/ssrf-protection";
 import { requireRoleGroup } from "./middleware/role-validation";
 import { requirePermission } from "./middleware/role-validation";
@@ -4208,8 +4211,8 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
     // Create a category lookup map by ID
     const categoryByIdMap = new Map(directCategories.map(cat => [cat.id, cat]));
     
-    const itemsWithoutPriceCents = items.map((item: { [x: string]: any; price?: any; price_cents?: any; directory_category_id?: any; image_url?: any; category_path?: any; id: string }) => {
-      const { price_cents, directory_category_id, image_url, id, ...itemWithoutPriceCents } = item;
+    const itemsWithoutPriceCents = items.map((item: any) => {
+      const { price_cents, directory_category_id, image_url, id, metadata, ...itemWithoutPriceCents } = item;
       
       // Get featured types for this item
       const featuredTypes = featuredTypesMap.get(id) || [];
@@ -4225,6 +4228,9 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         tenantCategory = categoryMap.get(item.category_path[0]) || null;
       }
       
+      // Extract metadata fields if they exist (fallback for any custom fields)
+      const metadataObj = (typeof metadata === 'object' && metadata !== null) ? metadata as Record<string, any> : {};
+      
       // Extract featured types array and maintain backward compatibility
       const featuredTypesArray = featuredTypes.map((ft: any) => ft.featured_type);
       const primaryFeaturedType = featuredTypesArray.length > 0 ? featuredTypesArray[0] : null;
@@ -4236,6 +4242,17 @@ app.get(["/api/items", "/api/inventory", "/items", "/inventory"], authenticateTo
         tenantCategory: tenantCategory || null,
         imageUrl: image_url || null, // Map image_url to imageUrl for frontend
         categoryPath: item.category_path || [], // Also include category_path for completeness
+        // Use real database columns first, fallback to metadata for backward compatibility
+        has_variants: item.has_variants || metadataObj.has_variants || false,
+        default_variant_id: item.default_variant_id || metadataObj.default_variant_id || null,
+        product_type: item.product_type || metadataObj.product_type || 'physical',
+        digital_delivery_method: item.digital_delivery_method || metadataObj.digital_delivery_method,
+        digital_assets: item.digital_assets || metadataObj.digital_assets,
+        license_type: item.license_type || metadataObj.license_type,
+        access_duration_days: item.access_duration_days || metadataObj.access_duration_days,
+        download_limit: item.download_limit || metadataObj.download_limit,
+        payment_gateway_type: item.payment_gateway_type || metadataObj.payment_gateway_type,
+        payment_gateway_id: item.payment_gateway_id || metadataObj.payment_gateway_id,
         // Multi-type featured products support
         featuredTypes: featuredTypesArray, // Array of featured types
         featuredProducts: featuredTypes, // Full featured product details with expirations
@@ -4366,7 +4383,11 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   // Convert Decimal price to number for frontend compatibility
   // Hide price_cents from frontend since price is the authoritative field
   // Map image_url to imageUrl for frontend compatibility
-  const { price_cents, image_url, sale_price_cents, ...itemWithoutPriceCents } = it;
+  const { price_cents, image_url, sale_price_cents, metadata, ...itemWithoutPriceCents } = it;
+  
+  // Extract metadata fields if they exist (fallback for any custom fields)
+  const metadataObj = (typeof metadata === 'object' && metadata !== null) ? metadata as Record<string, any> : {};
+  
   const transformed = {
     ...itemWithoutPriceCents,
     price: it.price !== null && it.price !== undefined ? Number(it.price) : null,
@@ -4377,6 +4398,16 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     tenantCategoryId: it.directory_category_id,
     hasActivePaymentGateway: hasActivePaymentGateway || false,
     defaultGatewayType: defaultGatewayType || null,
+    // Use real database columns first, fallback to metadata for backward compatibility
+    has_variants: it.has_variants || metadataObj.has_variants || false,
+    product_type: it.product_type || metadataObj.product_type || 'physical',
+    digital_delivery_method: it.digital_delivery_method || metadataObj.digital_delivery_method,
+    digital_assets: it.digital_assets || metadataObj.digital_assets,
+    license_type: it.license_type || metadataObj.license_type,
+    access_duration_days: it.access_duration_days || metadataObj.access_duration_days,
+    download_limit: it.download_limit || metadataObj.download_limit,
+    payment_gateway_type: it.payment_gateway_type || metadataObj.payment_gateway_type,
+    payment_gateway_id: it.payment_gateway_id || metadataObj.payment_gateway_id,
     // Multi-type featured products support
     featuredTypes: featuredTypesArray, // Array of featured types
     featuredProducts: featuredTypes, // Full featured product details with expirations
@@ -4478,6 +4509,26 @@ const baseItemSchema = z.object({
   // Tenant category assignment
   directory_category_id: z.string().nullable().optional(),
   tenantCategoryId: z.string().nullable().optional(), // Accept camelCase from frontend
+  // Variant support
+  has_variants: z.boolean().optional(),
+  variants: z.array(z.object({
+    variant_name: z.string().min(1),
+    sku: z.string().min(1),
+    price_cents: z.number().int().nonnegative(),
+    sale_price_cents: z.number().int().nonnegative().nullable().optional(),
+    stock: z.number().int().nonnegative(),
+    attributes: z.record(z.string(), z.string()),
+  })).optional(),
+  // Digital product fields
+  product_type: z.enum(['physical', 'digital', 'hybrid']).optional(),
+  digital_delivery_method: z.string().optional(),
+  digital_assets: z.array(z.any()).optional(),
+  license_type: z.string().optional(),
+  access_duration_days: z.number().int().nullable().optional(),
+  download_limit: z.number().int().nullable().optional(),
+  // Payment gateway fields
+  payment_gateway_type: z.string().nullable().optional(),
+  payment_gateway_id: z.string().nullable().optional(),
 });
 
 const createItemSchema = baseItemSchema.extend({
@@ -4508,13 +4559,16 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
   
   console.log('[POST /items] Parsed data:', parsed.data);
   try {
+    // Extract variants and other special fields before creating item
+    const { variants, has_variants, product_type, digital_delivery_method, digital_assets, license_type, access_duration_days, download_limit, payment_gateway_type, payment_gateway_id, ...itemData } = parsed.data;
+    
     // If category is assigned, look up the slug for category_path
-    let categoryPath: string[] = parsed.data.category_path || [];
-    if (parsed.data.directory_category_id && categoryPath.length === 0) {
+    let categoryPath: string[] = itemData.category_path || [];
+    if (itemData.directory_category_id && categoryPath.length === 0) {
       const category = await prisma.directory_category.findFirst({
         where: {
-          id: parsed.data.directory_category_id,
-          tenantId: parsed.data.tenant_id
+          id: itemData.directory_category_id,
+          tenantId: itemData.tenant_id
         },
         select: { slug: true }
       });
@@ -4525,36 +4579,104 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
     }
 
     const data = {
-      ...parsed.data,
-      title: parsed.data.title || parsed.data.name,
-      brand: parsed.data.brand || 'Unknown',
+      ...itemData,
+      title: itemData.title || itemData.name,
+      brand: itemData.brand || 'Unknown',
       // Price logic: prioritize price (dollars) over price_cents (cents)
       // Ensure price is never undefined since it's required in the schema
-      price: parsed.data.price ?? (parsed.data.price_cents ? parsed.data.price_cents / 100 : 0),
-      price_cents: parsed.data.price_cents ?? (parsed.data.price ? Math.round(parsed.data.price * 100) : 0),
-      currency: parsed.data.currency || 'USD',
+      price: itemData.price ?? (itemData.price_cents ? itemData.price_cents / 100 : 0),
+      price_cents: itemData.price_cents ?? (itemData.price ? Math.round(itemData.price * 100) : 0),
+      currency: itemData.currency || 'USD',
       // Auto-set availability based on stock if not explicitly provided
-      availability: parsed.data.availability || (parsed.data.stock > 0 ? 'in_stock' : 'out_of_stock'),
-      tenant_id: parsed.data.tenant_id || '', // Ensure tenant_id is always a string
+      availability: itemData.availability || (itemData.stock > 0 ? 'in_stock' : 'out_of_stock'),
+      tenant_id: itemData.tenant_id || '', // Ensure tenant_id is always a string
       // Category assignment - keep both directory_category_id and category_path for storefront compatibility
-      directory_category_id: parsed.data.directory_category_id || null,
+      directory_category_id: itemData.directory_category_id || null,
       category_path: categoryPath,
+      // Include new fields as direct columns
+      has_variants: has_variants || false,
+      product_type: product_type || 'physical',
+      digital_delivery_method: digital_delivery_method as any,
+      digital_assets: digital_assets as any,
+      license_type: license_type as any,
+      access_duration_days: access_duration_days,
+      download_limit: download_limit,
+      payment_gateway_type: payment_gateway_type || null,
+      payment_gateway_id: payment_gateway_id || null,
+      // Keep metadata for any other custom fields
+      metadata: {
+        ...(typeof itemData.metadata === 'object' && itemData.metadata !== null ? itemData.metadata : {}),
+        // Remove fields that are now in dedicated columns to avoid duplication
+        ...(typeof itemData.metadata === 'object' && itemData.metadata !== null ? {
+          has_variants: undefined,
+          default_variant_id: undefined,
+          product_type: undefined,
+          digital_delivery_method: undefined,
+          digital_assets: undefined,
+          license_type: undefined,
+          access_duration_days: undefined,
+          download_limit: undefined,
+          payment_gateway_type: undefined,
+          payment_gateway_id: undefined,
+        } : {}),
+      } as any,
     };
     
-    const created = await prisma.inventory_items.create({ 
-      data: {
-        id: generateItemId(),
-        ...data,
-        updated_at: new Date(),
+    // Create item and variants in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the main item
+      const created = await tx.inventory_items.create({ 
+        data: {
+          id: generateItemId(),
+          ...data,
+          updated_at: new Date(),
+        }
+      });
+      
+      // Create variants if provided
+      if (has_variants && variants && variants.length > 0) {
+        console.log(`[POST /items] Creating ${variants.length} variants for item ${created.id}`);
+        
+        for (const variant of variants) {
+          await tx.product_variants.create({
+            data: {
+              id: generateVariantId(created.id),
+              parent_item_id: created.id,
+              tenant_id: created.tenant_id,
+              variant_name: variant.variant_name,
+              sku: variant.sku,
+              price_cents: variant.price_cents,
+              sale_price_cents: variant.sale_price_cents || null,
+              stock: variant.stock,
+              attributes: variant.attributes as any,
+              is_active: true,
+              sort_order: 0,
+              created_at: new Date(),
+              updated_at: new Date(),
+            }
+          });
+        }
+        
+        // Update the item to mark it as having variants
+        await tx.inventory_items.update({
+          where: { id: created.id },
+          data: { 
+            has_variants: true,
+          }
+        });
       }
+      
+      return created;
     });
+    
     // await audit({ tenant_id: created.tenant_id, actor: null, action: "inventory.create", payload: { id: created.id, sku: created.sku } });
     
     // Convert Decimal price to number and hide price_cents for frontend compatibility
-    const { price_cents, ...itemWithoutPriceCents } = created;
+    const { price_cents, ...itemWithoutPriceCents } = result;
     const transformed = {
       ...itemWithoutPriceCents,
-      price: created.price !== null && created.price !== undefined ? Number(created.price) : null,
+      price: result.price !== null && result.price !== undefined ? Number(result.price) : null,
+      has_variants: result.has_variants,
     };
     
     res.status(201).json(transformed);
@@ -5637,7 +5759,8 @@ app.put("/admin/email-config", async (req, res) => {
 /* ------------------------------ ROUTE MOUNTING ------------------------------ */
 // Use modular route mounting for better isolation and debugging
 import { mountMinimalRoutes, mountAllRoutes } from './routes';
-import { generateItemId, generatePhotoId, generateTenantId, generateUserTenantId } from './lib/id-generator';
+// import { generateItemId, generatePhotoId, generateTenantId, generateUserTenantId, generateVariantId } from './lib/id-generator';
+// import { propagateVariants } from './utils/variant-propagation';
 
 // For debugging: mount only minimal routes
 // mountMinimalRoutes(app);

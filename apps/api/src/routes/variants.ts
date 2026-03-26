@@ -2,13 +2,9 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth';
+import { generateVariantId } from '../lib/id-generator';
 
 const router = Router();
-
-// Helper to generate variant ID
-function generateVariantId(): string {
-  return `var-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-}
 
 // Validation schema for variant
 const variantSchema = z.object({
@@ -96,7 +92,7 @@ router.post('/items/:itemId/variants', authenticateToken, async (req: Request, r
     // Create variant
     const variant = await prisma.product_variants.create({
       data: {
-        id: generateVariantId(),
+        id: generateVariantId(itemId),
         parent_item_id: itemId,
         tenant_id: item.tenant_id,
         ...parsed.data,
@@ -175,7 +171,7 @@ router.post('/items/:itemId/variants/bulk', authenticateToken, async (req: Reque
     // Create all variants
     const created = await prisma.product_variants.createMany({
       data: validatedVariants.map(v => ({
-        id: generateVariantId(),
+        id: generateVariantId(itemId),
         parent_item_id: itemId,
         tenant_id: item.tenant_id,
         ...v,

@@ -6,7 +6,8 @@ import { validateOrganizationTier, validateOrganizationLimits, validateOrganizat
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
 import { requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
-import { generateItemId, generateOrganizationId, generatePhotoId,generateProductCatId } from '../lib/id-generator';
+import { generateItemId, generateOrganizationId, generatePhotoId, generateProductCatId, generateTenantId, generateUserTenantId,generateVariantId } from '../lib/id-generator';
+import { propagateVariants } from '../utils/variant-propagation';
 import { authenticateToken } from '../middleware/auth';
 import { user_tenant_role } from '@prisma/client';
 import TierService from '../services/TierService';
@@ -906,6 +907,22 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
             });
           }
 
+          // Propagate variants if source item has them
+          if (sourceItem.has_variants) {
+            const variantResult = await propagateVariants(
+              sourceItem.id,
+              tenantId,
+              undefined, // newItemId is not provided for update mode
+              existing.id,
+              sourceItem.directory_category_id,
+              'update'
+            );
+            
+            if (variantResult.errors.length > 0) {
+              console.error(`[Organizations] Variant propagation errors for ${updatedItem.id}:`, variantResult.errors);
+            }
+          }
+
           results.updated.push(tenantId);
           continue;
         }
@@ -971,8 +988,21 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
             missing_description: sourceItem.missing_description,
             missing_specs: sourceItem.missing_specs,
             missing_brand: sourceItem.missing_brand,
-
-
+            sale_price_cents: sourceItem.sale_price_cents,
+            payment_gateway_type: sourceItem.payment_gateway_type,
+            payment_gateway_id: sourceItem.payment_gateway_id,
+            product_type: sourceItem.product_type,
+            digital_delivery_method: sourceItem.digital_delivery_method,
+            digital_assets: sourceItem.digital_assets as any,
+            access_duration_days: sourceItem.access_duration_days,
+            download_limit: sourceItem.download_limit,
+            license_type: sourceItem.license_type,
+            has_variants: sourceItem.has_variants,
+            is_featured: sourceItem.is_featured,
+            featured_at: sourceItem.featured_at,
+            featured_until: sourceItem.featured_until,
+            featured_priority: sourceItem.featured_priority,
+            featured_type: sourceItem.featured_type,
           },
         });
 
@@ -993,6 +1023,22 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
               caption: photo.caption,
             })),
           });
+        }
+
+        // Propagate variants if source item has them
+        if (sourceItem.has_variants) {
+          const variantResult = await propagateVariants(
+            sourceItem.id,
+            tenantId,
+            newItem.id,
+            undefined, // newItemId is provided for create mode
+            sourceItem.directory_category_id,
+            'create'
+          );
+          
+          if (variantResult.errors.length > 0) {
+            console.error(`[Organizations] Variant propagation errors for ${newItem.id}:`, variantResult.errors);
+          }
         }
 
         results.created.push(tenantId);
@@ -1354,6 +1400,21 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
             missing_description: sourceItem.missing_description,
             missing_specs: sourceItem.missing_specs,
             missing_brand: sourceItem.missing_brand,
+            sale_price_cents: sourceItem.sale_price_cents,
+            payment_gateway_type: sourceItem.payment_gateway_type,
+            payment_gateway_id: sourceItem.payment_gateway_id,
+            product_type: sourceItem.product_type,
+            digital_delivery_method: sourceItem.digital_delivery_method,
+            digital_assets: sourceItem.digital_assets as any,
+            access_duration_days: sourceItem.access_duration_days,
+            download_limit: sourceItem.download_limit,
+            license_type: sourceItem.license_type,
+            has_variants: sourceItem.has_variants,
+            is_featured: sourceItem.is_featured,
+            featured_at: sourceItem.featured_at,
+            featured_until: sourceItem.featured_until,
+            featured_priority: sourceItem.featured_priority,
+            featured_type: sourceItem.featured_type,
             } as any,
           });
 
@@ -1374,6 +1435,22 @@ router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => 
                 caption: photo.caption,
               })),
             });
+          }
+
+          // Propagate variants if source item has them
+          if (sourceItem.has_variants) {
+            const variantResult = await propagateVariants(
+              sourceItem.id,
+              tenantId,
+              newItem.id,
+              undefined, // newItemId is provided for bulk create mode
+              sourceItem.directory_category_id,
+              'create'
+            );
+            
+            if (variantResult.errors.length > 0) {
+              console.error(`[Organizations] Variant propagation errors for ${newItem.id}:`, variantResult.errors);
+            }
           }
 
           results.created.push({ 

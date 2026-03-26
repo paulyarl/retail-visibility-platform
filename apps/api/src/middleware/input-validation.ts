@@ -8,11 +8,14 @@ import validator from 'validator';
 
 // List of dangerous patterns to block
 const DANGEROUS_PATTERNS = [
-  /(\bUNION\b|\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bDROP\b|\bCREATE\b|\bALTER\b|\bEXEC\b|\bEXECUTE\b)/i,
+  // SQL injection patterns - more specific to avoid false positives
+  /(\bUNION\s+SELECT|\bSELECT\s+.*\bFROM\b|\bINSERT\s+INTO|\bUPDATE\s+.*\bSET\b|\bDELETE\s+FROM\b|\bDROP\s+TABLE|\bCREATE\s+TABLE|\bALTER\s+TABLE|\bEXEC\s*\(|\bEXECUTE\s*\()/i,
+  // XSS patterns
   /(<script|javascript:|vbscript:|onload=|onerror=|onclick=|onmouseover=)/i,
+  // Path traversal
   /(\.\.|\/etc\/passwd|\/etc\/shadow|\/proc\/|\/home\/)/i,
-  // Removed null pattern - null is a valid JSON value and shouldn't be blocked
-  /(-{2,}|\/\*|\*\/)/, // SQL comments
+  // SQL comments
+  /(-{2,}|\/\*|\*\/)/,
 ];
 
 // File upload security

@@ -246,25 +246,14 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       console.log('[ItemsPageClient] Creating item with data:', data);
       console.log('[ItemsPageClient] Data keys:', Object.keys(data));
       
-      // Use the items API to create a new item
-      const payload = {
+      // Use ItemsSingletonService to create a new item
+      const itemData = {
         ...data,
         tenantId,
       };
-      console.log('[ItemsPageClient] Full payload:', payload);
+      const newItem = await itemsSingletonService.createItem(itemData, tenantId);
       
-      const response = await fetch(`/api/items`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[ItemsPageClient] Response status:', response.status);
-        console.error('[ItemsPageClient] Response body:', errorText);
+      if (!newItem) {
         throw new Error('Failed to create item');
       }
 

@@ -7,14 +7,20 @@ export interface Item {
   description?: string;
   brand?: string;
   manufacturer?: string;
+  mpn?: string; // Manufacturer Part Number
   condition?: 'new' | 'used' | 'refurbished';
   price: number | null; // Allow null prices to match database schema
+  price_cents?: number; // Price in cents for internal calculations
+  sale_price?: number | null; // Sale price in dollars for display
+  sale_price_cents?: number; // Sale price in cents for internal calculations
   stock: number;
   status: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed';
   itemStatus?: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed'; // Backend field name
+  item_status?: 'active' | 'inactive' | 'archived' | 'draft' | 'syncing' | 'trashed'; // Snake case version for backend
   visibility: 'public' | 'private';
   categoryPath?: string[];
   tenantCategoryId?: string | null;
+  tenantId?: string; // Tenant ID for the item
   tenantCategory?: {
     id: string;
     name: string;
@@ -27,6 +33,17 @@ export interface Item {
   metadata?: any;
   createdAt?: string;
   updatedAt?: string;
+  // New fields for variants and digital products
+  has_variants?: boolean;
+  default_variant_id?: string;
+  product_type?: 'physical' | 'digital' | 'hybrid';
+  digital_delivery_method?: string;
+  digital_assets?: any[];
+  license_type?: string;
+  access_duration_days?: number;
+  download_limit?: number;
+  payment_gateway_type?: string;
+  payment_gateway_id?: string;
 }
 
 export interface ItemFilters {
