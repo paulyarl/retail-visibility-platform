@@ -452,7 +452,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 const createOrgSchema = z.object({
   name: z.string().min(1),
   ownerId: z.string().min(1).optional(), // Optional - defaults to authenticated user
-  subscriptionTier: z.enum(['chain_starter', 'chain_professional', 'chain_enterprise']).default('chain_starter'),
+  subscriptionTier: z.string().min(1).default('chain_starter'), // Validated by middleware against database
   subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).default('trial'),
   maxLocations: z.number().int().positive().default(5),
   maxTotalSKUs: z.number().int().positive().default(2500),
@@ -502,8 +502,8 @@ const updateOrgSchema = z.object({
   max_locations: z.number().int().positive().optional(),
   maxTotalSKUs: z.number().int().positive().optional(),
   max_total_skus: z.number().int().positive().optional(),
-  subscriptionTier: z.enum(['chain_starter', 'chain_professional', 'chain_enterprise']).optional(),
-  subscription_tier: z.enum(['chain_starter', 'chain_professional', 'chain_enterprise']).optional(),
+  subscriptionTier: z.string().min(1).optional(), // Validated by middleware against database
+  subscription_tier: z.string().min(1).optional(), // Validated by middleware against database
   subscriptionStatus: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
   subscription_status: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
 });

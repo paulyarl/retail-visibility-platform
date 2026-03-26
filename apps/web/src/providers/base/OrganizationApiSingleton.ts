@@ -268,7 +268,7 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
     }
     
     // Fall back to parent for non-organization endpoints
-    return this.makeDefaultRequest<T>(endpoint, options, cacheKey, cacheTTL);
+    return super.makeDefaultRequest<T>(endpoint, options as any, cacheKey, cacheTTL);
   }
 
   // New organization-aware request method

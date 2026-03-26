@@ -2,6 +2,7 @@
  * Admin Categories Service - Admin API Pattern
  * 
  * Manages admin category operations for platform administration
+ * Uses google_taxonomy_list table for Google Product Categories
  * Extends AdminApiSingleton for admin privilege validation and caching
  */
 
@@ -11,20 +12,12 @@ import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface AdminCategory {
   id: string;
+  category_id: string;
   name: string;
-  slug?: string;
-  description?: string;
-  icon_emoji?: string;
-  googleCategoryId?: string;
-  parentId?: string;
-  level?: number;
-  path?: string;
-  isActive: boolean;
-  sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
-  productCount?: number;
-  tenantCount?: number;
+  full_path: string;
+  level: number;
+  parent_id: string | null;
+  is_active: boolean;
 }
 
 export interface CreateCategoryRequest {
@@ -75,16 +68,21 @@ class AdminCategoriesService extends AdminApiSingleton {
   }
 
   /**
-   * Get all platform categories
+   * Get all Google Product Taxonomy categories
+   * Uses /api/admin/taxonomy endpoint (google_taxonomy_list table)
+   * @param forceRefresh - Bypass cache and fetch fresh data
    */
-  async getCategories(): Promise<AdminCategory[]> {
-    const result = await this.makeDefaultRequest<{
-      categories: AdminCategory[];
-    }>(
-      '/api/platform/categories',
+  async getCategories(forceRefresh: boolean = false): Promise<AdminCategory[]> {
+    // If forceRefresh, use unique cache key to bypass stale cache
+    const cacheKey = forceRefresh 
+      ? `admin-taxonomy-list-${Date.now()}` 
+      : 'admin-taxonomy-list';
+    
+    const result = await this.makeDefaultRequest<{ success: boolean; data: AdminCategory[]; pagination: { total: number } }>(
+      '/api/admin/taxonomy',
       {},
-      'admin-categories-list',
-      this.CATEGORIES_TTL
+      cacheKey,
+      forceRefresh ? 0 : this.CATEGORIES_TTL
     );
 
     if (!result.success) {
@@ -92,7 +90,95 @@ class AdminCategoriesService extends AdminApiSingleton {
       return [];
     }
 
-    return result.data?.categories || [];
+    // makeDefaultRequest wraps the API response: result.data = { success: true, data: Category[], pagination }
+    const apiResponse = result.data;
+    if (apiResponse && apiResponse.data && Array.isArray(apiResponse.data)) {
+      return apiResponse.data;
+    }
+    console.warn('[AdminCategoriesService] Expected array but got:', typeof apiResponse?.data, apiResponse);
+    return [];
+  }
+
+  /**
+   * Search Google Product Taxonomy categories
+   * Uses /api/taxonomy/search which searches the JSON file directly (fast, no DB)
+   * @param query - Search query
+   * @param limit - Max results (default 100)
+   */
+  async searchCategories(query: string, limit: number = 100): Promise<AdminCategory[]> {
+    if (!query.trim()) {
+      return this.getCategories(true);
+    }
+
+    interface TaxonomySearchResult {
+      id: string;
+      name: string;
+      path: string[];
+      level: number;
+    }
+
+    const result = await this.makeDefaultRequest<{ success: boolean; results: TaxonomySearchResult[]; total: number }>(
+      `/api/taxonomy/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+      {},
+      `taxonomy-search-${query}-${limit}`,
+      60 * 1000 // 1 minute TTL
+    );
+
+    if (!result.success) {
+      console.error('[AdminCategoriesService] Search failed:', result.error);
+      return [];
+    }
+
+    // API returns { success: true, results: [...], total: n }
+    const apiResponse = result.data;
+    if (apiResponse && Array.isArray(apiResponse.results)) {
+      // Map to AdminCategory format
+      return apiResponse.results.map(cat => ({
+        id: cat.id,
+        category_id: cat.id,
+        name: cat.name,
+        full_path: Array.isArray(cat.path) ? cat.path.join(' > ') : cat.name,
+        level: cat.level || (cat.path?.length || 1),
+        parent_id: null,
+        is_active: true,
+      }));
+    }
+    return [];
+  }
+
+  /**
+   * Propagate selected categories to tenant catalogs
+   * Admin-only operation to push Google taxonomy categories to tenant directory_category tables
+   */
+  async propagateCategories(params: {
+    categories: Array<{ category_id: string; name: string; full_path: string }>;
+    scope: 'tenant' | 'organization' | 'platform';
+    tenantId?: string;
+    organizationId?: string;
+    dryRun: boolean;
+  }): Promise<{ success: boolean; propagated: number; tenantsAffected: number; dryRun: boolean; error?: string }> {
+    try {
+      const response = await this.makeDefaultRequest<{ success: boolean; propagated: number; tenantsAffected: number; dryRun: boolean }>(
+        '/api/admin/categories/propagate',
+        {
+          method: 'POST',
+          body: JSON.stringify(params),
+        },
+        `admin-propagate-${Date.now()}`,
+        0 // No cache for mutations
+      );
+
+      if (!response.success) {
+        console.error('[AdminCategoriesService] Propagation failed:', response.error);
+        const errorMsg = typeof response.error === 'string' ? response.error : JSON.stringify(response.error);
+        return { success: false, propagated: 0, tenantsAffected: 0, dryRun: params.dryRun, error: errorMsg };
+      }
+
+      return response.data || { success: true, propagated: 0, tenantsAffected: 0, dryRun: params.dryRun };
+    } catch (error: any) {
+      console.error('[AdminCategoriesService] Propagation error:', error);
+      return { success: false, propagated: 0, tenantsAffected: 0, dryRun: params.dryRun, error: error.message };
+    }
   }
 
   /**

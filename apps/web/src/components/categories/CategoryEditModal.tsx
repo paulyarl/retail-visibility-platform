@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Modal, ModalFooter, Button, Input } from '@/components/ui';
-import PublicCategoriesService from '@/services/PublicCategoriesService';
+import { tenantCategoriesService, type GoogleTaxonomyCategory } from '@/services/TenantCategoriesService';
 
 interface TaxonomyResult {
   id: string;
@@ -23,6 +23,7 @@ interface CategoryEditModalProps {
     googleCategoryId?: string;
     description?: string;
     iconEmoji?: string;
+    isActive?: boolean;
   } | null;
   isCreate?: boolean;
   title?: string;
@@ -36,6 +37,7 @@ export interface CategoryFormData {
   googleCategoryId: string;
   description?: string;
   iconEmoji?: string;
+  isActive: boolean;
 }
 
 /**
@@ -62,6 +64,7 @@ export function CategoryEditModal({
   const [formGoogleId, setFormGoogleId] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formIconEmoji, setFormIconEmoji] = useState('📦');
+  const [formIsActive, setFormIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // Taxonomy search state
@@ -90,12 +93,12 @@ export function CategoryEditModal({
         setFormGoogleId(category.googleCategoryId || '');
         setFormDescription(category.description || '');
         setFormIconEmoji(category.iconEmoji || '📦');
+        setFormIsActive(category.isActive ?? true);
         
         // Fetch current path if category has a Google ID
         if (category.googleCategoryId) {
           setCurrentPathLoading(true);
-          // MIGRATION: Using PublicCategoriesService instead of direct fetch
-          PublicCategoriesService.getGoogleTaxonomyById(category.googleCategoryId)
+          tenantCategoriesService.getGoogleTaxonomyById(category.googleCategoryId)
             .then(data => {
               if (data?.path) {
                 const pathStr = Array.isArray(data.path) ? data.path.join(' > ') : data.path;
@@ -119,6 +122,7 @@ export function CategoryEditModal({
         setFormGoogleId('');
         setFormDescription('');
         setFormIconEmoji('📦');
+        setFormIsActive(true);
         setCurrentPath(null);
       }
       setTaxQuery('');
@@ -143,13 +147,12 @@ export function CategoryEditModal({
     const timer = setTimeout(async () => {
       setTaxLoading(true);
       try {
-        // MIGRATION: Using PublicCategoriesService instead of direct fetch
-        const result = await PublicCategoriesService.searchTaxonomy(taxQuery, { limit: 20 });
-        setTaxResults(result.nodes.map(node => ({
-          id: node.id,
-          name: node.name,
-          path: node.path.split('/'),
-          hasChildren: node.children && node.children.length > 0
+        const results = await tenantCategoriesService.searchGoogleTaxonomy(taxQuery, 20);
+        setTaxResults(results.map(r => ({
+          id: r.id,
+          name: r.name,
+          path: r.path,
+          hasChildren: false
         })));
       } catch (e) {
         console.error('Taxonomy search failed:', e);
@@ -164,23 +167,14 @@ export function CategoryEditModal({
   const loadTaxBrowseCategories = useCallback(async (path: string[] = []) => {
     setTaxBrowseLoading(true);
     try {
-      // MIGRATION: Using PublicCategoriesService instead of direct fetch
-      const nodes = await PublicCategoriesService.getTaxonomyNodes({ 
-        maxDepth: path.length + 1,
-        includeInactive: false 
-      });
-      
-      // Filter nodes by path
-      const pathStr = path.join('/');
-      const filteredNodes = nodes.filter(node => 
-        node.path === pathStr || node.path.startsWith(pathStr + '/')
-      );
-      
-      setTaxBrowseCategories(filteredNodes.map(node => ({
-        id: node.id,
-        name: node.name,
-        path: node.path.split('/'),
-        hasChildren: node.children && node.children.length > 0
+      // API expects / as path separator
+      const pathStr = path.length > 0 ? path.join('/') : undefined;
+      const categories = await tenantCategoriesService.browseGoogleTaxonomy(pathStr);
+      setTaxBrowseCategories(categories.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        path: cat.path,
+        hasChildren: cat.hasChildren ?? false
       })));
     } catch (e) {
       console.error('Taxonomy browse failed:', e);
@@ -205,6 +199,7 @@ export function CategoryEditModal({
         googleCategoryId: formGoogleId,
         description: formDescription.trim(),
         iconEmoji: formIconEmoji,
+        isActive: formIsActive,
       });
       onClose();
     } catch (error) {
@@ -258,6 +253,36 @@ export function CategoryEditModal({
             onChange={(e) => setFormSort(Number(e.target.value))}
             className="w-full border border-neutral-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
+        </div>
+
+        {/* Status */}
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">Status</label>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setFormIsActive(true)}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                formIsActive
+                  ? 'bg-green-100 text-green-700 border-2 border-green-500'
+                  : 'bg-neutral-100 text-neutral-600 border border-neutral-300 hover:bg-neutral-200'
+              }`}
+            >
+              ✓ Active
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormIsActive(false)}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                !formIsActive
+                  ? 'bg-red-100 text-red-700 border-2 border-red-500'
+                  : 'bg-neutral-100 text-neutral-600 border border-neutral-300 hover:bg-neutral-200'
+              }`}
+            >
+              ✗ Inactive
+            </button>
+          </div>
+          <p className="text-xs text-neutral-500 mt-1">Inactive categories won't appear in public listings.</p>
         </div>
 
         {/* Icon Emoji */}
@@ -413,7 +438,7 @@ export function CategoryEditModal({
                         {cat.hasChildren && (
                           <button
                             type="button"
-                            onClick={() => navigateToPath([...taxBrowsePath, cat.name])}
+                            onClick={() => navigateToPath(cat.path)}
                             className="px-3 py-2 text-primary-600 hover:text-primary-800 hover:bg-primary-50"
                           >
                             →

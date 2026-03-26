@@ -261,4 +261,38 @@ router.get('/browse', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/taxonomy/:id
+ * Get a single Google taxonomy category by ID
+ * NOTE: This must be last to avoid matching /search and /browse
+ */
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const category = GOOGLE_PRODUCT_TAXONOMY.find(cat => cat.id === id);
+    
+    if (!category) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Category not found',
+        id 
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        id: category.id,
+        name: category.path[category.path.length - 1],
+        path: category.path,
+        level: category.path.length
+      }
+    });
+  } catch (error) {
+    console.error('[GET /api/taxonomy/:id] Error:', error);
+    res.status(500).json({ success: false, error: 'failed_to_get_taxonomy' });
+  }
+});
+
 export default router;

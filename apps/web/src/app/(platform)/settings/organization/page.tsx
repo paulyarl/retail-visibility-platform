@@ -148,9 +148,23 @@ export default function OrganizationPage() {
         throw new Error('Failed to set hero location');
       }
 
+      // Update orgData state directly using the response data (no extra API call)
+      setOrgData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          locationBreakdown: prev.locationBreakdown.map(loc => ({
+            ...loc,
+            metadata: {
+              ...loc.metadata,
+              isHeroLocation: loc.tenantId === data.heroTenantId
+            }
+          }))
+        };
+      });
+
       alert(`✅ ${data.heroTenantName} is now set as the hero location!`);
-      
-      // Reload organization data - React Query handles cache invalidation automatically
+      setShowHeroModal(false);
     } catch (err: any) {
       console.error('Failed to set hero location:', err);
       alert(`❌ Error: ${err.message}`);
@@ -631,7 +645,7 @@ export default function OrganizationPage() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => window.location.href = '/admin/categories'}
+                        onClick={() => window.location.href = '/settings/admin/categories'}
                       >
                         Manage →
                       </Button>

@@ -9,7 +9,14 @@ const router = Router();
 
 router.get('/categories', authenticateToken, requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const categories = await categoryService.getTenantCategories('platform');
+    const { prisma } = await import('../prisma');
+    const categories = await prisma.platform_categories.findMany({
+      where: { is_active: true },
+      orderBy: [
+        { sort_order: 'asc' },
+        { name: 'asc' },
+      ],
+    });
     return res.json({ success: true, data: categories });
   } catch (e: any) {
     return res.status(500).json({ success: false, error: e?.message || 'internal_error' });

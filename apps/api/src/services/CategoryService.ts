@@ -9,6 +9,7 @@ export type UpdateCategoryInput = Partial<{
   parentId: string | null
   googleCategoryId: string | null
   sortOrder: number
+  isActive: boolean
 }>
 
 export const categoryService = {
@@ -36,6 +37,7 @@ export const categoryService = {
         parentId: input.parentId ?? undefined,
         googleCategoryId: input.googleCategoryId ?? undefined,
         sortOrder: input.sortOrder ?? 0,
+        isActive: input.isActive ?? true,
         updatedAt: new Date(),
       } as any,
     })

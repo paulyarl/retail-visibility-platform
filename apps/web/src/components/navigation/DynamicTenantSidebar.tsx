@@ -179,8 +179,9 @@ function buildTenantNav(
         { label: 'Language & Region', href: `/t/${tenantId}/settings/language` },
         { label: 'Subscription', href: `/t/${tenantId}/settings/subscription`, requiredPermission: 'CAN_MANAGE_TENANT_BILLING' },
         { label: 'Onboarding', href: `/t/${tenantId}/settings/onboarding`, requiredPermission: 'CAN_MANAGE_TENANT_SETTINGS' },
-        { label: 'Organization Dashboard', href: `/t/${tenantId}/settings/organization`, requiredGroup: 'CAN_MANAGE_TENANT_SETTINGS' },
-        { label: 'Propagation', href: `/t/${tenantId}/settings/propagation`, requiredGroup: 'CAN_MANAGE_TENANT_SETTINGS' },
+        { label: 'Organization Dashboard', href: `/t/${tenantId}/settings/organization` },
+        { label: 'Propagation Settings', href: `/t/${tenantId}/settings/propagation` },
+        { label: 'Propagation Center', href: `/t/${tenantId}/propagation` },
       ],
     },
     {

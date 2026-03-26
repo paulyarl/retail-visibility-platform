@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 
 import { useSecurityMonitoring } from '@/hooks/useSecurityMonitoring';
 import { useAdminSecurityMonitoring } from '@/hooks/useAdminSecurityMonitoring';
+import { useAdminSecurityData } from '@/hooks/useAdminSecurityData';
 import { getAlertsByType } from '@/services/securityMonitoring';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -40,6 +41,16 @@ export function SecurityDashboard() {
     handlePageChange,
     handlePageSizeChange,
   } = useAdminSecurityMonitoring();
+  
+  // Use the new admin security data hook for better caching
+  const { 
+    securitySessions: cachedSessions,
+    securityStats: cachedStats,
+    securityAlerts: cachedAlerts,
+    securityAlertStats: cachedAlertStats,
+    failedLogins: cachedFailedLogins,
+    loading: cachedLoading
+  } = useAdminSecurityData();
 
   const { user } = useAuth();
   const currentUserId = user?.id;

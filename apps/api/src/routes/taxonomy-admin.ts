@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { GOOGLE_PRODUCT_TAXONOMY, CategoryNode } from '../lib/google/taxonomy';
+import { authenticateToken, requireAdmin } from '../middleware/auth';
 
 const router = Router();
 
@@ -19,6 +20,104 @@ function collectNodes(nodes: CategoryNode[], opts?: { parentId?: string; level?:
   }
   return out;
 }
+
+/**
+ * GET /admin/taxonomy
+ * Get all Google Product Taxonomy categories from google_taxonomy_list table
+ * Used by /settings/admin/categories page
+ */
+router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { search, level, limit = '1000', offset = '0' } = req.query;
+    
+    const limitNum = parseInt(limit as string, 10);
+    const offsetNum = parseInt(offset as string, 10);
+    
+    let where: any = { is_active: true };
+    
+    // Filter by level if provided
+    if (level) {
+      where.level = parseInt(level as string, 10);
+    }
+    
+    // Search by category_path if provided
+    if (search && typeof search === 'string') {
+      where.category_path = { contains: search, mode: 'insensitive' };
+    }
+    
+    const categories = await prisma.google_taxonomy_list.findMany({
+      where,
+      orderBy: [
+        { level: 'asc' },
+        { category_path: 'asc' },
+      ],
+      take: limitNum,
+      skip: offsetNum,
+    });
+    
+    const total = await prisma.google_taxonomy_list.count({ where });
+    
+    res.json({
+      success: true,
+      data: categories.map(cat => ({
+        id: cat.id,
+        category_id: cat.category_id,
+        name: cat.category_path.split(' > ').pop() || cat.category_path,
+        full_path: cat.category_path,
+        level: cat.level,
+        parent_id: cat.parent_id,
+        is_active: cat.is_active,
+      })),
+      pagination: {
+        total,
+        limit: limitNum,
+        offset: offsetNum,
+      },
+    });
+  } catch (error) {
+    console.error('[GET /admin/taxonomy] Error:', error);
+    res.status(500).json({ success: false, error: 'failed_to_get_taxonomy' });
+  }
+});
+
+/**
+ * GET /admin/taxonomy/:id
+ * Get a single Google taxonomy category by ID
+ */
+router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const category = await prisma.google_taxonomy_list.findFirst({
+      where: {
+        OR: [
+          { id },
+          { category_id: id },
+        ],
+      },
+    });
+    
+    if (!category) {
+      return res.status(404).json({ success: false, error: 'category_not_found' });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        id: category.id,
+        category_id: category.category_id,
+        name: category.category_path.split(' > ').pop() || category.category_path,
+        full_path: category.category_path,
+        level: category.level,
+        parent_id: category.parent_id,
+        is_active: category.is_active,
+      },
+    });
+  } catch (error) {
+    console.error('[GET /admin/taxonomy/:id] Error:', error);
+    res.status(500).json({ success: false, error: 'failed_to_get_taxonomy_category' });
+  }
+});
 
 async function upsertInBatches(items: any[], batchSize = 200) {
   console.log(`[upsertInBatches] Processing ${items.length} items in batches of ${batchSize}`);

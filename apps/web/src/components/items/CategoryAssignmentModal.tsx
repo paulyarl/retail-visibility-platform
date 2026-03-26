@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Item } from '@/services/itemsDataService';
 import CategorySelector from './CategorySelector';
+import TenantCategorySelector from './TenantCategorySelector';
 import { tenantCategoriesService } from '@/services/TenantCategoriesService';
 
 interface CategoryAssignmentModalProps {
@@ -11,7 +12,9 @@ interface CategoryAssignmentModalProps {
 
 /**
  * Modal for assigning tenant categories to items
- * When a Google taxonomy category is selected, creates/finds a tenant category
+ * Dual mode: 
+ * - "My Categories" (easy): Select from tenant's existing categories
+ * - "Browse All" (advanced): Browse Google taxonomy, creates tenant category on selection
  */
 export default function CategoryAssignmentModal({
   item,
@@ -21,8 +24,14 @@ export default function CategoryAssignmentModal({
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(item.tenantCategoryId || '');
   const [selectedCategoryName, setSelectedCategoryName] = useState<string>('');
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [mode, setMode] = useState<'tenant' | 'google'>('tenant'); // Default to easy mode
 
-  const handleCategorySelect = async (category: { path: string[]; id: string; name: string }) => {
+  const handleTenantCategorySelect = (categoryId: string) => {
+    setSelectedCategoryId(categoryId);
+    // The name will be shown via the selected state display
+  };
+
+  const handleGoogleCategorySelect = async (category: { path: string[]; id: string; name: string }) => {
     try {
       setIsCreatingCategory(true);
       
@@ -130,11 +139,53 @@ export default function CategoryAssignmentModal({
             </div>
           )}
 
-          <CategorySelector
-            currentCategory={[]}
-            onCategorySelect={handleCategorySelect}
-            onCancel={onClose}
-          />
+          {/* Mode Toggle */}
+          <div className="flex gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => setMode('tenant')}
+              className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                mode === 'tenant'
+                  ? 'bg-primary-100 text-primary-700 border-2 border-primary-500'
+                  : 'bg-neutral-100 text-neutral-600 border border-neutral-300 hover:bg-neutral-200'
+              }`}
+            >
+              📋 My Categories
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('google')}
+              className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                mode === 'google'
+                  ? 'bg-primary-100 text-primary-700 border-2 border-primary-500'
+                  : 'bg-neutral-100 text-neutral-600 border border-neutral-300 hover:bg-neutral-200'
+              }`}
+            >
+              🌐 Browse All (Google)
+            </button>
+          </div>
+
+          {/* Mode hint */}
+          <div className="text-xs text-neutral-500 mb-4">
+            {mode === 'tenant' 
+              ? 'Select from your existing categories. Manage categories on the Categories page.'
+              : 'Browse the full Google taxonomy. A new category will be created automatically if needed.'}
+          </div>
+
+          {/* Category Selector */}
+          {mode === 'tenant' ? (
+            <TenantCategorySelector
+              selectedCategoryId={selectedCategoryId}
+              onSelect={handleTenantCategorySelect}
+              onCancel={undefined}
+            />
+          ) : (
+            <CategorySelector
+              currentCategory={[]}
+              onCategorySelect={handleGoogleCategorySelect}
+              onCancel={onClose}
+            />
+          )}
         </div>
 
         {/* Footer */}

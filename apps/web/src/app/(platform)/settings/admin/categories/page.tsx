@@ -3,10 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 import { Modal, ModalFooter, Input, Pagination, Spinner } from '@/components/ui';
-import { Tag, Globe, Edit, Trash2 } from 'lucide-react';
+import { Tag, Globe, Edit } from 'lucide-react';
 import PageHeader, { Icons } from '@/components/PageHeader';
-import { QuickStartCategoryModal } from '@/components/quick-start';
-import { CategoryEditModal, type CategoryFormData } from '@/components/categories';
 import { adminCategoriesService } from '@/services/AdminCategoriesService';
 import { adminUsersService } from '@/services/AdminUsersService';
 import { organizationService } from '@/services/OrganizationService';
@@ -15,15 +13,15 @@ import { organizationsService } from '@/services/OrganizationsSingletonService';
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
+// Category from google_taxonomy_list table (Google Product Taxonomy)
 interface Category {
   id: string;
-  name: string;
-  createdAt?: string;
-  googleCategoryId?: string;
-  google_category_id?: string;
-  slug?: string;
-  description?: string;
-  icon_emoji?: string;
+  category_id: string;  // Numeric Google taxonomy ID (e.g., "166", "7385")
+  name: string;        // Last segment of full_path
+  full_path: string;   // Full path (e.g., "Electronics > Televisions")
+  level: number;       // Depth in taxonomy (1 = top level)
+  parent_id: string | null;
+  is_active: boolean;
 }
 
 // Component to display Google category ID with lookup utility
@@ -122,25 +120,18 @@ interface Organization {
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set()); // Selected category IDs for propagation
   const [dryRun, setDryRun] = useState(true);
-  const [mirrorLoading, setMirrorLoading] = useState(false);
+  const [propagationLoading, setPropagationLoading] = useState(false);
   const [tenantIdInput, setTenantIdInput] = useState('');
   const [organizationIdInput, setOrganizationIdInput] = useState('');
   const [scope, setScope] = useState<'tenant' | 'organization' | 'platform'>('organization');
-  const [lastJobId, setLastJobId] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<any>(null);
-  const [lastSummary, setLastSummary] = useState<any>(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [confirmWriteOpen, setConfirmWriteOpen] = useState(false);
-  const [polling, setPolling] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [showQuickStartModal, setShowQuickStartModal] = useState(false);
   
   // Tenant and Organization lists for dropdowns
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -197,15 +188,9 @@ export default function AdminCategoriesPage() {
     }
   };
 
-  // Filter and paginate categories
-  const filteredCategories = categories.filter(cat => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    return cat.name.toLowerCase().includes(query) || cat.id.toLowerCase().includes(query);
-  });
-
-  const totalPages = Math.ceil(filteredCategories.length / pageSize);
-  const paginatedCategories = filteredCategories.slice(
+  // Paginate categories (search is handled by API)
+  const totalPages = Math.ceil(categories.length / pageSize);
+  const paginatedCategories = categories.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
@@ -217,163 +202,107 @@ export default function AdminCategoriesPage() {
 
   const loadCategories = async () => {
     try {
-      const categories = await adminCategoriesService.getCategories();
-      console.log('[Load Categories] Parsed categories:', categories);
-      setCategories(categories);
+      // Use search API if query present, otherwise load from DB
+      const categories = searchQuery.trim()
+        ? await adminCategoriesService.searchCategories(searchQuery, 500)
+        : await adminCategoriesService.getCategories(true);
+      console.log('[Load Categories] Parsed categories:', categories.length);
+      // Ensure categories is always an array
+      setCategories(Array.isArray(categories) ? categories : []);
     } catch (error) {
       console.error('Failed to load categories:', error);
+      setCategories([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const pollUntilCompleted = async (jobId: string, maxMs = 8000, intervalMs = 500) => {
-    setPolling(true);
-    const start = Date.now();
-    while (Date.now() - start < maxMs) {
-      await loadLastSummary();
-      const done = (lastSummary && lastSummary.jobId === jobId && lastSummary.completedAt) ? true : false;
-      if (done) break;
-      await new Promise((r) => setTimeout(r, intervalMs));
-    }
-    setPolling(false);
-  };
-
-  const loadLastSummary = async () => {
-    setSummaryLoading(true);
-    try {
-      // MIGRATION: Using AdminCategoriesService instead of direct fetch
-      const summary = await adminCategoriesService.getMirrorLastRunSummary(tenantIdInput.trim());
-      setLastSummary(summary?.data ?? null);
-    } catch (e) {
-      setLastSummary(null);
-    } finally {
-      setSummaryLoading(false);
-    }
-  };
-
+  // Debounced search effect
   useEffect(() => {
-    // Auto-load summary when tenantId input changes
-    loadLastSummary();
+    const timer = setTimeout(() => {
+      loadCategories();
+    }, 300); // 300ms debounce
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantIdInput]);
+  }, [searchQuery]);
 
-  // Handler for CategoryEditModal - works for both create and edit
-  const handleSaveCategory = async (data: CategoryFormData) => {
-    try {
-      if (selectedCategory) {
-        // Edit existing category
-        const updated = await adminCategoriesService.updateCategory(selectedCategory.id, {
-          name: data.name,
-          slug: data.slug,
-          googleCategoryId: data.googleCategoryId,
-          description: data.description,
-          icon_emoji: data.iconEmoji,
-        });
-        
-        if (!updated) {
-          throw new Error('Failed to update category');
-        }
+  // Toggle category selection for propagation
+  const toggleCategorySelection = (categoryId: string) => {
+    setSelectedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
       } else {
-        // Create new category
-        const created = await adminCategoriesService.createCategory({
-          name: data.name,
-          slug: data.slug,
-          googleCategoryId: data.googleCategoryId,
-          description: data.description,
-          icon_emoji: data.iconEmoji,
-        });
-        
-        if (!created) {
-          throw new Error('Failed to create category');
-        }
+        next.add(categoryId);
       }
-      
-      await loadCategories();
-      setShowEditModal(false);
-      setShowCreateModal(false);
-      setSelectedCategory(null);
-    } catch (error: any) {
-      console.error('Failed to save category:', error);
-      // Show error to user (could add toast notification here)
-      throw error;
+      return next;
+    });
+  };
+
+  // Select/deselect all visible categories
+  const toggleSelectAll = () => {
+    if (selectedCategories.size === paginatedCategories.length) {
+      setSelectedCategories(new Set());
+    } else {
+      setSelectedCategories(new Set(paginatedCategories.map(c => c.id)));
     }
   };
 
-  const handleDelete = async () => {
-    if (!selectedCategory) return;
-    
-    try {
-      const success = await adminCategoriesService.deleteCategory(selectedCategory.id);
-      
-      if (success) {
-        await loadCategories();
-        setShowDeleteModal(false);
-        setSelectedCategory(null);
-      }
-    } catch (error) {
-      console.error('Failed to delete category:', error);
+  // Propagate selected categories to target tenants
+  const handlePropagate = async () => {
+    if (selectedCategories.size === 0) {
+      alert('Please select at least one category to propagate');
+      return;
     }
-  };
 
-  const actuallyRunMirror = async () => {
-    if (mirrorLoading) return;
-    setMirrorLoading(true);
+    if (scope === 'tenant' && !tenantIdInput.trim()) {
+      alert('Please enter a tenant ID');
+      return;
+    }
+
+    if (scope === 'organization' && !organizationIdInput.trim()) {
+      alert('Please enter an organization ID');
+      return;
+    }
+
+    if (scope === 'platform' && !confirm('⚠️ WARNING: This will propagate to ALL tenants across ALL organizations! Are you sure?')) {
+      return;
+    }
+
+    setPropagationLoading(true);
     setLastResult(null);
-    try {
-      const body: any = { strategy: 'platform_to_gbp', dryRun, scope };
-      if (scope === 'tenant' && tenantIdInput.trim()) body.tenantId = tenantIdInput.trim();
-      if (scope === 'organization' && organizationIdInput.trim()) body.organizationId = organizationIdInput.trim();
-      if (scope === 'platform' && !confirm('⚠️ WARNING: This will affect ALL tenants across ALL organizations on the platform! Are you absolutely sure?')) {
-        setMirrorLoading(false);
-        return;
-      }
-      
-      const result = await organizationsService.mirrorCategories(body);
-      if (result && result.jobId) {
-        setLastJobId(String(result.jobId));
-        setLastResult(result);
-        // brief poll for completion
-        pollUntilCompleted(String(result.jobId)).catch(() => {});
-      } else {
-        setLastResult({ error: true, message: 'Failed to start mirroring' });
-      }
-    } catch (e: any) {
-      setLastResult({ error: true, message: e?.message || 'request_failed' });
-    } finally {
-      setMirrorLoading(false);
-    }
-  };
 
-  const handleMirror = async () => {
-    if (dryRun) {
-      return actuallyRunMirror();
+    try {
+      const selectedCats = categories.filter(c => selectedCategories.has(c.id));
+      
+      const response = await adminCategoriesService.propagateCategories({
+        categories: selectedCats.map(c => ({
+          category_id: c.category_id,
+          name: c.name,
+          full_path: c.full_path,
+        })),
+        scope,
+        tenantId: scope === 'tenant' ? tenantIdInput.trim() : undefined,
+        organizationId: scope === 'organization' ? organizationIdInput.trim() : undefined,
+        dryRun,
+      });
+
+      setLastResult(response);
+      
+      if (response.success) {
+        alert(`Successfully propagated ${response.propagated} categories to ${response.tenantsAffected} tenants`);
+      }
+    } catch (error: any) {
+      console.error('Propagation failed:', error);
+      setLastResult({ error: true, message: error.message || 'Propagation failed' });
+    } finally {
+      setPropagationLoading(false);
     }
-    setConfirmWriteOpen(true);
   };
 
   const openEditModal = (category: Category) => {
     setSelectedCategory(category);
     setShowEditModal(true);
-  };
-
-  const openDeleteModal = (category: Category) => {
-    setSelectedCategory(category);
-    setShowDeleteModal(true);
-  };
-
-  // Quick Start handler - used by shared QuickStartCategoryModal
-  const handleQuickStart = async (businessType: string, categoryCount: number) => {
-    try {
-      const categories = await adminCategoriesService.getQuickStartCategories(businessType, categoryCount);
-      console.log('[Quick Start] Response:', categories);
-      await loadCategories();
-      const createdCount = categories.length;
-      alert(`Successfully created ${createdCount} new categories! (${categories.length} total platform categories)`);
-    } catch (error: any) {
-      console.error('Quick start failed:', error);
-      throw new Error(error.message || 'Unknown error');
-    }
   };
 
   if (loading) {
@@ -404,9 +333,18 @@ export default function AdminCategoriesPage() {
             <div className="flex items-center gap-2 mb-4">
               <div className="h-3 w-3 rounded-full bg-blue-500"></div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sync Product Categories to Google Business Profile</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Propagate Product Categories to Tenant Catalogs</h3>
+                <p className="text-sm text-neutral-500">Select categories below, then choose scope and propagate</p>
               </div>
             </div>
+            {/* Selection Summary */}
+            {selectedCategories.size > 0 && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm font-medium text-green-800">
+                  {selectedCategories.size} categor{selectedCategories.size === 1 ? 'y' : 'ies'} selected for propagation
+                </p>
+              </div>
+            )}
             {/* Scope Selection */}
             <div className="mb-4 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
               <label className="block text-sm font-semibold text-neutral-700 mb-2">Scope</label>
@@ -517,21 +455,14 @@ export default function AdminCategoriesPage() {
                   checked={dryRun}
                   onChange={(e) => setDryRun(e.target.checked)}
                 />
-                <label htmlFor="dryRunToggle" className="text-sm">Dry Run</label>
+                <label htmlFor="dryRunToggle" className="text-sm">Dry Run (preview only)</label>
               </div>
               <Button
                 variant="primary"
-                onClick={handleMirror}
-                disabled={mirrorLoading}
+                onClick={handlePropagate}
+                disabled={propagationLoading || selectedCategories.size === 0}
               >
-                {mirrorLoading ? 'Running…' : 'Mirror now'}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={loadLastSummary}
-                disabled={summaryLoading}
-              >
-                {summaryLoading ? 'Refreshing…' : 'Refresh summary'}
+                {propagationLoading ? 'Propagating…' : `Propagate ${selectedCategories.size || 0} Categories`}
               </Button>
             </div>
             {/* Scope Summary */}
@@ -546,33 +477,18 @@ export default function AdminCategoriesPage() {
               </p>
             </div>
 
-            <div className="mt-4 flex items-center gap-3">
-              {lastJobId && (
-                <MantineBadge variant="success">jobId: {lastJobId}</MantineBadge>
-              )}
-              {lastResult?.error && (
-                <MantineBadge variant="error">error</MantineBadge>
-              )}
-              {polling && (
-                <MantineBadge variant="info">updating…</MantineBadge>
-              )}
-            </div>
-            {lastSummary && (
-              <div className="mt-3 text-sm text-neutral-700 space-y-1">
-                <div>
-                  <span className="font-semibold">Last run:</span>
-                  {' '}{new Date(lastSummary.startedAt).toLocaleString()} {lastSummary.dryRun ? '(dryRun)' : ''}
-                </div>
-                <div className="flex gap-3">
-                  <span>created: <strong>{lastSummary.created}</strong></span>
-                  <span>updated: <strong>{lastSummary.updated}</strong></span>
-                  <span>deleted: <strong>{lastSummary.deleted}</strong></span>
-                </div>
-                {lastSummary.skipped && (
-                  <div className="text-amber-700">skipped: {lastSummary.reason || 'cooldown'}</div>
-                )}
-                {lastSummary.error && (
-                  <div className="text-red-600">error: {lastSummary.error}</div>
+            {/* Result Display */}
+            {lastResult && (
+              <div className="mt-4 p-3 bg-neutral-50 border border-neutral-200 rounded">
+                {lastResult.error ? (
+                  <p className="text-sm text-red-600">Error: {lastResult.message}</p>
+                ) : (
+                  <div className="text-sm text-neutral-700">
+                    <p className="font-semibold text-green-700">
+                      ✓ Propagated {lastResult.propagated} categories to {lastResult.tenantsAffected} tenants
+                    </p>
+                    {lastResult.dryRun && <p className="text-amber-600">(Dry run - no changes made)</p>}
+                  </div>
                 )}
               </div>
             )}
@@ -583,20 +499,13 @@ export default function AdminCategoriesPage() {
           <p className="text-sm font-medium text-neutral-700">
             {categories.length} {categories.length === 1 ? 'category' : 'categories'}
           </p>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => setShowQuickStartModal(true)}
-            >
-              ⚡ Quick Start
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => setShowCreateModal(true)}
-            >
-              + Create Category
-            </Button>
-          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={toggleSelectAll}
+          >
+            {selectedCategories.size === paginatedCategories.length ? 'Deselect All' : 'Select All Visible'}
+          </Button>
         </div>
 
         {/* Categories List */}
@@ -614,16 +523,11 @@ export default function AdminCategoriesPage() {
             </div>
             {categories.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-neutral-500">No categories yet</p>
-                <p className="text-sm text-neutral-400 mt-2">
-                  Create your first category to get started
+                <p className="text-neutral-500">
+                  {searchQuery.trim() ? 'No categories match your search' : 'No categories found'}
                 </p>
-              </div>
-            ) : filteredCategories.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-neutral-500">No categories match your search</p>
                 <p className="text-sm text-neutral-400 mt-2">
-                  Try a different search term
+                  {searchQuery.trim() ? 'Try a different search term' : 'Categories will appear here'}
                 </p>
               </div>
             ) : (
@@ -631,21 +535,28 @@ export default function AdminCategoriesPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {paginatedCategories.map((category) => (
                     <Card key={category.id} withBorder radius="md" className="hover:shadow-lg transition-all duration-200 group">
+                      {/* Selection Checkbox */}
+                      <div className="absolute top-2 left-2 z-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedCategories.has(category.id)}
+                          onChange={() => toggleCategorySelection(category.id)}
+                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </div>
                       {/* Icon Section - Enhanced */}
                       <Card.Section className="relative">
                         <div className="h-24 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 dark:from-blue-600 dark:via-indigo-600 dark:to-purple-700 flex items-center justify-center rounded-t-md group-hover:from-blue-600 group-hover:via-indigo-600 group-hover:to-purple-700 transition-all duration-200">
                           <Tag className="w-12 h-12 text-white opacity-90" />
-                          {(category.googleCategoryId || category.google_category_id) && (
-                            <div className="absolute top-3 right-3">
-                              <MantineBadge 
-                                color="blue"
-                                variant="light"
-                                size="xs"
-                              >
-                                Google
-                              </MantineBadge>
-                            </div>
-                          )}
+                          <div className="absolute top-3 right-3">
+                            <MantineBadge 
+                              color="blue"
+                              variant="light"
+                              size="xs"
+                            >
+                              Level {category.level}
+                            </MantineBadge>
+                          </div>
                         </div>
                       </Card.Section>
 
@@ -662,51 +573,36 @@ export default function AdminCategoriesPage() {
                               {category.name}
                             </Text>
                             <Text size="xs" c="dimmed" mt={1}>
-                              ID: {category.id.slice(0, 8)}...
+                              Google ID: {category.category_id}
                             </Text>
                           </div>
                         </Group>
 
-                        {category.description && (
-                          <Text size="sm" c="dimmed" lineClamp={2} mb="md" className="min-h-[2.5rem]">
-                            {category.description}
-                          </Text>
-                        )}
+                        <Text size="sm" c="dimmed" lineClamp={2} mb="md" className="min-h-[2.5rem]">
+                          {category.full_path}
+                        </Text>
                       </Card.Section>
 
                       {/* Features Section - Enhanced */}
                       <Card.Section className="px-4 pb-3">
                         <Group gap={4} wrap="wrap">
-                          {/* Platform Badge */}
+                          {/* Level Badge */}
                           <MantineBadge 
                             color="blue"
                             variant="light"
                             size="xs"
                           >
-                            🏢 Platform
+                            📦 Product
                           </MantineBadge>
                           
-                          {/* Google Badge */}
-                          {(category.googleCategoryId || category.google_category_id) && (
-                            <MantineBadge 
-                              color="green"
-                              variant="light"
-                              size="xs"
-                            >
-                              🌍 GBP Ready
-                            </MantineBadge>
-                          )}
-                          
-                          {/* SEO Badge */}
-                          {category.slug && (
-                            <MantineBadge 
-                              color="purple"
-                              variant="light"
-                              size="xs"
-                            >
-                              🔗 SEO URL
-                            </MantineBadge>
-                          )}
+                          {/* Google ID Badge */}
+                          <MantineBadge 
+                            color="green"
+                            variant="light"
+                            size="xs"
+                          >
+                            🌍 GBP Ready
+                          </MantineBadge>
                         </Group>
                       </Card.Section>
 
@@ -720,17 +616,7 @@ export default function AdminCategoriesPage() {
                             onClick={() => openEditModal(category)}
                             className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 font-medium"
                           >
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="light"
-                            color="red"
-                            leftSection={<Trash2 size={14} />}
-                            onClick={() => openDeleteModal(category)}
-                            className="bg-red-50 hover:bg-red-100 text-red-700 border-red-200 font-medium"
-                          >
-                            Delete
+                            View
                           </Button>
                         </Group>
                       </Card.Section>
@@ -742,7 +628,7 @@ export default function AdminCategoriesPage() {
                 <div className="mt-6">
                   <Pagination
                     currentPage={currentPage}
-                    totalItems={filteredCategories.length}
+                    totalItems={categories.length}
                     pageSize={pageSize}
                     onPageChange={setCurrentPage}
                     onPageSizeChange={setPageSize}
@@ -839,62 +725,56 @@ export default function AdminCategoriesPage() {
         </Card>
       </div>
 
-      {/* Create/Edit Modal - Using shared CategoryEditModal */}
-      <CategoryEditModal
-        isOpen={showCreateModal || showEditModal}
+      {/* Category View Modal - Read-only taxonomy data */}
+      <Modal
+        isOpen={showEditModal}
         onClose={() => {
-          setShowCreateModal(false);
           setShowEditModal(false);
           setSelectedCategory(null);
         }}
-        onSave={handleSaveCategory}
-        category={selectedCategory}
-        isCreate={showCreateModal}
-        apiBaseUrl=""
-      />
-
-      {/* Quick Start Modal - Using shared component */}
-      <QuickStartCategoryModal
-        isOpen={showQuickStartModal}
-        onClose={() => setShowQuickStartModal(false)}
-        onGenerate={handleQuickStart}
-      />
-
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={showDeleteModal}
-        onClose={() => {
-          setShowDeleteModal(false);
-          setSelectedCategory(null);
-        }}
-        title="Delete Category"
-        description="Are you sure you want to delete this category?"
+        title="Google Product Category"
+        description="View taxonomy details"
       >
         {selectedCategory && (
-          <div className="py-4">
-            <p className="text-neutral-700">
-              Category: <strong>{selectedCategory.name}</strong>
-            </p>
-            <p className="text-sm text-neutral-600 mt-2">
-              This action cannot be undone.
-            </p>
+          <div className="py-4 space-y-4">
+            <div>
+              <label className="text-sm font-medium text-neutral-500">Google Category ID</label>
+              <p className="text-lg font-mono text-green-700">{selectedCategory.category_id}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-neutral-500">Name</label>
+              <p className="text-lg font-semibold text-neutral-900">{selectedCategory.name}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-neutral-500">Full Path</label>
+              <p className="text-neutral-700">{selectedCategory.full_path}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-neutral-500">Level</label>
+                <p className="text-neutral-700">{selectedCategory.level}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-neutral-500">Parent ID</label>
+                <p className="text-neutral-700">{selectedCategory.parent_id || 'None (Top Level)'}</p>
+              </div>
+            </div>
+            <div className="pt-4 border-t border-neutral-200">
+              <p className="text-sm text-neutral-500">
+                This is a Google Product Taxonomy category. These categories are read-only and managed by Google.
+              </p>
+            </div>
           </div>
         )}
         <div className="flex gap-3 justify-end p-4 border-t border-neutral-200">
           <Button
-            variant="ghost"
+            variant="outline"
             onClick={() => {
-              setShowDeleteModal(false);
+              setShowEditModal(false);
               setSelectedCategory(null);
             }}
           >
-            Cancel
-          </Button>
-          <Button
-            variant="danger"
-            onClick={handleDelete}
-          >
-            Delete Category
+            Close
           </Button>
         </div>
       </Modal>

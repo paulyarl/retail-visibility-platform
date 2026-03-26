@@ -36,13 +36,36 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
   }
 
   /**
+   * Get a single Google taxonomy category by ID
+   * Uses the /api/taxonomy/:id endpoint
+   */
+  async getGoogleTaxonomyById(googleCategoryId: string): Promise<GoogleTaxonomyCategory | null> {
+    const response = await this.makeDefaultRequest<{
+      success: boolean;
+      data: GoogleTaxonomyCategory;
+    }>(
+      `/api/taxonomy/${googleCategoryId}`,
+      {},
+      `google-taxonomy-${googleCategoryId}`,
+      this.TAXONOMY_TTL
+    );
+
+    if (!response.success) {
+      console.error('[GoogleTaxonomyService] Failed to get Google taxonomy:', response.error);
+      return null;
+    }
+
+    return response.data?.data || null;
+  }
+
+  /**
    * Browse Google taxonomy categories
-   * Uses the /api/google/taxonomy/browse endpoint (original endpoint)
+   * Uses the /api/taxonomy/browse endpoint
    */
   async browseGoogleTaxonomy(parentPath?: string): Promise<GoogleTaxonomyCategory[] | null> {
     const url = parentPath 
-      ? `/api/google/taxonomy/browse?parent=${encodeURIComponent(parentPath)}`
-      : '/api/google/taxonomy/browse';
+      ? `/api/taxonomy/browse?path=${encodeURIComponent(parentPath)}`
+      : '/api/taxonomy/browse';
     
     const response = await this.makeDefaultRequest<{
       success: boolean;
@@ -58,14 +81,13 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
       console.error('[GoogleTaxonomyService] Failed to browse Google taxonomy:', response.error);
       return null;
     }
-    console.log(`[GoogleTaxonomyService] Browsed Google taxonomy:`, response.data?.categories)
 
     return response.data?.categories || null;
   }
 
   /**
    * Search Google taxonomy
-   * Uses the /api/google/taxonomy/search endpoint (original endpoint)
+   * Uses the /api/taxonomy/search endpoint
    */
   async searchGoogleTaxonomy(query: string, limit: number = 20): Promise<GoogleTaxonomyCategory[] | null> {
     if (!query) {
@@ -75,9 +97,9 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
 
     const response = await this.makeDefaultRequest<{
       success: boolean;
-      categories: GoogleTaxonomyCategory[];
+      results: GoogleTaxonomyCategory[];
     }>(
-      `/api/google/taxonomy/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+      `/api/taxonomy/search?q=${encodeURIComponent(query)}&limit=${limit}`,
       {},
       `google-taxonomy-search-${query}`,
       this.TAXONOMY_TTL
@@ -88,7 +110,7 @@ class GoogleTaxonomyService extends AuthenticatedApiSingleton {
       return null;
     }
 
-    return response.data?.categories || null;
+    return response.data?.results || null;
   }
 }
 

@@ -153,6 +153,7 @@ const buildAdminNavItems = (): NavItem[] => [
     icon: <Icon.Cog />,
     href: '/settings/admin/categories',
     children: [
+      { label: 'Categories Quick Start',  href: '/settings/admin/quick-start/categories' },
       { label: 'Product Categories',  href: '/settings/admin/categories' },
       { label: 'Platform Categories', href: '/settings/admin/platform-categories' },
       { label: 'Enrichment',          href: '/settings/admin/enrichment' },

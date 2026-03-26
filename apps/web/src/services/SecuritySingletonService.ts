@@ -474,7 +474,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
   async getAdminTenants(): Promise<any> {
     try {
       const result = await this.makeDefaultRequest<any>(
-        '/api/security/admin/tenants',
+        '/api/admin/tenants',
         {},
         'security-admin-tenants'
       );
@@ -496,7 +496,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
   async getAdminSyncStats(): Promise<any> {
     try {
       const result = await this.makeDefaultRequest<any>(
-        '/api/security/admin/sync-stats',
+        '/api/admin/analytics/overview',
         {},
         'security-admin-sync-stats'
       );
@@ -522,7 +522,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       if (params?.offset) queryParams.set('offset', params.offset.toString());
 
       const result = await this.makeDefaultRequest<any>(
-        `/api/security/admin/sessions?${queryParams}`,
+        `/api/admin/security/sessions${queryParams.toString() ? '?' + queryParams.toString() : ''}`,
         {},
         'security-admin-sessions'
       );
@@ -530,7 +530,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
       if (!result.success) {
         return { sessions: [], total: 0 };
       }
-      console.log('[SecuritySingletonService] Admin security sessions result:', JSON.stringify(result.data, null, 2));
+      // console.log('[SecuritySingletonService] Admin security sessions result:', JSON.stringify(result.data, null, 2));
       
       return result.data || { sessions: [], total: 0 };
     } catch (error) {
@@ -545,7 +545,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
   async getAdminSecuritySessionsStats(): Promise<any> {
     try {
       const result = await this.makeDefaultRequest<any>(
-        '/api/security/admin/sessions/stats',
+        '/api/admin/security/sessions/stats',
         {},
         'security-admin-sessions-stats'
       );
@@ -567,7 +567,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
   async getAdminSecurityAlerts(): Promise<any[]> {
     try {
       const result = await this.makeDefaultRequest<any[]>(
-        '/api/security/admin/alerts',
+        '/api/admin/security/alerts',
         {},
         'security-admin-alerts'
       );
@@ -589,7 +589,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
   async getAdminSecurityAlertsStats(): Promise<any> {
     try {
       const result = await this.makeDefaultRequest<any>(
-        '/api/security/admin/alerts/stats',
+        '/api/admin/security/alerts/stats',
         {},
         'security-admin-alerts-stats'
       );
@@ -611,7 +611,7 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
   async getAdminFailedLogins(): Promise<any[]> {
     try {
       const result = await this.makeDefaultRequest<any[]>(
-        '/api/security/admin/failed-logins',
+        '/api/admin/security/failed-logins',
         {},
         'security-admin-failed-logins'
       );

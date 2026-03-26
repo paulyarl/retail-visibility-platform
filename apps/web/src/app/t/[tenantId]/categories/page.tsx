@@ -85,8 +85,8 @@ function GoogleCategoryLookup({ googleCategoryId }: { googleCategoryId: string }
   useEffect(() => {
     async function fetchPath() {
       try {
-        // Use the TenantCategoriesService for Google taxonomy path
-        const taxonomyData = await tenantCategoriesService.getGoogleTaxonomyPath(googleCategoryId)
+        // Use the TenantCategoriesService for Google taxonomy
+        const taxonomyData = await tenantCategoriesService.getGoogleTaxonomyById(googleCategoryId)
         if (taxonomyData && taxonomyData.path) {
           const pathString = Array.isArray(taxonomyData.path) ? taxonomyData.path.join(' > ') : taxonomyData.path
           setPath(pathString)
@@ -135,6 +135,7 @@ export default function CategoriesPage() {
 
   // Filter state
   const [filterUnmapped, setFilterUnmapped] = useState(false)
+  const [includeInactive, setIncludeInactive] = useState(true) // Show all categories by default for management
   const [searchQuery, setSearchQuery] = useState('')
 
   // Edit modal state (using shared CategoryEditModal)
@@ -215,8 +216,8 @@ export default function CategoriesPage() {
       try {
         setLoading(true)
         
-        // Fetch categories using TenantCategoriesService
-        const categories = await tenantCategoriesService.getTenantCategories(tenantId)
+        // Fetch categories using TenantCategoriesService (include inactive for management)
+        const categories = await tenantCategoriesService.getTenantCategories(tenantId, includeInactive)
         setCategories(categories)
 
         // Fetch alignment status using TenantCategoriesService
@@ -280,7 +281,7 @@ export default function CategoriesPage() {
     if (tenantId) {
       fetchData()
     }
-  }, [tenantId])
+  }, [tenantId, includeInactive])
 
   function openEdit(cat: Category) {
     setSelected(cat)
@@ -306,6 +307,9 @@ export default function CategoriesPage() {
         const aligned = await tenantCategoriesService.alignCategory(tenantId, created.id, data.googleCategoryId)
         if (!aligned) throw new Error('Failed to align category')
       }
+      
+      // Add created category directly to state for instant display
+      setCategories(prev => [...prev, created])
       showToast('success', 'Category created')
     } else {
       // Update existing category using TenantCategoriesService
@@ -317,13 +321,12 @@ export default function CategoriesPage() {
         const aligned = await tenantCategoriesService.alignCategory(tenantId, selected.id, data.googleCategoryId)
         if (!aligned) throw new Error('Failed to align category')
       }
+      
+      // Update category in state for instant display
+      setCategories(prev => prev.map(c => c.id === selected.id ? { ...c, ...updated } : c))
       showToast('success', 'Changes saved')
     }
 
-    // Refresh data using TenantCategoriesService
-    const categories = await tenantCategoriesService.getTenantCategories(tenantId)
-    setCategories(categories)
-    
     setIsModalOpen(false)
     setSelected(null)
   }
@@ -449,23 +452,22 @@ export default function CategoriesPage() {
       const newCategories = await tenantCategoriesService.quickStartCategories(tenantId, businessType, categoryCount)
       
       if (newCategories.length > 0) {
-        // Refresh categories and alignment status using TenantCategoriesService
-        setLoading(true)
-        const [categories, alignmentStatus] = await Promise.all([
-          tenantCategoriesService.getTenantCategories(tenantId),
-          tenantCategoriesService.getAlignmentStatus(tenantId)
-        ])
-        setCategories(categories)
-        setAlignmentStatus(alignmentStatus)
-        
-        // Track newly created category IDs (those not in existingIds)
+        // Add new category IDs to highlight
         const newIds = new Set<string>()
-        categories.forEach((cat: Category) => {
+        newCategories.forEach((cat: Category) => {
           if (!existingIds.has(cat.id)) {
             newIds.add(cat.id)
           }
         })
         setNewCategoryIds(newIds)
+        
+        // Refresh categories list
+        const categoriesData = await tenantCategoriesService.getTenantCategories(tenantId, includeInactive)
+        setCategories(categoriesData)
+        
+        // Refresh alignment status
+        const alignmentData = await tenantCategoriesService.getAlignmentStatus(tenantId)
+        setAlignmentStatus(alignmentData)
         
         // Clear "New" badges after 30 seconds
         if (newIds.size > 0) {
@@ -473,7 +475,7 @@ export default function CategoriesPage() {
         }
         
         const createdCount = newCategories.length
-        const totalCount = categories.length
+        const totalCount = categoriesData.length
         showToast('success', `Successfully created ${createdCount} new categories! (${totalCount} total categories)`)
       } else {
         showToast('error', 'Failed to create categories')
@@ -763,6 +765,26 @@ export default function CategoriesPage() {
                 )}
               </button>
             )}
+
+            {/* Include Inactive Toggle */}
+            <button
+              onClick={() => setIncludeInactive(!includeInactive)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex-shrink-0 ${
+                includeInactive
+                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                  : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+              }`}
+              title={includeInactive ? 'Show only active categories' : 'Show all categories including inactive'}
+            >
+              <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                {includeInactive ? (
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                ) : (
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                )}
+              </svg>
+              {includeInactive ? 'All Categories' : 'Active Only'}
+            </button>
           </div>
           <div className="flex items-center gap-4">
             {/* Bulk Actions */}
@@ -879,7 +901,15 @@ export default function CategoriesPage() {
                     />
                     <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-medium text-gray-900">{cat.name}</h3>
+                      <h3 className={`font-medium ${cat.isActive === false ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{cat.name}</h3>
+                      {cat.isActive === false && (
+                        <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-300">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                          Inactive
+                        </span>
+                      )}
                       {newCategoryIds.has(cat.id) && (
                         <span className="inline-flex items-center gap-1 text-xs text-white bg-gradient-to-r from-blue-500 to-purple-500 px-2 py-1 rounded-full font-semibold animate-pulse shadow-sm">
                           ✨ New

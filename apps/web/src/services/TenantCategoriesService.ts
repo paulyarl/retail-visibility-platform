@@ -1,5 +1,4 @@
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
-import { googleTaxonomyPublicService, type GoogleTaxonomyPath } from './GoogleTaxonomyPublicService';
 
 export interface Category {
   id: string;
@@ -26,6 +25,15 @@ export interface CategoryFormData {
   slug?: string;
   googleCategoryId?: string;
   sortOrder: number;
+  isActive?: boolean;
+}
+
+export interface GoogleTaxonomyCategory {
+  id: string;
+  name: string;
+  path: string[];
+  level: number;
+  hasChildren?: boolean;
 }
 
 /**
@@ -72,15 +80,82 @@ class TenantCategoriesService extends TenantApiSingleton {
   }
 
   /**
+   * Get a single Google taxonomy category by ID
+   * Uses the /api/taxonomy/:id endpoint
+   */
+  async getGoogleTaxonomyById(googleCategoryId: string): Promise<GoogleTaxonomyCategory | null> {
+    try {
+      const response = await this.makeDefaultRequest<{ success: boolean; data: GoogleTaxonomyCategory }>(
+        `/api/taxonomy/${googleCategoryId}`,
+        {},
+        `google-taxonomy-${googleCategoryId}`,
+        this.TAXONOMY_TTL
+      );
+
+      return response.data?.data || null;
+    } catch (error) {
+      console.error('[TenantCategoriesService] Failed to get Google taxonomy:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Search Google taxonomy categories
+   * Uses the /api/taxonomy/search endpoint
+   */
+  async searchGoogleTaxonomy(query: string, limit: number = 20): Promise<GoogleTaxonomyCategory[]> {
+    try {
+      const response = await this.makeDefaultRequest<{ success: boolean; results: GoogleTaxonomyCategory[] }>(
+        `/api/taxonomy/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+        {},
+        `google-taxonomy-search-${query}`,
+        this.TAXONOMY_TTL
+      );
+
+      return response.data?.results || [];
+    } catch (error) {
+      console.error('[TenantCategoriesService] Failed to search Google taxonomy:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Browse Google taxonomy categories
+   * Uses the /api/taxonomy/browse endpoint
+   */
+  async browseGoogleTaxonomy(path?: string): Promise<GoogleTaxonomyCategory[]> {
+    try {
+      const url = path 
+        ? `/api/taxonomy/browse?path=${encodeURIComponent(path)}`
+        : '/api/taxonomy/browse';
+
+      const response = await this.makeDefaultRequest<{ success: boolean; categories: GoogleTaxonomyCategory[] }>(
+        url,
+        {},
+        `google-taxonomy-browse-${path || 'root'}`,
+        this.TAXONOMY_TTL
+      );
+
+      return response.data?.categories || [];
+    } catch (error) {
+      console.error('[TenantCategoriesService] Failed to browse Google taxonomy:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get tenant categories
    * Uses the /api/v1/tenants/:tenantId/categories endpoint
+   * @param tenantId - The tenant ID
+   * @param includeInactive - If true, includes inactive categories (default: false)
    */
-  async getTenantCategories(tenantId: string): Promise<Category[]> {
+  async getTenantCategories(tenantId: string, includeInactive: boolean = false): Promise<Category[]> {
     try {
+      const query = includeInactive ? '?includeInactive=true' : '';
       const response = await this.makeDefaultRequest<{ data: Category[] }>(
-        `/api/v1/tenants/${tenantId}/categories`,
+        `/api/v1/tenants/${tenantId}/categories${query}`,
         {},
-        `tenant-categories-${tenantId}`,
+        `tenant-categories-${tenantId}${includeInactive ? '-all' : ''}`,
         this.CATEGORIES_TTL
       );
 
@@ -136,7 +211,8 @@ class TenantCategoriesService extends TenantApiSingleton {
             name: data.name,
             slug: data.slug || generateSlug(data.name),
             googleCategoryId: data.googleCategoryId,
-            sortOrder: data.sortOrder
+            sortOrder: data.sortOrder,
+            isActive: data.isActive
           }),
         },
         `tenant-categories-${tenantId}`
@@ -169,7 +245,8 @@ class TenantCategoriesService extends TenantApiSingleton {
           method: 'PUT',
           body: JSON.stringify({
             name: data.name,
-            sortOrder: data.sortOrder
+            sortOrder: data.sortOrder,
+            isActive: data.isActive
           }),
         },
         `tenant-categories-${tenantId}`
@@ -309,20 +386,6 @@ class TenantCategoriesService extends TenantApiSingleton {
     } catch (error) {
       console.error('[TenantCategoriesService] Failed to propagate categories:', error);
       return false;
-    }
-  }
-
-  /**
-   * Get Google taxonomy path for a category ID
-   * Uses the public Google taxonomy service
-   */
-  async getGoogleTaxonomyPath(googleCategoryId: string): Promise<GoogleTaxonomyPath | null> {
-    try {
-      // Use the dedicated public service for Google taxonomy operations
-      return await googleTaxonomyPublicService.getGoogleTaxonomyPath(googleCategoryId);
-    } catch (error) {
-      console.error('[TenantCategoriesService] Failed to get Google taxonomy path:', error);
-      return null;
     }
   }
 

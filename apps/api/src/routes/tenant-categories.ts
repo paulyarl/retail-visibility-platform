@@ -156,6 +156,7 @@ const createCategorySchema = z.object({
   parentId: z.string().min(1).optional(), // Accept any string ID
   googleCategoryId: z.string().optional(),
   sortOrder: z.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
 });
 
 const updateCategorySchema = z.object({
@@ -388,6 +389,7 @@ router.post('/:tenantId/categories', requireTenantManagement, async (req, res) =
       parentId: body.parentId ?? null,
       googleCategoryId: body.googleCategoryId ?? null,
       sortOrder: body.sortOrder || 0,
+      isActive: body.isActive ?? true,
     });
 
     // Refresh MV to sync with new category
@@ -1416,15 +1418,30 @@ router.post('/:tenantId/business-hours/propagate', requireTenantAdmin, requirePr
         await prisma.business_hours_list.upsert({
           where: { tenant_id: location.id },
           create: {
+            id: `${location.id}_hours`,
             tenant_id: location.id,
             timezone: heroBusinessHours.timezone,
             periods: heroBusinessHours.periods as any,
+            updated_at: new Date(),
           } as any,
           update: {
             timezone: heroBusinessHours.timezone,
             periods: heroBusinessHours.periods as any,
+            updated_at: new Date(),
           },
         });
+
+        // Also update the tenant_business_profiles_list.hours for TimezonePicker compatibility
+        // This includes both timezone and periods (store hours)
+        const hoursJson = {
+          timezone: heroBusinessHours.timezone,
+          periods: heroBusinessHours.periods,
+        };
+        await prisma.$executeRaw`
+          UPDATE tenant_business_profiles_list 
+          SET hours = ${JSON.stringify(hoursJson)}::jsonb
+          WHERE tenant_id = ${location.id}
+        `;
         results.regularHoursUpdated++;
 
         // Propagate special hours if requested
@@ -1753,6 +1770,7 @@ router.post('/:tenantId/business-profile/propagate', requireTenantAdmin, require
             country_code: profile.country_code,
             website: profile.website,
             email: profile.email,
+            updated_at: new Date(),
           } as any,
           update: {
             business_name: profile.business_name,
@@ -1764,6 +1782,7 @@ router.post('/:tenantId/business-profile/propagate', requireTenantAdmin, require
             country_code: profile.country_code,
             website: profile.website,
             email: profile.email,
+            updated_at: new Date(),
           },
         });
         results.updated++;

@@ -11,17 +11,11 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
-
-type OrganizationTier = 'chain_starter' | 'chain_professional' | 'chain_enterprise';
-
-const VALID_ORG_TIERS: OrganizationTier[] = [
-  'chain_starter',
-  'chain_professional',
-  'chain_enterprise',
-];
+import { isValidTier, getAllTiers } from '../services/TierService';
 
 /**
  * Validate organization tier assignment
+ * Uses dynamic tier data from subscription_tiers_list table
  */
 export async function validateOrganizationTier(
   req: Request,
@@ -29,23 +23,29 @@ export async function validateOrganizationTier(
   next: NextFunction
 ) {
   try {
-    const { subscriptionTier } = req.body;
+    const { subscriptionTier, subscription_tier } = req.body;
+    const tier = subscriptionTier || subscription_tier;
 
     // Skip if no tier being set
-    if (!subscriptionTier) {
+    if (!tier) {
       return next();
     }
 
-    // Validate tier exists
-    if (!VALID_ORG_TIERS.includes(subscriptionTier)) {
+    // Get all tiers and filter for organization type
+    const allTiers = await getAllTiers();
+    const orgTiers = allTiers.filter(t => t.tier_type === 'organization');
+    const validTierKeys = orgTiers.map(t => t.tier_key);
+
+    // Validate tier exists and is organization type
+    if (!validTierKeys.includes(tier)) {
       return res.status(400).json({
         error: 'invalid_organization_tier',
-        message: `Invalid organization tier: ${subscriptionTier}`,
-        validTiers: VALID_ORG_TIERS,
+        message: `Invalid organization tier: ${tier}`,
+        validTiers: validTierKeys,
       });
     }
 
-    console.log(`[Organization Validation] Tier ${subscriptionTier} validated successfully`);
+    console.log(`[Organization Validation] Tier ${tier} validated successfully`);
     next();
   } catch (error) {
     console.error('[validateOrganizationTier] Error:', error);
@@ -58,6 +58,7 @@ export async function validateOrganizationTier(
 
 /**
  * Validate organization limits are within tier constraints
+ * Uses dynamic tier data from subscription_tiers_list table
  */
 export async function validateOrganizationLimits(
   req: Request,
@@ -65,39 +66,32 @@ export async function validateOrganizationLimits(
   next: NextFunction
 ) {
   try {
-    const { subscriptionTier, maxLocations, maxTotalSKUs } = req.body;
+    const { subscriptionTier, subscription_tier, maxLocations, maxTotalSKUs } = req.body;
+    const tier = subscriptionTier || subscription_tier;
 
-    if (!subscriptionTier) {
+    if (!tier) {
       return next();
     }
 
-    // Define tier limits
-    const tierLimits: Record<OrganizationTier, { maxLocations: number; maxTotalSKUs: number }> = {
-      chain_starter: {
-        maxLocations: 5,
-        maxTotalSKUs: 2500,
-      },
-      chain_professional: {
-        maxLocations: 25,
-        maxTotalSKUs: 12500,
-      },
-      chain_enterprise: {
-        maxLocations: Infinity,
-        maxTotalSKUs: Infinity,
-      },
-    };
+    // Get tier limits from database
+    const allTiers = await getAllTiers();
+    const tierData = allTiers.find(t => t.tier_key === tier);
 
-    const limits = tierLimits[subscriptionTier as OrganizationTier];
-    if (!limits) {
+    if (!tierData) {
       return next(); // Already validated by validateOrganizationTier
     }
+
+    const limits = {
+      maxLocations: tierData.max_locations ?? Infinity,
+      maxTotalSKUs: tierData.max_skus ?? Infinity,
+    };
 
     // Validate maxLocations
     if (maxLocations !== undefined) {
       if (limits.maxLocations !== Infinity && maxLocations > limits.maxLocations) {
         return res.status(400).json({
           error: 'max_locations_exceeded',
-          message: `${subscriptionTier} tier allows maximum ${limits.maxLocations} locations`,
+          message: `${tier} tier allows maximum ${limits.maxLocations} locations`,
           requested: maxLocations,
           limit: limits.maxLocations,
         });
@@ -109,14 +103,14 @@ export async function validateOrganizationLimits(
       if (limits.maxTotalSKUs !== Infinity && maxTotalSKUs > limits.maxTotalSKUs) {
         return res.status(400).json({
           error: 'max_skus_exceeded',
-          message: `${subscriptionTier} tier allows maximum ${limits.maxTotalSKUs} total SKUs`,
+          message: `${tier} tier allows maximum ${limits.maxTotalSKUs} total SKUs`,
           requested: maxTotalSKUs,
           limit: limits.maxTotalSKUs,
         });
       }
     }
 
-    console.log(`[Organization Validation] Limits validated for ${subscriptionTier}`);
+    console.log(`[Organization Validation] Limits validated for ${tier}`);
     next();
   } catch (error) {
     console.error('[validateOrganizationLimits] Error:', error);
@@ -129,6 +123,7 @@ export async function validateOrganizationLimits(
 
 /**
  * Validate organization tier change doesn't violate current usage
+ * Uses dynamic tier data from subscription_tiers_list table
  */
 export async function validateOrganizationTierChange(
   req: Request,
@@ -136,10 +131,11 @@ export async function validateOrganizationTierChange(
   next: NextFunction
 ) {
   try {
-    const { subscriptionTier } = req.body;
+    const { subscriptionTier, subscription_tier } = req.body;
+    const tier = subscriptionTier || subscription_tier;
     const { id: organizationId } = req.params;
 
-    if (!subscriptionTier || !organizationId) {
+    if (!tier || !organizationId) {
       return next();
     }
 
@@ -168,33 +164,25 @@ export async function validateOrganizationTierChange(
       });
     }
 
-    // Define tier limits
-    const tierLimits: Record<OrganizationTier, { maxLocations: number; maxTotalSKUs: number }> = {
-      chain_starter: {
-        maxLocations: 5,
-        maxTotalSKUs: 2500,
-      },
-      chain_professional: {
-        maxLocations: 25,
-        maxTotalSKUs: 12500,
-      },
-      chain_enterprise: {
-        maxLocations: Infinity,
-        maxTotalSKUs: Infinity,
-      },
-    };
+    // Get tier limits from database
+    const allTiers = await getAllTiers();
+    const tierData = allTiers.find(t => t.tier_key === tier);
 
-    const newLimits = tierLimits[subscriptionTier as OrganizationTier];
-    if (!newLimits) {
+    if (!tierData) {
       return next(); // Already validated by validateOrganizationTier
     }
+
+    const newLimits = {
+      maxLocations: tierData.max_locations ?? Infinity,
+      maxTotalSKUs: tierData.max_skus ?? Infinity,
+    };
 
     // Check current location count
     const currentLocationCount = org.tenants.length;
     if (newLimits.maxLocations !== Infinity && currentLocationCount > newLimits.maxLocations) {
       return res.status(403).json({
         error: 'tier_change_blocked',
-        message: `Cannot change to ${subscriptionTier}: organization has ${currentLocationCount} locations, new tier limit is ${newLimits.maxLocations}`,
+        message: `Cannot change to ${tier}: organization has ${currentLocationCount} locations, new tier limit is ${newLimits.maxLocations}`,
         currentLocations: currentLocationCount,
         newLimit: newLimits.maxLocations,
         hint: 'Remove locations before downgrading tier',
@@ -206,14 +194,14 @@ export async function validateOrganizationTierChange(
     if (newLimits.maxTotalSKUs !== Infinity && totalSKUs > newLimits.maxTotalSKUs) {
       return res.status(403).json({
         error: 'tier_change_blocked',
-        message: `Cannot change to ${subscriptionTier}: organization has ${totalSKUs} total SKUs, new tier limit is ${newLimits.maxTotalSKUs}`,
+        message: `Cannot change to ${tier}: organization has ${totalSKUs} total SKUs, new tier limit is ${newLimits.maxTotalSKUs}`,
         currentSKUs: totalSKUs,
         newLimit: newLimits.maxTotalSKUs,
         hint: 'Reduce SKU count before downgrading tier',
       });
     }
 
-    console.log(`[Organization Validation] Tier change validated: ${currentLocationCount} locations, ${totalSKUs} SKUs fits in ${subscriptionTier}`);
+    console.log(`[Organization Validation] Tier change validated: ${currentLocationCount} locations, ${totalSKUs} SKUs fits in ${tier}`);
     next();
   } catch (error) {
     console.error('[validateOrganizationTierChange] Error:', error);

@@ -9,7 +9,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
-import { useAdminData } from '@/hooks/useAdminData';
+import { useAdminDashboardData } from '@/hooks/useAdminDashboardData';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 
 type AdminSection = {
@@ -41,8 +41,8 @@ export default function AdminDashboardPage() {
     AccessPresets.PLATFORM_ADMIN_ONLY
   );
 
-  // Use cached admin data hook
-  const { tenants, syncStats, loading: adminDataLoading, error: adminDataError } = useAdminData();
+  // Use admin dashboard data hook - only fetches tenants and sync stats
+  const { tenants, syncStats, loading: adminDataLoading, error: adminDataError } = useAdminDashboardData();
 
   // Track admin panel access
   useEffect(() => {

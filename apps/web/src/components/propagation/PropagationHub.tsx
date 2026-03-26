@@ -38,7 +38,7 @@ export default function PropagationHub({ tenantId }: PropagationHubProps) {
       impact: 'high',
       frequency: 'daily',
       status: 'available',
-      route: `/t/${tenantId}/items`,
+      route: `/t/${tenantId}/settings/organization`,
       gradient: 'from-blue-600 to-cyan-600'
     },
     {

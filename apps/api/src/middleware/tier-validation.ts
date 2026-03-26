@@ -236,7 +236,7 @@ export function requirePropagationTier(
         categories: 'propagation_categories',
         gbp: 'propagation_gbp_sync',
         flags: 'propagation_feature_flags',
-        brand_assets: 'propagation_brand_assets'
+        brand_assets: 'propagation_brand'
       };
 
       const featureKey = propagationFeatureMapping[propagationType];

@@ -22,6 +22,7 @@ import tiersRoutes from '../admin/tiers';
 import adminAnalyticsRoutes from '../admin-analytics';
 import adminSecurityMonitoringRoutes from '../admin/security-monitoring';
 import navigationLinksRoutes from '../admin/navigation-links';
+import categoriesPropagateRoutes from '../admin/categories-propagate';
 
 /**
  * Mount admin routes
@@ -50,6 +51,7 @@ export function mountAdminRoutes(app: Express) {
   app.use('/api/admin/analytics', authenticateToken,  adminAnalyticsRoutes);
   app.use('/api/admin/security', authenticateToken,  adminSecurityMonitoringRoutes);
   app.use('/api/admin/navigation-links', authenticateToken,  navigationLinksRoutes);
+  app.use('/api/admin/categories', authenticateToken, categoriesPropagateRoutes);
   
   // Tenant flags: accessible by platform admins OR store owners of that specific tenant
   app.use('/admin', authenticateToken, tenantFlagsRoutes);
@@ -59,7 +61,7 @@ export function mountAdminRoutes(app: Express) {
   app.use('/api/admin', authenticateToken,  adminToolsRoutes);
   app.use('/admin', authenticateToken, adminUsersRoutes);
   app.use('/api/admin', authenticateToken, adminUsersRoutes);
-  app.use('/admin/taxonomy',  taxonomyAdminRoutes);
+  app.use('/api/admin/taxonomy', authenticateToken, taxonomyAdminRoutes);
   app.use('/admin', authenticateToken, platformFlagsRoutes);
   app.use('/api/admin', authenticateToken, platformFlagsRoutes);
   

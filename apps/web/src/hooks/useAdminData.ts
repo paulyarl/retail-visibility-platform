@@ -1,7 +1,61 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AdminCacheService, ConsolidatedAdminData } from '@/lib/cache/admin-cache-service';
+import { securitySingletonService } from '@/services/SecuritySingletonService';
 import { useAuth } from '@/contexts/AuthContext';
+
+// Define interfaces inline since AdminCacheService is removed
+interface AdminTenantsData {
+  tenants: any[];
+  total: number;
+}
+
+interface AdminSyncStats {
+  totalRuns: number;
+  successRate: number;
+  outOfSyncCount: number;
+  failedRuns: number;
+}
+
+interface AdminSecuritySessions {
+  data: any[];
+  total: number;
+}
+
+interface AdminSecurityStats {
+  activeSessions: number;
+  activeUsers: number;
+  sessionsLast24h: number;
+  revokedSessions: number;
+  deviceBreakdown: Array<{ type: string; count: number }>;
+}
+
+interface AdminSecurityAlerts {
+  data: any[];
+  total: number;
+}
+
+interface AdminSecurityAlertStats {
+  totalAlerts: number;
+  unreadAlerts: number;
+  alertsLast24h: number;
+  criticalAlerts: number;
+  warningAlerts: number;
+  typeBreakdown: Array<{ type: string; count: number }>;
+}
+
+interface AdminFailedLogins {
+  data: any[];
+}
+
+interface ConsolidatedAdminData {
+  tenants: AdminTenantsData;
+  syncStats: AdminSyncStats;
+  securitySessions: AdminSecuritySessions;
+  securityStats: AdminSecurityStats;
+  securityAlerts: AdminSecurityAlerts;
+  securityAlertStats: AdminSecurityAlertStats;
+  failedLogins: AdminFailedLogins;
+}
 
 export interface UseAdminDataReturn {
   adminData: ConsolidatedAdminData | null;
@@ -33,8 +87,35 @@ export function useAdminData(): UseAdminDataReturn {
     queryKey: ['admin', 'consolidated-data'],
     queryFn: async (): Promise<ConsolidatedAdminData> => {
       try {
-        const data = await AdminCacheService.getConsolidatedAdminData(true, user?.id);
-        return data;
+        // Fetch data directly from singleton services (they already cache)
+        const [tenantsData, syncStatsData, securitySessionsData, securityStatsData, securityAlertsData, securityAlertStatsData, failedLoginsData] = await Promise.allSettled([
+          securitySingletonService.getAdminTenants(),
+          securitySingletonService.getAdminSyncStats(),
+          securitySingletonService.getAdminSecuritySessions(),
+          securitySingletonService.getAdminSecuritySessionsStats(),
+          securitySingletonService.getAdminSecurityAlerts(),
+          securitySingletonService.getAdminSecurityAlertsStats(),
+          securitySingletonService.getAdminFailedLogins()
+        ]);
+
+        // Build consolidated data object
+        const consolidatedData: ConsolidatedAdminData = {
+          tenants: tenantsData.status === 'fulfilled' ? 
+            { tenants: Array.isArray(tenantsData.value) ? tenantsData.value : [], total: Array.isArray(tenantsData.value) ? tenantsData.value.length : 0 } : 
+            { tenants: [], total: 0 },
+          syncStats: syncStatsData.status === 'fulfilled' ? syncStatsData.value : { totalRuns: 0, successRate: 0, outOfSyncCount: 0, failedRuns: 0 },
+          securitySessions: securitySessionsData.status === 'fulfilled' ? securitySessionsData.value : { data: [], total: 0 },
+          securityStats: securityStatsData.status === 'fulfilled' ? securityStatsData.value : { activeSessions: 0, activeUsers: 0, sessionsLast24h: 0, revokedSessions: 0, deviceBreakdown: [] },
+          securityAlerts: securityAlertsData.status === 'fulfilled' ? 
+            { data: Array.isArray(securityAlertsData.value) ? securityAlertsData.value : [], total: Array.isArray(securityAlertsData.value) ? securityAlertsData.value.length : 0 } : 
+            { data: [], total: 0 },
+          securityAlertStats: securityAlertStatsData.status === 'fulfilled' ? securityAlertStatsData.value : { totalAlerts: 0, unreadAlerts: 0, alertsLast24h: 0, criticalAlerts: 0, warningAlerts: 0, typeBreakdown: [] },
+          failedLogins: failedLoginsData.status === 'fulfilled' ? 
+            { data: Array.isArray(failedLoginsData.value) ? failedLoginsData.value : [] } : 
+            { data: [] }
+        };
+
+        return consolidatedData;
       } catch (error) {
         console.error('[useAdminData] Failed to fetch admin data:', error);
         throw error;
