@@ -6,7 +6,7 @@
  */
 
 import { prisma } from '../prisma';
-import { generateQsCatId } from './id-generator';
+import { generateProductCatId, generateQsCatId } from './id-generator';
 
 export interface QuickStartCategory {
   name: string;
@@ -97,7 +97,7 @@ export async function createQuickStartCategoriesForTenant(tenantId: string): Pro
       // Create new category
       await prisma.directory_category.create({
         data: {
-          id: generateQsCatId(),
+          id: generateProductCatId(tenantId),
           tenantId: tenantId,
           name: category.name,
           slug: category.slug,

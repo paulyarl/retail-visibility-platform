@@ -689,13 +689,19 @@ export abstract class OrganizationApiSingleton extends TenantApiSingleton {
    */
   protected async makeDefaultRequest<T>(
     endpoint: string,
-    options: OrganizationRequestOptions = {},
+    options?: OrganizationRequestOptions,
     cacheKey?: string,
-    cacheTTL?: number
+    cacheTTL?: number,
+    requestOptions?: any
   ): Promise<any> {
+    // If requestOptions are provided with context/isolation, use base class (non-org request)
+    if (requestOptions && ('context' in requestOptions || 'isolation' in requestOptions)) {
+      return super.makeDefaultRequest<T>(endpoint, options as any, cacheKey, cacheTTL, requestOptions);
+    }
+    // Otherwise use organization-enhanced request
     return this.makeOrganizationEnhancedDefaultRequest<T>(
       endpoint,
-      options,
+      options || {},
       cacheKey,
       cacheTTL ?? this.options.cacheTTL ?? 10 * 60 * 1000
     );

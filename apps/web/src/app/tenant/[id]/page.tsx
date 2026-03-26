@@ -242,6 +242,9 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       has_active_payment_gateway: p.hasActivePaymentGateway ?? false, // From MV (camelCase from API)
     }));
 
+    console.log(`${featured ? 'Featured' : 'Regular'} Products: ${products.length}`);
+    console.log(`${featured ? 'Featured' : 'Regular'} Products Data:`, productsData);
+
     const total = featured 
       ? ('count' in productsData ? productsData.count : 0) || products.length // Featured API uses count field
       : ('pagination' in productsData ? productsData.pagination?.totalItems : ('total' in productsData ? productsData.total : 0)) || products.length;

@@ -111,6 +111,7 @@ export interface EnhancedProduct {
   product_category_slug: string;
   product_google_category_id: string;
   product_parent_category_id?: string;
+  categoryName?: string; // Human-readable category name
   
   // Tenant information
   tenant_id: string;
@@ -196,7 +197,7 @@ class EnhancedProductService extends PublicApiSingleton {
       const response = await this.makeDefaultRequest<any>(
         `/api/public/products/${id}?include=variants,metadata,analytics,store`,
         {},
-        `enhanced-product-${id}`,
+        `enhanced-product-v2-${id}`, // Changed cache key to force refresh
         this.cacheTTL
       );
       
@@ -205,7 +206,9 @@ class EnhancedProductService extends PublicApiSingleton {
         return null;
       }
 
-      return this.transformProductData(response.data?.data);
+      // The API response is double-nested: { success, data: { success, data: product } }
+      const productData = response.data?.data || response.data;
+      return this.transformProductData(productData);
     } catch (error) {
       console.warn(`Failed to fetch product with variants: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return null;
@@ -364,25 +367,27 @@ class EnhancedProductService extends PublicApiSingleton {
       
       // Category - map from API response
       product_type: data.tenantCategoryId,
-      product_category: data.tenantCategoryId,
+      product_category: data.tenantCategory?.name || data.tenantCategoryId,
       product_category_slug: data.tenantCategory?.slug,
-      product_google_category_id: data.tenantCategoryId,
+      product_google_category_id: data.tenantCategory?.googleCategoryId || data.tenantCategoryId,
       product_parent_category_id: undefined,
+      // Also expose as categoryName for convenience
+      categoryName: data.tenantCategory?.name,
       
       // Tenant - map from API response (store object or tenant object)
-      tenant_id: data.tenant?.id || data.store?.id || data.tenant_id,
-      tenant_name: data.tenant?.name || data.store?.name || data.tenant_name,
-      tenant_slug: data.tenant?.slug || data.store?.slug || data.tenant_slug,
-      subscription_tier: data.tenant?.subscriptionTier || data.store?.subscription_tier || data.subscription_tier,
-      shop_category: data.tenant?.shop_category || data.store?.shop_category || data.shop_category,
-      tenant_city: data.tenant?.city || data.store?.city || data.tenant_city,
-      tenant_state: data.tenant?.state || data.store?.state || data.tenant_state,
-      tenant_country: data.tenant?.country || data.store?.country || data.tenant_country,
-      tenant_zip: data.tenant?.zipCode || data.store?.zip || data.tenant_zip,
-      tenant_address: data.tenant?.address || data.store?.address || data.tenant_address,
-      tenant_latitude: data.tenant?.latitude || data.store?.latitude || data.tenant_latitude,
-      tenant_longitude: data.tenant?.longitude || data.store?.longitude || data.tenant_longitude,
-      tenant_logo_url: data.tenant?.logoUrl || data.store?.logo_url || data.tenant_logo_url || data.store?.logo,
+      tenant_id: data.tenant?.id || data.store?.id || data.tenantId || data.tenant_id,
+      tenant_name: data.tenant?.name || data.store?.name || data.tenantName || data.tenant_name,
+      tenant_slug: data.tenant?.slug || data.store?.slug || data.tenantSlug || data.tenant_slug,
+      subscription_tier: data.tenant?.subscriptionTier || data.store?.subscription_tier || data.subscriptionTier || data.subscription_tier,
+      shop_category: data.tenant?.shop_category || data.store?.shop_category || data.shopCategory || data.shop_category,
+      tenant_city: data.tenant?.city || data.store?.city || data.tenantCity || data.tenant_city,
+      tenant_state: data.tenant?.state || data.store?.state || data.tenantState || data.tenant_state,
+      tenant_country: data.tenant?.country || data.store?.country || data.tenantCountry || data.tenant_country,
+      tenant_zip: data.tenant?.zipCode || data.store?.zip || data.tenantZip || data.tenant_zip,
+      tenant_address: data.tenant?.address || data.store?.address || data.tenantAddress || data.tenant_address,
+      tenant_latitude: data.tenant?.latitude || data.store?.latitude || data.tenantLatitude || data.tenant_latitude,
+      tenant_longitude: data.tenant?.longitude || data.store?.longitude || data.tenantLongitude || data.tenant_longitude,
+      tenant_logo_url: data.tenant?.logoUrl || data.store?.logo_url || data.tenantLogoUrl || data.tenant_logo_url || data.store?.logo,
       
       // Analytics
       view_count: data.view_count,

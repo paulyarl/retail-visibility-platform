@@ -73,7 +73,7 @@ export abstract class PublicApiSingleton extends FlexibleApiSingleton {
       if (type === AppContext.TENANT) {
         // Directory resolve-slug endpoint returns { success: true, tenantId: "tid-..." }
         if (!response?.success || !response?.data.tenantId) {
-          console.log(`[PublicApiSingleton] Invalid response for ${type}/${identifier}:`, response);
+          // console.log(`[PublicApiSingleton] Invalid response for ${type}/${identifier}:`, response);
           //throw new Error(`${type} not found for identifier: ${identifier}`);
           return identifier;
         }
@@ -81,7 +81,7 @@ export abstract class PublicApiSingleton extends FlexibleApiSingleton {
       } else {
         // Other resolvers return { success: true, data: { resolvedId: "..." } }
         if (!response?.success || !response?.data?.resolvedId) {
-          console.log(`[PublicApiSingleton] Invalid response for ${type}/${identifier}:`, response);
+          // console.log(`[PublicApiSingleton] Invalid response for ${type}/${identifier}:`, response);
           //throw new Error(`${type} not found for identifier: ${identifier}`);
           return identifier;
         }

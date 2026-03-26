@@ -200,7 +200,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           sku: product.sku,
           stock: product.stock,
           availability: product.availability,
+          condition: product.condition,
           tenantCategoryId: product.product_category,
+          tenantCategory: product.categoryName ? {
+            id: product.product_category,
+            name: product.categoryName,
+            slug: product.product_category_slug,
+          } : undefined,
           featuredTypes: product.featured_type_array,
           gtin: product.gtin,
           mpn: product.mpn,

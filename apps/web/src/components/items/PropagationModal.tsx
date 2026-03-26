@@ -39,8 +39,8 @@ export default function PropagationModal({
 
   // Load tenants when modal opens - use useEffect to avoid render-phase side effects
   useEffect(() => {
-    console.log('[PropagationModal] useEffect triggered', { isOpen, organizationId, tenantsLoaded, loading });
-    if (!isOpen || !organizationId || tenantsLoaded || loading) {
+    console.log('[PropagationModal] useEffect triggered', { isOpen, organizationId, tenantsLoaded });
+    if (!isOpen || !organizationId || tenantsLoaded) {
       console.log('[PropagationModal] Skipping loadTenants');
       return;
     }

@@ -468,7 +468,7 @@ class ShopsService extends PublicApiSingleton {
       // });
       
       if (!response.success) {
-        console.log('[ShopsService] API request failed:', response.error);
+      // console.log('[ShopsService] API request failed:', response.error);
      //   throw new Error('Failed to resolve shop');
       }
 

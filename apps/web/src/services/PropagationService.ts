@@ -130,6 +130,98 @@ export class PropagationService extends OrganizationApiSingleton {
   }
 
   /**
+   * Bulk propagate multiple items to multiple locations
+   */
+  async propagateItemsBulk(
+    organizationId: string,
+    request: {
+      sourceItemIds: string[];
+      targetTenantIds: string[];
+      mode?: 'create_only' | 'update_only' | 'create_or_update';
+      overrides?: {
+        price?: number;
+        stock?: number;
+        visibility?: 'public' | 'private';
+        itemStatus?: 'active' | 'inactive';
+      };
+    }
+  ): Promise<{
+    success: boolean;
+    summary: {
+      total: number;
+      created: number;
+      updated: number;
+      failed: number;
+      skipped: number;
+    };
+    errors?: Array<{ item_id: string; error: string }>;
+  }> {
+    try {
+      if (!organizationId) {
+        throw new Error('Organization ID is required');
+      }
+
+      if (!request.sourceItemIds || request.sourceItemIds.length === 0) {
+        throw new Error('At least one source item is required');
+      }
+
+      if (!request.targetTenantIds || request.targetTenantIds.length === 0) {
+        throw new Error('At least one target tenant is required');
+      }
+
+      const options: OrganizationRequestOptions = {
+        method: 'POST',
+        body: JSON.stringify({
+          sourceItemIds: request.sourceItemIds,
+          targetTenantIds: request.targetTenantIds,
+          mode: request.mode || 'create_only',
+          overrides: request.overrides
+        }),
+        organizationValidation: {
+          requireAuthorizationGroups: [AuthorizationGroup.CAN_PROPAGATE_ITEMS],
+          requireMultiLocation: true,
+          minTenantCount: 2,
+          platformUsersBypassMembership: true,
+          allowSupportOverride: true
+        },
+        organizationId,
+        bypassCache: true,
+        auditContext: {
+          operation: 'bulk_item_propagation',
+          reason: `Propagating ${request.sourceItemIds.length} items to ${request.targetTenantIds.length} locations`
+        }
+      };
+
+      const result = await this.makeDefaultRequest<{
+        success: boolean;
+        summary: {
+          total: number;
+          created: number;
+          updated: number;
+          failed: number;
+          skipped: number;
+        };
+        errors?: Array<{ item_id: string; error: string }>;
+      }>(
+        `/api/organizations/${organizationId}/items/propagate-bulk`,
+        options
+      );
+      if (!result.data) {
+        console.log(`[PropagationService] Bulk propagation result is null or undefined for org ${organizationId}`);
+      }
+
+      return result.data || {
+        success: false,
+        summary: { total: 0, created: 0, updated: 0, failed: 0, skipped: 0 },
+        errors: []
+      };
+    } catch (error) {
+      this.logError('Failed to bulk propagate items', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get organization tenants for propagation
    */
   async getOrganizationTenants(organizationId: string): Promise<OrganizationTenant[]> {

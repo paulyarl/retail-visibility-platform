@@ -630,7 +630,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     if (requestOptions?.requireAuth) {
       // Add auth headers or validation as needed
       // TODO: Implement getCurrentAuthToken() in concrete classes
-      console.log(`[${this.constructor.name}] 🔐 Auth required for request`);
+      // console.log(`[${this.constructor.name}] 🔐 Auth required for request`);
     }
     
     // Delegate to unified execution

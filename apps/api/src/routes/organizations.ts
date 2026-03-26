@@ -6,19 +6,12 @@ import { validateOrganizationTier, validateOrganizationLimits, validateOrganizat
 import { isPlatformAdmin, canPerformSupportActions } from '../utils/platform-admin';
 import { requireTenantAdmin } from '../middleware/auth';
 import { requirePropagationTier } from '../middleware/tier-validation';
-import { generateItemId, generateOrganizationId, generatePhotoId } from '../lib/id-generator';
+import { generateItemId, generateOrganizationId, generatePhotoId,generateProductCatId } from '../lib/id-generator';
 import { authenticateToken } from '../middleware/auth';
 import { user_tenant_role } from '@prisma/client';
 import TierService from '../services/TierService';
 
 const router = Router();
-
-/**
- * Generate a unique ID for directory_category
- */
-function generateCategoryId(): string {
-  return `cat-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-}
 
 /**
  * Ensure a directory category exists for a target tenant.
@@ -30,6 +23,7 @@ async function ensureCategoryForTargetTenant(
   sourceCategoryId: string | null,
   targetTenantId: string
 ): Promise<string | null> {
+  console.log(`[organizations: sourceCategoryId] ${sourceCategoryId} `);
   if (!sourceCategoryId) {
     return null;
   }
@@ -38,6 +32,8 @@ async function ensureCategoryForTargetTenant(
   const sourceCategory = await prisma.directory_category.findUnique({
     where: { id: sourceCategoryId },
   });
+  
+  console.log(`[organizations: sourceCategoryId] ${sourceCategoryId} `);
 
   if (!sourceCategory) {
     console.log(`[Propagation] Source category ${sourceCategoryId} not found, skipping category assignment`);
@@ -51,6 +47,8 @@ async function ensureCategoryForTargetTenant(
       slug: sourceCategory.slug,
     },
   });
+  
+  console.log(`[organizations: targetCategory] ${targetCategory} `);
 
   if (targetCategory) {
     console.log(`[Propagation] Using existing category for tenant ${targetTenantId}: ${sourceCategory.name} (${targetCategory.id})`);
@@ -60,7 +58,7 @@ async function ensureCategoryForTargetTenant(
   // Create a new category for the target tenant
   targetCategory = await prisma.directory_category.create({
     data: {
-      id: generateCategoryId(),
+      id: generateProductCatId(targetTenantId),
       tenantId: targetTenantId,
       name: sourceCategory.name,
       slug: sourceCategory.slug,
@@ -71,6 +69,9 @@ async function ensureCategoryForTargetTenant(
       updatedAt: new Date(),
     },
   });
+  
+  console.log(`[organizations: targetCategory] ${targetCategory} :  ${sourceCategory} `);
+  
 
   console.log(`[Propagation] Created category for tenant ${targetTenantId}: ${sourceCategory.name} (${targetCategory.id})`);
   return targetCategory.id;
@@ -1023,6 +1024,7 @@ router.post('/:id/items/propagate', authenticateToken, async (req, res) => {
 const propagateBulkSchema = z.object({
   sourceItemIds: z.array(z.string()).min(1),
   targetTenantIds: z.array(z.string()).min(1),
+  mode: z.enum(['create_only', 'update_only', 'create_or_update']).optional().default('create_only'),
   overrides: z.object({
     price: z.number().optional(),
     stock: z.number().int().optional(),
@@ -1032,17 +1034,17 @@ const propagateBulkSchema = z.object({
 });
 
 // POST /organizations/:id/items/propagate-bulk - Bulk propagate items
-// Permission: Tenant admin (Starter tier+, 2+ locations required)
-router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationTier('products'), async (req, res) => {
+// Permission: Authenticated user with propagation rights (tier validation done inline)
+router.post('/:id/items/propagate-bulk', authenticateToken, async (req, res) => {
   try {
     const parsed = propagateBulkSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: 'invalid_payload', details: parsed.error.flatten() });
     }
 
-    const { sourceItemIds, targetTenantIds, overrides } = parsed.data;
+    const { sourceItemIds, targetTenantIds, mode, overrides } = parsed.data;
 
-    // Verify organization exists
+    // Verify organization exists and get tier info
     const organization = await prisma.organizations_list.findUnique({
       where: { id: req.params.id },
       include: {
@@ -1056,6 +1058,52 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
       return res.status(400).json({ 
         error: 'organization_not_found',
         message: 'Organization not found'
+      });
+    }
+
+    // Check if organization has required tier for propagation (dynamic validation)
+    const orgTier = organization.subscription_tier || 'chain_starter';
+    const minTierForPropagation = await TierService.getMinimumTierForFeature('propagation');
+    if (!minTierForPropagation) {
+      return res.status(403).json({
+        error: 'feature_not_available',
+        message: 'Propagation feature is not available in current configuration',
+        currentTier: orgTier
+      });
+    }
+
+    // Get all valid tiers and check if current tier meets or exceeds minimum requirement
+    const allTiers = await TierService.getAllTiers();
+    const validTiers = allTiers
+      .filter(tier => tier.is_active)
+      .map(tier => tier.tier_key)
+      .filter(tierKey => {
+        // Check if this tier is equal to or higher than the minimum tier
+        const tier = allTiers.find(t => t.tier_key === tierKey);
+        const minTier = allTiers.find(t => t.tier_key === minTierForPropagation);
+        if (!minTier) return false;
+        
+        // Compare by sort_order (lower number = higher tier)
+        return (tier?.sort_order || 999) <= (minTier?.sort_order || 999);
+      });
+
+    if (!validTiers.includes(orgTier)) {
+      return res.status(403).json({
+        error: 'insufficient_tier',
+        message: `Propagation requires ${minTierForPropagation} tier or higher`,
+        currentTier: orgTier,
+        minimumTier: minTierForPropagation,
+        availableTiers: validTiers
+      });
+    }
+
+    // Check if organization has 2+ locations
+    if (organization.tenants.length < 2) {
+      return res.status(403).json({
+        error: 'insufficient_locations',
+        message: 'Propagation requires 2 or more locations',
+        currentLocations: organization.tenants.length,
+        requiredLocations: 2
       });
     }
 
@@ -1099,6 +1147,7 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
     // Propagate each item to each target tenant
     const results = {
       created: [] as Array<{ item_id: string; tenantId: string; sku: string }>,
+      updated: [] as Array<{ item_id: string; tenantId: string; sku: string }>,
       skipped: [] as Array<{ item_id: string; tenantId: string; sku: string; reason: string }>,
       errors: [] as Array<{ item_id: string; tenantId: string; sku: string; error: string }>,
     };
@@ -1125,12 +1174,127 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
             },
           });
 
+          // Handle based on mode
           if (existing) {
+            if (mode === 'create_only') {
+              results.skipped.push({ 
+                item_id: sourceItem.id, 
+                tenantId, 
+                sku: sourceItem.sku,
+                reason: 'sku_already_exists' 
+              });
+              continue;
+            }
+            
+            // Ensure category exists for target tenant before updating
+            const targetCategoryId = await ensureCategoryForTargetTenant(
+              sourceItem.directory_category_id,
+              tenantId
+            );
+            
+            // Update mode - update existing item
+            const updatedItem = await prisma.inventory_items.update({
+              where: { id: existing.id },
+              data: {
+                name: sourceItem.name,
+                price_cents: overrides?.price !== undefined ? Math.round(overrides.price * 100) : sourceItem.price_cents,
+                stock: overrides?.stock !== undefined ? overrides.stock : sourceItem.stock,
+                image_url: sourceItem.image_url, 
+                metadata: sourceItem.metadata as any,
+                marketing_description: sourceItem.marketing_description,
+                image_gallery: sourceItem.image_gallery,
+                custom_cta: sourceItem.custom_cta as any,
+                social_links: sourceItem.social_links as any,
+                custom_branding: sourceItem.custom_branding as any,
+                custom_sections: sourceItem.custom_sections as any,
+                landing_page_theme: sourceItem.landing_page_theme,
+                audit_log_id: sourceItem.audit_log_id,
+                availability: sourceItem.availability,
+                brand: sourceItem.brand,
+                category_path: sourceItem.category_path,
+                directory_category_id: targetCategoryId,
+                condition: sourceItem.condition,
+                currency: sourceItem.currency,
+                description: sourceItem.description,
+                eligibility_reason: sourceItem.eligibility_reason,
+                gtin: sourceItem.gtin,
+                item_status: overrides?.itemStatus || sourceItem.item_status,
+                location_id: sourceItem.location_id,
+                merchant_name: sourceItem.merchant_name,
+                mpn: sourceItem.mpn,
+                price: overrides?.price !== undefined ? overrides.price : sourceItem.price,
+                quantity: overrides?.stock !== undefined ? overrides.stock : sourceItem.quantity,
+                sync_status: sourceItem.sync_status,
+                synced_at: sourceItem.synced_at,
+                title: sourceItem.title,
+                visibility: overrides?.visibility || sourceItem.visibility,
+                manufacturer: sourceItem.manufacturer,
+                source: sourceItem.source,
+                enrichment_status: sourceItem.enrichment_status,
+                enriched_at: sourceItem.enriched_at,
+                enriched_by: sourceItem.enriched_by,
+                enriched_from_barcode: sourceItem.enriched_from_barcode,
+                missing_images: sourceItem.missing_images,
+                missing_description: sourceItem.missing_description,
+                missing_specs: sourceItem.missing_specs,
+                missing_brand: sourceItem.missing_brand,
+                sale_price_cents: sourceItem.sale_price_cents,
+                payment_gateway_type: sourceItem.payment_gateway_type,
+                payment_gateway_id: sourceItem.payment_gateway_id,
+                product_type: sourceItem.product_type,
+                digital_delivery_method: sourceItem.digital_delivery_method,
+                digital_assets: sourceItem.digital_assets as any,
+                access_duration_days: sourceItem.access_duration_days,
+                download_limit: sourceItem.download_limit,
+                license_type: sourceItem.license_type,
+                has_variants: sourceItem.has_variants,
+                is_featured: sourceItem.is_featured,
+                featured_at: sourceItem.featured_at,
+                featured_until: sourceItem.featured_until,
+                featured_priority: sourceItem.featured_priority,
+                featured_type: sourceItem.featured_type,
+                updated_at: new Date(),
+              },
+            });
+
+            // Delete old photos and copy new ones
+            await prisma.photo_assets.deleteMany({
+              where: { inventoryItemId: existing.id },
+            });
+
+            if (sourceItem.photo_assets && sourceItem.photo_assets.length > 0) {
+              await prisma.photo_assets.createMany({
+                data: sourceItem.photo_assets.map((photo: any, index: number) => ({
+                  id: generatePhotoId(tenantId, updatedItem.id),
+                  tenantId: tenantId,
+                  inventoryItemId: updatedItem.id,
+                  url: photo.url,
+                  width: photo.width,
+                  height: photo.height,
+                  contentType: photo.contentType,
+                  bytes: photo.bytes,
+                  position: photo.position !== undefined ? photo.position : index,
+                  alt: photo.alt,
+                  caption: photo.caption,
+                })),
+              });
+            }
+
+            results.updated.push({ 
+              item_id: sourceItem.id, 
+              tenantId, 
+              sku: sourceItem.sku
+            });
+            continue;
+          }
+
+          // Item doesn't exist - check if mode allows creation
+          if (mode === 'update_only') {
             results.skipped.push({ 
               item_id: sourceItem.id, 
               tenantId, 
               sku: sourceItem.sku,
-              reason: 'sku_already_exists' 
+              reason: 'item_not_found' 
             });
             continue;
           }
@@ -1236,6 +1400,7 @@ router.post('/:id/items/propagate-bulk', requireTenantAdmin, requirePropagationT
       summary: {
         totalOperations: sourceItems.length * targetTenantIds.length,
         created: results.created.length,
+        updated: results.updated.length,
         skipped: results.skipped.length,
         errors: results.errors.length,
       },

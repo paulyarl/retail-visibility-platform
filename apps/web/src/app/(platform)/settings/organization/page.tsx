@@ -911,7 +911,7 @@ export default function OrganizationPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => window.location.href = `/items?tenantId=${location.tenantId}`}
+                          onClick={() => window.location.href = `/tenants?tenantId=${location.tenantId}`}
                         >
                           View Items →
                         </Button>

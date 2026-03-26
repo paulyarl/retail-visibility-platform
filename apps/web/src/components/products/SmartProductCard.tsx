@@ -997,17 +997,32 @@ export default function SmartProductCard({
             
             {/* Category and Stock Status */}
             <div className="flex items-center gap-2 mt-1 text-xs text-neutral-600 dark:text-neutral-400">
-              {showCategory && product.productCategory && (
+              {showCategory && (product.categoryName || product.productCategory) && (
                 <span className="flex items-center gap-1">
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                   </svg>
-                  {typeof product.productCategory === 'string' ? product.productCategory : ''}
+                  {product.categoryName || (typeof product.productCategory === 'string' ? product.productCategory : '')}
+                </span>
+              )}
+              {product.condition && (
+                <span className="px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded capitalize">
+                  {product.condition.replace('_', ' ')}
+                </span>
+              )}
+              {(product.inStock === true || (product.stock && product.stock > 0)) && (
+                <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
+                  ✓ In Stock
+                </span>
+              )}
+              {product.inStock === false && (
+                <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded">
+                  Out of Stock
                 </span>
               )}
               {product.stock !== undefined && product.stock !== null && (
                 <>
-                  {showCategory && product.productCategory && <span>•</span>}
+                  {(showCategory && (product.categoryName || product.productCategory)) || product.condition || product.inStock !== undefined ? <span>•</span> : null}
                   <span className={`flex items-center gap-1 ${
                     product.stock === 0 
                       ? 'text-red-600 dark:text-red-400' 
@@ -1121,9 +1136,9 @@ export default function SmartProductCard({
                         </span>
                       ));
                     })()}
-                    {showCategory && product.productCategory && (
+                    {showCategory && (product.categoryName || product.productCategory) && (
                       <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
-                        {typeof product.productCategory === 'string' ? product.productCategory :  ''}
+                        {product.categoryName || (typeof product.productCategory === 'string' ? product.productCategory : '')}
                       </span>
                     )}
                   </div>
@@ -1250,17 +1265,34 @@ export default function SmartProductCard({
             )}
           </div>
           <div className="flex items-center justify-between">
-            <div className="text-xs text-neutral-500">
-              <span>SKU: {product.sku}</span>
-              <span className={`ml-4 font-medium ${
-                product.stock === 0 
-                  ? 'text-red-600 dark:text-red-400' 
-                  : product.stock < 10 
-                  ? 'text-amber-600 dark:text-amber-400' 
-                  : 'text-green-600 dark:text-green-400'
-              }`}>
-                Stock: {product.stock}
-              </span>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-neutral-500">SKU: {product.sku}</span>
+              {product.condition && (
+                <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded capitalize">
+                  {product.condition.replace('_', ' ')}
+                </span>
+              )}
+              {(product.inStock === true || (product.stock && product.stock > 0)) && (
+                <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
+                  ✓ In Stock
+                </span>
+              )}
+              {product.inStock === false && (
+                <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded">
+                  Out of Stock
+                </span>
+              )}
+              {product.stock !== undefined && product.stock !== null && (
+                <span className={`font-medium ${
+                  product.stock === 0 
+                    ? 'text-red-600 dark:text-red-400' 
+                    : product.stock < 10 
+                      ? 'text-amber-600 dark:text-amber-400' 
+                      : 'text-green-600 dark:text-green-400'
+                }`}>
+                  Stock: {product.stock}
+                </span>
+              )}
             </div>
             {effectiveCanPurchase && (
               (product.has_variants === true) ? (
@@ -1336,9 +1368,9 @@ export default function SmartProductCard({
               {displayBrand}
             </p>
           )}
-          {showCategory && product.productCategory && (
+          {(showCategory && (product.categoryName || product.productCategory)) && (
             <span className="text-xs px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded">
-              {typeof product.productCategory === 'string' ? product.productCategory : ''}
+              {product.categoryName || (typeof product.productCategory === 'string' ? product.productCategory : '')}
             </span>
           )}
         </div>
@@ -1412,6 +1444,25 @@ export default function SmartProductCard({
         )}
         
         <div className="flex items-center justify-between mb-3">
+          {/* Condition and Stock Status */}
+          <div className="flex items-center gap-2 text-xs">
+            {product.condition && (
+              <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded capitalize">
+                {product.condition.replace('_', ' ')}
+              </span>
+            )}
+            {(product.inStock === true || (product.stock && product.stock > 0)) && (
+              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
+                ✓ In Stock
+              </span>
+            )}
+            {product.inStock === false && (
+              <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded">
+                Out of Stock
+              </span>
+            )}
+          </div>
+          
           <div className="flex-1">
             {product.has_variants && product.price_range ? (
               <>
@@ -1438,15 +1489,17 @@ export default function SmartProductCard({
             <p className="text-xs text-neutral-500">
               SKU: {product.sku}
             </p>
-            <p className={`text-xs font-medium ${
-              product.stock === 0 
-                ? 'text-red-600 dark:text-red-400' 
-                : product.stock < 10 
-                  ? 'text-amber-600 dark:text-amber-400' 
-                  : 'text-green-600 dark:text-green-400'
-            }`}>
-              Stock: {product.stock}
-            </p>
+            {product.stock !== undefined && product.stock !== null && (
+              <p className={`text-xs font-medium ${
+                product.stock === 0 
+                  ? 'text-red-600 dark:text-red-400' 
+                  : product.stock < 10 
+                    ? 'text-amber-600 dark:text-amber-400' 
+                    : 'text-green-600 dark:text-green-400'
+              }`}>
+                Stock: {product.stock}
+              </p>
+            )}
           </div>
         </div>
 

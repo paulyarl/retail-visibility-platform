@@ -84,22 +84,12 @@ export default function BulkPropagationModal({
     setResult(null);
 
     try {
-      const response = await fetch(`/api/organizations/${organizationId}/items/propagate-bulk`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceItemIds: itemIds,
-          targetTenantIds: selectedTenantIds,
-          overrides: { mode },
-        }),
+      const propagationResult = await propagationService.propagateItemsBulk(organizationId, {
+        sourceItemIds: itemIds,
+        targetTenantIds: selectedTenantIds,
+        mode
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to propagate items');
-      }
-
-      const propagationResult = await response.json();
+      
       setResult(propagationResult);
 
       if (propagationResult.summary.created > 0 || propagationResult.summary.updated > 0) {

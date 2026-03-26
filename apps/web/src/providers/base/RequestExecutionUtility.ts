@@ -89,11 +89,11 @@ export class RequestExecutionUtility {
    * Track performance metrics
    */
   static trackPerformanceMetrics(url: string, startTime: number, cacheKey?: string): void {
-    const duration = Date.now() - startTime;
-    console.log(`[RequestExecutionUtility] Request to ${url} took ${duration}ms`);
-    if (cacheKey) {
-      console.log(`[RequestExecutionUtility] Cache key: ${cacheKey}`);
-    }
+    // const duration = Date.now() - startTime;
+    // console.log(`[RequestExecutionUtility] Request to ${url} took ${duration}ms`);
+    // if (cacheKey) {
+    //   console.log(`[RequestExecutionUtility] Cache key: ${cacheKey}`);
+    // }
   }
 
   /**

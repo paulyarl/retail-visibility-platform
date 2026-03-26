@@ -137,14 +137,15 @@ export class SingleProductService {
       }
     });
 
-    // Get category info separately
+    // Get category info separately - use directory_category table (tenant categories)
     const category = product.directory_category_id ? 
-      await prisma.platform_categories.findUnique({
+      await prisma.directory_category.findUnique({
         where: { id: product.directory_category_id },
         select: {
           id: true,
           name: true,
-          slug: true
+          slug: true,
+          googleCategoryId: true
         }
       }) : null;
 
@@ -226,7 +227,7 @@ export class SingleProductService {
         id: category.id,
         name: category.name,
         slug: category.slug,
-        googleCategoryId: null
+        googleCategoryId: category.googleCategoryId || null
       } : null,
       // Featured types from MV
       featuredTypes: featuredTypes
@@ -272,12 +273,13 @@ export class SingleProductService {
       }
     });
 
-    const allCategories = await prisma.platform_categories.findMany({
+    const allCategories = await prisma.directory_category.findMany({
       where: { id: { in: products.map(p => p.directory_category_id).filter(Boolean) as string[] } },
       select: {
         id: true,
         name: true,
-        slug: true
+        slug: true,
+        googleCategoryId: true
       }
     });
 
@@ -352,7 +354,7 @@ export class SingleProductService {
           id: category.id,
           name: category.name,
           slug: category.slug,
-          googleCategoryId: null
+          googleCategoryId: category.googleCategoryId || null
         } : null
       };
     });

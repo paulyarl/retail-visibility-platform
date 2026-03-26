@@ -25,7 +25,7 @@ import {
   calculateTokenExpiration,
   formatScopesForDisplay
 } from '../../services/clover-oauth';
-import { generateCloverCatId, generateCloverIntegrationId, generateCloverItemId, generateCloverItemMappingsId, generateCloverOauthChangeLogId, generateCloverSyncLogId } from '../../lib/id-generator';
+import { generateCloverCatId, generateCloverIntegrationId, generateCloverItemId, generateCloverItemMappingsId, generateCloverOauthChangeLogId, generateCloverSyncLogId, generateProductCatId } from '../../lib/id-generator';
  
 
 // Import platform standard slug service
@@ -127,7 +127,7 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
         // Create new tenant category
         const newCategory = await prisma.directory_category.create({
           data: {
-            id: generateCloverCatId(),
+            id: generateProductCatId(tenantId),
             tenantId: tenantId,
             name: categoryName,
             slug: slug,
@@ -893,7 +893,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
           // Create the category (same as demo startup)
           existingCategory = await prisma.directory_category.create({
             data: {
-              id: generateCloverCatId(),
+              id: generateProductCatId(tenantId),
               tenantId: tenantId,
               name: categoryName,
               slug: slug,
@@ -1123,7 +1123,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
         if (!newCategory) {
           newCategory = await prisma.directory_category.create({
             data: {
-              id: generateCloverCatId(),
+              id: generateProductCatId(tenantId),
               tenantId,
               name: newCatData.name,
               slug: newCatSlug,
@@ -1239,7 +1239,7 @@ router.post('/:tenantId/clover/demo/simulate/:eventId/execute', authenticateToke
         if (!destCategory) {
           destCategory = await prisma.directory_category.create({
             data: {
-              id: generateCloverCatId(),
+              id: generateProductCatId(tenantId),
               tenantId,
               name: toCatName,
               slug: slugSingletonService.slugify(toCatName),
@@ -1780,7 +1780,7 @@ router.post('/:tenantId/clover/sync', authenticateToken, async (req: Request, re
               // Create new Visible Shelf category
               rvpCategory = await prisma.directory_category.create({
                 data: { 
-                  id: generateCloverCatId(),
+                  id: generateProductCatId(tenantId),
                   tenantId: tenantId,
                   name: cloverCat.name,
                   slug: slug,
