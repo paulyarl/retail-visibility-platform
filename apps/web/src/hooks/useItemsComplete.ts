@@ -49,6 +49,7 @@ interface UseItemsCompleteResult {
 
   // Actions
   refresh: () => Promise<void>;
+  updateItem: (itemId: string, updatedItem: Item) => void; // Update local state instantly
 }
 
 /**
@@ -180,6 +181,15 @@ export function useItemsComplete(options: UseItemsCompleteOptions): UseItemsComp
     await fetchItems();
   }, [fetchItems]);
 
+  // Update item in local state instantly
+  const updateItem = useCallback((itemId: string, updatedItem: Item) => {
+    setItems(prevItems => 
+      prevItems.map(item => 
+        item.id === itemId ? updatedItem : item
+      )
+    );
+  }, []);
+
   // Fetch items when filters change
   useEffect(() => {
     fetchItems();
@@ -210,5 +220,6 @@ export function useItemsComplete(options: UseItemsCompleteOptions): UseItemsComp
     setPage,
     setPageSize: handleSetPageSize,
     refresh,
+    updateItem,
   };
 }

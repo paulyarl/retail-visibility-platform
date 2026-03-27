@@ -12,7 +12,7 @@ import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 export type { ProductVariant } from '@/components/items/ProductVariants';
 
 export interface VariantCreateData {
-  name: string;
+  variant_name: string;
   sku: string;
   price_cents: number;
   stock: number;
@@ -20,7 +20,7 @@ export interface VariantCreateData {
 }
 
 export interface VariantUpdateData {
-  name?: string;
+  variant_name?: string;
   sku?: string;
   price_cents?: number;
   stock?: number;

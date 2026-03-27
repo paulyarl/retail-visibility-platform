@@ -110,6 +110,9 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       
       // Reload data to reflect changes (cache will be fresh after invalidation)
       await loadItemData();
+      
+      // Return the updated item
+      return result.item || updatedItem;
     } catch (err) {
       console.error('Error updating item:', err);
       throw err;

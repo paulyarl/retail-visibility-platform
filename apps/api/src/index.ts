@@ -28,7 +28,7 @@ import { createRateLimitingMiddleware } from "./services/RateLimitingService";
 
 // Security middleware imports
 import { validateInput, securityLogger } from "./middleware/security";
-import { generateItemId, generatePhotoId, generateTenantId, generateUserTenantId, generateVariantId } from './lib/id-generator';
+import { generateItemId, generatePhotoId, generateTenantId, generateUserTenantId, generateVariantId, generateVariantSkuFromParent } from './lib/id-generator';
 import { propagateVariants } from './utils/variant-propagation';
 
 import { ssrfProtection, basicRateLimit, blockIotRequests } from "./middleware/ssrf-protection";
@@ -2783,7 +2783,27 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
           digital_assets: true,
           access_duration_days: true,
           download_limit: true,
-          license_type: true
+          license_type: true,
+          // Include variants for items that have them
+          product_variants: {
+            select: {
+              id: true,
+              parent_item_id: true,
+              tenant_id: true,
+              variant_name: true,
+              sku: true,
+              price_cents: true,
+              sale_price_cents: true,
+              stock: true,
+              image_url: true,
+              attributes: true,
+              sort_order: true,
+              is_active: true,
+              created_at: true,
+              updated_at: true,
+            },
+            orderBy: { sort_order: 'asc', created_at: 'asc' },
+          },
         }
       }).then(items => {
         // Add inventory_item_id field for frontend compatibility
@@ -2882,6 +2902,9 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
       // Map image_url to imageUrl for frontend compatibility
       imageUrl: item.image_url || null,
       image_url: undefined, // Remove from response
+      // Include variants if they exist
+      variants: item.product_variants || [],
+      product_variants: undefined, // Remove from response
     }));
 
     // Calculate pagination info
@@ -4512,18 +4535,21 @@ const baseItemSchema = z.object({
   // Variant support
   has_variants: z.boolean().optional(),
   variants: z.array(z.object({
-    variant_name: z.string().min(1),
-    sku: z.string().min(1),
+    variant_name: z.string().min(1).optional(),
+    name: z.string().min(1).optional(), // Accept both 'name' and 'variant_name'
+    sku: z.string().optional(), // Allow empty SKUs - API will generate them
     price_cents: z.number().int().nonnegative(),
     sale_price_cents: z.number().int().nonnegative().nullable().optional(),
     stock: z.number().int().nonnegative(),
     attributes: z.record(z.string(), z.string()),
+  }).refine((data) => data.variant_name || data.name, {
+    message: "Either 'name' or 'variant_name' must be provided"
   })).optional(),
   // Digital product fields
   product_type: z.enum(['physical', 'digital', 'hybrid']).optional(),
-  digital_delivery_method: z.string().optional(),
-  digital_assets: z.array(z.any()).optional(),
-  license_type: z.string().optional(),
+  digital_delivery_method: z.string().nullable().optional(),
+  digital_assets: z.array(z.any()).nullable().optional(),
+  license_type: z.string().nullable().optional(),
   access_duration_days: z.number().int().nullable().optional(),
   download_limit: z.number().int().nullable().optional(),
   // Payment gateway fields
@@ -4638,13 +4664,22 @@ app.post(["/api/items", "/api/inventory", "/items", "/inventory"], /* checkSubsc
         console.log(`[POST /items] Creating ${variants.length} variants for item ${created.id}`);
         
         for (const variant of variants) {
+          // Generate SKU if not provided
+          let sku = variant.sku;
+          if (!sku || sku.trim() === '') {
+            sku = generateVariantSkuFromParent(created.sku, variants.indexOf(variant), created.product_type as any);
+          }
+          
+          // Handle both 'name' and 'variant_name' fields
+          const variantName = variant.variant_name || variant.name;
+          
           await tx.product_variants.create({
             data: {
               id: generateVariantId(created.id),
               parent_item_id: created.id,
               tenant_id: created.tenant_id,
-              variant_name: variant.variant_name,
-              sku: variant.sku,
+              variant_name: variantName || `Variant ${variants.indexOf(variant) + 1}`, // Ensure string value
+              sku: sku, // Now guaranteed to be a string
               price_cents: variant.price_cents,
               sale_price_cents: variant.sale_price_cents || null,
               stock: variant.stock,
@@ -4755,6 +4790,13 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
       }
     }
     
+    // Handle variants separately - they go to the product_variants table
+    let variantsData;
+    if (updateData.variants) {
+      variantsData = updateData.variants;
+      delete updateData.variants; // Remove from main item update
+    }
+    
     // Handle stock updates
     if (updateData.stock !== undefined) {
       const stockValue = typeof updateData.stock === 'string' ? parseInt(updateData.stock, 10) : updateData.stock;
@@ -4787,6 +4829,45 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     
     if (!updated) {
       return res.status(400).json({ error: 'item_not_found' });
+    }
+    
+    // Process variants if they exist
+    if (variantsData && Array.isArray(variantsData)) {
+      const { generateVariantId, generateVariantSkuFromParent } = await import('./lib/id-generator');
+      
+      // Delete existing variants for this item
+      await prisma.product_variants.deleteMany({
+        where: { parent_item_id: itemId }
+      });
+      
+      // Create new variants with auto-generated SKUs based on parent SKU pattern
+      const variantPromises = variantsData.map(async (variant: any, index: number) => {
+        // Generate SKU if not provided or empty, using parent item's SKU pattern
+        let sku = variant.sku;
+        if (!sku || sku.trim() === '') {
+          sku = generateVariantSkuFromParent(updated.sku, index, updated.product_type as any);
+        }
+        
+        return prisma.product_variants.create({
+          data: {
+            id: generateVariantId(itemId), // Unique variant ID
+            parent_item_id: itemId,
+            tenant_id: updated.tenant_id,
+            sku: sku, // Variant SKU following parent SKU pattern
+            variant_name: variant.variant_name || variant.name || `Variant ${index + 1}`, // Handle both field names
+            price_cents: variant.price_cents || 0,
+            sale_price_cents: variant.sale_price_cents || null,
+            stock: variant.stock || 0,
+            image_url: variant.image_url || null,
+            attributes: variant.attributes || {},
+            sort_order: variant.sort_order || index,
+            is_active: variant.is_active !== false, // default to true
+          }
+        });
+      });
+      
+      await Promise.all(variantPromises);
+      console.log(`[PUT /items/:id] Created ${variantsData.length} variants for item ${itemId} with intelligent SKU generation`);
     }
     
     console.log('[PUT /items/:id] Database returned directory_category_id:', updated.directory_category_id);

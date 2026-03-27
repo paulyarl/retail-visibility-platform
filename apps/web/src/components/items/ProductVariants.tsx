@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, Copy, Save } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 
 export interface ProductVariant {
   id?: string;
@@ -23,6 +24,9 @@ interface ProductVariantsProps {
   variants: ProductVariant[];
   onChange: (variants: ProductVariant[]) => void;
   disabled?: boolean;
+  onValidationChange?: (errors: string[]) => void;
+  attributeTypes?: string[]; // Pre-loaded attribute types
+  onAttributeTypesChange?: (attributeTypes: string[]) => void; // Callback when attribute types change
 }
 
 export default function ProductVariants({
@@ -31,10 +35,20 @@ export default function ProductVariants({
   variants,
   onChange,
   disabled = false,
+  onValidationChange,
+  attributeTypes: initialAttributeTypes = ['size', 'color'],
+  onAttributeTypesChange,
 }: ProductVariantsProps) {
-  const [attributeTypes, setAttributeTypes] = useState<string[]>(['size', 'color']);
+  const [attributeTypes, setAttributeTypes] = useState<string[]>(initialAttributeTypes);
   const [newAttributeType, setNewAttributeType] = useState('');
   const [showAddAttribute, setShowAddAttribute] = useState(false);
+  const [priceInputs, setPriceInputs] = useState<Record<string, string>>({});
+  const [salePriceInputs, setSalePriceInputs] = useState<Record<string, string>>({});
+
+  // Sync attributeTypes when initialAttributeTypes prop changes
+  useEffect(() => {
+    setAttributeTypes(initialAttributeTypes);
+  }, [initialAttributeTypes]);
 
   const addVariant = () => {
     const newVariant: ProductVariant = {
@@ -53,6 +67,69 @@ export default function ProductVariants({
     const updated = [...variants];
     updated[index] = { ...updated[index], ...updates };
     onChange(updated);
+  };
+
+  const handlePriceInputChange = (index: number, value: string) => {
+    setPriceInputs(prev => ({ ...prev, [index]: value }));
+    // Only update the actual variant if the input is valid
+    if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
+      const priceCents = value ? Math.round(parseFloat(value) * 100) : 0;
+      updateVariant(index, { price_cents: priceCents });
+    }
+  };
+
+  const handleSalePriceInputChange = (index: number, value: string) => {
+    setSalePriceInputs(prev => ({ ...prev, [index]: value }));
+    // Only update the actual variant if the input is valid
+    if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
+      const salePriceCents = value ? Math.round(parseFloat(value) * 100) : undefined;
+      updateVariant(index, { sale_price_cents: salePriceCents });
+    }
+  };
+
+  const handlePriceBlur = (index: number) => {
+    const formattedValue = (variants[index].price_cents / 100).toFixed(2);
+    setPriceInputs(prev => ({ ...prev, [index]: formattedValue }));
+  };
+
+  const handleSalePriceBlur = (index: number) => {
+    const value = variants[index].sale_price_cents;
+    const formattedValue = value ? (value / 100).toFixed(2) : '';
+    setSalePriceInputs(prev => ({ ...prev, [index]: formattedValue }));
+  };
+
+  const validateVariants = () => {
+    const errors: string[] = [];
+    
+    variants.forEach((variant, index) => {
+      if (!variant.variant_name || variant.variant_name.trim() === '') {
+        errors.push(`Variant ${index + 1}: Name is required`);
+      }
+      if (!variant.sku || variant.sku.trim() === '') {
+        errors.push(`Variant ${index + 1}: SKU is required`);
+      }
+      if (variant.price_cents < 0) {
+        errors.push(`Variant ${index + 1}: Price must be non-negative`);
+      }
+      if (variant.stock < 0) {
+        errors.push(`Variant ${index + 1}: Stock must be non-negative`);
+      }
+    });
+
+    return errors;
+  };
+
+  const getCleanVariants = () => {
+    return variants.map(variant => ({
+      variant_name: variant.variant_name || 'Variant',
+      sku: variant.sku || `variant-${variants.indexOf(variant) + 1}`,
+      price_cents: variant.price_cents || 0,
+      sale_price_cents: variant.sale_price_cents || undefined,
+      stock: variant.stock || 0,
+      attributes: variant.attributes || {},
+      sort_order: variant.sort_order || 0,
+      is_active: variant.is_active !== false, // default to true
+    }));
   };
 
   const removeVariant = (index: number) => {
@@ -74,9 +151,14 @@ export default function ProductVariants({
 
   const addAttributeType = () => {
     if (newAttributeType && !attributeTypes.includes(newAttributeType.toLowerCase())) {
-      setAttributeTypes([...attributeTypes, newAttributeType.toLowerCase()]);
+      const updatedTypes = [...attributeTypes, newAttributeType.toLowerCase()];
+      setAttributeTypes(updatedTypes);
       setNewAttributeType('');
       setShowAddAttribute(false);
+      // Notify parent of attribute types change
+      if (onAttributeTypesChange) {
+        onAttributeTypesChange(updatedTypes);
+      }
     }
   };
 
@@ -89,8 +171,13 @@ export default function ProductVariants({
     // Auto-generate variant name from attributes
     const attrs = updated[variantIndex].attributes;
     const name = Object.values(attrs).filter(v => v).join(' - ');
-    updated[variantIndex].variant_name = name || 'Variant';
-    onChange(updated);
+    const variantName = name || 'Variant';
+    
+    // Use updateVariant to ensure SKU auto-generation
+    updateVariant(variantIndex, { 
+      variant_name: variantName,
+      attributes: updated[variantIndex].attributes 
+    });
   };
 
   const bulkUpdatePrice = () => {
@@ -243,55 +330,52 @@ export default function ProductVariants({
             {/* SKU, Price, Stock */}
             <div className="grid grid-cols-4 gap-3">
               <div>
-                <label className="block text-xs font-medium text-neutral-700 mb-1">
-                  SKU
-                </label>
-                <input
-                  type="text"
+                <Input
+                  label="SKU"
                   value={variant.sku}
                   onChange={(e) => updateVariant(index, { sku: e.target.value })}
                   placeholder="Auto-generate"
                   disabled={disabled}
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-neutral-100"
+                  className="text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-neutral-700 mb-1">
-                  Price ($)
-                </label>
-                <input
+                <Input
+                  label="Price ($)"
                   type="number"
                   step="0.01"
-                  value={(variant.price_cents / 100).toFixed(2)}
-                  onChange={(e) => updateVariant(index, { price_cents: Math.round(parseFloat(e.target.value || '0') * 100) })}
+                  min="0"
+                  value={priceInputs[index] !== undefined ? priceInputs[index] : (variants[index].price_cents / 100).toFixed(2)}
+                  onChange={(e) => handlePriceInputChange(index, e.target.value)}
+                  onBlur={() => handlePriceBlur(index)}
                   disabled={disabled}
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-neutral-100"
+                  className="text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-neutral-700 mb-1">
-                  Sale Price ($)
-                </label>
-                <input
+                <Input
+                  label="Sale Price ($)"
                   type="number"
                   step="0.01"
-                  value={variant.sale_price_cents ? (variant.sale_price_cents / 100).toFixed(2) : ''}
-                  onChange={(e) => updateVariant(index, { sale_price_cents: e.target.value ? Math.round(parseFloat(e.target.value) * 100) : undefined })}
+                  min="0"
+                  value={salePriceInputs[index] !== undefined ? salePriceInputs[index] : (variants[index].sale_price_cents ? (variants[index].sale_price_cents / 100).toFixed(2) : '')}
+                  onChange={(e) => handleSalePriceInputChange(index, e.target.value)}
+                  onBlur={() => handleSalePriceBlur(index)}
                   placeholder="Optional"
                   disabled={disabled}
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-neutral-100"
+                  className="text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-neutral-700 mb-1">
-                  Stock
-                </label>
-                <input
+                <Input
+                  label="Stock"
                   type="number"
+                  step="1"
+                  min="0"
                   value={variant.stock}
                   onChange={(e) => updateVariant(index, { stock: parseInt(e.target.value || '0', 10) })}
                   disabled={disabled}
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-neutral-100"
+                  className="text-sm"
                 />
               </div>
             </div>

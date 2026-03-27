@@ -226,10 +226,12 @@ export default function ItemsClient({
 
   const handleUpdate = async (itemId: string, data: Partial<Item>) => {
     try {
-      await updateItem(itemId, data);
+      const updatedItem = await updateItem(itemId, data);
       closeEditModal();
+      return updatedItem; // Return the updated item
     } catch (error) {
       console.error('[ItemsClient] Update failed:', error);
+      throw error; // Re-throw to handle in modal
     }
   };
 
@@ -560,8 +562,9 @@ export default function ItemsClient({
         item={editingItem}
         onSave={async (data) => {
           if (editingItem) {
-            await handleUpdate(editingItem.id, data);
+            return await handleUpdate(editingItem.id, data);
           }
+          throw new Error('No item being edited');
         }}
         onClose={closeEditModal}
       />

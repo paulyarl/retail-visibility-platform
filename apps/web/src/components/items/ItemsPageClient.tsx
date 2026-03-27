@@ -52,6 +52,7 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
     setPage,
     setPageSize,
     refresh,
+    updateItem: updateLocalItem,
   } = useItemsComplete({
     tenantId,
     initialPage: 1,
@@ -234,10 +235,14 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
 
   const handleUpdate = async (itemId: string, data: Partial<Item>) => {
     try {
-      await updateItem(itemId, data);
+      const updatedItem = await updateItem(itemId, data);
+      // Instantly update local state with the response
+      updateLocalItem(itemId, updatedItem);
       closeEditModal();
+      return updatedItem; // Return the updated item
     } catch (error) {
       console.error("[ItemsPageClient] Update failed:", error);
+      throw error; // Re-throw to handle in modal
     }
   };
 
@@ -259,8 +264,10 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
 
       closeCreateModal();
       refresh();
+      return newItem; // Return the created item
     } catch (error) {
       console.error("[ItemsPageClient] Create failed:", error);
+      throw error; // Re-throw to handle in modal
     }
   };
 
@@ -696,8 +703,8 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
             {/* Gradient Background */}
             <div className={`absolute inset-0 transition-opacity duration-300 ${
               bulkMode 
-                ? 'opacity-100 bg-gradient-to-r from-primary-50 via-blue-50 to-purple-50 dark:from-primary-900/20 dark:via-blue-900/20 dark:to-purple-900/20' 
-                : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg animate-pulse'
+                ? 'opacity-100 bg-gradient-to-r from-primary-50 via-blue-50 to-navy-50 dark:from-primary-900/20 dark:via-blue-900/20 dark:to-green-900/20 animate-pulse' 
+                : 'bg-gradient-to-r from-cyan-500 to-pink-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg '
             }`} />
             
             {/* Header - Always Visible */}
@@ -1207,8 +1214,9 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
         item={editingItem}
         onSave={async (data) => {
           if (editingItem) {
-            await handleUpdate(editingItem.id, data);
+            return await handleUpdate(editingItem.id, data);
           }
+          throw new Error('No item being edited');
         }}
         onClose={closeEditModal}
         onItemUpdated={refresh}

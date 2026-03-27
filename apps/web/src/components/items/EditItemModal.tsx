@@ -90,7 +90,7 @@ interface EditItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   item: Item | null;
-  onSave: (item: Item) => Promise<void>;
+  onSave: (item: Item) => Promise<Item>; // Return the saved item
   onItemUpdated?: () => void; // Callback to refresh item data
 }
 
@@ -126,7 +126,8 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
     downloadLimit: null,
   });
   const [hasVariants, setHasVariants] = useState(false);
-  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [variants, setVariants] = useState<any[]>([]);
+  const [attributeTypes, setAttributeTypes] = useState<string[]>(['size', 'color']); // Initialize with defaults
   const [variantsLoading, setVariantsLoading] = useState(false);
 
   // Initialize VariantsSingleton
@@ -151,6 +152,19 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
       return null;
     }
   }
+
+  // Extract unique attribute types from variants
+  const extractAttributeTypes = (variants: any[]): string[] => {
+    const attributeTypes = new Set<string>();
+    variants.forEach(variant => {
+      if (variant.attributes && typeof variant.attributes === 'object') {
+        Object.keys(variant.attributes).forEach(key => {
+          attributeTypes.add(key.toLowerCase());
+        });
+      }
+    });
+    return Array.from(attributeTypes).sort();
+  };
 
   // Initialize form when item changes
   useEffect(() => {
@@ -191,29 +205,6 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
           downloadLimit: (item as any).download_limit || null,
         });
       }
-
-      // Load variants if item has them
-      setHasVariants((item as any).has_variants || false);
-      if ((item as any).has_variants && item.id && tenantId) {
-          // Use VariantsSingleton to fetch variants
-          variantsActions.fetchItemVariants(item.id)
-            .then(result => {
-              if (result.success && result.variants) {
-                setVariants(result.variants);
-              } else {
-                console.error('Failed to fetch variants:', result.error);
-              }
-            })
-            .catch(err => {
-              console.error('Error fetching variants:', err);
-            })
-            .finally(() => {
-              setVariantsLoading(false);
-            });
-        } else {
-          setVariants([]);
-          setVariantsLoading(false);
-        }
     } else {
       // Reset form for new item creation
       setSku('');
@@ -240,8 +231,80 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
         accessDurationDays: null,
         downloadLimit: null,
       });
+      setHasVariants(false); // Reset variants state
+      setVariants([]); // Reset variants array
+      setVariantsLoading(false); // Reset loading state
+      setSaving(false); // Reset saving state
+      setError(null); // Reset error state
+      setShowCategorySelector(false); // Reset category selector state
     }
   }, [item]);
+
+  // Initialize variants state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      // Reset transient states when modal opens
+      setSaving(false);
+      setError(null);
+      setShowCategorySelector(false);
+      
+      if (item) {
+        // Load variants if item has them
+        setHasVariants((item as any).has_variants || false);
+        
+        // First, try to use variants from the item prop (from complete endpoint)
+        const itemVariants = (item as any).variants;
+        if (itemVariants && Array.isArray(itemVariants) && itemVariants.length > 0) {
+          console.log('[EditItemModal] Using variants from item prop:', itemVariants.length);
+          setVariants(itemVariants);
+          setHasVariants(true);
+          setVariantsLoading(false);
+          // Extract attribute types from loaded variants
+          const extractedTypes = extractAttributeTypes(itemVariants);
+          if (extractedTypes.length > 0) {
+            console.log('[EditItemModal] Extracted attribute types:', extractedTypes);
+            setAttributeTypes(extractedTypes);
+          }
+        } else if (item.id && tenantId) {
+          // Fallback: fetch variants via API if not available in item prop
+          setVariantsLoading(true);
+          console.log('[EditItemModal] Fetching variants via API for item:', item.id);
+          variantsActions.fetchItemVariants(item.id)
+            .then(result => {
+              if (result.success && result.variants) {
+                setVariants(result.variants);
+                // Update has_variants flag based on actual variants found
+                setHasVariants(result.variants.length > 0);
+                // Extract attribute types from loaded variants
+                const extractedTypes = extractAttributeTypes(result.variants);
+                if (extractedTypes.length > 0) {
+                  console.log('[EditItemModal] Extracted attribute types from API:', extractedTypes);
+                  setAttributeTypes(extractedTypes);
+                }
+              } else {
+                console.log('No variants found for item:', item.id);
+                setVariants([]);
+                setHasVariants(false);
+                setAttributeTypes(['size', 'color']); // Reset to defaults
+              }
+            })
+            .catch(err => {
+              console.error('Error fetching variants:', err);
+              setVariants([]);
+              setHasVariants(false);
+              setAttributeTypes(['size', 'color']); // Reset to defaults
+            })
+            .finally(() => {
+              setVariantsLoading(false);
+            });
+        } else {
+          setVariants([]);
+          setVariantsLoading(false);
+          setAttributeTypes(['size', 'color']); // Reset to defaults
+        }
+      }
+    }
+  }, [isOpen, item, tenantId, variantsActions]);
 
   // Auto-adjust stock quantity for digital products
   useEffect(() => {
@@ -394,7 +457,14 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
         download_limit?: number;
       };
 
-      await onSave(updatedItem);
+      const savedItem = await onSave(updatedItem);
+
+      // Update local state with the response from PUT to show instant changes
+      if (savedItem) {
+        // Update the item data in the modal to reflect the saved state
+        // Note: Since item is passed as prop, we'll update through callback
+        console.log('[EditItemModal] Item saved successfully:', savedItem.id, 'has_variants:', savedItem.has_variants);
+      }
 
       // Save variants if enabled and item has been created (only for existing items or if variants weren't included in creation)
       if (hasVariants && variants.length > 0 && updatedItem.id && !item?.id) {
@@ -410,7 +480,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
                 // Generate variant SKU: ParentSKU-AttributeValues
                 const attrValues = Object.values(v.attributes)
                   .filter(val => val)
-                  .map(val => val.toUpperCase().substring(0, 3))
+                  .map(val => String(val).toUpperCase().substring(0, 3))
                   .join('-');
                 return {
                   ...v,
@@ -427,7 +497,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
             // Create new variants using VariantsSingleton
             if (newVariants.length > 0) {
               const createData = newVariants.map(v => ({
-                name: v.variant_name,
+                variant_name: v.variant_name,
                 sku: v.sku,
                 price_cents: v.price_cents,
                 stock: v.stock,
@@ -436,6 +506,16 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
               const createResult = await variantsActions.createBulkVariants(updatedItem.id, createData);
               if (!createResult.success) {
                 throw new Error(createResult.error || 'Failed to create variants');
+              }
+              
+              // Update local variants state with the created variants from response for instant confirmation
+              if (createResult.variants && Array.isArray(createResult.variants)) {
+                console.log('[EditItemModal] Variants created successfully:', createResult.variants.length, 'variants');
+                setVariants(prevVariants => {
+                  // Remove the temporary new variants (those without IDs) and add the real ones
+                  const filteredExisting = prevVariants.filter(v => v.id);
+                  return [...filteredExisting, ...(createResult.variants || [])];
+                });
               }
             }
 
@@ -446,7 +526,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
                 .map(variant => ({
                   variantId: variant.id!,
                   data: {
-                    name: variant.variant_name,
+                    variant_name: variant.variant_name,
                     sku: variant.sku,
                     price_cents: variant.price_cents,
                     stock: variant.stock,
@@ -615,6 +695,8 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
               variants={variants}
               onChange={setVariants}
               disabled={saving}
+              attributeTypes={attributeTypes}
+              onAttributeTypesChange={setAttributeTypes}
             />
           )}
         </div>

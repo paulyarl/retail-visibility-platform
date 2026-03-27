@@ -2,14 +2,15 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth';
-import { generateVariantId } from '../lib/id-generator';
+import { generateVariantId, generateVariantSkuFromParent } from '../lib/id-generator';
 
 const router = Router();
 
 // Validation schema for variant
 const variantSchema = z.object({
-  sku: z.string().min(1),
-  variant_name: z.string().min(1),
+  sku: z.string().optional(), // Allow empty SKUs for auto-generation
+  variant_name: z.string().min(1).optional(),
+  name: z.string().min(1).optional(), // Accept both 'name' and 'variant_name'
   price_cents: z.number().int().nonnegative().optional(),
   sale_price_cents: z.number().int().nonnegative().optional().nullable(),
   stock: z.number().int().nonnegative().default(0),
@@ -17,6 +18,8 @@ const variantSchema = z.object({
   attributes: z.record(z.string(), z.string()).default({}),
   sort_order: z.number().int().nonnegative().default(0),
   is_active: z.boolean().default(true),
+}).refine((data) => data.variant_name || data.name, {
+  message: "Either 'name' or 'variant_name' must be provided"
 });
 
 /**
@@ -90,13 +93,27 @@ router.post('/items/:itemId/variants', authenticateToken, async (req: Request, r
     }
 
     // Create variant
+    // Ensure variant_name and sku are always strings
+    const variantName = parsed.data.variant_name || parsed.data.name || `Variant 1`;
+    let sku = parsed.data.sku;
+    if (!sku || sku.trim() === '') {
+      sku = generateVariantSkuFromParent(itemId, 0);
+    }
+
     const variant = await prisma.product_variants.create({
       data: {
         id: generateVariantId(itemId),
         parent_item_id: itemId,
         tenant_id: item.tenant_id,
-        ...parsed.data,
-        attributes: parsed.data.attributes as any,
+        variant_name: variantName,
+        sku: sku,
+        price_cents: parsed.data.price_cents || 0,
+        sale_price_cents: parsed.data.sale_price_cents || null,
+        stock: parsed.data.stock || 0,
+        image_url: parsed.data.image_url || null,
+        attributes: parsed.data.attributes as any || {},
+        sort_order: parsed.data.sort_order || 0,
+        is_active: parsed.data.is_active !== false,
       },
     });
 
@@ -151,32 +168,62 @@ router.post('/items/:itemId/variants/bulk', authenticateToken, async (req: Reque
       validatedVariants.push(parsed.data);
     }
 
-    // Check for duplicate SKUs
-    const skus = validatedVariants.map(v => v.sku);
-    const existingSkus = await prisma.product_variants.findMany({
-      where: {
-        tenant_id: item.tenant_id,
-        sku: { in: skus },
-      },
-      select: { sku: true },
+    // Generate SKUs first, then check for duplicates
+    const variantsWithSkus = validatedVariants.map((v, index) => {
+      const variantName = v.variant_name || v.name || `Variant ${index + 1}`;
+      let sku = v.sku;
+      if (!sku || sku.trim() === '') {
+        sku = generateVariantSkuFromParent(itemId, index);
+      }
+      return { ...v, variant_name: variantName, sku };
     });
 
-    if (existingSkus.length > 0) {
-      return res.status(409).json({ 
-        error: 'Duplicate SKUs found', 
-        skus: existingSkus.map(s => s.sku) 
+    // Check for duplicate SKUs (only if provided manually)
+    const manualSkus = variantsWithSkus.filter(v => v.sku && v.sku.trim() !== '').map(v => v.sku);
+    if (manualSkus.length > 0) {
+      const existingSkus = await prisma.product_variants.findMany({
+        where: {
+          tenant_id: item.tenant_id,
+          sku: { in: manualSkus },
+        },
+        select: { sku: true },
       });
+
+      if (existingSkus.length > 0) {
+        return res.status(409).json({ 
+          error: 'Duplicate SKUs found', 
+          skus: existingSkus.map(s => s.sku) 
+        });
+      }
     }
 
     // Create all variants
     const created = await prisma.product_variants.createMany({
-      data: validatedVariants.map(v => ({
+      data: variantsWithSkus.map((v, index) => ({
         id: generateVariantId(itemId),
         parent_item_id: itemId,
         tenant_id: item.tenant_id,
-        ...v,
-        attributes: v.attributes as any,
+        variant_name: v.variant_name,
+        sku: v.sku,
+        price_cents: v.price_cents || 0,
+        sale_price_cents: v.sale_price_cents || null,
+        stock: v.stock || 0,
+        image_url: v.image_url || null,
+        attributes: v.attributes as any || {},
+        sort_order: v.sort_order || index,
+        is_active: v.is_active !== false,
       })),
+    });
+
+    // Fetch the created variants to return them with IDs and generated SKUs
+    const createdVariants = await prisma.product_variants.findMany({
+      where: {
+        parent_item_id: itemId,
+        tenant_id: item.tenant_id,
+        sku: { in: variantsWithSkus.map(v => v.sku) }
+      },
+      orderBy: { created_at: 'desc' },
+      take: created.count
     });
 
     // Update parent item to mark it has variants
@@ -187,7 +234,8 @@ router.post('/items/:itemId/variants/bulk', authenticateToken, async (req: Reque
 
     res.status(201).json({ 
       message: `Created ${created.count} variants`,
-      count: created.count 
+      count: created.count,
+      variants: createdVariants // Return the created variants with IDs and SKUs
     });
   } catch (error: any) {
     console.error('[POST /items/:itemId/variants/bulk] Error:', error);

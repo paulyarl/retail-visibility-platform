@@ -359,6 +359,149 @@ export function generateVariantId(parentItemId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 3);
   return `vid-${parentItemId}-${nanoid()}`;
 }
+
+// Generate variant SKU function - creates SKUs related to parent item SKU
+export function generateVariantSku(parentItemSku: string, variantIndex?: number): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 2);
+  const suffix = variantIndex !== undefined ? (variantIndex + 1).toString().padStart(2, '0') : nanoid();
+  
+  // Extract base SKU (remove any existing variant suffixes)
+  const baseSku = parentItemSku.split('-')[0] || parentItemSku;
+  
+  return `${baseSku}-V${suffix}`;
+}
+
+// SKU Generation interfaces and codes (ported from frontend)
+export interface SKUGenerationParams {
+  tenantKey?: string; // 4-character tenant identifier
+  productType: 'physical' | 'digital' | 'hybrid';
+  deliveryMethod?: 'direct_download' | 'external_link' | 'email_delivery' | 'license_key' | 'access_grant' | 'shipping' | 'pickup' | 'delivery';
+  accessControl?: 'personal' | 'commercial' | 'enterprise' | 'educational' | 'public' | 'subscription';
+}
+
+const PRODUCT_TYPE_CODES: Record<string, string> = {
+  physical: 'PHYS',
+  digital: 'DIGI',
+  hybrid: 'HYBR',
+};
+
+const DELIVERY_METHOD_CODES: Record<string, string> = {
+  direct_download: 'DWNL',
+  external_link: 'LINK',
+  email_delivery: 'MAIL',
+  shipping: 'SHIP',
+  pickup: 'PICK',
+  delivery: 'DELV',
+};
+
+const ACCESS_CONTROL_CODES: Record<string, string> = {
+  personal: 'PERS',
+  commercial: 'COMM',
+  enterprise: 'ENTR',
+  public: 'PUBL',
+  subscription: 'SUBS',
+};
+
+/**
+ * Generate a random alphanumeric suffix (4 characters)
+ */
+function generateRandomSuffix(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed ambiguous chars (0, O, 1, I)
+  let result = '';
+  for (let i = 0; i < 4; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
+ * Generate a tenant key from tenant ID
+ * Converts tenant ID to a 4-character alphanumeric key
+ */
+export function generateTenantKey(tenantId: string): string {
+  if (!tenantId) return 'UNKN';
+  
+  // Use a simple hash to create consistent 4-char key from tenant ID
+  let hash = 0;
+  for (let i = 0; i < tenantId.length; i++) {
+    hash = ((hash << 5) - hash) + tenantId.charCodeAt(i);
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  // Convert hash to 4-character alphanumeric key
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let tempHash = Math.abs(hash);
+  let key = '';
+  for (let i = 0; i < 4; i++) {
+    key += chars[tempHash % chars.length];
+    tempHash = Math.floor(tempHash / chars.length);
+  }
+  
+  return key;
+}
+
+/**
+ * Generate SKU based on product attributes
+ */
+export function generateSKU(params: SKUGenerationParams): string {
+  const parts: string[] = [];
+
+  // Tenant key (optional but recommended)
+  if (params.tenantKey) {
+    parts.push(params.tenantKey.toUpperCase().substring(0, 4).padEnd(4, 'X'));
+  }
+
+  // Product type (required)
+  parts.push(PRODUCT_TYPE_CODES[params.productType] || 'PROD');
+
+  // Delivery method (optional, defaults based on product type)
+  let deliveryMethod = params.deliveryMethod;
+  if (!deliveryMethod) {
+    // Auto-detect delivery method based on product type
+    if (params.productType === 'digital') {
+      deliveryMethod = 'direct_download';
+    } else if (params.productType === 'physical') {
+      deliveryMethod = 'shipping';
+    } else {
+      deliveryMethod = 'direct_download'; // hybrid defaults to digital delivery
+    }
+  }
+  parts.push(DELIVERY_METHOD_CODES[deliveryMethod] || 'UNKN');
+
+  // Access control (optional, defaults to public for physical, personal for digital)
+  let accessControl = params.accessControl;
+  if (!accessControl) {
+    accessControl = params.productType === 'physical' ? 'public' : 'personal';
+  }
+  parts.push(ACCESS_CONTROL_CODES[accessControl] || 'PUBL');
+
+  // Random suffix for uniqueness
+  parts.push(generateRandomSuffix());
+
+  return parts.join('-');
+}
+
+/**
+ * Generate variant SKU based on parent item SKU and variant attributes
+ * This creates a variant SKU that follows the same pattern as the parent but with variant suffix
+ */
+export function generateVariantSkuFromParent(
+  parentItemSku: string, 
+  variantIndex: number,
+  productType?: 'physical' | 'digital' | 'hybrid'
+): string {
+  // If parent SKU follows the pattern, extract components and add variant suffix
+  const parentParts = parentItemSku.split('-');
+  if (parentParts.length >= 4) {
+    // Replace the random suffix with variant identifier
+    const variantSuffix = `V${(variantIndex + 1).toString().padStart(2, '0')}`;
+    parentParts[parentParts.length - 1] = variantSuffix;
+    return parentParts.join('-');
+  }
+  
+  // Fallback: append variant suffix to parent SKU
+  return `${parentItemSku}-V${(variantIndex + 1).toString().padStart(2, '0')}`;
+}
 /**
  * Example outputs:
  * 

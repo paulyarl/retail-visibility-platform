@@ -44,6 +44,7 @@ export interface Item {
   updatedAt?: string;
   // New fields for variants and digital products
   has_variants?: boolean;
+  variants?: ProductVariant[]; // Variants array from complete endpoint
   default_variant_id?: string;
   product_type?: 'physical' | 'digital' | 'hybrid';
   digital_delivery_method?: string;
@@ -53,6 +54,24 @@ export interface Item {
   download_limit?: number;
   payment_gateway_type?: string;
   payment_gateway_id?: string;
+}
+
+// Product variant interface (matches API response)
+export interface ProductVariant {
+  id: string;
+  parent_item_id: string;
+  tenant_id: string;
+  variant_name: string;
+  sku: string;
+  price_cents: number;
+  sale_price_cents?: number | null;
+  stock: number;
+  image_url?: string | null;
+  attributes?: Record<string, string>;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ItemsStats {
