@@ -984,6 +984,8 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           metadata: item.metadata,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
+          variants: item.variants,
+          has_variants: item.has_variants || (item.variants && item.variants.length > 0),
         } : null}
         onSave={handleSaveItem}
         onItemUpdated={loadItemData}
