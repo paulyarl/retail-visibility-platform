@@ -202,6 +202,55 @@ router.post('/bulk/create', async (req: Request, res: Response) => {
 });
 
 /**
+ * PUT /api/variants-singleton/bulk
+ * Bulk update multiple variants
+ */
+router.put('/bulk', async (req: Request, res: Response) => {
+  try {
+    const { updates } = req.body;
+    const user = (req as any).user;
+
+    if (!updates || !Array.isArray(updates)) {
+      return res.status(400).json({ 
+        error: 'Invalid request body', 
+        message: 'updates array is required' 
+      });
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ 
+        error: 'Invalid request body', 
+        message: 'updates array cannot be empty' 
+      });
+    }
+
+    // Validate each update object
+    for (const update of updates) {
+      if (!update.variantId || !update.data) {
+        return res.status(400).json({ 
+          error: 'Invalid update format', 
+          message: 'Each update must have variantId and data fields' 
+        });
+      }
+    }
+
+    const result = await variantBulkOperationsService.bulkUpdateVariants(updates);
+    
+    res.json({
+      success: true,
+      ...result,
+      message: `Bulk variant update completed: ${result.success_count} variants updated`
+    });
+  } catch (error: unknown) {
+    logger.error('[VARIANT BULK OPERATIONS] Bulk update error: ' + (error instanceof Error ? error.message : 'Unknown error'), undefined, { error });
+    res.status(500).json({ 
+      error: 'Bulk update failed', 
+      message: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
+/**
  * DELETE /api/variants-singleton/bulk/delete
  * Bulk delete variants
  */

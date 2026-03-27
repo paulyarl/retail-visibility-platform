@@ -2,6 +2,7 @@
 
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import PublicApiSingleton from '../providers/base/PublicApiSingleton';
+// import { ProductData } from '@/components/products/ProductCardLayouts';
 // ====================
 // STOREFRONT SERVICE - PLATFORM-ALIGNED
 // ====================
@@ -24,6 +25,82 @@ interface ProductResponse {
     totalPages: number;
     hasMore: boolean;
   };
+}
+
+interface ProductImage {
+  id: string;
+  url: string;
+  position: number;
+  isPrimary: boolean;
+}
+
+interface ProductVariant {
+  id: string;
+  sku: string;
+  variant_name: string;
+  price_cents: number;
+  sale_price_cents?: number;
+  stock: number;
+  image_url?: string;
+  attributes: Record<string, any>;
+  sort_order: number;
+  is_active: boolean;
+  is_on_sale: boolean;
+  discount_percentage: number;
+}
+
+interface ProductData {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  price: number;
+  priceCents: number;
+  listPriceCents: number;
+  salePriceCents: number;
+  isOnSale: boolean;
+  discountPercentage: string;
+  sku: string;
+  availability: string;
+  stock: number;
+  quantity: number;
+  images: ProductImage[];
+  tenant: {
+    id: string;
+    name: string;
+    slug: string;
+    subscriptionTier?: string;
+    city?: string;
+    state?: string;
+  };
+  category?: {
+    id: string;
+    name: string;
+    slug: string;
+    googleCategoryId?: string;
+  };
+  brand?: string;
+  condition?: string;
+  manufacturer?: string;
+  createdAt: string;
+  updatedAt: string;
+  metadata?: {
+    features?: string[];
+    enhancedDescription?: string;
+  };
+  tenantId: string;
+  itemStatus: string;
+  visibility: string;
+  imageUrl?: string;
+  currency: string;
+  variants?: ProductVariant[];
+  productType?: 'physical' | 'digital' | 'hybrid';
+  digitalDeliveryMethod?: string;
+  digitalAssets?: any[];
+  licenseType?: string;
+  accessDurationDays?: number;
+  downloadLimit?: number;
+  featuredTypes?: string[];
 }
 
 interface CatalogProduct {
@@ -80,6 +157,7 @@ class StorefrontService extends PublicApiSingleton {
   private readonly PRODUCTS_TTL = 5 * 60 * 1000; // 5 minutes for products
   private readonly CATEGORIES_TTL = 30 * 60 * 1000; // 30 minutes for categories
   private readonly FEATURED_PRODUCTS_TTL = 10 * 60 * 1000; // 10 minutes for featured products
+  private readonly SINGLE_PRODUCT_TTL = 15 * 60 * 1000; // 15 minutes for single product
 
   private constructor() {
     super('storefront-service');
@@ -110,6 +188,32 @@ class StorefrontService extends PublicApiSingleton {
       return result.data || { items: [], pagination: { page: 1, limit: 10, totalItems: 0, totalPages: 0, hasMore: false } };
     } catch (error) {
       console.error('[StorefrontService] Failed to get products:', error);
+      throw error;
+    }
+  }
+
+  async getProduct(productId: string): Promise<ProductData | null> {
+    try {
+      if (!productId) {
+        throw new Error('Product ID is required');
+      }
+
+      const endpoint = `/api/public/products/${productId}?include=variants,metadata,analytics,store`;
+      const cacheKey = `product:${productId}`;
+
+      const result = await super.makeDefaultRequest<any>(endpoint, {}, cacheKey, this.SINGLE_PRODUCT_TTL);
+      
+      // Handle both wrapped and direct response formats
+      if (result.success && result.data) {
+        return result.data;
+      } else if (result.data) {
+        // Direct response format
+        return result.data as ProductData;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('[StorefrontService] Failed to get product:', error);
       throw error;
     }
   }

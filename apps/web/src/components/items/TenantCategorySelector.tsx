@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { useCategorySingleton } from '@/providers/data/CategorySingleton';
+import { tenantCategoriesService } from '@/services/TenantCategoriesService';
 
 interface TenantCategory {
   id: string;
@@ -34,19 +34,11 @@ export default function TenantCategorySelector({
   const [localSelectedId, setLocalSelectedId] = useState<string>(selectedCategoryId || '');
   const [searchQuery, setSearchQuery] = useState('');
 
-  
-  // Use CategorySingleton for automatic caching (15-min TTL)
-  const { state: categoryState, actions: categoryActions } = useCategorySingleton();
-
-  // Fetch tenant categories via singleton
+  // Fetch tenant categories via TenantCategoriesService
   useEffect(() => {
     async function fetchCategories() {
       try {
-        // Use singleton for automatic caching
-        const { categories: fetchedCategories } = await categoryActions.fetchCategories({
-          includeChildren: true,
-          includeProductCount: false
-        });
+        const fetchedCategories = await tenantCategoriesService.getTenantCategories(tenantId);
         setCategories(fetchedCategories);
       } catch (error) {
         console.error('Failed to fetch categories:', error);
@@ -55,7 +47,7 @@ export default function TenantCategorySelector({
       }
     }
     fetchCategories();
-  }, [tenantId, categoryActions]);
+  }, [tenantId]);
 
   // Update local selection when prop changes
   useEffect(() => {
@@ -69,23 +61,11 @@ export default function TenantCategorySelector({
   );
 
   const handleSelect = (categoryId: string) => {
-    console.log('[TenantCategorySelector] Category selected:', {
-      categoryId,
-      localSelectedId: localSelectedId,
-      categoriesCount: categories.length
-    });
-
     setLocalSelectedId(categoryId);
     
     // In tenant mode, just pass the category ID
     const selectedTenantCat = categories.find(cat => cat.id === categoryId);
-    console.log('[TenantCategorySelector] Tenant category selection:', {
-      categoryId,
-      selectedTenantCat,
-      categories: categories.slice(0, 3) // Log first 3 for debugging
-    });
     
-    console.log('[TenantCategorySelector] Calling onSelect with tenant categoryId:', categoryId);
     onSelect(categoryId);
   };
 

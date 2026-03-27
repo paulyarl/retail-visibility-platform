@@ -20,7 +20,7 @@ interface UseItemsActionsReturn {
   updateError: string | null;
   
   // Delete
-  deleteItem: (itemId: string) => Promise<void>;
+  deleteItem: (itemId: string) => Promise<Item>;
   deleting: boolean;
   deleteError: string | null;
   
@@ -105,7 +105,7 @@ export function useItemsActions({
     }
   }, [tenantId, onSuccess]);
 
-  const deleteItem = useCallback(async (itemId: string): Promise<void> => {
+  const deleteItem = useCallback(async (itemId: string): Promise<Item> => {
     setDeleting(true);
     setDeleteError(null);
 
@@ -118,9 +118,16 @@ export function useItemsActions({
         throw new Error(result.error || 'Failed to delete item');
       }
       
+      // Return the updated item data
+      if (!result.item) {
+        throw new Error('Delete succeeded but no item data returned');
+      }
+      
       if (onSuccess) {
         onSuccess();
       }
+      
+      return result.item;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete item';
       setDeleteError(errorMessage);

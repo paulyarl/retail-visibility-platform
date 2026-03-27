@@ -72,56 +72,48 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
       params
     }); */
     
-    // Query storefront_products MV for individual products (includes payment gateway info)
+    // Query storefront_products_mv for individual products (includes photo gallery and variants)
     const query = `
-      SELECT DISTINCT 
+      SELECT 
         sp.id,
         sp.tenant_id,
         sp.sku,
         sp.name,
         sp.title,
         sp.description,
-        sp.marketing_description,
         sp.price_cents / 100.0 as price,
         sp.price_cents,
-        ii.sale_price_cents,
-        ii.price_cents as list_price_cents,
+        sp.sale_price_cents,
+        sp.price_cents as list_price_cents,
         CASE 
-          WHEN ii.sale_price_cents IS NOT NULL AND ii.sale_price_cents < ii.price_cents 
+          WHEN sp.sale_price_cents IS NOT NULL AND sp.sale_price_cents < sp.price_cents 
           THEN true 
           ELSE false 
         END as is_on_sale,
         CASE 
-          WHEN ii.sale_price_cents IS NOT NULL AND ii.sale_price_cents < ii.price_cents 
-          THEN ROUND(((ii.price_cents - ii.sale_price_cents)::numeric / ii.price_cents::numeric) * 100, 0)
+          WHEN sp.sale_price_cents IS NOT NULL AND sp.sale_price_cents < sp.price_cents 
+          THEN ROUND(((sp.price_cents - sp.sale_price_cents)::numeric / sp.price_cents::numeric) * 100, 0)
           ELSE 0 
         END as discount_percentage,
-        sp.currency,
+        COALESCE(sp.currency, 'USD') as currency,
         sp.stock,
-        sp.quantity,
         sp.availability,
         sp.image_url,
-        sp.image_gallery,
+        sp.image_gallery, -- Enhanced photo gallery from photo_assets
         sp.brand,
         sp.manufacturer,
         sp.condition,
-        sp.gtin,
-        sp.mpn,
         sp.metadata,
-        sp.custom_cta,
-        sp.social_links,
-        sp.custom_branding,
-        sp.custom_sections,
-        sp.landing_page_theme,
-        sp.category_slug,
-        sp.category_id,
-        sp.has_image,
-        sp.in_stock,
-        sp.has_gallery,
-        sp.has_active_payment_gateway,
-        sp.default_gateway_type,
         sp.created_at,
         sp.updated_at,
+        sp.variants, -- Full variants data from product_variants
+        sp.product_type, -- Digital product fields
+        sp.digital_delivery_method,
+        sp.digital_assets,
+        sp.license_type,
+        sp.access_duration_days,
+        sp.download_limit,
+        sp.tenant_category_id,
         -- Featured status flag
         CASE 
           WHEN EXISTS (
@@ -132,16 +124,15 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
           ) THEN true 
           ELSE false 
         END as is_featured
-      FROM storefront_products sp
-      LEFT JOIN inventory_items ii ON ii.id = sp.id
+      FROM storefront_products_mv sp
       WHERE ${whereClause}
       ORDER BY sp.updated_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
     const countQuery = `
-      SELECT COUNT(DISTINCT sp.id) as count
-      FROM storefront_products sp
+      SELECT COUNT(sp.id) as count
+      FROM storefront_products_mv sp
       WHERE ${whereClause}
     `;
     
@@ -282,6 +273,15 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         updatedAt: row.updated_at,
         isFeatured: row.is_featured,
         featuredTypes: featuredTypesMap[row.id] || [],
+        // Add enhanced fields
+        hasVariants: row.has_variants,
+        variants: row.variants || [],
+        productType: row.product_type,
+        digitalDeliveryMethod: row.digital_delivery_method,
+        digitalAssets: row.digital_assets || [],
+        licenseType: row.license_type,
+        accessDurationDays: row.access_duration_days,
+        downloadLimit: row.download_limit,
       };
     });
     

@@ -257,6 +257,116 @@ export class VariantBulkOperationsService extends BaseService {
   }
 
   /**
+   * Bulk operations for variants with explicit actions
+   * Supports: update, delete, create
+   */
+  async bulkVariantOperations(operations: Array<{
+    action: 'update' | 'delete' | 'create';
+    variantId?: string; // Required for update/delete
+    data?: any;        // Required for update/create
+  }>, parentItemId?: string): Promise<BulkOperationResult> {
+    try {
+      let success_count = 0;
+      let error_count = 0;
+      const errors: Array<{
+        variant_id: string;
+        error: string;
+      }> = [];
+
+      logger.info(`Starting bulk variant operations for ${operations.length} operations`);
+
+      for (const operation of operations) {
+        try {
+          switch (operation.action) {
+            case 'update':
+              if (!operation.variantId || !operation.data) {
+                throw new Error('Update operation requires variantId and data');
+              }
+              await this.variantService.updateVariant(operation.variantId, operation.data);
+              success_count++;
+              break;
+
+            case 'delete':
+              if (!operation.variantId) {
+                throw new Error('Delete operation requires variantId');
+              }
+              await this.variantService.deleteVariant(operation.variantId);
+              success_count++;
+              break;
+
+            case 'create':
+              if (!operation.data || !parentItemId) {
+                throw new Error('Create operation requires data and parentItemId');
+              }
+              await this.variantService.createVariant(parentItemId, operation.data);
+              success_count++;
+              break;
+
+            default:
+              throw new Error(`Unknown action: ${operation.action}`);
+          }
+        } catch (error) {
+          error_count++;
+          errors.push({
+            variant_id: operation.variantId || 'unknown',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      const result = {
+        success_count,
+        error_count,
+        errors
+      };
+
+      logger.info(`Bulk variant operations completed: ${success_count} successful, ${error_count} failed`);
+      return result;
+    } catch (error) {
+      logger.error('Failed to perform bulk variant operations: ' + (error instanceof Error ? error.message : 'Unknown error'), undefined, { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Bulk update variants (general properties) - DEPRECATED, use bulkVariantOperations
+   */
+  async bulkUpdateVariants(updates: Array<{ variantId: string; data: any }>): Promise<BulkOperationResult> {
+    try {
+      let success_count = 0;
+      let error_count = 0;
+      const errors: Array<{ variant_id: string; error: string }> = [];
+
+      logger.info(`Starting bulk variant update for ${updates.length} variants`);
+
+      for (const { variantId, data } of updates) {
+        try {
+          await this.variantService.updateVariant(variantId, data);
+          success_count++;
+        } catch (error) {
+          error_count++;
+          errors.push({
+            variant_id: variantId,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      const result = {
+        success_count,
+        error_count,
+        errors
+      };
+
+      logger.info(`Bulk variant update completed: ${success_count} successful, ${error_count} failed`);
+      return result;
+    } catch (error) {
+      logger.error('Failed to perform bulk variant update: ' + (error instanceof Error ? error.message : 'Unknown error'), undefined, { error });
+      throw error;
+    }
+  }
+
+  /**
    * Bulk delete variants
    */
   async bulkDeleteVariants(variant_ids: string[]): Promise<BulkOperationResult> {

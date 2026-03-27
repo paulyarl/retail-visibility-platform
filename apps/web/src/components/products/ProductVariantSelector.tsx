@@ -9,7 +9,22 @@
 
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { ProductVariant } from '../../services/EnhancedProductService';
+
+// Updated interface to match actual variant structure
+interface ProductVariant {
+  id: string;
+  sku: string;
+  variant_name: string;
+  price_cents: number;
+  sale_price_cents?: number;
+  stock: number;
+  image_url?: string;
+  attributes: Record<string, string>;
+  sort_order?: number;
+  is_active?: boolean;
+  is_on_sale?: boolean;
+  discount_percentage?: number;
+}
 
 interface VariantOption {
   value: string;
@@ -42,60 +57,64 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [availableCombinations, setAvailableCombinations] = useState<Set<string>>(new Set());
 
-  // Group variants by attributes
+  // Debug logging for variants
+  console.log('[ProductVariantSelector] Received variants:', variants);
+  console.log('[ProductVariantSelector] Variants length:', variants.length);
+  console.log('[ProductVariantSelector] First variant structure:', variants[0]);
+  console.log('[ProductVariantSelector] First variant keys:', Object.keys(variants[0] || {}));
+
+  // Group variants by dynamic attributes
   const getVariantGroups = (): VariantGroup[] => {
     const groups: VariantGroup[] = [];
     const attributes = new Map<string, Set<string>>();
 
-    // Collect all unique attribute values
-    variants.forEach(variant => {
-      // Color
-      if (variant.color) {
-        if (!attributes.has('color')) attributes.set('color', new Set());
-        attributes.get('color')!.add(variant.color);
+    // Collect all unique dynamic attributes
+    variants.forEach((variant: any) => {
+      // Handle dynamic attributes from the attributes object
+      const variantAttributes = (variant as ProductVariant).attributes || {};
+      
+      Object.entries(variantAttributes).forEach(([key, value]) => {
+        if (value) {
+          if (!attributes.has(key)) attributes.set(key, new Set());
+          attributes.get(key)!.add(String(value));
+        }
+      });
+      
+      // Also check for variant_name as a fallback for single-attribute variants
+      if ((variant as ProductVariant).variant_name && Object.keys(variantAttributes).length === 0) {
+        if (!attributes.has('option')) attributes.set('option', new Set());
+        attributes.get('option')!.add((variant as ProductVariant).variant_name);
       }
       
-      // Size
-      if (variant.size) {
-        if (!attributes.has('size')) attributes.set('size', new Set());
-        attributes.get('size')!.add(variant.size);
-      }
-      
-      // Format (for books/media)
-      if (variant.format) {
-        if (!attributes.has('format')) attributes.set('format', new Set());
-        attributes.get('format')!.add(variant.format);
-      }
-      
-      // Edition
-      if (variant.edition) {
-        if (!attributes.has('edition')) attributes.set('edition', new Set());
-        attributes.get('edition')!.add(variant.edition);
-      }
-      
-      // Language
-      if (variant.language) {
-        if (!attributes.has('language')) attributes.set('language', new Set());
-        attributes.get('language')!.add(variant.language);
-      }
-      
-      // Material
-      if (variant.material) {
-        if (!attributes.has('material')) attributes.set('material', new Set());
-        attributes.get('material')!.add(variant.material);
-      }
+      console.log(`[ProductVariantSelector] Processing variant ${(variant as ProductVariant).id}:`, {
+        variant_name: (variant as ProductVariant).variant_name,
+        attributes: variantAttributes,
+        stock: (variant as ProductVariant).stock
+      });
     });
 
-    // Create variant groups
+    console.log('[ProductVariantSelector] Found attributes:', Array.from(attributes.keys()));
+
+    // Create variant groups for dynamic attributes
     attributes.forEach((values, attributeName) => {
       const options: VariantOption[] = Array.from(values).map(value => {
         // Find variants with this attribute value
-        const matchingVariants = variants.filter(v => 
-          v[attributeName as keyof ProductVariant] === value
-        );
+        const matchingVariants = variants.filter((v: any) => {
+          const variantAttributes = (v as ProductVariant).attributes || {};
+          return variantAttributes[attributeName] === value || 
+                 (attributeName === 'option' && (v as ProductVariant).variant_name === value);
+        });
         
-        // Check if any matching variant is available
-        const isAvailable = matchingVariants.some(v => v.inventory_quantity > 0);
+        console.log(`[ProductVariantSelector] Matching variants for ${attributeName}=${value}:`, matchingVariants);
+        
+        // Check if any matching variant is available - use stock instead of inventory_quantity
+        const isAvailable = matchingVariants.some((v: any) => ((v as ProductVariant).stock || 0) > 0);
+        
+        console.log(`[ProductVariantSelector] Availability for ${value}:`, {
+          matchingVariants: matchingVariants.length,
+          stock: matchingVariants.map((v: any) => (v as ProductVariant).stock),
+          isAvailable
+        });
         
         // Get price difference (if any)
         const basePrice = variants[0]?.price_cents || 0;
@@ -114,13 +133,13 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
         };
       });
 
-      // Determine display type
+      // Determine display type based on attribute name and options
       let displayType: VariantGroup['type'] = 'buttons';
-      if (attributeName === 'color') {
+      if (attributeName === 'color' || attributeName.includes('color')) {
         displayType = 'swatches';
-      } else if (attributeName === 'size' && options.length > 4) {
+      } else if (values.size > 4) {
         displayType = 'dropdown';
-      } else if (attributeName === 'format' || attributeName === 'edition') {
+      } else if (attributeName.includes('format') || attributeName.includes('edition')) {
         displayType = 'grid';
       }
 
@@ -128,7 +147,6 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
         name: attributeName,
         type: displayType,
         options: options.sort((a, b) => {
-          // Sort by availability first, then by label
           if (a.available !== b.available) {
             return b.available ? 1 : -1;
           }
@@ -139,8 +157,7 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
     });
 
     return groups.sort((a, b) => {
-      // Priority order: format, color, size, edition, language, material
-      const priority = ['format', 'color', 'size', 'edition', 'language', 'material'];
+      const priority = ['format', 'color', 'size', 'edition', 'language', 'material', 'option'];
       const aIndex = priority.indexOf(a.name);
       const bIndex = priority.indexOf(b.name);
       
@@ -158,17 +175,16 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
       .join(' ');
   };
 
-  // Find variant based on current selections
   const findMatchingVariant = (currentSelections: Record<string, string>): ProductVariant | null => {
-    return variants.find(variant => {
+    return variants.find((variant: any) => {
+      const variantAttributes = (variant as ProductVariant).attributes || {};
+      
       return Object.entries(currentSelections).every(([key, value]) => {
-        const variantValue = variant[key as keyof ProductVariant];
-        return variantValue === value;
+        return variantAttributes[key] === value;
       });
     }) || null;
   };
 
-  // Update selections and find matching variant
   const handleSelectionChange = (attributeName: string, value: string) => {
     const newSelections = { ...selections, [attributeName]: value };
     setSelections(newSelections);
@@ -177,7 +193,6 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
     onVariantChange(matchingVariant);
   };
 
-  // Render variant option based on type
   const renderVariantOption = (group: VariantGroup, option: VariantOption) => {
     const isSelected = selections[group.name] === option.value;
     const isDisabled = !option.available;
@@ -351,8 +366,7 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
           <div className="text-sm text-gray-600">
             <div className="font-medium">Selected Variant:</div>
             <div>SKU: {selectedVariant.sku}</div>
-            <div>Stock: {selectedVariant.inventory_quantity} units</div>
-            {selectedVariant.isbn && <div>ISBN: {selectedVariant.isbn}</div>}
+            <div>Stock: {selectedVariant.stock} units</div>
           </div>
         </div>
       )}

@@ -198,7 +198,7 @@ class ItemUpdateService extends TenantApiSingleton {
         {
           method: 'DELETE',
         }
-      ) as { success: boolean; error?: string };
+      ) as { success: boolean; error?: string; data?: any };
 
       if (!response.success) {
         throw new Error(response.error || `Failed to delete item`);
@@ -211,6 +211,7 @@ class ItemUpdateService extends TenantApiSingleton {
       return {
         success: true,
         message: 'Item moved to trash',
+        item: response.data // Return the updated item data
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete item';

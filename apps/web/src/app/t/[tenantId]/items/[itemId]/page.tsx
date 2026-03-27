@@ -13,6 +13,7 @@ import SyncStatusIndicator from '@/components/items/SyncStatusIndicator';
 import { QRCodeModal } from '@/components/items/QRCodeModal';
 import EditItemModal from '@/components/items/EditItemModal';
 import ItemPhotoGallery from '@/components/items/ItemPhotoGallery';
+import VariantsView from '@/components/items/VariantsView';
 import { Item as ItemType } from '@/services/itemsDataService';
 import { useTenantTier } from '@/hooks/dashboard/useTenantTier';
 import ProductCategoryContext from '@/components/products/ProductCategoryContext';
@@ -456,6 +457,12 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 )}
               </CardContent>
             </Card>
+
+            {/* Variants Section */}
+            <VariantsView 
+              item={item}
+              onAddVariant={() => setShowEditModal(true)}
+            />
           </div>
 
           {/* Right Column - Details */}

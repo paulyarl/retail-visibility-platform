@@ -32,6 +32,7 @@ import {
 import { Item } from '@/services/itemsDataService';
 import QuickStockEditor from '@/components/shared/QuickStockEditor';
 import SyncStatusIndicator from './SyncStatusIndicator';
+import VariantIndicator from './VariantIndicator';
 
 interface EnhancedProductCardProps {
   item: Item;
@@ -240,6 +241,9 @@ export default function EnhancedProductCard({
               <span>{typeof item.tenantCategory === 'string' ? item.tenantCategory : item.tenantCategory?.name || ''}</span>
             </div>
           )}
+
+          {/* Variant Information */}
+          <VariantIndicator item={item} compact={true} />
 
           {/* Sync Status */}
           <SyncStatusIndicator 

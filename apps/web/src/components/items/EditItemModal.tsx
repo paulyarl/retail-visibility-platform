@@ -127,6 +127,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
   });
   const [hasVariants, setHasVariants] = useState(false);
   const [variants, setVariants] = useState<any[]>([]);
+  const [originalVariants, setOriginalVariants] = useState<any[]>([]); // Track original variants for change detection
   const [attributeTypes, setAttributeTypes] = useState<string[]>(['size', 'color']); // Initialize with defaults
   const [variantsLoading, setVariantsLoading] = useState(false);
 
@@ -136,6 +137,64 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
 
   // Feature flag: sticky quick actions footer
   const ffQuick = useFeatureFlag('FF_CATEGORY_QUICK_ACTIONS');
+
+  // Helper function to detect variant changes using simple in/out comparison
+  const detectVariantChanges = () => {
+    const changes: Array<{
+      action: 'update' | 'delete' | 'create';
+      variantId?: string;
+      data?: any;
+    }> = [];
+
+    // Get IDs of original and current variants
+    const originalIds = new Set(originalVariants.map(v => v.id));
+    const currentIds = new Set(variants.map(v => v.id));
+
+    // DELETE: variants that were in original but not in current
+    originalIds.forEach(id => {
+      if (!currentIds.has(id)) {
+        changes.push({
+          action: 'delete',
+          variantId: id
+        });
+      }
+    });
+
+    // CREATE: variants that are in current but have no ID (new)
+    variants.forEach(variant => {
+      if (!variant.id) {
+        changes.push({
+          action: 'create',
+          data: {
+            variant_name: variant.variant_name,
+            sku: variant.sku,
+            price_cents: variant.price_cents,
+            stock: variant.stock,
+            attributes: variant.attributes
+          }
+        });
+      }
+    });
+
+    // UPDATE: variants that exist in both but may have changed data
+    variants.forEach(variant => {
+      if (variant.id && originalIds.has(variant.id)) {
+        changes.push({
+          action: 'update',
+          variantId: variant.id,
+          data: {
+            variant_name: variant.variant_name,
+            sku: variant.sku,
+            price_cents: variant.price_cents,
+            stock: variant.stock,
+            attributes: variant.attributes
+          }
+        });
+      }
+    });
+
+    return changes;
+  };
 
   // Simple analytics logger
   function logQa(event: string, payload?: Record<string, any>) {
@@ -233,6 +292,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
       });
       setHasVariants(false); // Reset variants state
       setVariants([]); // Reset variants array
+      setOriginalVariants([]); // Reset original variants tracking
       setVariantsLoading(false); // Reset loading state
       setSaving(false); // Reset saving state
       setError(null); // Reset error state
@@ -257,6 +317,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
         if (itemVariants && Array.isArray(itemVariants) && itemVariants.length > 0) {
           console.log('[EditItemModal] Using variants from item prop:', itemVariants.length);
           setVariants(itemVariants);
+          setOriginalVariants(JSON.parse(JSON.stringify(itemVariants))); // Deep copy for comparison
           setHasVariants(true);
           setVariantsLoading(false);
           // Extract attribute types from loaded variants
@@ -273,6 +334,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
             .then(result => {
               if (result.success && result.variants) {
                 setVariants(result.variants);
+                setOriginalVariants(JSON.parse(JSON.stringify(result.variants))); // Deep copy for comparison
                 // Update has_variants flag based on actual variants found
                 setHasVariants(result.variants.length > 0);
                 // Extract attribute types from loaded variants
@@ -418,8 +480,9 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
         tenantId: getTenantIdFromUrl() || undefined, // Ensure tenantId is included
         payment_gateway_type: gatewaySelection.gateway_type,
         payment_gateway_id: gatewaySelection.gateway_id,
-        // Include variants data when creating item with variants
-        ...(hasVariants && variants.length > 0 ? {
+        // Include variants data only when creating new item with variants
+        // For existing items, variants are handled separately to avoid conflicts
+        ...(!item?.id && hasVariants && variants.length > 0 ? {
           has_variants: true,
           variants: variants.map(v => ({
             variant_name: v.variant_name,
@@ -429,7 +492,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
             attributes: v.attributes
           }))
         } : {
-          has_variants: false
+          has_variants: hasVariants
         }),
         // Digital product fields
         product_type: productType,
@@ -470,79 +533,28 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
       if (hasVariants && variants.length > 0 && updatedItem.id && !item?.id) {
         // Skip variant creation for new items - variants were included in the initial request
         console.log('[EditItemModal] Variants included in item creation, skipping separate variant creation');
-      } else if (hasVariants && variants.length > 0 && updatedItem.id) {
+      } else if (hasVariants && updatedItem.id) {
         try {
           const tenantId = getTenantIdFromUrl();
           if (tenantId) {
-            // Auto-generate SKUs for variants without SKUs
-            const variantsWithSkus = variants.map((v, index) => {
-              if (!v.sku || !v.sku.trim()) {
-                // Generate variant SKU: ParentSKU-AttributeValues
-                const attrValues = Object.values(v.attributes)
-                  .filter(val => val)
-                  .map(val => String(val).toUpperCase().substring(0, 3))
-                  .join('-');
-                return {
-                  ...v,
-                  sku: `${finalSku}-${attrValues || `VAR${index + 1}`}`,
-                };
-              }
-              return v;
-            });
+            // Detect all variant changes (add, update, delete)
+            const variantOperations = detectVariantChanges();
+            console.log('[EditItemModal] Detected variant changes:', variantOperations);
 
-            // Separate new variants (no id) from existing variants (has id)
-            const newVariants = variantsWithSkus.filter((v: ProductVariant) => !v.id);
-            const existingVariants = variantsWithSkus.filter((v: ProductVariant) => v.id);
-
-            // Create new variants using VariantsSingleton
-            if (newVariants.length > 0) {
-              const createData = newVariants.map(v => ({
-                variant_name: v.variant_name,
-                sku: v.sku,
-                price_cents: v.price_cents,
-                stock: v.stock,
-                attributes: v.attributes
-              }));
-              const createResult = await variantsActions.createBulkVariants(updatedItem.id, createData);
-              if (!createResult.success) {
-                throw new Error(createResult.error || 'Failed to create variants');
+            if (variantOperations.length > 0) {
+              // Use enhanced bulk operations endpoint
+              const result = await variantsActions.bulkVariantOperations(variantOperations, updatedItem.id);
+              if (!result.success) {
+                throw new Error(result.error || 'Failed to update variants');
               }
-              
-              // Update local variants state with the created variants from response for instant confirmation
-              if (createResult.variants && Array.isArray(createResult.variants)) {
-                console.log('[EditItemModal] Variants created successfully:', createResult.variants.length, 'variants');
-                setVariants(prevVariants => {
-                  // Remove the temporary new variants (those without IDs) and add the real ones
-                  const filteredExisting = prevVariants.filter(v => v.id);
-                  return [...filteredExisting, ...(createResult.variants || [])];
-                });
-              }
-            }
-
-            // Update existing variants using VariantsSingleton
-            if (existingVariants.length > 0) {
-              const updates = existingVariants
-                .filter(v => v.id) // Only include variants with IDs
-                .map(variant => ({
-                  variantId: variant.id!,
-                  data: {
-                    variant_name: variant.variant_name,
-                    sku: variant.sku,
-                    price_cents: variant.price_cents,
-                    stock: variant.stock,
-                    attributes: variant.attributes
-                  }
-                }));
-              const updateResult = await variantsActions.updateBulkVariants(updates);
-              if (!updateResult.success) {
-                throw new Error(updateResult.error || 'Failed to update variants');
-              }
+              console.log('[EditItemModal] Variant operations completed:', result);
+            } else {
+              console.log('[EditItemModal] No variant changes detected');
             }
           }
-        } catch (variantError) {
-          console.error('Failed to save variants:', variantError);
-          setError('Item saved, but failed to save variants. Please try editing the item again.');
-          setSaving(false);
+        } catch (err: any) {
+          console.error('[EditItemModal] Variant operations error:', err);
+          setError(err.message || 'Failed to update variants');
           return;
         }
       }

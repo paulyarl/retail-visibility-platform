@@ -279,9 +279,29 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
       variant: "danger",
       onConfirm: async () => {
         try {
-          await deleteItem(item.id);
+          const updatedItem = await deleteItem(item.id);
+          console.log('[ItemsPageClient] Item deleted successfully:', updatedItem.id, updatedItem.item_status);
+          
+          // Update local state instantly with the returned item data
+          updateLocalItem(updatedItem.id, updatedItem);
+          
+          // Show success message
+          alert(`✅ Item moved to trash\n\n"${updatedItem.name}" has been moved to trash.\n\nYou can restore it later from the trash bin.`);
         } catch (error) {
           console.error("[ItemsPageClient] Delete failed:", error);
+          
+          // Handle specific error types
+          if (error && typeof error === 'object' && 'error' in error) {
+            const errorObj = error as any;
+            if (errorObj.error === 'trash_capacity_exceeded') {
+              alert(`⚠️ Cannot delete item\n\nTrash bin is full (${errorObj.current}/${errorObj.capacity} items).\n\nPlease purge some items from trash first:\n1. Go to the items page\n2. Filter by "Status: Trashed"\n3. Select items and click "Purge"\n\nThis will free up space in the trash bin.`);
+              return;
+            }
+          }
+          
+          // Generic error handling
+          const errorMessage = error instanceof Error ? error.message : 'Failed to delete item';
+          alert(`❌ Delete failed\n\n${errorMessage}\n\nPlease try again or contact support if the issue persists.`);
         }
       },
     });
@@ -1023,7 +1043,19 @@ export default function ItemsPageClient({ tenantId }: ItemsPageClientProps) {
                               alert(`✅ Successfully moved ${itemIds.length} item(s) to trash`);
                             } catch (error) {
                               console.error('[Bulk Trash] Error moving items to trash:', error);
-                              alert(`❌ Error moving items to trash: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                              
+                              // Handle specific error types
+                              if (error && typeof error === 'object' && 'error' in error) {
+                                const errorObj = error as any;
+                                if (errorObj.error === 'trash_capacity_exceeded') {
+                                  alert(`⚠️ Cannot move items to trash\n\nTrash bin is full (${errorObj.current}/${errorObj.capacity} items).\n\nPlease purge some items from trash first:\n1. Filter by "Status: Trashed"\n2. Select items and click "Purge"\n\nThis will free up space in the trash bin.`);
+                                  return;
+                                }
+                              }
+                              
+                              // Generic error handling
+                              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                              alert(`❌ Error moving items to trash\n\n${errorMessage}\n\nPlease try again or contact support if the issue persists.`);
                             }
                           },
                         });

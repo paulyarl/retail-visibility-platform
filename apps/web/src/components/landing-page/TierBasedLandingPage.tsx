@@ -1,20 +1,43 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+// Dynamic tier-based landing page component
+import React, { useState, useEffect, useCallback } from 'react';
 import QRCode from 'qrcode';
 import { AddToCartButton } from '@/components/products/AddToCartButton';
 import { PriceDisplay } from '@/components/products/PriceDisplay';
-import { getLandingPageFeatures } from '@/lib/landing-page-tiers';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
+import { storefrontService } from '@/services/StorefrontService';
 import { SafeImage } from '@/components/SafeImage';
 import ProductActions from '@/components/products/ProductActions';
-import { storefrontService } from '@/services/StorefrontService';
+import ProductVariantSelector from '@/components/products/ProductVariantSelector';
+import ProductGallery from '@/components/products/ProductGallery';
+import BasicProductGallery from '@/components/products/BasicProductGallery';
 import Link from 'next/link';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { Badge, Group } from '@mantine/core';
 import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame, Package, DollarSign, Calendar } from 'lucide-react';
 // Store status
 import { useStoreStatus } from '@/hooks/useStoreStatus';
+
+// Landing page features interface
+interface LandingPageFeatures {
+  customMarketingDescription: boolean;
+  imageGallery: boolean;
+  maxGalleryImages: number;
+  customCta: boolean;
+  socialLinks: boolean;
+  qrCodes: boolean;
+  showBusinessLogo: boolean;
+  removePlatformBranding: boolean;
+  customLogo: boolean;
+  customColors: boolean;
+  customSections: boolean;
+  maxCustomSections: number;
+  customTheme: boolean;
+  customDomain: boolean;
+  abTesting: boolean;
+  advancedAnalytics: boolean;
+}
 
 // Featured Type Badge Component with icons only (subtle display)
 // Aligned with StorefrontFeaturedProducts.tsx featuredTypeConfig
@@ -382,6 +405,17 @@ interface Product {
   // Featured types
   featuredTypes?: string[];
   
+  // Product variants
+  variants?: any[];
+  
+  // Product image gallery with captions
+  imageGallery?: Array<{
+    url: string;
+    alt?: string;
+    caption?: string;
+    position: number;
+  }>;
+  
   // Category assignment
   tenantCategoryId?: string | null;
   tenantCategory?: {
@@ -435,7 +469,6 @@ interface Product {
   
   // Professional+ tier fields
   marketingDescription?: string;
-  imageGallery?: string[];
   customCta?: {
     text: string;
     link: string;
@@ -487,35 +520,143 @@ interface TierBasedLandingPageProps {
 
 export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fulfillmentPane, slug }: TierBasedLandingPageProps) {
   const { settings: platformSettings } = usePlatformSettings();
-  const tier = tenant.subscriptionTier || 'trial';
-  // console.log(`Product Tier: ${JSON.stringify(tier)}`);
-  // console.log(`Product: ${JSON.stringify(product)}`);
-  const features = getLandingPageFeatures(tier);
+  const [features, setFeatures] = useState<LandingPageFeatures | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  
+  // Move all hooks to the top - Rules of Hooks
+  const { status: hoursStatus } = useStoreStatus(tenant.id, true); // Public scope
+
+  // Debug logging for variants
+  console.log('[TierBasedLandingPage] Product variants:', product.variants);
+  console.log('[TierBasedLandingPage] Variants length:', product.variants?.length);
+  console.log('[TierBasedLandingPage] Variants type:', typeof product.variants);
+  console.log('[TierBasedLandingPage] Product object keys:', Object.keys(product));
+
+  // Calculate current pricing based on selected variant
+  const currentPrice = selectedVariant?.price_cents ? selectedVariant.price_cents / 100 : product.price;
+  const currentPriceCents = selectedVariant?.price_cents || product.priceCents;
+  const currentStock = selectedVariant?.inventory_quantity ?? product.stock;
+  const currentSku = selectedVariant?.sku || product.sku;
+  const currentAvailability = selectedVariant ? (selectedVariant.inventory_quantity > 0 ? 'in_stock' : 'out_of_stock') : product.availability;
+
+  // Convert tenant tier features to landing page features
+  const mapTierToFeatures = useCallback((tierData: any): LandingPageFeatures => {
+    // Handle nested API response structure
+    const actualTierData = tierData.data || tierData;
+    // Features are nested in tenantTier.features
+    const tenantTier = actualTierData.tenantTier || actualTierData;
+    const featureMap = new Map(
+      tenantTier.features?.map((f: any) => [f.feature_key, f.is_enabled]) || []
+    );
+
+    // Determine gallery level based on enabled features
+    let maxGalleryImages = 0; // Default: no gallery
+    let hasGalleryFeature = false;
+    
+    if (featureMap.get('image_gallery_10')) {
+      maxGalleryImages = 10;
+      hasGalleryFeature = true;
+    } else if (featureMap.get('image_gallery_5')) {
+      maxGalleryImages = 5;
+      hasGalleryFeature = true;
+    }
+    // If neither feature is enabled, maxGalleryImages stays 0 (no gallery)
+
+    return {
+      customMarketingDescription: Boolean(featureMap.get('custom_marketing_copy')),
+      imageGallery: hasGalleryFeature,
+      maxGalleryImages,
+      customCta: Boolean(featureMap.get('custom_cta')),
+      socialLinks: Boolean(featureMap.get('social_links')),
+      qrCodes: Boolean(featureMap.get('qr_codes_1024') || featureMap.get('qr_codes_512')),
+      showBusinessLogo: Boolean(featureMap.get('business_logo')),
+      removePlatformBranding: Boolean(featureMap.get('remove_platform_branding')),
+      customLogo: Boolean(featureMap.get('custom_logo')),
+      customColors: Boolean(featureMap.get('custom_colors')),
+      customSections: Boolean(featureMap.get('custom_sections')),
+      maxCustomSections: 0, // Will be implemented later
+      customTheme: Boolean(featureMap.get('custom_theme')),
+      customDomain: Boolean(featureMap.get('custom_domain')),
+      abTesting: Boolean(featureMap.get('ab_testing')),
+      advancedAnalytics: Boolean(featureMap.get('advanced_analytics')),
+    };
+  }, []);
+
+  useEffect(() => {
+    async function loadFeatures() {
+      try {
+        const tierData = await storefrontService.getPublicTier(tenant.id);
+        if (tierData) {
+          const mappedFeatures = mapTierToFeatures(tierData);
+          setFeatures(mappedFeatures);
+        }
+      } catch (error) {
+        console.error('[TierBasedLandingPage] Failed to load features:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadFeatures();
+  }, [tenant.id]);
+
   const branding = product.customBranding;
 
   const tenantSlug = tenant?.slug || tenant?.id;
   
-  // console.log(`Tenant: ${tenant.name}, Slug: ${slug}, Tenant: ${JSON.stringify(tenant)}`);
+  // Show loading state while features are loading
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-neutral-50">
+        <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+          <div className="animate-pulse">
+            <div className="h-96 bg-gray-200 rounded-lg mb-6"></div>
+            <div className="h-8 bg-gray-200 rounded mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  // Check if storefront is available (Starter+ tier)
-  const hasStorefront = tier !== 'trial' && tier !== 'google_only';
+  // Use fallback features if not available
+  const safeFeatures = features || {
+    customMarketingDescription: false,
+    imageGallery: false,
+    maxGalleryImages: 0,
+    customCta: false,
+    socialLinks: false,
+    qrCodes: false,
+    showBusinessLogo: false,
+    removePlatformBranding: false,
+    customLogo: false,
+    customColors: false,
+    customSections: false,
+    maxCustomSections: 0,
+    customTheme: false,
+    customDomain: false,
+    abTesting: false,
+    advancedAnalytics: false,
+  };
+
+  // Check if storefront is available (has features and not trial)
+  const hasStorefront = features && !loading;
   
   // Determine colors
-  const primaryColor = features.customColors && branding?.primaryColor ? branding.primaryColor : '#3b82f6';
-  const secondaryColor = features.customColors && branding?.secondaryColor ? branding.secondaryColor : '#1e40af';
+  const primaryColor = safeFeatures.customColors && branding?.primaryColor ? branding.primaryColor : '#3b82f6';
+  const secondaryColor = safeFeatures.customColors && branding?.secondaryColor ? branding.secondaryColor : '#1e40af';
 
   // Get logo - Priority: 1) Enterprise custom branding, 2) Tenant business logo, 3) Platform logo
   const metadata = tenant.metadata as any;
-  const enterpriseLogo = features.customLogo && branding?.logo;
+  const enterpriseLogo = safeFeatures.customLogo && branding?.logo;
   const businessLogo = metadata?.logo_url;
   const platformLogo = platformSettings?.logoUrl;
   
-  const displayLogo = enterpriseLogo || businessLogo || (tier !== 'trial' && tier !== 'starter' ? platformLogo : null);
+  const displayLogo = enterpriseLogo || businessLogo || (features && !loading ? platformLogo : null);
   const displayName = metadata?.businessName || tenant.name || platformSettings?.platformName;
   const showLogo = !!displayLogo;
-  const { status: hoursStatus } = useStoreStatus(tenant.id, true); // Public scope
-  // console.log(`Hours status: ${JSON.stringify(hoursStatus)}`);
-  // console.log(`Tenant: ${JSON.stringify(tenant)}`);
 
   // Status indicator color
   const getStatusColor = () => {
@@ -535,8 +676,18 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
       <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         {/* Product Images */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
-          {features.imageGallery && product.imageGallery && product.imageGallery.length > 0 ? (
-            <ImageGallery images={product.imageGallery} productName={product.name} />
+          {safeFeatures.imageGallery && product.imageGallery && product.imageGallery.length > 0 ? (
+            safeFeatures.maxGalleryImages === 10 ? (
+              <ProductGallery 
+                gallery={product.imageGallery.slice(0, safeFeatures.maxGalleryImages)} 
+                productTitle={product.name} 
+              />
+            ) : (
+              <BasicProductGallery 
+                gallery={product.imageGallery.slice(0, safeFeatures.maxGalleryImages)} 
+                productTitle={product.name} 
+              />
+            )
           ) : product.imageUrl ? (
             <div className="relative w-full h-96">
               <SafeImage
@@ -594,19 +745,40 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           {!product.manufacturer && !product.tenantCategory && <div className="mb-3" />}
           {(product.manufacturer || product.tenantCategory) && <div className="mb-3" />}
           
+          {/* Variant Selector - Only show if variants exist */}
+          {(() => {
+            if (product.variants && product.variants.length > 0) {
+              return (
+                <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg shadow-sm">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Package className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-semibold text-blue-900">Select Options</span>
+                  </div>
+                  <ProductVariantSelector
+                    variants={product.variants || []}
+                    onVariantChange={setSelectedVariant}
+                    selectedVariant={selectedVariant}
+                  />
+                </div>
+              );
+            } else {
+              return null;
+            }
+          })()}
+          
           <div className="mb-6">
             <PriceDisplay
-              priceCents={product.listPriceCents || product.priceCents || Math.round(product.price * 100)}
-              salePriceCents={product.salePriceCents}
+              priceCents={currentPriceCents}
+              salePriceCents={selectedVariant?.sale_price_cents || product.salePriceCents}
               variant="large"
               showSavingsBadge={true}
               className="mb-1"
             />
-            <span className="text-sm text-neutral-500">SKU: {product.sku}</span>
+            <span className="text-sm text-neutral-500">SKU: {currentSku}</span>
           </div>
 
           {/* Description - Marketing or Standard */}
-          {features.customMarketingDescription && product.marketingDescription ? (
+          {safeFeatures.customMarketingDescription && product.marketingDescription ? (
             <div className="prose prose-neutral max-w-none mb-6">
               <p className="text-lg text-neutral-700 whitespace-pre-wrap">{product.marketingDescription}</p>
             </div>
@@ -617,15 +789,15 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           {/* Availability */}
           <div className="mb-6">
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-              product.availability === 'in_stock' 
+              currentAvailability === 'in_stock' 
                 ? 'bg-green-100 text-green-800' 
                 : 'bg-red-100 text-red-800'
             }`}>
-              {product.availability === 'in_stock' ? '✓ In Stock' : '✗ Out of Stock'}
+              {currentAvailability === 'in_stock' ? '✓ In Stock' : '✗ Out of Stock'}
             </span>
-            {product.availability === 'in_stock' && product.stock !== undefined && product.stock !== null && (
+            {currentAvailability === 'in_stock' && currentStock !== undefined && currentStock !== null && (
               <span className="ml-2 text-sm text-neutral-600 dark:text-neutral-400">
-                {product.stock} units available
+                {currentStock} units available
               </span>
             )}
           </div>
@@ -639,15 +811,16 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
               </div>
               <AddToCartButton
                 product={{
-                  id: product.id,
-                  name: product.title,
-                  sku: product.sku,
-                  priceCents: product.priceCents || Math.round(product.price * 100),
-                  salePriceCents: product.salePriceCents,
-                  imageUrl: product.imageUrl,
-                  stock: product.availability === 'in_stock' ? 999 : 0,
+                  id: selectedVariant?.id || product.id,
+                  name: selectedVariant?.variant_name ? `${product.title} - ${selectedVariant.variant_name}` : product.title,
+                  sku: currentSku,
+                  priceCents: currentPriceCents,
+                  salePriceCents: selectedVariant?.sale_price_cents || product.salePriceCents,
+                  imageUrl: selectedVariant?.image_url || product.imageUrl,
+                  stock: currentAvailability === 'in_stock' ? (currentStock || 999) : 0,
                   tenantId: product.tenantId,
                 }}
+                variant={selectedVariant}
                 tenantName={tenant.metadata?.businessName || tenant.name}
                 tenantLogo={businessLogo}
                 hasActivePaymentGateway={tenant.hasActivePaymentGateway}
@@ -684,20 +857,21 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           )}
 
           {/* Custom CTA */}
-          {features.customCta && product.customCta && (
+          {safeFeatures.customCta && product.customCta && (
             <div className="mb-6">
               <a
                 href={product.customCta.link}
-                className="inline-block px-6 py-3 rounded-lg font-semibold text-white transition-colors"
-                style={{ backgroundColor: primaryColor }}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
               >
-                {product.customCta.text}
+                {product.customCta.text || 'Learn More'}
               </a>
             </div>
           )}
 
           {/* Social Links */}
-          {features.socialLinks && product.socialLinks && (
+          {safeFeatures.socialLinks && product.socialLinks && (
             <div className="flex gap-4 mb-6">
               {product.socialLinks.facebook && (
                 <a href={product.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-neutral-600 hover:text-blue-600">
@@ -780,7 +954,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                 {product.nutritionFacts.totalCarbohydrate && (
                   <div className="flex justify-between border-b border-neutral-400 py-1">
                     <span className="font-bold">Total Carbohydrate</span>
-                    <span>{product.nutritionFacts.totalCarbohydrate}</span>
+                    <span style={{ textDecoration: 'line-through' }}>{product.nutritionFacts.totalCarbohydrate}</span>
                   </div>
                 )}
                 {product.nutritionFacts.dietaryFiber && (
@@ -897,7 +1071,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
         )}
 
         {/* QR Code CTA Section - Professional+ Tier */}
-        {features.qrCodes && (
+        {safeFeatures.qrCodes && (
           <PublicQRCodeSection
             productUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/products/${product.id}`}
             productName={product.name}
@@ -949,11 +1123,12 @@ function ImageGallery({ images, productName }: { images: string[]; productName: 
     <div className="relative">
       <div className="relative w-full h-96">
         <SafeImage
+          key={images[currentIndex]} // Force re-render when image changes
           src={images[currentIndex]}
           alt={`${productName} - Image ${currentIndex + 1}`}
           fill
           className="object-contain"
-          priority
+          priority={currentIndex === 0} // Only priority for first image
         />
       </div>
       

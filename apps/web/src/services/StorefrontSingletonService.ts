@@ -28,6 +28,38 @@ export interface StorefrontProduct {
   imageUrl?: string;
   payment_gateway_type?: string | null;
   has_active_payment_gateway?: boolean;
+  // Enhanced fields from new API
+  imageGallery?: Array<{
+    id: string;
+    url: string;
+    position: number;
+    alt?: string;
+    caption?: string;
+    variant_id?: string;
+    createdAt: string;
+    isPrimary: boolean;
+  }>;
+  variants?: Array<{
+    id: string;
+    sku: string;
+    variant_name: string;
+    price_cents: number;
+    sale_price_cents?: number;
+    stock: number;
+    image_url?: string;
+    attributes: Record<string, any>;
+    sort_order: number;
+    is_active: boolean;
+    is_on_sale: boolean;
+    discount_percentage: number;
+  }>;
+  hasVariants?: boolean;
+  productType?: 'physical' | 'digital' | 'hybrid';
+  digitalDeliveryMethod?: string;
+  digitalAssets?: any[];
+  licenseType?: string;
+  accessDurationDays?: number;
+  downloadLimit?: number;
   [key: string]: any;
 }
 

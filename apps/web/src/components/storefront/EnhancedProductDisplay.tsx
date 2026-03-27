@@ -4,9 +4,57 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import SmartProductCard from '@/components/products/SmartProductCard';
+import EnhancedStorefrontProductCard, { type EnhancedProductData } from '@/components/products/EnhancedStorefrontProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { useProductSingleton, PublicProduct } from '@/providers/data/ProductSingleton';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
+
+// Helper function to convert UniversalProduct to EnhancedProductData
+const convertToEnhancedProduct = (product: UniversalProduct): EnhancedProductData => {
+  // The product already has all the enhanced fields from the API
+  // Just need to ensure the interface matches
+  return {
+    id: product.id,
+    sku: product.sku,
+    name: product.name,
+    title: product.title,
+    brand: product.brand,
+    description: product.description,
+    price: product.price,
+    priceCents: product.priceCents,
+    salePriceCents: product.salePriceCents,
+    listPriceCents: product.listPriceCents,
+    currency: product.currency,
+    stock: product.stock,
+    availability: product.availability || 'in_stock',
+    imageUrl: product.imageUrl,
+    imageGallery: product.imageGallery || [],
+    variants: product.variants || [],
+    hasVariants: product.hasVariants || (product.variants && product.variants.length > 0),
+    productType: product.productType,
+    digitalDeliveryMethod: product.digitalDeliveryMethod,
+    digitalAssets: product.digitalAssets || [],
+    licenseType: product.licenseType,
+    accessDurationDays: product.accessDurationDays,
+    downloadLimit: product.downloadLimit,
+    isFeatured: product.isFeatured,
+    featuredTypes: product.featuredTypes || [],
+    productRating: product.productRating,
+    product_review_count: product.product_review_count,
+    tenantId: product.tenantId,
+    hasActivePaymentGateway: product.hasActivePaymentGateway,
+    // Additional fields that SmartProductCard was using
+    manufacturer: (product as any).manufacturer,
+    condition: (product as any).condition,
+    metadata: product.metadata,
+    categoryName: (product as any).categoryName,
+    categorySlug: (product as any).categorySlug,
+    createdAt: (product as any).createdAt,
+    updatedAt: (product as any).updatedAt,
+    isOnSale: (product as any).isOnSale,
+    discountPercentage: (product as any).discountPercentage,
+  };
+};
 
 // Enhanced Product interface that includes featured types from singleton
 interface UniversalProduct extends Omit<PublicProduct, 'availability'> {
@@ -25,6 +73,51 @@ interface UniversalProduct extends Omit<PublicProduct, 'availability'> {
   payment_gateway_id?: string | null;
   // Enhanced gallery support
   images?: ProductImage[];
+  // New fields from enhanced API
+  listPriceCents?: number;
+  imageGallery?: Array<{
+    id: string;
+    url: string;
+    position: number;
+    alt?: string;
+    caption?: string;
+    variant_id?: string;
+    createdAt: string;
+    isPrimary: boolean;
+  }>;
+  variants?: Array<{
+    id: string;
+    sku: string;
+    variant_name: string;
+    price_cents: number;
+    sale_price_cents?: number;
+    stock: number;
+    image_url?: string;
+    attributes: Record<string, any>;
+    sort_order: number;
+    is_active: boolean;
+    is_on_sale: boolean;
+    discount_percentage: number;
+  }>;
+  hasVariants?: boolean;
+  productType?: 'physical' | 'digital' | 'hybrid';
+  digitalDeliveryMethod?: string;
+  digitalAssets?: any[];
+  licenseType?: string;
+  accessDurationDays?: number;
+  downloadLimit?: number;
+  isFeatured?: boolean;
+  featuredTypes?: string[];
+  productRating?: number;
+  product_review_count?: number;
+  manufacturer?: string;
+  condition?: string;
+  categoryName?: string;
+  categorySlug?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  isOnSale?: boolean;
+  discountPercentage?: string | number;
 }
 
 interface ProductImage {
@@ -552,13 +645,12 @@ export default function ProductDisplay({
 
                   {/* Action Buttons */}
                   <div className="pt-4 border-t border-neutral-200 dark:border-neutral-700">
-                    <SmartProductCard
-                      product={currentProduct}
+                    <EnhancedStorefrontProductCard
+                      product={convertToEnhancedProduct(currentProduct)}
                       tenantId={tenantId}
-                      tenantName={tenantName}
-                      hasActivePaymentGateway={hasActivePaymentGateway}
-                      defaultGatewayType={defaultGatewayType}
                       variant="featured"
+                      showGallery={true}
+                      showVariants={false} // Featured product shows full details, no need for variant preview
                     />
                   </div>
                 </div>
@@ -635,15 +727,15 @@ export default function ProductDisplay({
             : 'space-y-4'
         }>
           {paginatedProducts.map((product, index) => (
-            <SmartProductCard
+            <EnhancedStorefrontProductCard
               key={product.id}
+              product={convertToEnhancedProduct(product)}
               tenantId={tenantId}
-              product={product}
-              tenantName={tenantName}
-              tenantLogo={tenantLogo}
-              hasActivePaymentGateway={hasActivePaymentGateway}
-              defaultGatewayType={defaultGatewayType}
               variant={viewMode === 'grid' ? 'grid' : 'list'}
+              showGallery={viewMode === 'grid'} // Show gallery in grid mode
+              showVariants={true}
+              maxGalleryImages={3}
+              maxVariants={2}
             />
           ))}
         </div>

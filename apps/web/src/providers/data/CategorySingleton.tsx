@@ -87,10 +87,10 @@ class CategoryService extends PublicApiSingleton {
       let response;
       
       if (tenantId) {
-        // Use tenant-specific endpoint for inventory management
+        // Use tenant-specific endpoint for inventory management (all categories for assignment)
         response = await this.makeDefaultRequest<{
           categories: Category[];
-        }>(`/api/categories/product-level/${tenantId}`, {});
+        }>(`/api/categories/tenant/${tenantId}`, {});
       } else {
         // Use public directory endpoint for public browsing
         const params = new URLSearchParams();

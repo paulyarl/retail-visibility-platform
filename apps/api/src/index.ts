@@ -2234,6 +2234,68 @@ app.get("/public/tenant/:tenant_id/payment-gateways", async (req, res) => {
   }
 });
 
+// Get all tenant categories (for category assignment - includes categories without products)
+app.get("/api/categories/tenant/:tenant_id", async (req, res) => {
+  try {
+    const { tenant_id } = req.params;
+    if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
+    
+    // Use direct database pool to avoid Prisma issues
+    const { getDirectPool } = await import('./utils/db-pool');
+    const pool = getDirectPool();
+    
+    // Query ALL tenant categories, not just those with products
+    const result = await pool.query(
+      `SELECT
+        id,
+        name,
+        slug,
+        "googleCategoryId",
+        "isActive",
+        "sortOrder",
+        "parentId",
+        "createdAt",
+        "updatedAt"
+      FROM directory_category
+      WHERE "tenantId" = $1
+        AND "isActive" = true
+      ORDER BY "sortOrder" ASC, name ASC`,
+      [tenant_id]
+    );
+    
+    // Transform to expected format
+    const categories = result.rows.map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      googleCategoryId: cat.googleCategoryId,
+      isActive: cat.isActive,
+      sortOrder: cat.sortOrder,
+      parentId: cat.parentId,
+      productCount: 0, // Will be calculated separately if needed
+      createdAt: cat.createdAt,
+      updatedAt: cat.updatedAt
+    }));
+    
+    const cleanResponse = {
+      success: true,
+      data: {
+        tenant_id: tenant_id,
+        categories: categories,
+        summary: {
+          total_categories: categories.length,
+          category_type: 'tenant-all'
+        }
+      }
+    };
+
+    res.json(cleanResponse);
+  } catch (e: any) {
+    console.error("[GET /api/categories/tenant/:tenant_id] Error:", e);
+    return res.status(500).json({ error: "failed_to_get_tenant_categories" });
+  }
+});
+
 // Product-level categories endpoint (for product sidebar)
 app.get("/api/categories/product-level/:tenant_id", async (req, res) => {
   try {
@@ -2804,19 +2866,66 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
             },
           },
         }
-      }).then(items => {
-        // Add inventory_item_id field for frontend compatibility
-        // For inventory items, inventory_item_id = id (the item's own ID)
+      }).then(async items => {
+        // Fetch photos for all items in parallel
+        const itemIds = items.map(item => item.id);
+        const photosMap = new Map<string, any[]>();
+        
+        if (itemIds.length > 0) {
+          // Fetch all photos for these items in one query
+          const allPhotos = await prisma.photo_assets.findMany({
+            where: { 
+              inventoryItemId: { in: itemIds },
+              variant_id: null // Only item-level photos, not variant photos
+            },
+            orderBy: { position: 'asc' },
+            select: {
+              id: true,
+              inventoryItemId: true,
+              variant_id: true,
+              url: true,
+              publicUrl: true,
+              position: true,
+              alt: true,
+              caption: true,
+              createdAt: true
+            }
+          });
+          
+          // Group photos by item ID
+          allPhotos.forEach(photo => {
+            const itemId = photo.inventoryItemId;
+            if (!photosMap.has(itemId)) {
+              photosMap.set(itemId, []);
+            }
+            photosMap.get(itemId)!.push({
+              id: photo.id,
+              url: photo.url,
+              position: photo.position,
+              alt: photo.alt,
+              caption: photo.caption,
+              variant_id: photo.variant_id,
+              createdAt: photo.createdAt.toISOString()
+            });
+          });
+        }
+        
+        // Add inventory_item_id field and photo gallery for frontend compatibility
         return items.map(item => ({
           ...item,
           inventory_item_id: item.id, // CRITICAL: Frontend expects this field
+          imageGallery: photosMap.get(item.id) || [], // Add actual photo gallery data
           // Sort variants by sort_order and created_at
           variants: item.product_variants ? 
             [...item.product_variants].sort((a, b) => {
-              if (a.sort_order !== b.sort_order) {
-                return a.sort_order - b.sort_order;
+              const aSortOrder = a.sort_order || 0;
+              const bSortOrder = b.sort_order || 0;
+              if (aSortOrder !== bSortOrder) {
+                return aSortOrder - bSortOrder;
               }
-              return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+              const aCreatedAt = a.created_at ? new Date(a.created_at).getTime() : 0;
+              const bCreatedAt = b.created_at ? new Date(b.created_at).getTime() : 0;
+              return aCreatedAt - bCreatedAt;
             }) : []
         }));
       }),
@@ -4316,6 +4425,26 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const it = await prisma.inventory_items.findUnique({
     where: { id: itemId },
+    include: {
+      product_variants: {
+        select: {
+          id: true,
+          parent_item_id: true,
+          tenant_id: true,
+          variant_name: true,
+          sku: true,
+          price_cents: true,
+          sale_price_cents: true,
+          stock: true,
+          image_url: true,
+          attributes: true,
+          sort_order: true,
+          is_active: true,
+          created_at: true,
+          updated_at: true,
+        },
+      },
+    },
   });
   if (!it) return res.status(400).json({ error: "not_found" });
 
@@ -4410,10 +4539,54 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
   const featuredTypesArray = featuredTypes.map(ft => ft.featured_type);
   const primaryFeaturedType = featuredTypesArray.length > 0 ? featuredTypesArray[0] : null;
 
+  // Fetch photo gallery data from photo_assets table
+  let imageGallery: Array<{
+    id: string;
+    url: string;
+    position: number;
+    alt: string | null;
+    caption: string | null;
+    variant_id: string | null;
+    createdAt: string;
+  }> = [];
+  try {
+    const photos = await prisma.photo_assets.findMany({
+      where: { 
+        inventoryItemId: itemId,
+        variant_id: null // Only item-level photos, not variant photos
+      },
+      orderBy: { position: 'asc' },
+      select: {
+        id: true,
+        inventoryItemId: true,
+        variant_id: true,
+        url: true,
+        publicUrl: true,
+        position: true,
+        alt: true,
+        caption: true,
+        createdAt: true
+      }
+    });
+    
+    imageGallery = photos.map(photo => ({
+      id: photo.id,
+      url: photo.url,
+      position: photo.position,
+      alt: photo.alt,
+      caption: photo.caption,
+      variant_id: photo.variant_id,
+      createdAt: photo.createdAt.toISOString()
+    }));
+  } catch (error) {
+    console.error(`[GET /items/${itemId}] Error fetching photo gallery:`, error);
+    // Continue without photos if there's an error
+  }
+
   // Convert Decimal price to number for frontend compatibility
   // Hide price_cents from frontend since price is the authoritative field
   // Map image_url to imageUrl for frontend compatibility
-  const { price_cents, image_url, sale_price_cents, metadata, ...itemWithoutPriceCents } = it;
+  const { price_cents, image_url, sale_price_cents, metadata, product_variants, ...itemWithoutPriceCents } = it;
   
   // Extract metadata fields if they exist (fallback for any custom fields)
   const metadataObj = (typeof metadata === 'object' && metadata !== null) ? metadata as Record<string, any> : {};
@@ -4424,10 +4597,23 @@ app.get(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     priceCents: price_cents !== null && price_cents !== undefined ? Number(price_cents) : null,
     salePriceCents: sale_price_cents !== null && sale_price_cents !== undefined ? Number(sale_price_cents) : null,
     imageUrl: image_url || null,
+    imageGallery: imageGallery, // Add actual photo gallery data
     tenantCategory,
     tenantCategoryId: it.directory_category_id,
     hasActivePaymentGateway: hasActivePaymentGateway || false,
     defaultGatewayType: defaultGatewayType || null,
+    // Include variants array with sorting
+    variants: product_variants ? 
+      [...product_variants].sort((a, b) => {
+        const aSortOrder = a.sort_order || 0;
+        const bSortOrder = b.sort_order || 0;
+        if (aSortOrder !== bSortOrder) {
+          return aSortOrder - bSortOrder;
+        }
+        const aCreatedAt = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bCreatedAt = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return aCreatedAt - bCreatedAt;
+      }) : [],
     // Use real database columns first, fallback to metadata for backward compatibility
     has_variants: it.has_variants || metadataObj.has_variants || false,
     product_type: it.product_type || metadataObj.product_type || 'physical',
@@ -4837,6 +5023,30 @@ app.put(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:id"]
     if (!updated) {
       return res.status(400).json({ error: 'item_not_found' });
     }
+
+    // Sync variants with parent item status
+    if (updateData.item_status) {
+      const newStatus = updateData.item_status;
+      let variantStatus = true; // Default to active
+      
+      // Determine variant status based on item status
+      if (newStatus === 'trashed' || newStatus === 'archived' || newStatus === 'inactive') {
+        variantStatus = false;
+      } else if (newStatus === 'active') {
+        variantStatus = true;
+      }
+      
+      // Update all variants to match parent status
+      await prisma.product_variants.updateMany({
+        where: { 
+          parent_item_id: itemId,
+          tenant_id: updated.tenant_id 
+        },
+        data: { is_active: variantStatus }
+      });
+      
+      console.log(`[PUT /items/:id] Synced variants status for item ${itemId}: ${newStatus} -> variants ${variantStatus ? 'active' : 'inactive'}`);
+    }
     
     // Process variants if they exist
     if (variantsData && Array.isArray(variantsData)) {
@@ -4933,6 +5143,21 @@ app.delete(["/api/items/:id", "/api/inventory/:id", "/items/:id", "/inventory/:i
       where: { id: req.params.id },
       data: { item_status: 'trashed' }
     });
+
+    // Sync variants with parent item status
+    if (updated.item_status === 'trashed') {
+      // Deactivate all variants when item is trashed
+      await prisma.product_variants.updateMany({
+        where: { 
+          parent_item_id: req.params.id,
+          tenant_id: item.tenant_id 
+        },
+        data: { is_active: false }
+      });
+      
+      console.log(`[Delete Item] Deactivated ${updated.item_status ? updated.item_status : 'trashed'} item variants:`, req.params.id);
+    }
+
     res.json(updated);
   } catch (error) {
     console.error('[Delete Item] Error:', error);
@@ -4977,6 +5202,21 @@ app.patch(["/api/items/:id/restore", "/items/:id/restore"], authenticateToken, r
       where: { id: req.params.id },
       data: { item_status: 'active' }
     });
+
+    // Reactivate variants when item is restored
+    if (item.item_status === 'active') {
+      // Reactivate all variants when item is restored
+      await prisma.product_variants.updateMany({
+        where: { 
+          parent_item_id: req.params.id,
+          tenant_id: item.tenant_id 
+        },
+        data: { is_active: true }
+      });
+      
+      console.log(`[Restore Item] Reactivated ${item.item_status} item variants:`, req.params.id);
+    }
+
     res.json(item);
   } catch {
     res.status(500).json({ error: "failed_to_restore_item" });

@@ -175,7 +175,9 @@ router.post('/items/:itemId/variants/bulk', authenticateToken, async (req: Reque
       if (!sku || sku.trim() === '') {
         sku = generateVariantSkuFromParent(itemId, index);
       }
-      return { ...v, variant_name: variantName, sku };
+      // Ensure proper sort_order - use index if not provided or if it's the same as previous
+      const sortOrder = v.sort_order !== undefined && v.sort_order !== null ? v.sort_order : index;
+      return { ...v, variant_name: variantName, sku, sort_order: sortOrder };
     });
 
     // Check for duplicate SKUs (only if provided manually)
@@ -197,9 +199,34 @@ router.post('/items/:itemId/variants/bulk', authenticateToken, async (req: Reque
       }
     }
 
+    // Check for duplicate variant data (same variant_name, attributes, price, etc.)
+    const duplicateCheck = new Map<string, any>();
+    const uniqueVariants = [];
+    
+    for (const variant of variantsWithSkus) {
+      // Create a key based on variant data that should be unique
+      const key = `${variant.variant_name}|${JSON.stringify(variant.attributes)}|${variant.price_cents}|${variant.stock}`;
+      
+      if (duplicateCheck.has(key)) {
+        console.log(`[Variants] Skipping duplicate variant: ${key}`);
+        continue; // Skip duplicate
+      }
+      
+      duplicateCheck.set(key, true);
+      uniqueVariants.push(variant);
+    }
+
+    if (uniqueVariants.length === 0) {
+      return res.status(400).json({ error: 'No valid variants to create (all duplicates)' });
+    }
+
+    if (uniqueVariants.length < variantsWithSkus.length) {
+      console.log(`[Variants] Deduplicated: ${variantsWithSkus.length} -> ${uniqueVariants.length}`);
+    }
+
     // Create all variants
     const created = await prisma.product_variants.createMany({
-      data: variantsWithSkus.map((v, index) => ({
+      data: uniqueVariants.map((v, index) => ({
         id: generateVariantId(itemId),
         parent_item_id: itemId,
         tenant_id: item.tenant_id,
@@ -210,7 +237,7 @@ router.post('/items/:itemId/variants/bulk', authenticateToken, async (req: Reque
         stock: v.stock || 0,
         image_url: v.image_url || null,
         attributes: v.attributes as any || {},
-        sort_order: v.sort_order || index,
+        sort_order: v.sort_order, // Use the corrected sort_order from above
         is_active: v.is_active !== false,
       })),
     });
@@ -220,7 +247,7 @@ router.post('/items/:itemId/variants/bulk', authenticateToken, async (req: Reque
       where: {
         parent_item_id: itemId,
         tenant_id: item.tenant_id,
-        sku: { in: variantsWithSkus.map(v => v.sku) }
+        sku: { in: uniqueVariants.map(v => v.sku) }
       },
       orderBy: { created_at: 'desc' },
       take: created.count
@@ -240,6 +267,128 @@ router.post('/items/:itemId/variants/bulk', authenticateToken, async (req: Reque
   } catch (error: any) {
     console.error('[POST /items/:itemId/variants/bulk] Error:', error);
     res.status(500).json({ error: 'Failed to create variants', message: error.message });
+  }
+});
+
+/**
+ * PUT /api/variants/bulk/operations
+ * Enhanced bulk operations with explicit actions (update, delete, create)
+ */
+router.put('/bulk/operations', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { operations, parentItemId } = req.body;
+    const user = (req as any).user;
+
+    if (!operations || !Array.isArray(operations)) {
+      return res.status(400).json({ 
+        error: 'Invalid request body', 
+        message: 'operations array is required' 
+      });
+    }
+
+    if (operations.length === 0) {
+      return res.status(400).json({ 
+        error: 'Invalid request body', 
+        message: 'operations array cannot be empty' 
+      });
+    }
+
+    // Validate each operation object
+    for (const operation of operations) {
+      if (!operation.action || !['update', 'delete', 'create'].includes(operation.action)) {
+        return res.status(400).json({ 
+          error: 'Invalid operation format', 
+          message: 'Each operation must have a valid action (update, delete, create)' 
+        });
+      }
+
+      // Validate required fields based on action
+      if (operation.action === 'update' && (!operation.variantId || !operation.data)) {
+        return res.status(400).json({ 
+          error: 'Invalid update operation', 
+          message: 'Update operations require variantId and data fields' 
+        });
+      }
+
+      if (operation.action === 'delete' && !operation.variantId) {
+        return res.status(400).json({ 
+          error: 'Invalid delete operation', 
+          message: 'Delete operations require variantId field' 
+        });
+      }
+
+      if (operation.action === 'create' && (!operation.data || !parentItemId)) {
+        return res.status(400).json({ 
+          error: 'Invalid create operation', 
+          message: 'Create operations require data field and parentItemId in request' 
+        });
+      }
+    }
+
+    // Import the bulk operations service
+    const { VariantBulkOperationsService } = await import('../services/VariantBulkOperationsService');
+    const variantBulkOperationsService = VariantBulkOperationsService.getInstance();
+
+    const result = await variantBulkOperationsService.bulkVariantOperations(operations, parentItemId);
+    
+    res.json({
+      success: true,
+      ...result,
+      message: `Bulk variant operations completed: ${result.success_count} successful, ${result.error_count} failed`
+    });
+  } catch (error: any) {
+    console.error('[PUT /variants/bulk/operations] Error:', error);
+    res.status(500).json({ error: 'Bulk operations failed', message: error.message });
+  }
+});
+
+/**
+ * PUT /api/variants/bulk (DEPRECATED)
+ * Use /api/variants/bulk/operations instead for explicit actions
+ */
+router.put('/bulk', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { updates } = req.body;
+    const user = (req as any).user;
+
+    if (!updates || !Array.isArray(updates)) {
+      return res.status(400).json({ 
+        error: 'Invalid request body', 
+        message: 'updates array is required' 
+      });
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ 
+        error: 'Invalid request body', 
+        message: 'updates array cannot be empty' 
+      });
+    }
+
+    // Validate each update object
+    for (const update of updates) {
+      if (!update.variantId || !update.data) {
+        return res.status(400).json({ 
+          error: 'Invalid update format', 
+          message: 'Each update must have variantId and data fields' 
+        });
+      }
+    }
+
+    // Import the bulk operations service
+    const { VariantBulkOperationsService } = await import('../services/VariantBulkOperationsService');
+    const variantBulkOperationsService = VariantBulkOperationsService.getInstance();
+
+    const result = await variantBulkOperationsService.bulkUpdateVariants(updates);
+    
+    res.json({
+      success: true,
+      ...result,
+      message: `Bulk variant update completed: ${result.success_count} variants updated`
+    });
+  } catch (error: any) {
+    console.error('[PUT /variants/bulk] Error:', error);
+    res.status(500).json({ error: 'Failed to update variants', message: error.message });
   }
 });
 

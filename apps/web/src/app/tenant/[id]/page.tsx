@@ -58,6 +58,38 @@ interface Product {
   product_review_count?: number;
   product_helpful_count?: number;
   product_review_approved?: number;
+  // Enhanced fields from new API
+  imageGallery?: Array<{
+    id: string;
+    url: string;
+    position: number;
+    alt?: string;
+    caption?: string;
+    variant_id?: string;
+    createdAt: string;
+    isPrimary: boolean;
+  }>;
+  variants?: Array<{
+    id: string;
+    sku: string;
+    variant_name: string;
+    price_cents: number;
+    sale_price_cents?: number;
+    stock: number;
+    image_url?: string;
+    attributes: Record<string, any>;
+    sort_order: number;
+    is_active: boolean;
+    is_on_sale: boolean;
+    discount_percentage: number;
+  }>;
+  hasVariants?: boolean;
+  productType?: 'physical' | 'digital' | 'hybrid';
+  digitalDeliveryMethod?: string;
+  digitalAssets?: any[];
+  licenseType?: string;
+  accessDurationDays?: number;
+  downloadLimit?: number;
 }
 
 interface Tenant {
@@ -242,8 +274,8 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       has_active_payment_gateway: p.hasActivePaymentGateway ?? false, // From MV (camelCase from API)
     }));
 
-    console.log(`${featured ? 'Featured' : 'Regular'} Products: ${products.length}`);
-    console.log(`${featured ? 'Featured' : 'Regular'} Products Data:`, productsData);
+    // console.log(`${featured ? 'Featured' : 'Regular'} Products: ${products.length}`);
+    // console.log(`${featured ? 'Featured' : 'Regular'} Products Data:`, productsData);
 
     const total = featured 
       ? ('count' in productsData ? productsData.count : 0) || products.length // Featured API uses count field

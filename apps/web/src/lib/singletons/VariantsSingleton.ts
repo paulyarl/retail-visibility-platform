@@ -268,6 +268,48 @@ class VariantsSingleton extends TenantApiSingleton {
   }
 
   /**
+   * Bulk operations for variants with explicit actions (update, delete, create)
+   */
+  async bulkVariantOperations(
+    operations: Array<{
+      action: 'update' | 'delete' | 'create';
+      variantId?: string;
+      data?: any;
+    }>, 
+    parentItemId?: string
+  ): Promise<VariantResult> {
+    try {
+      const response = await this.makeDefaultRequest(
+        `/api/variants/bulk/operations`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            operations,
+            parentItemId
+          })
+        }
+      ) as any;
+
+      // Invalidate all variant caches after bulk operations
+      this.clearCache();
+
+      console.log('[VariantsSingleton] Bulk variant operations completed:', operations.length);
+      
+      return {
+        success: true,
+        variants: response.variants || [],
+        message: `Bulk operations completed: ${response.success_count || 0} successful, ${response.error_count || 0} failed`,
+      };
+    } catch (error) {
+      console.error('[VariantsSingleton] Error performing bulk variant operations:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to perform bulk variant operations',
+      };
+    }
+  }
+
+  /**
    * Get variant statistics for an item
    */
   async getVariantStats(itemId: string): Promise<VariantResult> {

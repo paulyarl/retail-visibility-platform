@@ -162,7 +162,7 @@ class ProductDataService extends PublicApiSingleton {
   async fetchProduct(id: string): Promise<any> {
     try {
       const response = await this.makeDefaultRequest<any>(
-        `/api/public/products/${id}`,
+        `/api/public/products/${id}?include=variants,metadata,analytics,store`,
         {},
         `product-data-${id}`,
         this.cacheTTL
@@ -173,8 +173,10 @@ class ProductDataService extends PublicApiSingleton {
         return null;
       }
 
-      return response.data.data;
+      const productData = response.data.data; // Fixed: product data is nested
+      return productData;
     } catch (error) {
+      console.error('[ProductDataService] Error in fetchProduct:', error);
       throw new Error(`Failed to fetch product: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -329,4 +331,4 @@ class ProductDataService extends PublicApiSingleton {
 
 // Export singleton instance
 export const productDataService = ProductDataService.getInstance();
-export default ProductDataService;
+export default productDataService;

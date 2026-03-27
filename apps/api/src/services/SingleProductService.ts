@@ -43,12 +43,25 @@ export interface SingleProductResult {
     height?: number;
   };
   tags?: string[];
+  productType?: 'physical' | 'digital' | 'hybrid';
+  digitalDeliveryMethod?: string;
+  digitalAssets?: any[];
+  licenseType?: string;
+  accessDurationDays?: number;
+  downloadLimit?: number;
   variants?: Array<{
     id: string;
-    name: string;
     sku: string;
-    price: number;
+    variant_name: string;
+    price_cents: number | null;
+    sale_price_cents: number | null;
     stock: number;
+    image_url: string | null;
+    attributes: any;
+    sort_order: number | null;
+    is_active: boolean | null;
+    is_on_sale: boolean;
+    discount_percentage: number;
   }>;
   createdAt: Date;
   updatedAt: Date;
@@ -125,6 +138,16 @@ export class SingleProductService {
       where: { inventoryItemId: productId },
       orderBy: { position: 'asc' }
     });
+
+    // Get variants separately if product has variants
+    const variants = product.has_variants ? 
+      await prisma.product_variants.findMany({
+        where: { 
+          parent_item_id: productId,
+          is_active: true 
+        },
+        orderBy: { sort_order: 'asc' }
+      }) : [];
 
     // Get tenant info separately
     const tenant = await prisma.tenants.findUnique({
@@ -217,20 +240,40 @@ export class SingleProductService {
       tenantId: product.tenant_id,
       itemStatus: product.item_status || 'unknown',
       visibility: product.visibility || 'public',
-      gtin: product.gtin || undefined,
-      mpn: product.mpn || undefined,
-      manufacturer: product.manufacturer || undefined,
-      imageUrl: photos.length > 0 ? photos[0].url : undefined,
-      currency: 'USD', // Default currency
+      manufacturer: product.manufacturer || '',
+      imageUrl: product.image_url || '',
+      currency: product.currency || 'USD',
       tenantCategoryId: product.directory_category_id || undefined,
       tenantCategory: category ? {
         id: category.id,
         name: category.name,
         slug: category.slug,
-        googleCategoryId: category.googleCategoryId || null
-      } : null,
-      // Featured types from MV
-      featuredTypes: featuredTypes
+        googleCategoryId: category.googleCategoryId
+      } : undefined,
+      // Add variants data
+      variants: variants.map(v => ({
+        id: v.id,
+        sku: v.sku,
+        variant_name: v.variant_name,
+        price_cents: v.price_cents,
+        sale_price_cents: v.sale_price_cents,
+        stock: v.stock,
+        image_url: v.image_url,
+        attributes: v.attributes,
+        sort_order: v.sort_order,
+        is_active: v.is_active,
+        is_on_sale: v.sale_price_cents && v.price_cents ? v.sale_price_cents < v.price_cents : false,
+        discount_percentage: v.sale_price_cents && v.price_cents ? 
+          Math.round(((v.price_cents - v.sale_price_cents) / v.price_cents) * 100) : 0
+      })),
+      // Add digital product fields
+      productType: product.product_type || 'physical',
+      digitalDeliveryMethod: product.digital_delivery_method || undefined,
+      digitalAssets: Array.isArray(product.digital_assets) ? product.digital_assets : [],
+      licenseType: product.license_type || undefined,
+      accessDurationDays: product.access_duration_days || undefined,
+      downloadLimit: product.download_limit || undefined,
+      featuredTypes: featuredTypes || []
     };
 
     // Cache the result

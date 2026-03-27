@@ -36,7 +36,28 @@ export default function ProductVariants({
   onChange,
   disabled = false,
   onValidationChange,
-  attributeTypes: initialAttributeTypes = ['size', 'color'],
+  attributeTypes: initialAttributeTypes = [
+    'format',      // Grid layout for books/media
+    'color',       // Swatches for visual selection
+    'size',        // Buttons or dropdown
+    'edition',     // Grid layout for book editions
+    'language',    // Buttons for language selection
+    'material',    // Buttons for material selection
+    'weight',      // Buttons for weight/size selection
+    'style',       // Buttons for style variants
+    'length',      // Buttons for length variants
+    'width',       // Buttons for width variants
+    'height',      // Buttons for height variants
+    'capacity',    // Buttons for capacity variants
+    'volume',      // Buttons for volume variants
+    'finish',      // Buttons for finish variants
+    'pattern',     // Buttons for pattern variants
+    'brand',       // Buttons for brand variants
+    'model',       // Buttons for model variants
+    'version',     // Buttons for version variants
+    'type',        // Buttons for type variants
+    'category'     // Buttons for category variants
+  ],
   onAttributeTypesChange,
 }: ProductVariantsProps) {
   const [attributeTypes, setAttributeTypes] = useState<string[]>(initialAttributeTypes);

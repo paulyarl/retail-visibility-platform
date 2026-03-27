@@ -5,7 +5,7 @@
  * Extends AuthenticatedApiSingleton for consistent authentication and caching
  */
 
-import { AuthenticatedApiSingleton } from '@/providers/base/AuthenticatedApiSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 // Photo Data Interfaces
 export interface Photo {
@@ -44,7 +44,13 @@ export interface PhotoReorderResult {
   updatedPhotos?: Photo[];
 }
 
-class PhotoService extends AuthenticatedApiSingleton {
+class PhotoService extends TenantApiSingleton {
+  public getServiceCachePatterns(): string[] {
+    throw new Error('Method not implemented.');
+  }
+  public invalidateServiceCaches(tenantId?: string, ...params: any[]): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
   private static instance: PhotoService;
 
   // TTL constants for different data types

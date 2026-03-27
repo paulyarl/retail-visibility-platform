@@ -4,6 +4,7 @@ import { Item } from '@/services/itemsDataService';
 import { Copy } from 'lucide-react';
 import SyncStatusIndicator from './SyncStatusIndicator';
 import QuickStockEditor from '@/components/shared/QuickStockEditor';
+import VariantIndicator from './VariantIndicator';
 
 interface ItemsListProps {
   items: Item[];
@@ -237,6 +238,9 @@ export default function ItemsList({
                     )}
                   </div>
                 </div>
+
+                {/* Variant Information */}
+                <VariantIndicator item={item} compact={true} showDetails={true} />
               </div>
             </div>
 

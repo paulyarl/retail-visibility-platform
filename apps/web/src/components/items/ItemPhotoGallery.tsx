@@ -133,7 +133,17 @@ export default function ItemPhotoGallery({ item, tenantId, onUpdate }: ItemPhoto
         throw new Error("Upload failed");
       }
 
-      await loadPhotos();
+      // Instant update: Add the new photo to the gallery immediately
+      const newPhoto: Photo = {
+        id: res.id,
+        url: res.url,
+        position: res.position,
+        alt: res.alt,
+        caption: res.caption,
+        variant_id: res.variant_id,
+      };
+      
+      setPhotos(prevPhotos => [...prevPhotos, newPhoto]);
       onUpdate?.();
     } catch (err: any) {
       setError(err.message || "Upload failed");
