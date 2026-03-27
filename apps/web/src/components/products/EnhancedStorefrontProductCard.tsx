@@ -522,10 +522,11 @@ export default function EnhancedStorefrontProductCard({
                       <Badge
                         key={variant.id}
                         variant="light"
-                        size="xs"
+                        size="sm"
                         onClick={() => handleVariantClick(variant)}
                         style={{ cursor: 'pointer' }}
-                        className="hover:bg-blue-100 transition-colors"
+                        className="hover:bg-blue-100 transition-colors text-xs px-3 py-2"
+                        title={`${variant.variant_name}: $${(variant.price_cents / 100).toFixed(2)}`}
                       >
                         {variant.variant_name}
                       </Badge>
@@ -536,6 +537,9 @@ export default function EnhancedStorefrontProductCard({
                       </Text>
                     )}
                   </Group>
+                  <Text size="xs" c="blue" className="hover:text-blue-600 transition-colors">
+                    💡 Click options for details
+                  </Text>
                 </div>
               )}
 
