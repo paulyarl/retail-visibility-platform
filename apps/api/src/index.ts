@@ -2802,7 +2802,6 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
               created_at: true,
               updated_at: true,
             },
-            orderBy: { sort_order: 'asc', created_at: 'asc' },
           },
         }
       }).then(items => {
@@ -2810,7 +2809,15 @@ app.get("/api/items/complete", authenticateToken, checkTenantAccess, async (req,
         // For inventory items, inventory_item_id = id (the item's own ID)
         return items.map(item => ({
           ...item,
-          inventory_item_id: item.id // CRITICAL: Frontend expects this field
+          inventory_item_id: item.id, // CRITICAL: Frontend expects this field
+          // Sort variants by sort_order and created_at
+          variants: item.product_variants ? 
+            [...item.product_variants].sort((a, b) => {
+              if (a.sort_order !== b.sort_order) {
+                return a.sort_order - b.sort_order;
+              }
+              return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+            }) : []
         }));
       }),
 
