@@ -18,6 +18,8 @@
     "dev:vercel-local": "doppler run --config local -- vercel dev --debug",
     "dev:local-vercel": "doppler run --config local -- pnpm -r --parallel --filter @rvp/web dev:vercel-web --filter @rvp/api dev:vercel-api",
     "dev:prod": "doppler run --config prd -- pnpm -r --parallel dev",
+    "test:cache": "node run-cache-test.js",
+    "test:cache:ts": "npx tsx run-cache-test.ts",
     "build": "pnpm -r build",
     "start": "cd apps/api && npm start",
     "buildweb": "cd apps/web && pnpm build",

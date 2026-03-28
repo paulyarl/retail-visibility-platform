@@ -194,17 +194,17 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
 
   // Initial data load - get all tenants for client-side filtering
   useEffect(() => {
-    console.log('[TenantsClient] Initial data load - getting all tenants');
+    // console.log('[TenantsClient] Initial data load - getting all tenants');
     fetchTenants(true); // Get all tenants including archived for complete client-side filtering
   }, []);
 
   const fetchTenants = async (includeArchived = false, statusParam?: string) => {
-    console.log('[TenantsClient] fetchTenants called:', { includeArchived, statusParam });
+    // console.log('[TenantsClient] fetchTenants called:', { includeArchived, statusParam });
     setLoading(true);
     setError(null);
     try {
       const tenants = await platformHomeService.getTenants();
-      console.log('[TenantsClient] Raw tenants from API:', tenants?.length, tenants?.map(t => ({ name: t.name, subscriptionStatus: t.subscriptionStatus })));
+      // console.log('[TenantsClient] Raw tenants from API:', tenants?.length, tenants?.map(t => ({ name: t.name, subscriptionStatus: t.subscriptionStatus })));
       
       // Filter tenants based on parameters
       let filteredTenants = tenants || [];
@@ -275,7 +275,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       }
       
       const newTenant = responseData as Tenant;
-      console.log('[TenantsClient] Tenant created:', newTenant.id);
+      // console.log('[TenantsClient] Tenant created:', newTenant.id);
       
       // Immediately add the new tenant to the list for instant UI update
       setTenants(prev => [...prev, newTenant]);

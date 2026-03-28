@@ -77,9 +77,7 @@ class CacheManager {
       }
     }
 
-    if (this.indexedDBSupported) {
-      this.initIndexedDB();
-    }
+    // IndexedDB will be initialized lazily when needed
   }
 
   /**
@@ -103,21 +101,62 @@ class CacheManager {
     
     const dbName = parts.join('-');
     
+    // Use context-aware store name (not always 'cache-store')
+    const storeName = `${context}-store`;
+    
     return new CacheManager({
       dbName,
-      storeName: 'cache-store',
+      storeName,
       ttl: 15 * 60 * 1000, // 15 minutes
       maxSize: 100
     });
   }
 
-  private async initIndexedDB(): Promise<void> {
+  /**
+   * 🎯 Get context-aware database/store configuration
+   * Routes to appropriate database based on context and isolation
+   */
+  private getContextAwareStorage(context?: CacheContext, isolation?: CacheContext): { dbName: string; storeName: string } {
+    // Priority: isolation > context > default
+    const activeContext = isolation || context;
+    
+    switch (activeContext) {
+      case 'tenant':
+        return { dbName: 'tenant-cache', storeName: 'tenant-store' };
+      case 'admin':
+        return { dbName: 'admin-cache', storeName: 'admin-store' };
+      case 'user':
+        return { dbName: 'user-cache', storeName: 'user-store' };
+      case 'shop':
+        return { dbName: 'shop-cache', storeName: 'shop-store' };
+      case 'product':
+        return { dbName: 'product-cache', storeName: 'product-store' };
+      case 'store':
+        return { dbName: 'store-cache', storeName: 'store-store' };
+      case 'directory':
+        return { dbName: 'directory-cache', storeName: 'directory-store' };
+      case 'system':
+        return { dbName: 'system-cache', storeName: 'system-store' };
+      case 'public':
+        return { dbName: 'public-cache', storeName: 'public-store' };
+      case 'global':
+        return { dbName: 'global-cache', storeName: 'global-store' };
+      default:
+        return { dbName: this.dbName, storeName: this.storeName };
+    }
+  }
+
+  /**
+   * 🎯 Initialize database connection with context awareness
+   */
+  private async initializeDB(context?: CacheContext, isolation?: CacheContext): Promise<void> {
     if (!this.indexedDBSupported) return;
 
     try {
       // Always try to open with a higher version to trigger onupgradeneeded
       const version = 1; // Base version
-      const request = indexedDB.open(this.dbName, version);
+      const { dbName, storeName } = this.getContextAwareStorage(context, isolation);
+      const request = indexedDB.open(dbName, version);
 
       request.onerror = () => {
         console.warn('[CacheManager] IndexedDB open failed, falling back to memory only');
@@ -501,85 +540,195 @@ class CacheManager {
   }
 
   /**
-   * Remove all keys matching a pattern from all storage layers
-   * Supports wildcards like 'platform-admin-tier-tenants*'
+   * 🎯 Remove keys matching pattern from all storage layers
+   * Uses context-aware factory pattern like save operations
    */
-  async removeByPattern(pattern: string): Promise<number> {
+  async removeByPattern(pattern: string, context?: CacheContext, isolation?: CacheContext): Promise<number> {
+    console.log(`[CacheManager] 🚀 START removeByPattern with pattern: ${pattern} (context: ${context}, isolation: ${isolation})`);
+    
+    let totalRemoved = 0;
+
+    // If context provided, use context-specific cache manager like save operations
+    if (context) {
+      console.log(`[CacheManager] 🎯 Using context-specific cache manager for: ${context}/${isolation || context}`);
+      const contextCacheManager = CacheManager.createContextAware(context, isolation);
+      
+      // Delegate to context-specific cache manager
+      totalRemoved = await contextCacheManager.removeByPattern(pattern);
+      console.log(`[CacheManager] ✅ Context-specific invalidation completed, removed: ${totalRemoved}`);
+      return totalRemoved;
+    }
+
+    // Fallback to default behavior for backward compatibility
+    console.log(`[CacheManager] 🗄️ Using default cache manager (no context provided)`);
+    
+    // Convert pattern to regex for matching
+    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+    console.log(`[CacheManager] 📝 Generated regex: ${regex}`);
+
+    // Clear memory cache
+    const memoryKeysToDelete: string[] = [];
+    for (const [key] of this.memoryCache.entries()) {
+      if (regex.test(key)) {
+        memoryKeysToDelete.push(key);
+      }
+    }
+    
+    memoryKeysToDelete.forEach(key => this.memoryCache.delete(key));
+    totalRemoved += memoryKeysToDelete.length;
+    console.log(`[CacheManager] 💾 Removed ${memoryKeysToDelete.length} keys from memory cache matching pattern: ${pattern}`);
+
+    // Check if IndexedDB and localStorage are supported
+    console.log(`[CacheManager] 📊 IndexedDB supported: ${this.indexedDBSupported}, DB exists: ${!!this.db}`);
+    console.log(`[CacheManager] 📊 localStorage supported: ${this.localStorageSupported}`);
+
+    // Run IndexedDB and localStorage invalidation in parallel for reliability
+    const invalidationPromises: Promise<number>[] = [];
+    
+    if (this.indexedDBSupported && this.db) {
+      console.log(`[CacheManager] 🔥 Adding IndexedDB invalidation to parallel queue`);
+      invalidationPromises.push(this.removeByPatternFromIndexedDB(pattern, regex));
+    }
+    
+    if (this.localStorageSupported) {
+      console.log(`[CacheManager] 🔥 Adding localStorage invalidation to parallel queue`);
+      invalidationPromises.push(this.removeByPatternFromLocalStorage(pattern, regex));
+    }
+    
+    console.log(`[CacheManager] ⚡ Running ${invalidationPromises.length} invalidation promises in parallel`);
+    
+    if (invalidationPromises.length > 0) {
+      const results = await Promise.allSettled(invalidationPromises);
+      console.log(`[CacheManager] ✅ All invalidation promises completed, results:`, results);
+      
+      // Sum up successful removals
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          totalRemoved += result.value;
+          console.log(`[CacheManager] ✅ Promise ${index + 1} removed ${result.value} entries`);
+        } else {
+          console.error(`[CacheManager] ❌ Promise ${index + 1} failed:`, result.reason);
+        }
+      });
+    }
+    
+    console.log(`[CacheManager] 🏁 END removeByPattern, total removed: ${totalRemoved}`);
+    return totalRemoved;
+  }
+
+  /**
+   * Remove keys matching pattern from IndexedDB only
+   */
+  private async removeByPatternFromIndexedDB(pattern: string, regex: RegExp): Promise<number> {
+    console.log(`[CacheManager] 🗄️ START IndexedDB pattern removal for: ${pattern}`);
     let removedCount = 0;
     
-    // Convert wildcard pattern to regex
-    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
-    
-    // Remove from memory cache
-    for (const key of Array.from(this.memoryCache.keys())) {
-      if (regex.test(key)) {
-        this.memoryCache.delete(key);
-        removedCount++;
+    try {
+      const keysToDelete: string[] = [];
+      const allKeys: string[] = [];
+      
+      // Collect matching keys
+      await new Promise<void>((resolve, reject) => {
+        console.log(`[CacheManager] 🔍 Scanning IndexedDB for matching keys...`);
+        const transaction = this.db!.transaction([this.storeName], 'readonly');
+        const store = transaction.objectStore(this.storeName);
+        const request = store.openCursor();
+        
+        request.onsuccess = () => {
+          const cursor = request.result;
+          if (cursor) {
+            const key = cursor.key as string;
+            allKeys.push(key);
+            if (regex.test(key)) {
+              keysToDelete.push(key);
+              console.log(`[CacheManager] 🎯 Found matching IndexedDB key: ${key}`);
+            }
+            cursor.continue();
+          } else {
+            console.log(`[CacheManager] 📊 IndexedDB scan complete: ${allKeys.length} total keys, ${keysToDelete.length} matching`);
+            console.log(`[CacheManager] 📋 All IndexedDB keys:`, allKeys.slice(0, 10)); // Show first 10 keys
+            if (allKeys.length > 10) {
+              console.log(`[CacheManager] 📋 ... and ${allKeys.length - 10} more keys`);
+            }
+            resolve();
+          }
+        };
+        request.onerror = () => reject(request.error);
+      });
+      
+      if (keysToDelete.length > 0) {
+        console.log(`[CacheManager] 🗑️ Deleting ${keysToDelete.length} keys from IndexedDB in parallel...`);
+        // Delete matching keys in parallel for better performance
+        const deletePromises = keysToDelete.map(key => this.remove(key));
+        await Promise.all(deletePromises);
+        console.log(`[CacheManager] ✅ Successfully deleted ${keysToDelete.length} keys from IndexedDB`);
+      } else {
+        console.log(`[CacheManager] ℹ️ No keys to delete from IndexedDB`);
       }
+      
+      removedCount = keysToDelete.length;
+      
+    } catch (error) {
+      console.error('[CacheManager] ❌ IndexedDB pattern remove failed:', error);
+      throw error;
     }
     
-    // Remove from IndexedDB - need to iterate all keys
-    if (this.indexedDBSupported && this.db) {
-      try {
-        const keysToDelete: string[] = [];
-        
-        await new Promise<void>((resolve, reject) => {
-          const transaction = this.db!.transaction([this.storeName], 'readonly');
-          const store = transaction.objectStore(this.storeName);
-          const request = store.openCursor();
-          
-          request.onsuccess = () => {
-            const cursor = request.result;
-            if (cursor) {
-              const key = cursor.key as string;
-              if (regex.test(key)) {
-                keysToDelete.push(key);
-              }
-              cursor.continue();
-            } else {
-              resolve();
-            }
-          };
-          request.onerror = () => reject(request.error);
-        });
-        
-        // Delete matching keys
-        for (const key of keysToDelete) {
-          await this.remove(key);
-          removedCount++;
-        }
-      } catch (error) {
-        console.warn('[CacheManager] IndexedDB pattern remove failed:', error);
-      }
-    }
+    console.log(`[CacheManager] 🏁 END IndexedDB pattern removal, removed: ${removedCount}`);
+    return removedCount;
+  }
+
+  /**
+   * Remove keys matching pattern from localStorage only
+   */
+  private async removeByPatternFromLocalStorage(pattern: string, regex: RegExp): Promise<number> {
+    console.log(`[CacheManager] 💾 START localStorage pattern removal for: ${pattern}`);
+    let removedCount = 0;
     
-    // Remove from localStorage - scan all keys with our prefix
-    if (this.localStorageSupported) {
-      try {
-        const prefix = this.getStorageKey('');
-        const keysToDelete: string[] = [];
-        
-        for (let i = 0; i < localStorage.length; i++) {
-          const storageKey = localStorage.key(i);
-          if (storageKey && storageKey.startsWith(prefix)) {
-            // Extract the actual cache key from the storage key
-            const cacheKey = storageKey.substring(prefix.length);
-            if (regex.test(cacheKey)) {
-              keysToDelete.push(storageKey);
-            }
+    try {
+      const prefix = this.getStorageKey('');
+      const keysToDelete: string[] = [];
+      const allKeys: string[] = [];
+      
+      console.log(`[CacheManager] 🔍 Scanning localStorage with prefix: ${prefix}`);
+      
+      // Collect matching keys
+      for (let i = 0; i < localStorage.length; i++) {
+        const storageKey = localStorage.key(i);
+        if (storageKey && storageKey.startsWith(prefix)) {
+          // Extract the actual cache key from the storage key
+          const cacheKey = storageKey.substring(prefix.length);
+          allKeys.push(cacheKey);
+          if (regex.test(cacheKey)) {
+            keysToDelete.push(storageKey);
+            console.log(`[CacheManager] 🎯 Found matching localStorage key: ${storageKey} (cache key: ${cacheKey})`);
           }
         }
-        
-        for (const storageKey of keysToDelete) {
+      }
+      
+      console.log(`[CacheManager] 📊 localStorage scan complete: ${allKeys.length} total keys, ${keysToDelete.length} matching`);
+      console.log(`[CacheManager] 📋 All localStorage cache keys:`, allKeys.slice(0, 10)); // Show first 10 keys
+      if (allKeys.length > 10) {
+        console.log(`[CacheManager] 📋 ... and ${allKeys.length - 10} more keys`);
+      }
+      
+      if (keysToDelete.length > 0) {
+        console.log(`[CacheManager] 🗑️ Deleting ${keysToDelete.length} keys from localStorage...`);
+        // Delete matching keys
+        keysToDelete.forEach(storageKey => {
           localStorage.removeItem(storageKey);
           removedCount++;
-        }
-      } catch (error) {
-        console.warn('[CacheManager] localStorage pattern remove failed:', error);
+        });
+        console.log(`[CacheManager] ✅ Successfully deleted ${keysToDelete.length} keys from localStorage`);
+      } else {
+        console.log(`[CacheManager] ℹ️ No keys to delete from localStorage`);
       }
+      
+    } catch (error) {
+      console.error('[CacheManager] ❌ localStorage pattern remove failed:', error);
+      throw error;
     }
     
-    console.log(`[CacheManager] Removed ${removedCount} entries matching pattern: ${pattern}`);
+    console.log(`[CacheManager] 🏁 END localStorage pattern removal, removed: ${removedCount}`);
     return removedCount;
   }
 

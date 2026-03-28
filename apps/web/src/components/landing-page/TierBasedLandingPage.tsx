@@ -528,10 +528,10 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   const { status: hoursStatus } = useStoreStatus(tenant.id, true); // Public scope
 
   // Debug logging for variants
-  console.log('[TierBasedLandingPage] Product variants:', product.variants);
-  console.log('[TierBasedLandingPage] Variants length:', product.variants?.length);
-  console.log('[TierBasedLandingPage] Variants type:', typeof product.variants);
-  console.log('[TierBasedLandingPage] Product object keys:', Object.keys(product));
+  // console.log('[TierBasedLandingPage] Product variants:', product.variants);
+  // console.log('[TierBasedLandingPage] Variants length:', product.variants?.length);
+  // console.log('[TierBasedLandingPage] Variants type:', typeof product.variants);
+  // console.log('[TierBasedLandingPage] Product object keys:', Object.keys(product));
 
   // Calculate current pricing based on selected variant
   const currentPrice = selectedVariant?.price_cents ? selectedVariant.price_cents / 100 : product.price;

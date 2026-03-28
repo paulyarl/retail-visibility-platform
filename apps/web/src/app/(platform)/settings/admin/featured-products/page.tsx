@@ -200,19 +200,19 @@ export default function FeaturedProductsManagement() {
 
   const fetchPendingTenants = async () => {
     try {
-      console.log('[DEBUG] Fetching tenants with featured access status...');
+      // console.log('[DEBUG] Fetching tenants with featured access status...');
       const allTenants = await AdminFeaturedApprovalService.getAllTenantsWithFeaturedAccessStatus();
-      console.log('[DEBUG] Raw API response:', allTenants);
+      // console.log('[DEBUG] Raw API response:', allTenants);
       
       // Log each tenant's approval status
       allTenants.forEach((tenant, index) => {
-        console.log(`[DEBUG] Tenant ${index + 1}: ${tenant.name}`, {
-          id: tenant.id,
-          featured_access_approved: tenant.featured_access_approved,
-          featured_access_approved_by: tenant.featured_access_approved_by,
-          featured_access_approved_at: tenant.featured_access_approved_at,
-          featured_access_rejection_reason: tenant.featured_access_rejection_reason
-        });
+        // console.log(`[DEBUG] Tenant ${index + 1}: ${tenant.name}`, {
+        //   id: tenant.id,
+        //   featured_access_approved: tenant.featured_access_approved,
+        //   featured_access_approved_by: tenant.featured_access_approved_by,
+        //   featured_access_approved_at: tenant.featured_access_approved_at,
+        //   featured_access_rejection_reason: tenant.featured_access_rejection_reason
+        // });
       });
       
       setPendingTenants(allTenants);
@@ -283,31 +283,31 @@ export default function FeaturedProductsManagement() {
 
   const getFeaturedAccessStatus = (tenant: PendingTenant) => {
     // DEBUG: Log the tenant data to understand what's happening
-    console.log(`[DEBUG] Tenant: ${tenant.name} (${tenant.id})`, {
-      featured_access_approved: tenant.featured_access_approved,
-      featured_access_approved_by: tenant.featured_access_approved_by,
-      featured_access_approved_at: tenant.featured_access_approved_at,
-      featured_access_rejection_reason: tenant.featured_access_rejection_reason,
-      subscription_tier: tenant.subscription_tier,
-      subscription_status: tenant.subscription_status
-    });
+    // console.log(`[DEBUG] Tenant: ${tenant.name} (${tenant.id})`, {
+    //   featured_access_approved: tenant.featured_access_approved,
+    //   featured_access_approved_by: tenant.featured_access_approved_by,
+    //   featured_access_approved_at: tenant.featured_access_approved_at,
+    //   featured_access_rejection_reason: tenant.featured_access_rejection_reason,
+    //   subscription_tier: tenant.subscription_tier,
+    //   subscription_status: tenant.subscription_status
+    // });
     
     if (tenant.featured_access_approved === true) {
-      console.log(`[DEBUG] ${tenant.name} - APPROVED ✓`);
+      // console.log(`[DEBUG] ${tenant.name} - APPROVED ✓`);
       return {
         status: 'Approved',
         style: 'bg-green-100 text-green-700',
         icon: '✓'
       };
     } else if (tenant.featured_access_approved === false && tenant.featured_access_rejection_reason) {
-      console.log(`[DEBUG] ${tenant.name} - REJECTED ✗`);
+      // console.log(`[DEBUG] ${tenant.name} - REJECTED ✗`);
       return {
         status: 'Rejected',
         style: 'bg-red-100 text-red-700',
         icon: '✗'
       };
     } else {
-      console.log(`[DEBUG] ${tenant.name} - PENDING ⏳ (featured_access_approved: ${tenant.featured_access_approved})`);
+      // console.log(`[DEBUG] ${tenant.name} - PENDING ⏳ (featured_access_approved: ${tenant.featured_access_approved})`);
       // Either null or false without rejection reason = Pending Approval
       return {
         status: 'Pending Approval',

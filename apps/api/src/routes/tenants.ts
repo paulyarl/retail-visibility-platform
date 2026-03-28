@@ -174,19 +174,37 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
 router.patch('/:id', authenticateToken, requirePlatformAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { subscriptionTier, subscriptionStatus } = req.body;
+    const { subscriptionTier, subscriptionStatus, organizationId } = req.body;
 
     console.log('[PATCH /api/tenants/:id] Starting update for tenant:', id);
-    console.log('[PATCH /api/tenants/:id] Request body:', { subscriptionTier, subscriptionStatus });
+    console.log('[PATCH /api/tenants/:id] Request body:', { subscriptionTier, subscriptionStatus, organizationId });
 
     // Validate input
-    if (!subscriptionTier && !subscriptionStatus) {
+    if (!subscriptionTier && !subscriptionStatus && organizationId === undefined) {
       console.log('[PATCH /api/tenants/:id] Validation failed: no fields to update');
       return res.status(400).json({
         success: false,
         error: 'bad_request',
-        message: 'Must provide subscriptionTier or subscriptionStatus to update'
+        message: 'Must provide subscriptionTier, subscriptionStatus, or organizationId to update'
       });
+    }
+
+    // Good standing check for organization membership
+    if (organizationId !== undefined) {
+      const { validateTenantOrganizationMembership } = await import('../utils/tenant-organization-validation');
+      const validation = await validateTenantOrganizationMembership(id, organizationId);
+      
+      if (!validation.valid) {
+        console.log('[PATCH /api/tenants/:id] Organization membership validation failed:', validation.reason);
+        return res.status(403).json({
+          success: false,
+          error: 'organization_membership_denied',
+          message: validation.message,
+          reason: validation.reason,
+        });
+      }
+      
+      console.log('[PATCH /api/tenants/:id] Organization membership validation passed');
     }
 
     // Build update data
@@ -198,6 +216,10 @@ router.patch('/:id', authenticateToken, requirePlatformAdmin, async (req: Reques
     if (subscriptionStatus) {
       updateData.subscription_status = subscriptionStatus;
       console.log('[PATCH /api/tenants/:id] Updating subscription_status to:', subscriptionStatus);
+    }
+    if (organizationId !== undefined) {
+      updateData.organization_id = organizationId;
+      console.log('[PATCH /api/tenants/:id] Updating organization_id to:', organizationId);
     }
 
     console.log('[PATCH /api/tenants/:id] Final updateData:', updateData);

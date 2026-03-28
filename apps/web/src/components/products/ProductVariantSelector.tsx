@@ -58,10 +58,10 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
   const [availableCombinations, setAvailableCombinations] = useState<Set<string>>(new Set());
 
   // Debug logging for variants
-  console.log('[ProductVariantSelector] Received variants:', variants);
-  console.log('[ProductVariantSelector] Variants length:', variants.length);
-  console.log('[ProductVariantSelector] First variant structure:', variants[0]);
-  console.log('[ProductVariantSelector] First variant keys:', Object.keys(variants[0] || {}));
+  // console.log('[ProductVariantSelector] Received variants:', variants);
+  // console.log('[ProductVariantSelector] Variants length:', variants.length);
+  // console.log('[ProductVariantSelector] First variant structure:', variants[0]);
+  // console.log('[ProductVariantSelector] First variant keys:', Object.keys(variants[0] || {}));
 
   // Group variants by dynamic attributes
   const getVariantGroups = (): VariantGroup[] => {
@@ -86,14 +86,14 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
         attributes.get('option')!.add((variant as ProductVariant).variant_name);
       }
       
-      console.log(`[ProductVariantSelector] Processing variant ${(variant as ProductVariant).id}:`, {
-        variant_name: (variant as ProductVariant).variant_name,
-        attributes: variantAttributes,
-        stock: (variant as ProductVariant).stock
-      });
+      // console.log(`[ProductVariantSelector] Processing variant ${(variant as ProductVariant).id}:`, {
+      //   variant_name: (variant as ProductVariant).variant_name,
+      //   attributes: variantAttributes,
+      //   stock: (variant as ProductVariant).stock
+      // });
     });
 
-    console.log('[ProductVariantSelector] Found attributes:', Array.from(attributes.keys()));
+    // console.log('[ProductVariantSelector] Found attributes:', Array.from(attributes.keys()));
 
     // Create variant groups for dynamic attributes
     attributes.forEach((values, attributeName) => {
@@ -105,16 +105,16 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
                  (attributeName === 'option' && (v as ProductVariant).variant_name === value);
         });
         
-        console.log(`[ProductVariantSelector] Matching variants for ${attributeName}=${value}:`, matchingVariants);
+        // console.log(`[ProductVariantSelector] Matching variants for ${attributeName}=${value}:`, matchingVariants);
         
         // Check if any matching variant is available - use stock instead of inventory_quantity
         const isAvailable = matchingVariants.some((v: any) => ((v as ProductVariant).stock || 0) > 0);
         
-        console.log(`[ProductVariantSelector] Availability for ${value}:`, {
-          matchingVariants: matchingVariants.length,
-          stock: matchingVariants.map((v: any) => (v as ProductVariant).stock),
-          isAvailable
-        });
+        // console.log(`[ProductVariantSelector] Availability for ${value}:`, {
+        //   matchingVariants: matchingVariants.length,
+        //   stock: matchingVariants.map((v: any) => (v as ProductVariant).stock),
+        //   isAvailable
+        // });
         
         // Get price difference (if any)
         const basePrice = variants[0]?.price_cents || 0;

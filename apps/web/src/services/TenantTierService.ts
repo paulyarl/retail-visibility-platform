@@ -163,14 +163,69 @@ export class TenantTierService extends AdminApiSingleton {
     }
 
     // Invalidate tenant and tier caches
-    await this.invalidateCache(`platform-tenant-${tenantId}*`);
-    await this.invalidateCache(`platform-update-tenant-tier-${tenantId}*`);
-    await this.invalidateCache(`platform-tenant-tier-${tenantId}*`);
-    await this.invalidateCache('platform-admin-tier-tenants*');
-    await this.invalidateCache('admin-tier-tenants');
-    await this.invalidateCache('platform-admin-tier-tenants');
+    // await this.invalidateCache(`platform-tenant-${tenantId}*`);
+    // await this.invalidateCache(`platform-update-tenant-tier-${tenantId}*`);
+    // await this.invalidateCache(`platform-tenant-tier-${tenantId}*`);
+    // await this.invalidateCache('platform-admin-tier-tenants*');
+    // await this.invalidateCache('admin-tier-tenants');
+    // await this.invalidateCache('platform-admin-tier-tenants');
+
+      // Invalidate tier system cache
+    await this.invalidateTierCachePatterns();
+
 
     return result.data || null;
+  }
+
+   /**
+   * PILOT: Get all tier cache patterns for this service
+   * Documents all tier cache keys that this service manages
+   * Separates exact keys from pattern keys for optimal invalidation
+   */
+  public getTierCachePatterns(): string[] {
+    return [
+      // === EXACT KEYS (No pattern matching needed) ===
+      // These are fixed keys that don't contain tenant IDs or variables
+      `tenant-cache-tenant-store-platform-admin-tier-tenants:tenant:tenant`,
+      `user-cache-user-store-platform-tenants:user:user`,
+      `admin-cache-admin-store-platform-admin-tier-tenants:admin:admin`,
+      
+      // === PATTERN KEYS (Require wildcard matching) ===
+      // Generic patterns (existing)
+      `platform-tenants`,
+      `platform-tenant-tier`,
+      `platform-admin-tier-tenants`,
+      `platform-admin-tiers`,
+      `/api/admin/tiers/tiers`,
+      `/api/featured-products/tenants/all-with-featured-access-status`,
+      `/api/admin/products/featuring/stats`,
+      `/api/admin/products/featured?limit=20&offset=0&is_active=true`,
+      `platform-tier-system-tiers`,
+      
+      // Context-specific patterns (match variations)
+      `platform-tenants:*:*`,           // Matches platform-tenants:admin:admin, etc.
+      `platform-admin-tier-tenants:*:*`, // Matches tenant-specific variations
+      `/api/featured-products/tenants/all-with-featured-access-status:*:*`, // Matches admin:admin context
+      `/api/admin/tiers/tiers:*:*`,     // Matches admin:admin context
+      `/api/admin/products/featuring/stats:*:*`,
+      `/api/admin/products/featured*:*:*`,
+      `platform-tier-system-tiers:*:*`,
+    ];
+  }
+
+   /**
+   * PILOT: Get all tier cache patterns for this service
+   * Documents all tier cache keys that this service manages
+   */
+  async invalidateTierCachePatterns(): Promise<void> {
+    const cacheKeys = this.getTierCachePatterns();
+
+     await Promise.all (
+      cacheKeys.map(key => this.invalidateCacheWithContext(key))
+     );
+     await Promise.all (
+      cacheKeys.map(key => this.invalidateCacheAcrossContexts(key, [AppContext.TENANT,AppContext.USER,AppContext.ADMIN], [CacheIsolation.TENANT,CacheIsolation.USER,CacheIsolation.ADMIN]))
+     );
   }
 
   /**
@@ -269,7 +324,8 @@ export class TenantTierService extends AdminApiSingleton {
     }
 
     // Invalidate tier system cache
-    await this.invalidateCache('platform-tier-system-tiers*');
+    await this.invalidateTierCachePatterns();
+
 
     return result.data || null;
   }
@@ -324,7 +380,8 @@ export class TenantTierService extends AdminApiSingleton {
     }
 
     // Invalidate tier system cache
-    await this.invalidateCache('platform-tier-system-tiers*');
+    await this.invalidateTierCachePatterns();
+
 
     return result.data || null;
   }
@@ -347,9 +404,9 @@ export class TenantTierService extends AdminApiSingleton {
       console.error('[TenantTierService] Failed to delete tier:', result.error);
       throw result.error;
     }
+ // Invalidate tier system cache
+    await this.invalidateTierCachePatterns();
 
-    // Invalidate tier system cache
-    await this.invalidateCache('platform-tier-system-tiers*');
   }
 
   /**

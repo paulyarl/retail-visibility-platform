@@ -605,7 +605,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
    * Update tenant profile
    */
   async updateTenantProfile(tenantId: string, profileData: Partial<BusinessProfile>): Promise<BusinessProfile | null> {
-    console.log('[PlatformHomeSingleton] updateTenantProfile called with tenantId:', tenantId, 'profileData:', profileData);
+    // console.log('[PlatformHomeSingleton] updateTenantProfile called with tenantId:', tenantId, 'profileData:', profileData);
     if (!tenantId) {
       throw new Error('Tenant ID is required');
     }
@@ -619,7 +619,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       `platform-tenant-profile-${tenantId}`
     );
 
-    console.log('[PlatformHomeSingleton] updateTenantProfile result:', result);
+    // console.log('[PlatformHomeSingleton] updateTenantProfile result:', result);
     if (!result.success) {
       console.error('[PlatformHomeSingleton] Failed to update tenant profile:', result.error);
       throw result.error;
@@ -663,6 +663,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
    * Other services can call this to invalidate platform-related caches
    */
   public async invalidateServiceCaches(tenantId?: string, tierId?: string): Promise<void> {
+    // console.log(`[PlatformHomeSingletonService] 🔄 Starting cache invalidation:`, { tenantId, tierId });
+    
+    // Invalidate client-side caches first
     if (tenantId) {
       // Invalidate specific tenant caches
       await this.invalidateTenantCaches(tenantId);
@@ -674,6 +677,39 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     if (tierId) {
       // Invalidate specific tier caches
       await this.invalidateTierCaches(tierId);
+    }
+    
+    // Also invalidate server-side API cache
+    await this.invalidateApiCache(tenantId);
+  }
+
+  /**
+   * Invalidate server-side API cache to ensure fresh data
+   */
+  private async invalidateApiCache(tenantId?: string): Promise<void> {
+    try {
+      // console.log(`[PlatformHomeSingletonService] 🌐 Invalidating API cache for:`, tenantId || 'all tenants');
+      
+      const response = await fetch('/api/cache/invalidate/tenants', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache', // Ensure this request isn't cached
+        },
+        body: JSON.stringify({ tenantId })
+      });
+      
+      if (!response.ok) {
+        console.warn(`[PlatformHomeSingletonService] API cache invalidation failed:`, response.status);
+        return;
+      }
+      
+      const result = await response.json();
+      // console.log(`[PlatformHomeSingletonService] ✅ API cache invalidated:`, result);
+      
+    } catch (error) {
+      console.warn(`[PlatformHomeSingletonService] API cache invalidation error:`, error);
+      // Don't throw - client cache invalidation is still valuable
     }
   }
 
@@ -809,7 +845,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       return null;
 
     }
-    console.log(`[PlatformHomeSingleton] Got admin tier tenants:`, result.data)
+    // console.log(`[PlatformHomeSingleton] Got admin tier tenants:`, result.data)
 
     return result.data?.tenants || null;
   }
@@ -1133,16 +1169,49 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
 
   private async invalidateTierCaches(tierId: string) {
     // Use context-aware invalidation for tier system
-    // Clear admin, system, and tenant contexts since tier changes affect all levels
-    await this.invalidateCacheAcrossContexts('platform-tier-system-tiers', [AppContext.ADMIN, AppContext.SYSTEM, AppContext.TENANT], [CacheIsolation.ADMIN, CacheIsolation.TENANT, CacheIsolation.USER]);
+    // // Clear admin, system, and tenant contexts since tier changes affect all levels
+    // await this.invalidateCacheAcrossContexts('platform-tier-system-tiers', [AppContext.ADMIN, AppContext.SYSTEM, AppContext.TENANT], [CacheIsolation.ADMIN, CacheIsolation.TENANT, CacheIsolation.USER]);
     
-    // Also clear specific tier-based patterns
-    await this.invalidateCachePattern(`platform-tier-system-tiers-${tierId}*`);
-    await this.invalidateCachePattern('/api/admin/tiers/tiers*');
+    // // Also clear specific tier-based patterns
+    // await this.invalidateCachePattern(`platform-tier-system-tiers-${tierId}*`);
+    // await this.invalidateCachePattern('/api/admin/tiers/tiers*');
     
-    await this.refreshMaterializedView(undefined, true);
-  }
+    // await this.refreshMaterializedView(undefined, true);
 
+    // const cacheKeys = [
+    //   `platform-tenants`,
+    //   `platform-admin-tier-tenants`,
+    //   `platform-admin-tiers`,
+    //   `/api/featured-products/tenants/all-with-featured-access-status`,
+    //   `/api/admin/products/featuring/stats`,
+    //   `/api/admin/products/featured?limit=20&offset=0&is_active=true`,
+    //   `platform-tier-system-tiers`,
+    //   `/api/admin/tiers/tiers`,
+    //   `/api/featured-products/all-featured-products`
+    // ];
+
+    const cacheKeys = this.getTierCachePatterns();
+
+    for (const key of cacheKeys) {
+      await this.invalidateCacheWithContext(`${key}`);
+    }
+  }
+ /**
+   * PILOT: Get all tier cache patterns for this service
+   * Documents all tier cache keys that this service manages
+   */
+  private getTierCachePatterns(): string[] {
+    return [
+      `platform-tenants`,
+      `platform-admin-tier-tenants`,
+      `platform-admin-tiers`,
+      `/api/admin/tiers/tiers`,
+      `/api/featured-products/tenants/all-with-featured-access-status`,
+      `/api/admin/products/featuring/stats`,
+      `/api/admin/products/featured?limit=20&offset=0&is_active=true`,
+      `platform-tier-system-tiers`,
+    ];
+  }
   /**
    * Update tier
    */

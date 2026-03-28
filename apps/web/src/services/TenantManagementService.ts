@@ -210,7 +210,7 @@ class TenantManagementService extends TenantApiSingleton {
       if (response.data?.usage) {
         return response.data.usage;
       }
-      console.log('[TenantManagementService] No usage data found in response:', response.data);
+      // console.log('[TenantManagementService] No usage data found in response:', response.data);
 
       return response.data || null;
     } catch (error) {
@@ -439,7 +439,7 @@ class TenantManagementService extends TenantApiSingleton {
    * Updates both the dedicated special-hours endpoint and the profile
    */
   async updateSpecialBusinessHours(tenantId: string, overrides: any[]): Promise<any> {
-    console.log('[TenantManagementService] updateSpecialBusinessHours', tenantId, overrides);
+    // console.log('[TenantManagementService] updateSpecialBusinessHours', tenantId, overrides);
 
     // 1. Update via dedicated endpoint
     const result = await this.makeDefaultRequest(

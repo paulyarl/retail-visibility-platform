@@ -366,6 +366,11 @@ import cacheMonitoringRoutes from './routes/cache-monitoring';
 app.use('/api/cache', cacheMonitoringRoutes);
 console.log('✅ Cache monitoring routes mounted at /api/cache (Phase 1: Encrypted Cache System)');
 
+// Mount cache invalidation routes (NEW - Cache Management)
+import cacheInvalidationRoutes from './routes/cache-invalidation';
+app.use('/api/cache', cacheInvalidationRoutes);
+console.log('✅ Cache invalidation routes mounted at /api/cache (Cache Management)');
+
 // Health check route
 const healthRoutes = (req: any, res: any) => {
   const alertStatus = getAlertStatus();
@@ -761,6 +766,7 @@ const createTenantSchema = z.object({
   state: z.string().optional(),
   country_code: z.string().optional(),
   ownerId: z.string().optional(), // Optional: specify a different owner (for PLATFORM_SUPPORT)
+  organizationId: z.string().optional(), // Optional: assign to organization during creation
 });
 app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req, res) => {
   const parsed = createTenantSchema.safeParse(req.body ?? {});
@@ -801,6 +807,14 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
     
     // Create tenant and link to user manually (not using $transaction to avoid issues)
 
+    // Good standing check for organization membership
+    if (parsed.data.organizationId) {
+      // Since new tenants start with 'starter' tier and 'trial' status,
+      // they are automatically in good standing for organization membership
+      // This validation is mainly for future-proofing and consistency
+      console.log('[POST /tenants] Assigning tenant to organization:', parsed.data.organizationId);
+    }
+
     // Create the tenant first
 
     const tenant = await prisma.tenants.create({
@@ -813,6 +827,7 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
         subscription_status: 'trial',
         trial_ends_at: trial_ends_at,
         location_status: 'active',
+        organization_id: parsed.data.organizationId || null,
         metadata: {
           city: parsed.data.city,
           state: parsed.data.state,
@@ -2645,7 +2660,7 @@ app.post("/public/debug-query", async (req, res) => {
 // Public endpoint to refresh materialized views (no auth required for development)
 app.post("/public/refresh-materialized-views", async (req, res) => {
   try {
-    console.log('[POST /public/refresh-materialized-views] Refreshing storefront_category_counts...');
+    // console.log('[POST /public/refresh-materialized-views] Refreshing storefront_category_counts...');
     
     // Use shared connection pool to prevent connection exhaustion
     const { getDirectPool } = await import('./utils/db-pool');

@@ -191,12 +191,18 @@ router.get('/featured-products', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'tenant_id_required' });
     }
 
-    // Get tenant information
+    // Get tenant information with organization
     const tenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
         subscription_tier: true,
         subscription_status: true,
+        organization_id: true,
+        organizations_list: {
+          select: {
+            subscription_tier: true,
+          }
+        }
       },
     });
 
@@ -204,28 +210,86 @@ router.get('/featured-products', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'tenant_not_found' });
     }
 
-    // Get limits from database based on tenant's actual tier
-    const tierLimits = await prisma.subscription_tiers_list.findUnique({
-      where: { tier_key: tenant.subscription_tier || 'starter' },
-      select: {
-        featured_store_selection: true,
-        featured_new_arrival: true,
-        featured_seasonal: true,
-        featured_sale: true,
-        featured_staff_pick: true,
-        featured_bestseller: true,
-        featured_clearance: true,
-        featured_trending: true,
-        featured_featured: true,
-        featured_recommended: true
-      }
-    });
+    // Get limits from BOTH tenant tier and organization tier
+    const [tenantTierLimits, orgTierLimits] = await Promise.all([
+      // Tenant's own tier limits
+      prisma.subscription_tiers_list.findUnique({
+        where: { tier_key: tenant.subscription_tier || 'starter' },
+      }),
+      // Organization's tier limits (if exists)
+      tenant.organization_id 
+        ? prisma.subscription_tiers_list.findUnique({
+            where: { tier_key: tenant.organizations_list?.subscription_tier || 'starter' },
+          })
+        : null
+    ]);
 
-    if (!tierLimits) {
-      return res.status(404).json({ error: 'tier_limits_not_found' });
-    }
+    // Use the MAX of tenant tier and DISTRIBUTED organization tier limits
+    const tierLimits = {
+      featured_store_selection: Math.max(
+        tenantTierLimits?.featured_store_selection || 0,
+        // Distribute organization limits equally across all possible locations
+        orgTierLimits?.featured_store_selection && orgTierLimits?.max_locations
+          ? Math.floor(orgTierLimits.featured_store_selection / orgTierLimits.max_locations)
+          : 0
+      ),
+      featured_new_arrival: Math.max(
+        tenantTierLimits?.featured_new_arrival || 0,
+        orgTierLimits?.featured_new_arrival && orgTierLimits?.max_locations
+          ? Math.floor(orgTierLimits.featured_new_arrival / orgTierLimits.max_locations)
+          : 0
+      ),
+      featured_seasonal: Math.max(
+        tenantTierLimits?.featured_seasonal || 0,
+        orgTierLimits?.featured_seasonal && orgTierLimits?.max_locations
+          ? Math.floor(orgTierLimits.featured_seasonal / orgTierLimits.max_locations)
+          : 0
+      ),
+      featured_sale: Math.max(
+        tenantTierLimits?.featured_sale || 0,
+        orgTierLimits?.featured_sale && orgTierLimits?.max_locations
+          ? Math.floor(orgTierLimits.featured_sale / orgTierLimits.max_locations)
+          : 0
+      ),
+      featured_staff_pick: Math.max(
+        tenantTierLimits?.featured_staff_pick || 0,
+        orgTierLimits?.featured_staff_pick && orgTierLimits?.max_locations
+          ? Math.floor(orgTierLimits.featured_staff_pick / orgTierLimits.max_locations)
+          : 0
+      ),
+      featured_bestseller: Math.max(
+        tenantTierLimits?.featured_bestseller || 0,
+        orgTierLimits?.featured_bestseller && orgTierLimits?.max_locations
+          ? Math.floor(orgTierLimits.featured_bestseller / orgTierLimits.max_locations)
+          : 0
+      ),
+      featured_clearance: Math.max(
+        tenantTierLimits?.featured_clearance || 0,
+        orgTierLimits?.featured_clearance && orgTierLimits?.max_locations
+          ? Math.floor(orgTierLimits.featured_clearance / orgTierLimits.max_locations)
+          : 0
+      ),
+      featured_trending: Math.max(
+        tenantTierLimits?.featured_trending || 0,
+        orgTierLimits?.featured_trending && orgTierLimits?.max_locations
+          ? Math.floor(orgTierLimits.featured_trending / orgTierLimits.max_locations)
+          : 0
+      ),
+      featured_featured: Math.max(
+        tenantTierLimits?.featured_featured || 0,
+        orgTierLimits?.featured_featured && orgTierLimits?.max_locations
+          ? Math.floor(orgTierLimits.featured_featured / orgTierLimits.max_locations)
+          : 0
+      ),
+      featured_recommended: Math.max(
+        tenantTierLimits?.featured_recommended || 0,
+        orgTierLimits?.featured_recommended && orgTierLimits?.max_locations
+          ? Math.floor(orgTierLimits.featured_recommended / orgTierLimits.max_locations)
+          : 0
+      ),
+    };
 
-    // Convert database columns to expected format
+    // Convert to expected format
     const limits = {
       store_selection: tierLimits.featured_store_selection || 0,
       new_arrival: tierLimits.featured_new_arrival || 0,

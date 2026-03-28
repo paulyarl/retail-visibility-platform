@@ -26,11 +26,11 @@ export async function runCacheInvalidationTest() {
     try {
       // Test getServiceCachePatterns
       const patterns = test.service.getServiceCachePatterns();
-      console.log(`    ✅ getServiceCachePatterns: ${patterns.length} patterns found`);
+      // console.log(`    ✅ getServiceCachePatterns: ${patterns.length} patterns found`);
       patterns.forEach(pattern => console.log(`       - ${pattern}`));
       
       // Test invalidateServiceCaches method exists
-      console.log(`    ✅ invalidateServiceCaches: Method exists`);
+      // console.log(`    ✅ invalidateServiceCaches: Method exists`);
       
       results.push({
         test: 'Service Contracts',
@@ -53,7 +53,7 @@ export async function runCacheInvalidationTest() {
   }
 
   // Test 2: Cache Invalidation Functionality
-  console.log('\n🗑️  2. Testing Cache Invalidation Functionality:');
+  // console.log('\n🗑️  2. Testing Cache Invalidation Functionality:');
   
   for (const test of testServices) {
     console.log(`  🧪 Testing ${test.name} invalidation:`);

@@ -300,26 +300,26 @@ export abstract class UniversalSingleton {
   protected async clearCache(key?: string): Promise<void> {
     try {
       // Clear memory cache
-      // console.log(`[${this.constructor.name}] ----------------------------------------`);
-      // console.log(`[${this.constructor.name}] start         : clearCache`);
-      // console.log(`[${this.constructor.name}] key           : ${key}`);
-      // console.log(`[${this.constructor.name}] end           : clearCache  `);
+      console.log(`[${this.constructor.name}] ----------------------------------------`);
+      console.log(`[${this.constructor.name}] start         : clearCache`);
+      console.log(`[${this.constructor.name}] key           : ${key}`);
+      console.log(`[${this.constructor.name}] end           : clearCache  `);
       
       if (key) {
         this.cache.delete(key);
-        // console.log(`[${this.constructor.name}] Memory cache cleared for key: ${key}`);
+        console.log(`[${this.constructor.name}] Memory cache cleared for key: ${key}`);
       } else {
         this.cache.clear();
-        // console.log(`[${this.constructor.name}] Memory cache cleared for all keys`);
+        console.log(`[${this.constructor.name}] Memory cache cleared for all keys`);
       }
      
       // Clear persistent cache
       if (key) {
         await this.cacheManager.remove(key);
-        // console.log(`[${this.constructor.name}] Persistent cache cleared for key: ${key}`);
+        console.log(`[${this.constructor.name}] Persistent cache cleared for key: ${key}`);
       } else {
         await this.cacheManager.clear();
-        // console.log(`[${this.constructor.name}] Persistent cache cleared for all keys`);
+        console.log(`[${this.constructor.name}] Persistent cache cleared for all keys`);
       }
     } catch (error) {
       console.warn(`[${this.constructor.name}] Cache clear failed:`, error);
@@ -444,18 +444,28 @@ export abstract class UniversalSingleton {
    */
   protected async invalidateCachePattern(pattern: string): Promise<void> {
     try {
-        // console.log(`[${this.constructor.name}] ----------------------------------------`);
-        // console.log(`[${this.constructor.name}] start         : invalidateCachePattern`);
-        // console.log(`[${this.constructor.name}] pattern       : ${pattern}`);
-        // console.log(`[${this.constructor.name}] end           : invalidateCachePattern  `);
+        console.log(`[${this.constructor.name}] ----------------------------------------`);
+        console.log(`[${this.constructor.name}] start         : invalidateCachePattern`);
+        console.log(`[${this.constructor.name}] pattern       : ${pattern}`);
+        console.log(`[${this.constructor.name}] end           : invalidateCachePattern  `);
       
-      // Handle wildcard patterns
+      // Get context and isolation from base class defaults
+      const context = (this as any).defaultContext;
+      const isolation = (this as any).defaultIsolation;
+      
+      console.log(`[${this.constructor.name}] 🎯 Using context: ${context}, isolation: ${isolation}`);
+      
+      // Always use the enhanced parallel invalidation for both patterns and exact keys
+      // This ensures both IndexedDB and localStorage are invalidated reliably
       if (pattern.includes('*')) {
-        // Use the new removeByPattern method that scans all storage layers
-        await this.cacheManager.removeByPattern(pattern);
+        console.log(`[${this.constructor.name}] 🎯 Using pattern-based invalidation for: ${pattern}`);
+        // Use the new removeByPattern method that scans all storage layers with context
+        await this.cacheManager.removeByPattern(pattern, context, isolation);
       } else {
-        // Exact match or context-aware key - use clearCache
-        await this.clearCache(pattern);
+        console.log(`[${this.constructor.name}] 🎯 Using exact-key invalidation for: ${pattern}`);
+        // For exact keys, we still want to use the enhanced parallel invalidation
+        // Convert exact key to pattern by adding * to match the key itself
+        await this.cacheManager.removeByPattern(pattern, context, isolation);
       }
     } catch (error) {
       console.warn(`[${this.constructor.name}] Enhanced cache invalidation failed for pattern '${pattern}':`, error);
@@ -482,11 +492,11 @@ export abstract class UniversalSingleton {
     try {
       let pattern = baseKey;
 
-      // console.log(`[${this.constructor.name}] ----------------------------------------`);
-      // console.log(`[${this.constructor.name}] start         : invalidateCacheWithContext`);
-      // console.log(`[${this.constructor.name}] baseKey       : ${baseKey}`);
-      // console.log(`[${this.constructor.name}] context       : ${context}`);
-      // console.log(`[${this.constructor.name}] isolation     : ${isolation}`);
+      console.log(`[${this.constructor.name}] ----------------------------------------`);
+      console.log(`[${this.constructor.name}] start         : invalidateCacheWithContext`);
+      console.log(`[${this.constructor.name}] baseKey       : ${baseKey}`);
+      console.log(`[${this.constructor.name}] context       : ${context}`);
+      console.log(`[${this.constructor.name}] isolation     : ${isolation}`);
       
       // Check if baseKey already contains context:isolation format
       const keyParts = baseKey.split(':');
@@ -532,8 +542,8 @@ export abstract class UniversalSingleton {
         }
       }
       
-      // console.log(`[${this.constructor.name}] end           : invalidateCacheWithContext  `);
-      // console.log(`[${this.constructor.name}] Pattern       : ${pattern}`);
+      console.log(`[${this.constructor.name}] end           : invalidateCacheWithContext  `);
+      console.log(`[${this.constructor.name}] Pattern       : ${pattern}`);
       
       await this.invalidateCachePattern(pattern);
     } catch (error) {
@@ -553,12 +563,12 @@ export abstract class UniversalSingleton {
     isolations?: CacheIsolation[]
   ): Promise<void> {
     try {
-      // console.log(`[${this.constructor.name}] ----------------------------------------`);
-      // console.log(`[${this.constructor.name}] start         : invalidateCacheAcrossContexts`);
-      // console.log(`[${this.constructor.name}] baseKey       : ${baseKey}`);
-      // console.log(`[${this.constructor.name}] contexts      : ${contexts}`);
-      // console.log(`[${this.constructor.name}] isolations    : ${isolations}`);
-      // console.log(`[${this.constructor.name}] end           : invalidateCacheAcrossContexts  `);
+      console.log(`[${this.constructor.name}] ----------------------------------------`);
+      console.log(`[${this.constructor.name}] start         : invalidateCacheAcrossContexts`);
+      console.log(`[${this.constructor.name}] baseKey       : ${baseKey}`);
+      console.log(`[${this.constructor.name}] contexts      : ${contexts}`);
+      console.log(`[${this.constructor.name}] isolations    : ${isolations}`);
+      console.log(`[${this.constructor.name}] end           : invalidateCacheAcrossContexts  `);
       
       // Use base class defaults for backward compatibility
       if (!contexts || contexts.length === 0) {

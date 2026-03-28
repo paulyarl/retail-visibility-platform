@@ -75,7 +75,7 @@ export class AdminFeaturedApprovalService extends AdminApiSingleton {
    * Get all tenants with featured access status
    */
   async getAllTenantsWithFeaturedAccessStatus(): Promise<PendingTenant[]> {
-    console.log('[DEBUG] AdminFeaturedApprovalService: Fetching all tenants with featured access status...');
+    // console.log('[DEBUG] AdminFeaturedApprovalService: Fetching all tenants with featured access status...');
     const result = await this.makeDefaultRequest<{ tenants: PendingTenant[] }>(
       '/api/featured-products/tenants/all-with-featured-access-status',
       {},
@@ -83,8 +83,8 @@ export class AdminFeaturedApprovalService extends AdminApiSingleton {
     );
     
     const tenants = result.data.tenants || [];
-    console.log('[DEBUG] AdminFeaturedApprovalService: API returned tenants:', tenants.length);
-    console.log('[DEBUG] AdminFeaturedApprovalService: Raw tenant data:', tenants);
+    // console.log('[DEBUG] AdminFeaturedApprovalService: API returned tenants:', tenants.length);
+    // console.log('[DEBUG] AdminFeaturedApprovalService: Raw tenant data:', tenants);
     
     return tenants;
   }
@@ -266,7 +266,7 @@ export class AdminFeaturedApprovalService extends AdminApiSingleton {
    * Approve a product
    */
   async approveProduct(productId: string): Promise<any> {
-    console.log('[AdminFeaturedApprovalService] Approving product:', productId);
+    // console.log('[AdminFeaturedApprovalService] Approving product:', productId);
     const result = await this.makeDefaultRequest<{ featuredProduct: any }>(
       `/api/featured-products/${productId}/approve`,
       {
@@ -278,8 +278,8 @@ export class AdminFeaturedApprovalService extends AdminApiSingleton {
       },
       `admin-approval-product-${productId}`
     );
-    console.log('[AdminFeaturedApprovalService] Approve result:', result);
-    console.log('[AdminFeaturedApprovalService] Result data:', result.data);
+    // console.log('[AdminFeaturedApprovalService] Approve result:', result);
+    // console.log('[AdminFeaturedApprovalService] Result data:', result.data);
     
     if (!result.success) {
       console.log(`Failed to approve product: ${result.error}`);
@@ -289,7 +289,7 @@ export class AdminFeaturedApprovalService extends AdminApiSingleton {
     // The API returns { message, featuredProduct } 
     // makeDefaultRequest wraps it in result.data
     const featuredProduct = result.data?.featuredProduct;
-    console.log('[AdminFeaturedApprovalService] Extracted featuredProduct:', featuredProduct);
+    // console.log('[AdminFeaturedApprovalService] Extracted featuredProduct:', featuredProduct);
     
     // Invalidate relevant caches
     await this.invalidateCache('admin-approval-pending-products');
@@ -301,7 +301,7 @@ export class AdminFeaturedApprovalService extends AdminApiSingleton {
    * Reject a product
    */
   async rejectProduct(productId: string, reason?: string): Promise<any> {
-    console.log('[AdminFeaturedApprovalService] Rejecting product:', productId, 'reason:', reason);
+    // console.log('[AdminFeaturedApprovalService] Rejecting product:', productId, 'reason:', reason);
     const result = await this.makeDefaultRequest<{ featuredProduct: any }>(
       `/api/featured-products/${productId}/reject`,
       {
@@ -313,9 +313,9 @@ export class AdminFeaturedApprovalService extends AdminApiSingleton {
       },
       `admin-rejection-product-${productId}`
     );
-    console.log('[AdminFeaturedApprovalService] Reject result:', result);
-    console.log('[AdminFeaturedApprovalService] Result data:', result.data);
-    console.log('[AdminFeaturedApprovalService] Result success:', result.success);
+    // console.log('[AdminFeaturedApprovalService] Reject result:', result);
+    // console.log('[AdminFeaturedApprovalService] Result data:', result.data);
+    // console.log('[AdminFeaturedApprovalService] Result success:', result.success);
     
     if (!result.success) {
       console.log(`Failed to reject product: ${result.error}`);
@@ -325,7 +325,7 @@ export class AdminFeaturedApprovalService extends AdminApiSingleton {
     // The API returns { message, featuredProduct, reason } 
     // makeDefaultRequest wraps it in result.data
     const featuredProduct = result.data?.featuredProduct;
-    console.log('[AdminFeaturedApprovalService] Extracted featuredProduct:', featuredProduct);
+    // console.log('[AdminFeaturedApprovalService] Extracted featuredProduct:', featuredProduct);
     
     // Invalidate relevant caches
     await this.invalidateCache('admin-approval-pending-products');

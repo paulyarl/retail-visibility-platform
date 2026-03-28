@@ -54,11 +54,11 @@ function SimpleTierBadge({ tier }: { tier: string }) {
 }
 
 export default function AdminTenantFeaturedManagement({ selectedTenant, setSelectedTenant, pendingTenants = [] }: AdminTenantFeaturedManagementProps) {
-  console.log('[DEBUG] AdminTenantFeaturedManagement rendered:', {
-    selectedTenant,
-    pendingTenantsCount: pendingTenants.length,
-    pendingTenants: pendingTenants.map(t => ({ id: t.id, name: t.name, featured_access_approved: t.featured_access_approved }))
-  });
+  // console.log('[DEBUG] AdminTenantFeaturedManagement rendered:', {
+  //   selectedTenant,
+  //   pendingTenantsCount: pendingTenants.length,
+  //   pendingTenants: pendingTenants.map(t => ({ id: t.id, name: t.name, featured_access_approved: t.featured_access_approved }))
+  // });
   
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);

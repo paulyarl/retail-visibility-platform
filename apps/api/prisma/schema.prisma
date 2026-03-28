@@ -1407,6 +1407,8 @@ model tenants {
   featured_access_approved_by      String?
   featured_access_approved_at      DateTime?                          @db.Timestamp(6)
   featured_access_rejection_reason String?
+  updated_at                       DateTime?                          @default(now()) @db.Timestamp(6)
+  tier_updated_at                  DateTime?                          @default(now()) @db.Timestamp(6)
   business_hours_list              business_hours_list?
   business_hours_special_list      business_hours_special_list[]
   category_mirror_runs             category_mirror_runs[]
