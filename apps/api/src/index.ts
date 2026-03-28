@@ -756,6 +756,10 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
 
 const createTenantSchema = z.object({ 
   name: z.string().min(1),
+  slug: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  country_code: z.string().optional(),
   ownerId: z.string().optional(), // Optional: specify a different owner (for PLATFORM_SUPPORT)
 });
 app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req, res) => {
@@ -803,10 +807,17 @@ app.post("/api/tenants", authenticateToken, checkTenantCreationLimit, async (req
       data: {
         id: generateTenantId(),
         name: parsed.data.name,
+        slug: parsed.data.slug,
+        created_by: req.user?.userId || null, // Optional field - null if user not authenticated
         subscription_tier: 'starter',
         subscription_status: 'trial',
         trial_ends_at: trial_ends_at,
-        created_by: req.user?.userId || null, // Optional field - null if user not authenticated
+        location_status: 'active',
+        metadata: {
+          city: parsed.data.city,
+          state: parsed.data.state,
+          country_code: parsed.data.country_code,
+        }
       }
     });
 

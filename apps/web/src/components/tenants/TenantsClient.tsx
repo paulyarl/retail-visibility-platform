@@ -75,7 +75,7 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [chainFilter, setChainFilter] = useState<'all' | 'chain' | 'standalone'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'active' | 'inactive' | 'closed' | 'archived'>('active');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'active' | 'inactive' | 'closed' | 'archived' | 'trial'>('active');
   
   // View mode toggle
   // Important for hydration: default to 'grid' on both server and initial client render,
@@ -164,7 +164,10 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
         (chainFilter === 'chain' && t.organization) ||
         (chainFilter === 'standalone' && !t.organization);
       const matchesStatus = statusFilter === 'all' || 
-        (t.locationStatus || 'active') === statusFilter;
+        (statusFilter === 'trial' && t.subscriptionStatus === 'trial') ||
+        (statusFilter === 'active' && ((t.locationStatus || 'active') === 'active' || t.subscriptionStatus === 'trial')) ||
+        ((statusFilter === 'pending' || statusFilter === 'inactive' || statusFilter === 'closed' || statusFilter === 'archived') && (t.locationStatus || 'active') === statusFilter);
+      
       return matchesSearch && matchesChain && matchesStatus;
     });
     
@@ -178,10 +181,10 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     return filteredTenants.slice(startIndex, endIndex);
   }, [filteredTenants, currentPage, pageSize]);
 
-  // Reset to page 1 when status filter changes and reload tenants
+  // Reset to page 1 when status filter changes (client-side filtering only)
   useEffect(() => {
     setCurrentPage(1);
-    refresh();
+    // No automatic refresh - rely on client-side filtering
   }, [statusFilter]);
 
   // Reset to page 1 when search or chain filter changes (client-side only)
@@ -189,18 +192,19 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     setCurrentPage(1);
   }, [searchQuery, chainFilter]);
 
-  // Initial data load
+  // Initial data load - get all tenants for client-side filtering
   useEffect(() => {
-    refresh();
+    console.log('[TenantsClient] Initial data load - getting all tenants');
+    fetchTenants(true); // Get all tenants including archived for complete client-side filtering
   }, []);
 
   const fetchTenants = async (includeArchived = false, statusParam?: string) => {
-    //console.log('[TenantsClient] fetchTenants called', { includeArchived, statusParam });
+    console.log('[TenantsClient] fetchTenants called:', { includeArchived, statusParam });
     setLoading(true);
     setError(null);
     try {
       const tenants = await platformHomeService.getTenants();
-      //console.log('[TenantsClient] Raw tenants data:', tenants);
+      console.log('[TenantsClient] Raw tenants from API:', tenants?.length, tenants?.map(t => ({ name: t.name, subscriptionStatus: t.subscriptionStatus })));
       
       // Filter tenants based on parameters
       let filteredTenants = tenants || [];
@@ -244,6 +248,9 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
     } else if (statusFilter === 'archived') {
       // 'archived' filter: include archived and filter to archived status
       await fetchTenants(true, 'archived');
+    } else if (statusFilter === 'trial') {
+      // 'trial' filter: get all tenants and filter client-side by subscriptionStatus
+      await fetchTenants(true);
     } else {
       // Specific status filter: don't include archived, filter to specific status
       await fetchTenants(false, statusFilter);
@@ -268,10 +275,13 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       }
       
       const newTenant = responseData as Tenant;
-      //console.log('[TenantsClient] Tenant created:', newTenant.id);
+      console.log('[TenantsClient] Tenant created:', newTenant.id);
       
-      // Refresh tenant list to get the new tenant
-      await refresh();
+      // Immediately add the new tenant to the list for instant UI update
+      setTenants(prev => [...prev, newTenant]);
+      
+      // Also refresh in background to ensure consistency
+      refresh().catch(console.error);
       
       // If this was from onboarding flow, redirect to profile page
       if (hasOnboardingData) {
@@ -541,6 +551,13 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
                     ✅ Active
                   </Button>
                   <Button
+                    variant={statusFilter === 'trial' ? 'filled' : 'light'}
+                    size="sm"
+                    onClick={() => setStatusFilter('trial')}
+                  >
+                    🧪 Trial
+                  </Button>
+                  <Button
                     variant={statusFilter === 'inactive' ? 'filled' : 'light'}
                     size="sm"
                     onClick={() => setStatusFilter('inactive')}
@@ -717,7 +734,7 @@ function TenantRow({ tenant, index, onSelect, onViewItems, onEditProfile, onRena
   onDelete: () => void;
   onStatusChange: (tenant: Tenant) => void;
   onRefresh: (includeArchived?: boolean, statusParam?: string) => void;
-  statusFilter?: 'all' | 'pending' | 'active' | 'inactive' | 'closed' | 'archived';
+  statusFilter?: 'all' | 'pending' | 'active' | 'inactive' | 'closed' | 'archived' | 'trial';
   canEdit?: boolean;
   canRename?: boolean;
   canDelete?: boolean;

@@ -143,8 +143,8 @@ const buildAdminNavItems = (): NavItem[] => [
     icon: <Icon.Chart />,
     href: '/settings/admin/tier-system',
     children: [
-      { label: 'Tier System',  href: '/settings/admin/tier-system' },
-      { label: 'Tenant Tiers', href: '/settings/admin/tiers' },
+      { label: 'Tier Management',  href: '/settings/admin/tier-system' },
+      { label: 'Tenant Tier Mgmt', href: '/settings/admin/tiers' },
       { label: 'Billing',      href: '/settings/admin/billing' },
     ],
   },
