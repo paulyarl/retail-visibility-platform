@@ -482,7 +482,15 @@ export class ProductSingleton extends PublicApiSingleton {
         imageUrl: product.imageUrl,
         availability: product.availability || 'in_stock',
         hasVariants: product.has_variants || false,
-        category: product.category,
+        // Create category object from direct fields (API returns categoryName, categorySlug directly)
+        category: product.categoryName ? {
+          id: product.googleCategoryId || '',
+          name: product.categoryName,
+          slug: product.categorySlug || '',
+          googleCategoryId: product.googleCategoryId,
+          description: undefined,
+          productCount: undefined
+        } : undefined,
         featuredType: product.featuredType,
         featuredPriority: product.featuredPriority,
         featuredAt: product.featuredAt,

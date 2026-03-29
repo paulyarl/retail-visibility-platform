@@ -43,15 +43,15 @@ async function getConsolidatedDirectoryData(identifier: string) {
         const isTenantId = /^tid-[a-z0-9]+$/i.test(identifier);
         
         if (isTenantId) {
-          console.log(`[Directory] Resolving tenant ID: ${identifier}`);
+          // console.log(`[Directory] Resolving tenant ID: ${identifier}`);
           const resolvedSlug = await tenantDirectoryService.getTenantSlug(identifier);
           
           if (resolvedSlug) {
-            console.log(`[Directory] Resolved to slug: ${resolvedSlug}`);
+            // console.log(`[Directory] Resolved to slug: ${resolvedSlug}`);
             const resolvedData = await directoryService.getDirectoryConsolidated(resolvedSlug);
             return resolvedData;
           } else {
-            console.error(`[Directory] Could not resolve tenant ID ${identifier} to slug`);
+            // console.error(`[Directory] Could not resolve tenant ID ${identifier} to slug`);
             return null;
           }
         } else {
@@ -65,10 +65,12 @@ async function getConsolidatedDirectoryData(identifier: string) {
       const isTenantId = /^tid-[a-z0-9]+$/i.test(identifier);
       
       if (isTenantId) {
+        // console.log(`[Directory] Resolving tenant ID: ${identifier}`);
         const resolvedSlug = await tenantDirectoryService.getTenantSlug(identifier);
+        // console.log(`[Directory] Resolved tenant ID to slug: ${resolvedSlug}`);
         
         if (!resolvedSlug) {
-          console.error(`[Directory] Could not resolve tenant ID ${identifier} to slug`);
+          // console.error(`[Directory] Could not resolve tenant ID ${identifier} to slug`);
           return null;
         }
         
@@ -336,7 +338,9 @@ async function getUserLocation(): Promise<{
 
 export async function generateMetadata({ params }: StoreDetailPageProps): Promise<Metadata> {
   const { slug: identifier } = await params;
+  // console.log(`[Directory] Generating metadata for identifier: ${identifier}`);
   const consolidatedData = await getConsolidatedDirectoryData(identifier);
+  // console.log(`[Directory] Consolidated data:`, consolidatedData);
 
   if (!consolidatedData?.listing) {
     return {
@@ -370,7 +374,9 @@ export async function generateMetadata({ params }: StoreDetailPageProps): Promis
 
 export default async function StoreDetailPage({ params }: StoreDetailPageProps) {
   const { slug: identifier } = await params;
+  // console.log(`[Directory] Fetching data for identifier: ${identifier}`);
   const consolidatedData = await getConsolidatedDirectoryData(identifier);
+  // console.log(`[Directory] Consolidated data:`, consolidatedData);
 
   if (!consolidatedData?.listing) {
     notFound();
@@ -828,3 +834,4 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
     </>
   );
 }
+

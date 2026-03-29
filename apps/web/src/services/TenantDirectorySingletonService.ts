@@ -86,6 +86,7 @@ class TenantDirectorySingletonService extends PublicApiSingleton {
         const result = await this.makeDefaultRequest<{ slug: string }>(`/directory/tenant/${tenantId}`, {
           method: 'GET'
         });
+        console.log('[TenantDirectorySingleton] SSR tenant slug result:', result);
         
         return result.data?.slug;
       } catch (error) {

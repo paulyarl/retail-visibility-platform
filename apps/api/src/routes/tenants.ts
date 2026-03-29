@@ -131,6 +131,12 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
       });
       tenants = userTenants.map(ut => ut.tenants);
     }
+     // Check if tenant has published directory listing
+    // const directoryResult = await prisma.$queryRaw`
+    //   SELECT is_published FROM "directory_settings_list" WHERE tenant_id = ${tenant.id}
+    // `;
+    // const hasPublishedDirectory = directoryResult && (directoryResult as any[])?.[0]?.is_published === true;
+
 
     // Transform for frontend compatibility
     const transformedTenants = tenants.map((tenant: any) => ({
@@ -142,6 +148,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
       trialEndsAt: tenant.trial_ends_at,
       subscriptionEndsAt: tenant.subscription_ends_at,
       createdAt: tenant.created_at,
+      // hasPublishedDirectory: hasPublishedDirectory,
       organization: tenant.organizations_list ? {
         id: tenant.organizations_list.id,
         name: tenant.organizations_list.name,
@@ -237,6 +244,16 @@ router.patch('/:id', authenticateToken, requirePlatformAdmin, async (req: Reques
       subscription_tier: updatedTenant.subscription_tier,
       subscription_status: updatedTenant.subscription_status,
     });
+     // Check if tenant has published directory listing
+    const tenantResult = await prisma.directory_settings_list.findUnique({
+        where: { tenant_id: updatedTenant.id },
+        select: {
+          is_published: true
+        }
+      });
+
+      const hasDirectory = tenantResult?.is_published === true;
+
 
     // Transform response for frontend compatibility
     const transformedTenant = {
@@ -247,6 +264,7 @@ router.patch('/:id', authenticateToken, requirePlatformAdmin, async (req: Reques
       subscriptionStatus: updatedTenant.subscription_status,
       locationStatus: updatedTenant.location_status,
       createdAt: updatedTenant.created_at,
+      hasPublishedDirectory: hasDirectory,
     };
 
     console.log('[PATCH /api/tenants/:id] Returning transformed response:', transformedTenant);
@@ -333,10 +351,15 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
     const hasActivePaymentGateway = (tenant as any).payment_gateways?.length > 0;
 
     // Check if tenant has published directory listing
-    const directoryResult = await prisma.$queryRaw`
-      SELECT is_published FROM "directory_settings_list" WHERE tenant_id = ${tenant.id}
-    `;
-    const hasPublishedDirectory = (directoryResult as any[])?.[0]?.is_published === true;
+
+     const tenantResult = await prisma.directory_settings_list.findUnique({
+        where: { tenant_id: id },
+        select: {
+          is_published: true
+        }
+      });
+
+      const hasDirectory = tenantResult?.is_published === true;
 
     // Transform for frontend compatibility
     const transformedTenant = {
@@ -354,7 +377,7 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
       subscriptionEndsAt: tenant.subscription_ends_at,
       createdAt: tenant.created_at,
       locationStatus: tenant.location_status,
-      hasPublishedDirectory,
+      hasPublishedDirectory: hasDirectory,
       statusInfo: getLocationStatusInfo(tenant.location_status as any),
       logoUrl: (tenant as any).tenant_business_profiles_list?.logo_url || null,
       hasActivePaymentGateway,
@@ -749,7 +772,15 @@ router.get('/:id/complete', authenticateToken, checkTenantAccess, async (req: Re
       console.warn(`[TENANTS] Could not fetch usage info for ${id}:`, usageError);
       // Continue without usage data rather than failing the whole request
     }
+ // Check if tenant has published directory listing
+    const tenantResult = await prisma.directory_settings_list.findUnique({
+        where: { tenant_id: id },
+        select: {
+          is_published: true
+        }
+      });
 
+      const hasDirectory = tenantResult?.is_published === true;
     // Transform response for frontend compatibility
     const transformedResponse = {
       tenant: {
@@ -762,6 +793,7 @@ router.get('/:id/complete', authenticateToken, checkTenantAccess, async (req: Re
         subdomain: tenant.subdomain,
         createdAt: tenant.created_at,
         logoUrl: (tenant as any).tenant_business_profiles_list?.logo_url || null,
+        hasPublishedDirectory: hasDirectory,
         statusInfo: getLocationStatusInfo(tenant.location_status as any),
         stats: {
           productCount: usageInfo?.totalItems || 0,

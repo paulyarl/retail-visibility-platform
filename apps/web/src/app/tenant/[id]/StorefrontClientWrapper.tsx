@@ -164,7 +164,7 @@ export default function StorefrontClientWrapper({
         
         // Validate cache: if data is empty, force a fresh fetch
         if (data && data.totalCount === 0 && (!data.buckets || data.buckets.length === 0)) {
-          console.warn('[StorefrontClientWrapper] Detected empty cached data, forcing fresh fetch');
+          // console.warn('[StorefrontClientWrapper] Detected empty cached data, forcing fresh fetch');
           // Clear cache and fetch fresh data
           await featuredProductsSingleton.clearCache();
           data = await featuredProductsSingleton.getAllFeaturedProducts(tenantId, 20);
@@ -736,8 +736,8 @@ export default function StorefrontClientWrapper({
             {/* Enhanced Product Display */}
             <EnhancedProductDisplay
               products={products}
-              tenantId={tenantId}
-              tenantName={businessName}
+              tenantId={tenantId} 
+              tenantSlug={tenant.slug}
               tenantLogo={tenant.metadata?.logo_url}
               hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
               defaultGatewayType={tenant.metadata?.defaultGatewayType}
@@ -931,6 +931,8 @@ export default function StorefrontClientWrapper({
             categories={categories}
             totalProducts={totalItems || 0}
             productsLength={products.length}
+            tenantSlug={tenant.slug}
+            tenantLogo={tenant.metadata?.logo_url}
             totalPages={totalPages || 1}
             currentPage={currentPage || 1}
             search={search}

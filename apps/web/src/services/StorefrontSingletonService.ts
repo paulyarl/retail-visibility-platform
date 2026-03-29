@@ -26,8 +26,20 @@ export interface StorefrontProduct {
   price: number;
   currency: string;
   imageUrl?: string;
+  category?: string;
+  subcategory?: string;
   payment_gateway_type?: string | null;
   has_active_payment_gateway?: boolean;
+  isActive?: boolean;
+  isFeatured?: boolean;
+  isArchived?: boolean;
+  isAvailable?: boolean;
+  isDeleted?: boolean;
+  isPublished?: boolean;
+  isHidden?: boolean;
+  isDraft?: boolean;
+  isInactive?: boolean;
+
   // Enhanced fields from new API
   imageGallery?: Array<{
     id: string;
@@ -60,6 +72,8 @@ export interface StorefrontProduct {
   licenseType?: string;
   accessDurationDays?: number;
   downloadLimit?: number;
+  isOnSale?: boolean;
+  discountPercentage?: number;
   [key: string]: any;
 }
 
@@ -393,4 +407,4 @@ class StorefrontSingletonService extends PublicApiSingleton {
 }
 
 // Export singleton instance
-export const storefrontService = StorefrontSingletonService.getInstance();
+export const storefrontSingletonService = StorefrontSingletonService.getInstance();

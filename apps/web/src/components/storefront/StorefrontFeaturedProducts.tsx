@@ -5,7 +5,7 @@ import { Package, Calendar, DollarSign, Star, Tag, Grid, List, TrendingUp, Award
 import Link from 'next/link';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { Button } from '@/components/ui/Button';
-import { storefrontService } from '@/services/StorefrontSingletonService';
+import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 
 interface FeaturedProduct {
@@ -793,13 +793,34 @@ export default function StorefrontFeaturedProducts({
           return;
         }
         
-        // Use StorefrontSingletonService for backend API call with caching
-        const data = await storefrontService.getFeaturedProducts(tenantId, { limit: 50 });
+        // Use the correct API endpoint that has category data
+        const response = await fetch(`/api/public/products?tenantId=${tenantId}&limit=50`, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store', // We'll handle caching in the component
+        });
+        
+        const data = await response.json();
+        
+        // Debug: Log what the API actually returns
+        console.log('[StorefrontFeaturedProducts] API Response:', {
+          success: data.success,
+          count: data.products?.length || 0,
+          sample: data.products?.slice(0, 2).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            categoryName: p.categoryName,
+            categorySlug: p.categorySlug,
+            allFields: Object.keys(p)
+          }))
+        });
+        
         //console.log(`ShopsFeaturedProducts data:`, data);
         
-        if (data.items && isMounted) {
+        if (data.products && isMounted) {
           // Transform the data to match the expected format with all rich fields
-          const transformedProducts = data.items.map((product: any) => ({
+          const transformedProducts = data.products.map((product: any) => ({
             // Basic product info
             id: product.id,
             sku: product.sku,

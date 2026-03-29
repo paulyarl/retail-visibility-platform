@@ -30,11 +30,14 @@ import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeatur
 import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalogSidebar';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { platformSettingsService } from '@/services/PlatformSettingsSingletonService';
-import { storefrontService } from '@/services/StorefrontSingletonService';
+import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
+// import  storefrontService  from '@/services/StorefrontService';
 import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import StorefrontClientWrapper from './StorefrontClientWrapper';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
+import { publicTenantInfoService} from '@/services/PublicTenantInfoService';
+import ProductDataService from '@/services/ProductDataService';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -48,6 +51,11 @@ interface Product {
   description?: string;
   price: number;
   currency: string;
+  slug: string;
+  category: string;
+  subcategory: string;
+  tags: string[];
+  attributes: Record<string, any>;
   stock: number;
   imageUrl?: string;
   availability: 'in_stock' | 'out_of_stock' | 'preorder';
@@ -58,6 +66,7 @@ interface Product {
   product_review_count?: number;
   product_helpful_count?: number;
   product_review_approved?: number;
+
   // Enhanced fields from new API
   imageGallery?: Array<{
     id: string;
@@ -96,6 +105,17 @@ interface Tenant {
   id: string;
   name: string;
   subscriptionTier?: string;
+  slug: string;
+  description?: string;
+  logoUrl?: string;
+  bannerUrl?: string;
+  socialLinks?: {
+    facebook?: string;
+    instagram?: string;
+    twitter?: string;
+    linkedin?: string;
+  };
+
   hasActivePaymentGateway?: boolean;
   metadata?: {
     businessName?: string;
@@ -118,6 +138,11 @@ interface Tenant {
 interface PlatformSettings {
   platformName?: string;
   logoUrl?: string;
+  faviconUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  tertiaryColor?: string;
+  accentColor?: string;
 }
 
 interface Category {
@@ -128,6 +153,18 @@ interface Category {
   googleCategoryId: string | null;
   category_type?: string;
   is_primary?: boolean;
+  color?: string;
+  icon?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  isActive?: boolean;
+  isFeatured?: boolean;
+  isDeleted?: boolean;
+  isPublished?: boolean;
+  isHidden?: boolean;
+  isDraft?: boolean;
+  isInactive?: boolean;
 }
 
 interface PageProps {
@@ -137,8 +174,10 @@ interface PageProps {
 
 async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string, category?: string, featured?: string) {
   try {
+    // console.log(`[getTenantWithProducts] Resolving tenant ID for slug: ${tenantId}`);
     const idResolvedBySlug = await publicDirectoryService.resolveBySlug(tenantId);
-    const tenant = await tenantPublicService.getPublicTenantInfo(idResolvedBySlug);
+    // console.log(`[getTenantWithProducts] Resolved tenant ID: ${idResolvedBySlug}`);
+
     const hoursResponse = await tenantPublicService.getBusinessHours(idResolvedBySlug);
     
     // Extract business hours data from API response
@@ -172,7 +211,21 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     }
     
     // Fetch full shop details using the resolved tenant ID
-    const shopInfo = await publicDirectoryService.getShopInfoById(idResolvedBySlug);
+
+    const tenant = await tenantPublicService.getPublicTenantInfo(idResolvedBySlug);
+    const directoryData = tenant?.data.directoryData;
+
+    // if (directoryData.is_published){
+    let shopInfo: any = null;
+    if (directoryData.is_published) {
+      shopInfo = await publicDirectoryService.getShopInfoById(idResolvedBySlug);
+    }
+
+    // }
+
+
+    
+    // console.log('[TenantPage] Shop info response:', shopInfo);
 
     const tenantData = (tenant as any)?.data || tenant;
     // API returns { success: true, shop: {...} }
@@ -192,13 +245,17 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
         business_description: shopData.description || null,
         defaultGatewayType: shopData.default_gateway_type || null,
         hasActivePaymentGateway: shopData.has_active_payment_gateway || false,
+        isActive: shopData.is_active || false,
+        isFeatured: shopData.is_featured || false,
+        isArchived: shopData.is_archived || false,
+        isDeleted: shopData.is_deleted || false,
+        isPublished: shopData.is_published || false,
+        isHidden: shopData.is_hidden || false,
+        isDraft: shopData.is_draft || false,
+        isInactive: shopData.is_inactive || false,
+
       };
       
-      // console.log('[TenantPage] Merged Tenant Metadata:', tenantData.metadata);
-      // console.log('[TenantPage] Merged Phone:', tenantData.metadata.phone);
-      // console.log('[TenantPage] Merged Email:', tenantData.metadata.email);
-      // console.log('[TenantPage] Merged Address:', tenantData.metadata.address);
-      // console.log('[TenantPage] Merged Website:', tenantData.metadata.website);
     } else {
       console.log('[TenantPage] No shop data found');
      // console.log('[TenantPage] Raw shopInfo:', shopInfo);
@@ -218,7 +275,7 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     let uncategorizedCount = 0;
     try {
       // Get product counts per category from storefront singleton service
-      const storefrontData = await storefrontService.getStorefrontCategories(idResolvedBySlug);
+      const storefrontData = await storefrontSingletonService.getStorefrontCategories(idResolvedBySlug);
       const storefrontCategories = storefrontData.categories || [];
       uncategorizedCount = storefrontData.uncategorizedCount || 0;
 
@@ -230,6 +287,14 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
         count: parseInt(cat.productCount) || 0, // API returns productCount as string
         googleCategoryId: cat.googleCategoryId,
         category_type: 'platform', // All storefront categories are platform categories
+        isActive: cat.isActive || false,
+        isFeatured: cat.isFeatured || false,
+        isArchived: cat.isArchived || false,
+        isDeleted: cat.isDeleted || false,
+        isPublished: cat.isPublished || false,
+        isHidden: cat.isHidden || false,
+        isDraft: cat.isDraft || false,
+        isInactive: cat.isInactive || false,
       }));
 
       // All categories are product categories for storefront
@@ -246,32 +311,48 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     let productsData;
     if (featured) {
       // Use the featured products API when filtering by featured type
-      productsData = await storefrontService.getFeaturedProducts(idResolvedBySlug, {
+      productsData = await storefrontSingletonService.getFeaturedProducts(idResolvedBySlug, {
         limit,
         search
       });
+      // console.log('[TenantPage] Featured products data:', productsData);
     } else {
       // Use regular products API for general browsing
-      productsData = await storefrontService.getStorefrontProducts(idResolvedBySlug, {
+      productsData = await storefrontSingletonService.getStorefrontProducts(idResolvedBySlug, {
         page,
         limit,
         search,
         category
       });
+      // console.log('[TenantPage] Products data:', productsData);
     }
     // Handle both old (array) and new (paginated object) response formats
     const rawProducts = productsData.items
       ? (Array.isArray(productsData.items) ? productsData.items : [])
       : (Array.isArray(productsData) ? productsData : []);
 
+    // Deduplicate products by ID to prevent React key conflicts
+    const uniqueRawProducts = rawProducts.filter((product, index, arr) => 
+      arr.findIndex(p => p.id === product.id) === index
+    );
+
     // Transform products: convert priceCents to price and include payment gateway fields
-    const products: Product[] = rawProducts.map((p: any) => ({
+    const products: Product[] = uniqueRawProducts.map((p: any) => ({
       ...p,
       price: typeof p.price === 'number' ? p.price : (typeof p.priceCents === 'number' ? p.priceCents / 100 : 0),
       title: p.title || p.name,
       currency: p.currency || 'USD',
       payment_gateway_type: p.defaultGatewayType ?? null, // From MV (camelCase from API)
       has_active_payment_gateway: p.hasActivePaymentGateway ?? false, // From MV (camelCase from API)
+      isActive: p.isActive ?? false,
+      isFeatured: p.isFeatured ?? false,
+      isArchived: p.isArchived ?? false,
+      isAvailable: p.isAvailable ?? false,
+      isDeleted: p.isDeleted ?? false,
+      isPublished: p.isPublished ?? false,
+      isHidden: p.isHidden ?? false,
+      isDraft: p.isDraft ?? false,
+      isInactive: p.isInactive ?? false,
     }));
 
     // console.log(`${featured ? 'Featured' : 'Regular'} Products: ${products.length}`);
@@ -333,6 +414,7 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   const isProductsOnly = products_only === 'true';
 
   const data = await getTenantWithProducts(id, currentPage, 12, search, category, featured);
+  // console.log('[TenantStorefrontPage] data:', data);
  // console.log('[TenantStorefrontPage] data:', data);
 
   if (!data) {
@@ -353,6 +435,15 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
   const { tenant, products, total, limit, platformSettings, mapLocation, hasBranding, businessHours, storeStatus, categories, productCategories, storeCategories, uncategorizedCount, currentCategory, resolvedTenantId } = data as any;
   const businessName = tenant.metadata?.businessName || tenant.name;
+  // console.log('[TenantPage Main] Store Categories:', storeCategories);
+  // console.log('[TenantPage Main] Product Categories:', productCategories);
+  
+  // console.log('[TenantPage Main] Current Category:', currentCategory);
+
+  // console.log('[TenantPage Main] Resolved Tenant ID:', resolvedTenantId);
+  // console.log('[TenantPage Main] Tenant:', tenant);
+  // console.log('[TenantPage Main] Products:', products);
+
 
   // Log what data we're passing to StorefrontClientWrapper
   // console.log('[TenantPage Main] Tenant metadata being passed:', tenant.metadata);
@@ -362,6 +453,9 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
   // console.log('[TenantPage Main] Business hours:', businessHours);
 
   // Track storefront view for recommendations (fire and forget)
+  // console.log('[TenantPage Main] Tracking storefront view');
+  // console.log('[TenantPage Main] Category:', category);
+  // console.log('[TenantPage Main] Current Category:', currentCategory);
   if (category && currentCategory) {
     // Track category browse on storefront
     import('@/utils/behaviorTracking').then(({ trackCategoryBrowse }) => {
@@ -381,39 +475,46 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
  // const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
   // Fetch directory publish status and actual slug using singleton services
-  let directoryPublished = false;
-  let tenantSlug: string;
+  let directoryPublished = tenant?.hasDirectory||false;
+  let tenantSlug = tenant?.slug||id;
 
-  try {
-    // Use tenant directory service to get the actual slug from the API
-    const apiSlug = await tenantDirectoryService.getTenantSlug(id);
- //   console.log('[TenantPage] API slug:', apiSlug);
+  // try {
+  //   // Use tenant directory service to get the actual slug from the API
+  //  console.log('[TenantPage] Calling getTenantSlug...');
+  //  console.log(`[TenantPage] Tenant ID: ${tenant?.id}`);
+  //  console.log(`[TenantPage] Tenant slug: ${tenant?.slug}`);
+  //  console.log(`[TenantPage] Tenant: ${JSON.stringify(tenant)}`);
+    // const apiSlug = await tenantDirectoryService.getTenantSlug(id);
+  // const apiSlug = tenant?.slug;
+  //  console.log('[TenantPage] API slug:', apiSlug);
 
     // Use hasPublishedDirectory from tenant data (already fetched) instead of making another API call
-    directoryPublished = tenant.hasPublishedDirectory ?? false;
+    // directoryPublished = tenant.hasPublishedDirectory ?? false;
 
     // Use API slug if available, otherwise generate from business name or use tenant ID
-    tenantSlug = apiSlug || data.tenant?.slug || id;
+    // tenantSlug = apiSlug || data.tenant?.slug || id;
     // console.log('[TenantPage] Final tenantSlug:', tenantSlug);
-  } catch (e) {
+  // } catch (e) {
     // Directory page doesn't exist or error - store is not published
     // console.warn('[TenantPage] Directory service failed:', e);
-    directoryPublished = false;
+    // directoryPublished = false;
     // Fallback to generated slug
-    tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
-  }
+    // tenantSlug = businessName?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || id;
+  // }
 
   // Find primary store category for header badge
+  // console.log('[TenantPage] Store Categories:', storeCategories);
   const primaryStoreCategory = storeCategories.find((cat: Category) => cat.is_primary);
+  // console.log('[TenantPage] Primary Store Category:', primaryStoreCategory);
 
   // Get GBP categories from tenant metadata (always available regardless of directory publish status)
-  const primaryGBPCategory = tenant.metadata?.gbp_categories?.primary || tenant.metadata?.gbpCategories?.primary;
-  const secondaryGBPCategories = tenant.metadata?.gbp_categories?.secondary || tenant.metadata?.gbpCategories?.secondary || [];
+  const primaryGBPCategory = tenant?.primary_category || tenant?.metadata?.gbp_categories?.primary || tenant?.metadata?.gbpCategories?.primary;
+  const secondaryGBPCategories = tenant?.secondary_categories || tenant?.metadata?.gbp_categories?.secondary || tenant?.metadata?.gbpCategories?.secondary || [];
 
   // Fetch total product count for "All Products" using singleton service
   let totalAllProducts = 0;
   try {
-    totalAllProducts = await storefrontService.getTotalProductCount(id);
+    totalAllProducts = await storefrontSingletonService.getTotalProductCount(id);
   } catch (e) {
     console.error('Failed to fetch total product count:', e);
     // Fallback to current total if available
@@ -422,7 +523,9 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
 
   // Get tier features for footer
   const tier = tenant.subscriptionTier || 'trial';
+  // console.log('[TenantPage Main] Tier:', tier);
   const features = getLandingPageFeatures(tier);
+  // console.log('[TenantPage Main] Features:', features);
 
   // Location status check: Show closed banner if location is not active
   if (tenant.storefrontMessage) {

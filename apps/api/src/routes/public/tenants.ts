@@ -133,6 +133,13 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
     // Get the tenant profile (this includes contact information)
     const profile = await tenantService.getTenantProfile(tenantId);
     
+    // Check if tenant has published directory listing
+    const { prisma } = await import('../../prisma');
+    const directoryResult = await prisma.$queryRaw`
+      SELECT is_published FROM "directory_settings_list" WHERE tenant_id = ${tenantId}
+    `;
+    const hasPublishedDirectory = directoryResult && (directoryResult as any[])?.[0]?.is_published === true;
+    
     if (!profile) {
       console.log(`[Public Tenant Profile] No profile found for tenant: ${tenantId}`);
       return res.status(404).json({
@@ -174,6 +181,7 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
         business: profile.business,
         branding: profile.branding,
         settings: profile.settings,
+        has_published_directory: hasPublishedDirectory,
         metadata: {
           // Merge branding info for frontend compatibility
           theme: profile.branding?.theme || 'professional',

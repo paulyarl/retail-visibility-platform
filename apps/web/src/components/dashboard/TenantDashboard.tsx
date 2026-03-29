@@ -476,12 +476,23 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
 
         {/* Tier Gains Welcome - Celebrate what they unlocked */}
         {tier && tier.effective?.level && tier.effective?.name && (
-          <Suspense fallback={<ComponentLoader />}>
-            <TierGainsWelcome 
-              currentTier={tier.effective.level}
-              tierDisplayName={tier.effective.name}
-            />
-          </Suspense>
+          <>
+            {/* {console.log('[TenantDashboard] Tier object:', tier)}
+            {console.log('[TenantDashboard] tier.effective:', tier.effective)}
+            {console.log('[TenantDashboard] tier.effective.id:', tier.effective.id)}
+            {console.log('[TenantDashboard] tier.effective.level:', tier.effective.level)}
+            {console.log('[TenantDashboard] tier.effective.name:', tier.effective.name)}
+            {console.log('[TenantDashboard] tier.organization:', (tier as any).organization)}
+            {console.log('[TenantDashboard] tier.tenant:', tier.tenant)} */}
+            <Suspense fallback={<ComponentLoader />}>
+              <TierGainsWelcome 
+                currentTier={tier.tenant?.id || tier.effective.id}
+                tierDisplayName={tier.tenant?.name || tier.effective.name}
+                organizationTier={(tier as any).organization?.id}
+                organizationTierDisplayName={(tier as any).organization?.name}
+              />
+            </Suspense>
+          </>
         )}
 
         {/* Quick Actions */}

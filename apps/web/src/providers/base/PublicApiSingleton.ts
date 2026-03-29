@@ -88,7 +88,7 @@ export abstract class PublicApiSingleton extends FlexibleApiSingleton {
         resolvedId = response.data.resolvedId;
       }
 
-     // console.log(`[PublicApiSingleton] Successfully resolved ${type}/${identifier} → ${resolvedId}`);
+    //  console.log(`[PublicApiSingleton] Successfully resolved ${type}/${identifier} → ${resolvedId}`);
       return resolvedId;
       
     } catch (error) {

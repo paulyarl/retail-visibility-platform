@@ -86,7 +86,9 @@ export interface LastViewedItem {
 
 class PublicDirectoryService extends PublicApiSingleton {
   async resolveBySlug(slug: string): Promise<any> {
+    // console.log('[PublicDirectoryService] Resolving slug:', slug);
     const response = await this.resolveIdentifier(slug, AppContext.TENANT);
+    // console.log('[PublicDirectoryService] Resolved response:', response);
     return response;
   }
 

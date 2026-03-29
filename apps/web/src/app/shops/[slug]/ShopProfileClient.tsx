@@ -47,7 +47,7 @@ import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { directoryListingService } from '@/services/DirectoryListingSingletonService';
-import { storefrontService } from '@/services/StorefrontSingletonService';
+import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSingleton';
@@ -474,7 +474,7 @@ export default function ShopProfileClient({ shop, businessHours }: {
       if (!shopData?.id) return;
       
       try {
-        const storefrontData = await storefrontService.getStorefrontCategories(shopData.id);
+        const storefrontData = await storefrontSingletonService.getStorefrontCategories(shopData.id);
         const storefrontCategories = storefrontData.categories || [];
         
         // Convert to category format

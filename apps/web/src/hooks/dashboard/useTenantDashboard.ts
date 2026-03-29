@@ -55,10 +55,10 @@ export function useTenantDashboard(tenantId: string | null): UseTenantDashboardR
       // Use consolidated endpoint - reduces 2 API calls to 1
       const data = await platformHomeService.getDashboardConsolidated(tenantId);
 
-      console.log('[useTenantDashboard] Consolidated data received:', {
-        tenant: data.tenant?.id,
-        stats: data.stats,
-      });
+      // console.log('[useTenantDashboard] Consolidated data received:', {
+      //   tenant: data.tenant?.id,
+      //   stats: data.stats,
+      // });
 
       // Extract stats
       const stats: TenantDashboardStats = {
@@ -78,7 +78,7 @@ export function useTenantDashboard(tenantId: string | null): UseTenantDashboardR
         reopeningDate: data.tenant?.reopeningDate,
       };
 
-      console.log('[useTenantDashboard] Final data to set:', { stats, info });
+      // console.log('[useTenantDashboard] Final data to set:', { stats, info });
       setData({ stats, info });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load dashboard data';

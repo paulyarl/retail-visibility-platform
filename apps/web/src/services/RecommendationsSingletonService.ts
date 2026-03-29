@@ -372,14 +372,10 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
         }
       );
 
-      const cacheKeys = [
-      `/api/recommendations/track-batch`,
-      `/api/recommendations/last-viewed`
-      ];
-
-      for (const key of cacheKeys) {
-        await this.invalidateCacheWithContext(key);
-      }
+      // Smart cache invalidation for page changes
+      // Behavior tracking data is submitted on page change, so next page needs fresh data
+      // We selectively invalidate only behavior-affected caches (not storefront recommendations)
+      await this.invalidateBehaviorAffectedCaches();
 
       return true;
     } catch (error) {
@@ -417,7 +413,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
         `/api/recommendations/last-viewed?${searchParams.toString()}`,
         { headers },
         `display:last-viewed-recommendations`,
-        this.PERSONALIZED_TTL
+        0 // Skip cache for last-viewed - always get fresh data
       );
 
       if (!response.success) {
@@ -659,6 +655,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
         console.error('[RecommendationsSingleton] Failed to get tenant directory slug:', response.error);
         return null;
       }
+      console.log('[RecommendationsSingleton] Tenant directory slug response:', response.data);
 
       return response.data;
     } catch (error) {
@@ -690,6 +687,8 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       }
 
       return response.data;
+
+
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to search categories:', error);
       return null;
@@ -867,6 +866,11 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
           ttl: 0
         }
       );
+
+      // Smart cache invalidation for page changes
+      // Behavior tracking data is submitted on page change, so next page needs fresh data
+      // We selectively invalidate only behavior-affected caches (not storefront recommendations)
+      await this.invalidateBehaviorAffectedCaches();
       
       if (!response.success) {
         console.log('[RecommendationsSingleton] Failed to track behavior batch:', response.error);
@@ -874,18 +878,55 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
                            (response.error?.message) || 'Tracking failed';
         throw new Error(errorMessage);
       }
-      const cacheKeys = [
-        `/api/recommendations/track-batch`,
-        `/api/recommendations/last-viewed`
-      ];
 
-      for (const key of cacheKeys) {
-        await this.invalidateCacheWithContext(key);
-      }
+      // NOTE: Don't invalidate cache on behavior tracking
+      // Behavior tracking is high-frequency and shouldn't clear recommendations
+      // Cache invalidation should happen on meaningful events (purchases, profile updates, etc.)
     } catch (error) {
       console.error('[RecommendationsSingleton] Failed to track behavior batch:', error);
       throw error;
     }
+  }
+
+  /**
+   * Public method to invalidate all recommendations cache
+   * Use for meaningful events: purchases, profile updates, inventory changes, admin refresh
+   */
+  public async invalidateRecommendationsCaches() {
+    const cacheKeys = this.getRecommendationsCachePatterns();
+    await Promise.all(
+      cacheKeys.map(key => this.invalidateCacheWithContext(key))
+    );
+  }
+
+  /**
+   * Smart cache invalidation for behavior-affected data
+   * Use after page changes when behavior tracking was submitted
+   * Only invalidates caches that are directly affected by user behavior
+   */
+  public async invalidateBehaviorAffectedCaches() {
+    const behaviorAffectedKeys = [
+      `/api/recommendations/last-viewed*`,
+      `/api/recommendations/for-product-page*`,
+      // Note: Don't invalidate storefront recommendations - less behavior-sensitive
+    ];
+    
+    await Promise.all(
+      behaviorAffectedKeys.map(key => this.invalidateCacheWithContext(key))
+    );
+  }
+
+  /**
+   * PILOT: Get all cache patterns for this service
+   * Documents all cache keys that this service manages
+   */
+  private getRecommendationsCachePatterns(): string[] {
+    return [
+       `/api/recommendations/track-batch*`,
+        `/api/recommendations/last-viewed*`,
+        `/api/recommendations/for-product-page*`,
+        `/api/recommendations/for-storefront*`
+    ];
   }
 
   /**
@@ -929,3 +970,7 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
 
 // Export singleton instance
 export const recommendationsService = RecommendationsSingletonService.getInstance();
+function getRecommendationsCachePatterns() {
+  throw new Error('Function not implemented.');
+}
+

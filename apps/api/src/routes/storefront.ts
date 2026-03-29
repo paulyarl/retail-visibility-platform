@@ -43,9 +43,9 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     //   conditions.push('sp.category_id IS NOT NULL');
     // }
     
-    // Category filter - match by slug (MV uses category_slug)
+    // Category filter - match by slug (joined table uses category_slug)
     if (category && typeof category === 'string') {
-      conditions.push(`sp.category_slug = $${paramIndex}`);
+      conditions.push(`sp2.category_slug = $${paramIndex}`);
       params.push(category);
       paramIndex++;
     }
@@ -72,7 +72,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
       params
     }); */
     
-    // Query storefront_products_mv for individual products (includes photo gallery and variants)
+    // Query storefront_products_mv for individual products and join with storefront_products for category data
     const query = `
       SELECT 
         sp.id,
@@ -114,6 +114,11 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         sp.access_duration_days,
         sp.download_limit,
         sp.tenant_category_id,
+        -- Get category data from storefront_products view
+        sp2.category_id,
+        sp2.category_slug,
+        sp2.category_name,
+        sp2.google_category_id,
         -- Featured status flag
         CASE 
           WHEN EXISTS (
@@ -125,6 +130,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
           ELSE false 
         END as is_featured
       FROM storefront_products_mv sp
+      LEFT JOIN storefront_products sp2 ON sp.id = sp2.id AND sp.tenant_id = sp2.tenant_id
       WHERE ${whereClause}
       ORDER BY sp.updated_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -133,6 +139,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     const countQuery = `
       SELECT COUNT(sp.id) as count
       FROM storefront_products_mv sp
+      LEFT JOIN storefront_products sp2 ON sp.id = sp2.id AND sp.tenant_id = sp2.tenant_id
       WHERE ${whereClause}
     `;
     
@@ -188,25 +195,37 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
       console.log(`[Storefront] Category: ${category}, Count: ${totalCount}, Returned: ${itemsResult.rows.length}`);
     }
     
-    // Fetch categories by slug (from category_slug) and id (from category_id)
-    const categorySlugs = [...new Set(itemsResult.rows.map((item: any) => item.category_slug).filter(Boolean))];
+    // Fetch categories by category_id and category_slug from the joined data
     const categoryIds = [...new Set(itemsResult.rows.map((item: any) => item.category_id).filter(Boolean))];
+    const categorySlugs = [...new Set(itemsResult.rows.map((item: any) => item.category_slug).filter(Boolean))];
     
-    // Build category query to fetch by slug OR id
+    // Debug: Show what the MV actually contains after the join
+    // console.log(`[Storefront] MV Category debug:`, {
+    //   sampleProducts: itemsResult.rows.slice(0, 3).map((row: any) => ({
+    //     id: row.id,
+    //     name: row.name,
+    //     tenant_category_id: row.tenant_category_id,
+    //     category_id: row.category_id,
+    //     category_slug: row.category_slug,
+    //     category_name: row.category_name
+    //   }))
+    // });
+    
+    // Build category query to fetch by id OR slug
     let categoriesResult = { rows: [] as any[] };
-    if (categorySlugs.length > 0 || categoryIds.length > 0) {
+    if (categoryIds.length > 0 || categorySlugs.length > 0) {
       const categoryConditions: string[] = [];
       const categoryParams: any[] = [tenantId];
       let paramIdx = 2;
       
-      if (categorySlugs.length > 0) {
-        categoryConditions.push(`slug = ANY($${paramIdx})`);
-        categoryParams.push(categorySlugs);
-        paramIdx++;
-      }
       if (categoryIds.length > 0) {
         categoryConditions.push(`id = ANY($${paramIdx})`);
         categoryParams.push(categoryIds);
+        paramIdx++;
+      }
+      if (categorySlugs.length > 0) {
+        categoryConditions.push(`slug = ANY($${paramIdx})`);
+        categoryParams.push(categorySlugs);
         paramIdx++;
       }
       
@@ -216,20 +235,23 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
       );
     }
     
+    // Debug logging for category lookup
+    // console.log(`[Storefront] Category lookup debug:`, {
+    //   categoryIds,
+    //   categorySlugs,
+    //   categoriesFound: categoriesResult.rows.length,
+    //   sampleCategories: categoriesResult.rows.slice(0, 3)
+    // });
+    
     // Create category lookup maps (by slug and by id)
     const categoryBySlug = new Map(categoriesResult.rows.map((cat: any) => [cat.slug, cat]));
     const categoryById = new Map(categoriesResult.rows.map((cat: any) => [cat.id, cat]));
     
     // Transform to camelCase for frontend compatibility
     const items = itemsResult.rows.map((row: any) => {
-      // Find tenant category - prefer category_path, fallback to category_id
-      let tenantCategory = null;
-      if (row.category_path && row.category_path.length > 0) {
-        tenantCategory = categoryBySlug.get(row.category_path[0]) || null;
-      }
-      if (!tenantCategory && row.category_id) {
-        tenantCategory = categoryById.get(row.category_id) || null;
-      }
+      // Use the category data from the join - no need to lookup separately
+      const categoryName = row.category_name || null;
+      const categorySlug = row.category_slug || null;
       
       return {
         id: row.id,
@@ -262,8 +284,8 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         customBranding: row.custom_branding,
         customSections: row.custom_sections,
         landingPageTheme: row.landing_page_theme,
-        categoryName: tenantCategory?.name || null,
-        categorySlug: tenantCategory?.slug || null,
+        categoryName: categoryName,  // Use joined data directly
+        categorySlug: categorySlug, // Use joined data directly
         hasImage: row.has_image,
         inStock: row.in_stock,
         hasGallery: row.has_gallery,

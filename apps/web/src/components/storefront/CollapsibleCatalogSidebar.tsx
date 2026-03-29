@@ -17,6 +17,8 @@ interface CollapsibleCatalogSidebarProps {
   featured?: string;
   view?: string;
   featuredCounts?: Record<string, number>;
+  tenantSlug: string;
+  tenantLogo?: string;
 }
 
 export default function CollapsibleCatalogSidebar({
@@ -30,7 +32,9 @@ export default function CollapsibleCatalogSidebar({
   currentCategory,
   featured,
   view,
-  featuredCounts
+  featuredCounts,
+  tenantSlug,
+  tenantLogo
 }: CollapsibleCatalogSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(true); // Default to collapsed
   const router = useRouter();

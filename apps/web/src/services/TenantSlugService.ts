@@ -90,7 +90,7 @@ class TenantSlugService extends TenantApiSingleton {
         `slug-patterns:${params.businessName}:${params.location?.city || ''}:${params.location?.state || ''}:${params.tenantId || ''}`
       );
 
-      console.log('[TenantSlugService] Slug patterns API response:', response);
+      // console.log('[TenantSlugService] Slug patterns API response:', response);
 
       // Handle case where response is not in expected format
       if (!response || typeof response !== 'object') {
@@ -142,7 +142,7 @@ class TenantSlugService extends TenantApiSingleton {
         `slug-patterns:${params.tenantId}`
       );
 
-      console.log('[TenantSlugService] Slug patterns API response:', response);
+      // console.log('[TenantSlugService] Slug patterns API response:', response);
 
       // Handle case where response is not in expected format
       if (!response || typeof response !== 'object') {

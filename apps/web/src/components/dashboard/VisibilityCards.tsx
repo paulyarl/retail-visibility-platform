@@ -218,7 +218,7 @@ export default function VisibilityCards({
                   style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                 >
                   <Eye className="w-4 h-4" />
-                  {hasPublishedDirectory ? 'View Your Listing' : 'Browse PlatformDirectory'}
+                  {hasPublishedDirectory ? 'View Your Listing' : 'Browse Platform Directory'}
                   <ExternalLink className="w-3 h-3" />
                 </Link>
                 

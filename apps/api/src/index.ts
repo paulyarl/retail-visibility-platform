@@ -696,12 +696,19 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
     
     // Fetch current slug and published status from directory_settings_list (source of truth)
     const { basePrisma } = await import('./prisma');
-    const directoryResult = await basePrisma.$queryRaw`
-      SELECT slug, is_published FROM "directory_settings_list" WHERE tenant_id = ${tenant.id}
-    `;
-    const directoryRow = (directoryResult as any[])[0];
-    const currentSlug = directoryRow?.slug || tenant.slug;
-    const hasPublishedDirectory = directoryRow?.is_published === true;
+    // Check if tenant has published directory listing
+     const directoryResult = await prisma.directory_settings_list.findUnique({
+            where: { tenant_id: tenant.id },
+            select: {
+              is_published: true,
+              slug: true
+            }
+          });
+    
+    const hasDirectory = directoryResult?.is_published === true;
+    const directorySlug = directoryResult?.slug;
+    const currentSlug = directorySlug || tenant.slug;
+    const hasPublishedDirectory = directoryResult?.is_published === true;
     console.log('[GET /tenants/:id] Slug from directory_settings_list:', currentSlug, 'hasPublishedDirectory:', hasPublishedDirectory);
     
     const now = new Date();
@@ -1636,10 +1643,16 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
     console.log('[POST /tenant/profile] Success, returning result:', (result as any)[0] || result);
     
     // Fetch slug from directory_settings_list and include in response
-    const slugResult = await basePrisma.$queryRaw`
-      SELECT slug FROM "directory_settings_list" WHERE tenant_id = ${tenant_id}
-    `;
-    const slug = (slugResult as any[])[0]?.slug || null;
+    const slugResult = await prisma.directory_settings_list.findUnique({
+            where: { tenant_id: tenant_id },
+            select: {
+              is_published: true,
+              slug: true
+            }
+          });
+    
+    const hasDirectory = slugResult?.is_published === true;
+    const slug = slugResult?.slug || null;
     
     const responseWithSlug = {
       ...(result as any)[0] || result,
@@ -1676,10 +1689,16 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
     const bp = (bpResults as any[])[0] || null;
     
     // Fetch slug from directory_settings_list
-    const slugResults = await basePrisma.$queryRaw`
-      SELECT slug FROM "directory_settings_list" WHERE tenant_id = ${tenant_id}
-    `;
-    const slug = (slugResults as any[])[0]?.slug || tenant.slug || null;
+    const slugResult = await prisma.directory_settings_list.findUnique({
+            where: { tenant_id: tenant_id },
+            select: {
+              is_published: true,
+              slug: true
+            }
+          });
+    
+    // const hasDirectory = slugResult?.is_published === true;
+    const slug = slugResult?.slug || tenant.slug || null;
     
     // Fetch business hours from BusinessHours table (optional - tables may not exist)
     let businessHours = null;
@@ -1699,6 +1718,17 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
       console.log('[GET /tenant/profile] Business hours tables not found, continuing without them');
     }
     
+  
+    // Check if tenant has published directory listing
+     const tenantResult = await prisma.directory_settings_list.findUnique({
+            where: { tenant_id: tenant_id },
+            select: {
+              is_published: true
+            }
+          });
+    
+          const hasDirectory = tenantResult?.is_published === true;
+	
     const md = (tenant.metadata as any) || {};
     const profile = {
       tenant_id: tenant.id,
@@ -1732,6 +1762,8 @@ app.get("/api/tenant/profile", authenticateToken, async (req, res) => {
       gbpSecondaryCategories: md?.gbp_categories?.secondary || [],
       // Slug from directory_settings_list
       slug,
+      // Whether tenant has published directory listing
+      hasPublishedDirectory: hasDirectory,
     };
     return res.json(profile);
   } catch (e: any) {
@@ -1913,6 +1945,16 @@ app.get("/public/tenant/:tenant_id", async (req, res) => {
     // Check if tenant has storefront access (tier-based)
     const tier = tenant.subscription_tier as string;
     const hasStorefrontAccess = tier !== 'google_only'; // google_only doesn't have storefront
+      // Check if tenant has published directory listing
+    // Check if tenant has published directory listing
+     const tenantResult = await prisma.directory_settings_list.findUnique({
+            where: { tenant_id: tenant_id },
+            select: {
+              is_published: true
+            }
+          });
+    
+          const hasDirectory = tenantResult?.is_published === true;
 
     // Storefront is accessible if: tier allows it AND location status allows it
     const finalStorefrontAccess = hasStorefrontAccess && canShowStorefront;
@@ -1922,6 +1964,7 @@ app.get("/public/tenant/:tenant_id", async (req, res) => {
       id: tenant.id,
       name: tenant.name,
       subscription_tier: tenant.subscription_tier,
+      has_published_directory: hasDirectory,
       metadata: tenant.metadata,
       location_status,
       reopening_date: tenant.reopening_date,
@@ -2054,6 +2097,18 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
     }
     
     const md = (tenant.metadata as any) || {};
+       // Check if tenant has published directory listing
+     // Check if tenant has published directory listing
+     const directoryResult = await prisma.directory_settings_list.findUnique({
+            where: { tenant_id: tenant_id },
+            select: {
+              is_published: true
+            }
+          });
+    
+          // const hasDirectory = tenantResult?.is_published === true;
+    const hasPublishedDirectory = directoryResult && directoryResult.is_published === true;
+
     
     // Return public business information only
     const profile = {
@@ -2077,6 +2132,7 @@ app.get("/public/tenant/:tenant_id/profile", async (req, res) => {
       latitude: bp?.latitude || md.latitude || null,
       longitude: bp?.longitude || md.longitude || null,
       metadata: tenant.metadata || null, // Include metadata for GBP categories
+      has_published_directory: hasPublishedDirectory,
     };
     return res.json(profile);
   } catch (e: any) {

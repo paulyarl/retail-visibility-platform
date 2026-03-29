@@ -764,6 +764,71 @@ router.get('/tenant/:identifier', async (req, res) => {
       });
     }
     
+      let hasDirectory = false;
+       let tenantResult: any = null;
+       let profileResult: any = null;
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: resolvedTenant.id },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          subscription_status: true,
+          metadata: true,
+          created_at: true,
+          language: true,
+          currency: true,
+          region: true, 
+          trial_ends_at: true,
+          subscription_ends_at: true, 
+          organization_id: true,           
+          location_status: true
+        }
+      });
+
+      if (!tenant) {
+        console.log(`[TenantService] Tenant not found: ${resolvedTenant.id}`);
+        return null;
+      } else {
+        tenantResult = await prisma.directory_settings_list.findUnique({
+        where: { tenant_id: resolvedTenant.id },
+        select: {
+          is_published: true,
+          primary_category: true,
+          secondary_categories: true,
+          seo_keywords: true,
+          seo_description: true,
+          is_featured: true,
+          featured_until: true,
+          slug: true,
+        }});
+        profileResult = await prisma.tenant_business_profiles_list.findUnique({
+          where: { tenant_id: resolvedTenant.id },
+          select: {
+            business_name: true,
+            address_line1: true,
+            address_line2: true,
+            city: true,
+            state: true,
+            phone_number: true,
+            email: true,
+            website: true,
+            logo_url: true,
+            banner_url: true,
+            business_description: true,
+            hours: true,
+            social_links: true,
+            latitude: true,
+            longitude: true,
+            gbp_category_name: true,
+            country_code: true,
+            postal_code: true,
+            contact_person: true
+          }
+        });
+
+		   hasDirectory = tenantResult?.is_published === true; 
+      }
     // Return basic tenant information
     res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
     res.setHeader('X-Service-Source', 'Universal-Identifier-Cache');
@@ -775,6 +840,9 @@ router.get('/tenant/:identifier', async (req, res) => {
         name: resolvedTenant.name,
         slug: resolvedTenant.slug,
         subscriptionStatus: resolvedTenant.subscriptionStatus,
+        hasDirectory: hasDirectory,
+        directoryData: tenantResult,
+        profileData: profileResult,
         metadata: resolvedTenant.metadata,
         createdAt: new Date().toISOString(), // We don't have created_at in cache
         updatedAt: new Date().toISOString()
@@ -853,6 +921,12 @@ router.get('/tenant/:identifier/profile', async (req, res) => {
     try {
       profile = await Promise.race([profilePromise, profileTimeoutPromise]);
       console.log(`[Public API] Successfully retrieved profile for tenant: ${resolvedTenant.id}`);
+      console.log(`[Public API] Profile:`, profile);
+      // Add the field to the profile
+      // if (profile) {
+      //   profile.has_published_directory = profile.has_published_directory || false;
+      // }
+      
     } catch (error) {
       console.error(`[Public API] Error retrieving profile for tenant: ${resolvedTenant.id}`, error);
       return res.status(404).json({

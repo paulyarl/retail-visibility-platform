@@ -179,6 +179,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
   // console.log('[ShopProfilePage] Shop:', shop);
   if (shop?.success && shop?.data?.data?.id) {
     try {
+      // console.log('[ShopProfilePage] Resolving slug:', slug);
       const idResolvedBySlug = await publicDirectoryService.resolveBySlug(slug);
       // console.log('[ShopProfilePage] Resolved ID:', idResolvedBySlug);
       businessHours = await tenantPublicService.getBusinessHours(idResolvedBySlug);
@@ -194,7 +195,7 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
   
   // If no shop found, show not found page
   if (!shop || !shop.success || !shop.data || !shop.data.success || !shop.data.data) {
-    console.log('[ShopProfilePage] Showing not found page');
+    // console.log('[ShopProfilePage] Showing not found page');
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

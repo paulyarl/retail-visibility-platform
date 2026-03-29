@@ -176,7 +176,7 @@ class TenantPublicService extends PublicApiSingleton {
         console.error('[TenantPublicService] Failed to get public tenant profile:', response.error);
         return null;
       }
-   //   console.log(`${this.constructor.name} - Profile Response:`, response.data);
+    //  console.log(`${this.constructor.name} - Profile Response:`, response.data);
 
       return response.data||null;
     } catch (error) {

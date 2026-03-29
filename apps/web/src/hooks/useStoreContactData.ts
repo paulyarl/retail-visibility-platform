@@ -41,7 +41,7 @@ export function useStoreContactData(params: { slug?: string; tenantId?: string }
         setData(prev => ({ ...prev, isLoading: true, error: null }));
 
         let directoryData = null;
-        console.log(`[useStoreContactData] params:`, params);
+        // console.log(`[useStoreContactData] params:`, params);
 
         // For directory pages: use slug directly
         if (params.slug) {
@@ -50,9 +50,9 @@ export function useStoreContactData(params: { slug?: string; tenantId?: string }
        
         // For tenant pages: get slug from tenantId, then use slug
         else if (params.tenantId) {
-           console.log(`[useStoreContactData] tenantId:`, params.tenantId);
+          //  console.log(`[useStoreContactData] tenantId:`, params.tenantId);
           const tenantSlug = await tenantDirectoryService.getTenantSlug(params.tenantId);
-          console.log(`[useStoreContactData] tenantSlug:`, tenantSlug);
+          // console.log(`[useStoreContactData] tenantSlug:`, tenantSlug);
           if (tenantSlug) {
             directoryData = await directoryService.getDirectoryConsolidated(tenantSlug);
           }

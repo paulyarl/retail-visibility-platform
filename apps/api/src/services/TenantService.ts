@@ -13,10 +13,43 @@ export interface TenantProfile {
   name: string;
   slug: string | null;
   subscriptionStatus: string;
-  metadata: any;
+  hasPublishedDirectory?: boolean;
+  primaryCategory?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  phoneNumber?: string;
+  email?: string;
+  website?: string;
+  logoUrl?: string;
+  bannerUrl?: string;
+  businessDescription?: string;
+  hours?: string;
+  socialLinks?: string;
+  latitude?: number;
+  longitude?: number;
+  gbpCategoryName?: string;
+  countryCode?: string;
+  postalCode?: string;
+  contactPerson?: string;
+  seoKeywords ?: string;
+  seoDescriptions ?: string;
+  isFeatured ?: boolean;
+  featuredUntil?: string;
+  isPublished ?: boolean;
+  secondaryCategories?: string[];
+  metadata?: any;
   createdAt: string;
   updatedAt: string;
-  settings: any;
+  language?: string;
+  currency?: string;
+  region?: string;
+  trialEndsAt?: string | null;
+  subscriptionEndsAt?: string | null;
+  organizationId?: string | null;
+  locationStatus?: string | null;
+  settings?: any;
   businessInfo: {
     address?: string;
     city?: string;
@@ -117,7 +150,9 @@ export class TenantService {
   async getTenantProfile(tenantId: string): Promise<TenantProfile | null> {
     try {
       console.log(`[TenantService] Getting profile for tenant: ${tenantId}`);
-      
+       let hasDirectory = false;
+       let tenantResult: any = null;
+       let profileResult: any = null;
       const tenant = await prisma.tenants.findUnique({
         where: { id: tenantId },
         select: {
@@ -126,30 +161,121 @@ export class TenantService {
           slug: true,
           subscription_status: true,
           metadata: true,
-          created_at: true
+          created_at: true,
+          language: true,
+          currency: true,
+          region: true, 
+          trial_ends_at: true,
+          subscription_ends_at: true, 
+          organization_id: true,           
+          location_status: true
         }
       });
 
       if (!tenant) {
         console.log(`[TenantService] Tenant not found: ${tenantId}`);
         return null;
+      } else {
+        tenantResult = await prisma.directory_settings_list.findUnique({
+        where: { tenant_id: tenantId },
+        select: {
+          is_published: true,
+          primary_category: true,
+          secondary_categories: true,
+          seo_keywords: true,
+          seo_description: true,
+          is_featured: true,
+          featured_until: true,
+          slug: true,
+        }});
+        profileResult = await prisma.tenant_business_profiles_list.findUnique({
+          where: { tenant_id: tenantId },
+          select: {
+            business_name: true,
+            address_line1: true,
+            address_line2: true,
+            city: true,
+            state: true,
+            phone_number: true,
+            email: true,
+            website: true,
+            logo_url: true,
+            banner_url: true,
+            business_description: true,
+            hours: true,
+            social_links: true,
+            latitude: true,
+            longitude: true,
+            gbp_category_name: true,
+            country_code: true,
+            postal_code: true,
+            contact_person: true
+          }
+        });
+
+		   hasDirectory = tenantResult?.is_published === true; 
       }
 
       // Extract business info from metadata
       const businessInfo = (tenant.metadata && typeof tenant.metadata === 'object' && !Array.isArray(tenant.metadata)) 
         ? (tenant.metadata as any).businessInfo || {} 
         : {};
+ // Check if tenant has published directory listing
+      // const { prisma } = await import('../prisma');
+      // const directoryResult = await prisma.$queryRaw`
+      //   SELECT is_published FROM "directory_settings_list" WHERE tenant_id = ${tenantId}
+      // `;
 
+      
+      
+      // Add the field to the profile
+      // if (hasPublishedDirectory) {
+      //   tenant.hasPublishedDirectory = hasPublishedDirectory;
+      // }
+      
       return {
         id: tenant.id,
-        name: tenant.name,
-        slug: tenant.slug || '',
+        name: tenant.name||profileResult?.business_name,
+        slug: tenant.slug || profileResult?.slug || tenantResult?.slug || '',
         subscriptionStatus: tenant.subscription_status || 'unknown',
+        hasPublishedDirectory: hasDirectory as boolean,
+        primaryCategory: tenantResult?.primary_category,
+        seoKeywords: tenantResult?.seo_keywords,
+        seoDescriptions: tenantResult?.seo_description,
+        isFeatured: tenantResult?.is_featured,
+        featuredUntil: tenantResult?.featured_until,
+        isPublished: tenantResult?.is_published,
+        secondaryCategories: tenantResult?.secondary_categories,
         metadata: tenant.metadata,
         createdAt: tenant.created_at.toISOString(),
         updatedAt: tenant.created_at.toISOString(), // Use created_at as fallback
         settings: {}, // Settings not available in schema
-        businessInfo
+        addressLine1: profileResult?.address_line1,
+        addressLine2: profileResult?.address_line2,
+        city: profileResult?.city,
+        state: profileResult?.state,
+        phoneNumber: profileResult?.phone_number,
+        email: profileResult?.email,
+        website: profileResult?.website,
+        logoUrl: profileResult?.logo_url,
+        bannerUrl: profileResult?.banner_url,
+        businessDescription: profileResult?.business_description,
+        hours: profileResult?.hours,
+        socialLinks: profileResult?.social_links,
+        latitude: profileResult?.latitude,
+        longitude: profileResult?.longitude,
+        gbpCategoryName: profileResult?.gbp_category_name,
+        countryCode: profileResult?.country_code,
+        postalCode: profileResult?.postal_code,
+        contactPerson: profileResult?.contact_person,
+        businessInfo,
+        language: tenant.language,
+        currency: tenant.currency,
+        region: tenant.region,
+        trialEndsAt: tenant?.trial_ends_at ? tenant.trial_ends_at.toISOString() : null,
+        subscriptionEndsAt: tenant?.subscription_ends_at ? tenant.subscription_ends_at.toISOString() : null,
+        organizationId: tenant?.organization_id,
+        locationStatus: tenant?.location_status,
       };
     } catch (error) {
       console.error(`[TenantService] Error getting profile for ${tenantId}:`, error);
@@ -176,7 +302,14 @@ export class TenantService {
             slug: true,
             subscription_status: true,
             metadata: true,
-            created_at: true
+            created_at: true,
+            language: true,
+            currency: true,
+            region: true,
+            trial_ends_at: true,
+            subscription_ends_at: true,
+            organization_id: true,
+            location_status: true
           }
         }),
         
@@ -221,6 +354,17 @@ export class TenantService {
       const metadata = tenant.metadata as any || {};
       const businessInfo = metadata.businessInfo || {};
 
+      // directory profile status 
+
+        const tenantResult = await prisma.directory_settings_list.findUnique({
+        where: { tenant_id: tenantId },
+        select: {
+          is_published: true
+        }
+      });
+
+      const hasDirectory = tenantResult?.is_published === true;
+
       return {
         profile: {
           id: tenant.id,
@@ -231,7 +375,15 @@ export class TenantService {
           createdAt: tenant.created_at.toISOString(),
           updatedAt: tenant.created_at.toISOString(), // Use created_at as fallback
           settings: metadata.settings || {},
-          businessInfo
+          businessInfo,
+          language: tenant.language,
+          currency: tenant.currency,
+          region: tenant.region,
+          trialEndsAt: tenant?.trial_ends_at ? tenant.trial_ends_at.toISOString() : null,
+          subscriptionEndsAt: tenant?.subscription_ends_at ? tenant.subscription_ends_at.toISOString() : null,
+          organizationId: tenant?.organization_id,
+          locationStatus: tenant?.location_status,
+          hasPublishedDirectory: hasDirectory
         },
         usage: {
           totalItems: itemCount,
@@ -448,7 +600,8 @@ export class TenantService {
         createdAt: tenant.created_at.toISOString(),
         updatedAt: tenant.created_at.toISOString(), // Use created_at as fallback
         settings: {}, // Settings not available in schema
-        businessInfo
+        hasPublishedDirectory: false, // Will be updated when directory status is tracked
+        businessInfo: {}
       };
     } catch (error) {
       console.error(`[TenantService] Error updating profile for ${tenantId}:`, error);
@@ -484,8 +637,6 @@ export class TenantService {
           id: true,
           name: true,
           slug: true,
-          subscription_status: true,
-          metadata: true,
           created_at: true
         }
       });
@@ -494,20 +645,25 @@ export class TenantService {
       const { UniversalIdentifierCache } = await import('./UniversalIdentifierCache');
       const cache = UniversalIdentifierCache.getInstance();
       await cache.invalidateTenant(tenantId);
+      
+      const tenantResult = await prisma.directory_settings_list.findUnique({
+        where: { tenant_id: tenantId },
+        select: {
+          is_published: true
+        }
+      });
 
-      const metadata = tenant.metadata as any || {};
-      const businessInfo = metadata.businessInfo || {};
+      const hasDirectory = tenantResult?.is_published === true;
 
       return {
         id: tenant.id,
         name: tenant.name,
         slug: tenant.slug || '',
-        subscriptionStatus: tenant.subscription_status || '',
-        metadata: tenant.metadata,
+        subscriptionStatus: 'active',
         createdAt: tenant.created_at.toISOString(),
-        updatedAt: tenant.created_at.toISOString(), // Use created_at as fallback
-        settings: (tenant.metadata as any)?.settings || {},
-        businessInfo
+        updatedAt: tenant.created_at.toISOString(),
+        businessInfo: {},
+        hasPublishedDirectory: hasDirectory
       };
     } catch (error) {
       console.error(`[TenantService] Error updating subdomain for ${tenantId}:`, error);
@@ -539,6 +695,23 @@ export class TenantService {
           max_locations: true,
           tier_key: true,
           name: true,
+          is_active: true,
+          tier_type: true, 
+        }
+      });
+      const tierConfigFeatured = await prisma.subscription_tiers_list.findUnique({
+        where: { tier_key: tierKey },
+        select: {
+          featured_store_selection: true, 
+          featured_new_arrival: true, 
+          featured_seasonal: true, 
+          featured_sale: true,
+          featured_staff_pick: true,
+          featured_bestseller: true,
+          featured_clearance: true,
+          featured_trending: true,
+          featured_featured: true,
+          featured_recommended: true,
         }
       });
 

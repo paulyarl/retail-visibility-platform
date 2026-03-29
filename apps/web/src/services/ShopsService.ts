@@ -445,8 +445,9 @@ class ShopsService extends PublicApiSingleton {
     try {
       // console.log('[ShopsService] Making request to resolve shop:', identifier);
       const tenantId = await this.resolveIdentifier(identifier,AppContext.TENANT);
+      // console.log('[ShopsService] Resolved tenant ID:', tenantId);
       if (!tenantId) {
-        console.error('[ShopsService] Failed to resolve tenant ID for identifier:', identifier);
+        // console.error('[ShopsService] Failed to resolve tenant ID for identifier:', identifier);
         throw new Error('Failed to resolve shop');
       }
       const response = await this.makeDefaultRequest<{ shop: any; metadata?: any }>(

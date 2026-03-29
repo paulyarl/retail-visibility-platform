@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import SmartProductCard from './SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
-import { storefrontService } from '@/services/StorefrontSingletonService';
+import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
 import { Package, Calendar, DollarSign, Star, TrendingUp, Award, Zap, Flame, Crown, ThumbsUp, Sparkles } from 'lucide-react';
 
 interface FeaturedTypeProduct {
@@ -140,7 +140,7 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
       
       try {
         // Use singleton service to fetch featured products grouped by type
-        const groupedProducts = await storefrontService.getFeaturedProductsByType(
+        const groupedProducts = await storefrontSingletonService.getFeaturedProductsByType(
           tenantId,
           undefined, // Get all types
           6 // Limit per type

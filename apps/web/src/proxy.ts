@@ -246,10 +246,13 @@ export async function proxy(req: NextRequest) {
     // Try to get the slug for this tenant
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.visibleshelf.com';
+      console.log(`[Proxy] Fetching slug for tenant: ${tenantId}`);
       const slugRes = await fetch(`${apiBaseUrl}/api/directory/resolve-slug/${tenantId}`);
+      console.log(`[Proxy] Slug res:`, slugRes);
       
       if (slugRes.ok) {
         const slugData = await slugRes.json();
+        console.log(`[Proxy] Slug data:`, slugData);
         if (slugData.success && slugData.tenantId && slugData.tenantId !== tenantId) {
           // If we got a different tenantId back, it means the input was a slug
           // This case shouldn't happen but we handle it gracefully
@@ -262,8 +265,10 @@ export async function proxy(req: NextRequest) {
         
         // Try to get the actual slug from directory
         const directoryRes = await fetch(`${apiBaseUrl}/api/directory/tenant/${tenantId}`);
+        console.log(`[Proxy] Directory res:`, directoryRes);
         if (directoryRes.ok) {
           const directoryData = await directoryRes.json();
+          console.log(`[Proxy] Directory data:`, directoryData);
           if (directoryData.listing?.slug) {
             const slug = directoryData.listing.slug;
             const destUrl = new URL(`/shops/${slug}${remainingPath}`, req.url);

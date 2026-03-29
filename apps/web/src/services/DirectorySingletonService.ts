@@ -210,6 +210,7 @@ class DirectorySingletonService extends PublicApiSingleton {
         `tenant-slug-${tenantId}`,
         this.CACHE_TTL_LONG
       );
+      
 
       return response?.data?.slug || response?.data?.slug || null;
     } catch (error) {
@@ -548,6 +549,7 @@ class DirectorySingletonService extends PublicApiSingleton {
       console.log('[DirectorySingleton] Failed to get tenant directory slug:', response.error);
       return null;
     }
+    // console.log(`[DirectorySingleton] Tenant directory slug response:`, response.data);
 
     // Handle case where tenant exists but has no published directory
     // This is expected behavior, not an error

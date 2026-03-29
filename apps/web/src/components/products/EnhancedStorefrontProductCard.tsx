@@ -13,7 +13,8 @@ import {
   ChevronRight,
   Package,
   Download,
-  Shield
+  Shield,
+  Tag
 } from 'lucide-react';
 import { PriceDisplay } from './PriceDisplay';
 import { AddToCartButton } from './AddToCartButton';
@@ -88,6 +89,13 @@ interface EnhancedStorefrontProductCardProps {
   product: EnhancedProductData;
   tenantId: string;
   tenantSlug?: string;
+  tenantLogo?: string;
+  hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
+  useSingletonData?: boolean;
+  showFeaturedBadges?: boolean;
+  initialPageSize?: number;
+  showPageSizeControl?: boolean;
   variant?: 'grid' | 'list' | 'compact' | 'featured';
   showGallery?: boolean;
   showVariants?: boolean;
@@ -102,6 +110,13 @@ export default function EnhancedStorefrontProductCard({
   product,
   tenantId,
   tenantSlug,
+  tenantLogo,
+  hasActivePaymentGateway,
+  defaultGatewayType,
+  useSingletonData,
+  showFeaturedBadges,
+  initialPageSize,
+  showPageSizeControl,
   variant = 'grid',
   showGallery = true,
   showVariants = true,
@@ -159,7 +174,7 @@ export default function EnhancedStorefrontProductCard({
 
   // Product URL
   const productUrl = tenantSlug 
-    ? `/t/${tenantSlug}/items/${product.id}`
+    ? `/products/${product.id}`
     : `/products/${product.id}`;
 
   // Badge styles for featured types
@@ -175,6 +190,49 @@ export default function EnhancedStorefrontProductCard({
 
   // Render different card variants
   const renderCardContent = () => {
+    // Debug: Log the entire product object structure
+    // console.log('[EnhancedStorefrontProductCard] FULL Product Structure:', {
+    //   id: product.id,
+    //   name: product.name,
+    //   categoryName: product.categoryName,
+    //   categorySlug: product.categorySlug,
+    //   isFeatured: product.isFeatured,
+    //   condition: product.condition,
+    //   description: product.description ? product.description.substring(0, 50) + '...' : 'none',
+    //   allKeys: Object.keys(product),
+    //   allValues: Object.entries(product).reduce((acc, [key, value]) => {
+    //     if (typeof value === 'object' && value !== null) {
+    //       acc[key] = JSON.stringify(value, null, 2).substring(0, 100) + '...';
+    //     } else {
+    //       acc[key] = value;
+    //     }
+    //     return acc;
+    //   }, {} as any)
+    // });
+
+    // Debug: Log all field names explicitly
+    // console.log('[EnhancedStorefrontProductCard] ALL FIELD NAMES:', Object.keys(product));
+    
+    // Debug: Check for any category-related fields
+    const categoryRelatedFields = Object.keys(product).filter(key => 
+      key.toLowerCase().includes('category') || 
+      key.toLowerCase().includes('cat')
+    );
+    // console.log('[EnhancedStorefrontProductCard] CATEGORY-RELATED FIELDS:', categoryRelatedFields);
+    
+    // Debug: Show specific fields that might contain category data
+    // console.log('[EnhancedStorefrontProductCard] SPECIFIC FIELDS:', {
+    //   'category': (product as any).category,
+    //   'categoryName': (product as any).categoryName,
+    //   'categorySlug': (product as any).categorySlug,
+    //   'tenantCategory': (product as any).tenantCategory,
+    //   'tenant_category': (product as any).tenant_category,
+    //   'productCategory': (product as any).productCategory,
+    //   'product_category': (product as any).product_category,
+    //   'categoryData': (product as any).categoryData,
+    //   'categories': (product as any).categories
+    // });
+
     switch (variant) {
       case 'compact':
         return (
@@ -189,14 +247,63 @@ export default function EnhancedStorefrontProductCard({
                   sizes="64px"
                 />
               )}
+              {/* Featured Badge for Compact */}
+              {product.isFeatured && (
+                <div className="absolute top-1 right-1">
+                  <Badge 
+                    color="yellow" 
+                    variant="filled" 
+                    size="xs"
+                    leftSection={<Star size={8} />}
+                  >
+                    ★
+                  </Badge>
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <Text size="sm" fw={500} lineClamp={1}>{product.name}</Text>
+              
+              {/* Condition for Compact */}
+              {product.condition && (
+                <Text size="xs" c="dimmed">
+                  {product.condition.replace('_', ' ')}
+                </Text>
+              )}
+              
               <PriceDisplay 
                 priceCents={product.priceCents}
                 salePriceCents={product.salePriceCents}
                 variant="compact"
               />
+              
+              {/* Category for Compact */}
+              {product.categoryName && (
+                <Group 
+                  gap="xs" 
+                  wrap="nowrap"
+                  justify="flex-end"
+                  className="mt-1"
+                >
+                  <Badge
+                    variant="light"
+                    color="blue"
+                    size="xs"
+                    radius="sm"
+                    leftSection={<Tag size={10} />}
+                    component="a"
+                    href={`/tenant/${tenantSlug}?category=${product.categorySlug}`}
+                    style={{ textDecoration: 'none' }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      // Navigate to category filter using tenant ID (not slug)
+                      window.location.href = `/tenant/${tenantId}?category=${product.categorySlug}`;
+                    }}
+                  >
+                    {product.categoryName}
+                  </Badge>
+                </Group>
+              )}
               {displayVariants.length > 0 && (
                 <Text size="xs" c="dimmed">
                   {displayVariants.length} variants
@@ -278,6 +385,19 @@ export default function EnhancedStorefrontProductCard({
 
             {/* Content */}
             <div className="p-4">
+              {/* Featured Status Badge */}
+              {product.isFeatured && (
+                <Badge 
+                  color="yellow" 
+                  variant="filled" 
+                  size="sm" 
+                  mb="xs"
+                  leftSection={<Star size={10} />}
+                >
+                  Featured
+                </Badge>
+              )}
+              
               <Text fw={600} size="lg" lineClamp={2} mb="sm">
                 {product.name}
               </Text>
@@ -288,11 +408,53 @@ export default function EnhancedStorefrontProductCard({
                 </Text>
               )}
 
+              {/* Condition */}
+              {product.condition && (
+                <Text size="xs" c="dimmed" mb="xs">
+                  Condition: {product.condition.replace('_', ' ')}
+                </Text>
+              )}
+
+              {/* Description */}
+              {product.description && (
+                <Text size="sm" c="gray" lineClamp={2} mb="sm">
+                  {product.description}
+                </Text>
+              )}
+
               <PriceDisplay 
                 priceCents={product.priceCents}
                 salePriceCents={product.salePriceCents}
                 variant="large"
               />
+
+              {/* Category - Improved Styling */}
+              {product.categoryName && (
+                <Group 
+                  gap="xs" 
+                  mb="sm"
+                  justify="flex-end"
+                  className="mt-2"
+                >
+                  <Badge
+                    variant="light"
+                    color="blue"
+                    size="sm"
+                    radius="md"
+                    leftSection={<Tag size={12} />}
+                    component="a"
+                    href={`/tenant/${tenantSlug}?category=${product.categorySlug}`}
+                    style={{ textDecoration: 'none' }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      // Navigate to category filter using tenant ID (not slug)
+                      window.location.href = `/tenant/${tenantId}?category=${product.categorySlug}`;
+                    }}
+                  >
+                    {product.categoryName}
+                  </Badge>
+                </Group>
+              )}
 
               {/* Variants Preview */}
               {displayVariants.length > 0 && (
@@ -458,6 +620,17 @@ export default function EnhancedStorefrontProductCard({
                   Sale
                 </Badge>
               )}
+
+              {/* Featured Status Badge */}
+              {product.isFeatured && (
+                <Badge
+                  className="absolute top-2 left-2 bg-yellow-500 text-white"
+                  size="sm"
+                  leftSection={<Star size={10} />}
+                >
+                  Featured
+                </Badge>
+              )}
             </div>
 
             {/* Content */}
@@ -486,10 +659,17 @@ export default function EnhancedStorefrontProductCard({
               )}
 
               {/* Condition */}
-              {product.condition && product.condition !== 'brand_new' && (
+              {product.condition && (
                 <Badge variant="light" size="xs" mb="xs">
                   {product.condition.replace('_', ' ')}
                 </Badge>
+              )}
+
+              {/* Description */}
+              {product.description && (
+                <Text size="sm" c="gray" lineClamp={2} mb="xs">
+                  {product.description}
+                </Text>
               )}
 
               {/* Price Display */}
@@ -497,6 +677,34 @@ export default function EnhancedStorefrontProductCard({
                 priceCents={product.priceCents}
                 salePriceCents={product.salePriceCents}
               />
+
+              {/* Category - Improved Styling */}
+              {product.categoryName && (
+                <Group 
+                  gap="xs" 
+                  mb="xs"
+                  justify="flex-end"
+                  className="mt-2"
+                >
+                  <Badge
+                    variant="light"
+                    color="blue"
+                    size="sm"
+                    radius="md"
+                    leftSection={<Tag size={12} />}
+                    component="a"
+                    href={`/tenant/${tenantSlug}?category=${product.categorySlug}`}
+                    style={{ textDecoration: 'none' }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      // Navigate to category filter using tenant ID (not slug)
+                      window.location.href = `/tenant/${tenantId}?category=${product.categorySlug}`;
+                    }}
+                  >
+                    {product.categoryName}
+                  </Badge>
+                </Group>
+              )}
 
               {/* Rating */}
               {product.productRating && (
@@ -541,13 +749,6 @@ export default function EnhancedStorefrontProductCard({
                     💡 Click options for details
                   </Text>
                 </div>
-              )}
-
-              {/* Category */}
-              {product.categoryName && (
-                <Text size="xs" c="blue" mb="xs">
-                  {product.categoryName}
-                </Text>
               )}
 
               {/* Stock Status */}

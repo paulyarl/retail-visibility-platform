@@ -9,7 +9,9 @@ interface DirectoryTenantPageProps {
 
 async function getTenantSlug(tenantId: string): Promise<string | null> {
   try {
+    // console.log('[DirectoryTenantPage] Calling getTenantDirectorySlug...');
     const data = await recommendationsService.getTenantDirectorySlug(tenantId);
+    // console.log('[DirectoryTenantPage] getTenantDirectorySlug result:', data);
     return data?.slug || null;
   } catch (error) {
     console.error('Error fetching tenant directory slug:', error);
