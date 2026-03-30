@@ -599,11 +599,13 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
           setLoading(false);
           return;
         }
-        const directoryInfo = await directoryService.getTenantDirectorySlug(tenantId);
-        if (directoryInfo) {
-          setDirectorySlug(slug ?? directoryInfo.slug);
+        if (slug) {
+          setDirectorySlug(slug);          
           setIsPublished(true);
+          setLoading(false);
+          return;
         }
+       
       } catch {
         // non-fatal — sidebar still renders with defaults
       } finally {
