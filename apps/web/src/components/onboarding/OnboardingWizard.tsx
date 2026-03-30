@@ -64,21 +64,21 @@ export default function OnboardingWizard({
   // Adjust initial step (if skipping account, start at 0 which maps to 'store')
   const effectiveInitialStep = skipAccountStep ? Math.max(0, initialStep - 1) : initialStep;
   
-  // Load onboarding data
+  // Load initial data
   const { 
     data: businessData, 
     setData: setBusinessData, 
     loading, 
-    error: loadError,
-    initialStep: loadedStep,
+    error: loadError, 
+    initialStep: loadedStep 
   } = useOnboardingData({ 
     tenantId, 
     forced, 
-    initialStep: effectiveInitialStep,
+    initialStep: initialStep || 1, 
     phase1Data: skipAccountStep ? (onboardingStateService.getPhase1DataForPhase2() as Partial<BusinessProfile>) : undefined,
   });
   
-  // Manage step navigation
+  // Manage step navigation with localStorage persistence
   const { 
     currentStep, 
     goNext, 
@@ -108,6 +108,8 @@ export default function OnboardingWizard({
   // Reset validation when step changes (optional steps default to valid)
   useEffect(() => {
     setIsValid(true);
+    console.log('[OnboardingWizard] Step changed to:', currentStep);
+    console.log('[OnboardingWizard] Current businessData:', businessData);
   }, [currentStep]);
   
   // Feature flags
@@ -155,6 +157,10 @@ export default function OnboardingWizard({
     } else if (currentStep === 5) {
       handleComplete();
     }
+  };
+
+  const handleBack = () => {
+    goBack();
   };
   
   const handleComplete = () => {
@@ -433,7 +439,7 @@ export default function OnboardingWizard({
             
             <div className="flex items-center gap-3">
               {currentStep > 1 && currentStep <= 5 && (
-                <Button variant="secondary" onClick={goBack} disabled={saving}>
+                <Button variant="secondary" onClick={handleBack} disabled={saving}>
                   <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
@@ -461,6 +467,14 @@ export default function OnboardingWizard({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
                 </Button>
+              )}
+              
+              {/* Saving Status Indicator */}
+              {saving && (
+                <div className="flex items-center text-sm text-gray-500 ml-3">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b border-gray-500 mr-2"></div>
+                  Saving progress...
+                </div>
               )}
             </div>
           </div>

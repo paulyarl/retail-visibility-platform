@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 import TimeInput from "./TimeInput";
 import { tenantManagementService } from "@/services/TenantManagementService";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
+import { platformHomeService } from "@/services/PlatformHomeSingletonService";
 
 type Period = { day: string; open: string; close: string };
 type SpecialHour = { date: string; isClosed: boolean; open?: string; close?: string; note?: string };
@@ -37,6 +38,83 @@ function parseTimeToMinutes(time: string): number | null {
   const m = parseInt(parts[1], 10);
   if (isNaN(h) || isNaN(m)) return null;
   return h * 60 + m;
+}
+
+// Convert profile hours format to business hours periods format
+function convertProfileHoursToPeriods(profileHours: Record<string, string>): Period[] {
+  const dayMap: Record<string, string> = {
+    'monday': 'MONDAY',
+    'tuesday': 'TUESDAY', 
+    'wednesday': 'WEDNESDAY',
+    'thursday': 'THURSDAY',
+    'friday': 'FRIDAY',
+    'saturday': 'SATURDAY',
+    'sunday': 'SUNDAY'
+  };
+
+  const periods: Period[] = [];
+
+  Object.entries(profileHours).forEach(([day, hours]) => {
+    const dayName = dayMap[day.toLowerCase()];
+    if (!dayName) return;
+
+    if (hours.toLowerCase() === 'closed') {
+      // Skip closed days for now, or handle as needed
+      return;
+    }
+
+    // Parse "9:00 AM - 5:00 PM" format
+    const match = hours.match(/(\d{1,2}:\d{2}\s*[AP]M)\s*-\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
+    if (match) {
+      const openTime = to24Hour(match[1]);
+      const closeTime = to24Hour(match[2]);
+      
+      if (openTime && closeTime) {
+        periods.push({
+          day: dayName,
+          open: openTime,
+          close: closeTime
+        });
+      }
+    }
+  });
+
+  return periods;
+}
+
+// Convert business hours periods format back to profile hours format
+function convertPeriodsToProfileHours(periods: Period[]): Record<string, string> {
+  const dayMap: Record<string, string> = {
+    'MONDAY': 'monday',
+    'TUESDAY': 'tuesday', 
+    'WEDNESDAY': 'wednesday',
+    'THURSDAY': 'thursday',
+    'FRIDAY': 'friday',
+    'SATURDAY': 'saturday',
+    'SUNDAY': 'sunday'
+  };
+
+  const profileHours: Record<string, string> = {};
+
+  // Initialize all days as closed
+  Object.values(dayMap).forEach(day => {
+    profileHours[day] = 'Closed';
+  });
+
+  // Convert periods to profile format
+  periods.forEach(period => {
+    const dayName = dayMap[period.day];
+    if (!dayName) return;
+
+    const openTime = to12Hour(period.open);
+    const closeTime = to12Hour(period.close);
+    
+    if (openTime && closeTime) {
+      profileHours[dayName] = `${openTime} - ${closeTime}`;
+    }
+  });
+
+  return profileHours;
 }
 
 
@@ -77,7 +155,33 @@ export default function HoursEditor({ tenantId, timezone: externalTimezone }: { 
         const hoursData = await tenantManagementService.getBusinessHours(tenantId);
         if (!mountedRef.current) return;
         setTimezone(hoursData?.timezone || "America/New_York");
-        setPeriods(Array.isArray(hoursData?.periods) ? hoursData.periods : []);
+        
+        let businessHoursPeriods = Array.isArray(hoursData?.periods) ? hoursData.periods : [];
+        
+        // If no business hours exist, check profile for hours data and sync it
+        if (businessHoursPeriods.length === 0) {
+          try {
+            const profileData = await platformHomeService.getOnboardingTenantData(tenantId);
+            if (profileData?.hours && typeof profileData.hours === 'object') {
+              console.log('[HoursEditor] Syncing profile hours to business hours:', profileData.hours);
+              const convertedPeriods = convertProfileHoursToPeriods(profileData.hours);
+              
+              if (convertedPeriods.length > 0) {
+                // Save the converted periods to business hours
+                await tenantManagementService.updateBusinessHours(tenantId, {
+                  timezone: hoursData?.timezone || "America/New_York",
+                  periods: convertedPeriods
+                });
+                businessHoursPeriods = convertedPeriods;
+                console.log('[HoursEditor] Successfully synced profile hours to business hours');
+              }
+            }
+          } catch (syncError) {
+            console.warn('[HoursEditor] Failed to sync profile hours:', syncError);
+          }
+        }
+        
+        setPeriods(businessHoursPeriods);
         
         // Load special hours
         const specialData = await tenantManagementService.getSpecialBusinessHours(tenantId);
@@ -106,45 +210,33 @@ export default function HoursEditor({ tenantId, timezone: externalTimezone }: { 
     // Validate that open time is before close time for each period
     const invalidPeriods = periods.filter(p => {
       if (!p.open || !p.close) return false;
-      return p.open >= p.close;
+      const openMinutes = parseTimeToMinutes(p.open);
+      const closeMinutes = parseTimeToMinutes(p.close);
+      return openMinutes !== null && closeMinutes !== null && openMinutes >= closeMinutes;
     });
 
     if (invalidPeriods.length > 0) {
-      setMsg("✗ Opening time must be before closing time");
+      setMsg("✗ Invalid hours: close time must be after open time");
       setTimeout(() => setMsg(null), 3000);
       return;
-    }
-
-    // Check for duplicate days with overlapping times
-    const dayGroups = periods.reduce((acc, p) => {
-      if (!acc[p.day]) acc[p.day] = [];
-      acc[p.day].push(p);
-      return acc;
-    }, {} as Record<string, Period[]>);
-
-    for (const [day, dayPeriods] of Object.entries(dayGroups)) {
-      if (dayPeriods.length > 1) {
-        // Check for overlaps
-        for (let i = 0; i < dayPeriods.length; i++) {
-          for (let j = i + 1; j < dayPeriods.length; j++) {
-            const p1 = dayPeriods[i];
-            const p2 = dayPeriods[j];
-            // Check if periods overlap: p1.open < p2.close AND p2.open < p1.close
-            if (p1.open < p2.close && p2.open < p1.close) {
-              setMsg(`✗ Overlapping hours on ${day.charAt(0) + day.slice(1).toLowerCase()}`);
-              setTimeout(() => setMsg(null), 3000);
-              return;
-            }
-          }
-        }
-      }
     }
 
     setSaving(true);
     setMsg(null);
     try {
-      // await tenantManagementService.updateBusinessHours(tenantId, { timezone, periods });
+      // Save to business hours table
       await tenantManagementService.updateBusinessHours(tenantId, { timezone, periods });
+      
+      // Also sync back to profile for consistency
+      try {
+        const profileHours = convertPeriodsToProfileHours(periods);
+        await platformHomeService.saveOnboardingProfile(tenantId, { hours: profileHours });
+        console.log('[HoursEditor] Successfully synced business hours back to profile');
+      } catch (profileSyncError) {
+        console.warn('[HoursEditor] Failed to sync hours back to profile:', profileSyncError);
+        // Don't fail the entire save if profile sync fails
+      }
+      
       setSaving(false);
       setMsg("✓ Saved");
       setTimeout(() => setMsg(null), 2000);

@@ -8,6 +8,74 @@ import { addressParser } from '@/lib/address-parser';
 import { z } from 'zod';
 import SlugPatternSelector from '@/components/tenants/SlugPatternSelector';
 
+// Create a schema that only validates onboarding form fields and ignores extra fields
+const onboardingFormSchema = z.object({
+  business_name: z.string()
+    .min(2, 'Business name must be at least 2 characters')
+    .max(100, 'Business name must be less than 100 characters')
+    .trim(),
+  
+  address_line1: z.string({ message: 'Address is required' })
+    .min(5, 'Address must be at least 5 characters')
+    .max(200, 'Address must be less than 200 characters')
+    .trim(),
+  
+  address_line2: z.string()
+    .max(200, 'Address line 2 must be less than 200 characters')
+    .trim()
+    .optional()
+    .nullable()
+    .transform(val => val ?? ''),
+  
+  city: z.string({ message: 'City is required' })
+    .min(2, 'City must be at least 2 characters')
+    .max(100, 'City must be less than 100 characters')
+    .trim(),
+  
+  state: z.string()
+    .max(100, 'State must be less than 100 characters')
+    .trim()
+    .optional()
+    .nullable()
+    .transform(val => val ?? ''),
+  
+  postal_code: z.string({ message: 'Postal code is required' })
+    .min(3, 'Postal code must be at least 3 characters')
+    .max(20, 'Postal code must be less than 20 characters')
+    .trim(),
+  
+  country_code: z.string({ message: 'Country is required' })
+    .length(2, 'Country code must be 2 characters (ISO 3166)')
+    .toUpperCase(),
+  
+  phone_number: z.string({ message: 'Phone number is required' })
+    .min(1, 'Phone number is required')
+    .trim(),
+  
+  email: z.string()
+    .refine((val) => !val || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), 'Please enter a valid email address')
+    .toLowerCase()
+    .trim()
+    .optional()
+    .nullable()
+    .transform(val => val ?? ''),
+  
+  website: z.string()
+    .refine((val) => !val || /^https:\/\//.test(val), 'Website must use HTTPS (e.g., https://www.example.com)')
+    .toLowerCase()
+    .trim()
+    .optional()
+    .nullable()
+    .transform(val => val ?? ''),
+  
+  contact_person: z.string()
+    .max(100, 'Contact person must be less than 100 characters')
+    .trim()
+    .optional()
+    .nullable()
+    .transform(val => val ?? ''),
+}).passthrough(); // This allows extra fields like latitude/longitude to pass through
+
 interface StoreIdentityStepProps {
   tenantId: string;
   initialData?: Partial<BusinessProfile>;
@@ -36,99 +104,73 @@ export default function StoreIdentityStep({
   onDataChange,
   onValidationChange
 }: StoreIdentityStepProps) {
+  console.log('[StoreIdentityStep] Received initialData:', initialData);
+  
+  // Use refs for callbacks to prevent infinite loops
+  const onDataChangeRef = useRef(onDataChange);
+  const onValidationChangeRef = useRef(onValidationChange);
+  
+  // Update refs when callbacks change
+  useEffect(() => {
+    onDataChangeRef.current = onDataChange;
+  }, [onDataChange]);
+  
+  useEffect(() => {
+    onValidationChangeRef.current = onValidationChange;
+  }, [onValidationChange]);
+  
   // Sanitize initial data to prevent hydration mismatches
   const sanitizedInitialData = sanitizeData(initialData);
   const [formData, setFormData] = useState<Partial<BusinessProfile>>(sanitizedInitialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [geocoding, setGeocoding] = useState(false);
-  const hasInitializedFromInitialData = useRef(false);
 
-  // Update formData when initialData changes (e.g., when API data loads)
+  // Validate initial data once on mount
   useEffect(() => {
-    // Only hydrate once when non-empty initial data first arrives to avoid
-    // infinite loops with onDataChange -> parent state -> initialData changes.
-    if (hasInitializedFromInitialData.current) return;
-
     if (Object.keys(initialData).length > 0) {
-      hasInitializedFromInitialData.current = true;
-      console.log('[StoreIdentityStep] Updating formData with initialData:', initialData);
-      const sanitized = sanitizeData(initialData);
-      
-      // Auto-convert HTTP to HTTPS for website field
-      if (sanitized.website && typeof sanitized.website === 'string') {
-        const website = sanitized.website.trim();
-        if (website.toLowerCase().startsWith('http://')) {
-          sanitized.website = 'https://' + website.substring(7);
-          console.log('[StoreIdentityStep] Auto-converted HTTP to HTTPS:', sanitized.website);
-        }
-      }
-      
-      setFormData(sanitized);
-      
-      // Notify parent of the sanitized data (with HTTPS conversion)
-      onDataChange(sanitized);
-      
-      // Validate the sanitized data (not the original initialData)
-      // This ensures HTTP->HTTPS conversion is validated correctly
-      // Use onboardingProfileSchema which only validates fields on the form
       try {
-        onboardingProfileSchema.parse(sanitized);
-        onValidationChange(true);
+        onboardingFormSchema.parse(sanitizedInitialData);
+        onValidationChangeRef.current(true);
       } catch (error) {
-        // Pre-populated data is incomplete - this is expected for new tenants
-        // Show errors for all incomplete fields
-        if (error instanceof z.ZodError) {
+        if (error instanceof z.ZodError && error.issues) {
           const fieldErrors: Record<string, string> = {};
-          error.issues.forEach(issue => {
-            const fieldName = issue.path.join('.');
-            if (!fieldErrors[fieldName]) {
-              fieldErrors[fieldName] = issue.message;
+          error.issues.forEach((err: any) => {
+            if (err.path.length > 0) {
+              fieldErrors[err.path[0] as string] = err.message;
             }
           });
           setErrors(fieldErrors);
-          // Mark all fields with errors as touched so errors are visible
-          setTouched(prev => {
-            const newTouched = { ...prev };
-            Object.keys(fieldErrors).forEach(key => {
-              newTouched[key] = true;
-            });
-            return newTouched;
-          });
+          onValidationChangeRef.current(false);
         }
-        onValidationChange(false);
       }
     }
-  }, [initialData, onDataChange, onValidationChange]);
+  }, []); // Only run once on mount
 
   const validateField = (name: string, value: any) => {
     try {
-      const fieldSchema = (onboardingProfileSchema.shape as any)[name];
+      const fieldSchema = (onboardingFormSchema.shape as any)[name];
       if (fieldSchema) {
         fieldSchema.parse(value);
+        // Clear error for this field if validation passes
         setErrors(prev => {
           const newErrors = { ...prev };
           delete newErrors[name];
           return newErrors;
         });
-        return true;
       }
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        setErrors(prev => ({
-          ...prev,
-          [name]: error.issues[0]?.message || 'Invalid value'
-        }));
-        return false;
+      if (error instanceof z.ZodError && error.issues) {
+        const errorMessage = error.issues[0]?.message || 'Invalid value';
+        setErrors(prev => ({ ...prev, [name]: errorMessage }));
       }
     }
-    return false;
   };
 
   const handleChange = (name: keyof BusinessProfile, value: any) => {
     const newData = { ...formData, [name]: value };
     setFormData(newData);
-    onDataChange(newData);
+    onDataChangeRef.current(newData);
 
     // Mark field as touched when user changes it
     setTouched(prev => ({ ...prev, [name]: true }));
@@ -138,32 +180,36 @@ export default function StoreIdentityStep({
       validateField(name, value);
     }
 
-    // Check overall validity using onboardingProfileSchema
+    // Check overall validity using onboardingFormSchema
     try {
-      onboardingProfileSchema.parse(newData);
+      onboardingFormSchema.parse(newData);
       setErrors({}); // Clear all errors on valid form
-      onValidationChange(true);
+      onValidationChangeRef.current(true);
+      console.log('[StoreIdentityStep] Validation passed for:', newData);
     } catch (error) {
-      if (error instanceof z.ZodError) {
+      if (error instanceof z.ZodError && error.issues) {
         // Extract all field errors and display them
         const fieldErrors: Record<string, string> = {};
-        error.issues.forEach(issue => {
-          const fieldName = issue.path.join('.');
-          if (!fieldErrors[fieldName]) {
-            fieldErrors[fieldName] = issue.message;
+        error.issues.forEach((err: any) => {
+          if (err.path.length > 0) {
+            fieldErrors[err.path[0] as string] = err.message;
           }
         });
         setErrors(fieldErrors);
-        // Mark all fields with errors as touched so errors are visible
-        setTouched(prev => {
-          const newTouched = { ...prev };
-          Object.keys(fieldErrors).forEach(key => {
-            newTouched[key] = true;
-          });
-          return newTouched;
+        
+        // Mark all fields with errors as touched
+        const newTouched = { ...touched };
+        Object.keys(fieldErrors).forEach(key => {
+          newTouched[key] = true;
         });
+        setTouched(newTouched);
+        
+        console.log('[StoreIdentityStep] Validation failed:', fieldErrors);
+        console.log('[StoreIdentityStep] Form data:', newData);
+      } else {
+        console.log('[StoreIdentityStep] Validation error (non-Zod):', error);
       }
-      onValidationChange(false);
+      onValidationChangeRef.current(false);
     }
   };
 
@@ -213,10 +259,10 @@ export default function StoreIdentityStep({
       
       // Check overall validity
       try {
-        onboardingProfileSchema.parse(newData);
-        onValidationChange(true);
+        onboardingFormSchema.parse(newData);
+        onValidationChangeRef.current(true);
       } catch (error) {
-        onValidationChange(false);
+        onValidationChangeRef.current(false);
       }
     } else {
       // Normal single-field update
