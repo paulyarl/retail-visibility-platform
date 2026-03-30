@@ -55,7 +55,7 @@ export function useOnboardingPersistence({
       
       const savedProgress = await onboardingStorageService.load(tenantId);
       if (savedProgress) {
-        console.log('[useOnboardingPersistence] Loaded from storage:', savedProgress);
+        // console.log('[useOnboardingPersistence] Loaded from storage:', savedProgress);
         setBusinessDataState(savedProgress.businessData);
         setCurrentStep(savedProgress.currentStep);
       }
@@ -80,7 +80,7 @@ export function useOnboardingPersistence({
         businessData,
       });
       
-      console.log('[useOnboardingPersistence] Saved to storage:', { currentStep, businessData });
+      // console.log('[useOnboardingPersistence] Saved to storage:', { currentStep, businessData });
     } catch (err) {
       console.error('[useOnboardingPersistence] Failed to save to storage:', err);
       setError(err instanceof Error ? err.message : 'Failed to save progress');
@@ -106,20 +106,20 @@ export function useOnboardingPersistence({
   const updateBusinessData = useCallback((updates: Partial<BusinessProfile>) => {
     const newData = { ...businessData, ...updates };
     setBusinessDataState(newData);
-    console.log('[useOnboardingPersistence] Updated business data:', newData);
+    // console.log('[useOnboardingPersistence] Updated business data:', newData);
   }, [businessData]);
 
   // Set business data completely
   const setBusinessData = useCallback((data: Partial<BusinessProfile>) => {
     setBusinessDataState(data);
-    console.log('[useOnboardingPersistence] Set business data:', data);
+    // console.log('[useOnboardingPersistence] Set business data:', data);
   }, []);
 
   // Navigation functions
   const goToStep = useCallback((step: number) => {
     const validStep = Math.max(1, Math.min(step, 5)); // Ensure step is between 1-5
     setCurrentStep(validStep);
-    console.log('[useOnboardingPersistence] Navigated to step:', validStep);
+    // console.log('[useOnboardingPersistence] Navigated to step:', validStep);
   }, []);
 
   const nextStep = useCallback(() => {
@@ -138,7 +138,7 @@ export function useOnboardingPersistence({
     }
     
     onboardingStorageService.clear(tenantId);
-    console.log('[useOnboardingPersistence] Cleared storage for tenant:', tenantId);
+    // console.log('[useOnboardingPersistence] Cleared storage for tenant:', tenantId);
   }, [tenantId, saveTimeout]);
 
   // Auto-save when data or step changes

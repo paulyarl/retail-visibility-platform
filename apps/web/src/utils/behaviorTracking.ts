@@ -796,7 +796,7 @@ async function getUserLocationClient(): Promise<{
     
     return null;
   } catch (error) {
-    console.error('[BehaviorTracking] Failed to get user location:', error);
+    console.warn('[BehaviorTracking] Failed to get user location:', error);  
     return null;
   }
 }

@@ -87,6 +87,7 @@ export default function CategoryViewClient({
 }: CategoryViewClientProps) {
   const { settings } = usePlatformSettings();
   const [data, setData] = useState<DirectoryResponse | null>(null);
+  // console.log(`CategoryViewClient: ${categorySlug}`, data);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
@@ -308,7 +309,7 @@ export default function CategoryViewClient({
 
         {viewMode === 'map' && (
           <>
-            {console.log('[CategoryViewClient] Map listings:', data?.listings?.slice(0, 3)?.map(l => ({ id: l.id, businessName: l.businessName, logoUrl: l.logoUrl })))}
+            {/* {console.log('[CategoryViewClient] Map listings:', data?.listings?.slice(0, 3)?.map(l => ({ id: l.id, businessName: l.businessName, logoUrl: l.logoUrl })))} */}
             <DirectoryMapGoogle
               listings={data?.listings || []} // Use the already-filtered listings
               useMapEndpoint={false} // Don't use the endpoint to avoid data sync issues

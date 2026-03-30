@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Calendar, Filter, ChevronDown, X } from 'lucide-react';
 
 interface AnalyticsFiltersProps {
@@ -79,10 +79,14 @@ export default function AnalyticsFilters({ initialFilters, onFiltersChange }: An
   const updateFilter = (key: keyof FilterOptions, value: string) => {
     setFilters(prev => {
       const newFilters = { ...prev, [key]: value };
-      onFiltersChange?.(newFilters);
       return newFilters;
     });
   };
+
+  // Notify parent of filter changes via useEffect to avoid setState during render
+  useEffect(() => {
+    onFiltersChange?.(filters);
+  }, [filters, onFiltersChange]);
 
   const clearFilters = () => {
     setFilters({

@@ -90,6 +90,7 @@ export function StoreCard({
 }: StoreCardProps) {
   // Get business hours status
   const { status: hoursStatus } = useStoreStatus(store.tenantId, true);
+  // console.log(`StoreCard: ${store.name}`, store);
   
   // Derived data
   const totalProducts = stats?.totalProducts || store.productCount || 0;
@@ -103,7 +104,7 @@ export function StoreCard({
 
   // Determine link destination
   const linkHref = linkType === 'storefront' 
-    ? `/shops/${store.tenantId}`
+    ? `/shops/${store.slug || store.tenantId}`
     : `/directory/${store.slug || store.tenantId}`;
 
   // Format category name

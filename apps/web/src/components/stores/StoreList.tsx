@@ -112,6 +112,7 @@ export function StoreList({
   // Fetch store stats for all stores
   useEffect(() => {
     if (stores.length > 0 && !loading) {
+      // console.log(`StoreList: ${stores.length} stores`, stores);
       const fetchAllStats = async () => {
         // Set loading state for all stores
         const loadingState: Record<string, boolean> = {};

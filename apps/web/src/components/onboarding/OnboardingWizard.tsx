@@ -108,8 +108,8 @@ export default function OnboardingWizard({
   // Reset validation when step changes (optional steps default to valid)
   useEffect(() => {
     setIsValid(true);
-    console.log('[OnboardingWizard] Step changed to:', currentStep);
-    console.log('[OnboardingWizard] Current businessData:', businessData);
+    // console.log('[OnboardingWizard] Step changed to:', currentStep);
+    // console.log('[OnboardingWizard] Current businessData:', businessData);
   }, [currentStep]);
   
   // Feature flags

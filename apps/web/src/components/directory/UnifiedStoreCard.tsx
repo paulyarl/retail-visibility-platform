@@ -90,6 +90,9 @@ export function UnifiedStoreCard({
   // console.log(`UnifiedStoreCard - listing:`, listing);
   
   // Use enhanced stats if available, otherwise fall back to basic listing data
+  // console.log(`UnifiedStoreCard - contextCategory:`, contextCategory);
+  // console.log(`UnifiedStoreCard - listing:`, listing);
+  // console.log(`UnifiedStoreCard - enhancedStats:`, enhancedStats);
   const ratingAvg = enhancedStats?.ratingAvg || (typeof listing.ratingAvg === 'number' ? listing.ratingAvg : parseFloat(listing.ratingAvg || '0')) || 0;
   const ratingCount = enhancedStats?.ratingCount || (typeof listing.ratingCount === 'number' ? listing.ratingCount : parseInt(listing.ratingCount || '0')) || 0;
   const categories = enhancedStats?.categories || [];
@@ -102,20 +105,27 @@ export function UnifiedStoreCard({
     : `/directory/${listing.slug || listing.tenantId}`;
 
   // Prioritize category display: enhancedStats → contextCategory → gbpPrimaryCategoryName → primaryCategory → category.name
-  const displayCategory = categories.length > 0 
-    ? categories[0].name  // Use first category from enhanced stats
-    : contextCategory ||
-      listing.gbpPrimaryCategoryName ||
-      listing.primaryCategory ||
-      listing.category?.name ||
-      'General Store';
-
+  // const displayCategory = categories.length > 0 
+  //   ? categories[0].name  // Use first category from enhanced stats
+  //   : listing.primaryCategory ||
+  //     listing.gbpPrimaryCategoryName ||
+  //     contextCategory ||
+  //     listing.category?.name ||
+  //     'General Store';
+  const displayCategory = listing.primaryCategory 
+    ? listing.primaryCategory
+    : listing.gbpPrimaryCategoryName ||
+    contextCategory ||
+    listing.category?.name ||
+    'General Store';
+  // console.log(`UnifiedStoreCard - displayCategory:`, displayCategory);
   // Format category name (handle snake_case and underscores)
   const formattedCategory = displayCategory
     .replace(/_/g, ' ')
     .split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+  // console.log(`UnifiedStoreCard - formattedCategory:`, formattedCategory);
 
   // Format address
   const formattedAddress = [
@@ -124,10 +134,11 @@ export function UnifiedStoreCard({
     listing.state,
     listing.zipCode
   ].filter(Boolean).join(', ');
+  // console.log(`UnifiedStoreCard - formattedAddress:`, formattedAddress);
 
   if (viewMode === 'list') {
     return (
-      <Link href={linkHref} className={`block ${className}`}>
+       
         <Card withBorder padding="md" radius="md" className="hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700">
           <div className="flex items-center space-x-4">
               {/* Logo - conditionally shown */}
@@ -153,9 +164,11 @@ export function UnifiedStoreCard({
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:!text-white truncate">
-                      {listing.businessName}
-                    </h3>
+                    <Link href={linkHref} className={`block ${className}`}>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:!text-white truncate">
+                        {listing.businessName}
+                      </h3>
+                    </Link>
 
                     <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600 dark:text-gray-400">
                       <span className="flex items-center">
@@ -306,7 +319,7 @@ export function UnifiedStoreCard({
               </div>
             </div>
           </Card>
-        </Link>
+     
       );
     }
 

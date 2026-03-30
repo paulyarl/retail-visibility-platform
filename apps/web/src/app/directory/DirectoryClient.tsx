@@ -53,6 +53,8 @@ function getCachedData(key: string): any | null {
       localStorage.removeItem(key);
       return null;
     }
+    // console.log('[DirectoryClient] Cache hit for:', key);
+    // console.log('[DirectoryClient] Cache data:', data);
     
     return data;
   } catch (error) {
@@ -323,6 +325,7 @@ export default function DirectoryClient() {
         if (!categories || categories.length === 0) {
           // Fetch directory categories
           const categoriesData = await directoryService.getDirectoryCategories();
+          // console.log('[DirectoryClient] Categories data:', categoriesData);
 
           if (categoriesData) {
             setCategories(categoriesData);
@@ -420,7 +423,8 @@ export default function DirectoryClient() {
   // Mark component render completion (minimal logging only)
   useEffect(() => {
     if (!loading && data) {
-      // console.log('Directory loaded:', data?.length || 0, 'stores');
+      // console.log('Directory loaded:', data.length || 0, 'stores');
+      // console.log('Directory data:', data);
     }
   }, [loading, data]);
 
@@ -505,36 +509,7 @@ export default function DirectoryClient() {
         locations={Array.isArray(locations) ? locations.map(loc => ({ city: loc.city, state: loc.state, count: loc.count })) : []} 
       />
 
-      {/* Random Featured Products */}
-      <ProductSingletonProvider>
-        <RandomFeaturedProducts />
-      </ProductSingletonProvider>
-
-      {/* Featured Stores */}
-      <StoreSingletonProvider>
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Featured Stores</h2>
-            <Link
-              href="/directory/stores"
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              View all stores →
-            </Link>
-          </div>
-          <FeaturedStoresList 
-            limit={8} 
-            showLocation={true}
-            showRating={true}
-            showProductCount={true}
-            userLocation={userLocation ? {
-              lat: userLocation.latitude,
-              lng: userLocation.longitude
-            } : undefined}
-          />
-        </div>
-      </StoreSingletonProvider>
-
+   
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         {/* Error State */}
@@ -626,6 +601,7 @@ export default function DirectoryClient() {
           <DirectoryGrid 
             listings={data || []} 
             loading={loading}
+            viewMode="grid"
           />
         )}
 
@@ -634,6 +610,8 @@ export default function DirectoryClient() {
           <DirectoryList 
             listings={data || []} 
             loading={loading}
+            showLogo={true}
+            viewMode="list"
           />
         )}
 
@@ -685,6 +663,36 @@ export default function DirectoryClient() {
             />
           </>
         )}
+           {/* Random Featured Products */}
+      <ProductSingletonProvider>
+        <RandomFeaturedProducts />
+      </ProductSingletonProvider>
+
+      {/* Featured Stores */}
+      <StoreSingletonProvider>
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Featured Stores</h2>
+            <Link
+              href="/directory/stores"
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              View all stores →
+            </Link>
+          </div>
+          <FeaturedStoresList 
+            limit={8} 
+            showLocation={true}
+            showRating={true}
+            showProductCount={true}
+            userLocation={userLocation ? {
+              lat: userLocation.latitude,
+              lng: userLocation.longitude
+            } : undefined}
+          />
+        </div>
+      </StoreSingletonProvider>
+
 
         {/* Directory Home Recommendations */}
         <DirectoryHomeRecommendations />
@@ -738,9 +746,10 @@ export default function DirectoryClient() {
           </div>
         )}
         
+      
+      </div>
       {/* Platform Branding Footer */}
       <PoweredByFooter />
-      </div>
     </div>
   );
 }

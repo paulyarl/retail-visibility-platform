@@ -104,7 +104,7 @@ export default function StoreIdentityStep({
   onDataChange,
   onValidationChange
 }: StoreIdentityStepProps) {
-  console.log('[StoreIdentityStep] Received initialData:', initialData);
+  // console.log('[StoreIdentityStep] Received initialData:', initialData);
   
   // Use refs for callbacks to prevent infinite loops
   const onDataChangeRef = useRef(onDataChange);
@@ -185,7 +185,7 @@ export default function StoreIdentityStep({
       onboardingFormSchema.parse(newData);
       setErrors({}); // Clear all errors on valid form
       onValidationChangeRef.current(true);
-      console.log('[StoreIdentityStep] Validation passed for:', newData);
+      // console.log('[StoreIdentityStep] Validation passed for:', newData);
     } catch (error) {
       if (error instanceof z.ZodError && error.issues) {
         // Extract all field errors and display them
@@ -204,10 +204,10 @@ export default function StoreIdentityStep({
         });
         setTouched(newTouched);
         
-        console.log('[StoreIdentityStep] Validation failed:', fieldErrors);
-        console.log('[StoreIdentityStep] Form data:', newData);
+          // console.log('[StoreIdentityStep] Validation failed:', fieldErrors);
+          // console.log('[StoreIdentityStep] Form data:', newData);
       } else {
-        console.log('[StoreIdentityStep] Validation error (non-Zod):', error);
+        // console.log('[StoreIdentityStep] Validation error (non-Zod):', error);
       }
       onValidationChangeRef.current(false);
     }
@@ -289,7 +289,7 @@ export default function StoreIdentityStep({
       });
 
       if (coordinates) {
-        console.log('[StoreIdentityStep] Got coordinates:', coordinates);
+        // console.log('[StoreIdentityStep] Got coordinates:', coordinates);
         const newData = {
           ...formData,
           latitude: coordinates.latitude,

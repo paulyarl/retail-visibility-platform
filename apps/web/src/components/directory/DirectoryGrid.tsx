@@ -51,6 +51,7 @@ interface DirectoryGridProps {
 
 // Transform directory listing to store data format
 function transformListing(listing: DirectoryListing): StoreData {
+  // console.log(`transformListing: ${listing.businessName}`, listing);
   return {
     id: listing.id,
     tenantId: listing.tenantId,
@@ -64,7 +65,7 @@ function transformListing(listing: DirectoryListing): StoreData {
     longitude: listing.longitude,
     logoUrl: listing.logoUrl,
     bannerUrl: listing.bannerUrl,
-    primaryCategory: listing.primaryCategory || listing.gbpPrimaryCategoryName,
+    primaryCategory: listing.category?.name || listing.primaryCategory || listing.gbpPrimaryCategoryName,
     ratingAvg: listing.ratingAvg,
     ratingCount: listing.ratingCount,
     productCount: listing.productCount,
@@ -85,6 +86,7 @@ export default function DirectoryGrid({
 }: DirectoryGridProps) {
   // Transform listings to store data format
   const stores = listings.map(transformListing);
+  // console.log(`DirectoryGrid: ${stores.length} stores`, stores);
   
   // Use either loading prop
   const showLoading = loading || isLoading;

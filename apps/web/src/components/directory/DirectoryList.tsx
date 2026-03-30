@@ -10,11 +10,12 @@ interface DirectoryListProps {
   loading?: boolean;
   contextCategory?: string; // Override category display (e.g., for product category pages)
   showLogo?: boolean; // Whether to display store logos
+  viewMode?: 'list' | 'grid';
 }
 
 
 
-export default function DirectoryList({ listings, loading, contextCategory, showLogo = true }: DirectoryListProps) {
+export default function DirectoryList({ listings, loading, contextCategory, showLogo = true, viewMode = 'list' }: DirectoryListProps) {
   const [storeStats, setStoreStats] = useState<Record<string, any>>({});
   const [statsLoading, setStatsLoading] = useState<Record<string, boolean>>({});
 
@@ -100,7 +101,7 @@ export default function DirectoryList({ listings, loading, contextCategory, show
           <UnifiedStoreCard
             key={listing.id}
             listing={listing}
-            viewMode="list"
+            viewMode={viewMode}
             linkType="directory"
             contextCategory={contextCategory}
             showLogo={showLogo}
