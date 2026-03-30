@@ -161,6 +161,26 @@ class TenantLimitsSingletonService extends TenantApiSingleton {
       return {};
     }
   }
+
+  /**
+   * Get all available tiers with caching
+   * Uses the /api/tenant-limits/tiers endpoint
+   */
+  async getTiers(): Promise<any[]> {
+    try {
+      const result = await this.makeDefaultRequest<any[]>(
+        '/api/tenant-limits/tiers',
+        {},
+        'tenant-limits-tiers',
+        this.cacheTTL
+      );
+
+      return result.data || [];
+    } catch (error) {
+      console.error('[TenantLimitsSingleton] Failed to get tiers:', error);
+      return [];
+    }
+  }
 }
 
 // Export singleton instance

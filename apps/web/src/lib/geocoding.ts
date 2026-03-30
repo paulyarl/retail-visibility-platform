@@ -3,6 +3,8 @@
  * Converts addresses to latitude/longitude coordinates
  */
 
+import { externalApiService } from '@/services/ExternalApiService';
+
 export interface GeocodeResult {
   latitude: number;
   longitude: number;
@@ -16,53 +18,50 @@ export interface GeocodeError {
 }
 
 /**
- * Geocode an address using Google Geocoding API
+ * Geocode an address using Google Geocoding API via ExternalApiService for platform caching
  */
 export async function geocodeAddress(
   address: string,
   city?: string,
   state?: string,
-  zipCode?: string
+  zipCode?: string,
+  countryCode: string = 'US'
 ): Promise<GeocodeResult | null> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    if (!apiKey) {
-      throw new Error('Google Maps API key not configured');
-    }
-
     // Build full address string
     const fullAddress = [address, city, state, zipCode]
       .filter(Boolean)
       .join(', ');
 
-    if (!fullAddress.trim()) {
+    if (!address.trim()) {
       throw new Error('No address provided for geocoding');
     }
 
-    const encodedAddress = encodeURIComponent(fullAddress);
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;
+    // Use ExternalApiService for platform caching
+    const result = await externalApiService.geocodeAddress({
+      address_line1: address,
+      city: city || '',
+      state: state || '',
+      postal_code: zipCode || '',
+      country_code: countryCode
+    });
 
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (data.status !== 'OK') {
-      console.warn(`[Geocoding] Failed for "${fullAddress}": ${data.status}`);
+    if (!result) {
+      console.warn(`[Geocoding] Failed for "${fullAddress}"`);
       return null;
     }
 
-    if (!data.results || data.results.length === 0) {
-      console.warn(`[Geocoding] No results for "${fullAddress}"`);
-      return null;
-    }
-
-    const result = data.results[0];
-    const location = result.geometry.location;
+    // Get formatted address by making a reverse geocoding call
+    const reverseResult = await externalApiService.reverseGeocode(result.latitude, result.longitude, {
+      usePublicContext: true,
+      cacheKey: `geocode-formatted-${result.latitude}-${result.longitude}`
+    });
 
     return {
-      latitude: location.lat,
-      longitude: location.lng,
-      formattedAddress: result.formatted_address,
-      placeId: result.place_id,
+      latitude: result.latitude,
+      longitude: result.longitude,
+      formattedAddress: reverseResult?.display_name || fullAddress,
+      placeId: reverseResult?.place_id?.toString(),
     };
   } catch (error) {
     console.error('[Geocoding] Error:', error);
@@ -71,7 +70,8 @@ export async function geocodeAddress(
 }
 
 /**
- * Batch geocode multiple addresses with rate limiting
+ * Batch geocode multiple addresses using ExternalApiService with platform caching
+ * Processes requests in parallel with proper error handling
  */
 export async function batchGeocodeAddresses(
   addresses: Array<{
@@ -80,23 +80,73 @@ export async function batchGeocodeAddresses(
     city?: string;
     state?: string;
     zipCode?: string;
+    countryCode?: string;
   }>,
   onProgress?: (completed: number, total: number) => void
 ): Promise<Record<string, GeocodeResult | null>> {
   const results: Record<string, GeocodeResult | null> = {};
 
-  for (let i = 0; i < addresses.length; i++) {
-    const addr = addresses[i];
-    const result = await geocodeAddress(addr.address, addr.city, addr.state, addr.zipCode);
-    results[addr.id] = result;
-
-    // Rate limiting: 10 requests per second for Geocoding API
-    if (i < addresses.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+  // Process all addresses in parallel using ExternalApiService's batch capabilities
+  const requests = addresses.map(addr => ({
+    url: `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+      [addr.address, addr.city, addr.state, addr.zipCode].filter(Boolean).join(', ')
+    )}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`,
+    options: {
+      cacheKey: `geocode-${addr.id}-${encodeURIComponent([addr.address, addr.city, addr.state, addr.zipCode].filter(Boolean).join(', '))}`,
+      ttl: 7 * 24 * 60 * 60 * 1000, // 7 days cache
+      signal: AbortSignal.timeout(10000)
     }
+  }));
 
-    if (onProgress) {
-      onProgress(i + 1, addresses.length);
+  try {
+    // Use ExternalApiService batch request for parallel processing
+    const batchResults = await externalApiService.batchRequest<any>(requests);
+    
+    // Process results
+    for (let i = 0; i < addresses.length; i++) {
+      const addr = addresses[i];
+      const batchResult = batchResults[i];
+      
+      if (batchResult.success && batchResult.data?.status === 'OK' && batchResult.data?.results?.length > 0) {
+        const location = batchResult.data.results[0].geometry.location;
+        
+        // Get formatted address via reverse geocoding
+        const reverseResult = await externalApiService.reverseGeocode(location.lat, location.lng, {
+          usePublicContext: true,
+          cacheKey: `geocode-formatted-${location.lat}-${location.lng}`
+        });
+        
+        results[addr.id] = {
+          latitude: location.lat,
+          longitude: location.lng,
+          formattedAddress: reverseResult?.display_name || [addr.address, addr.city, addr.state, addr.zipCode].filter(Boolean).join(', '),
+          placeId: batchResult.data.results[0].place_id,
+        };
+      } else {
+        const errorMessage = typeof batchResult.error === 'string' 
+          ? batchResult.error 
+          : batchResult.error?.message || 'Unknown error';
+        console.warn(`[Geocoding] Failed for address ${addr.id}:`, errorMessage);
+        results[addr.id] = null;
+      }
+
+      // Report progress
+      if (onProgress) {
+        onProgress(i + 1, addresses.length);
+      }
+    }
+  } catch (error) {
+    console.error('[Geocoding] Batch request failed:', error);
+    
+    // Fallback to individual requests if batch fails
+    for (let i = 0; i < addresses.length; i++) {
+      const addr = addresses[i];
+      const result = await geocodeAddress(addr.address, addr.city, addr.state, addr.zipCode, addr.countryCode);
+      results[addr.id] = result;
+
+      if (onProgress) {
+        onProgress(i + 1, addresses.length);
+      }
     }
   }
 

@@ -282,6 +282,8 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                     width={150}
                     height={40}
                     className="object-contain cursor-pointer"
+                    loading="eager"
+                    priority
                   />
                 </Link>
               ) : (

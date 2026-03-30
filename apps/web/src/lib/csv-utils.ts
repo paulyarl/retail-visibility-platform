@@ -110,7 +110,7 @@ export const CSV_EXAMPLE_DATA = [
  */
 export function generateCSVTemplate(): string {
   const comments = [
-    '# RVP Bulk Import Template',
+    '# VS Bulk Import Template',
     '# Required fields: name, price',
     '# Optional fields: sku, title, brand, manufacturer, description, currency, availability, imageUrl, category, status, visibility',
     '#',

@@ -1,7 +1,11 @@
 /**
- * Admin email management utilities
- * Centralized access to configured admin emails from database
+ * Admin Email Configuration Library
+ * 
+ * Provides access to admin email addresses for different categories
+ * Uses AdminEmailConfigService for platform caching and proper error handling
  */
+
+import { adminEmailConfigService } from '@/services/AdminEmailConfigService';
 
 export type EmailCategory = 
   | 'subscription'
@@ -34,23 +38,17 @@ let cacheTimestamp: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Fetch email configurations from API
+ * Fetch email configurations from AdminEmailConfigService
  */
 async function fetchEmailConfigs(): Promise<Record<EmailCategory, string>> {
   try {
-    const response = await fetch('/api/admin/email-config');
-    if (response.ok) {
-      const configs = await response.json();
-      const emailMap: Record<string, string> = {};
-      configs.forEach((config: { category: string; email: string }) => {
-        emailMap[config.category] = config.email;
-      });
-      
-      // Merge with defaults
-      return { ...DEFAULT_ADMIN_EMAILS, ...emailMap } as Record<EmailCategory, string>;
-    }
+    // Use AdminEmailConfigService for platform caching and proper error handling
+    const emailMap = await adminEmailConfigService.getEmailConfigMap();
+    
+    // Merge with defaults
+    return { ...DEFAULT_ADMIN_EMAILS, ...emailMap } as Record<EmailCategory, string>;
   } catch (error) {
-    console.error('Error fetching admin emails from API:', error);
+    console.error('[AdminEmails] Error fetching email configs from service:', error);
   }
   
   return DEFAULT_ADMIN_EMAILS;
@@ -112,6 +110,33 @@ export function getAllAdminEmailsSync(): Record<EmailCategory, string> {
   });
 
   return emailCache || DEFAULT_ADMIN_EMAILS;
+}
+
+/**
+ * Refresh the email cache (force fresh data from service)
+ */
+export async function refreshAdminEmails(): Promise<Record<EmailCategory, string>> {
+  if (typeof window === 'undefined') {
+    return DEFAULT_ADMIN_EMAILS;
+  }
+
+  try {
+    const configs = await fetchEmailConfigs();
+    emailCache = configs;
+    cacheTimestamp = Date.now();
+    return configs;
+  } catch (error) {
+    console.error('[AdminEmails] Failed to refresh email cache:', error);
+    return emailCache || DEFAULT_ADMIN_EMAILS;
+  }
+}
+
+/**
+ * Clear the email cache (useful for testing or admin updates)
+ */
+export function clearAdminEmailCache(): void {
+  emailCache = null;
+  cacheTimestamp = 0;
 }
 
 /**

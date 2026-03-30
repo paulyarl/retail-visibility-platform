@@ -17,7 +17,7 @@ import {
   isTokenExpired,
   calculateTokenExpiration,
 } from '../services/clover-oauth';
-import { getDemoItems, convertDemoItemToRVPFormat } from '../services/clover-demo-emulator';
+import { getDemoItems, convertDemoItemToVSFormat } from '../services/clover-demo-emulator';
 import { prisma } from '../prisma';
 
 // Test configuration
@@ -309,7 +309,7 @@ async function testPhase3DemoMode() {
   subsection('Test 3.2: Demo Item Conversion');
   try {
     const demoItems = getDemoItems();
-    const converted = convertDemoItemToRVPFormat(demoItems[0]);
+    const converted = convertDemoItemToVSFormat(demoItems[0]);
     
     if (
       converted.name === demoItems[0].name &&

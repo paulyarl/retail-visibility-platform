@@ -517,7 +517,7 @@ export default function CloverIntegrationPage() {
                     <li>• 25 sample products across 5 categories</li>
                     <li>• Simulate sync scenarios (stock changes, price updates, conflicts)</li>
                     <li>• Practice conflict resolution</li>
-                    <li>• View item mappings between Clover and RVP</li>
+                    <li>• View item mappings between Clover and Visible Shelf</li>
                   </ul>
                 </div>
               )}
@@ -830,7 +830,7 @@ export default function CloverIntegrationPage() {
                     <thead className="bg-neutral-50 dark:bg-neutral-700/50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Clover Item</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">RVP Item</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Visible Shelf Item</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Status</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Actions</th>
                       </tr>
@@ -876,7 +876,7 @@ export default function CloverIntegrationPage() {
                                   disabled={actionLoading}
                                   className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
                                 >
-                                  Use RVP
+                                  Use Visible Shelf
                                 </button>
                               </div>
                             )}
@@ -910,7 +910,7 @@ export default function CloverIntegrationPage() {
                       <thead className="bg-neutral-50 dark:bg-neutral-700/50">
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Clover Category</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">RVP Category</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Visible Shelf Category</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Sync Direction</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase">Status</th>
                         </tr>
@@ -945,8 +945,8 @@ export default function CloverIntegrationPage() {
                                   : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
                               }`}>
                                 {catMapping.sync_direction === 'bidirectional' ? '↔ Both Ways' :
-                                 catMapping.sync_direction === 'clover_to_rvp' ? '→ Clover to RVP' :
-                                 '← RVP to Clover'}
+                                 catMapping.sync_direction === 'clover_to_rvp' ? '→ Clover to Visible Shelf' :
+                                 '← Visible Shelf to Clover'}
                               </span>
                             </td>
                             <td className="px-4 py-3">

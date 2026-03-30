@@ -477,7 +477,7 @@ This invitation was sent to ${data.inviteeEmail}. If you didn't expect this invi
   async testEmail(to: string): Promise<EmailResult> {
     return this.sendEmail({
       to,
-      subject: 'Test Email from RVP Platform',
+      subject: 'Test Email from Visible Shelf Platform',
       html: '<h1>Test Email</h1><p>If you received this, email configuration is working!</p>',
       text: 'Test Email\n\nIf you received this, email configuration is working!',
     });

@@ -191,7 +191,7 @@ export class IntegrationService extends TenantApiSingleton {
     }
 
     const result = await this.makeDefaultRequest<any>(
-      `/api/integrations/${tenantId}/clover/demo`,
+      `/api/integrations/${tenantId}/clover/demo/enable`,
       { 
         method: 'POST',
         body: JSON.stringify({})

@@ -10,7 +10,7 @@ import { authenticateToken } from '../../middleware/auth';
 import { 
   getDemoItems,
   getDemoItem,
-  convertDemoItemToRVPFormat,
+  convertDemoItemToVSFormat,
   getAvailableScenarios,
   generateSimulationEvent,
   SimulationScenario,
@@ -141,7 +141,7 @@ router.post('/:tenantId/clover/demo/enable', authenticateToken, async (req: Requ
     }
 
     for (const demoItem of demoItems) {
-      const rvpItem = convertDemoItemToRVPFormat(demoItem);
+      const rvpItem = convertDemoItemToVSFormat(demoItem);
       
       try {
         // Check if item with this SKU already exists

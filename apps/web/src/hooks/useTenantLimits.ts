@@ -94,21 +94,9 @@ export function useTierInfo() {
       setLoading(true);
       setError(null);
 
-      // Note: This endpoint doesn't exist in the singleton service yet
-      // For now, we'll keep the direct API call but should be migrated later
-      const response = await fetch('/api/tenant-limits/tiers', {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch tier information');
-      }
-
-      const data = await response.json();
-      setTiers(data.tiers);
+      // Use TenantLimitsService for platform caching and proper error handling
+      const tiersData = await tenantLimitsService.getTiers();
+      setTiers(tiersData);
     } catch (err) {
       console.error('[useTierInfo] Error:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');

@@ -21,7 +21,7 @@ router.get('/config', requirePlatformUser, async (req: Request, res: Response) =
       provider: process.env.EMAIL_PROVIDER || 'console',
       configured: isValid,
       fromEmail: process.env.EMAIL_FROM || 'noreply@rvp-platform.com',
-      fromName: process.env.EMAIL_FROM_NAME || 'RVP Platform',
+      fromName: process.env.EMAIL_FROM_NAME || 'Visible Shelf Platform',
     });
   } catch (error: any) {
     console.error('[Email Test] Config check failed:', error);

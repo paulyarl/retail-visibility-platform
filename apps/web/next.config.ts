@@ -54,6 +54,8 @@ const nextConfig: NextConfig = {
       /Failed to parse source map/,
       /Invalid source map/,
       /sourceMapURL could not be parsed/,
+      // Ignore Cloudflare cookie warnings (harmless cross-domain issue)
+      /Cookie.*__cf_bm.*rejected for invalid domain/,
     ];
 
     return config;
