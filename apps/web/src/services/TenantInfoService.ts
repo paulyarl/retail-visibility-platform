@@ -301,7 +301,13 @@ class TenantInfoService extends TenantApiSingleton {
         }
       );
       if (!result.success) {
-        console.error('[TenantInfoService] Failed to get tenant info:', result.error);
+        console.error('[TenantInfoService] Failed to get tenant info:', {
+          error: result.error,
+          status: result.status,
+          tenantId,
+          hasAuth0Email: !!ssrAuth?.auth0Email,
+          hasAuth0Id: !!ssrAuth?.auth0Id
+        });
         return null;
       }
 

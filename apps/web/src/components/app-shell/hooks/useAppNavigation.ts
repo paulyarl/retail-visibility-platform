@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { isFeatureEnabled } from '@/lib/featureFlags';
 import { useAuth } from "@/contexts/AuthContext";
-
+import { tenantInfoService } from '@/services/TenantInfoService';
 interface AppLinks {
   dashboard: string;
   tenants: string;
@@ -44,55 +43,97 @@ export function useAppNavigation({ tenantId }: UseAppNavigationProps): UseAppNav
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Compute tenant-scoped links when FF_TENANT_URLS is enabled
-    const tenantUrlsOverride = localStorage.getItem('ff_tenant_urls') === 'on';
-    // const tenantUrlsOn = tenantUrlsOverride || isFeatureEnabled('FF_TENANT_URLS', tenantId || undefined);
-    const tenantUrlsOn = true;
+    const fetchNavigationData = async () => {
+      // Compute tenant-scoped links when FF_TENANT_URLS is enabled
+      const tenantUrlsOverride = localStorage.getItem('ff_tenant_urls') === 'on';
+      const tenantUrlsOn = false;
 
-    // console.log(`${useAppNavigation.name} user: ${JSON.stringify(user)}`);
-    // console.log(`${useAppNavigation.name} isAuthenticated: ${isAuthenticated}`);
-    // console.log(`${useAppNavigation.name} tenantId: ${tenantId}`);
+      // Get auth info from cookies for API authentication headers
+      // Note: Cookies might be URL-encoded, need to decode
+      const auth0Email = document.cookie.match(/auth0_email=([^;]+)/)?.[1];
+      const auth0Id = document.cookie.match(/auth0_id=([^;]+)/)?.[1];
+      
+      // Decode URL-encoded values
+      const decodedEmail = auth0Email ? decodeURIComponent(auth0Email) : null;
+      const decodedAuth0Id = auth0Id ? decodeURIComponent(auth0Id) : null;
 
+      // Fetch tenant info using singleton service with auth headers
+      let tenantInfo: any = null;
+      let tenantSlug: string | null = null;
+      let hasPublishedDirectory: boolean | null = null;
+      
+      // Only fetch tenant info if user is authenticated and we have auth cookies
+      if (user && isAuthenticated && tenantId && (decodedEmail || decodedAuth0Id)) {
+        // Check if user has access to this tenant
+        const hasTenantAccess = user.tenants?.some(t => t.id === tenantId);
+        // console.log('Tenant access check:', { 
+        //   tenantId, 
+        //   userTenants: user.tenants?.map(t => ({ id: t.id, name: t.name })),
+        //   hasAccess: hasTenantAccess
+        // });
+        
+        if (!hasTenantAccess) {
+          console.warn('User does not have access to tenant:', tenantId);
+        } else {
+          try {
+            tenantInfo = await tenantInfoService.getTenantInfo(tenantId, { auth0Email: decodedEmail || undefined, auth0Id: decodedAuth0Id || undefined });
+            tenantSlug = tenantInfo?.slug;
+            hasPublishedDirectory = tenantInfo?.hasPublishedDirectory ?? tenantInfo?.has_published_directory;
+          } catch (error) {
+            console.error('Failed to fetch tenant info:', error);
+          }
+        }
+      }
 
-    // if (tenantUrlsOn && tenantId && isAuthenticated) {
-    // if (user || isAuthenticated || tenantId) {
-    // user is authenticated and has a tenant ID
-    if (user && isAuthenticated && tenantId) {
-      setLinks({
-        dashboard: `/t/${tenantId}/dashboard`,
-        tenants: `/tenants`,  
-        shops: `/shops/${tenantId}`,  
-        directory: `/directory/${tenantId}`,  
-        // analytics: `/`,
-        settings: `/t/${tenantId}/settings`,
-      });
-      setTenantScopedLinksOn(true);
-      // user is not authenticated yet
-    } else if (!isAuthenticated) {
-      setLinks({
-        dashboard: `/dashboard`,
-        tenants: `/auth/login`,
-        shops: `/shops`, 
-        directory: `/directory`, 
-        // analytics: `/`,
-        settings: `/`,
-      });
-      setTenantScopedLinksOn(false);
-      // user is authenticated but has no tenant ID
-    } else {
-      setLinks({
-        dashboard: `/dashboard`,
-        tenants: `/tenants`, 
-        shops: `/shops`, 
-        directory: `/directory`, 
-        // analytics: `/`,
-        settings: `/settings`,
-      });
-      setTenantScopedLinksOn(false);
-    }
+      // user is authenticated and has a tenant ID
+      if (user && isAuthenticated && tenantId) {
+        setLinks({
+          ...(hasPublishedDirectory ? {
+            dashboard: `/t/${tenantId}/dashboard`,
+            tenants: `/tenants`,
+            shops: `/shops/${tenantSlug}`,
+            directory: `/directory/${tenantSlug}`,
+            // analytics: `/`,
+            settings: `/t/${tenantId}/settings`,
+          } : {
+            dashboard: `/t/${tenantId}/dashboard`,
+            tenants: `/tenants`,
+            shops: `/shops`,
+            directory: `/directory`,
+            // analytics: `/`,
+            settings: `/t/${tenantId}/settings`,
+          })
+        });
+        setTenantScopedLinksOn(true);
+        // user is not authenticated yet
+      } else if (!isAuthenticated) {
+        setLinks({
+          dashboard: `/dashboard`,
+          tenants: `/auth/login`,
+          shops: `/shops`,
+          directory: `/directory`,
+          // analytics: `/`,
+          settings: `/`,
+        });
+        setTenantScopedLinksOn(false);
+        // user is authenticated but has no tenant ID
+      } else {
+        setLinks({
+          dashboard: `/dashboard`,
+          tenants: `/tenants`,
+          shops: `/shops`,
+          directory: `/directory`,
+          // analytics: `/`,
+          settings: `/settings`,
+        });
+        setTenantScopedLinksOn(false);
+      }
 
-    setHydrated(true);
-  }, [tenantId, isAuthenticated]);
+      setHydrated(true);
+    };
+
+    fetchNavigationData();
+  }, [tenantId, user, isAuthenticated]);
 
   return { links, tenantScopedLinksOn, hydrated };
 }
