@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner, ToastContainer, Alert } from '@/components/ui';
-import { Button } from '@mantine/core';
+import { Button, TextInput, Group, Stack } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { tenantTierService, type Tenant as ServiceTenant } from '@/services/TenantTierService';
 import { useToast } from '@/components/ui/use-toast';
@@ -34,10 +34,19 @@ interface DbTier {
 }
 
 const STATUSES = [
-  { value: 'trial', label: 'Trial', color: 'bg-neutral-100 text-neutral-800' },
-  { value: 'active', label: 'Active', color: 'bg-green-100 text-green-800' },
-  { value: 'past_due', label: 'Past Due', color: 'bg-red-100 text-red-800' },
-  { value: 'canceled', label: 'Canceled', color: 'bg-neutral-100 text-neutral-800' },
+  { value: 'all', label: 'All Status', color: '' },
+  { value: 'trial', label: '🧪 Trial', color: 'bg-neutral-100 text-neutral-800' },
+  { value: 'active', label: '💳 Active', color: 'bg-green-100 text-green-800' },
+  { value: 'past_due', label: '⚠️ Past Due', color: 'bg-red-100 text-red-800' },
+  { value: 'canceled', label: '❌ Canceled', color: 'bg-gray-100 text-gray-800' },
+];
+
+const TIER_FILTERS = [
+  { value: 'all', label: 'All Tiers', color: '' },
+  { value: 'google_only', label: '🔍 Google Only', color: 'bg-green-100 text-green-800' },
+  { value: 'starter', label: '🌱 Starter', color: 'bg-blue-100 text-blue-800' },
+  { value: 'professional', label: '👔 Professional', color: 'bg-purple-100 text-purple-800' },
+  { value: 'enterprise', label: '🏢 Enterprise', color: 'bg-amber-100 text-amber-800' },
 ];
 
 const ITEMS_PER_PAGE = 10;
@@ -51,6 +60,11 @@ export default function AdminTiersPage() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const { toast, toasts, removeToast } = useToast();
+  
+  // Admin filtering states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [tierFilter, setTierFilter] = useState<'all' | 'google_only' | 'starter' | 'professional' | 'enterprise'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'trial' | 'active' | 'past_due' | 'canceled'>('all');
 
   useEffect(() => {
     loadTenants();
@@ -173,6 +187,42 @@ export default function AdminTiersPage() {
 
   const getStatusInfo = (status?: string) => STATUSES.find(s => s.value === status) || STATUSES[0];
 
+  // Filter tenants based on admin criteria
+  const filteredTenants = useMemo(() => {
+    let filtered = tenants;
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim().toLowerCase();
+      filtered = filtered.filter(tenant => 
+        tenant.name.toLowerCase().includes(query) || 
+        tenant.id.toLowerCase().includes(query) ||
+        tenant.metadata?.businessName?.toLowerCase().includes(query) ||
+        tenant.metadata?.city?.toLowerCase().includes(query) ||
+        tenant.organization?.name?.toLowerCase().includes(query)
+      );
+    }
+
+    // Tier filter
+    if (tierFilter !== 'all') {
+      filtered = filtered.filter(tenant => tenant.subscriptionTier === tierFilter);
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(tenant => tenant.subscriptionStatus === statusFilter);
+    }
+
+    return filtered;
+  }, [tenants, searchQuery, tierFilter, statusFilter]);
+
+  // Pagination
+  const paginatedTenants = filteredTenants.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE, 
+    currentPage * ITEMS_PER_PAGE
+  );
+  const totalPages = Math.ceil(filteredTenants.length / ITEMS_PER_PAGE);
+
   if (loading || tiersLoading) {
     return (
       <div className="min-h-screen bg-neutral-50">
@@ -221,20 +271,118 @@ export default function AdminTiersPage() {
           </CardContent>
         </Card>
 
+        {/* Admin Filters */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Admin Filters</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Stack gap="md">
+              {/* Search */}
+              <div>
+                <TextInput
+                  placeholder="Search locations by name, ID, city, or chain..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
+
+              {/* Filter Groups */}
+              <Group wrap="wrap" gap="sm">
+                {/* Tier Filter */}
+                <Stack gap="xs">
+                  <div className="text-sm font-medium">🏆 Subscription Tier</div>
+                  <Group>
+                    {TIER_FILTERS.map(tier => (
+                      <Button
+                        key={tier.value}
+                        variant={tierFilter === tier.value ? 'filled' : 'light'}
+                        size="sm"
+                        onClick={() => {
+                          setTierFilter(tier.value as any);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        {tier.label}
+                      </Button>
+                    ))}
+                  </Group>
+                </Stack>
+
+                {/* Status Filter */}
+                <Stack gap="xs">
+                  <div className="text-sm font-medium">💳 Subscription Status</div>
+                  <Group>
+                    {STATUSES.map(status => (
+                      <Button
+                        key={status.value}
+                        variant={statusFilter === status.value ? 'filled' : 'light'}
+                        size="sm"
+                        onClick={() => {
+                          setStatusFilter(status.value as any);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        {status.label}
+                      </Button>
+                    ))}
+                  </Group>
+                </Stack>
+              </Group>
+
+              {/* Results Summary */}
+              <div className="text-sm text-neutral-600 border-t pt-4">
+                Showing {paginatedTenants.length} of {filteredTenants.length} locations 
+                {filteredTenants.length !== tenants.length && ` (from ${tenants.length} total)`}
+              </div>
+            </Stack>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Locations ({tenants.length})</CardTitle>
-              {tenants.length > ITEMS_PER_PAGE && <div className="text-sm text-neutral-600">Page {currentPage} of {Math.ceil(tenants.length / ITEMS_PER_PAGE)}</div>}
+              <CardTitle>
+                Locations 
+                <span className="ml-2 text-sm font-normal text-neutral-600">
+                  ({filteredTenants.length} filtered)
+                </span>
+              </CardTitle>
+              <Button onClick={() => {
+                loadTenants();
+                setSearchQuery("");
+                setTierFilter('all');
+                setStatusFilter('all');
+              }} variant="outline" size="sm">
+                🔄 Refresh
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
-            {tenants.length === 0 ? (
-              <div className="text-center py-12"><p className="text-neutral-500">No locations found</p></div>
+            {filteredTenants.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-neutral-500">No locations found matching the current filters</p>
+                <Button 
+                  onClick={() => {
+                    setSearchQuery("");
+                    setTierFilter('all');
+                    setStatusFilter('all');
+                    setCurrentPage(1);
+                  }} 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-4"
+                >
+                  Clear Filters
+                </Button>
+              </div>
             ) : (
               <>
                 <div className="space-y-4">
-                  {tenants.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map(tenant => {
+                  {paginatedTenants.map(tenant => {
                     const tierInfo = getTierInfo(tenant.subscriptionTier);
                     const statusInfo = getStatusInfo(tenant.subscriptionStatus);
                     const isUpdating = updating === tenant.id;
@@ -279,15 +427,15 @@ export default function AdminTiersPage() {
                     );
                   })}
                 </div>
-                {tenants.length > ITEMS_PER_PAGE && (
+                {filteredTenants.length > ITEMS_PER_PAGE && (
                   <div className="flex items-center justify-between mt-6 pt-6 border-t border-neutral-200">
-                    <div className="text-sm text-neutral-600">Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, tenants.length)} of {tenants.length} tenants</div>
+                    <div className="text-sm text-neutral-600">Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredTenants.length)} of {filteredTenants.length} locations</div>
                     <div className="flex items-center gap-2">
                       <Button variant="secondary" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>← Previous</Button>
-                      {Array.from({ length: Math.ceil(tenants.length / ITEMS_PER_PAGE) }, (_, i) => i + 1).map(page => (
+                      {Array.from({ length: Math.ceil(filteredTenants.length / ITEMS_PER_PAGE) }, (_, i) => i + 1).map(page => (
                         <Button key={page} variant={page === currentPage ? 'primary' : 'ghost'} size="sm" onClick={() => setCurrentPage(page)} className="min-w-[2.5rem]">{page}</Button>
                       ))}
-                      <Button variant="secondary" size="sm" onClick={() => setCurrentPage(p => Math.min(Math.ceil(tenants.length / ITEMS_PER_PAGE), p + 1))} disabled={currentPage === Math.ceil(tenants.length / ITEMS_PER_PAGE)}>Next →</Button>
+                      <Button variant="secondary" size="sm" onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredTenants.length / ITEMS_PER_PAGE), p + 1))} disabled={currentPage === Math.ceil(filteredTenants.length / ITEMS_PER_PAGE)}>Next →</Button>
                     </div>
                   </div>
                 )}

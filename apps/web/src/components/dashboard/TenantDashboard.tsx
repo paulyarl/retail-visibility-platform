@@ -1,9 +1,7 @@
 "use client";
 
 import { lazy, Suspense } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
-import { Button, Tooltip } from '@mantine/core';
-// Replace separate hooks with consolidated hook
+import { Card as MantineCard, Button, Tooltip, Group, Badge, Box, Title, Text, Stack } from '@mantine/core';
 import { useTenantComplete } from "@/hooks/dashboard/useTenantComplete";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,8 +23,6 @@ import { platformHomeService } from '../../services/PlatformHomeSingletonService
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { AnimatedCard } from "@/components/ui";
-import { Badge as MantineBadge } from '@mantine/core';
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 
@@ -198,14 +194,10 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   if (error) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle className="text-red-600">Error Loading Dashboard</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-neutral-600">{error}</p>
-          </CardContent>
-        </Card>
+        <MantineCard padding="lg" radius="md" withBorder w="max-w-md">
+          <Title order={4} c="red">Error Loading Dashboard</Title>
+          <Text c="dimmed" mt="md">{error}</Text>
+        </MantineCard>
       </div>
     );
   }
@@ -369,50 +361,47 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
               switch (hoursStatus?.status) {
                 case 'open':
                   return (
-                    <MantineBadge 
+                    <Badge 
                       color="green"
                       variant="light"
                       size="xs"
                       className="animate-pulse"
                     >
                       🟢 Open
-                    </MantineBadge>
+                    </Badge>
                   );
                 case 'closed':
                   return (
-                    <MantineBadge 
+                    <Badge 
                       color="red"
                       variant="light"
                       size="xs"
                       className="animate-bounce"
-                      title={hoursStatus?.label || 'Closed'}
                     >
                       🔴 Closed
-                    </MantineBadge>
+                    </Badge>
                   );
                 case 'opening-soon':
                   return (
-                    <MantineBadge 
+                    <Badge 
                       color="blue"
                       variant="filled"
                       size="xs"
                       className="animate-ping"
-                      title={hoursStatus?.label || 'Opening soon'}
                     >
                       🟡 Opening
-                    </MantineBadge>
+                    </Badge>
                   );
                 case 'closing-soon':
                   return (
-                    <MantineBadge 
+                    <Badge 
                       color="orange"
                       variant="filled"
                       size="xs"
                       className="animate-ping"
-                      title={hoursStatus?.label || 'Closing soon'}
                     >
                       🟡 Closing
-                    </MantineBadge>
+                    </Badge>
                   );
                 default:
                   return null;
@@ -518,72 +507,74 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
 
         {/* Business Hours Card (tenant-scoped) */}
         <div className="mb-6">
-          <AnimatedCard delay={0.35} className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-3">
-                  <svg className="h-5 w-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <h3 className="text-base sm:text-lg font-bold text-neutral-900">Business Hours</h3>
-                </div>
-                {hoursInfo?.hasHours ? (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* Hours Badge - Status */}
-            {(() => {
-              switch (hoursStatus?.status) {
-                case 'open':
-                  return (
-                    <MantineBadge 
-                      color="green"
-                      variant="light"
-                      size="lg"
-                      className="animate-pulse"
-                    >
-                      🟢 Open
-                    </MantineBadge>
-                  );
-                case 'closed':
-                  return (
-                    <MantineBadge 
-                      color="red"
-                      variant="light"
-                      size="lg"
-                      className="animate-bounce"
-                      title={hoursStatus?.label || 'Closed'}
-                    >
-                      🔴 Closed
-                    </MantineBadge>
-                  );
-                case 'opening-soon':
-                  return (
-                    <MantineBadge 
-                      color="blue"
-                      variant="filled"
-                      size="lg"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Opening soon'}
-                    >
-                      🟡 Opening
-                    </MantineBadge>
-                  );
-                case 'closing-soon':
-                  return (
-                    <MantineBadge 
-                      color="orange"
-                      variant="filled"
-                      size="lg"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Closing soon'}
-                    >
-                      🟡 Closing
-                    </MantineBadge>
-                  );
-                default:
-                  return null;
-              }
-            })()}
-            <h1>{hoursStatus?.label}</h1>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35, duration: 0.3 }}
+          >
+            <MantineCard padding="md" radius="md" withBorder className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="h-5 w-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <Title order={4} className="text-base sm:text-lg font-bold text-neutral-900">Business Hours</Title>
+                  </div>
+                  {hoursInfo?.hasHours ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Hours Badge - Status */}
+              {(() => {
+                switch (hoursStatus?.status) {
+                  case 'open':
+                    return (
+                      <Badge 
+                        color="green"
+                        variant="light"
+                        size="lg"
+                        className="animate-pulse"
+                      >
+                        🟢 Open
+                      </Badge>
+                    );
+                  case 'closed':
+                    return (
+                      <Badge 
+                        color="red"
+                        variant="light"
+                        size="lg"
+                        className="animate-bounce"
+                      >
+                        🔴 Closed
+                      </Badge>
+                    );
+                  case 'opening-soon':
+                    return (
+                      <Badge 
+                        color="blue"
+                        variant="filled"
+                        size="lg"
+                        className="animate-ping"
+                      >
+                        🟡 Opening
+                      </Badge>
+                    );
+                  case 'closing-soon':
+                    return (
+                      <Badge 
+                        color="orange"
+                        variant="filled"
+                        size="lg"
+                        className="animate-ping"
+                      >
+                        🟡 Closing
+                      </Badge>
+                    );
+                  default:
+                    return null;
+                }
+              })()}
+            <Text>{hoursStatus?.label}</Text>
                   </div>
                 ) : (
                   <p className="text-sm sm:text-base text-neutral-500">
@@ -603,47 +594,52 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                 );
               })()}
             </div>
-          </AnimatedCard>
+          </MantineCard>
+            </motion.div>
         </div>
 
         {/* Value Showcase - Only show when user has products */}
         {!loading && usage && usage.totalItems > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
             {/* Storefront Status */}
-            <AnimatedCard delay={0.6} hover={false}>
-              <div className="p-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6, duration: 0.3 }}
+            >
+              <MantineCard padding="md" radius="md" withBorder className="p-6 h-full">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex-1 min-w-0">Your Storefront</h3>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    Live
-                  </span>
+                  <Title order={5} className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex-1 min-w-0">Your Storefront</Title>
+                  <Badge color="green" variant="light">Live</Badge>
                 </div>
-                <div className="space-y-3 sm:space-y-4">
+                <Box mt="md">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 sm:h-12 sm:w-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
                       <svg className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9-3-9m-9 9a9 9 0 019-9" />
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-neutral-900 text-sm sm:text-base">{usage.activeItems} Products Live</p>
-                      <p className="text-xs sm:text-sm text-neutral-600">Visible to customers</p>
+                      <Text fw={600} className="text-neutral-900 text-sm sm:text-base">{usage.activeItems} Products Live</Text>
+                      <Text size="xs" c="dimmed">Visible to customers</Text>
                     </div>
                   </div>
                   <Link href={`/tenant/${tenantId}`} target="_blank">
-                    <button className="w-full bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors text-sm sm:text-base px-4 py-2">
-                      View Storefront →
-                    </button>
+                    <Button fullWidth mt="md" variant="filled">View Storefront →</Button>
                   </Link>
-                </div>
-              </div>
-            </AnimatedCard>
+                </Box>
+              </MantineCard>
+            </motion.div>
 
             {/* Google Integration Status */}
-            <AnimatedCard delay={0.7} hover={false}>
-              <div className="p-6">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">Google Integration</h3>
-                <div className="space-y-3 sm:space-y-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7, duration: 0.3 }}
+            >
+              <MantineCard padding="md" radius="md" withBorder className="p-6 h-full">
+                <Title order={5} className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">Google Integration</Title>
+                <Box mt="md">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 sm:h-12 sm:w-12 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
                       <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -651,61 +647,65 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-neutral-900 text-sm sm:text-base">Google Shopping</p>
-                      <p className="text-xs sm:text-sm text-neutral-600">{usage.activeItems} products synced</p>
+                      <Text fw={600} className="text-neutral-900 text-sm sm:text-base">Google Shopping</Text>
+                      <Text size="xs" c="dimmed">{usage.activeItems} products synced</Text>
                     </div>
                   </div>
                   <Link href={`/t/${tenantId}/settings`}>
-                    <button className="w-full bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors text-sm sm:text-base px-4 py-2">
-                      Manage Integration →
-                    </button>
+                    <Button fullWidth mt="md" variant="filled">Manage Integration →</Button>
                   </Link>
-                </div>
-              </div>
-            </AnimatedCard>
+                </Box>
+              </MantineCard>
+            </motion.div>
 
             {/* Actionable Insights */}
-            <AnimatedCard delay={0.8} hover={false}>
-              <div className="p-6">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">Action Items</h3>
-                <div className="space-y-2 sm:space-y-3">
-                  {(0) > 0 && (
-                    <div className="flex items-start gap-2 p-3 bg-yellow-50 rounded-lg">
-                      <svg className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-neutral-900">{0} items need sync</p>
-                        <Link href={`/t/${tenantId}/items`} className="text-xs text-blue-600 hover:underline block mt-1">
-                          Review sync status →
-                        </Link>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8, duration: 0.3 }}
+            >
+              <MantineCard padding="md" radius="md" withBorder className="p-6 h-full">
+                <Title order={5} className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">Action Items</Title>
+                <Box mt="md">
+                  <Stack gap="sm">
+                    {(0) > 0 && (
+                      <div className="flex items-start gap-2 p-3 bg-yellow-50 rounded-lg">
+                        <svg className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <div className="flex-1 min-w-0">
+                          <Text size="xs" fw={500} className="text-neutral-900">{0} items need sync</Text>
+                          <Link href={`/t/${tenantId}/items`} className="text-xs text-blue-600 hover:underline block mt-1">
+                            Review sync status →
+                          </Link>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {(usage.totalItems - usage.activeItems) > 0 && (
-                    <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg">
-                      <svg className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-neutral-900">{usage.totalItems - usage.activeItems} inactive products</p>
-                        <Link href={`/t/${tenantId}/items`} className="text-xs text-blue-600 hover:underline block mt-1">
-                          Activate products →
-                        </Link>
+                    )}
+                    {(usage.totalItems - usage.activeItems) > 0 && (
+                      <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg">
+                        <svg className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="flex-1 min-w-0">
+                          <Text size="xs" fw={500} className="text-neutral-900">{usage.totalItems - usage.activeItems} inactive products</Text>
+                          <Link href={`/t/${tenantId}/items`} className="text-xs text-blue-600 hover:underline block mt-1">
+                            Activate products →
+                          </Link>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {(0) === 0 && (usage.totalItems - usage.activeItems) === 0 && (
-                    <div className="flex items-start gap-2 p-3 bg-green-50 rounded-lg">
-                      <svg className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <p className="text-xs sm:text-sm font-medium text-neutral-900">Everything looks great! 🎉</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </AnimatedCard>
+                    )}
+                    {(0) === 0 && (usage.totalItems - usage.activeItems) === 0 && (
+                      <div className="flex items-start gap-2 p-3 bg-green-50 rounded-lg">
+                        <svg className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <Text size="xs" fw={500} className="text-neutral-900">Everything looks great! 🎉</Text>
+                      </div>
+                    )}
+                  </Stack>
+                </Box>
+              </MantineCard>
+            </motion.div>
           </div>
         )}
 

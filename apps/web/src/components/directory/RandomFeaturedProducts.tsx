@@ -24,6 +24,7 @@ export default function RandomFeaturedProducts() {
   
   // Use the new ProductSingleton hook
   const { products, loading, error, refetch } = useRandomFeaturedProducts(userLocation || undefined, 20);
+  // console.log(`RandomFeaturedProducts products:`, products);
   const { actions } = useProductSingleton();
   
   // Get user location on component mount
@@ -217,11 +218,6 @@ export default function RandomFeaturedProducts() {
                   tenantId: product.tenantId,
                   availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
                   has_variants: product.hasVariants || false,
-                  tenantCategory: product.category ? {
-                    id: product.category.googleCategoryId || product.category.id,
-                    name: product.category.name,
-                    slug: product.category.slug,
-                  } : undefined,
                   // All products in RandomFeaturedProducts are featured by definition
                   featuredType: product.featuredType,
                   featuredPriority: product.featuredPriority,
@@ -234,6 +230,10 @@ export default function RandomFeaturedProducts() {
                   hasPrice: product.hasPrice,
                   has_active_payment_gateway: product.hasActivePaymentGateway,
                   payment_gateway_type: product.defaultGatewayType,
+                  categoryName: product.categoryName,
+                  categorySlug: product.categorySlug,
+                  productCategory: product.productCategory,
+                  productCategorySlug: product.productCategorySlug,
                   // Store information (passed as props, not in ProductData)
                 }}
                 variant="featured"
@@ -273,11 +273,7 @@ export default function RandomFeaturedProducts() {
                   tenantId: product.tenantId,
                   availability: (product.availability as 'in_stock' | 'out_of_stock' | 'preorder') || 'in_stock',
                   has_variants: product.hasVariants || false,
-                  tenantCategory: product.category ? {
-                    id: product.category.googleCategoryId || product.category.id,
-                    name: product.category.name,
-                    slug: product.category.slug,
-                  } : undefined,
+                  
                   // All products in RandomFeaturedProducts are featured by definition
                   featuredType: product.featuredType,
                   featuredPriority: product.featuredPriority,
@@ -290,6 +286,10 @@ export default function RandomFeaturedProducts() {
                   hasPrice: product.hasPrice,
                   has_active_payment_gateway: product.hasActivePaymentGateway,
                   payment_gateway_type: product.defaultGatewayType,
+                  categoryName: product.categoryName,
+                  categorySlug: product.categorySlug,
+                  productCategory: product.productCategory,
+                  productCategorySlug: product.productCategorySlug,
                   // Store information (passed as props, not in ProductData)
                 }}
                 variant="featured"

@@ -27,6 +27,10 @@ export interface PublicProduct {
   availability: 'in_stock' | 'out_of_stock' | 'preorder' | 'discontinued';
   hasVariants?: boolean;
   category?: ProductCategory;
+  categoryName?: string;
+  categorySlug?: string;
+  productCategory?: string;
+  productCategorySlug?: string;
   featuredType?: string;
   featuredPriority?: number;
   featuredAt?: string;

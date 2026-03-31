@@ -542,8 +542,8 @@ export abstract class UniversalSingleton {
         }
       }
       
-      console.log(`[${this.constructor.name}] end           : invalidateCacheWithContext  `);
-      console.log(`[${this.constructor.name}] Pattern       : ${pattern}`);
+      // console.log(`[${this.constructor.name}] end           : invalidateCacheWithContext  `);
+      // console.log(`[${this.constructor.name}] Pattern       : ${pattern}`);
       
       await this.invalidateCachePattern(pattern);
     } catch (error) {
