@@ -112,10 +112,12 @@ export function UnifiedStoreCard({
   //     contextCategory ||
   //     listing.category?.name ||
   //     'General Store';
-  const displayCategory = listing.primaryCategory 
-    ? listing.primaryCategory
+  const primaryCategory = listing.primaryCategory;
+  // console.log(`UnifiedStoreCard - primaryCategory:`, primaryCategory);
+  const displayCategory =contextCategory
+    ? contextCategory
     : listing.gbpPrimaryCategoryName ||
-    contextCategory ||
+    primaryCategory ||
     listing.category?.name ||
     'General Store';
   // console.log(`UnifiedStoreCard - displayCategory:`, displayCategory);
@@ -372,6 +374,60 @@ export function UnifiedStoreCard({
                 <Text size="sm" c="dimmed" lineClamp={1}>
                   {formattedAddress || 'Location not available'}
                 </Text>
+                  {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="xs"
+                      className="animate-pulse"
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="xs"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="xs"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()}
               </Group>
             </div>
             {!showLogo && isFeatured && (
@@ -436,60 +492,7 @@ export function UnifiedStoreCard({
               </MantineBadge>
             )}
             
-            {/* Hours Badge - Status */}
-            {(() => {
-              switch (hoursStatus?.status) {
-                case 'open':
-                  return (
-                    <MantineBadge 
-                      color="green"
-                      variant="light"
-                      size="xs"
-                      className="animate-pulse"
-                    >
-                      🟢 Open
-                    </MantineBadge>
-                  );
-                case 'closed':
-                  return (
-                    <MantineBadge 
-                      color="red"
-                      variant="light"
-                      size="xs"
-                      className="animate-bounce"
-                      title={hoursStatus?.label || 'Closed'}
-                    >
-                      🔴 Closed
-                    </MantineBadge>
-                  );
-                case 'opening-soon':
-                  return (
-                    <MantineBadge 
-                      color="blue"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Opening soon'}
-                    >
-                      🟡 Opening
-                    </MantineBadge>
-                  );
-                case 'closing-soon':
-                  return (
-                    <MantineBadge 
-                      color="orange"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Closing soon'}
-                    >
-                      🟡 Closing
-                    </MantineBadge>
-                  );
-                default:
-                  return null;
-              }
-            })()}
+          
 
             {/* Products Badge - Info */}
             {totalProducts > 10 && (

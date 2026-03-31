@@ -1000,6 +1000,7 @@ export async function getLastViewedItems(
               'city', dcl.city,
               'state', dcl.state,
               'logoUrl', dcl.logo_url,
+              'primaryCategory',dcl.primary_category,
               'ratingAvg', dcl.rating_avg,
               'ratingCount', dcl.rating_count,
               'productCount', COALESCE((
@@ -1033,6 +1034,7 @@ export async function getLastViewedItems(
               'storeName', dcl.business_name,
               'storeSlug', dcl.slug,
               'storeLogo', dcl.logo_url,
+              'primaryCategory',dcl.primary_category,
               'tenantId', sp.tenant_id,
               'hasActivePaymentGateway', sp.has_active_payment_gateway,
               'defaultGatewayType', sp.default_gateway_type,
@@ -1081,6 +1083,7 @@ export async function getLastViewedItems(
             city: data.city,
             state: data.state,
             logoUrl: data.logoUrl,
+            primaryCategory: data.primaryCategory,
             ratingAvg: data.ratingAvg,
             ratingCount: data.ratingCount,
             productCount: data.productCount,
@@ -1110,6 +1113,7 @@ export async function getLastViewedItems(
             productCategory: data.productCategory,
             isFeatured: data.isFeatured,
             tenantLogo: data.storeLogo,
+            primaryCategory: data.primaryCategory,
             tenantCategory: data.tenantCategory,
             hasActivePaymentGateway: data.hasActivePaymentGateway,
             defaultGatewayType: data.defaultGatewayType

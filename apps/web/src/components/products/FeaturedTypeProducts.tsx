@@ -28,6 +28,8 @@ interface FeaturedTypeProduct {
   hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string | null;
   availability?: string;
+  categoryName?: string;
+  categorySlug?: string;
 }
 
 interface FeaturedTypeProductsProps {
@@ -145,6 +147,7 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
           undefined, // Get all types
           6 // Limit per type
         );
+        // console.log('[FeaturedTypeProducts] API response:', groupedProducts);
         
         // console.log('[FeaturedTypeProducts] API response:', {
         //   groupedProductsKeys: Object.keys(groupedProducts || {}),
@@ -196,6 +199,8 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
                   hasActivePaymentGateway: p.hasActivePaymentGateway,
                   defaultGatewayType: p.defaultGatewayType,
                   availability: p.availability,
+                  categoryName: p.categoryName,
+                  categorySlug: p.categorySlug,
                 }));
               }
             }
@@ -286,7 +291,12 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
                     has_active_payment_gateway: product.hasActivePaymentGateway,
                     payment_gateway_type: product.defaultGatewayType,
                     featuredTypes: product.featuredTypes as string[],
+                    categoryName: product.categoryName,
+                    categorySlug: product.categorySlug,
                   }}
+                  variant="grid"
+                  showCategory={true}
+                  showDescription={true}
                 />
               ))}
             </div>

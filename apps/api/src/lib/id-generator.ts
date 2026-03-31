@@ -9,7 +9,7 @@ import { customAlphabet } from 'nanoid';
 
 /**
  * Generates short tenant IDs
- * Format: tenant-abc123 (13 chars vs 36 for UUID)
+ * Format: tid-abc123 (13 chars vs 36 for UUID)
  * URL-safe, readable, unique
  */
 export function generateTenantId(): string {
@@ -19,7 +19,7 @@ export function generateTenantId(): string {
 
 /**
  * Generates short user IDs
- * Format: tenant-abc123 (13 chars vs 36 for UUID)
+ * Format: uid-abc123 (13 chars vs 36 for UUID)
  * URL-safe, readable, unique
  */
 export function generateUserId(): string {
@@ -29,7 +29,7 @@ export function generateUserId(): string {
 
 /**
  * Generates short user tenant IDs
- * Format: tenant-abc123 (13 chars vs 36 for UUID)
+ * Format: utid-abc123 (13 chars vs 36 for UUID)
  * URL-safe, readable, unique
  */
 export function generateUserTenantId(userId: string = 'uid',tenantId: string = 'tid'): string {
@@ -44,7 +44,7 @@ export function generateUserTenantId(userId: string = 'uid',tenantId: string = '
  */
 /**
  * Generates short category mirror IDs
- * Format: tenant-abc123 (13 chars vs 36 for UUID)
+ * Format: cmid-abc123 (13 chars vs 36 for UUID)
  * URL-safe, readable, unique
  */
 export function generateCategoryMirrorId(catId: string,tenantId: string = 'tid'): string {
@@ -121,6 +121,16 @@ export function generatePhotoId(tenantId?: string,itemId?: string): string {
 export function generateSessionId(tenantId?: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
   return `sid-${tenantId}-${nanoid()}`;
+}
+
+
+/**
+ * Generates short order IDs
+ * Format: ord-abc123 (12 chars)
+ */
+export function generateOrderId(tenantId?: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
+  return `oid-${tenantId}-${nanoid()}`;
 }
 
 /**
@@ -207,9 +217,9 @@ export function generateCloverSyncLogId(): string {
  * Generates gbp sync job IDs
  * Format: sess-abc123 (12 chars)
  */
-export function generateGbpHoursSyncLogId(): string {
+export function generateGbpHoursSyncLogId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `bhsid-${nanoid()}`;
+  return `bhsid-${tenantId}-${nanoid()}`;
 }
 
 /**
@@ -331,27 +341,36 @@ export async function generateOrderNumber(tenantId: string): Promise<string> {
  * Generates payment IDs
  * Format: pay-abc123xyz (14 chars)
  */
-export function generatePaymentId(): string {
+export function generatePaymentId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 10);
-  return `pay-${nanoid()}`;
+  return `pay-${tenantId}-${nanoid()}`;
 }
 
 /**
  * Generates order item IDs
- * Format: item-abc123 (12 chars)
+ * Format: oiid-abc123 (12 chars)
  */
-export function generateOrderItemId(): string {
-  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `item-${nanoid()}`;
+export function generateOrderItemId(id: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
+  return `oiid-${id}-${nanoid()}`;
+}
+
+/**
+ * Generates order item history IDs
+ * Format: oih-abc123 (12 chars)
+ */
+export function generateOrderItemHistoryId(id: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
+  return `oih-${id}-${nanoid()}`;
 }
 
 /**
  * Generates shipment IDs
  * Format: ship-abc123 (12 chars)
  */
-export function generateShipmentId(): string {
+export function generateShipmentId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `ship-${nanoid()}`;
+  return `ship-${tenantId}-${nanoid()}`;
 }
 
 // Generate variant ID function

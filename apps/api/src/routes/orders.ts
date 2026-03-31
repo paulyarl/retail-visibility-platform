@@ -9,6 +9,8 @@ import { requireAuth } from '../middleware/auth';
 import { generateOrderNumber } from '../utils/order-number-generator';
 import { calculateLineItem, calculateOrderTotals } from '../utils/order-calculations';
 
+import { generateOrderId, generateOrderItemHistoryId, generateOrderItemId } from '../lib/id-generator';
+
 const router = Router();
 
 /**
@@ -138,7 +140,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       // Create order
       const newOrder = await tx.orders.create({
         data: {
-          id: `ord_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateOrderId(tenant_id),
           tenant_id,
           order_number,
           order_status: 'draft',
@@ -184,21 +186,22 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
           updated_at: new Date(),
         },
       });
-
+      
       // Create order items
       await tx.order_items.createMany({
         data: calculatedItems.map((item) => ({
-          id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateOrderItemId(newOrder.id),
           order_id: newOrder.id,
           ...item,
           updated_at: new Date(),
         })),
       });
+      
 
       // Create initial status history
       await tx.order_status_history.create({
         data: {
-          id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateOrderItemHistoryId(newOrder.id),
           order_id: newOrder.id,
           from_status: null,
           to_status: 'draft',
@@ -432,7 +435,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response) => {
       if (order_status && order_status !== currentOrder.order_status) {
         await tx.order_status_history.create({
           data: {
-            id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: generateOrderItemHistoryId(id),
             order_id: id,
             from_status: currentOrder.order_status,
             to_status: order_status,

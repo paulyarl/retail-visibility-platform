@@ -5,7 +5,7 @@
 
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
-import { generateOrderNumber, generateOrderItemId, generatePaymentId } from '../lib/id-generator';
+import { generateOrderNumber, generateOrderItemId, generatePaymentId,generateOrderId } from '../lib/id-generator';
 import { calculateLineItem, calculateOrderTotals } from '../utils/order-calculations';
 import { customAlphabet } from 'nanoid';
 
@@ -120,7 +120,7 @@ router.post('/orders', async (req: Request, res: Response) => {
     }
 
     // Generate order number
-    const order_number = await generateOrderNumber('demo-tenant');
+    const order_number = await generateOrderNumber(tenant_id);
 
     // Calculate totals
     const line_items = items.map((item: any) => {
@@ -136,12 +136,12 @@ router.post('/orders', async (req: Request, res: Response) => {
     const totals = calculateOrderTotals(line_items);
 
     // Generate order ID
-    const generateOrderId = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 10);
+    // const generateOrderId = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 10);
     
     // Create order
     const order = await prisma.orders.create({
       data: {
-        id: `ord-${generateOrderId()}`,
+        id: generateOrderId(tenant_id),
         order_number,
         tenant_id,
         customer_email: customer.email,
@@ -172,7 +172,7 @@ router.post('/orders', async (req: Request, res: Response) => {
         // Line items
         order_items: {
           create: line_items.map((item: any, index: number) => ({
-            id: generateOrderItemId(),
+            id: generateOrderItemId(order.id),
             sku: item.sku,
             name: item.name,
             description: item.description,
@@ -197,7 +197,7 @@ router.post('/orders', async (req: Request, res: Response) => {
     // Create payment record for the order
     const payment = await prisma.payments.create({
       data: {
-        id: generatePaymentId(),
+        id: generatePaymentId(order.tenant_id),
         tenant_id: order.tenant_id,
         order_id: order.id,
         gateway_type: 'paypal',

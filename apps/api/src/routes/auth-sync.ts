@@ -208,6 +208,7 @@ router.post('/sync-user', async (req: Request, res: Response) => {
         last_login: new Date(),
         is_active: true,
         updated_at: new Date(),
+        
       },
       include: {
         user_tenants: {

@@ -920,8 +920,8 @@ router.get('/tenant/:identifier/profile', async (req, res) => {
     let profile: any = null;
     try {
       profile = await Promise.race([profilePromise, profileTimeoutPromise]);
-      console.log(`[Public API] Successfully retrieved profile for tenant: ${resolvedTenant.id}`);
-      console.log(`[Public API] Profile:`, profile);
+      // console.log(`[Public API] Successfully retrieved profile for tenant: ${resolvedTenant.id}`);
+      // console.log(`[Public API] Profile:`, profile);
       // Add the field to the profile
       // if (profile) {
       //   profile.has_published_directory = profile.has_published_directory || false;
@@ -992,7 +992,7 @@ router.get('/tenant/:identifier/payment-gateways', async (req, res) => {
     let resolvedTenant: any = null;
     try {
       resolvedTenant = await Promise.race([identifierPromise, timeoutPromise]);
-      console.log(`[Public API] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
+      // console.log(`[Public API] Successfully resolved identifier: ${identifier} -> ${resolvedTenant?.id}`);
     } catch (error) {
       console.error(`[Public API] Error resolving identifier: ${identifier}`, error);
       return res.status(404).json({
@@ -1042,7 +1042,7 @@ router.get('/tenant/:identifier/payment-gateways', async (req, res) => {
 router.get('/tenant/:identifier/business-profile', async (req, res) => {
   try {
     const { identifier } = req.params;
-    console.log(`[Public API] Business profile request for identifier: ${identifier}`);
+    // console.log(`[Public API] Business profile request for identifier: ${identifier}`);
     
     // Use the universal identifier resolver
     const { UniversalIdentifierCache } = await import('../services/UniversalIdentifierCache');
@@ -1311,7 +1311,7 @@ router.get('/shops/nearby', async (req, res) => {
  * Note: This route must come after specific routes like /shops/trending
  */
 router.get('/shops/:slug', async (req, res) => {
-  console.log('[PUBLIC API] Shops slug route HIT with slug:', req.params.slug);
+  // console.log('[PUBLIC API] Shops slug route HIT with slug:', req.params.slug);
   try {
     const { slug } = req.params;
     

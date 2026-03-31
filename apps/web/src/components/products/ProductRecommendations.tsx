@@ -19,15 +19,19 @@ interface RecommendedProduct {
   has_active_payment_gateway?: boolean;
   payment_gateway_type?: string | null;
   tenantSlug?: string;
+  productCategory?: string;
+  productCategorySlug?: string;
 }
 
 interface ProductRecommendationsProps {
   productId: string;
   tenantId: string;
   tenantSlug?: string;
+  productCategory?: string;
+  productCategorySlug?: string;
 }
 
-export function ProductRecommendations({ productId, tenantId, tenantSlug }: ProductRecommendationsProps) {
+export function ProductRecommendations({ productId, tenantId, tenantSlug, productCategory, productCategorySlug }: ProductRecommendationsProps) {
   const [recommendations, setRecommendations] = useState<RecommendedProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,6 +42,7 @@ export function ProductRecommendations({ productId, tenantId, tenantSlug }: Prod
     const fetchRecommendations = async () => {
       try {
         const data = await recommendationsService.getProductPageRecommendations(productId, 6);
+        // console.log('[ProductRecommendations] API response:', data);
         
         if (data && isMounted) {
           setRecommendations(data.recommendations || []);
@@ -91,15 +96,19 @@ export function ProductRecommendations({ productId, tenantId, tenantSlug }: Prod
                 availability: 'in_stock',
                 has_active_payment_gateway: product.has_active_payment_gateway,
                 payment_gateway_type: product.payment_gateway_type,
+                productCategory: product.productCategory,
+                productCategorySlug: product.productCategorySlug,
               }}
               tenantName=""
               hasActivePaymentGateway={product.has_active_payment_gateway}
               defaultGatewayType={product.payment_gateway_type || undefined}
               variant="compact"
-              showCategory={false}
+              showCategory={true}
               showDescription={false}
               className="h-full"
               tenantSlug={product.tenantSlug || ''}
+              productCategory={product.productCategory}
+              productCategorySlug={product.productCategorySlug}
             />
           );
         })}

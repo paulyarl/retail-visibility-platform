@@ -384,6 +384,8 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
 
   const listing = consolidatedData.listing;
   const featuredProductsRaw = consolidatedData.featuredProducts || [];
+  // TODO: Remove this temporary logging once we confirm the data is being fetched correctly
+  // console.log('[Directory Page] Featured products raw data:', featuredProductsRaw);
   const storeTypes = consolidatedData.storeTypes || [];
   const categoryCounts = consolidatedData.categoryCounts || [];
   const recommendations = consolidatedData.recommendations || [];
@@ -631,7 +633,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                       {(() => {
-                        //console.log('[Directory Page] Mapping featured products:', featuredProducts.length);
+                        // console.log('[Directory Page] Mapping featured products:', featuredProducts);
                         return featuredProducts.map((product: any) => (
                           <SmartProductCard
                             key={`directory-featured-${product.id}`}
@@ -650,6 +652,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                             tenantId: listing.tenantId,
                             availability: product.availability || 'in_stock',
                             tenantCategory: product.tenantCategory,
+                            productCategory: product.category_name,
                             has_variants: product.has_variants,
                             // Use fresh payment gateway status from consolidated data instead of inconsistent context
                             has_active_payment_gateway: paymentGatewayStatus.hasActiveGateway,

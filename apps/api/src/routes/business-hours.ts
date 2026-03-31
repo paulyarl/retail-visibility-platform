@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { prisma } from '../prisma'
 import { requireFlag } from '../middleware/flags'
-import { generateGbpHoursSyncLogId, generateQuickStart } from '../lib/id-generator'
+import { generateGbpHoursSyncLogId, generateQuickStart, generateSpecialHoursId } from '../lib/id-generator'
 import CacheService, { CacheKeys } from '../lib/cache-service';
 
 // Cache TTL constants
@@ -98,7 +98,7 @@ router.put('/tenant/:tenantId/business-hours/special',
     const date = new Date(`${dateStr}T00:00:00.000Z`)
     await prisma.business_hours_special_list.create({
       data: {
-        id: `${tenantId}_${date.toISOString().split('T')[0]}`,
+        id:generateSpecialHoursId(tenantId),
         tenant_id: tenantId,
         date,
         isClosed: !!o.isClosed,
@@ -134,7 +134,7 @@ router.post('/tenant/:tenantId/gbp/hours/mirror',
   // Enqueue sync job; runner loop will process it
   await prisma.sync_jobs.create({
     data: {
-      id: generateGbpHoursSyncLogId(),
+      id: generateGbpHoursSyncLogId(tenantId),
       tenant_id: tenantId,
       target: 'gbp_hours',
       status: 'queued',

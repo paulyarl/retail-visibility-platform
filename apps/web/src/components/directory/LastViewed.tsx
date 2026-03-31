@@ -23,6 +23,9 @@ interface LastViewedStore {
   ratingCount?: number;
   productCount?: number;
   isFeatured?: boolean;
+  primaryCategory?: string;
+  gbpPrimaryCategoryName?: string;
+  lastViewedAt?: string;
 }
 
 interface LastViewedProduct {
@@ -151,6 +154,7 @@ export default function LastViewed({
           limit: limit,
           entityType: entityType
         });
+        // console.log('LastViewed data:', data);
         
         const recommendations = data?.recommendations || [];
 
@@ -201,8 +205,8 @@ export default function LastViewed({
                 defaultGatewayType: item.defaultGatewayType,
                 tenantLogoUrl: item.tenantLogoUrl,
                 tenantCategory: item.tenantCategory,
-                productCategory: item.productCategory,
-                productCategorySlug: item.productCategorySlug,
+                productCategory: item.productCategory||item.tenantCategory?.name,
+                productCategorySlug: item.productCategorySlug||item.tenantCategory?.slug,
                 featuredType: item.featuredType,
                 featuredPriority: item.featuredPriority,
                 featuredAt: item.featuredAt,
@@ -221,6 +225,7 @@ export default function LastViewed({
                 score: item.score,
                 reason: item.reason,
                 businessName: item.businessName,
+                primaryCategory: item.primaryCategory,
                 tenantLogo: item.tenantLogoUrl
               }
             };
@@ -241,7 +246,12 @@ export default function LastViewed({
                 ratingAvg: item.storeAverageRating,
                 ratingCount: item.storeReviewCount,
                 productCount: item.productCount,
-                isFeatured: item.isFeatured
+                isFeatured: item.isFeatured,
+                primaryCategory: item.primaryCategory || item.tenantCategory,
+                tenantCategory: item.primaryCategory || item.tenantCategory,
+                gbpPrimaryCategoryName: item.gbpPrimaryCategoryName||item.primaryCategory,
+                lastViewedAt: item.lastViewedAt || new Date().toISOString()
+                
               }
             };
           }
@@ -446,7 +456,9 @@ export default function LastViewed({
                             productCount: storeData.productCount,
                             isFeatured: storeData.isFeatured,
                             reason: storeData.reason,
-                            directoryPublished: true
+                            directoryPublished: true,
+                            primaryCategory: storeData.primaryCategory,
+                            gbpPrimaryCategoryName: (storeData as any).gbpPrimaryCategoryName
                           }}
                           viewMode="grid"
                           linkType="directory"

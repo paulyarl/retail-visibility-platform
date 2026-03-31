@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { audit } from '../audit';
 import { optionalAuth } from '../middleware/auth';
+import { generateTenantId, generateUserTenantId } from '../lib/id-generator';
 
 const router = Router();
 
@@ -91,7 +92,7 @@ router.post('/', optionalAuth, async (req: Request, res: Response) => {
     let tenant = null;
     if (!existingTenant && businessName) {
       // Create tenant with the business name
-      const tenantId = `tenant-${Date.now()}`;
+      const tenantId = generateTenantId();
       tenant = await prisma.tenants.create({
         data: {
           id: tenantId,
@@ -103,9 +104,11 @@ router.post('/', optionalAuth, async (req: Request, res: Response) => {
       });
 
       // Link user to tenant
+      // const userTenantId = generateUserTenantId(userId, tenantId);
+
       await prisma.user_tenants.create({
         data: {
-          id: `ut-${Date.now()}`,
+          id: generateUserTenantId(userId, tenantId),
           user_id: userId,
           tenant_id: tenantId,
           role: 'OWNER',
