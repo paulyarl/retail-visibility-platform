@@ -81,7 +81,7 @@ router.post('/payments/charge', async (req: Request, res: Response) => {
     // Create payment record
     const payment = await prisma.payments.create({
       data: {
-        id: generatePaymentId(),
+        id: generatePaymentId(order.tenant_id),
         tenant_id: order.tenant_id,
         order_id: orderId,
         gateway_type: gatewayType,
