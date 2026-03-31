@@ -55,7 +55,9 @@ export function useAppNavigation({ tenantId }: UseAppNavigationProps): UseAppNav
 
 
     // if (tenantUrlsOn && tenantId && isAuthenticated) {
-    if (user || isAuthenticated || tenantId) {
+    // if (user || isAuthenticated || tenantId) {
+    // user is authenticated and has a tenant ID
+    if (user && isAuthenticated && tenantId) {
       setLinks({
         dashboard: `/t/${tenantId}/dashboard`,
         tenants: `/tenants`,  
@@ -65,6 +67,7 @@ export function useAppNavigation({ tenantId }: UseAppNavigationProps): UseAppNav
         settings: `/t/${tenantId}/settings`,
       });
       setTenantScopedLinksOn(true);
+      // user is not authenticated yet
     } else if (!isAuthenticated) {
       setLinks({
         dashboard: `/dashboard`,
@@ -75,6 +78,7 @@ export function useAppNavigation({ tenantId }: UseAppNavigationProps): UseAppNav
         settings: `/`,
       });
       setTenantScopedLinksOn(false);
+      // user is authenticated but has no tenant ID
     } else {
       setLinks({
         dashboard: `/dashboard`,
