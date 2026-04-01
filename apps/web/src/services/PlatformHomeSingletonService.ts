@@ -2476,16 +2476,39 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       const error = result.error as any;
       if (error?.details?.fieldErrors) {
         const fieldErrors = error.details.fieldErrors;
-        const firstError = Object.values(fieldErrors).flat()[0];
-        throw new Error(String(firstError) || 'Validation failed');
+        const fieldNames: Record<string, string> = {
+          email: 'Email',
+          phone_number: 'Phone number',
+          business_name: 'Business name',
+          address_line1: 'Address',
+          city: 'City',
+          state: 'State',
+          postal_code: 'Postal code',
+          country_code: 'Country',
+          website: 'Website',
+          contact_person: 'Contact person',
+        };
+        
+        // Build a user-friendly error message
+        const messages: string[] = [];
+        for (const [field, errors] of Object.entries(fieldErrors)) {
+          const fieldName = fieldNames[field] || field;
+          const errorList = errors as string[];
+          messages.push(`${fieldName}: ${errorList.join(', ')}`);
+        }
+        
+        throw new Error(messages.join(' | ') || 'Please check your input');
       }
       
-      throw new Error(error?.message || 'Failed to save business profile');
+      throw new Error(error?.message || 'Failed to save business profile. Please try again.');
     }
     
 
     // Invalidate tenant complete cache for this tenant
     await this.invalidateTenantCaches(tenantId);
+    
+    // Invalidate directory listing cache since business profile data is embedded
+    await this.invalidateCache(`directory-listing-${tenantId}`);
     
     return result.data;
   }

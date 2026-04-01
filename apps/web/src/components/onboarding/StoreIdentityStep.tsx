@@ -125,6 +125,20 @@ export default function StoreIdentityStep({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [geocoding, setGeocoding] = useState(false);
+  const lastInitialDataRef = useRef<string>('');
+
+  // Update form data when initialData changes (e.g., when navigating back from another step)
+  useEffect(() => {
+    if (Object.keys(initialData).length > 0) {
+      // Serialize to compare and prevent unnecessary updates
+      const dataKey = JSON.stringify(initialData);
+      if (dataKey !== lastInitialDataRef.current) {
+        lastInitialDataRef.current = dataKey;
+        const sanitized = sanitizeData(initialData);
+        setFormData(sanitized);
+      }
+    }
+  }, [initialData]);
 
   // Validate initial data once on mount
   useEffect(() => {

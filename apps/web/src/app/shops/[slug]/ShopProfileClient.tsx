@@ -334,7 +334,7 @@ function ShopProfileHeader({ shop, shopData, businessHours }: {
 
             {/* Photo Gallery */}
             {directoryListing && (
-              <DirectoryPhotoGalleryDisplay listing={directoryListing} />
+              <DirectoryPhotoGalleryDisplay listing={directoryListing} isPublished={true} />
             )}
 
             {/* Business Hours */}

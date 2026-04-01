@@ -28,6 +28,7 @@ import ProductCategoriesCollapsible from '@/components/storefront/ProductCategor
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 import GBPCategoriesNav from '@/components/storefront/GBPCategoriesNav';
 import GBPCategoryBadges from '@/components/shared/GBPCategoryBadges';
+// import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 
 // Store Information & Location
 import TenantMapSection from '@/components/tenant/TenantMapSection';

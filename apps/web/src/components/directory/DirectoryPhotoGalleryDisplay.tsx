@@ -14,15 +14,17 @@ type DirectoryPhoto = {
 type DirectoryListing = {
   id: string;
   business_name?: string;
+  is_directory_published?: boolean;
 };
 
 interface DirectoryPhotoGalleryDisplayProps {
   listing: DirectoryListing;
+  isPublished: boolean;
 }
 
 
 
-export default function DirectoryPhotoGalleryDisplay({ listing }: DirectoryPhotoGalleryDisplayProps) {
+export default function DirectoryPhotoGalleryDisplay({ listing, isPublished }: DirectoryPhotoGalleryDisplayProps) {
   const [photos, setPhotos] = useState<DirectoryPhoto[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -31,7 +33,15 @@ export default function DirectoryPhotoGalleryDisplay({ listing }: DirectoryPhoto
     const loadPhotos = async () => {
       try {
         setLoading(true);
+        console.log(`Checking if listing is published: ${listing.id}`);
+        console.log(`Checking if listing is published: ${JSON.stringify(listing)}`);
+        console.log(`Listing published status: ${listing.is_directory_published}`);
+        if (!isPublished) {
+          console.log(`Listing is not published, skipping photo loading`);
+          return;
+        }
         const photoAssets = await directoryListingService.getDirectoryListingPhotos(listing.id);
+        console.log(`Loaded ${photoAssets.length} photos`);
         setPhotos(photoAssets.sort((a, b) => a.position - b.position));
       } catch (e) {
         console.error("Failed to load directory photos:", e);

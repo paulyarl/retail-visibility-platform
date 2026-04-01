@@ -75,10 +75,12 @@ class RecommendationSingletonService extends UniversalSingleton {
     this.recommendationCache = new Map();
     this.pool = getDirectPool();
     
-    // Warm up ML models in background (non-blocking)
-    this.warmUpModels().catch(error => {
-      this.logError('Background warm-up failed', error);
-    });
+    // Warm up ML models in background after a delay to ensure database is ready
+    setTimeout(() => {
+      this.warmUpModels().catch(error => {
+        this.logError('Background warm-up failed', error);
+      });
+    }, 5000); // Wait 5 seconds after server start
   }
 
   static getInstance(): RecommendationSingletonService {
@@ -504,7 +506,9 @@ class RecommendationSingletonService extends UniversalSingleton {
    */
   private async warmUpModels(): Promise<void> {
     try {
-      this.logInfo('Warming up ML models...');
+      // Check database connectivity first
+      await this.pool.query('SELECT 1');
+      this.logInfo('Database connection verified, warming up ML models...');
       
       // Make warm-up non-blocking with timeout
       const warmUpPromise = this.generateSampleRecommendations();
@@ -513,13 +517,11 @@ class RecommendationSingletonService extends UniversalSingleton {
       );
       
       await Promise.race([warmUpPromise, timeoutPromise]);
-      
-      this.modelWarmedUp = true;
       this.logInfo('ML models warmed up successfully');
+      
     } catch (error) {
-      this.logError('Error warming up ML models', error);
-      this.modelWarmedUp = false;
-      // Don't fail the service initialization if warm-up fails
+      this.logError('Warm-up failed', error);
+      // Don't re-throw, just log the error
     }
   }
 
@@ -534,7 +536,7 @@ class RecommendationSingletonService extends UniversalSingleton {
       
       // Use a timeout for each recommendation generation
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Recommendation generation timeout')), 5000)
+        setTimeout(() => reject(new Error('Recommendation generation timeout')), 10000) // Increased to 10 seconds
       );
       
       const recommendationPromise = this.generateSameUsersRecommendations(sampleStoreId, undefined, 3);

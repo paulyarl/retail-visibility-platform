@@ -28,38 +28,36 @@ export function useOnboardingSteps({
 }: UseOnboardingStepsOptions): UseOnboardingStepsReturn {
   const [currentStep, setCurrentStep] = useState(initialStep);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedDataRef = useRef<string>('');
 
-  // Save progress to localStorage when step changes
-  useEffect(() => {
-    const saveProgress = async () => {
-      if (!forced && Object.keys(businessData).length > 0) {
-        await onboardingStorageService.save(tenantId, {
-          currentStep,
-          businessData,
-        });
-      }
-    };
-
-    saveProgress().catch((error) => {
-      console.error('[useOnboardingSteps] Failed to save progress:', error);
-    });
-  }, [currentStep, tenantId, forced]);
-
-  // Save data to localStorage when businessData changes (debounced)
+  // Save progress to localStorage with debouncing
   useEffect(() => {
     // Clear previous timeout
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
+    // Skip if forced mode
+    if (forced || Object.keys(businessData).length === 0) {
+      return;
+    }
+
+    // Serialize full data for comparison (not just keys)
+    const dataKey = JSON.stringify({ currentStep, businessData });
+    
+    // Skip if data hasn't actually changed
+    if (dataKey === lastSavedDataRef.current) {
+      return;
+    }
+
     // Debounce save to avoid rapid successive saves
     saveTimeoutRef.current = setTimeout(async () => {
-      if (!forced && Object.keys(businessData).length > 0) {
-        await onboardingStorageService.save(tenantId, {
-          currentStep,
-          businessData,
-        });
-      }
+      console.log('[useOnboardingSteps] Saving progress:', { currentStep, businessDataKeys: Object.keys(businessData) });
+      await onboardingStorageService.save(tenantId, {
+        currentStep,
+        businessData,
+      });
+      lastSavedDataRef.current = dataKey;
     }, 500); // 500ms debounce
 
     // Cleanup
@@ -68,7 +66,7 @@ export function useOnboardingSteps({
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [businessData, tenantId, forced]);
+  }, [currentStep, businessData, tenantId, forced]);
 
   const goNext = () => {
     setCurrentStep((prev) => prev + 1);

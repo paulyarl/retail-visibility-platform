@@ -52,7 +52,9 @@ export function useOnboardingSave({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save business profile';
       setError(errorMessage);
-      throw err;
+      // Don't re-throw - handle gracefully to avoid Next.js error overlay
+      // Return empty object to allow UI to continue functioning
+      return {};
     } finally {
       setSaving(false);
     }

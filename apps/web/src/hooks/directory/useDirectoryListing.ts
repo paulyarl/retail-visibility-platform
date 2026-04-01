@@ -119,17 +119,16 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
         secondary_categories: updates.secondaryCategories,
       };
       
-      const updatedListing = await tenantDirectoryManagementService.updateDirectoryListing(tenantId, requestData);
+      await tenantDirectoryManagementService.updateDirectoryListing(tenantId, requestData);
 
-      if (updatedListing) {
-        setListing(updatedListing);
-      }
+      // Refetch to get complete data including businessProfile
+      await fetchListing();
     } catch (err) {
       console.error('Error updating listing:', err);
       setError(err instanceof Error ? err.message : 'Failed to update');
       throw err;
     }
-  }, [tenantId, setListing]);
+  }, [tenantId, fetchListing]);
 
   useEffect(() => {
     fetchListing();

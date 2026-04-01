@@ -39,8 +39,14 @@ export default function DirectoryPhotoGallery({ listing, tenantId, onUpdate }: D
   const loadPhotos = async () => {
     try {
       setLoading(true);
+      // console.log(`Loading photos for listing: ${listing.id}`);
+      // console.log(`Listing published status: ${listing.isPublished}`);
+      if (!listing.isPublished) {
+        // console.log("Listing is not published, skipping photo load");
+        return;
+      }
       const photoAssets = await tenantDirectoryManagementService.getDirectoryListingPhotos(listing.id);
-
+      console.log(`Loaded ${photoAssets.length} photos`);
       setPhotos(photoAssets);
     } catch (error) {
       console.error("Failed to load photos:", error);

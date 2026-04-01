@@ -32,19 +32,22 @@ export default function BrandingSocialStep({
   const [formData, setFormData] = useState<Partial<BusinessProfile>>(initialData);
   const [logoPreview, setLogoPreview] = useState<string | null>(initialData.logo_url || null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const hasInitialized = useRef(false);
+  const lastInitialDataRef = useRef<string>('');
 
   useEffect(() => {
     // This step is always valid (branding and social are optional)
     onValidationChange(true);
   }, [onValidationChange]);
 
+  // Update form data when initialData changes (e.g., when navigating back)
   useEffect(() => {
-    if (hasInitialized.current) return;
     if (Object.keys(initialData).length > 0) {
-      hasInitialized.current = true;
-      setFormData(initialData);
-      setLogoPreview(initialData.logo_url || null);
+      const dataKey = JSON.stringify(initialData);
+      if (dataKey !== lastInitialDataRef.current) {
+        lastInitialDataRef.current = dataKey;
+        setFormData(initialData);
+        setLogoPreview(initialData.logo_url || null);
+      }
     }
   }, [initialData]);
 
@@ -174,10 +177,17 @@ export default function BrandingSocialStep({
               <Input
                 placeholder="https://example.com/logo.png"
                 className="flex-1"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    const input = e.target as HTMLInputElement;
-                    if (input.value) handleLogoUrlPaste(input.value);
+                value={formData.logo_url || ''}
+                onChange={(e) => {
+                  const url = e.target.value;
+                  handleChange('logo_url', url);
+                  setLogoPreview(url || null);
+                }}
+                onBlur={(e) => {
+                  // If URL looks valid, try to preview it
+                  const url = e.target.value;
+                  if (url && url.startsWith('http')) {
+                    setLogoPreview(url);
                   }
                 }}
               />

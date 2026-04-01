@@ -239,6 +239,94 @@ class ExternalApiService extends ExternalApiSingleton {
   }
 
   /**
+   * Get timezone from coordinates
+   * Uses coordinate-based approximation with caching
+   */
+  async getTimezoneFromCoordinates(latitude: number, longitude: number): Promise<string | null> {
+    try {
+      // Round coordinates to 2 decimal places for caching (approximately 1km precision)
+      const roundedLat = Math.round(latitude * 100) / 100;
+      const roundedLng = Math.round(longitude * 100) / 100;
+      const cacheKey = `timezone-${roundedLat}-${roundedLng}`;
+      
+      // Check cache first
+      const cached = await this.getFromCache<string>(cacheKey);
+      if (cached) {
+        console.log('[ExternalApiService] Using cached timezone:', cached, { roundedLat, roundedLng });
+        return cached;
+      }
+      
+      // Calculate timezone from coordinates
+      const timezone = this.approximateTimezoneFromCoordinates(latitude, longitude);
+      if (timezone) {
+        // Cache for 24 hours (timezone rarely changes)
+        await this.setCache(cacheKey, timezone, { ttl: 24 * 60 * 60 * 1000 });
+        console.log('[ExternalApiService] Calculated and cached timezone:', timezone, { roundedLat, roundedLng });
+        return timezone;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('[ExternalApiService] Failed to get timezone from coordinates:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Approximate timezone from coordinates using longitude ranges
+   * This provides a reasonable approximation for most locations
+   */
+  private approximateTimezoneFromCoordinates(latitude: number, longitude: number): string | null {
+    // North America timezones (rough boundaries)
+    if (latitude >= 25 && latitude <= 70) {
+      if (longitude >= -180 && longitude < -130) return 'America/Anchorage'; // Alaska
+      if (longitude >= -130 && longitude < -115) return 'America/Los_Angeles'; // Pacific
+      if (longitude >= -115 && longitude < -105) return 'America/Denver'; // Mountain
+      if (longitude >= -105 && longitude < -90) return 'America/Chicago'; // Central
+      if (longitude >= -90 && longitude < -75) return 'America/New_York'; // Eastern
+      if (longitude >= -75 && longitude < -65) return 'America/New_York'; // Eastern extended
+    }
+    
+    // Hawaii
+    if (latitude >= 18 && latitude <= 23 && longitude >= -161 && longitude <= -154) {
+      return 'Pacific/Honolulu';
+    }
+    
+    // Arizona (doesn't observe DST, stays on MST)
+    if (latitude >= 31 && latitude <= 37 && longitude >= -115 && longitude <= -109) {
+      return 'America/Phoenix';
+    }
+    
+    // Europe (rough approximation)
+    if (latitude >= 35 && latitude <= 70 && longitude >= -10 && longitude <= 40) {
+      if (longitude < 0) return 'Europe/London';
+      if (longitude < 10) return 'Europe/Paris';
+      if (longitude < 20) return 'Europe/Berlin';
+      return 'Europe/Madrid';
+    }
+    
+    // Asia (rough approximation)
+    if (latitude >= 0 && latitude <= 50 && longitude >= 100 && longitude <= 150) {
+      if (longitude < 120) return 'Asia/Hong_Kong';
+      if (longitude < 135) return 'Asia/Tokyo';
+      return 'Asia/Tokyo';
+    }
+    
+    // Australia (rough approximation)
+    if (latitude >= -45 && latitude <= -10 && longitude >= 110 && longitude <= 155) {
+      return 'Australia/Sydney';
+    }
+    
+    // Singapore
+    if (latitude >= 1 && latitude <= 1.5 && longitude >= 103.5 && longitude <= 104.5) {
+      return 'Asia/Singapore';
+    }
+    
+    // Default to UTC if no match
+    return 'UTC';
+  }
+
+  /**
    * Generic external API request
    * For any other external API not covered by specific methods
    */

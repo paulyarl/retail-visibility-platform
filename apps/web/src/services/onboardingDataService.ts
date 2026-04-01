@@ -44,13 +44,16 @@ export class OnboardingDataService {
   }
 
   /**
-   * Sanitize data - treat whitespace-only strings as empty
+   * Sanitize data - treat whitespace-only strings as empty, convert null to empty string
    */
   sanitizeData(data: Partial<BusinessProfile>): Partial<BusinessProfile> {
     const sanitized: Partial<BusinessProfile> = {};
     
     for (const [key, value] of Object.entries(data)) {
-      if (typeof value === 'string' && value.trim() === '') {
+      // Convert null to empty string for string fields
+      if (value === null) {
+        sanitized[key as keyof BusinessProfile] = '' as any;
+      } else if (typeof value === 'string' && value.trim() === '') {
         sanitized[key as keyof BusinessProfile] = '' as any;
       } else {
         sanitized[key as keyof BusinessProfile] = value as any;
@@ -94,7 +97,9 @@ export class OnboardingDataService {
    */
   async saveProfile(tenantId: string, data: Partial<BusinessProfile>): Promise<Partial<BusinessProfile>> {
     try {
-      const result = await platformHomeService.saveOnboardingProfile(tenantId, data);
+      // Sanitize data to convert null values to empty strings
+      const sanitizedData = this.sanitizeData(data);
+      const result = await platformHomeService.saveOnboardingProfile(tenantId, sanitizedData);
       return result as Partial<BusinessProfile>;
     } catch (error) {
       // Error will be caught and displayed in UI

@@ -11,6 +11,7 @@ import { GlobalAlertProvider } from "@/components/ui/GlobalAlertProvider";
 import { UniversalProvider } from "@/providers/UniversalProvider";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { FloatingCartWidget } from "@/components/cart/FloatingCartWidget";
+import { Notifications } from "@mantine/notifications";
 
 interface ClientRootLayoutProps {
   children: React.ReactNode;
@@ -62,6 +63,7 @@ export function ClientRootLayout({ children }: ClientRootLayoutProps) {
               <ProductLayoutProvider>
                 <GlobalAlertProvider>
                   <UniversalProvider>
+                    <Notifications position="top-right" />
                     <ErrorBoundary>
                       {children}
                     </ErrorBoundary>

@@ -22,6 +22,7 @@ import {
   Transition,
   Skeleton
 } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { motion } from "framer-motion";
 import PageHeader, { Icons } from "@/components/PageHeader";
 import { platformHomeService } from "@/services/PlatformHomeSingletonService";
@@ -275,20 +276,40 @@ export default function TenantsClient({ initialTenants = [] }: { initialTenants?
       }
       
       const newTenant = responseData as Tenant;
-      // console.log('[TenantsClient] Tenant created:', newTenant.id);
+      console.log('[TenantsClient] Tenant created:', newTenant.id, newTenant.name);
       
       // Immediately add the new tenant to the list for instant UI update
-      setTenants(prev => [...prev, newTenant]);
+      setTenants(prev => {
+        const updated = [...prev, newTenant];
+        console.log('[TenantsClient] Tenants after adding new one:', updated.length);
+        return updated;
+      });
+      
+      // Reset filters to ensure the new tenant is visible
+      setSearchQuery('');
+      setChainFilter('all');
+      setStatusFilter('active'); // New tenants are typically 'active'
+      setCurrentPage(1);
       
       // Also refresh in background to ensure consistency
       refresh().catch(console.error);
+      
+      // Show success feedback
+      notifications.show({
+        title: 'Location Created!',
+        message: `${newTenant.name} has been added successfully.`,
+        color: 'green',
+        icon: <svg style={{ width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>,
+        autoClose: 4000,
+      });
+      console.log('[TenantsClient] New tenant added successfully:', newTenant.name);
       
       // If this was from onboarding flow, redirect to profile page
       if (hasOnboardingData) {
         router.replace('/settings/profile');
       }
-      
-      //console.log('[TenantsClient] Tenant created successfully:', newTenant.id);
     } catch (err) {
       console.error('[TenantsClient] Create error:', err);
       setError(err instanceof Error ? err.message : "Failed to create tenant");

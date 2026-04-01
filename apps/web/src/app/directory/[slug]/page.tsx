@@ -13,7 +13,6 @@ import DirectoryKeywordTags from '@/components/directory/DirectoryKeywordTags';
 import StoreViewTracker from '@/components/tracking/StoreViewTracker';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import ContactInformationCollapsible from '@/components/directory/ContactInformationCollapsible';
-import { PoweredByFooter } from '@/components/PoweredByFooter';
 import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 import ProductCategoriesCollapsible from '@/components/directory/ProductCategoriesCollapsible';
 import SmartProductCard from '@/components/products/SmartProductCard';
@@ -24,6 +23,7 @@ import { recommendationsService } from '@/services/RecommendationsSingletonServi
 import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
 import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
 import LastViewed from '@/components/directory/LastViewed';
+import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 interface StoreDetailPageProps {
   params: {
@@ -689,7 +689,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               )}
 
               {/* Photo Gallery - Visual Proof */}
-              <DirectoryPhotoGalleryDisplay listing={listing} />
+              <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
 
               {/* Product Categories - Browse More */}
               {storefrontCategories.categories.length > 0 && (

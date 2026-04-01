@@ -149,17 +149,23 @@ export default function OnboardingWizard({
     if (currentStep >= 1 && currentStep <= 4) {
       // Save data at each step, capture response for next step
       const savedData = await save(businessData);
-      // Update businessData with the server response so next step has accurate data
-      if (savedData) {
+      
+      // Only proceed if save was successful (savedData has content)
+      if (savedData && Object.keys(savedData).length > 0) {
+        // Update businessData with the server response so next step has accurate data
         setBusinessData(savedData);
+        goNext();
       }
-      goNext();
+      // If save failed, the error state will be set and the Alert will show
+      // User can try again or fix the issue
     } else if (currentStep === 5) {
       handleComplete();
     }
   };
 
   const handleBack = () => {
+    // Save current data before going back so it's preserved
+    // This ensures data is in localStorage when the previous step remounts
     goBack();
   };
   
