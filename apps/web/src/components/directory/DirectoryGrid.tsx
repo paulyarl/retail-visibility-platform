@@ -1,6 +1,8 @@
 "use client";
 
 import { StoreList, StoreData } from '@/components/stores';
+import { LinkType } from '../stores/StoreCard';
+
 
 interface DirectoryListing {
   id: string;
@@ -96,7 +98,7 @@ export default function DirectoryGrid({
       <StoreList
         stores={stores}
         viewMode={viewMode}
-        linkType="storefront"
+        linkType={LinkType.Directory}
         showLogo={true}
         showCategories={true}
         maxCategories={3}

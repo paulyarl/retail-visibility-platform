@@ -454,6 +454,7 @@ export function UniversalProductCard({
                       variant="light"
                       size="xs"
                       className="animate-pulse"
+                      title={hoursStatus?.label || 'Open now'}
                     >
                       🟢 Open
                     </MantineBadge>
@@ -539,6 +540,7 @@ export function UniversalProductCard({
                       variant="light"
                       size="xs"
                       className="animate-pulse"
+                      title={hoursStatus?.label || 'Open now'}
                     >
                       🟢 Open
                     </MantineBadge>

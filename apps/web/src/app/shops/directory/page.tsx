@@ -7,6 +7,8 @@
 
 import { useState, useEffect, useMemo, use } from 'react';
 import { useShopDirectory, useStoreTypes, useTrendingShops } from '@/lib/shops/shop-hooks';
+
+import { LinkType } from '@/components/stores/StoreCard';
 import { Shop, ShopCategory } from '@/types/shop';
 import { SHOP_UI_CONFIG } from '@/constants/shop';
 import { ShopCard } from '@/components/shops/ShopCard';
@@ -587,7 +589,7 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
               businessHours: shop.hours || shop.businessHours,
             }))}
             viewMode={advancedViewMode}
-            linkType="storefront"
+            linkType={LinkType.Storefront}
             showLogo={true}
             showCategories={true}
             maxCategories={3}

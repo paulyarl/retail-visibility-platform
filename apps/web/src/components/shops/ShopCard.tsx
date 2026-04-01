@@ -532,6 +532,7 @@ export function ShopCard({ shop, variant = 'default', showUrls = false, classNam
                       variant="light"
                       size="xs"
                       className="animate-pulse"
+                      title={hoursStatus?.label || 'Open now'}
                     >
                       🟢 Open
                     </MantineBadge>

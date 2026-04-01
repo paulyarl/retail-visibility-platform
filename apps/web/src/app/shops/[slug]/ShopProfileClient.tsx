@@ -7,6 +7,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { LinkType } from '@/components/stores/StoreCard';
+
 import { Button, Card, Badge, Tabs, TabsList, TabsTab, TabsPanel, Skeleton, Group, Text, Divider, Container, Stack } from '@mantine/core';
 import { 
   MapPin, 
@@ -619,6 +621,7 @@ export default function ShopProfileClient({ shop, businessHours }: {
                       variant="light"
                       size="xs"
                       className="animate-pulse"
+                      title={hoursStatus?.label || 'Open now'}
                     >
                       🟢 Open
                     </MantineBadge>

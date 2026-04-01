@@ -92,7 +92,7 @@ const SIZE_CLASSES = {
  */
 export default function GBPCategoryBadges({
   categories,
-  basePath = '/directory/categories',
+  basePath = '/directory/stores',
   size = 'md',
   showCount = false,
   categoryCounts = {},
@@ -117,11 +117,24 @@ export default function GBPCategoryBadges({
         const icon = CATEGORY_ICONS[category.name] || '🏢';
         const count = categoryCounts[category.slug];
         const key = category.id || `${category.slug}-${index}`;
+        // console.log('GBPCategoryBadges', category, count);
+
+        // console.log(`Category ID: ${category.id}`);
+        
+        const keyParts = category.id?.split(':') || [];
+        const hasSlug = keyParts.length >= 2;
+        const keySlug = keyParts[1].split('_').join('-');
+
+        if (hasSlug){
+          
+        // console.log(`Category ID: ${keyParts[1]}`);
+        // console.log(`Category keySlug: ${keySlug}`);
+        }
 
         return (
           <Link
             key={key}
-            href={`${basePath}/${category.slug}`}
+            href={`${basePath}/${hasSlug ? keySlug : category.name}`}
             className={`inline-flex items-center gap-1.5 ${sizeClasses.badge} rounded-full font-medium transition-colors hover:opacity-80 ${
               category.isPrimary
                 ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-900 border border-purple-300 dark:border-purple-600'

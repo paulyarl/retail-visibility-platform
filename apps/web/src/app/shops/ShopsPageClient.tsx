@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Search, MapPin, Star, Phone, Globe, Clock, Filter, Grid, List, ChevronDown, ChevronLeft, ChevronRight, Store, ShoppingBag, TrendingUp, Sparkles, Tag, Users, Calendar, ArrowLeft, X, Flame, Leaf, Gift, Zap, ShoppingCart } from 'lucide-react';
 import { Button, Container, Grid as MantineGrid, SimpleGrid, Badge, Card, Group, Text, Stack } from '@mantine/core';
+import { LinkType } from '@/components/stores/StoreCard';
 
 // Actions
 import StorefrontActions from '../../components/storefront/StorefrontActions';
@@ -1238,7 +1239,7 @@ export default function ShopsPageClient({ id, searchParams }: { id: string; sear
               businessHours: shop.hours || shop.businessHours,
             }))}
             viewMode={viewMode}
-            linkType="storefront"
+            linkType={LinkType.Storefront}
             showLogo={true}
             showCategories={true}
             maxCategories={3}

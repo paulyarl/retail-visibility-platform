@@ -11,6 +11,8 @@ import React from 'react';
 import Link from 'next/link';
 import { useFeaturedStores } from '@/providers/data/StoreSingleton';
 import { StoreList, StoreData } from '@/components/stores';
+
+import { LinkType } from '@/components/stores/StoreCard';
 import { 
   Grid3x3, 
   List, 
@@ -207,7 +209,7 @@ export default function FeaturedStoresList({
           <StoreList
             stores={storeData}
             viewMode={currentViewMode}
-            linkType="directory"
+            linkType={LinkType.Directory}
             showLogo={true}
             showCategories={true}
             maxCategories={3}

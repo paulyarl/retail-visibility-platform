@@ -7,8 +7,8 @@ export type {
   StoreData, 
   StoreStats, 
   StoreCategory, 
-  ViewMode, 
-  LinkType,
+  ViewMode,  
   StoreCardProps 
 } from './StoreCard';
 export type { StoreListProps } from './StoreList';
+

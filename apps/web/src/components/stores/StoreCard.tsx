@@ -61,7 +61,10 @@ export interface StoreData {
 }
 
 export type ViewMode = 'grid' | 'list' | 'map';
-export type LinkType = 'storefront' | 'directory';
+export enum LinkType {
+  Storefront = 'storefront',
+  Directory = 'directory'
+}
 
 export interface StoreCardProps {
   store: StoreData;
@@ -80,7 +83,7 @@ export interface StoreCardProps {
 export function StoreCard({
   store,
   viewMode,
-  linkType = 'storefront',
+  linkType = LinkType.Directory,
   showLogo = true,
   showCategories = true,
   maxCategories = 3,
@@ -103,9 +106,12 @@ export function StoreCard({
   const remainingCategories = categories.length - maxCategories;
 
   // Determine link destination
-  const linkHref = linkType === 'storefront' 
+  const linkHref = linkType === LinkType.Storefront 
     ? `/shops/${store.slug || store.tenantId}`
     : `/directory/${store.slug || store.tenantId}`;
+
+  // console.log(`linkType: ${linkType}`);
+  // console.log(`linkHref: ${linkHref}`);
 
   // Format category name
   const formattedCategory = store.primaryCategory
@@ -245,6 +251,7 @@ export function StoreCard({
                       variant="light"
                       size="xs"
                       className="animate-pulse"
+                      title={hoursStatus?.label || 'Open now'}
                     >
                       🟢 Open
                     </MantineBadge>

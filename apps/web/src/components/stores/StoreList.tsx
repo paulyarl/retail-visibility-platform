@@ -98,7 +98,7 @@ function EmptyState() {
 export function StoreList({
   stores,
   viewMode,
-  linkType = 'storefront',
+  linkType = LinkType.Directory,
   showLogo = true,
   showCategories = true,
   maxCategories = 3,

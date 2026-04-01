@@ -34,7 +34,7 @@ export function StorefrontRecommendations({ tenantId }: { tenantId: string }) {
   return (
     <div className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8">
       <h2 className="text-2xl font-semibold text-neutral-900 dark:text-white mb-6">
-        You Might Also Like
+        You Might Also Like In Directory
       </h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {recommendations.map((rec, index) => (
@@ -57,7 +57,7 @@ export function StorefrontRecommendations({ tenantId }: { tenantId: string }) {
               reason: rec.reason
             }}
             viewMode="grid"
-            linkType="storefront"
+            linkType="directory"
           />
         ))}
       </div>

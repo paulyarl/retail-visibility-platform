@@ -201,6 +201,7 @@ export function UnifiedStoreCard({
                       variant="light"
                       size="xs"
                       className="animate-pulse"
+                      title={hoursStatus?.label || 'Open now'}
                     >
                       🟢 Open
                     </MantineBadge>
@@ -327,20 +328,21 @@ export function UnifiedStoreCard({
 
   // Grid view
   return (
-    <Link href={linkHref} className={`block ${className}`}>
+   
       <Card withBorder radius="md" p="md" className="h-full hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700">
         {/* Logo Section */}
         {showLogo && (
           <Card.Section>
             <div className="h-32 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center relative overflow-hidden">
               {listing.logoUrl ? (
+                <Link href={linkHref} className={`block ${className}`}>
                 <Image
                   src={listing.logoUrl}
                   alt={listing.businessName}
                   width={80}
                   height={80}
                   className="rounded-lg object-cover shadow-lg"
-                />
+                /></Link>
               ) : (
                 <div className="w-20 h-20 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center shadow-lg">
                   <Store className="w-10 h-10 text-blue-600 dark:text-blue-400" />
@@ -361,6 +363,7 @@ export function UnifiedStoreCard({
         <Card.Section className="p-4">
           <Group justify="space-between" mb="xs" align="start">
             <div className="flex-1">
+               <Link href={linkHref} className={`block ${className}`}>
               <Text 
                 fw={600} 
                 size="lg" 
@@ -368,7 +371,7 @@ export function UnifiedStoreCard({
                 className="text-gray-900 dark:text-white hover:text-blue-600 transition-colors"
               >
                 {listing.businessName}
-              </Text>
+              </Text></Link>
               <Group gap={4} mt={1}>
                 <MapPin size={14} className="text-gray-500" />
                 <Text size="sm" c="dimmed" lineClamp={1}>
@@ -384,6 +387,7 @@ export function UnifiedStoreCard({
                       variant="light"
                       size="xs"
                       className="animate-pulse"
+                      title={hoursStatus?.label || 'Open now'}
                     >
                       🟢 Open
                     </MantineBadge>
@@ -522,14 +526,17 @@ export function UnifiedStoreCard({
         {/* Enhanced Action Buttons */}
         <Card.Section className="pt-3">
           <Group gap={8}>
-            <Button 
-              radius="md" 
-              size="sm" 
-              variant="filled" 
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium"
-            >
-              Visit Store
-            </Button>
+            <Link href={linkHref} className="flex-1">
+              <Button 
+                radius="md" 
+                size="sm" 
+                variant="filled"
+                fullWidth
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium"
+              >
+                Visit Store
+              </Button>
+            </Link>
             <ActionIcon 
               variant="outline" 
               radius="md" 
@@ -553,6 +560,5 @@ export function UnifiedStoreCard({
           </Group>
         </Card.Section>
       </Card>
-    </Link>
   );
 }
