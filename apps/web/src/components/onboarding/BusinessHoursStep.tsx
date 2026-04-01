@@ -128,21 +128,28 @@ export default function BusinessHoursStep({
         ...prev,
         [day]: value,
       };
-      // Notify parent immediately
-      onDataChange({ hours: { ...newHours, timezone } });
       return newHours;
     });
+    
+    // Notify parent after state update (in next tick)
+    setTimeout(() => {
+      onDataChange({ hours: { ...hours, timezone } });
+    }, 0);
   };
 
   const handleToggleDefault = () => {
     if (useDefaultHours) {
       // Clear hours
       setHours({});
-      onDataChange({ hours: { timezone } });
+      setTimeout(() => {
+        onDataChange({ hours: { timezone } });
+      }, 0);
     } else {
       // Apply default hours
       setHours(DEFAULT_HOURS);
-      onDataChange({ hours: { ...DEFAULT_HOURS, timezone } });
+      setTimeout(() => {
+        onDataChange({ hours: { ...DEFAULT_HOURS, timezone } });
+      }, 0);
     }
     setUseDefaultHours(!useDefaultHours);
   };

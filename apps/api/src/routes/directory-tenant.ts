@@ -334,10 +334,17 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
 
     // Verify business profile is complete enough
     const profile = await prisma.tenant_business_profiles_list.findUnique({ where: { tenant_id: tenantId } });
-    if (!profile || !profile.business_name || !profile.city || !profile.state) {
+    
+    // Check required fields and provide specific error messages
+    const missingFields = [];
+    if (!profile?.business_name) missingFields.push('business name');
+    if (!profile?.city) missingFields.push('city');
+    if (!profile?.state) missingFields.push('state');
+    
+    if (missingFields.length > 0) {
       return res.status(400).json({ 
         error: 'incomplete_profile',
-        message: 'Business name, city, and state are required to publish to directory'
+        message: `Missing required fields: ${missingFields.join(', ')}. Please update your business profile.`
       });
     }
 

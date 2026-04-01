@@ -293,6 +293,12 @@ class StoreProviderSingleton {
 
       // Enhanced stats fetching using client-side API methods
       const fetchStoreStats = async (storeIds: string[]) => {
+        // Skip fetching if disabled
+        if (process.env.NODE_ENV === 'development' && window.location.hostname === 'localhost') {
+          singletonRef.logInfo(`[DEV] Skipping stats fetch for ${storeIds.length} stores`);
+          return;
+        }
+        
         singletonRef.logInfo(`Fetching enhanced stats for ${storeIds.length} stores`);
         
         // Set loading state

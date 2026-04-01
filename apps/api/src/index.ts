@@ -1524,8 +1524,14 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
         // Skip slug - it's stored in directory_settings_list, not tenant_business_profiles_list
         if (key === 'slug') return;
         if (value !== undefined) {
-          updateParts.push(`"${key}" = $${values.length + 1}`);
-          values.push(value === '' ? null : value);
+          // Cast arrays to JSON for jsonb columns
+          if (Array.isArray(value) && (key === 'seo_tags' || key === 'social_links')) {
+            updateParts.push(`"${key}" = $${values.length + 1}::jsonb`);
+            values.push(JSON.stringify(value));
+          } else {
+            updateParts.push(`"${key}" = $${values.length + 1}`);
+            values.push(value === '' ? null : value);
+          }
         }
       });
 
@@ -1564,7 +1570,7 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
       console.log('[POST /tenant/profile] Insert values:', insertValues);
 
       // Add optional fields
-      const optionalMappings = {
+      const optionalMappings: Record<string, any> = {
         address_line2: profileData.address_line2,
         state: profileData.state,
         phone_number: profileData.phone_number,
@@ -1582,18 +1588,36 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
         display_map: (profileData as any).display_map,
         map_privacy_mode: (profileData as any).map_privacy_mode,
       };
-      console.log('[POST /tenant/profile] Optional mappings social_links:', optionalMappings.social_links);
-
+      
+      // Add optional fields to insert
+      Object.entries(optionalMappings).forEach(([key, value]) => {
+        if (value !== undefined) {
+          insertFields.push(key);
+          // Cast arrays to JSON for jsonb columns
+          if (Array.isArray(value) && (key === 'seo_tags' || key === 'social_links')) {
+            insertValues.push(JSON.stringify(value));
+          } else {
+            insertValues.push(value);
+          }
+        }
+      });
+      
       // Always add updated_at field with current timestamp
       insertFields.push('updated_at');
       // Don't push a value for updated_at, we'll use CURRENT_TIMESTAMP in SQL
-
+      
+      // Build placeholders with JSON cast for jsonb columns
       const placeholders = insertFields.map((field, i) => {
         if (field === 'updated_at') {
           return 'CURRENT_TIMESTAMP';
         }
         // Calculate parameter index excluding updated_at
         const paramIndex = insertFields.slice(0, i).filter(f => f !== 'updated_at').length + 1;
+        const value = insertValues[paramIndex - 1];
+        // Add ::jsonb cast for jsonb columns
+        if (Array.isArray(value) && (field === 'seo_tags' || field === 'social_links')) {
+          return `$${paramIndex}::jsonb`;
+        }
         return `$${paramIndex}`;
       });
       
