@@ -402,6 +402,7 @@ interface Product {
   sku: string;
   availability: string;
   stock?: number;  // Add stock property
+  productType?: 'physical' | 'digital' | 'hybrid';  // Add product type
   
   // Featured types
   featuredTypes?: string[];

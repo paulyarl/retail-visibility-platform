@@ -40,16 +40,19 @@ export default function DirectoryListingsTable({
     return 'text-red-600 dark:text-red-400';
   };
 
-  const getTierBadgeColor = (tier: string) => {
+  const getTierBadgeColor = (tier?: string) => {
+    if (!tier) return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+    
     const colors: Record<string, string> = {
       google_only: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
       starter: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
       professional: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-      enterprise: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
-      chain_starter: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
-      chain_pro: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200',
+      enterprise: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      chain_starter: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      chain_pro: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+      chain_enterprise: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
     };
-    return colors[tier] || colors.starter;
+    return colors[tier] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
   };
 
   if (listings.length === 0) {
@@ -78,8 +81,8 @@ export default function DirectoryListingsTable({
                   {listing.businessName}
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {listing.tenant.name}
-                </p>
+                    {listing.tenant?.name || listing.tenants?.name || listing.businessName}
+                  </p>
               </div>
               <DirectoryStatusBadge
                 isPublished={listing.is_published}
@@ -88,8 +91,8 @@ export default function DirectoryListingsTable({
             </div>
             
             <div className="flex items-center gap-2 mb-2">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getTierBadgeColor(listing.tenant.subscriptionTier)}`}>
-                {listing.tenant.subscriptionTier.replace('_', ' ')}
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getTierBadgeColor(listing.tenant?.subscriptionTier || listing.tenants?.subscription_tier)}`}>
+                {(listing.tenant?.subscriptionTier || listing.tenants?.subscription_tier || '').replace('_', ' ')}
               </span>
               <span className={`text-sm font-medium ${getQualityColor(listing.qualityScore)}`}>
                 {listing.qualityScore}%
