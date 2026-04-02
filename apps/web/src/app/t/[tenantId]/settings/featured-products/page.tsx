@@ -60,6 +60,7 @@ export default function FeaturedProductsSettings({
   const [error, setError] = useState<string | null>(null);
   const [debug, setDebug] = useState<any>(null);
   const [featuredAccessApproved, setFeaturedAccessApproved] = useState<boolean>(false);
+  console.log(`FeaturedProductsSettings: featuredAccessApproved`, featuredAccessApproved);
 
   useEffect(() => {
     async function fetchTenant() {
@@ -91,10 +92,13 @@ export default function FeaturedProductsSettings({
           try {
             const approvalService = AdminFeaturedApprovalService.getInstance();
             const allTenantsWithStatus = await approvalService.getAllTenantsWithFeaturedAccessStatus();
+            console.log(`FeaturedProductsSettings: All tenants with status`, allTenantsWithStatus);
             const currentTenantStatus = allTenantsWithStatus.find(t => t.id === id);
+            console.log(`FeaturedProductsSettings: Current tenant status`, currentTenantStatus);
             
             const hasApprovedAccess = currentTenantStatus?.featured_access_approved === true && 
                                     currentTenantStatus?.subscription_status === 'active';
+            console.log(`FeaturedProductsSettings: Has approved access`, hasApprovedAccess);
             
             setFeaturedAccessApproved(hasApprovedAccess);
           } catch (approvalError) {

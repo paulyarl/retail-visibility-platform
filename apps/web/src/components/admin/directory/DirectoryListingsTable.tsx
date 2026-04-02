@@ -7,7 +7,7 @@ import Link from 'next/link';
 
 interface DirectoryListingsTableProps {
   listings: AdminDirectoryListing[];
-  onFeature: (tenantId: string) => void;
+  onFeature: (tenantId: string, tenantName: string) => void;
   onUnfeature: (tenantId: string) => void;
 }
 
@@ -106,7 +106,7 @@ export default function DirectoryListingsTable({
                 </button>
               ) : (
                 <button
-                  onClick={() => onFeature(listing.tenant_id)}
+                  onClick={() => onFeature(listing.tenant_id, listing.businessName)}
                   className="flex-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
                   Feature
@@ -175,7 +175,7 @@ export default function DirectoryListingsTable({
                     {listing.businessName}
                   </div>
                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {listing.tenant.name}
+                    {listing.tenant?.name || listing.tenants?.name || listing.businessName}
                   </div>
                 </td>
                 <td className="px-6 py-4">
@@ -185,8 +185,8 @@ export default function DirectoryListingsTable({
                   />
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTierBadgeColor(listing.tenant.subscriptionTier)}`}>
-                    {listing.tenant.subscriptionTier.replace('_', ' ')}
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTierBadgeColor(listing.tenant?.subscriptionTier || listing.tenants?.subscription_tier)}`}>
+                    {(listing.tenant?.subscriptionTier || listing.tenants?.subscription_tier || '').replace('_', ' ')}
                   </span>
                 </td>
                 <td className="px-6 py-4">
@@ -200,12 +200,12 @@ export default function DirectoryListingsTable({
                 <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                   <div className="space-y-1">
                     <div className="font-medium text-gray-900 dark:text-white">
-                      {listing.primaryCategory || '-'}
+                      {listing.primary_category || '-'}
                     </div>
-                    {listing.secondaryCategories && listing.secondaryCategories.length > 0 && (
+                    {listing.secondary_categories && listing.secondary_categories.length > 0 && (
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {listing.secondaryCategories.slice(0, 2).join(', ')}
-                        {listing.secondaryCategories.length > 2 && ` +${listing.secondaryCategories.length - 2} more`}
+                        {listing.secondary_categories.slice(0, 2).join(', ')}
+                        {listing.secondary_categories.length > 2 && ` +${listing.secondary_categories.length - 2} more`}
                       </div>
                     )}
                   </div>
@@ -220,7 +220,7 @@ export default function DirectoryListingsTable({
                     </button>
                   ) : (
                     <button
-                      onClick={() => onFeature(listing.tenant_id)}
+                      onClick={() => onFeature(listing.tenant_id, listing.businessName)}
                       className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200"
                     >
                       Feature

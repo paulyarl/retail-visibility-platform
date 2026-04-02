@@ -14,8 +14,9 @@ import ProductGallery from '@/components/products/ProductGallery';
 import BasicProductGallery from '@/components/products/BasicProductGallery';
 import Link from 'next/link';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
-import { Badge, Group } from '@mantine/core';
-import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame, Package, DollarSign, Calendar } from 'lucide-react';
+import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
+import { Package, Download, Globe } from 'lucide-react';
+import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame, DollarSign, Calendar } from 'lucide-react';
 // Store status
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 
@@ -528,10 +529,11 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   const { status: hoursStatus } = useStoreStatus(tenant.id, true); // Public scope
 
   // Debug logging for variants
-  console.log('[TierBasedLandingPage] Product variants:', product.variants);
-  console.log('[TierBasedLandingPage] Variants length:', product.variants?.length);
-  console.log('[TierBasedLandingPage] Variants type:', typeof product.variants);
-  console.log('[TierBasedLandingPage] Product object keys:', Object.keys(product));
+  // console.log('[TierBasedLandingPage] Product:', product);
+  // console.log('[TierBasedLandingPage] Product variants:', product.variants);
+  // console.log('[TierBasedLandingPage] Variants length:', product.variants?.length);
+  // console.log('[TierBasedLandingPage] Variants type:', typeof product.variants);
+  // console.log('[TierBasedLandingPage] Product object keys:', Object.keys(product));
 
   // Calculate current pricing based on selected variant
   const currentPrice = selectedVariant?.price_cents ? selectedVariant.price_cents / 100 : product.price;
@@ -540,6 +542,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   const currentStock = getStock(selectedVariant) || product.stock;
   const currentSku = selectedVariant?.sku || product.sku;
   const currentAvailability = selectedVariant ? (getStock(selectedVariant) > 0 ? 'in_stock' : 'out_of_stock') : product.availability;
+  // console.log(`[TierBasedLandingPage] Current availability: ${currentAvailability}`);
   
   // Calculate variant price range and stock for display when no variant is selected
   const hasVariants = product.variants && product.variants.length > 0;
@@ -819,8 +822,24 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
             <p className="text-neutral-700 mb-6">{product.description}</p>
           ) : null}
 
+          {/* Product Type Badge */}
+          {product.productType && (
+            <div className="mb-6">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                {product.productType === 'physical' && <Package size={14} className="mr-2" />}
+                {product.productType === 'digital' && <Download size={14} className="mr-2" />}
+                {product.productType === 'hybrid' && <Globe size={14} className="mr-2" />}
+                {product.productType.charAt(0).toUpperCase() + product.productType.slice(1)}
+              </span>
+            </div>
+          )}
+
           {/* Availability */}
-          <div className="mb-6">
+           {/* Variant Selector - Only show if variants exist */}
+          {(() => {
+            if (product.variants && product.variants.length > 0) {
+              return (
+                 <div className="mb-6">
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
               (selectedVariant ? currentAvailability : (variantStockInfo?.isAvailable ? 'in_stock' : 'out_of_stock')) === 'in_stock' 
                 ? 'bg-green-100 text-green-800' 
@@ -837,6 +856,21 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
               </span>
             )}
           </div>
+              );
+            } else {
+              // {product.stock > 0 ? `In stock (${product.stock})` : 'Out of stock'}
+              return (
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                  currentAvailability === 'in_stock' 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-red-100 text-red-800'
+                }`}>
+                  {currentAvailability === 'in_stock' ? '✓ In Stock' : '✗ Out of Stock'}
+                </span>
+              );
+            }
+          })()}
+         
 
           {/* Add to Cart Button - Only show if tenant has order processing enabled */}
           {tenant.hasActivePaymentGateway && (

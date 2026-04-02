@@ -21,6 +21,7 @@ export default function AdminDirectoryFeaturedManagement({ pendingTenants = [] }
   // Get featured access status from the actual tenant approval data
   const getTenantFeaturedAccess = (tenantId: string): boolean => {
     const tenant = pendingTenants.find(t => t.id === tenantId);
+    console.log(`getTenantFeaturedAccess: tenant`, tenant);
     return tenant?.featured_access_approved === true && tenant?.subscription_status === 'active';
   };
 

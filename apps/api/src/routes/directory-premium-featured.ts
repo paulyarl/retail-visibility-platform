@@ -170,7 +170,7 @@ router.get('/', async (req, res) => {
         mv.units_sold as sales,
         -- Dynamic trending score for random_featured
         CASE 
-          WHEN mv.featured_type = 'random_featured' THEN mv.dynamic_trending_score
+          WHEN mv.featured_type = 'random_featured' THEN mv.trending_score
           ELSE NULL
         END as random_score
       FROM mv_global_discovery mv

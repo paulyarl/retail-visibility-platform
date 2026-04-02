@@ -34,14 +34,12 @@ router.get('/', async (req, res) => {
           SELECT 
             COUNT(*) as count,
             COALESCE(AVG(mv.trending_score::numeric), 0) as avg_score,
-            mv.product_name as top_product
+            (SELECT mv.product_name FROM mv_global_discovery mv WHERE mv.featured_type = 'trending' AND mv.is_actively_featured = true AND mv.has_image = true AND mv.in_stock = true ORDER BY mv.trending_score DESC LIMIT 1) as top_product
           FROM mv_global_discovery mv
           WHERE mv.featured_type = 'trending'
             AND mv.is_actively_featured = true
             AND mv.has_image = true
             AND mv.in_stock = true
-          ORDER BY mv.trending_score DESC
-          LIMIT 1
         `;
         break;
 
@@ -50,14 +48,12 @@ router.get('/', async (req, res) => {
           SELECT 
             COUNT(*) as count,
             COALESCE(AVG(mv.product_average_rating::numeric), 0) as avg_rating,
-            mv.product_name as top_product
+            (SELECT mv.product_name FROM mv_global_discovery mv WHERE mv.featured_type = 'recommended' AND mv.is_actively_featured = true AND mv.has_image = true AND mv.in_stock = true ORDER BY mv.product_average_rating DESC, mv.product_reviews_count_live DESC LIMIT 1) as top_product
           FROM mv_global_discovery mv
           WHERE mv.featured_type = 'recommended'
             AND mv.is_actively_featured = true
             AND mv.has_image = true
             AND mv.in_stock = true
-          ORDER BY mv.product_average_rating DESC, mv.product_reviews_count_live DESC
-          LIMIT 1
         `;
         break;
 
@@ -66,14 +62,12 @@ router.get('/', async (req, res) => {
           SELECT 
             COUNT(*) as count,
             COALESCE(SUM(mv.units_sold::numeric), 0) as total_sales,
-            mv.product_name as top_product
+            (SELECT mv.product_name FROM mv_global_discovery mv WHERE mv.featured_type = 'bestseller' AND mv.is_actively_featured = true AND mv.has_image = true AND mv.in_stock = true ORDER BY mv.units_sold DESC LIMIT 1) as top_product
           FROM mv_global_discovery mv
           WHERE mv.featured_type = 'bestseller'
             AND mv.is_actively_featured = true
             AND mv.has_image = true
             AND mv.in_stock = true
-          ORDER BY mv.units_sold DESC
-          LIMIT 1
         `;
         break;
 
@@ -83,8 +77,15 @@ router.get('/', async (req, res) => {
             SELECT 
               COUNT(*) as count,
               COUNT(DISTINCT mv.tenant_id) as unique_merchants,
-              COUNT(DISTINCT mv.product_category_slug) as unique_categories,
-              mv.product_name as top_product
+              COUNT(DISTINCT mv.product_category_slug) as unique_categories
+            FROM mv_global_discovery mv
+            WHERE mv.featured_type = 'random_featured'
+              AND mv.is_actively_featured = true
+              AND mv.has_image = true
+              AND mv.in_stock = true
+          ),
+          top_product_calc AS (
+            SELECT mv.product_name as top_product
             FROM mv_global_discovery mv
             WHERE mv.featured_type = 'random_featured'
               AND mv.is_actively_featured = true
@@ -94,13 +95,13 @@ router.get('/', async (req, res) => {
             LIMIT 1
           )
           SELECT 
-            count,
+            dc.count,
             CASE 
-              WHEN count > 0 THEN (unique_merchants::float / count::float + unique_categories::float / count::float) / 2
+              WHEN dc.count > 0 THEN (dc.unique_merchants::float / dc.count::float + dc.unique_categories::float / dc.count::float) / 2
               ELSE 0
             END as diversity,
-            top_product
-          FROM diversity_calc
+            tp.top_product
+          FROM diversity_calc dc, top_product_calc tp
         `;
         break;
 

@@ -26,6 +26,7 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
     const {
       status, // published, draft, featured
       tier,
+      quality,
       category,
       search,
       page = '1',
@@ -47,11 +48,26 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
       where.is_featured = true;
     }
 
-    if (category) {
+    if (tier) {
+      where.tenants = {
+        subscription_tier: tier,
+      };
+    }
+
+    if (search) {
       where.OR = [
+        { tenants: { name: { contains: search, mode: 'insensitive' } } },
+        { primary_category: { contains: search, mode: 'insensitive' } },
+        { secondary_categories: { has: search } },
+      ];
+    }
+
+    if (category) {
+      if (!where.OR) where.OR = [];
+      where.OR.push(
         { primary_category: category },
         { secondary_categories: { has: category } },
-      ];
+      );
     }
 
     // Get listings
@@ -116,13 +132,25 @@ router.get('/listings', authenticateToken, requireAdmin, async (req: Request, re
       })
     );
 
+    // Apply quality filter if specified
+    let filteredListings = enrichedListings;
+    if (quality) {
+      if (quality === 'low') {
+        filteredListings = enrichedListings.filter(listing => listing.qualityScore <= 50);
+      } else if (quality === 'medium') {
+        filteredListings = enrichedListings.filter(listing => listing.qualityScore > 50 && listing.qualityScore <= 100);
+      } else if (quality === 'high') {
+        filteredListings = enrichedListings.filter(listing => listing.qualityScore > 100);
+      }
+    }
+
     return res.json({
-      listings: enrichedListings,
+      listings: filteredListings,
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum),
+        total: quality ? filteredListings.length : total,
+        totalPages: Math.ceil((quality ? filteredListings.length : total) / limitNum),
       },
     });
   } catch (error: any) {

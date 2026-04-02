@@ -1386,10 +1386,15 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     const params = new URLSearchParams();
     if (filters.status) params.append('status', filters.status);
     if (filters.tier) params.append('tier', filters.tier);
+    if (filters.quality) params.append('quality', filters.quality);
     if (filters.category) params.append('category', filters.category);
     if (filters.search) params.append('search', filters.search);
     if (filters.page) params.append('page', filters.page.toString());
     if (filters.limit) params.append('limit', filters.limit.toString());
+
+    // Include filters in cache key for proper cache invalidation
+    const filterKey = params.toString() || 'all';
+    const cacheKey = `platform-admin-directory-listings:${filterKey}`;
 
     const result = await this.makeDefaultRequest<{
       listings: AdminDirectoryListing[];
@@ -1402,7 +1407,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     }>(
       `/api/admin/directory/listings?${params}`,
       {},
-      'platform-admin-directory-listings',
+      cacheKey,
       this.cacheTTL,
       {
         context: AppContext.ADMIN,
@@ -1432,8 +1437,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
         { 
           method: 'POST',
           body: JSON.stringify({ 
-            until: until.toISOString(),
-            priority: priority || 0
+            featured_until: until.toISOString(),
+            placement_priority: priority || 5
           })
         },
         `platform-feature-directory-listing-${tenantId}`

@@ -145,11 +145,11 @@ export default function PremiumFeaturedDirectoryPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProducts.map((product) => {
+        {filteredProducts.map((product, index) => {
           const typeInfo = getTypeInfo(product.featuredType);
           const Icon = typeInfo?.icon || Sparkles;
           return (
-            <Card key={product.id} className="p-4 rounded-lg">
+            <Card key={`${product.id}-${product.featuredType || 'none'}-${index}`} className="p-4 rounded-lg">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
                   <h4 className="font-medium text-gray-900 dark:text-white mb-1 line-clamp-2">{product.name}</h4>

@@ -457,9 +457,9 @@ export default function FeaturedProductsManager({
   };
 
   const handleProductFeatureAllTypes = async (product: any) => {
-    // Check if tenant has featured access (includes subscription status validation)
-    if (!hasFeaturedAccess) {
-      alert('Your subscription must be active to feature products. Please contact support if you believe this is an error.');
+    // Check if tenant has featured access (only for "featured" type)
+    if (selectedType === 'featured' && !hasFeaturedAccess) {
+      alert('Featured access requires approval. Please contact support to request access.');
       return;
     }
     
@@ -1092,25 +1092,25 @@ export default function FeaturedProductsManager({
                           return;
                         }
                         
-                        // Check if tenant has featured access (includes subscription status validation)
-                        if (!hasFeaturedAccess) {
-                          alert('Your subscription must be active to feature products. Please contact support if you believe this is an error.');
+                        // Check if tenant has featured access (only for "featured" type)
+                        if (selectedType === 'featured' && !hasFeaturedAccess) {
+                          alert('Featured access requires approval. Please contact support to request access.');
                           return;
                         }
                         
                         handleError(() => featureProduct(product.id!), 'Failed to feature product');
                       }}
-                      disabled={processing || !product.id || isCurrentTypeAtLimit || !hasFeaturedAccess}
+                      disabled={processing || !product.id || isCurrentTypeAtLimit || (selectedType === 'featured' && !hasFeaturedAccess)}
                       className={`flex-1 px-3 py-2 text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 ${
                         isCurrentTypeAtLimit 
                           ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
-                          : !hasFeaturedAccess
+                          : (selectedType === 'featured' && !hasFeaturedAccess)
                           ? 'bg-orange-400 text-orange-100 cursor-not-allowed'
                           : 'bg-blue-600 text-white'
                       }`}
-                      title={isCurrentTypeAtLimit ? `Limit reached for ${currentType?.name} (${activeFeaturedByType[selectedType]?.length || 0}/${currentType?.maxProducts})` : !hasFeaturedAccess ? 'Featured access requires active subscription' : `Add to ${currentType?.name}`}
+                      title={isCurrentTypeAtLimit ? `Limit reached for ${currentType?.name} (${activeFeaturedByType[selectedType]?.length || 0}/${currentType?.maxProducts})` : (selectedType === 'featured' && !hasFeaturedAccess) ? 'Featured access requires approval' : `Add to ${currentType?.name}`}
                     >
-                      {isCurrentTypeAtLimit ? 'Limit Reached' : !hasFeaturedAccess ? 'Subscription Required' : `Add to ${currentType?.name}`}
+                      {isCurrentTypeAtLimit ? 'Limit Reached' : (selectedType === 'featured' && !hasFeaturedAccess) ? 'Approval Required' : `Add to ${currentType?.name}`}
                     </button>
                   )}
                   </div>
