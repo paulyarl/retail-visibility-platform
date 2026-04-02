@@ -342,11 +342,12 @@ class EnhancedProductService extends PublicApiSingleton {
       visibility: data.visibility,
       
       // Pricing - map from API response
+      // Sale price should only be set if there's actually a sale (different from regular price)
       list_price_cents: data.listPriceCents || data.priceCents || data.price * 100,
-      sale_price_cents: data.salePriceCents || data.priceCents || data.price * 100,
-      current_price_cents: data.priceCents || data.salePriceCents || data.price * 100,
+      sale_price_cents: data.salePriceCents || undefined,
+      current_price_cents: data.salePriceCents || data.priceCents || data.price * 100,
       price: data.price,
-      is_on_sale: data.isOnSale || false,
+      is_on_sale: data.isOnSale || (!!data.salePriceCents && data.salePriceCents < (data.priceCents || data.price * 100)),
       discount_percentage: data.discountPercentage || data.discount_percentage || '0',
       currency: data.currency,
       

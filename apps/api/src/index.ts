@@ -6201,6 +6201,13 @@ import { mountMinimalRoutes, mountAllRoutes } from './routes';
 
 // For full functionality: mount all routes (enabled for localhost testing)
 mountAllRoutes(app);
+
+/* ------------------------------ VARIANTS ROUTES ------------------------------ */
+// Add variants routes after modular mounting to ensure they're available
+import variantsRoutes from './routes/variants';
+app.use('/api', variantsRoutes);
+console.log('✅ Product variants routes mounted at /api (auth applied per-route)');
+
 /* ------------------------------ TAXONOMY ADMIN API ------------------------------ */
 
 // GET /api/admin/taxonomy/status - Check taxonomy sync status
@@ -6319,11 +6326,6 @@ app.use('/api/directory', directoryRoutes);
 console.log('✅ Directory main routes mounted at /api/directory (includes /:identifier catch-all)');
 
 /* ------------------------------ END PUBLIC ROUTES ------------------------------ */
-
-/* ------------------------------ product variants ------------------------------ */
-import variantsRoutes from './routes/variants';
-app.use('/api', variantsRoutes);
-console.log('✅ Product variants routes mounted at /api (auth applied per-route)');
 
 /* ------------------------------ item category assignment ------------------------------ */
 // PATCH /api/v1/tenants/:tenant_id/items/:itemId/category

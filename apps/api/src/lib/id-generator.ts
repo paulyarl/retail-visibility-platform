@@ -503,23 +503,27 @@ export function generateSKU(params: SKUGenerationParams): string {
 /**
  * Generate variant SKU based on parent item SKU and variant attributes
  * This creates a variant SKU that follows the same pattern as the parent but with variant suffix
+ * Uses nanoid to guarantee uniqueness even in bulk operations
  */
 export function generateVariantSkuFromParent(
   parentItemSku: string, 
   variantIndex: number,
   productType?: 'physical' | 'digital' | 'hybrid'
 ): string {
+  // Use nanoid to generate unique suffix - guarantees uniqueness regardless of timing
+  const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', 4);
+  const uniqueSuffix = nanoid();
+  
   // If parent SKU follows the pattern, extract components and add variant suffix
   const parentParts = parentItemSku.split('-');
   if (parentParts.length >= 4) {
-    // Replace the random suffix with variant identifier
-    const variantSuffix = `V${(variantIndex + 1).toString().padStart(2, '0')}`;
-    parentParts[parentParts.length - 1] = variantSuffix;
+    // Replace the random suffix with unique variant identifier
+    parentParts[parentParts.length - 1] = `V${uniqueSuffix}`;
     return parentParts.join('-');
   }
   
-  // Fallback: append variant suffix to parent SKU
-  return `${parentItemSku}-V${(variantIndex + 1).toString().padStart(2, '0')}`;
+  // Fallback: append unique variant suffix to parent SKU
+  return `${parentItemSku}-V${uniqueSuffix}`;
 }
 /**
  * Example outputs:

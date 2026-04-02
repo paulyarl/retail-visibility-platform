@@ -312,7 +312,27 @@ export function ProductBucket({
                 
                 {/* Price */}
                 <div className="product-price">
-                  {(product.sale_price_cents || product.salePriceCents) && (product.sale_price_cents || product.salePriceCents) < (product.price_cents || product.priceCents) ? (
+                  {/* If product has variants, show "From $X.XX" with lowest variant price */}
+                  {product.has_variants && product.variants && Array.isArray(product.variants) && product.variants.length > 0 ? (
+                    (() => {
+                      // Compute price range from variants
+                      const variantPrices = product.variants.map((v: any) => v.sale_price_cents && v.sale_price_cents < v.price_cents ? v.sale_price_cents : v.price_cents);
+                      const minPrice = Math.min(...variantPrices);
+                      const maxPrice = Math.max(...variantPrices);
+                      const hasSale = product.variants.some((v: any) => v.sale_price_cents && v.sale_price_cents < v.price_cents);
+                      
+                      return (
+                        <span className="price text-lg font-bold text-gray-900 dark:text-white">
+                          {minPrice === maxPrice 
+                            ? `From $${(minPrice / 100).toFixed(2)}` 
+                            : `From $${(minPrice / 100).toFixed(2)}`}
+                          {hasSale && (
+                            <span className="ml-1 text-xs text-gray-500">(Sale available)</span>
+                          )}
+                        </span>
+                      );
+                    })()
+                  ) : (product.sale_price_cents || product.salePriceCents) && (product.sale_price_cents || product.salePriceCents) < (product.price_cents || product.priceCents) ? (
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="sale-price text-lg font-bold text-red-600 dark:text-red-400">

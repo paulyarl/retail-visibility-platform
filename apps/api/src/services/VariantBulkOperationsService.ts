@@ -4,7 +4,7 @@
  */
 
 import { BaseService } from './BaseService';
-import { VariantService, CreateVariantDto, UpdateVariantDto } from './VariantService';
+import { VariantService, CreateVariantDto, UpdateVariantDto, Variant } from './VariantService';
 import { logger } from '../logger';
 
 export interface BulkPricingUpdate {
@@ -40,6 +40,7 @@ export interface BulkOperationResult {
     variant_id: string;
     error: string;
   }>;
+  variants?: Variant[]; // Add variants array to return created/updated variants
   details?: any;
 }
 
@@ -272,6 +273,8 @@ export class VariantBulkOperationsService extends BaseService {
         variant_id: string;
         error: string;
       }> = [];
+      const created_variants: Variant[] = [];
+      const updated_variants: Variant[] = [];
 
       logger.info(`Starting bulk variant operations for ${operations.length} operations`);
 
@@ -282,7 +285,8 @@ export class VariantBulkOperationsService extends BaseService {
               if (!operation.variantId || !operation.data) {
                 throw new Error('Update operation requires variantId and data');
               }
-              await this.variantService.updateVariant(operation.variantId, operation.data);
+              const updated = await this.variantService.updateVariant(operation.variantId, operation.data);
+              updated_variants.push(updated);
               success_count++;
               break;
 
@@ -298,7 +302,36 @@ export class VariantBulkOperationsService extends BaseService {
               if (!operation.data || !parentItemId) {
                 throw new Error('Create operation requires data and parentItemId');
               }
-              await this.variantService.createVariant(parentItemId, operation.data);
+              
+              // Pre-generate unique SKU if not provided to avoid conflicts in bulk operations
+              let variantData = { ...operation.data };
+              if (!variantData.sku || variantData.sku.trim() === '') {
+                // Get parent item data for generating variant SKU
+                const parentItem = await this.prisma.inventory_items.findUnique({
+                  where: { id: parentItemId },
+                  select: { sku: true, product_type: true }
+                });
+                
+                if (parentItem) {
+                  const { generateVariantSkuFromParent } = await import('../lib/id-generator');
+                  // Use index in the operations array to ensure uniqueness
+                  const variantIndex = operations.filter(op => op.action === 'create').indexOf(operation);
+                  const existingCount = await this.prisma.product_variants.count({
+                    where: { parent_item_id: parentItemId }
+                  });
+                  const finalIndex = variantIndex + existingCount;
+                  console.log(`[BulkOperations] Generating SKU for variant ${variantIndex}: parentSku=${parentItem.sku}, index=${finalIndex}`);
+                  variantData.sku = generateVariantSkuFromParent(
+                    parentItem.sku || parentItemId, 
+                    finalIndex,
+                    parentItem.product_type as any
+                  );
+                  console.log(`[BulkOperations] Generated SKU: ${variantData.sku}`);
+                }
+              }
+              
+              const created = await this.variantService.createVariant(parentItemId, variantData);
+              created_variants.push(created);
               success_count++;
               break;
 
@@ -317,7 +350,8 @@ export class VariantBulkOperationsService extends BaseService {
       const result = {
         success_count,
         error_count,
-        errors
+        errors,
+        variants: [...created_variants, ...updated_variants] // Return all processed variants
       };
 
       logger.info(`Bulk variant operations completed: ${success_count} successful, ${error_count} failed`);

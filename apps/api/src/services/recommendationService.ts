@@ -1025,32 +1025,33 @@ export async function getLastViewedItems(
               'brand', sp.brand,
               'sku', sp.sku,
               'priceCents', sp.price_cents,
-              'salePriceCents', ii.sale_price_cents,
+              'salePriceCents', sp.sale_price_cents,
               'imageUrl', sp.image_url,
               'currency', sp.currency,
               'stock', sp.stock,
               'availability', sp.availability,
-              'isFeatured', sp.is_featured,
+              'has_variants', sp.has_variants,
+              'variants', COALESCE(sp.variants, '[]'),
               'storeName', dcl.business_name,
               'storeSlug', dcl.slug,
               'storeLogo', dcl.logo_url,
               'primaryCategory',dcl.primary_category,
               'tenantId', sp.tenant_id,
-              'hasActivePaymentGateway', sp.has_active_payment_gateway,
-              'defaultGatewayType', sp.default_gateway_type,
+              'hasActivePaymentGateway', mgd.has_active_payment_gateway,
+              'defaultGatewayType', mgd.default_gateway_type,
               'tenantCategory', CASE 
-                WHEN sp.category_id IS NOT NULL THEN
+                WHEN sp.tenant_category_id IS NOT NULL THEN
                   json_build_object(
-                    'id', sp.category_id,
-                    'name', sp.category_name,
-                    'slug', sp.category_slug
+                    'id', sp.tenant_category_id,
+                    'name', mgd.product_category,
+                    'slug', mgd.product_category_slug
                   )
                 ELSE NULL
               END
             )
-            FROM storefront_products sp
+            FROM storefront_products_mv sp
             JOIN directory_listings_list dcl ON sp.tenant_id = dcl.tenant_id
-            LEFT JOIN inventory_items ii ON ii.id = sp.id
+            LEFT JOIN mv_global_discovery mgd ON sp.tenant_id = mgd.tenant_id
             WHERE sp.id = rv.entity_id
               AND dcl.is_published = true
             LIMIT 1
@@ -1090,6 +1091,24 @@ export async function getLastViewedItems(
             isFeatured: data.isFeatured
           } as Recommendation;
         } else if (row.entity_type === 'product') {
+          // Calculate price range from variants if available
+          let priceRange = null;
+          if (data.has_variants && data.variants && Array.isArray(data.variants) && data.variants.length > 0) {
+            const prices = data.variants
+              .map((v: any) => v.sale_price_cents || v.price_cents)
+              .filter((p: number) => typeof p === 'number');
+            if (prices.length > 0) {
+              const minPrice = Math.min(...prices);
+              const maxPrice = Math.max(...prices);
+              priceRange = {
+                min: minPrice / 100,
+                max: maxPrice / 100,
+                minCents: minPrice,
+                maxCents: maxPrice
+              };
+            }
+          }
+          
           return {
             tenantId: data.tenantId, // Use actual tenant ID for payment gateway checks
             businessName: data.storeName,
@@ -1116,7 +1135,11 @@ export async function getLastViewedItems(
             primaryCategory: data.primaryCategory,
             tenantCategory: data.tenantCategory,
             hasActivePaymentGateway: data.hasActivePaymentGateway,
-            defaultGatewayType: data.defaultGatewayType
+            defaultGatewayType: data.defaultGatewayType,
+            // Variant-aware fields
+            has_variants: data.has_variants,
+            variants: data.variants,
+            price_range: priceRange
           } as Recommendation;
         }
 

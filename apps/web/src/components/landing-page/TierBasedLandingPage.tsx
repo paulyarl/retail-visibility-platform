@@ -528,17 +528,38 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   const { status: hoursStatus } = useStoreStatus(tenant.id, true); // Public scope
 
   // Debug logging for variants
-  // console.log('[TierBasedLandingPage] Product variants:', product.variants);
-  // console.log('[TierBasedLandingPage] Variants length:', product.variants?.length);
-  // console.log('[TierBasedLandingPage] Variants type:', typeof product.variants);
-  // console.log('[TierBasedLandingPage] Product object keys:', Object.keys(product));
+  console.log('[TierBasedLandingPage] Product variants:', product.variants);
+  console.log('[TierBasedLandingPage] Variants length:', product.variants?.length);
+  console.log('[TierBasedLandingPage] Variants type:', typeof product.variants);
+  console.log('[TierBasedLandingPage] Product object keys:', Object.keys(product));
 
   // Calculate current pricing based on selected variant
   const currentPrice = selectedVariant?.price_cents ? selectedVariant.price_cents / 100 : product.price;
   const currentPriceCents = selectedVariant?.price_cents || product.priceCents;
-  const currentStock = selectedVariant?.inventory_quantity ?? product.stock;
+  const getStock = (v: any) => v?.inventory_quantity ?? v?.stock ?? v?.variant_stock ?? v?.variant_inventory_quantity ?? 0;
+  const currentStock = getStock(selectedVariant) || product.stock;
   const currentSku = selectedVariant?.sku || product.sku;
-  const currentAvailability = selectedVariant ? (selectedVariant.inventory_quantity > 0 ? 'in_stock' : 'out_of_stock') : product.availability;
+  const currentAvailability = selectedVariant ? (getStock(selectedVariant) > 0 ? 'in_stock' : 'out_of_stock') : product.availability;
+  
+  // Calculate variant price range and stock for display when no variant is selected
+  const hasVariants = product.variants && product.variants.length > 0;
+  const variantPriceRange = hasVariants && !selectedVariant ? (() => {
+    const variantPrices = product.variants!.map((v: any) => 
+      v.sale_price_cents && v.sale_price_cents < v.price_cents ? v.sale_price_cents : v.price_cents
+    );
+    const minPrice = Math.min(...variantPrices);
+    const hasSale = product.variants!.some((v: any) => v.sale_price_cents && v.sale_price_cents < v.price_cents);
+    return { minPrice, hasSale };
+  })() : null;
+  
+  // Calculate aggregate stock from all variants when no variant selected
+  const variantStockInfo = hasVariants && !selectedVariant ? (() => {
+    // Try multiple possible field names for stock
+    const getStock = (v: any) => v?.inventory_quantity ?? v?.stock ?? v?.variant_stock ?? v?.variant_inventory_quantity ?? 0;
+    const totalStock = product.variants!.reduce((sum: number, v: any) => sum + getStock(v), 0);
+    const inStockCount = product.variants!.filter((v: any) => getStock(v) > 0).length;
+    return { totalStock, inStockCount, isAvailable: totalStock > 0 };
+  })() : null;
 
   // Convert tenant tier features to landing page features
   const mapTierToFeatures = useCallback((tierData: any): LandingPageFeatures => {
@@ -767,13 +788,25 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           })()}
           
           <div className="mb-6">
-            <PriceDisplay
-              priceCents={currentPriceCents}
-              salePriceCents={selectedVariant?.sale_price_cents || product.salePriceCents}
-              variant="large"
-              showSavingsBadge={true}
-              className="mb-1"
-            />
+            {/* Show variant price range if has variants and no variant selected */}
+            {variantPriceRange ? (
+              <div className="mb-2">
+                <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                  From ${(variantPriceRange.minPrice / 100).toFixed(2)}
+                </span>
+                {variantPriceRange.hasSale && (
+                  <span className="ml-2 text-sm text-gray-500">(Sale available)</span>
+                )}
+              </div>
+            ) : (
+              <PriceDisplay
+                priceCents={currentPriceCents}
+                salePriceCents={selectedVariant?.sale_price_cents || product.salePriceCents}
+                variant="large"
+                showSavingsBadge={true}
+                className="mb-1"
+              />
+            )}
             <span className="text-sm text-neutral-500">SKU: {currentSku}</span>
           </div>
 
@@ -789,15 +822,18 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           {/* Availability */}
           <div className="mb-6">
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-              currentAvailability === 'in_stock' 
+              (selectedVariant ? currentAvailability : (variantStockInfo?.isAvailable ? 'in_stock' : 'out_of_stock')) === 'in_stock' 
                 ? 'bg-green-100 text-green-800' 
                 : 'bg-red-100 text-red-800'
             }`}>
-              {currentAvailability === 'in_stock' ? '✓ In Stock' : '✗ Out of Stock'}
+              {(selectedVariant ? currentAvailability : (variantStockInfo?.isAvailable ? 'in_stock' : 'out_of_stock')) === 'in_stock' ? '✓ In Stock' : '✗ Out of Stock'}
             </span>
-            {currentAvailability === 'in_stock' && currentStock !== undefined && currentStock !== null && (
+            {((selectedVariant ? currentAvailability : (variantStockInfo?.isAvailable ? 'in_stock' : 'out_of_stock')) === 'in_stock') && (
               <span className="ml-2 text-sm text-neutral-600 dark:text-neutral-400">
-                {currentStock} units available
+                {selectedVariant 
+                  ? (currentStock !== undefined && currentStock !== null ? `${currentStock} units available` : '')
+                  : (variantStockInfo ? `${variantStockInfo.totalStock} units across ${variantStockInfo.inStockCount} variant(s)` : '')
+                }
               </span>
             )}
           </div>

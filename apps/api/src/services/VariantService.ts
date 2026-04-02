@@ -126,20 +126,43 @@ export class VariantService extends BaseService {
         throw new Error(`Parent item not found: ${parentItemId}`);
       }
 
-      // Check for duplicate SKU within tenant
-      const existingSku = await this.prisma.product_variants.findFirst({
-        where: {
-          tenant_id: parentItem.tenant_id,
-          sku: data.sku,
-        }
-      });
+      // Check for duplicate SKU only if SKU is provided (not empty)
+      if (data.sku && data.sku.trim() !== '') {
+        const existingSku = await this.prisma.product_variants.findFirst({
+          where: {
+            tenant_id: parentItem.tenant_id,
+            sku: data.sku,
+          }
+        });
 
-      if (existingSku) {
-        throw new Error(`SKU already exists: ${data.sku}`);
+        if (existingSku) {
+          throw new Error(`SKU already exists: ${data.sku}`);
+        }
       }
 
       // Generate variant ID
       const variantId = `var-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+      // Auto-generate SKU if not provided
+      let sku = data.sku;
+      if (!sku || sku.trim() === '') {
+        // Get parent item SKU for generating variant SKU
+        const parentItemData = await this.prisma.inventory_items.findUnique({
+          where: { id: parentItemId },
+          select: { sku: true, product_type: true }
+        });
+        
+        if (parentItemData) {
+          const { generateVariantSkuFromParent } = await import('../lib/id-generator');
+          // Get count of existing variants to use as index
+          const existingVariantsCount = await this.prisma.product_variants.count({
+            where: { parent_item_id: parentItemId }
+          });
+          sku = generateVariantSkuFromParent(parentItemData.sku, existingVariantsCount, parentItemData.product_type as any);
+        } else {
+          sku = `VAR-${variantId}`;
+        }
+      }
 
       // Create variant
       const variant = await this.prisma.product_variants.create({
@@ -147,7 +170,12 @@ export class VariantService extends BaseService {
           id: variantId,
           parent_item_id: parentItemId,
           tenant_id: parentItem.tenant_id,
-          ...data,
+          sku,
+          variant_name: data.variant_name,
+          price_cents: data.price_cents,
+          stock: data.stock,
+          sale_price_cents: data.sale_price_cents,
+          image_url: data.image_url,
           attributes: data.attributes || {},
           sort_order: data.sort_order ?? 0,
           is_active: data.is_active ?? true,

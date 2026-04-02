@@ -280,7 +280,7 @@ class VariantsSingleton extends TenantApiSingleton {
   ): Promise<VariantResult> {
     try {
       const response = await this.makeDefaultRequest(
-        `/api/variants/bulk/operations`,
+        `/api/variants-singleton/bulk/operations`,
         {
           method: 'PUT',
           body: JSON.stringify({
@@ -290,16 +290,30 @@ class VariantsSingleton extends TenantApiSingleton {
         }
       ) as any;
 
+      console.log('[VariantsSingleton] Raw API response type:', typeof response);
+      console.log('[VariantsSingleton] Raw API response keys:', response ? Object.keys(response) : 'null');
+      console.log('[VariantsSingleton] Raw API response:', JSON.stringify(response));
+
+      // Handle response - API may wrap response in "data" object
+      const apiData = response.data || response;
+      console.log('[VariantsSingleton] apiData:', JSON.stringify(apiData));
+      console.log('[VariantsSingleton] apiData.variants:', JSON.stringify(apiData.variants));
+      
       // Invalidate all variant caches after bulk operations
       this.clearCache();
 
       console.log('[VariantsSingleton] Bulk variant operations completed:', operations.length);
       
-      return {
-        success: true,
-        variants: response.variants || [],
-        message: `Bulk operations completed: ${response.success_count || 0} successful, ${response.error_count || 0} failed`,
+      const result = {
+        success: apiData.success || false,
+        variants: apiData.variants || [],
+        success_count: apiData.success_count || 0,
+        error_count: apiData.error_count || 0,
+        message: `Bulk operations completed: ${apiData.success_count || 0} successful, ${apiData.error_count || 0} failed`,
       };
+      
+      console.log('[VariantsSingleton] Returning result:', JSON.stringify(result));
+      return result;
     } catch (error) {
       console.error('[VariantsSingleton] Error performing bulk variant operations:', error);
       return {

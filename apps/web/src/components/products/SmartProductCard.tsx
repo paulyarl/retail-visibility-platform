@@ -240,6 +240,7 @@ interface ProductData {
   variant_count?: number;
   price_range?: PriceRange;
   available_attributes?: AvailableAttributes;
+  variants?: any[];
   
   // Enhanced fields from API
   averageRating?: number;

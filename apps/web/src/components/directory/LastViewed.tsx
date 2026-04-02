@@ -90,6 +90,15 @@ interface LastViewedProduct {
   businessName?: string;
   tenantLogo?: string;
   productImage?: string;
+  // Variant-aware fields
+  has_variants?: boolean;
+  variants?: any[];
+  price_range?: {
+    min: number;
+    max: number;
+    minCents: number;
+    maxCents: number;
+  };
   
 }
 
@@ -226,7 +235,11 @@ export default function LastViewed({
                 reason: item.reason,
                 businessName: item.businessName,
                 primaryCategory: item.primaryCategory,
-                tenantLogo: item.tenantLogoUrl
+                tenantLogo: item.tenantLogoUrl,
+                // Variant-aware fields
+                has_variants: item.has_variants,
+                variants: item.variants,
+                price_range: item.price_range
               }
             };
           } else {
@@ -414,7 +427,15 @@ export default function LastViewed({
                             
                             // Categories
                             productCategory: productData.productCategory,
-                            productCategorySlug: productData.productCategorySlug
+                            productCategorySlug: productData.productCategorySlug,
+                            
+                            // Variant-aware fields
+                            has_variants: productData.has_variants,
+                            variants: productData.variants,
+                            price_range: productData.price_range ? {
+                              min_cents: productData.price_range.minCents,
+                              max_cents: productData.price_range.maxCents
+                            } : undefined
                           }}
                           tenantName={productData.businessName || productData.storeName}
                           tenantLogo={productData.tenantLogo || productData.storeLogo}

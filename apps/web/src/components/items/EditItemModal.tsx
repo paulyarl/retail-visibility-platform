@@ -169,6 +169,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
             variant_name: variant.variant_name,
             sku: variant.sku,
             price_cents: variant.price_cents,
+            sale_price_cents: variant.sale_price_cents,
             stock: variant.stock,
             attributes: variant.attributes
           }
@@ -186,6 +187,7 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
             variant_name: variant.variant_name,
             sku: variant.sku,
             price_cents: variant.price_cents,
+            sale_price_cents: variant.sale_price_cents,
             stock: variant.stock,
             attributes: variant.attributes
           }
@@ -548,6 +550,13 @@ export default function EditItemModal({ isOpen, onClose, item, onSave, onItemUpd
                 throw new Error(result.error || 'Failed to update variants');
               }
               console.log('[EditItemModal] Variant operations completed:', result);
+              
+              // Update local variant state with the newly created/updated variants
+              if (result.variants && result.variants.length > 0) {
+                console.log('[EditItemModal] Updating local variant state with:', result.variants);
+                setVariants(result.variants);
+                setOriginalVariants(JSON.parse(JSON.stringify(result.variants)));
+              }
             } else {
               console.log('[EditItemModal] No variant changes detected');
             }

@@ -12,7 +12,13 @@ interface VariantPopupModalProps {
     id: string;
     name: string;
     title?: string;
-    variants: Array<{
+    // Parent product fields (used when no variants)
+    priceCents?: number;
+    salePriceCents?: number;
+    stock?: number;
+    sku?: string;
+    // Variant fields
+    variants?: Array<{
       id: string;
       sku: string;
       variant_name: string;
@@ -30,7 +36,8 @@ interface VariantPopupModalProps {
     currency: string;
     hasActivePaymentGateway?: boolean;
   };
-  onVariantSelect: (variant: any) => void;
+  onVariantSelect?: (variant: any) => void;
+  onProductSelect?: (product: any) => void;
   tenantName?: string;
   hasActivePaymentGateway?: boolean;
 }
@@ -40,36 +47,64 @@ export default function VariantPopupModal({
   onClose,
   product,
   onVariantSelect,
+  onProductSelect,
   tenantName,
   hasActivePaymentGateway = false
 }: VariantPopupModalProps) {
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
+  // Check if product has variants
+  const hasVariants = product.variants && product.variants.length > 0;
+
   const handleVariantChange = (variant: any) => {
     setSelectedVariant(variant);
   };
 
-  const handleSelectVariant = () => {
-    if (selectedVariant) {
-      setIsAddingToCart(true);
+  const handleSelect = () => {
+    setIsAddingToCart(true);
+    
+    if (hasVariants && selectedVariant && onVariantSelect) {
       onVariantSelect(selectedVariant);
-      setTimeout(() => {
-        setIsAddingToCart(false);
-        onClose();
-      }, 1000);
+    } else if (onProductSelect) {
+      onProductSelect(product);
     }
+    
+    setTimeout(() => {
+      setIsAddingToCart(false);
+      onClose();
+    }, 1000);
   };
 
   const formatPrice = (cents: number) => {
     return (cents / 100).toFixed(2);
   };
 
-  const currentPrice = selectedVariant ? selectedVariant.price_cents : product.variants?.[0]?.price_cents || 0;
-  const currentStock = selectedVariant ? selectedVariant.stock : product.variants?.[0]?.stock || 0;
+  // Calculate current price/stock based on mode
+  const currentPrice = hasVariants 
+    ? (selectedVariant ? selectedVariant.price_cents : product.variants?.[0]?.price_cents || 0)
+    : (product.salePriceCents || product.priceCents || 0);
+  const currentStock = hasVariants 
+    ? (selectedVariant ? selectedVariant.stock : product.variants?.[0]?.stock || 0)
+    : (product.stock || 0);
+  const currentSku = hasVariants
+    ? (selectedVariant?.sku || product.variants?.[0]?.sku)
+    : product.sku;
+
+  // Determine if cart is available - use modal prop first, then product field
+  const hasGateway = hasActivePaymentGateway || product.hasActivePaymentGateway;
 
   // Determine if button should be disabled
-  const isButtonDisabled = !selectedVariant || currentStock <= 0;
+  const isButtonDisabled = hasVariants ? (!selectedVariant || currentStock <= 0) : (currentStock <= 0);
+
+  // Check if on sale
+  const isOnSale = hasVariants
+    ? (selectedVariant?.sale_price_cents && selectedVariant.sale_price_cents < selectedVariant.price_cents)
+    : (product.salePriceCents && product.salePriceCents < (product.priceCents || 0));
+
+  const originalPrice = hasVariants
+    ? (selectedVariant?.price_cents || 0)
+    : (product.priceCents || 0);
 
   return (
     <Modal
@@ -78,7 +113,7 @@ export default function VariantPopupModal({
       size="lg"
       title={
         <Group justify="space-between">
-          <Text fw={600}>Select Variant</Text>
+          <Text fw={600}>{hasVariants ? 'Select Options' : 'Product Details'}</Text>
           <Button variant="subtle" size="sm" onClick={onClose}>
             <X size={16} />
           </Button>
@@ -91,7 +126,7 @@ export default function VariantPopupModal({
           {product.imageUrl && (
             <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100">
               <img
-                src={selectedVariant?.image_url || product.imageUrl}
+                src={hasVariants ? (selectedVariant?.image_url || product.imageUrl) : product.imageUrl}
                 alt={product.name}
                 className="w-full h-full object-cover"
               />
@@ -103,12 +138,18 @@ export default function VariantPopupModal({
               <Text size="sm" c="dimmed">by {tenantName}</Text>
             )}
             <Group gap="xs" mt="xs">
-              <Badge color="blue" variant="light">
-                {product.variants?.length || 0} Options
-              </Badge>
+              {hasVariants ? (
+                <Badge color="blue" variant="light">
+                  {product.variants?.length || 0} Options
+                </Badge>
+              ) : (
+                <Badge color="blue" variant="light">
+                  Single Item
+                </Badge>
+              )}
               {currentStock > 0 ? (
                 <Badge color="green" variant="light">
-                  In Stock
+                  In Stock ({currentStock})
                 </Badge>
               ) : (
                 <Badge color="red" variant="light">
@@ -121,8 +162,8 @@ export default function VariantPopupModal({
 
         <Divider />
 
-        {/* Variant Selector */}
-        {product.variants && product.variants.length > 0 && (
+        {/* Variant Selector - Only show if variants exist */}
+        {hasVariants && product.variants && (
           <div>
             <Text fw={500} mb="sm">Choose Options:</Text>
             <ProductVariantSelector
@@ -134,44 +175,55 @@ export default function VariantPopupModal({
           </div>
         )}
 
-        <Divider />
-
-        {/* Selected Variant Info */}
-        {selectedVariant && (
-          <div>
-            <Text fw={500} mb="xs">Selected Variant:</Text>
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <Group justify="space-between">
-                <div>
-                  <Text size="sm" fw={500}>{selectedVariant.variant_name}</Text>
-                  <Text size="xs" c="dimmed">SKU: {selectedVariant.sku}</Text>
-                </div>
-                <div className="text-right">
-                  <Text size="lg" fw={600}>
-                    {product.currency} {formatPrice(currentPrice)}
-                  </Text>
-                  {selectedVariant.sale_price_cents && (
-                    <Text size="xs" c="dimmed" style={{ textDecoration: 'line-through' }}>
-                      {product.currency} {formatPrice(selectedVariant.sale_price_cents)}
-                    </Text>
-                  )}
-                </div>
-              </Group>
-              {Object.entries(selectedVariant.attributes || {}).length > 0 && (
-                <div className="mt-2">
-                  <Text size="xs" c="dimmed" mb="xs">Attributes:</Text>
-                  <div className="flex flex-wrap gap-1">
-                    {Object.entries(selectedVariant.attributes || {}).map(([key, value]: [string, any]) => (
-                      <Badge key={key} variant="light" size="xs">
-                        {key}: {String(value)}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+        {/* Price Display - Shows for both variant and non-variant products */}
+        <div className="p-3 bg-gray-50 rounded-lg">
+          <Group justify="space-between">
+            <div>
+              <Text size="sm" fw={500}>
+                {hasVariants 
+                  ? (selectedVariant ? selectedVariant.variant_name : 'Select an option')
+                  : 'Price'}
+              </Text>
+              {currentSku && (
+                <Text size="xs" c="dimmed">SKU: {currentSku}</Text>
               )}
             </div>
-          </div>
-        )}
+            <div className="text-right">
+              {/* Sale price display - same logic as before */}
+              {isOnSale ? (
+                <>
+                  <Text size="lg" fw={600} c="red">
+                    {product.currency} {formatPrice(currentPrice)}
+                  </Text>
+                  <Text size="xs" c="dimmed" style={{ textDecoration: 'line-through' }}>
+                    {product.currency} {formatPrice(originalPrice)}
+                  </Text>
+                  <Badge size="xs" color="red" className="ml-1">
+                    {Math.round((1 - currentPrice / originalPrice) * 100)}% OFF
+                  </Badge>
+                </>
+              ) : (
+                <Text size="lg" fw={600}>
+                  {product.currency} {formatPrice(currentPrice)}
+                </Text>
+              )}
+            </div>
+          </Group>
+          
+          {/* Show attributes for selected variant */}
+          {hasVariants && selectedVariant && Object.entries(selectedVariant.attributes || {}).length > 0 && (
+            <div className="mt-2">
+              <Text size="xs" c="dimmed" mb="xs">Attributes:</Text>
+              <div className="flex flex-wrap gap-1">
+                {Object.entries(selectedVariant.attributes || {}).map(([key, value]: [string, any]) => (
+                  <Badge key={key} variant="light" size="xs">
+                    {key}: {String(value)}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Action Buttons */}
         <Group justify="space-between">
@@ -179,7 +231,7 @@ export default function VariantPopupModal({
             Cancel
           </Button>
           <Button
-            onClick={handleSelectVariant}
+            onClick={handleSelect}
             disabled={isButtonDisabled}
             loading={isAddingToCart}
             color="blue"
@@ -192,7 +244,7 @@ export default function VariantPopupModal({
             ) : (
               <>
                 <Package size={16} />
-                <span>{product.hasActivePaymentGateway ? 'Add to Cart' : 'View Details'}</span>
+                <span>{hasGateway ? 'Add to Cart' : 'View Details'}</span>
               </>
             )}
           </Button>

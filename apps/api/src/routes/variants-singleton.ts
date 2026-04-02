@@ -316,4 +316,86 @@ router.get('/search', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * PUT /api/variants-singleton/bulk/operations
+ * Enhanced bulk operations with explicit actions (update, delete, create)
+ */
+router.put('/bulk/operations', async (req: Request, res: Response) => {
+  try {
+    const { operations, parentItemId } = req.body;
+    const user = (req as any).user;
+
+    if (!operations || !Array.isArray(operations)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid request body', 
+        message: 'operations array is required' 
+      });
+    }
+
+    if (operations.length === 0) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid request body', 
+        message: 'operations array cannot be empty' 
+      });
+    }
+
+    // Validate each operation object
+    for (const operation of operations) {
+      if (!operation.action || !['update', 'delete', 'create'].includes(operation.action)) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Invalid operation format', 
+          message: 'Each operation must have a valid action (update, delete, create)' 
+        });
+      }
+
+      if (operation.action === 'update' && (!operation.variantId || !operation.data)) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Invalid update operation', 
+          message: 'Update operations require variantId and data fields' 
+        });
+      }
+
+      if (operation.action === 'delete' && !operation.variantId) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Invalid delete operation', 
+          message: 'Delete operations require variantId field' 
+        });
+      }
+
+      if (operation.action === 'create' && (!operation.data || !parentItemId)) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Invalid create operation', 
+          message: 'Create operations require data field and parentItemId in request' 
+        });
+      }
+    }
+
+    // Import the bulk operations service
+    const { VariantBulkOperationsService } = await import('../services/VariantBulkOperationsService');
+    const variantBulkOperationsService = VariantBulkOperationsService.getInstance();
+
+    const result = await variantBulkOperationsService.bulkVariantOperations(operations, parentItemId);
+    
+    res.json({
+      success: true,
+      ...result,
+      message: `Bulk variant operations completed: ${result.success_count} successful, ${result.error_count} failed`
+    });
+  } catch (error: unknown) {
+    logger.error('[PUT /bulk/operations] Error: ' + (error instanceof Error ? error.message : 'Unknown error'), undefined, { error });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({
+      success: false,
+      error: 'Bulk operations failed',
+      message: errorMessage
+    });
+  }
+});
+
 export default router;

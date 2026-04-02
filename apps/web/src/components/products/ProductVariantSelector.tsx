@@ -186,10 +186,51 @@ const ProductVariantSelector: React.FC<ProductVariantSelectorProps> = ({
   };
 
   const handleSelectionChange = (attributeName: string, value: string) => {
-    const newSelections = { ...selections, [attributeName]: value };
-    setSelections(newSelections);
+    // First, find variants that match ONLY the newly selected attribute
+    const singleAttrVariants = variants.filter((variant: any) => {
+      const variantAttributes = (variant as ProductVariant).attributes || {};
+      // Find the key that matches the attributeName (case-insensitive)
+      const matchingKey = Object.keys(variantAttributes).find(
+        k => k.toLowerCase() === attributeName.toLowerCase()
+      );
+      return matchingKey && variantAttributes[matchingKey]?.toLowerCase() === value.toLowerCase();
+    });
     
-    const matchingVariant = findMatchingVariant(newSelections);
+    // If there's exactly ONE variant matching just this attribute, use ALL its attributes
+    if (singleAttrVariants.length === 1) {
+      const matchingVariant = singleAttrVariants[0];
+      const variantAttributes = matchingVariant.attributes || {};
+      const allAttributeNames = Object.keys(variantAttributes);
+      
+      // Build selections from ONLY this variant's attributes
+      const updatedSelections: Record<string, string> = {};
+      allAttributeNames.forEach(attr => {
+        if (variantAttributes[attr]) {
+          updatedSelections[attr] = variantAttributes[attr];
+        }
+      });
+      
+      setSelections(updatedSelections);
+      onVariantChange(matchingVariant);
+      return;
+    }
+    
+    // Default: use the clicked attribute value along with any existing compatible selections
+    const newSelections = { ...selections, [attributeName]: value };
+    
+    // Find matching variants with current selections
+    const matchingVariants = variants.filter((variant: any) => {
+      const variantAttributes = (variant as ProductVariant).attributes || {};
+      return Object.entries(newSelections).every(([key, val]) => {
+        const matchingKey = Object.keys(variantAttributes).find(
+          k => k.toLowerCase() === key.toLowerCase()
+        );
+        return matchingKey && variantAttributes[matchingKey]?.toLowerCase() === val.toLowerCase();
+      });
+    });
+    
+    const matchingVariant = matchingVariants.length > 0 ? matchingVariants[0] : null;
+    setSelections(newSelections);
     onVariantChange(matchingVariant);
   };
 

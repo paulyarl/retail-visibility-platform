@@ -271,11 +271,22 @@ export default function EnhancedStorefrontProductCard({
                 </Text>
               )}
               
-              <PriceDisplay 
-                priceCents={product.priceCents}
-                salePriceCents={product.salePriceCents}
-                variant="compact"
-              />
+              {/* Price Display - Compact */}
+              {(product.variants && product.variants.length > 0) ? (
+                (() => {
+                  const variantPrices = product.variants.map((v: any) => 
+                    v.sale_price_cents && v.sale_price_cents < v.price_cents ? v.sale_price_cents : v.price_cents
+                  );
+                  const minPrice = Math.min(...variantPrices);
+                  return <Text size="sm" fw={600}>From ${(minPrice / 100).toFixed(2)}</Text>;
+                })()
+              ) : (
+                <PriceDisplay 
+                  priceCents={product.priceCents}
+                  salePriceCents={product.salePriceCents}
+                  variant="compact"
+                />
+              )}
               
               {/* Category for Compact */}
               {product.categoryName && (
@@ -422,11 +433,30 @@ export default function EnhancedStorefrontProductCard({
                 </Text>
               )}
 
-              <PriceDisplay 
-                priceCents={product.priceCents}
-                salePriceCents={product.salePriceCents}
-                variant="large"
-              />
+              {/* Price Display - Large */}
+              {(product.variants && product.variants.length > 0) ? (
+                (() => {
+                  const variantPrices = product.variants.map((v: any) => 
+                    v.sale_price_cents && v.sale_price_cents < v.price_cents ? v.sale_price_cents : v.price_cents
+                  );
+                  const minPrice = Math.min(...variantPrices);
+                  const hasSale = product.variants.some((v: any) => v.sale_price_cents && v.sale_price_cents < v.price_cents);
+                  return (
+                    <div>
+                      <span className="text-xl font-bold text-gray-900 dark:text-white">
+                        From ${(minPrice / 100).toFixed(2)}
+                      </span>
+                      {hasSale && <span className="ml-1 text-xs text-gray-500">(Sale)</span>}
+                    </div>
+                  );
+                })()
+              ) : (
+                <PriceDisplay 
+                  priceCents={product.priceCents}
+                  salePriceCents={product.salePriceCents}
+                  variant="large"
+                />
+              )}
 
               {/* Category - Improved Styling */}
               {product.categoryName && (
@@ -673,10 +703,32 @@ export default function EnhancedStorefrontProductCard({
               )}
 
               {/* Price Display */}
-              <PriceDisplay 
-                priceCents={product.priceCents}
-                salePriceCents={product.salePriceCents}
-              />
+              {(product.variants && product.variants.length > 0) ? (
+                (() => {
+                  // Compute price range from variants
+                  const variantPrices = product.variants.map((v: any) => 
+                    v.sale_price_cents && v.sale_price_cents < v.price_cents ? v.sale_price_cents : v.price_cents
+                  );
+                  const minPrice = Math.min(...variantPrices);
+                  const hasSale = product.variants.some((v: any) => v.sale_price_cents && v.sale_price_cents < v.price_cents);
+                  
+                  return (
+                    <div>
+                      <span className="text-lg font-bold text-gray-900 dark:text-white">
+                        From ${(minPrice / 100).toFixed(2)}
+                      </span>
+                      {hasSale && (
+                        <span className="ml-1 text-xs text-gray-500">(Sale)</span>
+                      )}
+                    </div>
+                  );
+                })()
+              ) : (
+                <PriceDisplay 
+                  priceCents={product.priceCents}
+                  salePriceCents={product.salePriceCents}
+                />
+              )}
 
               {/* Category - Improved Styling */}
               {product.categoryName && (

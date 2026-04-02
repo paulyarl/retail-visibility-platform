@@ -84,7 +84,7 @@ export default function FeaturedProductsSettings({
         
         const tenantData = await tenantInfoService.getTenantInfo(id);
         if (tenantData) {
-          console.log('FeaturedProductsSettings: Tenant data received', tenantData);
+          // console.log('FeaturedProductsSettings: Tenant data received', tenantData);
           setTenant(tenantData);
           
           // Fetch featured access approval status
