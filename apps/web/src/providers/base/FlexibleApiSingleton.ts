@@ -189,8 +189,35 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         
         try {
           const errorData = await response.json();
-          if (errorData.message) {
+          // Check for detailed error structure
+          if (errorData.error === 'invalid_payload' && errorData.details?.fieldErrors) {
+            // Handle validation errors specifically
+            const fieldErrors = errorData.details.fieldErrors;
+            const fieldNames: Record<string, string> = {
+              email: 'Email',
+              phone_number: 'Phone number',
+              business_name: 'Business name',
+              address_line1: 'Address',
+              city: 'City',
+              state: 'State',
+              postal_code: 'Postal code',
+              country_code: 'Country',
+              website: 'Website',
+              contact_person: 'Contact person',
+            };
+            
+            const messages: string[] = [];
+            for (const [field, errors] of Object.entries(fieldErrors)) {
+              const fieldName = fieldNames[field] || field;
+              const errorList = errors as string[];
+              messages.push(`${fieldName}: ${errorList.join(', ')}`);
+            }
+            
+            errorMessage = messages.join(' | ') || 'Please check your input';
+          } else if (errorData.message) {
             errorMessage = errorData.message;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
           }
           if (errorData.error) {
             errorCode = errorData.error;
@@ -760,12 +787,12 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
       );
 
       
-      // console.log(`[${this.constructor.name}] ----------------------------------------`);
-      // console.log(`[${this.constructor.name}] start           : makeAdminRequest`);
-      // console.log(`[${this.constructor.name}] url             : ${url}`);
-      // console.log(`[${this.constructor.name}] options         : ${JSON.stringify(options)}`);
-      // console.log(`[${this.constructor.name}] requestOptions 5: ${JSON.stringify(requestOptions)}`);
-      // console.log(`[${this.constructor.name}] end             : makeAdminRequest  `);      
+    //   console.log(`[${this.constructor.name}] ----------------------------------------`);
+    //   console.log(`[${this.constructor.name}] start           : makeAdminRequest`);
+    //   console.log(`[${this.constructor.name}] url             : ${url}`);
+    //   console.log(`[${this.constructor.name}] options         : ${JSON.stringify(options)}`);
+    //   console.log(`[${this.constructor.name}] requestOptions 5: ${JSON.stringify(requestOptions)}`);
+    //   console.log(`[${this.constructor.name}] end             : makeAdminRequest  `);      
       // console.log(`[${this.constructor.name}] 🎯 makeAdminRequest Enhanced cacheKey generated: ${finalCacheKey}`);
     
 
@@ -1084,6 +1111,9 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     // For SSR: use ssrAuth parameter
     const auth0Id = ssrAuth?.auth0Id || this.getAuth0Id();
     const email = ssrAuth?.auth0Email || this.getAuth0Email();
+    
+      console.log('[FlexibleApiSingleton] Making authenticated request to:', url);
+    
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
@@ -1328,31 +1358,47 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
           userId: undefined
         };
         const cachedResponse = await this.getContextAwareCache<string>(cacheKey, cacheOptions);
-        if (cachedResponse) {
-          // console.log("---------------------------------------------------------------------------------");
-          // console.log(`[${this.constructor.name}] 🎯 Cache HIT (context-aware) for key: ${cacheKey}`);
-          // console.log(`[${this.constructor.name}] 🎯 Cache HIT (context-aware) response: ${cachedResponse}`);          
-          // console.log("---------------------------------------------------------------------------------");
-          // Return cached response as a Response object
-          return new Response(cachedResponse, {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-          });
+        if (cachedResponse && typeof cachedResponse === 'string' && cachedResponse.trim() !== '' && cachedResponse !== 'undefined') {
+          // Validate that cached response is valid JSON before returning
+          try {
+            JSON.parse(cachedResponse); // Validate JSON
+            
+            // console.log("---------------------------------------------------------------------------------");
+            // console.log(`[${this.constructor.name}] 🎯 Cache HIT (context-aware) for key: ${cacheKey}`);
+            // console.log(`[${this.constructor.name}] 🎯 Cache HIT (context-aware) response: ${cachedResponse}`);          
+            // console.log("---------------------------------------------------------------------------------");
+            // Return cached response as a Response object
+            return new Response(cachedResponse, {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          } catch (jsonError) {
+            console.warn(`[${this.constructor.name}] Invalid JSON in cache for key: ${cacheKey}, fetching fresh:`, jsonError);
+            // Continue to fetch fresh data
+          }
         }
       } else {
         // Fallback to generic caching
         const cachedResponse = await this.getFromCache<string>(cacheKey);
-        if (cachedResponse) {
-          // console.log("---------------------------------------------------------------------------------");
-          // console.log(`[${this.constructor.name}] 🎯 Cache HIT (generic) for key: ${cacheKey}`);
-          // console.log(`[${this.constructor.name}] 🎯 Cache HIT (generic) response: ${cachedResponse}`);          
-          // console.log("---------------------------------------------------------------------------------");
-          // console.log(`[${this.constructor.name}] 🎯 Cache HIT (generic) for key: ${cacheKey}`);
-          // Return cached response as a Response object
-          return new Response(cachedResponse, {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-          });
+        if (cachedResponse && typeof cachedResponse === 'string' && cachedResponse.trim() !== '' && cachedResponse !== 'undefined') {
+          // Validate that cached response is valid JSON before returning
+          try {
+            JSON.parse(cachedResponse); // Validate JSON
+            
+            // console.log("---------------------------------------------------------------------------------");
+            // console.log(`[${this.constructor.name}] 🎯 Cache HIT (generic) for key: ${cacheKey}`);
+            // console.log(`[${this.constructor.name}] 🎯 Cache HIT (generic) response: ${cachedResponse}`);          
+            // console.log("---------------------------------------------------------------------------------");
+            // console.log(`[${this.constructor.name}] 🎯 Cache HIT (generic) for key: ${cacheKey}`);
+            // Return cached response as a Response object
+            return new Response(cachedResponse, {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          } catch (jsonError) {
+            console.warn(`[${this.constructor.name}] Invalid JSON in generic cache for key: ${cacheKey}, fetching fresh:`, jsonError);
+            // Continue to fetch fresh data
+          }
         }
       }
       
