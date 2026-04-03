@@ -7,15 +7,7 @@ import { Package, ExternalLink, Grid3x3, List, MapPin } from 'lucide-react';
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { useRandomFeaturedProducts, useProductSingleton } from '@/providers/data/ProductSingleton';
 import type { PublicProduct } from '@/providers/data/ProductSingleton';
-
-// Utility function to format distance
-const formatDistance = (distanceKm: number | null): string => {
-  if (distanceKm === null) return '';
-  if (distanceKm < 1) {
-    return `${Math.round(distanceKm * 1000)}m away`;
-  }
-  return `${Math.round(distanceKm)}km away`;
-};
+import { distanceUtils } from '@/lib/utils';
 
 export default function RandomFeaturedProducts() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -209,7 +201,7 @@ export default function RandomFeaturedProducts() {
                   title: product.title || product.name,
                   brand: product.brand || '',
                   description: product.distanceKm !== null 
-                    ? `${product.description || ''} ${formatDistance(product.distanceKm || null)}`.trim()
+                    ? `${product.description || ''} ${distanceUtils.formatDistance(product.distanceKm || 0)}`.trim()
                     : product.description || '',
                   priceCents: product.priceCents,
                   salePriceCents: product.salePriceCents,
@@ -264,7 +256,7 @@ export default function RandomFeaturedProducts() {
                   title: product.title || product.name,
                   brand: product.brand || '',
                   description: product.distanceKm !== null 
-                    ? `${product.description || ''} ${formatDistance(product.distanceKm || null)}`.trim()
+                    ? `${product.description || ''} ${distanceUtils.formatDistance(product.distanceKm || 0)}`.trim()
                     : product.description || '',
                   priceCents: product.priceCents,
                   salePriceCents: product.salePriceCents,

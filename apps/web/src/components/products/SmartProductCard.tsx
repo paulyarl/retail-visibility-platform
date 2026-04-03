@@ -13,6 +13,7 @@ import type { PriceRange, AvailableAttributes } from '@/types/variants';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
+import { distanceUtils } from '@/lib/utils';
 
 // Helper functions for storefront featured type badges
 const getStorefrontBadgeStyle = (typeId: string): string => {
@@ -589,7 +590,7 @@ export default function SmartProductCard({
                   </p>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400">
                     {tenantCity && tenantState ? `${tenantCity}, ${tenantState}` : 'Available at this store'}
-                    {distanceKm !== null && distanceKm !== undefined && ` • ${Math.round(distanceKm)}km away`}
+                    {distanceKm !== null && distanceKm !== undefined && ` • ${distanceUtils.formatDistance(distanceKm)}`}
                   </p>
                 </div>
                 <div className="text-neutral-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
@@ -1178,7 +1179,7 @@ export default function SmartProductCard({
                       </p>
                       <p className="text-xs text-neutral-500 dark:text-neutral-400">
                         {tenantCity && tenantState ? `${tenantCity}, ${tenantState}` : 'Available at this store'}
-                        {distanceKm !== null && distanceKm !== undefined && ` • ${Math.round(distanceKm)}km away`}
+                        {distanceKm !== null && distanceKm !== undefined && ` • ${distanceUtils.formatDistance(distanceKm)}`}
                       </p>
                     </div>
                   </div>
