@@ -4,11 +4,189 @@ import CacheService, { CacheKeys, CACHE_TTL } from '../lib/cache-service';
 
 const router = Router();
 
-/**
- * Advanced merchant diversification using JavaScript utilities
- * Ensures products are distributed across different merchants rather than grouped
- */
-function diversifyByMerchant(products: any[], limit: number): any[] {
+// GET /api/directory/random-featured
+// Returns proximity-weighted random featured products with merchant diversification
+router.get('/', async (req, res) => {
+  try {
+    const pool = getDirectPool();
+    
+    // Get user location and limit from query params
+    const userLat = parseFloat(req.query.lat as string) || 40.7128; // Default: New York
+    const userLng = parseFloat(req.query.lng as string) || -74.0060; // Default: New York
+    const maxDistance = parseFloat(req.query.maxDistance as string) || 500; // Default: 500km
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 12));
+    
+    // Query for random featured products with proximity weighting from mv_global_discovery
+    const query = `
+      WITH featured_products AS (
+        SELECT 
+          mv.inventory_item_id as id,
+          mv.product_name as name,
+          mv.list_price_cents as price_cents,
+          mv.sale_price_cents,
+          'USD' as currency,
+          mv.image_url,
+          mv.brand,
+          mv.product_description as description,
+          mv.stock,
+          mv.availability,
+          mv.is_variant,
+          mv.has_gallery,
+          mv.tenant_id,
+          mv.product_category_name_lower as category_name,
+          mv.product_category_slug as category_slug,
+          mv.product_google_category_id as google_category_id,
+          mv.has_active_payment_gateway,
+          mv.default_gateway_type,
+          dsl.slug as store_slug,
+          dsl.business_name as store_name,
+          dsl.logo_url as store_logo,
+          dsl.city as store_city,
+          dsl.state as store_state,
+          dsl.latitude,
+          dsl.longitude,
+          dsl.primary_category as store_category,
+          mv.updated_at,
+          -- Calculate distance in kilometers using Haversine formula
+          CASE 
+            WHEN dsl.latitude IS NOT NULL AND dsl.longitude IS NOT NULL THEN
+              6371 * acos(
+                cos(radians($1)) * cos(radians(dsl.latitude)) * 
+                cos(radians(dsl.longitude) - radians($2)) + 
+                sin(radians($1)) * sin(radians(dsl.latitude))
+              )
+            ELSE NULL
+          END as distance_km,
+          -- Geographic relevance score based on city/state when lat/lng missing
+          CASE 
+            WHEN dsl.latitude IS NOT NULL AND dsl.longitude IS NOT NULL THEN 1.0
+            WHEN dsl.state = 'NY' THEN 0.8 -- High priority for same state
+            WHEN dsl.state IN ('NJ', 'CT', 'PA', 'MA') THEN 0.6 -- Nearby states
+            WHEN dsl.city IS NOT NULL THEN 0.4 -- Has city info
+            ELSE 0.1 -- No location info
+          END as geographic_relevance
+        FROM mv_global_discovery mv
+        JOIN directory_listings_list dsl ON dsl.tenant_id = mv.tenant_id
+        WHERE mv.is_actively_featured = true 
+          AND mv.featured_type IN ('store_selection', 'featured')
+          AND dsl.is_published = true
+          AND mv.has_image = true
+          AND mv.in_stock = true
+      ),
+      weighted_products AS (
+        SELECT *,
+          -- Weight: combine geographic relevance with distance and randomness
+          CASE 
+            WHEN distance_km IS NOT NULL AND distance_km <= $3 THEN 
+              -- Has precise location and within radius: use distance + geographic relevance
+              (1.0 / (1 + distance_km/100)) * geographic_relevance * (0.7 + random() * 0.3)
+            WHEN distance_km IS NULL THEN 
+              -- No precise location: use geographic relevance + randomness
+              geographic_relevance * (0.5 + random() * 0.5)
+            ELSE 
+              -- Far away: low weight but still some chance
+              0.1 * random()
+          END as weight
+        FROM featured_products
+      )
+      SELECT * FROM weighted_products
+      ORDER BY weight DESC, RANDOM()
+      LIMIT $4
+    `;
+    
+    const result = await pool.query(query, [userLat, userLng, maxDistance, Math.min(limit * 5, 100)]);
+    
+    // Transform to camelCase for frontend compatibility
+    const products = result.rows.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      priceCents: row.price_cents,
+      salePriceCents: row.sale_price_cents,
+      currency: row.currency,
+      imageUrl: row.image_url,
+      brand: row.brand,
+      description: row.description,
+      stock: row.stock,
+      availability: row.availability,
+      isVariant: row.is_variant,
+      hasGallery: row.has_gallery,
+      tenantId: row.tenant_id,
+      categoryName: row.category_name,
+      categorySlug: row.category_slug,
+      googleCategoryId: row.google_category_id,
+      distanceKm: row.distance_km,
+      hasActivePaymentGateway: row.has_active_payment_gateway,
+      paymentGatewayType: row.default_gateway_type,
+      storeSlug: row.store_slug,
+      storeName: row.store_name,
+      storeLogo: row.store_logo,
+      storeCity: row.store_city,
+      storeState: row.store_state,
+      storeCategory: row.store_category,
+      updatedAt: row.updated_at
+    }));
+    
+    // Apply merchant diversification
+    const diversifiedProducts = diversifyByMerchant(products, limit);
+    
+    res.json({
+      products: diversifiedProducts,
+      total: diversifiedProducts.length,
+      refreshed_at: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('[GET /api/directory/random-featured] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch random featured products',
+      products: [],
+      total: 0,
+      refreshed_at: new Date().toISOString()
+    });
+  }
+});
+
+// GET /api/directory/random-featured/debug
+// Debug endpoint to see all merchants with featured products
+router.get('/debug', async (req, res) => {
+  try {
+    const pool = getDirectPool();
+    
+    const query = `
+      SELECT DISTINCT 
+        mv.tenant_id,
+        COUNT(*) as product_count,
+        dsl.business_name as store_name
+      FROM mv_global_discovery mv
+      JOIN directory_listings_list dsl ON dsl.tenant_id = mv.tenant_id
+      WHERE mv.is_actively_featured = true 
+        AND mv.featured_type IN ('store_selection', 'featured')
+        AND mv.has_image = true 
+        AND mv.in_stock = true
+        AND dsl.is_published = true
+      GROUP BY mv.tenant_id, dsl.business_name
+      ORDER BY product_count DESC
+    `;
+    
+    const result = await pool.query(query);
+    
+    console.log('[DEBUG] All merchants with featured products:');
+    result.rows.forEach(row => {
+      console.log(`  ${row.tenant_id} (${row.store_name}): ${row.product_count} products`);
+    });
+    
+    return res.json({
+      merchants: result.rows,
+      totalMerchants: result.rows.length
+    });
+  } catch (error) {
+    console.error('[DEBUG] Error:', error);
+    return res.status(500).json({ error: 'Debug query failed' });
+  }
+});
+
+// Helper function for merchant diversification (shared across endpoints)
+const diversifyByMerchant = (products: any[], limit: number) => {
   if (!products || products.length === 0) return [];
   
   // Group products by merchant
@@ -23,7 +201,6 @@ function diversifyByMerchant(products: any[], limit: number): any[] {
   
   // Shuffle each merchant's products randomly
   merchantGroups.forEach(merchantProducts => {
-    // Fisher-Yates shuffle for each merchant's products
     for (let i = merchantProducts.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [merchantProducts[i], merchantProducts[j]] = [merchantProducts[j], merchantProducts[i]];
@@ -51,7 +228,7 @@ function diversifyByMerchant(products: any[], limit: number): any[] {
       if (diversified.length >= limit) break;
       
       const merchantProducts = merchantGroups.get(merchantId)!;
-      const productIndex = diversified.length + merchantIndex;
+      const productIndex = merchantIndex;
       
       if (productIndex < merchantProducts.length) {
         diversified.push(merchantProducts[productIndex]);
@@ -62,291 +239,8 @@ function diversifyByMerchant(products: any[], limit: number): any[] {
     merchantIndex++;
   }
   
-  // If we still need more products to reach the limit, fill with remaining products
-  if (diversified.length < limit) {
-    const remainingProducts = products.filter(p => !diversified.includes(p));
-    // Shuffle remaining products
-    for (let i = remainingProducts.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [remainingProducts[i], remainingProducts[j]] = [remainingProducts[j], remainingProducts[i]];
-    }
-    // Add remaining products up to the limit
-    diversified.push(...remainingProducts.slice(0, limit - diversified.length));
-  }
-  
   return diversified.slice(0, limit);
-}
-
-// GET /api/directory/random-featured
-// Returns proximity-weighted random featured products with pagination
-router.get('/', async (req, res) => {
-  try {
-    const { lat, lng, maxDistance = '500', page = '1', limit = '12', _t } = req.query;
-    
-    const pageNum = Math.max(1, parseInt(page as string) || 1);
-    const limitNum = Math.min(50, Math.max(1, parseInt(limit as string) || 12));
-    const offset = (pageNum - 1) * limitNum;
-    
-    // Check for cache-busting parameter
-    const useCache = !_t; // If _t parameter exists, bypass cache
-    
-    // Generate cache key based on location, distance, pagination, and cache-busting
-    const cacheBustingSuffix = _t ? `_cb_${_t}` : '';
-    const cacheKey = lat && lng 
-      ? CacheKeys.FEATURED_PRODUCTS(`${lat}:${lng}:${maxDistance}:${page}:${limit}${cacheBustingSuffix}`)
-      : CacheKeys.FEATURED_PRODUCTS(`global:${page}:${limit}${cacheBustingSuffix}`);
-    
-    // Try to get from cache first (unless cache-busting)
-    if (useCache) {
-      const cached = await CacheService.get(cacheKey);
-      if (cached) {
-        return res.json({
-          ...cached,
-          refreshed_at: new Date().toISOString()
-        });
-      }
-    }
-    
-    const pool = getDirectPool();
-    let query;
-    let queryParams = [];
-    
-    if (lat && lng) {
-      // Proximity-weighted random query with rich data from mv_global_discovery
-      query = `
-        WITH nearby_stores AS (
-          SELECT 
-            tenant_id,
-            (6371 * acos(
-              cos(radians($1)) * cos(radians(lat)) * 
-              cos(radians(lng) - radians($2)) + 
-              sin(radians($1)) * sin(radians(lat))
-            )) AS distance_km
-          FROM directory_listings_list
-          WHERE is_published = true
-            AND lat IS NOT NULL 
-            AND lng IS NOT NULL
-          HAVING distance_km < $3
-        ),
-        weighted_products AS (
-          SELECT 
-            mv.inventory_item_id as id,
-            mv.tenant_id,
-            mv.sku,
-            mv.product_name as name,
-            mv.product_title as title,
-            mv.product_description as description,
-            mv.list_price_cents as price_cents,
-            mv.sale_price_cents,
-            mv.stock,
-            mv.image_url,
-            mv.brand,
-            mv.item_status,
-            mv.availability,
-            mv.has_variants,
-            mv.product_category_name_lower as category_name,
-            mv.product_category_slug as category_slug,
-            mv.product_google_category_id as google_category_id,
-            mv.has_gallery,
-            mv.has_description,
-            mv.has_brand,
-            mv.has_price,
-            mv.has_active_payment_gateway,
-            mv.default_gateway_type,
-            mv.featured_type,
-            mv.featured_priority,
-            mv.featured_at,
-            mv.featured_until as featured_expires_at,
-            mv.is_actively_featured as is_featured_active,
-            mv.created_at,
-            mv.updated_at,
-            dsl.slug as store_slug,
-            dsl.business_name as store_name,
-            dsl.logo_url as store_logo,
-            dsl.city as store_city,
-            dsl.state as store_state,
-            dsl.website_url as store_website,
-            dsl.phone as store_phone,
-            ns.distance_km,
-            CASE 
-              WHEN ns.distance_km < 50 THEN 0.1   -- Very nearby (50km) - 10x weight
-              WHEN ns.distance_km < 100 THEN 0.3  -- Nearby (100km) - 3x weight  
-              WHEN ns.distance_km < 200 THEN 0.5  -- Medium distance - 2x weight
-              ELSE 1.0  -- Far away - normal weight
-            END * RANDOM() as weighted_random
-          FROM mv_global_discovery mv
-          JOIN directory_listings_list dsl ON dsl.tenant_id = mv.tenant_id
-          JOIN nearby_stores ns ON ns.tenant_id = mv.tenant_id
-          WHERE mv.is_actively_featured = true 
-            AND dsl.is_published = true
-            AND mv.has_image = true
-            AND mv.in_stock = true
-        )
-        SELECT * FROM weighted_products
-        ORDER BY weighted_random
-        LIMIT $4 OFFSET $5
-      `;
-      queryParams = [
-        parseFloat(lat as string), 
-        parseFloat(lng as string), 
-        parseFloat(maxDistance as string),
-        limitNum,
-        offset
-      ];
-    } else {
-      // Fallback: Simple query - let JavaScript handle the randomization
-      query = `
-        SELECT 
-          mv.inventory_item_id as id,
-          mv.tenant_id,
-          mv.sku,
-          mv.product_name as name,
-          mv.product_title as title,
-          mv.product_description as description,
-          mv.list_price_cents as price_cents,
-          mv.sale_price_cents,
-          mv.stock,
-          mv.image_url,
-          mv.brand,
-          mv.item_status,
-          mv.availability,
-          mv.product_category as category_name,
-          mv.product_category_slug as category_slug,
-          mv.product_google_category_id as google_category_id,
-          mv.has_gallery,
-          mv.has_description,
-          mv.has_brand,
-          mv.has_price,
-          mv.has_active_payment_gateway,
-          mv.default_gateway_type,
-          mv.featured_type,
-          mv.featured_priority,
-          mv.featured_at,
-          mv.featured_until as featured_expires_at,
-          mv.is_actively_featured as is_featured_active,
-          mv.created_at,
-          mv.updated_at,
-          mv.tenant_slug as store_slug,
-          mv.tenant_name as store_name,
-          mv.tenant_logo_url as store_logo,
-          mv.tenant_city as store_city,
-          mv.tenant_state as store_state
-        FROM mv_global_discovery mv
-        WHERE mv.is_actively_featured = true 
-          AND mv.has_image = true
-          AND mv.in_stock = true
-        LIMIT $1 OFFSET $2
-      `;
-      queryParams = [limitNum, offset];
-    }
-    
-    const result = await pool.query(query, queryParams);
-    
-    // Transform to match storefront data structure
-    let products = result.rows.map((row: any) => ({
-      id: row.id,
-      tenantId: row.tenant_id,
-      sku: row.sku,
-      name: row.name,
-      title: row.title,
-      description: row.description,
-      priceCents: row.price_cents,
-      salePriceCents: row.sale_price_cents,
-      stock: row.stock,
-      imageUrl: row.image_url,
-      brand: row.brand,
-      itemStatus: row.item_status,
-      availability: row.availability,
-      featuredType: row.featured_type,
-      featuredTypes: row.featured_type ? [row.featured_type] : [], // Convert single to array
-      featuredPriority: row.featured_priority,
-      featuredAt: row.featured_at,
-      featuredExpiresAt: row.featured_expires_at,
-      isFeaturedActive: row.is_featured_active,
-      categoryName: row.category_name,
-      categorySlug: row.category_slug,
-      googleCategoryId: row.google_category_id,
-      hasGallery: row.has_gallery,
-      hasDescription: row.has_description,
-      hasBrand: row.has_brand,
-      hasPrice: row.has_price,
-      hasActivePaymentGateway: row.has_active_payment_gateway,
-      defaultGatewayType: row.default_gateway_type,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      storeSlug: row.store_slug,
-      storeName: row.store_name,
-      storeLogo: row.store_logo,
-      storeCity: row.store_city,
-      storeState: row.store_state,
-      distanceKm: row.distance_km || null,
-    }));
-    
-    // Advanced merchant diversification using JavaScript utilities
-    products = diversifyByMerchant(products, limitNum);
-    
-    // Get total count for pagination
-    let totalCountQuery;
-    let totalCountParams: any[] = [];
-    
-    if (lat && lng) {
-      totalCountQuery = `
-        SELECT COUNT(DISTINCT mv.inventory_item_id) as total
-        FROM mv_global_discovery mv
-        WHERE mv.is_actively_featured = true 
-          AND mv.has_image = true
-          AND mv.in_stock = true
-          AND mv.tenant_latitude IS NOT NULL 
-          AND mv.tenant_longitude IS NOT NULL
-          AND (6371 * acos(
-            cos(radians($1)) * cos(radians(mv.tenant_latitude)) * 
-            cos(radians(mv.tenant_longitude) - radians($2)) + 
-            sin(radians($1)) * sin(radians(mv.tenant_latitude))
-          )) < $3
-      `;
-      totalCountParams = [parseFloat(lat as string), parseFloat(lng as string), parseFloat(maxDistance as string)];
-    } else {
-      totalCountQuery = `
-        SELECT COUNT(DISTINCT mv.inventory_item_id) as total
-        FROM mv_global_discovery mv
-        WHERE mv.is_actively_featured = true 
-          AND mv.has_image = true
-          AND mv.in_stock = true
-      `;
-      totalCountParams = [];
-    }
-    
-    const totalCountResult = await pool.query(totalCountQuery, totalCountParams);
-    const totalCount = parseInt(totalCountResult.rows[0].total);
-    
-    const responseData = {
-      products,
-      pagination: {
-        currentPage: pageNum,
-        limit: limitNum,
-        totalCount,
-        totalPages: Math.ceil(totalCount / limitNum),
-        hasNext: pageNum * limitNum < totalCount,
-        hasPrev: pageNum > 1
-      },
-      location: lat && lng ? { lat: parseFloat(lat as string), lng: parseFloat(lng as string), maxDistance: parseFloat(maxDistance as string) } : null,
-      refreshed_at: new Date().toISOString()
-    };
-    
-    // Cache the response (unless cache-busting)
-    if (useCache) {
-      await CacheService.set(cacheKey, responseData, CACHE_TTL.FEATURED_PRODUCTS);
-    }
-    
-    return res.json(responseData);
-  } catch (error) {
-    console.error('[GET /api/directory/random-featured] Error:', error);
-    return res.status(500).json({
-      error: 'Failed to fetch random featured products',
-      details: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
-    });
-  }
-});
+};
 
 // GET /api/directory/random-featured/available
 // Returns available products for directory featuring (not currently featured)
@@ -363,6 +257,7 @@ router.get('/available', async (req, res) => {
     // Build where conditions for mv_global_discovery
     const whereConditions = [
       'mv.is_actively_featured = true', 
+      'mv.featured_type IN (\'store_selection\', \'featured\')',
       'mv.has_image = true', 
       'mv.in_stock = true',
       'dsl.is_published = true'
@@ -397,7 +292,7 @@ router.get('/available', async (req, res) => {
         mv.brand,
         mv.item_status,
         mv.availability,
-        mv.has_variants,
+        mv.is_variant,
         null as tenant_category_id, -- Not available in mv_global_discovery
         mv.featured_type,
         mv.featured_priority,
@@ -407,7 +302,7 @@ router.get('/available', async (req, res) => {
         null as days_until_expiration, -- Not available in mv_global_discovery
         null as is_expired, -- Not available in mv_global_discovery
         null as is_expiring_soon, -- Not available in mv_global_discovery
-        mv.metadata,
+        mv.product_metadata,
         mv.product_category_name_lower as category_name,
         mv.product_category_slug as category_slug,
         mv.product_google_category_id as google_category_id,
@@ -424,7 +319,7 @@ router.get('/available', async (req, res) => {
         dsl.logo_url as store_logo,
         dsl.city as store_city,
         dsl.state as store_state,
-        dsl.website_url as store_website,
+        dsl.website as store_website,
         dsl.phone as store_phone
       FROM mv_global_discovery mv
       JOIN directory_listings_list dsl ON dsl.tenant_id = mv.tenant_id
@@ -470,7 +365,7 @@ router.get('/available', async (req, res) => {
         brand: row.brand,
         itemStatus: row.item_status,
         availability: row.availability,
-        hasVariants: row.has_variants,
+        hasVariants: row.is_variant,
         tenantCategoryId: null, // Not available in mv_global_discovery
         featuredType: row.featured_type,
         featuredTypes: row.featured_type ? [row.featured_type] : [], // Convert single to array
@@ -481,7 +376,7 @@ router.get('/available', async (req, res) => {
         daysUntilExpiration: null, // Not available in mv_global_discovery
         isExpired: null, // Not available in mv_global_discovery
         isExpiringSoon: null, // Not available in mv_global_discovery
-        metadata: row.metadata,
+        metadata: row.product_metadata,
         categoryName: row.category_name,
         categorySlug: row.category_slug,
         googleCategoryId: row.google_category_id,
