@@ -725,14 +725,31 @@ async function getUserLocationClient(): Promise<{
   state: string;
 } | null> {
   try {
-    // Try browser geolocation first
+    // Try browser geolocation first with better timeout strategy
     if ('geolocation' in navigator) {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          timeout: 10000,
-          enableHighAccuracy: true
+      let position: GeolocationPosition;
+      
+      try {
+        // First attempt: High accuracy with reasonable timeout
+        position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 8000, // Reduced from 10s to 8s
+            enableHighAccuracy: true,
+            maximumAge: 5 * 60 * 1000 // 5 minutes cache
+          });
         });
-      });
+      } catch (highAccuracyError) {
+        console.warn('[BehaviorTracking] High accuracy geolocation failed, trying low accuracy:', highAccuracyError);
+        
+        // Second attempt: Low accuracy with shorter timeout
+        position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 5000, // 5 seconds for low accuracy
+            enableHighAccuracy: false, // Low accuracy mode
+            maximumAge: 30 * 60 * 1000 // 30 minutes cache
+          });
+        });
+      }
       
       const { latitude, longitude } = position.coords;
       

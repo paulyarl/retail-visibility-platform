@@ -11,6 +11,7 @@ import AccessDenied from '@/components/AccessDenied';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 import { useAdminDashboardData } from '@/hooks/useAdminDashboardData';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import { clearCachesWithConfirmation } from '@/utils/clearAllCaches';
 
 type AdminSection = {
   title: string;
@@ -792,6 +793,54 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
               </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Cache Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Cache Management</CardTitle>
+            <CardDescription>Clear application caches to resolve data issues</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="h-6 w-6 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <svg className="w-3 h-3 text-amber-600 dark:text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-amber-900 dark:text-amber-100">Clear All Caches</h4>
+                    <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                      This will clear all cached data including directory listings, user preferences, product data, and session data. Use this when experiencing data inconsistencies or after cache system updates.
+                    </p>
+                    <div className="mt-3">
+                      <Button 
+                        variant="outline" 
+                        color="amber"
+                        onClick={clearCachesWithConfirmation}
+                        className="text-sm"
+                      >
+                        Clear All Caches
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                <p><strong>Cache types cleared:</strong></p>
+                <ul className="mt-1 space-y-1">
+                  <li>• Directory listings and search results</li>
+                  <li>• Product and store data</li>
+                  <li>• User preferences and session data</li>
+                  <li>• API response caches</li>
+                  <li>• Location and behavior tracking data</li>
+                </ul>
+              </div>
             </div>
           </CardContent>
         </Card>

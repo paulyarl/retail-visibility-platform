@@ -2,7 +2,7 @@
  * Context-Aware Cache Service
  * 
  * Provides intelligent caching delegation by selecting the appropriate
- * composite cache manager based on context detection.
+ * enhanced context-aware cache manager based on context detection.
  */
 
 import {
@@ -21,68 +21,86 @@ import {
   type CacheOptions
 } from '../utils/cacheManager';
 
+import { ContextAwareCacheManager, EnhancedCacheOptions } from '../utils/contextAwareCacheManager';
+import { AppContext, CacheIsolation } from '../utils/contextCacheManager';
+
 export interface ContextAwareCacheOptions extends CacheOptions {
-  context?: CacheContext;
+  context?: CacheContext | AppContext; // Allow both types for compatibility
   isolation?: CacheContext;
   tenantId?: string;
   userId?: string;
 }
 
 /**
- * Context-aware caching service that delegates to appropriate composite cache managers
+ * Enhanced context-aware caching service that delegates to appropriate
+ * context-aware cache managers with intelligent storage strategies
  */
 export class ContextAwareCacheService {
-  // Singleton instances for each context type
-  private adminCache = new AdminCacheManager();
-  private publicCache = new PublicCacheManager();
-  private productCache = new ProductCacheManager();
-  private shopCache = new ShopCacheManager();
-  private storeCache = new StoreCacheManager();
-  private systemCache = new SystemCacheManager();
-  private directoryCache = new DirectoryCacheManager();
-  private globalCache = new GlobalCacheManager();
+  // Enhanced singleton instances with context-aware strategies
+  private adminCache = new ContextAwareCacheManager({ context: AppContext.ADMIN } as EnhancedCacheOptions);
+  private publicCache = new ContextAwareCacheManager({ context: AppContext.PUBLIC } as EnhancedCacheOptions);
+  private productCache = new ContextAwareCacheManager({ context: AppContext.PRODUCT } as EnhancedCacheOptions);
+  private shopCache = new ContextAwareCacheManager({ context: AppContext.SHOP } as EnhancedCacheOptions);
+  private storeCache = new ContextAwareCacheManager({ context: AppContext.STORE } as EnhancedCacheOptions);
+  private systemCache = new ContextAwareCacheManager({ context: AppContext.SYSTEM } as EnhancedCacheOptions);
+  private directoryCache = new ContextAwareCacheManager({ context: AppContext.DIRECTORY } as EnhancedCacheOptions);
+  private globalCache = new ContextAwareCacheManager({ context: AppContext.GLOBAL } as EnhancedCacheOptions);
 
   // Cached instances for tenant and user contexts (with ID-specific databases)
-  private tenantCacheManagers = new Map<string, TenantCacheManager>();
-  private userCacheManagers = new Map<string, UserCacheManager>();
+  private tenantCacheManagers = new Map<string, ContextAwareCacheManager>();
+  private userCacheManagers = new Map<string, ContextAwareCacheManager>();
 
   /**
-   * Get cached data using context-aware cache manager selection
+   * Get cached data using enhanced context-aware cache manager selection
    */
   async get<T>(key: string, options?: ContextAwareCacheOptions): Promise<T | null> {
     if (!options?.context) {
-      // Fall back to generic cache manager if no context provided
-      const cacheManager = new CacheManager();
-      return cacheManager.get<T>(key, options);
+      // Fall back to generic enhanced cache manager if no context provided
+      const cacheManager = new ContextAwareCacheManager();
+      return cacheManager.get<T>(key, options as EnhancedCacheOptions);
     }
 
     const cacheManager = this.getCacheManager(options.context, options);
     
-    return cacheManager.get<T>(key, options);
+    // Convert options to EnhancedCacheOptions
+    const enhancedOptions: EnhancedCacheOptions = {
+      ...options,
+      context: this.convertToAppContext(options.context),
+      isolation: this.convertIsolation(options.isolation)
+    };
+    
+    return cacheManager.get<T>(key, enhancedOptions);
   }
 
   /**
-   * Set cached data using context-aware cache manager selection
+   * Set cached data using enhanced context-aware cache manager selection
    */
   async set<T>(key: string, data: T, options?: ContextAwareCacheOptions): Promise<void> {
     if (!options?.context) {
-      // Fall back to generic cache manager if no context provided
-      const cacheManager = new CacheManager();
-      return cacheManager.set<T>(key, data, options);
+      // Fall back to generic enhanced cache manager if no context provided
+      const cacheManager = new ContextAwareCacheManager();
+      return cacheManager.set<T>(key, data, options as EnhancedCacheOptions);
     }
 
     const cacheManager = this.getCacheManager(options.context, options);
     
-    return cacheManager.set<T>(key, data, options);
+    // Convert options to EnhancedCacheOptions
+    const enhancedOptions: EnhancedCacheOptions = {
+      ...options,
+      context: this.convertToAppContext(options.context),
+      isolation: this.convertIsolation(options.isolation)
+    };
+    
+    return cacheManager.set<T>(key, data, enhancedOptions);
   }
 
   /**
-   * Remove cached data using context-aware cache manager selection
+   * Remove cached data using enhanced context-aware cache manager selection
    */
   async remove(key: string, options?: ContextAwareCacheOptions): Promise<void> {
     if (!options?.context) {
-      // Fall back to generic cache manager if no context provided
-      const cacheManager = new CacheManager();
+      // Fall back to generic enhanced cache manager if no context provided
+      const cacheManager = new ContextAwareCacheManager();
       return cacheManager.remove(key);
     }
 
@@ -107,54 +125,104 @@ export class ContextAwareCacheService {
   }
 
   /**
-   * Select the appropriate cache manager based on context
+   * Convert between CacheContext and AppContext enums
    */
-  private getCacheManager(context: CacheContext, options?: ContextAwareCacheOptions): CacheManager {
-    switch (context) {
-      case 'tenant':
+  private convertToAppContext(context: CacheContext | AppContext): AppContext {
+    // If it's already AppContext, return as-is
+    if (Object.values(AppContext).includes(context as AppContext)) {
+      return context as AppContext;
+    }
+    
+    // Convert CacheContext to AppContext
+    const contextMap: Record<CacheContext, AppContext> = {
+      'admin': AppContext.ADMIN,
+      'tenant': AppContext.TENANT,
+      'product': AppContext.PRODUCT,
+      'store': AppContext.STORE,
+      'shop': AppContext.SHOP,
+      'directory': AppContext.DIRECTORY,
+      'user': AppContext.USER,
+      'global': AppContext.GLOBAL,
+      'public': AppContext.PUBLIC,
+      'system': AppContext.SYSTEM
+    };
+    
+    return contextMap[context as CacheContext] || AppContext.GLOBAL;
+  }
+
+  /**
+   * Convert CacheContext to CacheIsolation for EnhancedCacheOptions
+   */
+  private convertIsolation(isolation?: CacheContext): CacheIsolation | undefined {
+    if (!isolation) return undefined;
+    
+    const isolationMap: Record<CacheContext, CacheIsolation> = {
+      'admin': CacheIsolation.ADMIN,
+      'tenant': CacheIsolation.TENANT,
+      'product': CacheIsolation.PRODUCT,
+      'store': CacheIsolation.STORE,
+      'shop': CacheIsolation.SHOP,
+      'directory': CacheIsolation.DIRECTORY,
+      'user': CacheIsolation.USER,
+      'global': CacheIsolation.GLOBAL,
+      'public': CacheIsolation.PUBLIC,
+      'system': CacheIsolation.SYSTEM
+    };
+    
+    return isolationMap[isolation];
+  }
+
+  /**
+   * Select the appropriate enhanced cache manager based on context
+   */
+  private getCacheManager(context: CacheContext | AppContext, options?: ContextAwareCacheOptions): ContextAwareCacheManager {
+    const appContext = this.convertToAppContext(context);
+    
+    switch (appContext) {
+      case AppContext.TENANT:
         return this.getTenantCacheManager(options?.tenantId);
       
-      case 'user':
+      case AppContext.USER:
         return this.getUserCacheManager(options?.userId);
       
-      case 'admin':
+      case AppContext.ADMIN:
         return this.adminCache;
       
-      case 'public':
+      case AppContext.PUBLIC:
         return this.publicCache;
       
-      case 'product':
+      case AppContext.PRODUCT:
         return this.productCache;
       
-      case 'shop':
+      case AppContext.SHOP:
         return this.shopCache;
       
-      case 'store':
+      case AppContext.STORE:
         return this.storeCache;
       
-      case 'system':
+      case AppContext.SYSTEM:
         return this.systemCache;
       
-      case 'directory':
+      case AppContext.DIRECTORY:
         return this.directoryCache;
       
-      case 'global':
+      case AppContext.GLOBAL:
         return this.globalCache;
       
       default:
-        // Fallback to generic cache manager
-        return new CacheManager();
+        // Fallback to generic enhanced cache manager
+        return new ContextAwareCacheManager();
     }
   }
 
   /**
-   * Get or create a tenant-specific cache manager
+   * Get or create a tenant-specific enhanced cache manager
    */
-  private getTenantCacheManager(tenantId?: string): TenantCacheManager {
+  private getTenantCacheManager(tenantId?: string): ContextAwareCacheManager {
     const key = tenantId || 'default';
     
     if (!this.tenantCacheManagers.has(key)) {
-      const manager = new TenantCacheManager(tenantId);
+      const manager = new ContextAwareCacheManager({ context: AppContext.TENANT, tenantId } as EnhancedCacheOptions);
       this.tenantCacheManagers.set(key, manager);
     }
     
@@ -162,13 +230,13 @@ export class ContextAwareCacheService {
   }
 
   /**
-   * Get or create a user-specific cache manager
+   * Get or create a user-specific enhanced cache manager
    */
-  private getUserCacheManager(userId?: string): UserCacheManager {
+  private getUserCacheManager(userId?: string): ContextAwareCacheManager {
     const key = userId || 'default';
     
     if (!this.userCacheManagers.has(key)) {
-      const manager = new UserCacheManager(userId);
+      const manager = new ContextAwareCacheManager({ context: AppContext.USER, userId } as EnhancedCacheOptions);
       this.userCacheManagers.set(key, manager);
     }
     

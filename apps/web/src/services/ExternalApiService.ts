@@ -62,12 +62,12 @@ class ExternalApiService extends ExternalApiSingleton {
 
   /**
    * Get IP geolocation information
-   * Uses ipapi.co service
+   * Uses ip-api.com service (free, CORS-friendly)
    */
   async getIpGeolocation(cacheKey?: string): Promise<GeolocationResponse | null> {
     try {
-      const response = await this.makeExternalRequest<GeolocationResponse>(
-        'https://ipapi.co/json/',
+      const response = await this.makeExternalRequest<any>(
+        'http://ip-api.com/json/',
         {
           signal: AbortSignal.timeout(5000) // 5 seconds timeout
         },
@@ -77,7 +77,26 @@ class ExternalApiService extends ExternalApiSingleton {
         }
       );
 
-      return response.data || null;
+      // Transform ip-api.com response to match our interface
+      const data = response.data;
+      if (data) {
+        return {
+          ip: data.query || data.ip,
+          city: data.city,
+          region: data.regionName || data.region,
+          country: data.country,
+          country_name: data.country,
+          postal: data.zip,
+          latitude: data.lat,
+          longitude: data.lon,
+          timezone: data.timezone,
+          utc_offset: data.timezone ? `UTC${data.timezone}` : undefined,
+          org: data.org,
+          asn: data.as
+        };
+      }
+
+      return null;
     } catch (error) {
       console.error('[ExternalApiService] Failed to get IP geolocation:', error);
       return null;
@@ -374,7 +393,7 @@ class ExternalApiService extends ExternalApiSingleton {
   }> {
     // Default services if not provided
     const defaultServices = [
-      { name: 'ipapi', url: 'https://ipapi.co/json/', timeout: 3000 },
+      { name: 'ipapi', url: 'http://ip-api.com/json/', timeout: 3000 },
       { name: 'nominatim', url: 'https://nominatim.openstreetmap.org/search?format=json&q=test', timeout: 5000 }
     ];
     

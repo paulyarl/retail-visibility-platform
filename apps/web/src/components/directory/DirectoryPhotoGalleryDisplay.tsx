@@ -33,15 +33,15 @@ export default function DirectoryPhotoGalleryDisplay({ listing, isPublished }: D
     const loadPhotos = async () => {
       try {
         setLoading(true);
-        console.log(`Checking if listing is published: ${listing.id}`);
-        console.log(`Checking if listing is published: ${JSON.stringify(listing)}`);
-        console.log(`Listing published status: ${listing.is_directory_published}`);
+        // console.log(`Checking if listing is published: ${listing.id}`);
+        // console.log(`Checking if listing is published: ${JSON.stringify(listing)}`);
+        // console.log(`Listing published status: ${listing.is_directory_published}`);
         if (!isPublished) {
           console.log(`Listing is not published, skipping photo loading`);
           return;
         }
         const photoAssets = await directoryListingService.getDirectoryListingPhotos(listing.id);
-        console.log(`Loaded ${photoAssets.length} photos`);
+        // console.log(`Loaded ${photoAssets.length} photos`);
         setPhotos(photoAssets.sort((a, b) => a.position - b.position));
       } catch (e) {
         console.error("Failed to load directory photos:", e);

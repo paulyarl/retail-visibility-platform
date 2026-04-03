@@ -341,7 +341,61 @@ class CacheManager {
       const storageKey = this.getStorageKey(key);
       localStorage.setItem(storageKey, JSON.stringify(entry));
     } catch (error) {
-      console.warn('[CacheManager] localStorage set failed:', error);
+      // Handle quota exceeded specifically
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        console.warn('[CacheManager] localStorage quota exceeded, attempting cleanup...');
+        this.cleanupLocalStorage();
+        // Try again after cleanup
+        try {
+          const storageKey = this.getStorageKey(key);
+          localStorage.setItem(storageKey, JSON.stringify(entry));
+        } catch (retryError) {
+          console.warn('[CacheManager] localStorage set failed even after cleanup:', retryError);
+        }
+      } else {
+        console.warn('[CacheManager] localStorage set failed:', error);
+      }
+    }
+  }
+
+  private cleanupLocalStorage(): void {
+    if (!this.localStorageSupported) return;
+
+    try {
+      // Get all cache-related keys
+      const cacheKeys = Object.keys(localStorage).filter(key => 
+        key.startsWith('singleton-cache-') || key.includes('-cache-')
+      );
+
+      // Sort by timestamp (if available) and remove oldest entries
+      const entriesWithTimestamp: Array<{key: string, timestamp: number}> = [];
+      
+      cacheKeys.forEach(key => {
+        try {
+          const value = localStorage.getItem(key);
+          if (value) {
+            const parsed = JSON.parse(value);
+            if (parsed.timestamp) {
+              entriesWithTimestamp.push({ key, timestamp: parsed.timestamp });
+            }
+          }
+        } catch {
+          // Remove malformed entries
+          localStorage.removeItem(key);
+        }
+      });
+
+      // Sort by oldest first and remove 25% of entries
+      entriesWithTimestamp.sort((a, b) => a.timestamp - b.timestamp);
+      const toRemove = Math.max(1, Math.floor(entriesWithTimestamp.length * 0.25));
+      
+      for (let i = 0; i < toRemove; i++) {
+        localStorage.removeItem(entriesWithTimestamp[i].key);
+      }
+
+      console.log(`[CacheManager] Cleaned up ${toRemove} old localStorage cache entries`);
+    } catch (error) {
+      console.warn('[CacheManager] localStorage cleanup failed:', error);
     }
   }
 
@@ -451,16 +505,21 @@ class CacheManager {
     this.memoryCache.set(key, entry);
     this.cleanupMemory();
 
-    // Store in IndexedDB if available
+    // Priority 1: Try IndexedDB first
     if (this.indexedDBSupported) {
-      await this.setToIndexedDB(key, entry);
-     // console.log('[CacheManager] Stored in IndexedDB:', key, { encrypted: encrypt, userId: userId ? '***' : 'none' });
+      try {
+        await this.setToIndexedDB(key, entry);
+        // console.log('[CacheManager] Stored in IndexedDB:', key, { encrypted: encrypt, userId: userId ? '***' : 'none' });
+        return; // Success, don't fallback to localStorage
+      } catch (error) {
+        console.warn('[CacheManager] IndexedDB set failed, falling back to localStorage:', error);
+      }
     }
     
-    // Fallback to localStorage
+    // Priority 2: Fallback to localStorage only if IndexedDB fails
     if (this.localStorageSupported) {
       this.setToLocalStorage(key, entry);
-    //  console.log('[CacheManager] Stored in localStorage:', key, { encrypted: encrypt, userId: userId ? '***' : 'none' });
+      // console.log('[CacheManager] Stored in localStorage:', key, { encrypted: encrypt, userId: userId ? '***' : 'none' });
     }
   }
 

@@ -453,13 +453,27 @@ export class ContextAwareCacheManager {
   async get<T>(key: string, options: EnhancedCacheOptions = {}): Promise<T | null> {
     // 🎯 Determine context
     const context = options.context || this.extractContextFromKey(key);
+    const strategy = this.contextStorageConfig[context];
     
     // 📊 Try to get from underlying cache manager
     const result = await this.cacheManager.get<T>(key, options);
     
     if (result) {
+      // 🔧 Apply context-specific processing in reverse order
+      let processedData: any = result;
+      
+      // Decrypt if needed
+      if (strategy.encryption) {
+        processedData = await this.decryptData(processedData, options.userId);
+      }
+      
+      // Decompress if needed
+      if (strategy.compression && processedData?.__compressed) {
+        processedData = await this.decompressData(processedData);
+      }
+      
       // console.log(`[ContextAwareCacheManager] HIT for ${context}:${key}`);
-      return result;
+      return processedData as T;
     }
 
     // console.log(`[ContextAwareCacheManager] MISS for ${context}:${key}`);
@@ -648,12 +662,22 @@ export class ContextAwareCacheManager {
    * 🔐 Encrypt data
    */
   private async encryptData(data: any, userId?: string): Promise<any> {
-    // Simple encryption simulation - in production use proper encryption
-    return {
-      __encrypted: true,
-      data: btoa(JSON.stringify(data)),
-      userId: userId
-    };
+    try {
+      // Handle Unicode properly by using encodeURIComponent before btoa
+      const jsonString = JSON.stringify(data);
+      const encodedString = encodeURIComponent(jsonString);
+      const encryptedData = btoa(encodedString);
+      
+      return {
+        __encrypted: true,
+        data: encryptedData,
+        userId: userId
+      };
+    } catch (error) {
+      console.warn('[ContextAwareCacheManager] Encryption failed, returning original data:', error);
+      // Fallback to original data if encryption fails
+      return data;
+    }
   }
 
   /**
@@ -664,7 +688,8 @@ export class ContextAwareCacheManager {
     
     try {
       const decryptedString = atob(data);
-      return JSON.parse(decryptedString);
+      const decodedString = decodeURIComponent(decryptedString);
+      return JSON.parse(decodedString);
     } catch (error) {
       console.warn('[ContextAwareCacheManager] Decryption failed:', error);
       return data as any;
