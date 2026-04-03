@@ -1524,10 +1524,26 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
         // Skip slug - it's stored in directory_settings_list, not tenant_business_profiles_list
         if (key === 'slug') return;
         if (value !== undefined) {
-          // Cast arrays to JSON for jsonb columns
+          // Cast arrays and JSON fields to JSON for jsonb columns
           if (Array.isArray(value) && (key === 'seo_tags' || key === 'social_links')) {
             updateParts.push(`"${key}" = $${values.length + 1}::jsonb`);
             values.push(JSON.stringify(value));
+          } else if (key === 'hours' && typeof value === 'string') {
+            // Handle hours field - if it's a string, parse it as JSON or cast to JSON
+            try {
+              // Try to parse as JSON first
+              const parsed = JSON.parse(value || '{}');
+              updateParts.push(`"${key}" = $${values.length + 1}::jsonb`);
+              values.push(JSON.stringify(parsed));
+            } catch {
+              // If parsing fails, treat empty string as empty JSON object
+              updateParts.push(`"${key}" = $${values.length + 1}::jsonb`);
+              values.push(value ? JSON.stringify(value) : '{}');
+            }
+          } else if ((key === 'seo_tags' || key === 'social_links') && typeof value === 'string') {
+            // Handle empty strings for jsonb array fields
+            updateParts.push(`"${key}" = $${values.length + 1}::jsonb`);
+            values.push(value ? JSON.stringify([value]) : '[]');
           } else {
             updateParts.push(`"${key}" = $${values.length + 1}`);
             values.push(value === '' ? null : value);
@@ -1593,9 +1609,22 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
       Object.entries(optionalMappings).forEach(([key, value]) => {
         if (value !== undefined) {
           insertFields.push(key);
-          // Cast arrays to JSON for jsonb columns
+          // Cast arrays and JSON fields to JSON for jsonb columns
           if (Array.isArray(value) && (key === 'seo_tags' || key === 'social_links')) {
             insertValues.push(JSON.stringify(value));
+          } else if (key === 'hours' && typeof value === 'string') {
+            // Handle hours field - if it's a string, parse it as JSON or cast to JSON
+            try {
+              // Try to parse as JSON first
+              const parsed = JSON.parse(value || '{}');
+              insertValues.push(JSON.stringify(parsed));
+            } catch {
+              // If parsing fails, treat empty string as empty JSON object
+              insertValues.push(value ? JSON.stringify(value) : '{}');
+            }
+          } else if ((key === 'seo_tags' || key === 'social_links') && typeof value === 'string') {
+            // Handle empty strings for jsonb array fields
+            insertValues.push(value ? JSON.stringify([value]) : '[]');
           } else {
             insertValues.push(value);
           }
@@ -1616,6 +1645,10 @@ app.post("/api/tenant/profile", authenticateToken, async (req, res) => {
         const value = insertValues[paramIndex - 1];
         // Add ::jsonb cast for jsonb columns
         if (Array.isArray(value) && (field === 'seo_tags' || field === 'social_links')) {
+          return `$${paramIndex}::jsonb`;
+        } else if (field === 'hours') {
+          return `$${paramIndex}::jsonb`;
+        } else if (field === 'seo_tags' || field === 'social_links') {
           return `$${paramIndex}::jsonb`;
         }
         return `$${paramIndex}`;
