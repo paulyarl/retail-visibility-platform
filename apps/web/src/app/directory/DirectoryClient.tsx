@@ -282,6 +282,41 @@ export default function DirectoryClient() {
     });
   }, []);
 
+  // Auto-detect user location on first visit (no location params in URL)
+  useEffect(() => {
+    // Skip if already has location params or explicit sort
+    const hasLat = searchParams.get('lat');
+    const hasLng = searchParams.get('lng');
+    const hasSort = searchParams.get('sort');
+    
+    if (hasLat && hasLng) {
+      return; // Already has location
+    }
+    
+    // Check if user has opted out of auto-location
+    const autoLocationDisabled = localStorage.getItem('directory-auto-location-disabled');
+    if (autoLocationDisabled === 'true') {
+      return;
+    }
+    
+    // Detect location and update URL
+    getUserLocation()
+      .then((location) => {
+        if (location) {
+          setUserLocation(location);
+          // Update URL with location params and sort by distance
+          const params = new URLSearchParams(searchParams.toString());
+          params.set('lat', location.latitude.toString());
+          params.set('lng', location.longitude.toString());
+          params.set('sort', 'distance');
+          router.replace(`?${params.toString()}`, { scroll: false });
+        }
+      })
+      .catch((error) => {
+        console.warn('Auto-location detection failed:', error);
+      });
+  }, []); // Only run once on mount
+
   // Save view mode to localStorage when it changes
   const handleViewModeChange = (mode: 'grid' | 'list' | 'map') => {
     setViewMode(mode);

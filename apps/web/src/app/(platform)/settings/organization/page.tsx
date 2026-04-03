@@ -43,6 +43,7 @@ interface OrganizationData {
 export default function OrganizationPage() {
   // Get tenantId from localStorage for access control
   const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+  // console.log(`tenantId: ${tenantId}`);
   
   // Get organizationId from URL if provided
   const [urlOrgId, setUrlOrgId] = useState<string | null>(null);
@@ -74,6 +75,8 @@ export default function OrganizationPage() {
   const [error, setError] = useState<string | null>(null);
   const [organizationId, setOrganizationId] = useState<string>('');
   const [selectedHeroId, setSelectedHeroId] = useState<string>('');
+  // console.log(`selectedHeroId: ${selectedHeroId}`);
+  
   const [settingHero, setSettingHero] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<any>(null);
@@ -83,12 +86,17 @@ export default function OrganizationPage() {
   const [showCategorySyncModal, setShowCategorySyncModal] = useState(false);
   const [categorySyncScope, setCategorySyncScope] = useState<'single' | 'all'>('all');
   const [selectedSyncTenantId, setSelectedSyncTenantId] = useState<string>('');
+  // console.log(`selectedSyncTenantId: ${selectedSyncTenantId}`);
+  
   const [showQuickStart, setShowQuickStart] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const locationsPerPage = 5;
 
   // Use organization data from access control hook or URL
   const { data: organizationData, isLoading: orgLoading, error: orgError } = useOrganizationData(organizationId);
+  // console.log(`organizationData: ${JSON.stringify(organizationData)}`);
+  // console.log(`orgLoading: ${orgLoading}`);
+  // console.log(`orgError: ${orgError}`);
 
   useEffect(() => {
     if (orgDataFromHook) {
@@ -109,11 +117,11 @@ export default function OrganizationPage() {
     // console.log('[OrganizationPage] organizationId:', organizationId);
     
     if (organizationData) {
-      console.log('[OrganizationPage] Setting orgData from organizationData');
+      // console.log('[OrganizationPage] Setting orgData from organizationData');
       setOrgData(organizationData);
       setError(null);
     } else if (orgError) {
-      console.log('[OrganizationPage] Setting error from orgError:', orgError);
+      // console.log('[OrganizationPage] Setting error from orgError:', orgError);
       setError(orgError.message || 'Failed to load organization data');
     }
   }, [organizationData, orgError, organizationId]);
@@ -324,6 +332,7 @@ export default function OrganizationPage() {
   const heroLocation = orgData.locationBreakdown.find(loc => 
     (loc as any).metadata?.isHeroLocation || loc.tenantId === selectedHeroId
   );
+  // console.log(`heroLocation: ${JSON.stringify(heroLocation)}`);
 
   const getGaugeColor = (percentage: number) => {
     if (percentage >= 100) return 'bg-red-600';
@@ -494,7 +503,7 @@ export default function OrganizationPage() {
                 variant="secondary" 
                 size="lg"
                 className="flex-1 flex items-center justify-center gap-2"
-                onClick={() => window.location.href = `/items`}
+                onClick={() => window.location.href = `/t/${heroLocation?.tenantId}/items`}
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
