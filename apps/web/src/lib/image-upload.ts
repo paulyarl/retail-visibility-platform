@@ -43,6 +43,7 @@ export interface ImageUploadResult {
   originalSize: number;        // Original file size in bytes
   compressedSize: number;      // Compressed size in bytes
   compressionRatio: number;    // Compression ratio (0-1)
+  error?: ImageValidationError; // Validation error if any
 }
 
 export interface ImageValidationError {
@@ -369,7 +370,16 @@ export async function uploadImage(
   // Validate image
   const validation = await validateImage(file, processedOptions);
   if (!validation.valid) {
-    throw new Error(validation.error.message);
+    return {
+      dataUrl: '',
+      contentType: '',
+      width: 0,
+      height: 0,
+      originalSize: 0,
+      compressedSize: 0,
+      compressionRatio: 0,
+      error: validation.error
+    };
   }
   
   // Detect image type

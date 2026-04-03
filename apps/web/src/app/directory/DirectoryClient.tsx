@@ -211,10 +211,10 @@ export default function DirectoryClient() {
     pagination,
     refetch
   } = useDirectoryStores({
-    search: searchParams.get('search') || undefined,
+    search: searchParams.get('q') || searchParams.get('search') || undefined,
     category: searchParams.get('category') || undefined,
-    lat: searchParams.get('lat') ? parseFloat(searchParams.get('lat')!) : undefined,
-    lng: searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : undefined,
+    lat: (searchParams.get('sort') === 'distance' && searchParams.get('lat')) ? parseFloat(searchParams.get('lat')!) : undefined,
+    lng: (searchParams.get('sort') === 'distance' && searchParams.get('lng')) ? parseFloat(searchParams.get('lng')!) : undefined,
     sort: searchParams.get('sort') || 'activity',
     page: searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1,
     limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 24,
@@ -382,7 +382,7 @@ export default function DirectoryClient() {
   const lat = searchParams.get('lat');
   const lng = searchParams.get('lng');
   const sort = searchParams.get('sort');
-  const search = searchParams.get('search');
+  const search = searchParams.get('q') || searchParams.get('search');
   
   useEffect(() => {
     if (lat && lng && sort === 'distance') {
@@ -648,7 +648,7 @@ export default function DirectoryClient() {
         </div> {/* Close Store Listings Section */}
 
         {/* Browse Sections - Show immediately when collapsed (no search active) */}
-        {!searchParams.get('q') && !searchParams.get('category') && (
+        {!searchParams.get('q') && !searchParams.get('search') && !searchParams.get('category') && (
           <>
             {/* Product Category Browser - Show immediately, data loads in background */}
             <DirectoryCategoryBrowser 

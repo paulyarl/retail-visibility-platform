@@ -181,11 +181,10 @@ export const useDirectoryStores = (
     return fetchDirectoryStores();
   }, [fetchDirectoryStores]);
 
-  // Initial fetch
+  // Initial fetch and re-fetch when parameters change
   useEffect(() => {
     fetchDirectoryStores();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchDirectoryStores]);
 
   return {
     stores,

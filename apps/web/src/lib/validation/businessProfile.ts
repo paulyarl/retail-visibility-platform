@@ -124,6 +124,7 @@ export type BusinessProfile = {
   contact_person?: string;
   admin_email?: string;
   logo_url?: string;
+  banner_url?: string;
   business_description?: string;
   hours?: Record<string, string> | null;
   social_links?: Record<string, string> | null;

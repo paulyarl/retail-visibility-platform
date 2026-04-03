@@ -231,7 +231,7 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
       `/api/directory/${listingId}/photos/${photoId}`,
       {
         method: 'PUT',
-        body: photoData
+        body: JSON.stringify(photoData)
       },
       `directory-update-photo-${listingId}-${photoId}`
     );

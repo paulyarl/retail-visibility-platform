@@ -32,6 +32,7 @@ export default function BrandingSocialStep({
   const [formData, setFormData] = useState<Partial<BusinessProfile>>(initialData);
   const [logoPreview, setLogoPreview] = useState<string | null>(initialData.logo_url || null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
   const lastInitialDataRef = useRef<string>('');
 
   useEffect(() => {
@@ -71,25 +72,30 @@ export default function BrandingSocialStep({
   };
 
   const handleLogoUpload = async (file: File) => {
-    try {
-      setUploadingLogo(true);
+    setUploadingLogo(true);
+    setLogoError(null); // Clear previous errors
 
-      // Optimize image
-      const result = await uploadImage(file, ImageUploadPresets.logo);
-      setLogoPreview(result.dataUrl);
-
-      // Upload to server
-      const uploadResult = await platformHomeService.uploadTenantLogo(tenantId, result.dataUrl, result.contentType);
-
-      if (uploadResult.success && uploadResult.data?.url) {
-        handleChange('logo_url', uploadResult.data.url);
-        setLogoPreview(uploadResult.data.url);
-      }
-    } catch (err) {
-      console.error('Logo upload error:', err);
-    } finally {
+    // Optimize image
+    const result = await uploadImage(file, ImageUploadPresets.logo);
+    
+    if (result.error) {
+      // Handle validation error gracefully
+      setLogoError(result.error.message);
       setUploadingLogo(false);
+      return;
     }
+
+    setLogoPreview(result.dataUrl);
+
+    // Upload to server
+    const uploadResult = await platformHomeService.uploadTenantLogo(tenantId, result.dataUrl, result.contentType);
+
+    if (uploadResult.success && uploadResult.data?.url) {
+      handleChange('logo_url', uploadResult.data.url);
+      setLogoPreview(uploadResult.data.url);
+    }
+    
+    setUploadingLogo(false);
   };
 
   const handleLogoUrlPaste = async (url: string) => {
@@ -163,11 +169,17 @@ export default function BrandingSocialStep({
               accept="image/*"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) handleLogoUpload(file);
+                if (file) {
+                  setLogoError(null); // Clear error when selecting new file
+                  handleLogoUpload(file);
+                }
               }}
               disabled={uploadingLogo}
               className="w-full text-sm text-neutral-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
             />
+            {logoError && (
+              <p className="mt-1 text-xs text-red-600">{logoError}</p>
+            )}
           </div>
 
           {/* URL Input */}

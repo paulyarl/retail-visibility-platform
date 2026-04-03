@@ -54,7 +54,7 @@ function calculateActivityScore(lastUpdated: string, firstAdded: string): number
  */
 router.get('/search', async (req: Request, res: Response) => {
   try {
-    const { category, city, state, sort = 'rating', page = '1', limit = '12', q: searchQuery } = req.query;
+    const { category, city, state, sort = 'rating', page = '1', limit = '12', q: searchQuery, lat, lng, search } = req.query;
 
     const pageNum = Math.max(1, Number(page));
     const limitNum = Math.min(100, Math.max(1, Number(limit)));
@@ -83,29 +83,58 @@ router.get('/search', async (req: Request, res: Response) => {
     }
 
     // Keyword/text search filtering
-    if (searchQuery && typeof searchQuery === 'string' && searchQuery.trim()) {
-      const searchTerm = searchQuery.trim();
-      params.push(searchTerm, searchTerm, searchTerm);
+    // Handle both 'q' and 'search' parameters for compatibility
+    const searchTerm = (searchQuery || search)?.toString()?.trim();
+    if (searchTerm) {
+      // Add wildcards for partial matching
+      const searchPattern = `%${searchTerm}%`;
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
       conditions.push(`
         (
-          -- Search in business name, description, or keywords from settings
+          -- Search in business name, description, keywords, or categories
           dll.business_name ILIKE $${paramIndex} OR 
           dll.description ILIKE $${paramIndex + 1} OR
+          dll.primary_category ILIKE $${paramIndex + 2} OR
           EXISTS (
             SELECT 1 FROM unnest(dsl.seo_keywords) AS keyword 
-            WHERE keyword ILIKE $${paramIndex + 2}
+            WHERE keyword ILIKE $${paramIndex + 3}
+          ) OR
+          EXISTS (
+            SELECT 1 FROM unnest(dll.secondary_categories) AS cat 
+            WHERE cat ILIKE $${paramIndex + 4}
           )
         )
       `);
-      paramIndex += 3;
+      paramIndex += 5;
     }
 
     // Location filters are now handled directly in the query
 
     // Determine ORDER BY clause (uses indexed columns)
     let orderByClause = 'rating_avg DESC NULLS LAST, rating_count DESC';
+    let distanceSelect = '';
     
-    if (sort === 'rating') {
+    // Handle distance sorting
+    const userLat = lat ? parseFloat(lat as string) : null;
+    const userLng = lng ? parseFloat(lng as string) : null;
+    
+    if (sort === 'distance' && userLat && userLng) {
+      // Calculate distance using Haversine formula (in kilometers)
+      distanceSelect = `
+        CASE 
+          WHEN dll.latitude IS NOT NULL AND dll.longitude IS NOT NULL THEN
+            6371 * acos(
+              LEAST(1.0, GREATEST(-1.0, 
+                cos(radians(${userLat})) * cos(radians(dll.latitude)) * 
+                cos(radians(dll.longitude) - radians(${userLng})) + 
+                sin(radians(${userLat})) * sin(radians(dll.latitude))
+              ))
+            )
+          ELSE NULL
+        END as distance_km
+      `;
+      orderByClause = 'distance_km ASC NULLS LAST';
+    } else if (sort === 'rating') {
       orderByClause = 'rating_avg DESC NULLS LAST, rating_count DESC';
     } else if (sort === 'newest') {
       orderByClause = 'created_at DESC';
@@ -116,69 +145,120 @@ router.get('/search', async (req: Request, res: Response) => {
     }
 
     // Query using directory_listings_list directly, with MV data where available
-    const listingsQuery = `
-      SELECT DISTINCT ON (dll.tenant_id)
-        dll.tenant_id as id,
-        dll.tenant_id,
-        dll.business_name,
-        dll.business_name,
-        dll.slug,
-        dll.address,
-        dll.city,
-        dll.state,
-        dll.zip_code,
-        dll.phone,
-        dll.email,
-        dll.website,
-        dll.latitude,
-        dll.longitude,
-        dll.primary_category as category_name,
-        dll.primary_category as category_slug,
-        null as google_category_id,
-        null as googleCategoryId,
-        null as icon,
-        ${category ? `CASE WHEN dll.primary_category = $${paramIndex}::text THEN true ELSE false END` : 'false'} as is_primary,
-        dll.rating_avg,
-        dll.rating_count,
-        -- Calculate real product count from inventory_items
-        COALESCE(real_counts.product_count, 0) as product_count,
-        dll.is_featured,
-        dll.subscription_tier,
-        null as use_custom_website,
-        dll.created_at,
-        dll.updated_at,
-        -- GBP primary category name - fall back to tenant metadata if directory listing is null
-        COALESCE(dll.primary_category, t.metadata->'gbp_categories'->'primary'->>'name') as gbp_primary_category_name,
-        -- Get logo URL from directory listings
-        dll.logo_url,
-        -- Address data from directory listings
-        dll.address,
-        dll.city,
-        dll.state,
-        dll.zip_code,
-        dll.latitude,
-        dll.longitude,
-        -- Business hours for status indicator
-        dll.business_hours,
-        -- Directory publish status (always true since we're filtering)
-        true as directory_published
-      FROM directory_listings_list dll
-      INNER JOIN tenants t ON dll.tenant_id = t.id
-      LEFT JOIN directory_settings_list dsl ON dll.tenant_id = dsl.tenant_id
-      LEFT JOIN (
-        SELECT 
-          tenant_id,
-          COUNT(*) as product_count
-        FROM inventory_items
-        WHERE item_status = 'active' 
-          AND visibility = 'public'
-          AND directory_category_id IS NOT NULL  -- Only count products with categories (matches storefront filter)
-        GROUP BY tenant_id
-      ) real_counts ON dll.tenant_id = real_counts.tenant_id
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY dll.tenant_id, dll.rating_avg DESC NULLS LAST, dll.rating_count DESC
-      LIMIT $${paramIndex}::int OFFSET $${paramIndex + 1}::int
-    `;
+    // For distance sorting, we need to use a subquery to handle deduplication properly
+    let listingsQuery: string;
+    
+    if (sort === 'distance' && userLat && userLng) {
+      // For distance sorting, use ROW_NUMBER() to deduplicate and order by distance
+      listingsQuery = `
+        SELECT * FROM (
+          SELECT
+            dll.tenant_id as id,
+            dll.tenant_id,
+            dll.business_name,
+            dll.slug,
+            dll.address,
+            dll.city,
+            dll.state,
+            dll.zip_code,
+            dll.phone,
+            dll.email,
+            dll.website,
+            dll.latitude,
+            dll.longitude,
+            dll.primary_category as category_name,
+            dll.primary_category as category_slug,
+            null as google_category_id,
+            null as googleCategoryId,
+            null as icon,
+            ${category ? `CASE WHEN dll.primary_category = $${paramIndex}::text THEN true ELSE false END` : 'false'} as is_primary,
+            dll.rating_avg,
+            dll.rating_count,
+            COALESCE(real_counts.product_count, 0) as product_count,
+            dll.is_featured,
+            dll.subscription_tier,
+            null as use_custom_website,
+            dll.created_at,
+            dll.updated_at,
+            COALESCE(dll.primary_category, t.metadata->'gbp_categories'->'primary'->>'name') as gbp_primary_category_name,
+            dll.logo_url,
+            dll.business_hours,
+            true as directory_published,
+            ${distanceSelect},
+            ROW_NUMBER() OVER (PARTITION BY dll.tenant_id ORDER BY dll.rating_avg DESC NULLS LAST) as rn
+          FROM directory_listings_list dll
+          INNER JOIN tenants t ON dll.tenant_id = t.id
+          LEFT JOIN directory_settings_list dsl ON dll.tenant_id = dsl.tenant_id
+          LEFT JOIN (
+            SELECT 
+              tenant_id,
+              COUNT(*) as product_count
+            FROM inventory_items
+            WHERE item_status = 'active' 
+              AND visibility = 'public'
+              AND directory_category_id IS NOT NULL
+            GROUP BY tenant_id
+          ) real_counts ON dll.tenant_id = real_counts.tenant_id
+          WHERE ${conditions.join(' AND ')}
+        ) sub
+        WHERE rn = 1
+        ORDER BY distance_km ASC NULLS LAST
+        LIMIT $${paramIndex}::int OFFSET $${paramIndex + 1}::int
+      `;
+    } else {
+      // For other sorting, use DISTINCT ON as before
+      listingsQuery = `
+        SELECT DISTINCT ON (dll.tenant_id)
+          dll.tenant_id as id,
+          dll.tenant_id,
+          dll.business_name,
+          dll.slug,
+          dll.address,
+          dll.city,
+          dll.state,
+          dll.zip_code,
+          dll.phone,
+          dll.email,
+          dll.website,
+          dll.latitude,
+          dll.longitude,
+          dll.primary_category as category_name,
+          dll.primary_category as category_slug,
+          null as google_category_id,
+          null as googleCategoryId,
+          null as icon,
+          ${category ? `CASE WHEN dll.primary_category = $${paramIndex}::text THEN true ELSE false END` : 'false'} as is_primary,
+          dll.rating_avg,
+          dll.rating_count,
+          COALESCE(real_counts.product_count, 0) as product_count,
+          dll.is_featured,
+          dll.subscription_tier,
+          null as use_custom_website,
+          dll.created_at,
+          dll.updated_at,
+          COALESCE(dll.primary_category, t.metadata->'gbp_categories'->'primary'->>'name') as gbp_primary_category_name,
+          dll.logo_url,
+          dll.business_hours,
+          true as directory_published,
+          NULL as distance_km
+        FROM directory_listings_list dll
+        INNER JOIN tenants t ON dll.tenant_id = t.id
+        LEFT JOIN directory_settings_list dsl ON dll.tenant_id = dsl.tenant_id
+        LEFT JOIN (
+          SELECT 
+            tenant_id,
+            COUNT(*) as product_count
+          FROM inventory_items
+          WHERE item_status = 'active' 
+            AND visibility = 'public'
+            AND directory_category_id IS NOT NULL
+          GROUP BY tenant_id
+        ) real_counts ON dll.tenant_id = real_counts.tenant_id
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY dll.tenant_id, dll.rating_avg DESC NULLS LAST, dll.rating_count DESC
+        LIMIT $${paramIndex}::int OFFSET $${paramIndex + 1}::int
+      `;
+    }
     
     //console.log('[Directory MV Search] Query:', listingsQuery);
     //console.log('[Directory MV Search] Params:', [...params, limitNum, skip]);
@@ -227,6 +307,7 @@ router.get('/search', async (req: Request, res: Response) => {
         directoryPublished: row.directory_published || false, // Add directory publish status
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        distance: row.distance_km ? Math.round(row.distance_km * 10) / 10 : null, // Distance in km, rounded to 1 decimal
       };
     }));
 
