@@ -248,7 +248,7 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
         if (products.length === 0) return null;
 
         return (
-          <div key={type} className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8">
+          <div key={type} id={`featured-${type}`} className="mt-12 border-t border-neutral-200 dark:border-neutral-800 pt-8 scroll-mt-20">
             <div className="flex items-center gap-3 mb-6">
               <span className={`p-2 rounded-lg ${config.bgColor} ${config.textColor}`}>
                 {config.icon}

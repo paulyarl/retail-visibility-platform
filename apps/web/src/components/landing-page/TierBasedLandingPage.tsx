@@ -135,10 +135,11 @@ function FeaturedTypeBadges({ featuredTypes, bucketCounts }: { featuredTypes: st
           const count = bucketCounts[type] || 0;
           
           return (
-            <span
+            <a
               key={index}
-              className={`group relative inline-flex items-center gap-1 px-2 py-1 rounded-full ${config.bgColor} ${config.textColor} ${isProductType ? 'ring-2 ring-offset-1 ring-current font-semibold' : 'opacity-70'} hover:opacity-100 transition-opacity cursor-help`}
-              title={`${count} products`}
+              href={`#featured-${type}`}
+              className={`group relative inline-flex items-center gap-1 px-2 py-1 rounded-full ${config.bgColor} ${config.textColor} ${isProductType ? 'ring-2 ring-offset-1 ring-current font-semibold' : 'opacity-70'} hover:opacity-100 transition-opacity cursor-pointer no-underline`}
+              title={`Jump to ${config.label} products`}
             >
               {config.icon}
               <span className="text-xs">{count}</span>
@@ -151,8 +152,9 @@ function FeaturedTypeBadges({ featuredTypes, bucketCounts }: { featuredTypes: st
                 {isProductType && (
                   <span className="block text-green-300 font-normal mt-0.5">✓ This product</span>
                 )}
+                <span className="block text-blue-300 font-normal mt-0.5">Click to view →</span>
               </span>
-            </span>
+            </a>
           );
         })}
       </div>
@@ -171,9 +173,10 @@ function FeaturedTypeBadges({ featuredTypes, bucketCounts }: { featuredTypes: st
           description: '' 
         };
         return (
-          <span
+          <a
             key={index}
-            className={`group relative inline-flex items-center justify-center w-8 h-8 rounded-full ${config.bgColor} ${config.textColor} hover:opacity-80 transition-opacity cursor-help`}
+            href={`#featured-${type}`}
+            className={`group relative inline-flex items-center justify-center w-8 h-8 rounded-full ${config.bgColor} ${config.textColor} hover:opacity-80 transition-opacity cursor-pointer no-underline`}
           >
             {config.icon}
             {/* Mouse-over caption with description */}
@@ -182,8 +185,9 @@ function FeaturedTypeBadges({ featuredTypes, bucketCounts }: { featuredTypes: st
               {config.description && (
                 <span className="block text-gray-300 font-normal mt-0.5">{config.description}</span>
               )}
+              <span className="block text-blue-300 font-normal mt-0.5">Click to view →</span>
             </span>
-          </span>
+          </a>
         );
       })}
     </div>
