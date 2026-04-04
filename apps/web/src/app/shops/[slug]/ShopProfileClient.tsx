@@ -583,10 +583,10 @@ export default function ShopProfileClient({ shop, businessHours }: {
       {/* Navigation Header */}
       <div className="bg-white border-b sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center space-x-4">
               {/* Navigation Links */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Link 
                   href="/shops"
                   className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
@@ -627,7 +627,7 @@ export default function ShopProfileClient({ shop, businessHours }: {
                     <MantineBadge 
                       color="green"
                       variant="light"
-                      size="xs"
+                      size="lg"
                       className="animate-pulse"
                       title={hoursStatus?.label || 'Open now'}
                     >
@@ -639,7 +639,7 @@ export default function ShopProfileClient({ shop, businessHours }: {
                     <MantineBadge 
                       color="red"
                       variant="light"
-                      size="xs"
+                      size="lg"
                       className="animate-bounce"
                       title={hoursStatus?.label || 'Closed'}
                     >
@@ -651,7 +651,7 @@ export default function ShopProfileClient({ shop, businessHours }: {
                     <MantineBadge 
                       color="blue"
                       variant="filled"
-                      size="xs"
+                      size="lg"
                       className="animate-ping"
                       title={hoursStatus?.label || 'Opening soon'}
                     >
@@ -663,7 +663,7 @@ export default function ShopProfileClient({ shop, businessHours }: {
                     <MantineBadge 
                       color="orange"
                       variant="filled"
-                      size="xs"
+                      size="lg"
                       className="animate-ping"
                       title={hoursStatus?.label || 'Closing soon'}
                     >
@@ -673,13 +673,13 @@ export default function ShopProfileClient({ shop, businessHours }: {
                 default:
                   return null;
               }
-            })()}
+            })()} {hoursStatus?.label}
 			
               </div>
              
             </div>
             
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Link href={`/shops/directory${shopData.primary_category||shopData.category ? `?category=${encodeURIComponent(shopData.primary_category||shopData.category)}` : ''}`}>
                 <Button variant="ghost" size="sm">
                   Similar Shops
@@ -861,18 +861,8 @@ export default function ShopProfileClient({ shop, businessHours }: {
                   <FeaturedBucketsShowcase 
                     featuredData={{
                       totalCount: featuredData.totalCount,
+                      buckets: featuredData.buckets || [],
                       bucketCounts: featuredCounts,
-                      // Transform buckets array to individual properties for all bucket types
-                      bestseller: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'bestseller')?.products || [],
-                      clearance: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'clearance')?.products || [],
-                      featured: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'featured')?.products || [],
-                      newArrival: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'new_arrival')?.products || [],
-                      recommended: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'recommended')?.products || [],
-                      sale: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'sale')?.products || [],
-                      seasonal: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'seasonal')?.products || [],
-                      staffPick: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'staff_pick')?.products || [],
-                      storeSelection: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'store_selection')?.products || [],
-                      trending: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'trending')?.products || [],
                     }}
                     tenantId={shopData.id}
                     hasActivePaymentGateway={shopData.has_active_payment_gateway}

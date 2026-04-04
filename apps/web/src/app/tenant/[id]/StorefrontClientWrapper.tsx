@@ -357,61 +357,6 @@ export default function StorefrontClientWrapper({
                           size="md"
                         />  {/* Store Status Badge */}
                   
-                   {/* Hours Badge - Status */}
-            {(() => {
-              switch (hoursStatus?.status) {
-                case 'open':
-                  return (
-                    <MantineBadge 
-                      color="green"
-                      variant="light"
-                      size="lg"
-                      className="animate-pulse"
-                      title={hoursStatus?.label || 'Open now'}
-                    >
-                      🟢 Open
-                    </MantineBadge>
-                  );
-                case 'closed':
-                  return (
-                    <MantineBadge 
-                      color="red"
-                      variant="light"
-                      size="lg"
-                      className="animate-bounce"
-                      title={hoursStatus?.label || 'Closed'}
-                    >
-                      🔴 Closed
-                    </MantineBadge>
-                  );
-                case 'opening-soon':
-                  return (
-                    <MantineBadge 
-                      color="blue"
-                      variant="filled"
-                      size="lg"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Opening soon'}
-                    >
-                      🟡 Opening
-                    </MantineBadge>
-                  );
-                case 'closing-soon':
-                  return (
-                    <MantineBadge 
-                      color="orange"
-                      variant="filled"
-                      size="lg"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Closing soon'}
-                    >
-                      🟡 Closing
-                    </MantineBadge>
-                  );
-                default:
-                  return null;
-              }
-            })()}
                       </div>
                     )}
 
@@ -918,6 +863,62 @@ export default function StorefrontClientWrapper({
                       {contactInfo.address}
                     </p>
                   )}
+                  
+                   {/* Hours Badge - Status */}
+            {(() => {
+              switch (hoursStatus?.status) {
+                case 'open':
+                  return (
+                    <MantineBadge 
+                      color="green"
+                      variant="light"
+                      size="lg"
+                      className="animate-pulse"
+                      title={hoursStatus?.label || 'Open now'}
+                    >
+                      🟢 Open
+                    </MantineBadge>
+                  );
+                case 'closed':
+                  return (
+                    <MantineBadge 
+                      color="red"
+                      variant="light"
+                      size="lg"
+                      className="animate-bounce"
+                      title={hoursStatus?.label || 'Closed'}
+                    >
+                      🔴 Closed
+                    </MantineBadge>
+                  );
+                case 'opening-soon':
+                  return (
+                    <MantineBadge 
+                      color="blue"
+                      variant="filled"
+                      size="lg"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Opening soon'}
+                    >
+                      🟡 Opening
+                    </MantineBadge>
+                  );
+                case 'closing-soon':
+                  return (
+                    <MantineBadge 
+                      color="orange"
+                      variant="filled"
+                      size="lg"
+                      className="animate-ping"
+                      title={hoursStatus?.label || 'Closing soon'}
+                    >
+                      🟡 Closing
+                    </MantineBadge>
+                  );
+                default:
+                  return null;
+              }
+            })()} {hoursStatus?.label}
                 </div>
                 
                 {/* Single Map Display */}

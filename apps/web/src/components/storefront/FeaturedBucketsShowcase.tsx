@@ -5,6 +5,13 @@ import FeaturedBucket from './FeaturedBucket';
 interface FeaturedBucketsShowcaseProps {
   featuredData: Record<string, any> & {
     totalCount: number;
+    buckets: Array<{
+      bucketType: string;
+      bucketName: string;
+      products: any[];
+      count: number;
+      totalCount: number;
+    }>;
     bucketCounts: Record<string, number>;
   };
   tenantId: string;
@@ -29,6 +36,12 @@ export default function FeaturedBucketsShowcase({
     return null;
   }
 
+  // Helper to get products for a bucket type from the buckets array
+  const getProductsForType = (type: string) => {
+    const bucket = featuredData.buckets?.find((b) => b.bucketType === type);
+    return bucket?.products || [];
+  };
+
   // Dynamic bucket configurations from API data
   const bucketConfigs = Object.entries(featuredData.bucketCounts || {}).map(([bucketType, count]) => {
     if (!count || count === 0) return null;
@@ -43,7 +56,7 @@ export default function FeaturedBucketsShowcase({
             title: 'Featured Products',
             icon: '⭐',
             gradient: 'from-blue-500 to-cyan-500',
-            products: featuredData.storeSelection
+            products: getProductsForType(type)
           };
         case 'new_arrival':
           return {
@@ -51,7 +64,7 @@ export default function FeaturedBucketsShowcase({
             title: 'New Arrivals',
             icon: '✨',
             gradient: 'from-green-500 to-emerald-500',
-            products: featuredData.newArrival
+            products: getProductsForType(type)
           };
         case 'seasonal':
           return {
@@ -59,7 +72,7 @@ export default function FeaturedBucketsShowcase({
             title: 'Seasonal Specials',
             icon: '🗓️',
             gradient: 'from-orange-500 to-red-500',
-            products: featuredData.seasonal
+            products: getProductsForType(type)
           };
         case 'sale':
           return {
@@ -67,7 +80,7 @@ export default function FeaturedBucketsShowcase({
             title: 'Sale Items',
             icon: '🏷️',
             gradient: 'from-red-500 to-pink-500',
-            products: featuredData.sale
+            products: getProductsForType(type)
           };
         case 'staff_pick':
           return {
@@ -75,7 +88,7 @@ export default function FeaturedBucketsShowcase({
             title: 'Staff Picks',
             icon: '👥',
             gradient: 'from-purple-500 to-indigo-500',
-            products: featuredData.staffPick
+            products: getProductsForType(type)
           };
         case 'clearance':
           return {
@@ -83,7 +96,7 @@ export default function FeaturedBucketsShowcase({
             title: 'Clearance',
             icon: '🔥',
             gradient: 'from-yellow-500 to-orange-500',
-            products: featuredData.clearance
+            products: getProductsForType(type)
           };
         case 'featured':
           return {
@@ -91,7 +104,7 @@ export default function FeaturedBucketsShowcase({
             title: 'Premium Featured',
             icon: '👑',
             gradient: 'from-indigo-500 to-purple-500',
-            products: featuredData.featured
+            products: getProductsForType(type)
           };
           
         // Platform-controlled types (algorithmic)
@@ -101,7 +114,7 @@ export default function FeaturedBucketsShowcase({
             title: 'Trending Now',
             icon: '📈',
             gradient: 'from-pink-500 to-rose-500',
-            products: featuredData.trending
+            products: getProductsForType(type)
           };
         case 'recommended':
           return {
@@ -109,7 +122,7 @@ export default function FeaturedBucketsShowcase({
             title: 'Recommended',
             icon: '🏆',
             gradient: 'from-teal-500 to-cyan-500',
-            products: featuredData.recommended
+            products: getProductsForType(type)
           };
         case 'bestseller':
           return {
@@ -117,7 +130,7 @@ export default function FeaturedBucketsShowcase({
             title: 'Bestsellers',
             icon: '🥇',
             gradient: 'from-amber-500 to-yellow-500',
-            products: featuredData.bestseller
+            products: getProductsForType(type)
           };
         case 'random_featured':
           return {
@@ -125,7 +138,7 @@ export default function FeaturedBucketsShowcase({
             title: 'Discover',
             icon: '✨',
             gradient: 'from-cyan-500 to-blue-500',
-            products: featuredData.randomFeatured
+            products: getProductsForType(type)
           };
           
         default:
@@ -134,7 +147,7 @@ export default function FeaturedBucketsShowcase({
             title: type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' '),
             icon: '⭐',
             gradient: 'from-blue-500 to-cyan-500',
-            products: featuredData[type] || []
+            products: getProductsForType(type)
           };
       }
     };
@@ -151,7 +164,7 @@ export default function FeaturedBucketsShowcase({
   // Filter buckets that have products
   const bucketsWithProducts = bucketConfigs.filter(
     (bucket): bucket is NonNullable<typeof bucket> => 
-      bucket && bucket.products && bucket.products.length > 0
+      Boolean(bucket && bucket.products && bucket.products.length > 0)
   );
 
   // Don't render if no buckets have products

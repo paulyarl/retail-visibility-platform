@@ -61,6 +61,9 @@ export default function FeaturedBucket({
   return (
     <div id={`${bucketType}-section`} className="featured-bucket mb-12 scroll-mt-20">
       {/* Section Header */}
+      
+      {/* Gradient border line */}
+      <div className="flex w-full bottom-0.5 top-0.5 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-lg bg-gradient-to-r ${gradient} flex items-center justify-center text-white`}>
@@ -135,6 +138,7 @@ export default function FeaturedBucket({
           </button>
         </div>
       )}
+      
     </div>
   );
 }

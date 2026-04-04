@@ -2,6 +2,9 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { MapPin, Phone, Mail, Globe, Clock, Share2, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
+
+import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
+
 import { LocalBusinessStructuredData, BreadcrumbStructuredData } from '@/components/directory/StructuredData';
 import RelatedStores from '@/components/directory/RelatedStores';
 import DirectoryActions from '@/components/directory/DirectoryActions';
@@ -415,7 +418,6 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
     const productId = product.id || product.inventory_item_id;
     return arr.findIndex((p: any) => (p.id || p.inventory_item_id) === productId) === index;
   });
-
   // Debug logging for featured products
   /* console.log('[Directory Page] Featured products data:', {
     count: featuredProducts.length,
@@ -489,25 +491,6 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               Back to Directory
             </Link>
             
-            {/* Store Open/Closed Status */}
-            {storeStatus && (
-              <div className="mt-4 flex items-center justify-center gap-2 text-sm">
-                <span className={`inline-block w-2.5 h-2.5 rounded-full ${
-                  storeStatus.status === 'open' ? 'bg-green-500' :
-                  storeStatus.status === 'closing-soon' ? 'bg-orange-500' :
-                  storeStatus.status === 'opening-soon' ? 'bg-blue-500' :
-                  'bg-red-500'
-                }`}></span>
-                <span className={`font-medium ${
-                  storeStatus.status === 'open' ? 'text-green-700' :
-                  storeStatus.status === 'closing-soon' ? 'text-orange-700' :
-                  storeStatus.status === 'opening-soon' ? 'text-blue-700' :
-                  'text-red-700'
-                }`}>
-                  {storeStatus.label}
-                </span>
-              </div>
-            )}
             
             {/* Visit Storefront Hero Banner */}
             <div className="mt-4 bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-100 border-2 border-blue-200 rounded-xl shadow-sm overflow-hidden">
@@ -525,6 +508,65 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   <Globe className="w-5 h-5" />
                   Visit Storefront
                 </Link>
+              </div>
+              <div className="px-4 py-4 lg:px-4 lg:py-4 text-center">
+
+                
+             {/* Hours Badge - Status */}
+                        {(() => {
+                          switch (storeStatus?.status) {
+                            case 'open':
+                              return (
+                                <MantineBadge 
+                                  color="green"
+                                  variant="light"
+                                  size="lg"
+                                  className="animate-pulse"
+                                  title={storeStatus?.label || 'Open now'}
+                                >
+                                  🟢 Open
+                                </MantineBadge>
+                              );
+                            case 'closed':
+                              return (
+                                <MantineBadge 
+                                  color="red"
+                                  variant="light"
+                                  size="lg"
+                                  className="animate-bounce"
+                                  title={storeStatus?.label || 'Closed'}
+                                >
+                                  🔴 Closed
+                                </MantineBadge>
+                              );
+                            case 'opening-soon':
+                              return (
+                                <MantineBadge 
+                                  color="blue"
+                                  variant="filled"
+                                  size="lg"
+                                  className="animate-ping"
+                                  title={storeStatus?.label || 'Opening soon'}
+                                >
+                                  🟡 Opening
+                                </MantineBadge>
+                              );
+                            case 'closing-soon':
+                              return (
+                                <MantineBadge 
+                                  color="orange"
+                                  variant="filled"
+                                  size="lg"
+                                  className="animate-ping"
+                                  title={storeStatus?.label || 'Closing soon'}
+                                >
+                                  🟡 Closing
+                                </MantineBadge>
+                              );
+                            default:
+                              return null;
+                          }
+                        })()} {storeStatus?.label}
               </div>
             </div>
           </div>
