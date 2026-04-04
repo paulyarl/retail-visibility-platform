@@ -187,21 +187,11 @@ export default function StorefrontClientWrapper({
             });
           }); */
           
-          // Transform bucket data into the expected format
+          // Transform bucket data into the expected format - all 10 types
           const transformedData = {
             totalCount: data.totalCount,
-            staffPick: data.buckets?.find((b: any) => b.bucketType === 'staff_pick')?.products || [],
-            seasonal: data.buckets?.find((b: any) => b.bucketType === 'seasonal')?.products || [],
-            sale: data.buckets?.find((b: any) => b.bucketType === 'sale')?.products || [],
-            newArrival: data.buckets?.find((b: any) => b.bucketType === 'new_arrival')?.products || [],
-            storeSelection: data.buckets?.find((b: any) => b.bucketType === 'store_selection')?.products || [],
-            bucketCounts: {
-              staff_pick: data.buckets?.find((b: any) => b.bucketType === 'staff_pick')?.totalCount || 0,
-              seasonal: data.buckets?.find((b: any) => b.bucketType === 'seasonal')?.totalCount || 0,
-              sale: data.buckets?.find((b: any) => b.bucketType === 'sale')?.totalCount || 0,
-              new_arrival: data.buckets?.find((b: any) => b.bucketType === 'new_arrival')?.totalCount || 0,
-              store_selection: data.buckets?.find((b: any) => b.bucketType === 'store_selection')?.totalCount || 0,
-            }
+            buckets: data.buckets || [],
+            bucketCounts: data.bucketCounts || {}
           };
           
           setFeaturedData(transformedData);
@@ -580,14 +570,32 @@ export default function StorefrontClientWrapper({
                 // Get button styling based on type
                 const getButtonStyle = (type: string) => {
                   switch (type) {
-                    case 'staff_pick':
+                    case 'bestseller':
                       return {
-                        bgClass: 'bg-amber-100 dark:bg-amber-900/30',
-                        textClass: 'text-amber-700 dark:text-amber-300',
-                        borderClass: 'border-amber-300 dark:border-amber-600',
-                        hoverClass: 'hover:bg-amber-200 dark:hover:bg-amber-900/50',
+                        bgClass: 'bg-yellow-100 dark:bg-yellow-900/30',
+                        textClass: 'text-yellow-700 dark:text-yellow-300',
+                        borderClass: 'border-yellow-300 dark:border-yellow-600',
+                        hoverClass: 'hover:bg-yellow-200 dark:hover:bg-yellow-900/50',
+                        icon: '🏆',
+                        label: 'Bestsellers'
+                      };
+                    case 'clearance':
+                      return {
+                        bgClass: 'bg-pink-100 dark:bg-pink-900/30',
+                        textClass: 'text-pink-700 dark:text-pink-300',
+                        borderClass: 'border-pink-300 dark:border-pink-600',
+                        hoverClass: 'hover:bg-pink-200 dark:hover:bg-pink-900/50',
+                        icon: '🏷️',
+                        label: 'Clearance'
+                      };
+                    case 'featured':
+                      return {
+                        bgClass: 'bg-indigo-100 dark:bg-indigo-900/30',
+                        textClass: 'text-indigo-700 dark:text-indigo-300',
+                        borderClass: 'border-indigo-300 dark:border-indigo-600',
+                        hoverClass: 'hover:bg-indigo-200 dark:hover:bg-indigo-900/50',
                         icon: '⭐',
-                        label: 'Staff Picks'
+                        label: 'Featured'
                       };
                     case 'new_arrival':
                       return {
@@ -597,6 +605,15 @@ export default function StorefrontClientWrapper({
                         hoverClass: 'hover:bg-green-200 dark:hover:bg-green-900/50',
                         icon: '✨',
                         label: 'New Arrivals'
+                      };
+                    case 'recommended':
+                      return {
+                        bgClass: 'bg-cyan-100 dark:bg-cyan-900/30',
+                        textClass: 'text-cyan-700 dark:text-cyan-300',
+                        borderClass: 'border-cyan-300 dark:border-cyan-600',
+                        hoverClass: 'hover:bg-cyan-200 dark:hover:bg-cyan-900/50',
+                        icon: '👍',
+                        label: 'Recommended'
                       };
                     case 'sale':
                       return {
@@ -616,6 +633,15 @@ export default function StorefrontClientWrapper({
                         icon: '🎃',
                         label: 'Seasonal'
                       };
+                    case 'staff_pick':
+                      return {
+                        bgClass: 'bg-amber-100 dark:bg-amber-900/30',
+                        textClass: 'text-amber-700 dark:text-amber-300',
+                        borderClass: 'border-amber-300 dark:border-amber-600',
+                        hoverClass: 'hover:bg-amber-200 dark:hover:bg-amber-900/50',
+                        icon: '⭐',
+                        label: 'Staff Picks'
+                      };
                     case 'store_selection':
                       return {
                         bgClass: 'bg-purple-100 dark:bg-purple-900/30',
@@ -624,6 +650,15 @@ export default function StorefrontClientWrapper({
                         hoverClass: 'hover:bg-purple-200 dark:hover:bg-purple-900/50',
                         icon: '🏪',
                         label: 'Store Selection'
+                      };
+                    case 'trending':
+                      return {
+                        bgClass: 'bg-rose-100 dark:bg-rose-900/30',
+                        textClass: 'text-rose-700 dark:text-rose-300',
+                        borderClass: 'border-rose-300 dark:border-rose-600',
+                        hoverClass: 'hover:bg-rose-200 dark:hover:bg-rose-900/50',
+                        icon: '🔥',
+                        label: 'Trending'
                       };
                     default:
                       return {

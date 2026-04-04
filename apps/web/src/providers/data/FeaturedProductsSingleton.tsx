@@ -66,6 +66,7 @@ export interface FeaturedProductsBucket {
 export interface FeaturedProductsData {
   totalCount: number;
   buckets: FeaturedProductsBucket[];
+  bucketCounts: Record<string, number>;
   lastUpdated: string;
 }
 
@@ -220,6 +221,7 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
     const defaultResult: FeaturedProductsData = {
       totalCount: 0,
       buckets: [],
+      bucketCounts: {},
       lastUpdated: new Date().toISOString()
     };
 
@@ -286,46 +288,41 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
           return acc;
         }, {} as Record<string, any[]>);
         
-        // Create buckets for each featured type with proper categorization
+        // Define bucket metadata for all 10 types
+        const bucketMetadata: Record<string, { name: string; order: number }> = {
+          bestseller: { name: 'Bestsellers', order: 1 },
+          clearance: { name: 'Clearance', order: 2 },
+          featured: { name: 'Featured', order: 3 },
+          new_arrival: { name: 'New Arrivals', order: 4 },
+          recommended: { name: 'Recommended', order: 5 },
+          sale: { name: 'Sale Items', order: 6 },
+          seasonal: { name: 'Seasonal Specials', order: 7 },
+          staff_pick: { name: 'Staff Picks', order: 8 },
+          store_selection: { name: 'Store Selection', order: 9 },
+          trending: { name: 'Trending Now', order: 10 }
+        };
+        
+        // Create buckets dynamically for all types present in the data
+        const buckets: FeaturedProductsBucket[] = Object.keys(productsByType)
+          .filter(type => productsByType[type] && productsByType[type].length > 0)
+          .map(type => ({
+            bucketType: type,
+            bucketName: bucketMetadata[type]?.name || type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' '),
+            products: productsByType[type] || [],
+            count: productsByType[type]?.length || 0,
+            totalCount: productsByType[type]?.length || 0
+          }))
+          .sort((a, b) => (bucketMetadata[a.bucketType]?.order || 99) - (bucketMetadata[b.bucketType]?.order || 99));
+        
+        const bucketCounts: Record<string, number> = {};
+        buckets.forEach(b => {
+          bucketCounts[b.bucketType] = b.totalCount;
+        });
+        
         const result: FeaturedProductsData = {
           totalCount: products.length,
-          buckets: [
-            { 
-              bucketType: 'staff_pick', 
-              bucketName: 'Staff Picks', 
-              products: productsByType.staff_pick || [],
-              count: productsByType.staff_pick?.length || 0,
-              totalCount: productsByType.staff_pick?.length || 0
-            },
-            { 
-              bucketType: 'seasonal', 
-              bucketName: 'Seasonal Specials', 
-              products: productsByType.seasonal || [],
-              count: productsByType.seasonal?.length || 0,
-              totalCount: productsByType.seasonal?.length || 0
-            },
-            { 
-              bucketType: 'sale', 
-              bucketName: 'Sale Items', 
-              products: productsByType.sale || [],
-              count: productsByType.sale?.length || 0,
-              totalCount: productsByType.sale?.length || 0
-            },
-            { 
-              bucketType: 'new_arrival', 
-              bucketName: 'New Arrivals', 
-              products: productsByType.new_arrival || [],
-              count: productsByType.new_arrival?.length || 0,
-              totalCount: productsByType.new_arrival?.length || 0
-            },
-            { 
-              bucketType: 'store_selection', 
-              bucketName: 'Store Selection', 
-              products: productsByType.store_selection || [],
-              count: productsByType.store_selection?.length || 0,
-              totalCount: productsByType.store_selection?.length || 0
-            }
-          ],
+          buckets,
+          bucketCounts,
           lastUpdated: new Date().toISOString()
         };
         
@@ -377,6 +374,7 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
     const defaultResult: FeaturedProductsData = {
       totalCount: 0,
       buckets: [],
+      bucketCounts: {},
       lastUpdated: new Date().toISOString()
     };
 
@@ -440,46 +438,41 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
           return acc;
         }, {} as Record<string, any[]>);
         
-        // Create buckets for each featured type with proper categorization
+        // Define bucket metadata for all 10 types
+        const bucketMetadata: Record<string, { name: string; order: number }> = {
+          bestseller: { name: 'Bestsellers', order: 1 },
+          clearance: { name: 'Clearance', order: 2 },
+          featured: { name: 'Featured', order: 3 },
+          new_arrival: { name: 'New Arrivals', order: 4 },
+          recommended: { name: 'Recommended', order: 5 },
+          sale: { name: 'Sale Items', order: 6 },
+          seasonal: { name: 'Seasonal Specials', order: 7 },
+          staff_pick: { name: 'Staff Picks', order: 8 },
+          store_selection: { name: 'Store Selection', order: 9 },
+          trending: { name: 'Trending Now', order: 10 }
+        };
+        
+        // Create buckets dynamically for all types present in the data
+        const buckets: FeaturedProductsBucket[] = Object.keys(productsByType)
+          .filter(type => productsByType[type] && productsByType[type].length > 0)
+          .map(type => ({
+            bucketType: type,
+            bucketName: bucketMetadata[type]?.name || type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' '),
+            products: productsByType[type] || [],
+            count: productsByType[type]?.length || 0,
+            totalCount: productsByType[type]?.length || 0
+          }))
+          .sort((a, b) => (bucketMetadata[a.bucketType]?.order || 99) - (bucketMetadata[b.bucketType]?.order || 99));
+        
+        const bucketCounts: Record<string, number> = {};
+        buckets.forEach(b => {
+          bucketCounts[b.bucketType] = b.totalCount;
+        });
+        
         const result: FeaturedProductsData = {
           totalCount: products.length,
-          buckets: [
-            { 
-              bucketType: 'staff_pick', 
-              bucketName: 'Staff Picks', 
-              products: productsByType.staff_pick || [],
-              count: productsByType.staff_pick?.length || 0,
-              totalCount: productsByType.staff_pick?.length || 0
-            },
-            { 
-              bucketType: 'seasonal', 
-              bucketName: 'Seasonal Specials', 
-              products: productsByType.seasonal || [],
-              count: productsByType.seasonal?.length || 0,
-              totalCount: productsByType.seasonal?.length || 0
-            },
-            { 
-              bucketType: 'sale', 
-              bucketName: 'Sale Items', 
-              products: productsByType.sale || [],
-              count: productsByType.sale?.length || 0,
-              totalCount: productsByType.sale?.length || 0
-            },
-            { 
-              bucketType: 'new_arrival', 
-              bucketName: 'New Arrivals', 
-              products: productsByType.new_arrival || [],
-              count: productsByType.new_arrival?.length || 0,
-              totalCount: productsByType.new_arrival?.length || 0
-            },
-            { 
-              bucketType: 'store_selection', 
-              bucketName: 'Store Selection', 
-              products: productsByType.store_selection || [],
-              count: productsByType.store_selection?.length || 0,
-              totalCount: productsByType.store_selection?.length || 0
-            }
-          ],
+          buckets,
+          bucketCounts,
           lastUpdated: new Date().toISOString()
         };
         
@@ -571,11 +564,16 @@ export class FeaturedProductsSingleton extends PublicApiSingleton {
 
   getBucketStats() {
     return {
-      staff_pick: 0,
-      seasonal: 0,
-      sale: 0,
+      bestseller: 0,
+      clearance: 0,
+      featured: 0,
       new_arrival: 0,
-      store_selection: 0
+      recommended: 0,
+      sale: 0,
+      seasonal: 0,
+      staff_pick: 0,
+      store_selection: 0,
+      trending: 0
     };
   }
 

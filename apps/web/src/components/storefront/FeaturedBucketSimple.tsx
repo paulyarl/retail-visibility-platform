@@ -151,10 +151,13 @@ export default function FeaturedBucketSimple({
 
   return (
     <div id={`${bucketType}-section`} className="featured-bucket mb-12">
+       {/* Gradient border line */}
+          <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
       {/* Section Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+         
           <p className="text-gray-600">{description}</p>
           <p className="text-sm text-gray-500">
             {validProducts.length} {validProducts.length === 1 ? 'product' : 'products'}

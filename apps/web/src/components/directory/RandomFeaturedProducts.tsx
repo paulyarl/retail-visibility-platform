@@ -300,6 +300,8 @@ export default function RandomFeaturedProducts() {
           </div>
         )}
 
+         {/* Gradient border line */}
+      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
         {/* Store Attribution Section */}
         <div className="mt-8 bg-white rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Random Featured Stores</h3>

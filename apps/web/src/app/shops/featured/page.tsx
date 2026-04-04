@@ -117,11 +117,25 @@ const randomizeBuckets = (data: FeaturedProductsData): FeaturedProductsData => {
 
 const FEATURED_BUCKETS = [
   {
-    type: 'store_selection',
-    title: 'Staff Selections',
-    description: 'Hand-picked by our team',
+    type: 'bestseller',
+    title: 'Bestsellers',
+    description: 'Top-selling products across all shops',
+    icon: '🏆',
+    gradient: 'from-yellow-500 to-amber-500'
+  },
+  {
+    type: 'clearance',
+    title: 'Clearance',
+    description: 'Final markdowns and closeout deals',
+    icon: '💨',
+    gradient: 'from-gray-500 to-slate-500'
+  },
+  {
+    type: 'featured',
+    title: 'Featured',
+    description: 'Highlighted products from our marketplace',
     icon: '⭐',
-    gradient: 'from-blue-500 to-cyan-500'
+    gradient: 'from-blue-500 to-indigo-500'
   },
   {
     type: 'new_arrival',
@@ -131,11 +145,11 @@ const FEATURED_BUCKETS = [
     gradient: 'from-green-500 to-emerald-500'
   },
   {
-    type: 'seasonal',
-    title: 'Seasonal Picks',
-    description: 'Perfect for the current season',
-    icon: '🍂',
-    gradient: 'from-orange-500 to-red-500'
+    type: 'recommended',
+    title: 'Recommended',
+    description: 'Curated picks just for you',
+    icon: '👍',
+    gradient: 'from-teal-500 to-cyan-500'
   },
   {
     type: 'sale',
@@ -145,11 +159,32 @@ const FEATURED_BUCKETS = [
     gradient: 'from-purple-500 to-pink-500'
   },
   {
+    type: 'seasonal',
+    title: 'Seasonal Picks',
+    description: 'Perfect for the current season',
+    icon: '🍂',
+    gradient: 'from-orange-500 to-red-500'
+  },
+  {
     type: 'staff_pick',
     title: 'Staff Picks',
     description: 'Editor\'s choice favorites',
     icon: '🔥',
     gradient: 'from-yellow-500 to-orange-500'
+  },
+  {
+    type: 'store_selection',
+    title: 'Staff Selections',
+    description: 'Hand-picked by our team',
+    icon: '🎯',
+    gradient: 'from-blue-500 to-cyan-500'
+  },
+  {
+    type: 'trending',
+    title: 'Trending Now',
+    description: 'What\'s hot and popular right now',
+    icon: '📈',
+    gradient: 'from-rose-500 to-pink-500'
   }
 ];
 
@@ -171,7 +206,7 @@ export default function FeaturedProductsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [categories, setCategories] = useState<Array<{name: string, count: number}>>([]);
   const [locations, setLocations] = useState<Array<{name: string, count: number}>>([]);
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'gallery'>('grid');
+  const [showLayoutSelector, setShowLayoutSelector] = useState(false);
 
   // Fetch featured products
   const fetchFeaturedProducts = async () => {
@@ -188,7 +223,7 @@ export default function FeaturedProductsPage() {
         sortBy: sortBy === 'trending' ? 'trending' : sortBy,
         limit: 100 // Fetch 100 products (20 per bucket across 5 buckets)
       });
-      
+      console.log(`fetchFeaturedProducts data: ${JSON.stringify(data)}`);
       // Randomize buckets for better store diversity
       const randomizedData = randomizeBuckets(data);
       setData(randomizedData);
@@ -327,7 +362,7 @@ export default function FeaturedProductsPage() {
             
             {/* Column 2: Page Name */}
             <div className="text-center sm:text-right">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-2xl text-center sm:text-right font-bold text-gray-900 dark:text-white">
                 Featured Products
               </h1>
               <p className="text-gray-600 dark:text-gray-300">
@@ -456,17 +491,45 @@ export default function FeaturedProductsPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-gray-600 dark:text-gray-400 mr-2">Quick Jump:</span>
                 
-                {/* Store Selection */}
-                {(data.bucketCounts?.store_selection || 0) > 0 && (
+                {/* Bestsellers */}
+                {(data.bucketCounts?.bestseller || 0) > 0 && (
                   <button
                     onClick={() => {
-                      const element = document.getElementById('store_selection-section');
+                      const element = document.getElementById('bestseller-section');
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-300 dark:border-yellow-600 hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors whitespace-nowrap"
+                  >
+                    <span>🏆</span>
+                    <span>Bestsellers ({data.bucketCounts.bestseller})</span>
+                  </button>
+                )}
+
+                {/* Clearance */}
+                {(data.bucketCounts?.clearance || 0) > 0 && (
+                  <button
+                    onClick={() => {
+                      const element = document.getElementById('clearance-section');
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-900/50 transition-colors whitespace-nowrap"
+                  >
+                    <span>💨</span>
+                    <span>Clearance ({data.bucketCounts.clearance})</span>
+                  </button>
+                )}
+
+                {/* Featured */}
+                {(data.bucketCounts?.featured || 0) > 0 && (
+                  <button
+                    onClick={() => {
+                      const element = document.getElementById('featured-section');
                       element?.scrollIntoView({ behavior: 'smooth' });
                     }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap"
                   >
                     <span>⭐</span>
-                    <span>Staff Selections ({data.bucketCounts.store_selection})</span>
+                    <span>Featured ({data.bucketCounts.featured})</span>
                   </button>
                 )}
 
@@ -484,17 +547,17 @@ export default function FeaturedProductsPage() {
                   </button>
                 )}
 
-                {/* Seasonal */}
-                {(data.bucketCounts?.seasonal || 0) > 0 && (
+                {/* Recommended */}
+                {(data.bucketCounts?.recommended || 0) > 0 && (
                   <button
                     onClick={() => {
-                      const element = document.getElementById('seasonal-section');
+                      const element = document.getElementById('recommended-section');
                       element?.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-600 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border border-teal-300 dark:border-teal-600 hover:bg-teal-200 dark:hover:bg-teal-900/50 transition-colors whitespace-nowrap"
                   >
-                    <span>🍂</span>
-                    <span>Seasonal ({data.bucketCounts.seasonal})</span>
+                    <span>👍</span>
+                    <span>Recommended ({data.bucketCounts.recommended})</span>
                   </button>
                 )}
 
@@ -512,6 +575,20 @@ export default function FeaturedProductsPage() {
                   </button>
                 )}
 
+                {/* Seasonal */}
+                {(data.bucketCounts?.seasonal || 0) > 0 && (
+                  <button
+                    onClick={() => {
+                      const element = document.getElementById('seasonal-section');
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-600 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors whitespace-nowrap"
+                  >
+                    <span>🍂</span>
+                    <span>Seasonal ({data.bucketCounts.seasonal})</span>
+                  </button>
+                )}
+
                 {/* Staff Picks */}
                 {(data.bucketCounts?.staff_pick || 0) > 0 && (
                   <button
@@ -525,42 +602,49 @@ export default function FeaturedProductsPage() {
                     <span>Staff Picks ({data.bucketCounts.staff_pick})</span>
                   </button>
                 )}
+
+                {/* Store Selection */}
+                {(data.bucketCounts?.store_selection || 0) > 0 && (
+                  <button
+                    onClick={() => {
+                      const element = document.getElementById('store_selection-section');
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-600 hover:bg-cyan-200 dark:hover:bg-cyan-900/50 transition-colors whitespace-nowrap"
+                  >
+                    <span>🎯</span>
+                    <span>Staff Selections ({data.bucketCounts.store_selection})</span>
+                  </button>
+                )}
+
+                {/* Trending */}
+                {(data.bucketCounts?.trending || 0) > 0 && (
+                  <button
+                    onClick={() => {
+                      const element = document.getElementById('trending-section');
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-600 hover:bg-rose-200 dark:hover:bg-rose-900/50 transition-colors whitespace-nowrap"
+                  >
+                    <span>📈</span>
+                    <span>Trending ({data.bucketCounts.trending})</span>
+                  </button>
+                )}
               </div>
 
               {/* View Mode Controls */}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 text-sm border rounded ${
-                    viewMode === 'grid'
+                  onClick={() => setShowLayoutSelector(!showLayoutSelector)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border rounded transition-colors ${
+                    showLayoutSelector
                       ? 'bg-blue-600 text-white border-blue-600'
-                      : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
                   }`}
-                  title="Grid View"
+                  title="Toggle Layout Selector"
                 >
                   <LayoutGrid className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 text-sm border rounded ${
-                    viewMode === 'list'
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                  title="List View"
-                >
-                  <List className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('gallery')}
-                  className={`p-2 text-sm border rounded ${
-                    viewMode === 'gallery'
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                  title="Gallery View"
-                >
-                  <ImageIcon className="w-4 h-4" />
+                  <span>Layout Options</span>
                 </button>
               </div>
             </div>
@@ -797,9 +881,11 @@ export default function FeaturedProductsPage() {
 
             {/* Featured Buckets */}
             {data && data.buckets ? (
+              console.log(`data.buckets: ${JSON.stringify(data.buckets)}`), 
               FEATURED_BUCKETS.map((bucket) => {
                 const products = data.buckets[bucket.type] || [];
                 const count = data.bucketCounts?.[bucket.type] || 0;
+              
                 
                 if (products.length === 0) return null;
                 
@@ -832,6 +918,7 @@ export default function FeaturedProductsPage() {
                   tenantName={products[0]?.tenantName}
                   tenantLogo={products[0]?.tenantLogo}
                   shops={data.shops}
+                  showLayoutSelector={showLayoutSelector}
                   initialLimit={8} // Show 8 products per bucket initially
                 />
               </div>

@@ -18,7 +18,7 @@ export default function ShopNotFound() {
               <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <Store className="h-8 w-8 text-gray-400" />
               </div>
-              <CardTitle className="text-2xl">Shop Not Found</CardTitle>
+              <CardTitle className="text-2xl">Shops Not Found</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-gray-600">
@@ -30,7 +30,7 @@ export default function ShopNotFound() {
                 <Link href="/shops/directory">
                   <Button className="w-full">
                     <Search className="h-4 w-4 mr-2" />
-                    Browse Shop Directory
+                    Browse Shops Directory
                   </Button>
                 </Link>
                 

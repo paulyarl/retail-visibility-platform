@@ -458,8 +458,8 @@ export default function DirectoryClient() {
   // Mark component render completion (minimal logging only)
   useEffect(() => {
     if (!loading && data) {
-      // console.log('Directory loaded:', data.length || 0, 'stores');
-      // console.log('Directory data:', data);
+      console.log('Directory loaded:', data.length || 0, 'stores');
+      console.log('Directory data:', data);
     }
   }, [loading, data]);
 
@@ -681,6 +681,8 @@ export default function DirectoryClient() {
           </div>
         )}
         </div> {/* Close Store Listings Section */}
+         {/* Gradient border line */}
+      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
 
         {/* Browse Sections - Show immediately when collapsed (no search active) */}
         {!searchParams.get('q') && !searchParams.get('search') && !searchParams.get('category') && (
@@ -691,11 +693,16 @@ export default function DirectoryClient() {
               className="mt-12"
             />
 
+         {/* Gradient border line */}
+      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
             {/* Store Type Browser - Show immediately, data loads in background */}
             <DirectoryStoreTypeBrowser 
               storeTypes={storeTypes}
               className="mt-8"
             />
+            
+            {/* Gradient border line */}
+      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
           </>
         )}
            {/* Random Featured Products */}
@@ -703,6 +710,8 @@ export default function DirectoryClient() {
         <RandomFeaturedProducts />
       </ProductSingletonProvider>
 
+         {/* Gradient border line */}
+      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
       {/* Featured Stores */}
       <StoreSingletonProvider>
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
@@ -715,6 +724,9 @@ export default function DirectoryClient() {
               View all stores →
             </Link>
           </div>
+          
+         {/* Gradient border line */}
+      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
           <FeaturedStoresList 
             limit={8} 
             showLocation={true}
@@ -728,13 +740,19 @@ export default function DirectoryClient() {
         </div>
       </StoreSingletonProvider>
 
+         {/* Gradient border line */}
+      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
 
         {/* Directory Home Recommendations */}
         <DirectoryHomeRecommendations />
 
+         {/* Gradient border line */}
+      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
         {/* Last Viewed Items */}
         <LastViewed />
 
+         {/* Gradient border line */}
+      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
         {/* Help Section - Two Column */}
         {!loading && (
           <div className="mt-16 grid md:grid-cols-2 gap-6">

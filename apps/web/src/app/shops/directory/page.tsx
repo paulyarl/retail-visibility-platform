@@ -236,8 +236,8 @@ export default function ShopDirectoryPage({ searchParams }: ShopDirectoryPagePro
           
           {/* Column 2: Page Name */}
           <div className="text-right">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Shop Directory
+            <h1 className="text-2xl text-center sm:text-right font-bold text-gray-900 dark:text-white">
+              Shops Directory
             </h1>
             <p className="text-gray-600 dark:text-gray-300">
               Discover amazing shops from our marketplace

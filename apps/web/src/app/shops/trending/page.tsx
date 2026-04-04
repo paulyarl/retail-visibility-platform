@@ -7,6 +7,8 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+// platform branding
+import { usePublicBranding } from '@/hooks/usePublicBranding';
 import Link from 'next/link';
 import { ShopCard } from '@/components/shops/ShopCard';
 import { ShopPagination } from '@/components/shops/ShopPagination';
@@ -18,6 +20,7 @@ import { useTrendingShops } from '@/lib/shops/shop-hooks';
 import { ShopViewTracker } from '@/components/tracking/ShopViewTracker';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import LastViewed from '@/components/directory/LastViewed';
+
 
 interface TrendingShop {
   id: string;
@@ -41,6 +44,7 @@ interface TrendingShop {
 function TrendingShopsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { branding: platformBranding } = usePublicBranding();
   
   const [page, setPage] = useState(parseInt(searchParams?.get('page') || '1'));
   const [limit] = useState(12);
@@ -129,51 +133,91 @@ function TrendingShopsPageContent() {
         category="trending"
         pageType="shop_directory"
       />
+{/* Page Header with horizontal gradient background */}
+      <div className="bg-gradient-to-r from-blue-100 via-indigo-50 to-purple-50 dark:from-gray-800 dark:via-gray-850 dark:to-gray-900 border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Mobile: Stacked layout, Desktop: Side by side */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+            {/* Column 1: Platform Branding */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg overflow-hidden">
+                {platformBranding?.logoUrl ? (
+                  <img 
+                    src={platformBranding.logoUrl} 
+                    alt={platformBranding.platformName || 'Platform'} 
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <Sparkles className="w-7 h-7" />
+                )}
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                  {platformBranding?.platformName || 'Visible Shelf'}
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Retail visibility platform
+                </p>
+              </div>
+            </div>
+            
+            {/* Column 2: Page Name */}
+            <div className="text-right">
+               <div className="flex items-end space-x-2">
+              <h1 className="text-2xl font-bold text-gray-900">Trending Shops</h1>
+              <Badge variant="filled" color="red" size="lg">
+                Hot
+              </Badge>
+            </div>
+            
+            </div>
+          </div>
+          {/* Gradient border line */}
+          <div className="flex-1 bottom-0 top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
 
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-6">
-          {/* Navigation Links */}
-          <div className="flex items-center gap-2 mb-4">
+          <p className="flex items-end justify-end text-gray-600 mt-4">
+            Discover the most popular shops gaining traction right now
+          </p>
+
+          <div className="flex items-left justify-left">
+           {/* Navigation Links */}
+          <div className="flex items-left gap-2 mb-1">
             <Link 
               href="/shops"
               className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
             >
               <Store className="h-4 w-4" />
-              Shops
+              Shops<span className="text-gray-400">•</span>
             </Link>
-            <span className="text-gray-400">•</span>
+            
             <Link 
               href="/shops/directory"
               className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
             >
               <Grid className="h-4 w-4" />
-              Directory
+              Directory<span className="text-gray-400">•</span>
             </Link>
-            <span className="text-gray-400">•</span>
+            
             <Link 
               href="/shops/featured"
               className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
             >
               <Sparkles className="h-4 w-4" />
-              Featured
+              Featured<span className="text-gray-400">•</span>
             </Link>
-            <span className="text-gray-400">•</span>
+            
             <span className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 font-medium">
               <TrendingUp className="h-4 w-4" />
               Trending
             </span>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <h1 className="text-2xl font-bold text-gray-900">Trending Shops</h1>
-              <Badge variant="filled" color="red" size="lg">
-                Hot
-              </Badge>
-            </div>
 
-            <div className="flex items-center space-x-4">
+          
+           <div className="container mx-auto px-4 py-6">
+          
+
+            <div className="flex items-end justify-end space-x-4">
               <select
                 value={region}
                 onChange={(e) => handleRegionChange(e.target.value)}
@@ -186,10 +230,7 @@ function TrendingShopsPageContent() {
               </select>
             </div>
           </div>
-
-          <p className="text-gray-600 mt-2">
-            Discover the most popular shops gaining traction right now
-          </p>
+        </div>
         </div>
       </div>
 

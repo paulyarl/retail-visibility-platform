@@ -206,13 +206,13 @@ function ShopProfileHeader({ shop, shopData, businessHours }: {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Page Header with horizontal gradient background */}
       <div className="bg-gradient-to-r from-blue-100 via-indigo-50 to-purple-50 dark:from-gray-800 dark:via-gray-850 dark:to-gray-900 border-b border-gray-200 dark:border-gray-700">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-between">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             {/* Column 1: Shop Logo and Details */}
-            <div className="flex items-start space-x-6">
+            <div className="flex items-start space-x-4 sm:space-x-6 min-w-0 flex-1">
               {/* Shop Logo */}
-              <div className="relative">
-                <div className="h-24 w-24 bg-white rounded-xl shadow-lg flex items-center justify-center overflow-hidden">
+              <div className="relative flex-shrink-0">
+                <div className="h-20 w-20 sm:h-24 sm:w-24 bg-white rounded-xl shadow-lg flex items-center justify-center overflow-hidden">
                   {(directoryListing?.logo_url || shopData?.logo_url || shopData?.bannerUrl || shopData?.tenantLogoUrl || shopData?.imageUrl) ? (
                     <img
                       src={directoryListing?.logo_url || shopData?.logo_url || shopData?.bannerUrl || shopData?.tenantLogoUrl || shopData?.imageUrl}
@@ -221,21 +221,21 @@ function ShopProfileHeader({ shop, shopData, businessHours }: {
                     />
                   ) : (
                     <div className="flex items-center justify-center w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
-                      <Store className="h-12 w-12" />
+                      <Store className="h-10 w-10 sm:h-12 sm:w-12" />
                     </div>
                   )}
                 </div>
                 {shopData?.is_published && (
                   <div className="absolute -top-2 -right-2">
-                    <CheckCircle className="h-6 w-6 text-green-500 bg-white rounded-full" />
+                    <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 bg-white rounded-full" />
                   </div>
                 )}
               </div>
 
               {/* Shop Details */}
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{shopData.name}</h1>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white truncate">{shopData.name}</h1>
                   {shopData.is_published && (
                     <Badge variant="filled" color="green" size="sm">
                       Verified
@@ -244,16 +244,16 @@ function ShopProfileHeader({ shop, shopData, businessHours }: {
                 </div>
 
                 {shopData.business_name && shopData.business_name !== shopData.name && (
-                  <p className="text-lg text-gray-600 dark:text-gray-300 mb-3">{shopData.business_name}</p>
+                  <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 mb-2 truncate">{shopData.business_name}</p>
                 )}
 
-                <div className="flex items-center space-x-6 text-sm text-gray-600 dark:text-gray-300">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-sm text-gray-600 dark:text-gray-300">
                   {shopData.rating && (
                     <div className="flex items-center space-x-1">
                       <Star className="h-4 w-4 text-yellow-500 fill-current" />
                       <span className="font-medium">{shopData.rating.toFixed(1)}</span>
                       {shopData.rating_count && (
-                        <span className="text-gray-500 dark:text-gray-400">({shopData.rating_count} reviews)</span>
+                        <span className="text-gray-500 dark:text-gray-400 hidden sm:inline">({shopData.rating_count} reviews)</span>
                       )}
                     </div>
                   )}
@@ -272,21 +272,23 @@ function ShopProfileHeader({ shop, shopData, businessHours }: {
               </div>
             </div>
             
-            {/* Column 2: Action Buttons */}
-            <div className="flex items-center space-x-3">
+            {/* Column 2: Action Buttons - wraps on smaller screens */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 lg:justify-end">
               <StorefrontActions 
                 tenantId={shopData.id}
                 businessName={shopData.name}
               />
               
               <Button variant="outline" size="sm">
-                <Heart className="h-4 w-4 mr-2" />
-                Save Shop
+                <Heart className="h-4 w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Save Shop</span>
+                <span className="sm:hidden">Save</span>
               </Button>
               
               <Button variant="outline" size="sm">
-                <Share2 className="h-4 w-4 mr-2" />
-                Share
+                <Share2 className="h-4 w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Share</span>
+                <span className="sm:hidden">Share</span>
               </Button>
             </div>
           </div>
@@ -460,12 +462,17 @@ export default function ShopProfileClient({ shop, businessHours }: {
   const shopData = (shop.data as any)?.data;
   
   // Featured products state
-  const [featuredCounts, setFeaturedCounts] = useState({
-    staff_pick: 0,
-    seasonal: 0,
-    sale: 0,
+  const [featuredCounts, setFeaturedCounts] = useState<Record<string, number>>({
+    bestseller: 0,
+    clearance: 0,
+    featured: 0,
     new_arrival: 0,
+    recommended: 0,
+    sale: 0,
+    seasonal: 0,
+    staff_pick: 0,
     store_selection: 0,
+    trending: 0,
   });
   const [featuredData, setFeaturedData] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
@@ -514,21 +521,22 @@ export default function ShopProfileClient({ shop, businessHours }: {
         
         if (data) {
           setFeaturedData(data);
-          // Derive counts from buckets array
-          const counts = {
-            staff_pick: 0,
-            seasonal: 0,
-            sale: 0,
+          // Derive counts from buckets array - handle all bucket types dynamically
+          const counts: Record<string, number> = {
+            bestseller: 0,
+            clearance: 0,
+            featured: 0,
             new_arrival: 0,
+            recommended: 0,
+            sale: 0,
+            seasonal: 0,
+            staff_pick: 0,
             store_selection: 0,
+            trending: 0,
           };
           
           data.buckets?.forEach((bucket: { bucketType: string; totalCount?: number }) => {
-            if (bucket.bucketType === 'staff_pick') counts.staff_pick = bucket.totalCount || 0;
-            if (bucket.bucketType === 'seasonal') counts.seasonal = bucket.totalCount || 0;
-            if (bucket.bucketType === 'sale') counts.sale = bucket.totalCount || 0;
-            if (bucket.bucketType === 'new_arrival') counts.new_arrival = bucket.totalCount || 0;
-            if (bucket.bucketType === 'store_selection') counts.store_selection = bucket.totalCount || 0;
+            counts[bucket.bucketType] = bucket.totalCount || 0;
           });
           
           setFeaturedCounts(counts);
@@ -691,87 +699,6 @@ export default function ShopProfileClient({ shop, businessHours }: {
 
       <ShopProfileHeader shop={shop} shopData={shopData} businessHours={businessHours} />
 
-      {/* Quick Jump Navigation - Featured Types */}
-      {(featuredCounts.staff_pick > 0 || featuredCounts.new_arrival > 0 || featuredCounts.sale > 0 || featuredCounts.seasonal > 0 || featuredCounts.store_selection > 0) && (
-        <div className="bg-white border-b border-gray-200 sticky top-[60px] z-30">
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-gray-600 mr-2">Quick Jump:</span>
-              
-              {/* Staff Picks */}
-              {featuredCounts.staff_pick > 0 && (
-                <button
-                  onClick={() => {
-                    const element = document.getElementById('staff_pick-section');
-                    element?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-600 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors whitespace-nowrap"
-                >
-                  <span>⭐</span>
-                  <span>Staff Picks ({featuredCounts.staff_pick})</span>
-                </button>
-              )}
-
-              {/* New Arrivals */}
-              {featuredCounts.new_arrival > 0 && (
-                <button
-                  onClick={() => {
-                    const element = document.getElementById('new_arrival-section');
-                    element?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
-                >
-                  <span>✨</span>
-                  <span>New Arrivals ({featuredCounts.new_arrival})</span>
-                </button>
-              )}
-
-              {/* Sale Items */}
-              {featuredCounts.sale > 0 && (
-                <button
-                  onClick={() => {
-                    const element = document.getElementById('sale-section');
-                    element?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-600 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors whitespace-nowrap"
-                >
-                  <span>💰</span>
-                  <span>Sale Items ({featuredCounts.sale})</span>
-                </button>
-              )}
-
-              {/* Seasonal Specials */}
-              {featuredCounts.seasonal > 0 && (
-                <button
-                  onClick={() => {
-                    const element = document.getElementById('seasonal-section');
-                    element?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-600 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors whitespace-nowrap"
-                >
-                  <span>🍂</span>
-                  <span>Seasonal ({featuredCounts.seasonal})</span>
-                </button>
-              )}
-
-              {/* Store Selection */}
-              {featuredCounts.store_selection > 0 && (
-                <button
-                  onClick={() => {
-                    const element = document.getElementById('store_selection-section');
-                    element?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
-                >
-                  <span>🏪</span>
-                  <span>Store Selection ({featuredCounts.store_selection})</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Products Section */}
       <div className="bg-gray-50 py-8">
         <div className="container mx-auto px-4">
@@ -817,6 +744,113 @@ export default function ShopProfileClient({ shop, businessHours }: {
               {/* Featured Buckets Showcase - with Quick Jump targets */}
               {featuredData && featuredData.totalCount > 0 && (
                 <div className="mb-12">
+                  {/* Quick Jump Navigation */}
+                  <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-30 mb-6 -mx-4 px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400 mr-2">Quick Jump:</span>
+                      
+                      {(featuredCounts?.bestseller || 0) > 0 && (
+                        <button
+                          onClick={() => document.getElementById('bestseller-section')?.scrollIntoView({ behavior: 'smooth' })}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-300 dark:border-yellow-600 hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors whitespace-nowrap"
+                        >
+                          <span>🏆</span>
+                          <span>Bestsellers ({featuredCounts.bestseller})</span>
+                        </button>
+                      )}
+
+                      {(featuredCounts?.clearance || 0) > 0 && (
+                        <button
+                          onClick={() => document.getElementById('clearance-section')?.scrollIntoView({ behavior: 'smooth' })}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-900/50 transition-colors whitespace-nowrap"
+                        >
+                          <span>💨</span>
+                          <span>Clearance ({featuredCounts.clearance})</span>
+                        </button>
+                      )}
+
+                      {(featuredCounts?.featured || 0) > 0 && (
+                        <button
+                          onClick={() => document.getElementById('featured-section')?.scrollIntoView({ behavior: 'smooth' })}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap"
+                        >
+                          <span>⭐</span>
+                          <span>Featured ({featuredCounts.featured})</span>
+                        </button>
+                      )}
+
+                      {(featuredCounts?.new_arrival || 0) > 0 && (
+                        <button
+                          onClick={() => document.getElementById('new_arrival-section')?.scrollIntoView({ behavior: 'smooth' })}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
+                        >
+                          <span>✨</span>
+                          <span>New Arrivals ({featuredCounts.new_arrival})</span>
+                        </button>
+                      )}
+
+                      {(featuredCounts?.recommended || 0) > 0 && (
+                        <button
+                          onClick={() => document.getElementById('recommended-section')?.scrollIntoView({ behavior: 'smooth' })}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border border-teal-300 dark:border-teal-600 hover:bg-teal-200 dark:hover:bg-teal-900/50 transition-colors whitespace-nowrap"
+                        >
+                          <span>👍</span>
+                          <span>Recommended ({featuredCounts.recommended})</span>
+                        </button>
+                      )}
+
+                      {(featuredCounts?.sale || 0) > 0 && (
+                        <button
+                          onClick={() => document.getElementById('sale-section')?.scrollIntoView({ behavior: 'smooth' })}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-600 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors whitespace-nowrap"
+                        >
+                          <span>🏷️</span>
+                          <span>Sale ({featuredCounts.sale})</span>
+                        </button>
+                      )}
+
+                      {(featuredCounts?.seasonal || 0) > 0 && (
+                        <button
+                          onClick={() => document.getElementById('seasonal-section')?.scrollIntoView({ behavior: 'smooth' })}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-600 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors whitespace-nowrap"
+                        >
+                          <span>🍂</span>
+                          <span>Seasonal ({featuredCounts.seasonal})</span>
+                        </button>
+                      )}
+
+                      {(featuredCounts?.staff_pick || 0) > 0 && (
+                        <button
+                          onClick={() => document.getElementById('staff_pick-section')?.scrollIntoView({ behavior: 'smooth' })}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-600 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors whitespace-nowrap"
+                        >
+                          <span>🔥</span>
+                          <span>Staff Picks ({featuredCounts.staff_pick})</span>
+                        </button>
+                      )}
+
+                      {(featuredCounts?.store_selection || 0) > 0 && (
+                        <button
+                          onClick={() => document.getElementById('store_selection-section')?.scrollIntoView({ behavior: 'smooth' })}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-600 hover:bg-cyan-200 dark:hover:bg-cyan-900/50 transition-colors whitespace-nowrap"
+                        >
+                          <span>🎯</span>
+                          <span>Staff Selections ({featuredCounts.store_selection})</span>
+                        </button>
+                      )}
+
+                      {(featuredCounts?.trending || 0) > 0 && (
+                        <button
+                          onClick={() => document.getElementById('trending-section')?.scrollIntoView({ behavior: 'smooth' })}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-600 hover:bg-rose-200 dark:hover:bg-rose-900/50 transition-colors whitespace-nowrap"
+                        >
+                          <span>📈</span>
+                          <span>Trending ({featuredCounts.trending})</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="mb-6">
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Featured Selections</h2>
                     <p className="text-sm text-gray-600">
@@ -828,12 +862,17 @@ export default function ShopProfileClient({ shop, businessHours }: {
                     featuredData={{
                       totalCount: featuredData.totalCount,
                       bucketCounts: featuredCounts,
-                      // Transform buckets array to individual properties
-                      staffPick: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'staff_pick')?.products || [],
+                      // Transform buckets array to individual properties for all bucket types
+                      bestseller: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'bestseller')?.products || [],
+                      clearance: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'clearance')?.products || [],
+                      featured: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'featured')?.products || [],
                       newArrival: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'new_arrival')?.products || [],
-                      seasonal: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'seasonal')?.products || [],
+                      recommended: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'recommended')?.products || [],
                       sale: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'sale')?.products || [],
-                      storeSelection: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'store_selection')?.products || []
+                      seasonal: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'seasonal')?.products || [],
+                      staffPick: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'staff_pick')?.products || [],
+                      storeSelection: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'store_selection')?.products || [],
+                      trending: featuredData.buckets?.find((b: { bucketType: string }) => b.bucketType === 'trending')?.products || [],
                     }}
                     tenantId={shopData.id}
                     hasActivePaymentGateway={shopData.has_active_payment_gateway}

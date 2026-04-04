@@ -499,7 +499,7 @@ const FeaturedSection: React.FC<FeaturedSectionProps> = ({
         )}
       </div>
       {/* Gradient border line */}
-      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 via-orange-500 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 via-orange-500 to-transparent" />
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {items.slice(0, 6).map((item) => renderItem(item))}

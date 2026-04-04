@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // For now, return basic metadata since we can't easily access tenant data in server component
   // without making the client component do all the work
   return {
-    title: 'Shop Directory',
+    title: 'Shops Directory',
     description: 'Browse shops and products in our directory',
   };
 }
