@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Map, Grid3x3, List, ArrowLeft } from 'lucide-react';
+import { Map, Grid3x3, List, ArrowLeft, Store } from 'lucide-react';
 import Link from 'next/link';
 import DirectorySearch from '@/components/directory/DirectorySearch';
 import DirectoryGrid from '@/components/directory/DirectoryGrid';
@@ -233,13 +233,22 @@ export default function StoreTypeViewClient({
               <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{displayName}</h1>
               <span className="text-2xl">🏪</span>
             </div>
-            <Link
-              href="/directory"
-              className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Back</span>
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/directory/stores"
+                className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+              >
+                <Store className="w-4 h-4" />
+                <span className="hidden sm:inline">All Store Types</span>
+              </Link>
+              <Link
+                href="/directory"
+                className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Back</span>
+              </Link>
+            </div>
           </div>
 
           <p className="text-neutral-600 dark:text-neutral-400 mt-2">

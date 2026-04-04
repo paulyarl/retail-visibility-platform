@@ -36,6 +36,7 @@ interface FeaturedTypeProductsProps {
   currentProductId: string;
   tenantId: string;
   featuredTypes: string[];
+  showAllBuckets?: boolean; // If true, show all buckets with products, not just current product's types
 }
 
 // Featured type configuration - supports all featured types in the system
@@ -119,7 +120,7 @@ const featuredTypeConfig: Record<string, { icon: React.ReactNode; bgColor: strin
   },
 };
 
-export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes }: FeaturedTypeProductsProps) {
+export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes, showAllBuckets = true }: FeaturedTypeProductsProps) {
   const [productsByType, setProductsByType] = useState<Record<string, FeaturedTypeProduct[]>>({});
   const [loading, setLoading] = useState(true);
 
@@ -159,23 +160,20 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
         if (isMounted) {
           const grouped: Record<string, FeaturedTypeProduct[]> = {};
           
+          // Determine which types to process
+          // When showAllBuckets is true, show all buckets with products
+          // Otherwise, only show types the current product belongs to
+          const typesToProcess = showAllBuckets 
+            ? Object.keys(groupedProducts || {})
+            : featuredTypes;
+          
           // Process each featured type
-          for (const type of featuredTypes) {
-            /* console.log(`[FeaturedTypeProducts] Processing type: ${type}`, {
-              hasProducts: !!groupedProducts[type],
-              count: groupedProducts[type]?.length || 0
-            }) */;
-            
+          for (const type of typesToProcess) {
             if (groupedProducts[type] && groupedProducts[type].length > 0) {
               // Filter out current product and limit to 4
               const filteredProducts = groupedProducts[type]
                 .filter((p: any) => p.id !== currentProductId)
                 .slice(0, 4);
-              
-              // console.log(`[FeaturedTypeProducts] Filtered products for ${type}:`, {
-              //   filteredCount: filteredProducts.length,
-              //   filteredIds: filteredProducts.map((p: any) => p.id)
-              // });
               
               if (filteredProducts.length > 0) {
                 grouped[type] = filteredProducts.map((p: any) => ({
@@ -229,7 +227,7 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
     return () => {
       isMounted = false;
     };
-  }, [currentProductId, tenantId, featuredTypes]);
+  }, [currentProductId, tenantId, featuredTypes, showAllBuckets]);
 
   if (loading || Object.keys(productsByType).length === 0) {
     return null;

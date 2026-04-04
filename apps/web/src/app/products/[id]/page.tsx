@@ -18,6 +18,7 @@ import StorefrontActionsWrapper from '@/components/storefront/StorefrontActionsW
 import { Badge, Group } from '@mantine/core';
 import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame } from 'lucide-react';
 import { productDataService } from '@/services/ProductDataService';
+import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
 
 // Define the product interface based on the API response
 interface ProductImage {
@@ -120,6 +121,22 @@ async function getShopData(tenantId: string) {
   }
 }
 
+async function getBucketCounts(tenantId: string): Promise<Record<string, number> | undefined> {
+  try {
+    const featuredData = await storefrontSingletonService.getFeaturedProductsByType(tenantId, undefined, 1);
+    // Extract bucket counts from the response
+    // The API returns products grouped by type, we just need counts
+    const counts: Record<string, number> = {};
+    for (const [type, products] of Object.entries(featuredData || {})) {
+      counts[type] = Array.isArray(products) ? products.length : 0;
+    }
+    return counts;
+  } catch (error) {
+    console.error('Error fetching bucket counts:', error);
+    return undefined;
+  }
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const product = await getProduct(id);
@@ -153,6 +170,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   }
 
   const shopData = await getShopData(product.tenantId);
+  const bucketCounts = await getBucketCounts(product.tenantId);
   const businessName = product.tenant?.name || 'Unknown Store';
   
   // Convert images to gallery format for ProductGallery component
@@ -296,6 +314,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             slug: product.category.slug,
           } : undefined,
           featuredTypes: product.featuredTypes,
+          bucketCounts,
           gtin: undefined, // Not available in new API
           mpn: undefined, // Not available in new API
           defaultGatewayType: undefined, // Will be determined by tenant

@@ -15,7 +15,7 @@ import BasicProductGallery from '@/components/products/BasicProductGallery';
 import Link from 'next/link';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
-import { Package, Download, Globe } from 'lucide-react';
+import { Package, Download, Globe, ThumbsUp } from 'lucide-react';
 import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame, DollarSign, Calendar } from 'lucide-react';
 // Store status
 import { useStoreStatus } from '@/hooks/useStoreStatus';
@@ -42,7 +42,7 @@ interface LandingPageFeatures {
 
 // Featured Type Badge Component with icons only (subtle display)
 // Aligned with StorefrontFeaturedProducts.tsx featuredTypeConfig
-function FeaturedTypeBadges({ featuredTypes }: { featuredTypes: string[] }) {
+function FeaturedTypeBadges({ featuredTypes, bucketCounts }: { featuredTypes: string[]; bucketCounts?: Record<string, number> }) {
   // Map featured types to icons, colors, and descriptions - matches shops page
   const typeConfig: Record<string, { icon: React.ReactNode; bgColor: string; textColor: string; label: string; description: string }> = {
     store_selection: { 
@@ -74,36 +74,92 @@ function FeaturedTypeBadges({ featuredTypes }: { featuredTypes: string[] }) {
       description: 'Great deal on this product' 
     },
     staff_pick: { 
-      icon: <Star className="w-4 h-4" />, 
+      icon: <ThumbsUp className="w-4 h-4" />, 
       bgColor: 'bg-purple-100', 
       textColor: 'text-purple-700',
       label: 'Staff Pick', 
       description: 'Hand-picked favorite by our team' 
     },
-    // Keep these for backwards compatibility
-    featured: { 
-      icon: <Star className="w-4 h-4" />, 
-      bgColor: 'bg-amber-100', 
-      textColor: 'text-amber-700',
-      label: 'Featured Product', 
-      description: 'Hand-picked favorite from our collection' 
+    bestseller: { 
+      icon: <Award className="w-4 h-4" />, 
+      bgColor: 'bg-yellow-100', 
+      textColor: 'text-yellow-700',
+      label: 'Bestseller', 
+      description: 'Our most popular products' 
+    },
+    clearance: { 
+      icon: <Zap className="w-4 h-4" />, 
+      bgColor: 'bg-pink-100', 
+      textColor: 'text-pink-700',
+      label: 'Clearance', 
+      description: 'Last chance to grab these deals' 
     },
     trending: { 
       icon: <TrendingUp className="w-4 h-4" />, 
-      bgColor: 'bg-pink-100', 
-      textColor: 'text-pink-700',
+      bgColor: 'bg-cyan-100', 
+      textColor: 'text-cyan-700',
       label: 'Trending', 
-      description: 'Popular with customers' 
+      description: 'Hot products everyone is viewing' 
     },
-    clearance: { 
-      icon: <Package className="w-4 h-4" />, 
-      bgColor: 'bg-yellow-100', 
-      textColor: 'text-yellow-700',
-      label: 'Clearance', 
-      description: 'Limited time offer' 
+    recommended: { 
+      icon: <Sparkles className="w-4 h-4" />, 
+      bgColor: 'bg-indigo-100', 
+      textColor: 'text-indigo-700',
+      label: 'Recommended', 
+      description: 'Products we think you\'ll love' 
+    },
+    featured: { 
+      icon: <Flame className="w-4 h-4" />, 
+      bgColor: 'bg-rose-100', 
+      textColor: 'text-rose-700',
+      label: 'Featured', 
+      description: 'Spotlight on special products' 
     },
   };
 
+  // If we have bucket counts, show all types with counts
+  if (bucketCounts && Object.keys(bucketCounts).length > 0) {
+    const allTypes = Object.keys(bucketCounts).filter(type => (bucketCounts[type] || 0) > 0);
+    
+    return (
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        {allTypes.map((type, index) => {
+          const config = typeConfig[type] || { 
+            icon: <Sparkles className="w-4 h-4" />, 
+            bgColor: 'bg-gray-100', 
+            textColor: 'text-gray-600',
+            label: type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), 
+            description: '' 
+          };
+          const isProductType = featuredTypes.includes(type);
+          const count = bucketCounts[type] || 0;
+          
+          return (
+            <span
+              key={index}
+              className={`group relative inline-flex items-center gap-1 px-2 py-1 rounded-full ${config.bgColor} ${config.textColor} ${isProductType ? 'ring-2 ring-offset-1 ring-current font-semibold' : 'opacity-70'} hover:opacity-100 transition-opacity cursor-help`}
+              title={`${count} products`}
+            >
+              {config.icon}
+              <span className="text-xs">{count}</span>
+              {/* Mouse-over caption with description */}
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 text-xs font-medium text-white bg-gray-800 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-10">
+                <span className="font-semibold">{config.label}</span>
+                {config.description && (
+                  <span className="block text-gray-300 font-normal mt-0.5">{config.description}</span>
+                )}
+                {isProductType && (
+                  <span className="block text-green-300 font-normal mt-0.5">✓ This product</span>
+                )}
+              </span>
+            </span>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Fallback: show only types the product belongs to (original behavior)
   return (
     <div className="flex items-center gap-2 mb-4">
       {featuredTypes.map((type, index) => {
@@ -406,6 +462,7 @@ interface Product {
   
   // Featured types
   featuredTypes?: string[];
+  bucketCounts?: Record<string, number>; // All featured type counts for the tenant
   
   // Product variants
   variants?: any[];
@@ -734,7 +791,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
 
         {/* Featured Type Badges - Prominent display below hero */}
         {product.featuredTypes && product.featuredTypes.length > 0 && (
-          <FeaturedTypeBadges featuredTypes={product.featuredTypes} />
+          <FeaturedTypeBadges featuredTypes={product.featuredTypes} bucketCounts={product.bucketCounts} />
         )}
 
         {/* Product Actions - Share, Print, Like */}

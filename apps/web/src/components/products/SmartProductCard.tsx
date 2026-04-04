@@ -127,6 +127,16 @@ const getStorefrontGradientBorder = (typeId: string): string => {
       return 'bg-gradient-to-br from-red-400 via-pink-400 to-rose-400';
     case 'staff_pick':
       return 'bg-gradient-to-br from-purple-400 via-indigo-400 to-blue-400';
+    case 'clearance':
+      return 'bg-gradient-to-br from-yellow-400 via-orange-400 to-red-400';
+    case 'trending':
+      return 'bg-gradient-to-br from-pink-400 via-rose-400 to-red-400';
+    case 'recommended':
+      return 'bg-gradient-to-br from-teal-400 via-cyan-400 to-blue-400';
+    case 'bestseller':
+      return 'bg-gradient-to-br from-amber-400 via-yellow-400 to-orange-400';
+    case 'featured':
+      return 'bg-gradient-to-br from-rose-400 via-pink-400 to-purple-400';
     default:
       return 'bg-gradient-to-br from-amber-400 via-orange-400 to-red-400';
   }
@@ -140,6 +150,11 @@ function FeaturedTypeIcon({ type }: { type: string }) {
     seasonal: 'bg-orange-500',
     sale: 'bg-red-500',
     staff_pick: 'bg-purple-500',
+    clearance: 'bg-pink-500',
+    trending: 'bg-cyan-500',
+    recommended: 'bg-indigo-500',
+    bestseller: 'bg-yellow-500',
+    featured: 'bg-rose-500',
   };
   
   const bgColor = bgColors[type] || 'bg-gray-500';
@@ -173,10 +188,15 @@ const getFeaturedTypes = (product: ProductData): string[] => {
 const getBadgePriority = (typeId: string): number => {
   switch (typeId) {
     case 'sale': return 1; // Sale is most important (drives urgency)
-    case 'new_arrival': return 2; // New arrivals are second
-    case 'seasonal': return 3; // Seasonal items are third
-    case 'staff_pick': return 4; // Staff picks are fourth
-    case 'store_selection': return 5; // Directory featured is fifth
+    case 'clearance': return 2; // Clearance is limited time
+    case 'new_arrival': return 3; // New arrivals 
+    case 'trending': return 4; // Trending items
+    case 'seasonal': return 5; // Seasonal items
+    case 'bestseller': return 6; // Bestsellers
+    case 'staff_pick': return 7; // Staff picks
+    case 'recommended': return 8; // Recommended
+    case 'store_selection': return 9; // Directory featured
+    case 'featured': return 10; // General featured
     default: return 999;
   }
 };

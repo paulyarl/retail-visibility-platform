@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Map, Grid3x3, List, ArrowLeft } from 'lucide-react';
+import { Map, Grid3x3, List, ArrowLeft, Package } from 'lucide-react';
 import Link from 'next/link';
 import DirectorySearch from '@/components/directory/DirectorySearch';
 import { DirectoryFilters } from '@/components/directory/DirectoryFilters';
@@ -205,13 +205,22 @@ export default function CategoryViewClient({
               <h1 className="text-3xl font-bold text-neutral-900 dark:text-white">{category?.name || formatCategoryName(categorySlug)}</h1>
               <span className="text-2xl">🏷️</span>
             </div>
-            <Link
-              href="/directory"
-              className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Back</span>
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/directory/categories"
+                className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <Package className="w-4 h-4" />
+                <span className="hidden sm:inline">All Categories</span>
+              </Link>
+              <Link
+                href="/directory"
+                className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Back</span>
+              </Link>
+            </div>
           </div>
 
           <div className="flex items-center gap-4 mt-2 text-sm">

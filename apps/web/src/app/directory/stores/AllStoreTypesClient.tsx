@@ -34,8 +34,11 @@ export default function AllStoreTypesClient() {
 
       try {
         const result = await recommendationsService.getDirectoryStoreTypes();
-        // Handle both response formats: result.storeTypes or result.data.storeTypes
-        setStoreTypes(result?.storeTypes || result?.data?.storeTypes || []);
+        // Result can be the storeTypes array directly, or an object with storeTypes property
+        const storeTypesArray = Array.isArray(result) 
+          ? result 
+          : (result?.storeTypes || result?.data?.storeTypes || []);
+        setStoreTypes(storeTypesArray);
       } catch (err) {
         console.error('Error fetching store types:', err);
         setError('Failed to load store types. Please try again.');
