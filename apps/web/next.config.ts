@@ -2,6 +2,62 @@
 import type { NextConfig } from "next";
 import path from "path";
 import { withSentryConfig } from "@sentry/nextjs";
+import withPWAInit from "next-pwa";
+
+const withPWA = withPWAInit({
+  dest: "public",
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === "development",
+  runtimeCaching: [
+    {
+      urlPattern: /^https:\/\/.*\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
+      handler: "CacheFirst",
+      options: {
+        cacheName: "static-images",
+        expiration: {
+          maxEntries: 100,
+          maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+        },
+      },
+    },
+    {
+      urlPattern: /^https:\/\/.*\.(?:js|css)$/i,
+      handler: "StaleWhileRevalidate",
+      options: {
+        cacheName: "static-resources",
+        expiration: {
+          maxEntries: 50,
+          maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+        },
+      },
+    },
+    {
+      urlPattern: /\/api\/directory\//i,
+      handler: "NetworkFirst",
+      options: {
+        cacheName: "api-directory",
+        networkTimeoutSeconds: 10,
+        expiration: {
+          maxEntries: 100,
+          maxAgeSeconds: 60 * 5, // 5 minutes
+        },
+      },
+    },
+    {
+      urlPattern: /\/api\/public\//i,
+      handler: "NetworkFirst",
+      options: {
+        cacheName: "api-public",
+        networkTimeoutSeconds: 10,
+        expiration: {
+          maxEntries: 100,
+          maxAgeSeconds: 60 * 5, // 5 minutes
+        },
+      },
+    },
+  ],
+});
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -168,4 +224,5 @@ const sentryWebpackPluginOptions = {
 
 
 // Make sure adding Sentry options is the last code to run before exporting
-export default withSentryConfig(nextConfig, sentryWebpackPluginOptions);
+// First wrap with PWA, then with Sentry
+export default withSentryConfig(withPWA(nextConfig), sentryWebpackPluginOptions);
