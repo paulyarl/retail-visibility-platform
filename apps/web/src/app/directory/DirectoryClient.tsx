@@ -458,8 +458,8 @@ export default function DirectoryClient() {
   // Mark component render completion (minimal logging only)
   useEffect(() => {
     if (!loading && data) {
-      console.log('Directory loaded:', data.length || 0, 'stores');
-      console.log('Directory data:', data);
+      // console.log('Directory loaded:', data.length || 0, 'stores');
+      // console.log('Directory data:', data);
     }
   }, [loading, data]);
 
