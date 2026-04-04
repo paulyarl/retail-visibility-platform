@@ -86,10 +86,23 @@ export class ContextAwareCacheManager {
   private cacheManager: CacheManager;
   private browserCapabilities: BrowserCapabilities;
   private contextStorageConfig: ContextStorageConfig;
+  private context: AppContext;
 
-  constructor(options: AutoUserCacheOptions = {}) {
-    // 🔍 Use composition instead of inheritance
-    this.cacheManager = new CacheManager(options);
+  constructor(options: EnhancedCacheOptions = {}) {
+    // 🎯 Extract context for database naming
+    this.context = options.context || AppContext.PRODUCT;
+    
+    // 🔍 Create context-specific database name and store name
+    const dbName = `${this.context}-cache`;
+    const storeName = `${this.context}-store`;
+    
+    // 🔍 Use composition with context-specific database
+    this.cacheManager = new CacheManager({
+      ...options,
+      dbName,
+      storeName,
+      ttl: options.ttl || 15 * 60 * 1000,
+    });
     
     // 🔍 Detect browser capabilities on initialization
     this.browserCapabilities = this.detectBrowserCapabilities();

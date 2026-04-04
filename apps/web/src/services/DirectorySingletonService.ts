@@ -33,16 +33,25 @@ export interface DirectoryStore {
   email?: string;
   website?: string;
   logo?: string;
+  logoUrl?: string; // Alias for logo
   coverImage?: string;
+  bannerUrl?: string; // Alias for coverImage
   rating?: number;
+  ratingAvg: number; // Average rating (required)
   reviewCount?: number;
+  ratingCount?: number; // Alias for reviewCount
+  productCount: number | string; // Number of products (API may return string or number)
   categories?: string[];
+  primaryCategory?: string; // Primary category name
   isVerified?: boolean;
   isFeatured?: boolean;
+  subscriptionTier?: string;
   coordinates?: {
     lat: number;
     lng: number;
   };
+  latitude?: number; // Flattened coordinate
+  longitude?: number; // Flattened coordinate
   businessHours?: any;
   distance?: number;
 }
@@ -76,16 +85,16 @@ export interface DirectoryLocation {
 }
 
 export interface DirectorySearchResult {
-  stores: DirectoryStore[];
-  categories: DirectoryCategory[];
-  locations: DirectoryLocation[];
+  listings: DirectoryStore[]; // API returns 'listings', not 'stores'
+  categories?: DirectoryCategory[];
+  locations?: DirectoryLocation[];
   pagination: {
     page: number;
     limit: number;
     totalItems: number;
     totalPages: number;
-    hasNext: boolean;
-    hasPrev: boolean;
+    hasNext?: boolean;
+    hasPrev?: boolean;
   };
 }
 

@@ -31,6 +31,7 @@ export interface DirectoryListingHook {
   publish: () => Promise<void>;
   unpublish: () => Promise<void>;
   updateSettings: (updates: Partial<DirectoryListing>) => Promise<void>;
+  syncProfile: () => Promise<{ success: boolean; message?: string; syncedData?: { businessName?: string; logoUrl?: string } }>;
   refresh: () => Promise<void>;
 }
 
@@ -130,6 +131,28 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     }
   }, [tenantId, fetchListing]);
 
+  const syncProfile = useCallback(async () => {
+    if (!tenantId) return { success: false, message: 'Tenant ID is required' };
+
+    try {
+      setError(null);
+      
+      const result = await tenantDirectoryManagementService.syncProfileToDirectory(tenantId);
+      
+      if (result.success) {
+        // Refetch to get updated data
+        await fetchListing();
+      }
+      
+      return result;
+    } catch (err) {
+      console.error('Error syncing profile:', err);
+      const message = err instanceof Error ? err.message : 'Failed to sync profile';
+      setError(message);
+      return { success: false, message };
+    }
+  }, [tenantId, fetchListing]);
+
   useEffect(() => {
     fetchListing();
   }, [fetchListing]);
@@ -141,6 +164,7 @@ export function useDirectoryListing(tenantId: string): DirectoryListingHook {
     publish,
     unpublish,
     updateSettings,
+    syncProfile,
     refresh: fetchListing,
   };
 }

@@ -459,13 +459,20 @@ class CacheManager {
 
     // Try IndexedDB
     if (this.indexedDBSupported) {
-      const indexedDBEntry = await this.getFromIndexedDB<T>(key);
-      if (indexedDBEntry) {
-        // console.log('[CacheManager] IndexedDB cache HIT:', key);
-        // Cache in memory for faster access
-        this.memoryCache.set(key, indexedDBEntry);
-        // Decrypt if needed
-        return await this.decryptData(indexedDBEntry.data, indexedDBEntry.encrypted, userId);
+      // Initialize DB if not already done
+      if (!this.db) {
+        await this.initializeDB();
+      }
+      
+      if (this.db) {
+        const indexedDBEntry = await this.getFromIndexedDB<T>(key);
+        if (indexedDBEntry) {
+          // console.log('[CacheManager] IndexedDB cache HIT:', key);
+          // Cache in memory for faster access
+          this.memoryCache.set(key, indexedDBEntry);
+          // Decrypt if needed
+          return await this.decryptData(indexedDBEntry.data, indexedDBEntry.encrypted, userId);
+        }
       }
     }
 
@@ -508,9 +515,16 @@ class CacheManager {
     // Priority 1: Try IndexedDB first
     if (this.indexedDBSupported) {
       try {
-        await this.setToIndexedDB(key, entry);
-        // console.log('[CacheManager] Stored in IndexedDB:', key, { encrypted: encrypt, userId: userId ? '***' : 'none' });
-        return; // Success, don't fallback to localStorage
+        // Initialize DB if not already done
+        if (!this.db) {
+          await this.initializeDB();
+        }
+        
+        if (this.db) {
+          await this.setToIndexedDB(key, entry);
+          // console.log('[CacheManager] Stored in IndexedDB:', key, { encrypted: encrypt, userId: userId ? '***' : 'none' });
+          return; // Success, don't fallback to localStorage
+        }
       } catch (error) {
         console.warn('[CacheManager] IndexedDB set failed, falling back to localStorage:', error);
       }

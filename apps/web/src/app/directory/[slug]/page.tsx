@@ -18,11 +18,20 @@ import ProductCategoriesCollapsible from '@/components/directory/ProductCategori
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { externalApiService } from '@/services/ExternalApiService';
+
+// tenant public data
 import { directoryService } from '@/services/DirectorySingletonService';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+
+// recommendation data
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
-import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
 import LastViewed from '@/components/directory/LastViewed';
+
+// tenant private data
+import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
+
+// platform branding
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 
 interface StoreDetailPageProps {
@@ -36,6 +45,7 @@ async function getConsolidatedDirectoryData(identifier: string) {
     // First, try to load as a slug (most common case)
     try {
       const data = await directoryService.getDirectoryConsolidated(identifier);
+    //  let tenantLogo; 
       
       // Check if data has listing property - if not, might be tenant ID case
       if (!data?.listing) {
@@ -49,6 +59,8 @@ async function getConsolidatedDirectoryData(identifier: string) {
           if (resolvedSlug) {
             // console.log(`[Directory] Resolved to slug: ${resolvedSlug}`);
             const resolvedData = await directoryService.getDirectoryConsolidated(resolvedSlug);
+            // console.log(`[Directory] Resolved data:`, resolvedData);
+         //   tenantlogo = await publicTenantInfoService.getTenantLogoFromDiscovery(identifier);
             return resolvedData;
           } else {
             // console.error(`[Directory] Could not resolve tenant ID ${identifier} to slug`);
@@ -75,6 +87,7 @@ async function getConsolidatedDirectoryData(identifier: string) {
         }
         
         const data = await directoryService.getDirectoryConsolidated(resolvedSlug);
+        // console.log(`[Directory] Resolved data:`, data);
         return data;
       } else {
         throw slugError;
@@ -340,13 +353,16 @@ export async function generateMetadata({ params }: StoreDetailPageProps): Promis
   const { slug: identifier } = await params;
   // console.log(`[Directory] Generating metadata for identifier: ${identifier}`);
   const consolidatedData = await getConsolidatedDirectoryData(identifier);
-  // console.log(`[Directory] Consolidated data:`, consolidatedData);
+  // console.log(`[Directory] Consolidated data 1:`, consolidatedData);
 
   if (!consolidatedData?.listing) {
     return {
       title: 'Store Not Found',
     };
   }
+
+  const tenantLogo = await publicTenantInfoService.getTenantLogoFromDiscovery(consolidatedData.listing.tenantId);
+  // console.log(`[Directory] Tenant logo 1:`, tenantLogo);
 
   const listing = consolidatedData.listing;
   const businessName = listing.businessName || 'Business';
@@ -361,13 +377,13 @@ export async function generateMetadata({ params }: StoreDetailPageProps): Promis
       title,
       description,
       type: 'website',
-      images: listing.logoUrl ? [listing.logoUrl] : [],
+      images: tenantLogo ? [tenantLogo.toString()] : listing.logoUrl ? [listing.logoUrl] : [],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: listing.logoUrl ? [listing.logoUrl] : [],
+      images: tenantLogo ? [tenantLogo.toString()] : listing.logoUrl ? [listing.logoUrl] : [],
     },
   };
 }
@@ -376,11 +392,14 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
   const { slug: identifier } = await params;
   // console.log(`[Directory] Fetching data for identifier: ${identifier}`);
   const consolidatedData = await getConsolidatedDirectoryData(identifier);
-  // console.log(`[Directory] Consolidated data:`, consolidatedData);
+  // console.log(`[Directory] Consolidated data 2:`, consolidatedData);
 
   if (!consolidatedData?.listing) {
     notFound();
   }
+  
+  const tenantLogo = await publicTenantInfoService.getTenantLogoFromDiscovery(consolidatedData.listing.tenantId);
+  // console.log(`[Directory] Tenant logo 2:`, tenantLogo);
 
   const listing = consolidatedData.listing;
   const featuredProductsRaw = consolidatedData.featuredProducts || [];
@@ -518,13 +537,13 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               {/* Store Header */}
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-start gap-6">
-                  {listing.logoUrl && (
+                  {tenantLogo?.toString() || listing.logoUrl ? (
                     <img
-                      src={listing.logoUrl}
+                      src={tenantLogo?.toString() || listing.logoUrl}
                       alt={listing.businessName}
                       className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                     />
-                  )}
+                  ) : null}
                   <div className="flex-1">
                     <h1 className="text-3xl font-bold text-gray-900">
                       {listing.businessName}
@@ -659,7 +678,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                             payment_gateway_type: paymentGatewayStatus.defaultGatewayType,
                           }}
                           tenantName={listing.businessName}
-                          tenantLogo={listing.logoUrl}
+                          tenantLogo={tenantLogo?.toString() || listing.logoUrl}
                           hasActivePaymentGateway={paymentGatewayStatus.hasActiveGateway}
                           defaultGatewayType={paymentGatewayStatus.defaultGatewayType}
                           variant="featured"

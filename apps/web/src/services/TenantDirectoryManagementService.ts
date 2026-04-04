@@ -170,6 +170,32 @@ export class TenantDirectoryManagementService extends TenantApiSingleton {
   }
 
   /**
+   * Sync profile data (logo, business name, etc.) to directory_listings_list
+   * Use this when profile is updated and directory needs to reflect changes
+   */
+  async syncProfileToDirectory(tenantId: string): Promise<{ success: boolean; message?: string; syncedData?: { businessName?: string; logoUrl?: string } }> {
+    if (!tenantId) {
+      throw new Error('Tenant ID is required');
+    }
+
+    const result = await this.makeDefaultRequest<{ success: boolean; message?: string; syncedData?: { businessName?: string; logoUrl?: string } }>(
+      `/api/tenants/${tenantId}/directory/sync-profile`,
+      { method: 'POST' },
+      `directory-sync-profile-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[TenantDirectoryManagement] Failed to sync profile to directory:', result.error);
+      return { success: false, message: typeof result.error === 'string' ? result.error : 'Failed to sync profile' };
+    }
+
+    // Invalidate directory listing cache
+    await this.invalidateCache(`directory-listing-${tenantId}`);
+
+    return result.data || { success: true };
+  }
+
+  /**
    * Get photos for tenant directory listing
    */
   async getDirectoryListingPhotos(listingId: string): Promise<any[]> {

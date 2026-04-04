@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../prisma'
+import { getDirectPool } from '../utils/db-pool'
 
 const router = Router()
 
@@ -117,6 +118,17 @@ router.post('/tenant/:tenantId/profile/geocode', async (req, res) => {
         }
       })
       completeness = completenessScore(updated)
+      
+      // Auto-sync profile data to directory_listings_list if published
+      try {
+        await getDirectPool().query(
+          `UPDATE directory_listings_list SET address = $1, city = $2, postal_code = $3, latitude = $4, longitude = $5, updated_at = NOW() WHERE tenant_id = $6 AND is_published = true`,
+          [parsed.data.address_line1, parsed.data.city, parsed.data.postal_code, lat, lng, tenantId]
+        );
+      } catch (syncError) {
+        console.warn('[PROFILE] Failed to sync address to directory listing:', syncError);
+        // Don't fail the profile save for sync errors
+      }
     }
 
     return res.json({ success: true, data: { latitude: lat, longitude: lng, completeness } })

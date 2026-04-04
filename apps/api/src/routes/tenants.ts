@@ -9,6 +9,7 @@ import { prisma } from '../prisma';
 import { authenticateToken, checkTenantAccess, requirePlatformAdmin } from '../middleware/auth';
 import { canViewAllTenants } from '../utils/platform-admin';
 import { getLocationStatusInfo } from '../utils/location-status';
+import { getDirectPool } from '../utils/db-pool';
 import fs from 'fs';
 import path from 'path';
 import { z } from 'zod';
@@ -1020,6 +1021,17 @@ router.post('/:id/logo', authenticateToken, checkTenantAccess, async (req: Reque
         updated_at: new Date(),
       }
     });
+
+    // Auto-sync logo to directory_listings_list if published
+    try {
+      await getDirectPool().query(
+        `UPDATE directory_listings_list SET logo_url = $1, updated_at = NOW() WHERE tenant_id = $2 AND is_published = true`,
+        [uploadedLogoUrl, id]
+      );
+    } catch (syncError) {
+      console.warn('[TENANTS] Failed to sync logo to directory listing:', syncError);
+      // Don't fail the upload for sync errors
+    }
 
     console.log(`[TENANTS] Logo uploaded successfully for tenant ${id}: ${uploadedLogoUrl}`);
 

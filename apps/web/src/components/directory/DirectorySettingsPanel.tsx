@@ -12,7 +12,7 @@ interface DirectorySettingsPanelProps {
 }
 
 export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPanelProps) {
-  const { listing, loading, error, publish, unpublish, updateSettings } = useDirectoryListing(tenantId);
+  const { listing, loading, error, publish, unpublish, updateSettings, syncProfile } = useDirectoryListing(tenantId);
   
   const [seoDescription, setSeoDescription] = useState('');
   const [seoKeywords, setSeoKeywords] = useState<string[]>([]);
@@ -96,6 +96,26 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
       setTimeout(() => setSaveMessage(''), 3000);
     } catch (err) {
       setSaveMessage('Failed to unpublish listing');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSyncProfile = async () => {
+    try {
+      setIsSaving(true);
+      setSaveMessage('');
+      
+      const result = await syncProfile();
+      
+      if (result.success) {
+        setSaveMessage('Profile synced successfully!');
+        setTimeout(() => setSaveMessage(''), 3000);
+      } else {
+        setSaveMessage(result.message || 'Failed to sync profile');
+      }
+    } catch (err) {
+      setSaveMessage('Failed to sync profile');
     } finally {
       setIsSaving(false);
     }
@@ -267,6 +287,29 @@ export default function DirectorySettingsPanel({ tenantId }: DirectorySettingsPa
               />
             )}
           </div>
+
+          {/* Profile Sync */}
+          {listing.isPublished && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    Sync from Profile
+                  </h4>
+                  <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                    Update logo, business name, and contact info from your profile to the directory listing.
+                  </p>
+                </div>
+                <button
+                  onClick={handleSyncProfile}
+                  disabled={isSaving}
+                  className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {isSaving ? 'Syncing...' : 'Sync Now'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3">

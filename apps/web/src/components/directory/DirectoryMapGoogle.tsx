@@ -58,7 +58,7 @@ interface DirectoryListing {
   logoUrl?: string;
   primaryCategory?: string;
   ratingAvg: number;
-  productCount: number;
+  productCount: number | string; // API may return string
 }
 
 interface DirectoryMapGoogleProps {
@@ -316,7 +316,7 @@ export default function DirectoryMapGoogle({
               ⭐ ${listing.ratingAvg.toFixed(1)} rating
             </p>
           ` : ''}
-          ${listing.productCount > 0 ? `
+          ${Number(listing.productCount) > 0 ? `
             <p style="margin: 4px 0; font-size: 14px; color: #666;">
               ${listing.productCount} products
             </p>

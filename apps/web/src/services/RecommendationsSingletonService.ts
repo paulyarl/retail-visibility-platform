@@ -696,50 +696,6 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
   }
 
   /**
-   * Search directory stores with comprehensive filtering
-   * Public endpoint for directory store search
-   */
-  async searchDirectoryStores(params: {
-    search?: string;
-    category?: string;
-    lat?: number;
-    lng?: number;
-    sort?: string;
-    page?: number;
-    limit?: number;
-  }): Promise<any> {
-    try {
-      const searchParams = new URLSearchParams();
-      if (params.search) searchParams.append('search', params.search);
-      if (params.category) searchParams.append('category', params.category);
-      if (params.lat && params.lng) {
-        searchParams.append('lat', params.lat.toString());
-        searchParams.append('lng', params.lng.toString());
-      }
-      if (params.sort) searchParams.append('sort', params.sort);
-      searchParams.append('page', (params.page || 1).toString());
-      searchParams.append('limit', (params.limit || 20).toString());
-
-      const response = await this.makeDefaultRequest<any>(
-        `/api/directory/mv/search?${searchParams.toString()}`,
-        {},
-        `search-directory-stores-${JSON.stringify(params)}`,
-        this.STATIC_TTL
-      );
-
-      if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to search directory stores:', response.error);
-        return null;
-      }
-
-      return response.data;
-    } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to search directory stores:', error);
-      return null;
-    }
-  }
-
-  /**
    * Get featured stores with location filtering
    * Public endpoint for featured stores
    */

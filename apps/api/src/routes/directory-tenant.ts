@@ -433,6 +433,69 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
 });
 
 /**
+ * POST /api/tenants/:id/directory/sync-profile
+ * Sync profile data (logo, business name, etc.) to directory_listings_list
+ */
+router.post('/:id/directory/sync-profile', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  try {
+    const { id: tenantId } = req.params;
+    
+    console.log('[POST /tenants/:id/directory/sync-profile] Syncing profile data for tenant:', tenantId);
+    
+    // Check if directory listing exists and is published
+    const existingListing = await getDirectPool().query(
+      'SELECT id FROM directory_listings_list WHERE tenant_id = $1',
+      [tenantId]
+    );
+    
+    if (existingListing.rows.length === 0) {
+      return res.status(404).json({ error: 'no_directory_listing', message: 'No directory listing found to sync' });
+    }
+    
+    // Sync profile data to directory_listings_list
+    const result = await getDirectPool().query(`
+      UPDATE directory_listings_list dll
+      SET 
+        business_name = COALESCE(bp.business_name, t.name),
+        address = bp.address_line1,
+        city = bp.city,
+        state = bp.state,
+        zip_code = bp.postal_code,
+        phone = bp.phone_number,
+        email = bp.email,
+        website = bp.website,
+        latitude = bp.latitude,
+        longitude = bp.longitude,
+        logo_url = bp.logo_url,
+        business_hours = bp.hours,
+        updated_at = NOW()
+      FROM tenants t
+      LEFT JOIN tenant_business_profiles_list bp ON bp.tenant_id = t.id
+      WHERE dll.tenant_id = $1 AND t.id = $1
+      RETURNING dll.logo_url, dll.business_name
+    `, [tenantId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(500).json({ error: 'sync_failed', message: 'Failed to sync profile data' });
+    }
+    
+    console.log('[POST /tenants/:id/directory/sync-profile] Synced profile data:', result.rows[0]);
+    
+    return res.json({ 
+      success: true, 
+      message: 'Profile data synced to directory listing',
+      syncedData: {
+        businessName: result.rows[0].business_name,
+        logoUrl: result.rows[0].logo_url
+      }
+    });
+  } catch (error: any) {
+    console.error('[POST /tenants/:id/directory/sync-profile] Error:', error);
+    return res.status(500).json({ error: 'failed_to_sync_profile', message: error.message });
+  }
+});
+
+/**
  * POST /api/tenants/:id/directory/refresh
  * Manually refresh materialized views for this tenant
  */

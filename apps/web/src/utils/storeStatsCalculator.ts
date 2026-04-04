@@ -28,12 +28,11 @@ class StoreStatsSingleton extends PublicApiSingleton {
 
   // Method to fetch store stats for a tenant
   async fetchStoreStats(tenantId: string): Promise<any> {
-    // Add cache-busting timestamp to force fresh data
-    const timestamp = Date.now();
     const result = await this.makeDefaultRequest<any>(
-      `/api/storefront/${tenantId}/storefront/categories-stats?t=${timestamp}`,
-      { cache: 'no-store' }, // Disable caching
-      `store-stats:${tenantId}`
+      `/api/storefront/${tenantId}/storefront/categories-stats`,
+      {},
+      `store-stats:${tenantId}`,
+      this.cacheTTL // Use class-level TTL (5 minutes)
     );
     
     // makeDefaultRequest returns ApiResult { success, data, error }

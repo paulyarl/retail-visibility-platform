@@ -5,7 +5,7 @@
  * Uses the platform's singleton architecture for automatic authentication and caching
  */
 
-import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
+import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
 
 export interface TenantSlugResponse {
   slug: string;
@@ -48,7 +48,13 @@ export interface TenantDirectoryListing {
   publishedAt?: string;
 }
 
-class TenantDirectorySingletonService extends PublicApiSingleton {
+class TenantDirectorySingletonService extends TenantApiSingleton {
+  public getServiceCachePatterns(): string[] {
+    throw new Error('Method not implemented.');
+  }
+  public invalidateServiceCaches(tenantId?: string, ...params: any[]): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
   private static instance: TenantDirectorySingletonService;
 
   private constructor() {
@@ -82,7 +88,7 @@ class TenantDirectorySingletonService extends PublicApiSingleton {
     if (isServer) {
       console.log('[TenantDirectorySingleton] Making tenant slug request during SSR');
       try {
-        // Use makeDefaultRequest for SSR requests (this is already a PublicApiSingleton)
+        // Use makeDefaultRequest for SSR requests (this is already a TenantApiSingleton)
         const result = await this.makeDefaultRequest<{ slug: string }>(`/directory/tenant/${tenantId}`, {
           method: 'GET'
         });

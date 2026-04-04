@@ -26,7 +26,7 @@ interface DirectoryListing {
   bannerUrl?: string;
   ratingAvg?: number;
   ratingCount?: number;
-  productCount?: number;
+  productCount?: number | string; // API may return string
   isFeatured?: boolean;
   subscriptionTier?: string;
   directoryPublished?: boolean;
@@ -70,7 +70,7 @@ function transformListing(listing: DirectoryListing): StoreData {
     primaryCategory: listing.category?.name || listing.primaryCategory || listing.gbpPrimaryCategoryName,
     ratingAvg: listing.ratingAvg,
     ratingCount: listing.ratingCount,
-    productCount: listing.productCount,
+    productCount: Number(listing.productCount) || 0,
     isFeatured: listing.isFeatured,
     subscriptionTier: listing.subscriptionTier,
     businessHours: listing.businessHours,

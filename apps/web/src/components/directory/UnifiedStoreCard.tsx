@@ -29,7 +29,7 @@ export interface DirectoryListing {
   logoUrl?: string;
   ratingAvg?: number;
   ratingCount?: number;
-  productCount?: number;
+  productCount?: number | string; // API may return string
   isFeatured?: boolean;
   subscriptionTier?: string;
   directoryPublished?: boolean;
@@ -96,7 +96,7 @@ export function UnifiedStoreCard({
   const ratingAvg = enhancedStats?.ratingAvg || (typeof listing.ratingAvg === 'number' ? listing.ratingAvg : parseFloat(listing.ratingAvg || '0')) || 0;
   const ratingCount = enhancedStats?.ratingCount || (typeof listing.ratingCount === 'number' ? listing.ratingCount : parseInt(listing.ratingCount || '0')) || 0;
   const categories = enhancedStats?.categories || [];
-  const totalProducts = enhancedStats?.totalProducts || listing.productCount || 0;
+  const totalProducts = enhancedStats?.totalProducts || Number(listing.productCount) || 0;
   const isFeatured = enhancedStats?.isFeatured || listing.isFeatured || false;
 
   // Determine link destination based on linkType

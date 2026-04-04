@@ -6,43 +6,9 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { recommendationsService } from '@/services/RecommendationsSingletonService';
+import { directoryService, DirectoryStore, DirectorySearchResult } from '@/services/DirectorySingletonService';
 
-export interface DirectoryStore {
-  id: string;
-  tenantId: string;
-  businessName: string;
-  slug: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
-  phone?: string;
-  latitude?: number;
-  longitude?: number;
-  logoUrl?: string;
-  primaryCategory?: string;
-  ratingAvg: number;
-  ratingCount: number;
-  productCount: number;
-  isFeatured: boolean;
-  subscriptionTier: string;
-  useCustomWebsite: boolean;
-  website?: string;
-  distance?: number;
-  isOpen?: boolean;
-  businessHours?: any;
-}
-
-export interface DirectoryStoresResponse {
-  listings: DirectoryStore[];
-  pagination: {
-    page: number;
-    limit: number;
-    totalItems: number;
-    totalPages: number;
-  };
-}
+export interface DirectoryStoresResponse extends DirectorySearchResult {}
 
 export interface UseDirectoryStoresOptions {
   search?: string;
@@ -116,7 +82,7 @@ export const useDirectoryStores = (
       
       // Use the directory API endpoint through singleton service
       // Service handles caching automatically through makeDefaultRequest
-      const result = await recommendationsService.searchDirectoryStores({
+      const result = await directoryService.searchDirectoryStores({
         search,
         category,
         lat,
@@ -145,7 +111,6 @@ export const useDirectoryStores = (
         // Update pagination count to reflect deduplicated results
         if (result.pagination) {
           result.pagination.totalItems = result.listings.length;
-          result.pagination.returnedCount = result.listings.length;
         }
       }
 
@@ -158,7 +123,7 @@ export const useDirectoryStores = (
       const responseTime = endTime - startTime;
 
       // Get actual service metrics instead of manual tracking
-      const serviceMetrics = recommendationsService.getMetrics();
+      const serviceMetrics = directoryService.getMetrics();
    //   console.log('[useDirectoryStores] Service metrics:', serviceMetrics);
       
       // Update local metrics to match service metrics
