@@ -6,8 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@mantine/core';
 import { Input } from '@/components/ui/Input';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
-import { CreditCard, Lock, AlertCircle, CheckCircle, Trash2, ShoppingBag, Package } from 'lucide-react';
+import { CreditCard, Lock, AlertCircle, CheckCircle, Trash2, ShoppingBag, Package, Crown } from 'lucide-react';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { tenantTierService } from '@/services/TenantTierService';
+import { checkTierFeature } from '@/lib/tiers/tier-features';
 import Link from 'next/link';
 import OAuthConnectButton from '@/components/payment-gateways/OAuthConnectButton';
 
@@ -68,11 +70,13 @@ export default function PaymentGatewaysPage() {
     paypal?: { connected: boolean; merchantId?: string; expiresAt?: Date };
     square?: { connected: boolean; merchantId?: string; expiresAt?: Date };
   }>({});
+  const [tenantTier, setTenantTier] = useState<string>('starter');
 
   useEffect(() => {
     if (hasAccess && tenantId) {
       loadGateways();
       loadOAuthStatus();
+      loadTenantTier();
     }
   }, [hasAccess, tenantId]);
 
@@ -94,6 +98,19 @@ export default function PaymentGatewaysPage() {
       setOauthError(decodedMessage);
     }
   }, [searchParams]);
+
+  const loadTenantTier = async () => {
+    try {
+      const tierData = await tenantTierService.getTenantTier(tenantId);
+      if (tierData?.tier) {
+        setTenantTier(tierData.tier);
+      } else if (tierData?.subscription_tier) {
+        setTenantTier(tierData.subscription_tier);
+      }
+    } catch (err) {
+      console.error('Failed to load tenant tier:', err);
+    }
+  };
 
   const loadOAuthStatus = async () => {
     try {
@@ -316,6 +333,7 @@ export default function PaymentGatewaysPage() {
 
   const paypalGateways = gateways.filter(g => g.gateway_type === 'paypal');
   const squareGateways = gateways.filter(g => g.gateway_type === 'square');
+  const canUseAdvancedPayment = checkTierFeature(tenantTier, 'payment_client_credentials');
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -394,7 +412,7 @@ export default function PaymentGatewaysPage() {
                 <p className="text-sm text-neutral-600">Accept payments via PayPal</p>
               </div>
             </div>
-            {paypalGateways.length > 0 && (
+            {canUseAdvancedPayment && paypalGateways.length > 0 && (
               <Button onClick={() => setShowPayPalForm(true)} size="sm">
                 Add Another PayPal Account
               </Button>
@@ -525,9 +543,26 @@ export default function PaymentGatewaysPage() {
             <Card>
               <CardContent className="text-center py-8">
                 <p className="text-neutral-600 mb-4">No PayPal accounts configured</p>
-                <Button onClick={() => setShowPayPalForm(true)}>
-                  Add PayPal Account
-                </Button>
+                {canUseAdvancedPayment ? (
+                  <Button onClick={() => setShowPayPalForm(true)}>
+                    Add PayPal Account
+                  </Button>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-neutral-500">
+                      Client credentials require a Pro or Enterprise plan
+                    </p>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-left">
+                      <div className="flex items-center gap-2 text-amber-700 font-medium mb-2">
+                        <Crown className="w-4 h-4" />
+                        Upgrade for Advanced Integration
+                      </div>
+                      <p className="text-xs text-amber-600">
+                        Pro and Enterprise plans allow direct API credential configuration for custom integrations.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -568,7 +603,7 @@ export default function PaymentGatewaysPage() {
                 <p className="text-sm text-neutral-600">Accept credit/debit cards via Square</p>
               </div>
             </div>
-            {squareGateways.length > 0 && (
+            {canUseAdvancedPayment && squareGateways.length > 0 && (
               <Button onClick={() => setShowSquareForm(true)} size="sm">
                 Add Another Square Account
               </Button>
@@ -723,9 +758,26 @@ export default function PaymentGatewaysPage() {
             <Card>
               <CardContent className="text-center py-8">
                 <p className="text-neutral-600 mb-4">No Square accounts configured</p>
-                <Button onClick={() => setShowSquareForm(true)}>
-                  Add Square Account
-                </Button>
+                {canUseAdvancedPayment ? (
+                  <Button onClick={() => setShowSquareForm(true)}>
+                    Add Square Account
+                  </Button>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-neutral-500">
+                      Client credentials require a Pro or Enterprise plan
+                    </p>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-left">
+                      <div className="flex items-center gap-2 text-amber-700 font-medium mb-2">
+                        <Crown className="w-4 h-4" />
+                        Upgrade for Advanced Integration
+                      </div>
+                      <p className="text-xs text-amber-600">
+                        Pro and Enterprise plans allow direct API credential configuration for custom integrations.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

@@ -74,9 +74,9 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const settingsData = await platformHomeService.getTenantFulfillmentSettings(tenantId);
-      if (settingsData) {
-        setSettings(settingsData);
+      const response = await platformHomeService.getTenantFulfillmentSettings(tenantId);
+      if (response) {
+        setSettings(response);
       }
     } catch (error) {
       console.error('Error fetching fulfillment settings:', error);
@@ -91,10 +91,10 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
       setSaving(true);
       setMessage(null);
       
-      const updatedSettings = await platformHomeService.updateTenantFulfillmentSettings(tenantId, settings);
+      const response = await platformHomeService.updateTenantFulfillmentSettings(tenantId, settings);
       
-      if (updatedSettings) {
-        setSettings(updatedSettings);
+      if (response) {
+        setSettings(response);
         setMessage({ type: 'success', text: 'Settings saved successfully!' });
         setTimeout(() => setMessage(null), 3000);
       }
@@ -107,8 +107,10 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
   };
 
   const formatCurrency = (cents: number | null) => {
-    if (cents === null) return '';
-    return (cents / 100).toFixed(2);
+    if (cents === null || cents === 0) return '';
+    const dollars = cents / 100;
+    // Only show decimals if there are cents
+    return dollars % 1 === 0 ? dollars.toString() : dollars.toFixed(2);
   };
 
   const parseCurrency = (value: string): number => {
@@ -182,7 +184,7 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
               <input
                 type="checkbox"
                 id="pickup_enabled"
-                checked={settings.pickup_enabled}
+                checked={settings.pickup_enabled ?? false}
                 onChange={(e) => setSettings({ ...settings, pickup_enabled: e.target.checked })}
                 className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
               />
@@ -313,7 +315,7 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
               <input
                 type="checkbox"
                 id="delivery_enabled"
-                checked={settings.delivery_enabled}
+                checked={settings.delivery_enabled ?? false}
                 onChange={(e) => setSettings({ ...settings, delivery_enabled: e.target.checked })}
                 className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
               />
@@ -332,11 +334,11 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
                     <input
                       type="number"
                       min="0"
-                      step="0.1"
+                      step="5"
                       value={settings.delivery_radius_miles ?? ''}
                       onChange={(e) => setSettings({ ...settings, delivery_radius_miles: parseFloat(e.target.value) || null })}
                       className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      placeholder="5.0"
+                      placeholder="5"
                     />
                   </div>
 
@@ -347,11 +349,11 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
                     <input
                       type="number"
                       min="0"
-                      step="0.01"
-                      value={formatCurrency(settings.delivery_fee_cents)}
+                      step="1"
+                      value={settings.delivery_fee_cents != null ? settings.delivery_fee_cents / 100 : ''}
                       onChange={(e) => setSettings({ ...settings, delivery_fee_cents: parseCurrency(e.target.value) })}
                       className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      placeholder="5.00"
+                      placeholder="5"
                     />
                   </div>
                 </div>
@@ -364,11 +366,11 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
                     <input
                       type="number"
                       min="0"
-                      step="0.01"
-                      value={settings.delivery_min_free_cents ? formatCurrency(settings.delivery_min_free_cents) : ''}
+                      step="1"
+                      value={settings.delivery_min_free_cents != null ? settings.delivery_min_free_cents / 100 : ''}
                       onChange={(e) => setSettings({ ...settings, delivery_min_free_cents: e.target.value ? parseCurrency(e.target.value) : null })}
                       className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      placeholder="50.00"
+                      placeholder="50"
                     />
                     <p className="text-xs text-neutral-500 mt-1">
                       Orders above this amount get free delivery
@@ -382,7 +384,7 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
                     <input
                       type="number"
                       min="1"
-                      value={settings.delivery_time_hours}
+                      value={settings.delivery_time_hours ?? 24}
                       onChange={(e) => setSettings({ ...settings, delivery_time_hours: parseInt(e.target.value) || 24 })}
                       className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       placeholder="24"
@@ -420,7 +422,7 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
               <input
                 type="checkbox"
                 id="shipping_enabled"
-                checked={settings.shipping_enabled}
+                checked={settings.shipping_enabled ?? false}
                 onChange={(e) => setSettings({ ...settings, shipping_enabled: e.target.checked })}
                 className="h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
               />
@@ -460,11 +462,11 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
                     <input
                       type="number"
                       min="0"
-                      step="0.01"
-                      value={settings.shipping_flat_rate_cents ? formatCurrency(settings.shipping_flat_rate_cents) : ''}
+                      step="1"
+                      value={settings.shipping_flat_rate_cents != null ? settings.shipping_flat_rate_cents / 100 : ''}
                       onChange={(e) => setSettings({ ...settings, shipping_flat_rate_cents: e.target.value ? parseCurrency(e.target.value) : null })}
                       className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      placeholder="8.50"
+                      placeholder="8"
                     />
                   </div>
 
@@ -475,7 +477,7 @@ export default function FulfillmentSettingsClient({ tenantId }: FulfillmentSetti
                     <input
                       type="number"
                       min="0"
-                      value={settings.shipping_handling_days}
+                      value={settings.shipping_handling_days ?? 2}
                       onChange={(e) => setSettings({ ...settings, shipping_handling_days: parseInt(e.target.value) || 2 })}
                       className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       placeholder="2"

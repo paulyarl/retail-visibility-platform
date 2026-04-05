@@ -198,28 +198,34 @@ export class SquareOAuthService {
     });
 
     if (!tokenRecord) {
-      throw new Error('No Square OAuth token found for this tenant');
+      // No token record, just proceed with disconnect
+      await this.disconnect(tenantId);
+      return;
     }
 
-    const accessToken = this.tokenEncryption.decrypt(tokenRecord.access_token);
-    const revokeUrl = `${this.getBaseUrl()}/oauth2/revoke`;
+    // Try to revoke token at Square, but continue even if it fails
+    try {
+      const accessToken = this.tokenEncryption.decrypt(tokenRecord.access_token);
+      const revokeUrl = `${this.getBaseUrl()}/oauth2/revoke`;
 
-    const response = await fetch(revokeUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Square-Version': '2024-01-18',
-      },
-      body: JSON.stringify({
-        client_id: this.applicationId,
-        access_token: accessToken,
-      }),
-    });
+      const response = await fetch(revokeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Square-Version': '2024-01-18',
+        },
+        body: JSON.stringify({
+          client_id: this.applicationId,
+          access_token: accessToken,
+        }),
+      });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' })) as any;
-      console.error(`[Square OAuth] Token revocation failed: ${error.message || error.error}`);
-      // Continue with disconnect even if revocation fails
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' })) as any;
+        console.error(`[Square OAuth] Token revocation failed: ${error.message || error.error}`);
+      }
+    } catch (error) {
+      console.error('[Square OAuth] Token revocation error (continuing with disconnect):', error);
     }
 
     await this.disconnect(tenantId);
@@ -268,18 +274,42 @@ export class SquareOAuthService {
       },
     });
 
-    // Update payment gateway record to mark as OAuth connected
-    await prisma.tenant_payment_gateways.updateMany({
+    // Create or update payment gateway record to mark as OAuth connected
+    const existingGateway = await prisma.tenant_payment_gateways.findFirst({
       where: {
         tenant_id: tenantId,
         gateway_type: 'square',
       },
-      data: {
-        oauth_connected: true,
-        oauth_merchant_id: tokenData.merchant_id || null,
-        updated_at: now,
-      },
     });
+
+    if (existingGateway) {
+      await prisma.tenant_payment_gateways.update({
+        where: { id: existingGateway.id },
+        data: {
+          oauth_connected: true,
+          oauth_merchant_id: tokenData.merchant_id || null,
+          is_active: true,
+          updated_at: now,
+        },
+      });
+    } else {
+      // Create new gateway record for OAuth connection
+      const gatewayId = `gateway_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      await prisma.tenant_payment_gateways.create({
+        data: {
+          id: gatewayId,
+          tenant_id: tenantId,
+          gateway_type: 'square',
+          is_active: true,
+          is_default: true,
+          oauth_connected: true,
+          oauth_merchant_id: tokenData.merchant_id || null,
+          config: {},
+          created_at: now,
+          updated_at: now,
+        },
+      });
+    }
 
     console.log(`[Square OAuth] Tokens stored successfully for tenant ${tenantId}`);
   }
@@ -306,6 +336,7 @@ export class SquareOAuthService {
       data: {
         oauth_connected: false,
         oauth_merchant_id: null,
+        is_active: false,
         updated_at: new Date(),
       },
     });

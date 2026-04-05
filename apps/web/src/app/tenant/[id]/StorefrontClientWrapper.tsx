@@ -1,54 +1,54 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { Pagination } from '@/components/ui';
 import { useRouter } from 'next/navigation';
 import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSingleton';
-import { FeaturedProduct } from '@/providers/data/FeaturedProductsSingleton';
-import StorefrontViewTracker from '@/components/tracking/StorefrontViewTracker';
-import ContactInformationCollapsible from '@/components/storefront/ContactInformationCollapsible';
+// import { FeaturedProduct } from '@/providers/data/FeaturedProductsSingleton';
+// import StorefrontViewTracker from '@/components/tracking/StorefrontViewTracker';
+// import ContactInformationCollapsible from '@/components/storefront/ContactInformationCollapsible';
 import BusinessHoursCollapsible from '@/components/storefront/BusinessHoursCollapsible';
 import GoogleMapEmbed from '@/components/shared/GoogleMapEmbed';
 import StorefrontMap from '@/components/storefront/StorefrontMap';
 import EnhancedProductDisplay from '@/components/storefront/EnhancedProductDisplay';
-import FeaturedProductsSection from '@/components/storefront/FeaturedProductsSection';
-import SmartProductCard from '@/components/products/SmartProductCard';
-import FeaturedBucketSimple from '@/components/storefront/FeaturedBucketSimple';
+// import FeaturedProductsSection from '@/components/storefront/FeaturedProductsSection';
+// import SmartProductCard from '@/components/products/SmartProductCard';
+// import FeaturedBucketSimple from '@/components/storefront/FeaturedBucketSimple';
 import FeaturedBucketsShowcase from '@/components/storefront/FeaturedBucketsShowcase';
-import StorefrontActions from '@/components/products/StorefrontActions';
-import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
-import Image from 'next/image';
-import Link from 'next/link';
-import { Pagination } from '@/components/ui';
+// import StorefrontActions from '@/components/products/StorefrontActions';
+// import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
 
 // Product Discovery & Navigation
 import ProductSearch from '@/components/storefront/ProductSearch';
 import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
-import ProductCategoriesCollapsible from '@/components/storefront/ProductCategoriesCollapsible';
+// import ProductCategoriesCollapsible from '@/components/storefront/ProductCategoriesCollapsible';
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
-import GBPCategoriesNav from '@/components/storefront/GBPCategoriesNav';
+// import GBPCategoriesNav from '@/components/storefront/GBPCategoriesNav';
 import GBPCategoryBadges from '@/components/shared/GBPCategoryBadges';
 // import DirectoryPhotoGalleryDisplay from '@/components/directory/DirectoryPhotoGalleryDisplay';
 
 // Store Information & Location
 import TenantMapSection from '@/components/tenant/TenantMapSection';
-import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
+// import { getTenantMapLocation, MapLocation } from '@/lib/map-utils';
 
 // User Engagement & Shopping Experience
 import LastViewed from '@/components/directory/LastViewed';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
 import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalogSidebar';
-import { StorefrontRecommendations } from './StorefrontClient';
+// import { StorefrontRecommendations } from './StorefrontClient';
 
-import { useStoreContactData } from '@/hooks/useStoreContactData';
+// import { useStoreContactData } from '@/hooks/useStoreContactData';
 
-import { computeStoreStatus } from '@/lib/hours-utils';
-import { directoryService } from '@/services/DirectorySingletonService';
+// import { computeStoreStatus } from '@/lib/hours-utils';
+// import { directoryService } from '@/services/DirectorySingletonService';
 import { useMultiCart } from '@/hooks/useMultiCart';
 
 // store status
 import { useStoreStatus } from '@/hooks/useStoreStatus';
-import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
+import { Badge as MantineBadge } from '@mantine/core';
 
 interface StorefrontClientWrapperProps {
   tenantId: string;
@@ -148,16 +148,16 @@ export default function StorefrontClientWrapper({
    const { status: hoursStatus } = useStoreStatus(tenantId, true); // Public scope
 
    // Status indicator color
-  const getStatusColor = () => {
-    if (!hoursStatus) return 'bg-gray-400';
-    switch (hoursStatus.status) {
-      case 'open': return 'bg-green-500';
-      case 'closed': return 'bg-red-500';
-      case 'opening-soon': return 'bg-blue-500';
-      case 'closing-soon': return 'bg-yellow-500';
-      default: return 'bg-gray-400';
-    }
-  };
+  // const getStatusColor = () => {
+  //   if (!hoursStatus) return 'bg-gray-400';
+  //   switch (hoursStatus.status) {
+  //     case 'open': return 'bg-green-500';
+  //     case 'closed': return 'bg-red-500';
+  //     case 'opening-soon': return 'bg-blue-500';
+  //     case 'closing-soon': return 'bg-yellow-500';
+  //     default: return 'bg-gray-400';
+  //   }
+  // };
   
 
   // Fetch featured data on mount

@@ -1,13 +1,15 @@
 /**
  * Phase 7 OAuth Singleton Service Communication Test
  * Tests the OAuth singleton service with PayPal and Square token management
+ * 
+ * Updated for Auth0 authentication (migrated from legacy JWT Bearer tokens)
  */
 
 const axios = require('axios');
 
 class Phase7OAuthTest {
   constructor() {
-    this.baseURL = 'http://localhost:4000';
+    this.baseURL = process.env.API_BASE_URL || 'http://localhost:4000';
     this.testResults = {
       total: 0,
       passed: 0,
@@ -15,13 +17,41 @@ class Phase7OAuthTest {
       tests: []
     };
     
-    // Test user token (same as Phase 5 test - corresponds to real user in database)
-    this.testToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1aWQtenFlNW5zNWsiLCJlbWFpbCI6InBsYXRmb3JtQHJ2cC5jb20iLCJyb2xlIjoiUExBVEZPUk1fQURNSU4iLCJ0ZW5hbnRJZHMiOlsidGlkLW04aWprcm5rIiwidGlkLTA0MmhpN2p1IiwidGlkLWx0MnQxd3p1IiwidGlkLXI2Y2NjcGFnIl0sImlhdCI6MTc2ODkxODMwOCwiZXhwIjoxODAwNDU0MzA4fQ.-Swkbx8_UOF_4rpBKhs5XvJauNgu0ef6IR_buNbYz64';
+    // Auth0 session credentials (from environment or defaults)
+    // These should match a user in the database with PLATFORM_ADMIN role
+    this.auth0Id = process.env.TEST_AUTH0_ID || 'google-oauth2|101197082777619041667';
+    this.auth0Email = process.env.TEST_AUTH0_EMAIL || 'yarlmoment@gmail.com';
     
+    // Tenant ID for testing (user must have access to this tenant)
+    this.testTenantId = process.env.TEST_TENANT_ID || 'tid-fjwr30ib';
+    
+    // Validate Auth0 credentials are available
+    if (!this.auth0Id && !this.auth0Email) {
+      console.error('❌ ERROR: Auth0 credentials required');
+      console.error('');
+      console.error('Set environment variables:');
+      console.error('  TEST_AUTH0_ID=auth0|xxx     - Your Auth0 user ID (sub)');
+      console.error('  TEST_AUTH0_EMAIL=user@xxx   - Your Auth0 email');
+      console.error('');
+      console.error('Or run with:');
+      console.error('  TEST_AUTH0_ID=auth0|xxx TEST_AUTH0_EMAIL=user@xxx node phase7-oauth-test.js');
+      console.error('');
+      console.error('The user must exist in the database with PLATFORM_ADMIN role.');
+      process.exit(1);
+    }
+    
+    // Headers for Auth0 session authentication
+    // API expects x-auth0-id and x-auth0-email headers (set from web app cookies)
     this.headers = {
-      'Authorization': `Bearer ${this.testToken}`,
+      'x-auth0-id': this.auth0Id,
+      'x-auth0-email': this.auth0Email,
       'Content-Type': 'application/json'
     };
+    
+    console.log(`🔐 Using Auth0 authentication:`);
+    console.log(`   ID: ${this.auth0Id || '(using email fallback)'}`);
+    console.log(`   Email: ${this.auth0Email || '(using ID fallback)'}`);
+    console.log('');
   }
 
   async runTest(testName, method, endpoint, data = null) {
@@ -103,52 +133,52 @@ class Phase7OAuthTest {
     await this.runTest('Get Supported Providers', 'GET', '/api/oauth-singleton/providers');
     
     // Test PayPal authorization URL
-    await this.runTest('PayPal Authorize', 'GET', '/api/oauth-singleton/paypal/authorize?tenantId=tid-m8ijkrnk&state=test-state');
+    await this.runTest('PayPal Authorize', 'GET', `/api/oauth-singleton/paypal/authorize?tenantId=${this.testTenantId}&state=test-state`);
     
     // Test Square authorization URL
-    await this.runTest('Square Authorize', 'GET', '/api/oauth-singleton/square/authorize?tenantId=tid-m8ijkrnk&state=test-state');
+    await this.runTest('Square Authorize', 'GET', `/api/oauth-singleton/square/authorize?tenantId=${this.testTenantId}&state=test-state`);
     
     // Test PayPal callback
     await this.runTest('PayPal Callback', 'POST', '/api/oauth-singleton/paypal/callback', {
       code: 'test-code',
       state: 'test-state',
-      tenantId: 'tid-m8ijkrnk'
+      tenantId: this.testTenantId
     });
     
     // Test Square callback
     await this.runTest('Square Callback', 'POST', '/api/oauth-singleton/square/callback', {
       code: 'test-code',
       state: 'test-state',
-      tenantId: 'tid-m8ijkrnk'
+      tenantId: this.testTenantId
     });
     
     // Test PayPal refresh tokens
     await this.runTest('PayPal Refresh', 'POST', '/api/oauth-singleton/paypal/refresh', {
-      tenantId: 'tid-m8ijkrnk'
+      tenantId: this.testTenantId
     });
     
     // Test Square refresh tokens
     await this.runTest('Square Refresh', 'POST', '/api/oauth-singleton/square/refresh', {
-      tenantId: 'tid-m8ijkrnk'
+      tenantId: this.testTenantId
     });
     
     // Test OAuth operations
     await this.runTest('Test PayPal Authorize', 'POST', '/api/oauth-singleton/test', {
       provider: 'paypal',
       operation: 'authorize',
-      tenantId: 'tid-m8ijkrnk'
+      tenantId: this.testTenantId
     });
     
     await this.runTest('Test Square Callback', 'POST', '/api/oauth-singleton/test', {
       provider: 'square',
       operation: 'callback',
-      tenantId: 'tid-m8ijkrnk'
+      tenantId: this.testTenantId
     });
     
     await this.runTest('Test PayPal Refresh', 'POST', '/api/oauth-singleton/test', {
       provider: 'paypal',
       operation: 'refresh',
-      tenantId: 'tid-m8ijkrnk'
+      tenantId: this.testTenantId
     });
     
     // Test cache management (admin only)
@@ -210,6 +240,7 @@ class Phase7OAuthTest {
     console.log('✅ Operation tracking and history');
     console.log('✅ Error handling and recovery');
     console.log('✅ Token encryption and security');
+    console.log('✅ Auth0 authentication (migrated from JWT Bearer)');
   }
 }
 

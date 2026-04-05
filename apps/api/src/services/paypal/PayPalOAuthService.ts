@@ -234,17 +234,40 @@ export class PayPalOAuthService {
       },
     });
 
-    // Update payment gateway record to mark as OAuth connected
-    await prisma.tenant_payment_gateways.updateMany({
+    // Create or update payment gateway record to mark as OAuth connected
+    const existingGateway = await prisma.tenant_payment_gateways.findFirst({
       where: {
         tenant_id: tenantId,
         gateway_type: 'paypal',
       },
-      data: {
-        oauth_connected: true,
-        updated_at: now,
-      },
     });
+
+    if (existingGateway) {
+      await prisma.tenant_payment_gateways.update({
+        where: { id: existingGateway.id },
+        data: {
+          oauth_connected: true,
+          is_active: true,
+          updated_at: now,
+        },
+      });
+    } else {
+      // Create new gateway record for OAuth connection
+      const gatewayId = `gateway_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      await prisma.tenant_payment_gateways.create({
+        data: {
+          id: gatewayId,
+          tenant_id: tenantId,
+          gateway_type: 'paypal',
+          is_active: true,
+          is_default: true,
+          oauth_connected: true,
+          config: {},
+          created_at: now,
+          updated_at: now,
+        },
+      });
+    }
 
     console.log(`[PayPal OAuth] Tokens stored successfully for tenant ${tenantId}`);
   }
@@ -271,6 +294,7 @@ export class PayPalOAuthService {
       data: {
         oauth_connected: false,
         oauth_merchant_id: null,
+        is_active: false,
         updated_at: new Date(),
       },
     });

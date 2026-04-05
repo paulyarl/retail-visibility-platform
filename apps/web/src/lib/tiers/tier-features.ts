@@ -40,6 +40,7 @@ export const TIER_FEATURES = {
     'custom_marketing_copy',
     'priority_support',
     'square_pos',                // Square POS integration (Pro+)
+    'payment_client_credentials', // Direct API credentials for payment gateways (Pro+)
   ],
   enterprise: [
     'unlimited_skus',
@@ -135,6 +136,7 @@ export const FEATURE_TIER_MAP: Record<string, string> = {
   qr_codes_1024: 'professional',
   image_gallery_5: 'professional',
   square_pos: 'professional',
+  payment_client_credentials: 'professional', // Direct API credentials for payment gateways
   
   // Enterprise tier features
   white_label: 'enterprise',
@@ -239,6 +241,7 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
   'custom_integrations': 'Custom Integrations',
   'clover_pos': 'Clover POS Integration',
   'square_pos': 'Square POS Integration',
+  'payment_client_credentials': 'Direct Payment API Credentials',
   
   // Multi-location
   'multi_location_5': '5 Locations',

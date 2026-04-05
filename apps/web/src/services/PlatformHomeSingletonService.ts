@@ -1738,7 +1738,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeDefaultRequest<FulfillmentSettings>(
+    const result = await this.makeDefaultRequest<{success: boolean; settings: FulfillmentSettings}>(
       `/api/tenants/${tenantId}/fulfillment-settings`,
       {},
       `platform-tenant-fulfillment-settings-${tenantId}`,
@@ -1750,7 +1750,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       return null;
     }
 
-    return result.data || null;
+    return result.data?.settings || null;
   }
 
   /**
@@ -1761,7 +1761,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
       throw new Error('Tenant ID is required');
     }
 
-    const result = await this.makeDefaultRequest<FulfillmentSettings>(
+    const result = await this.makeDefaultRequest<{success: boolean; settings: FulfillmentSettings}>(
       `/api/tenants/${tenantId}/fulfillment-settings`,
       { 
         method: 'PUT',
@@ -1778,7 +1778,7 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
     // Invalidate tenant complete cache for this tenant
     await this.invalidateTenantCaches(tenantId);
 
-    return result.data || null;
+    return result.data?.settings || null;
   }
 
   /**
