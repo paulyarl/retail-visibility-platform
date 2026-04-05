@@ -65,11 +65,8 @@ export class PayPalOAuthService {
     const stateParam = state || this.generateState(tenantId);
     const baseUrl = this.getAuthUrl();
 
-    // PayPal stores redirect URIs without protocol - strip it to match registration
-    let redirectUri = this.redirectUri;
-    if (redirectUri) {
-      redirectUri = redirectUri.replace(/^https?:\/\//, '');
-    }
+    // Use redirect_uri as configured - PayPal SCIM endpoint requires full URL with protocol
+    const redirectUri = this.redirectUri;
 
     const params = new URLSearchParams({
       client_id: this.clientId,
