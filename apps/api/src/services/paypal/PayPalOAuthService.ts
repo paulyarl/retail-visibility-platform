@@ -65,11 +65,17 @@ export class PayPalOAuthService {
     const stateParam = state || this.generateState(tenantId);
     const baseUrl = this.getAuthUrl();
 
+    // PayPal stores redirect URIs without protocol - strip it to match registration
+    let redirectUri = this.redirectUri;
+    if (redirectUri) {
+      redirectUri = redirectUri.replace(/^https?:\/\//, '');
+    }
+
     const params = new URLSearchParams({
       client_id: this.clientId,
       response_type: 'code',
       scope: 'openid profile email https://uri.paypal.com/services/payments/realtimepayment',
-      redirect_uri: this.redirectUri,
+      redirect_uri: redirectUri,
       state: stateParam,
     });
 
