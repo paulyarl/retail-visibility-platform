@@ -592,6 +592,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                 showCategory={true}
                 showDescription={true}
                 className="h-full"
+                buttonLayout="stacked"
               />
             ))}
           </div>
@@ -759,6 +760,7 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                 defaultGatewayType={defaultGatewayType}
                 showCategory={true}
                 showDescription={true}
+                buttonLayout="stacked"
               />
             ))}
           </div>
@@ -804,17 +806,17 @@ export default function StorefrontFeaturedProducts({
         const data = await response.json();
         
         // Debug: Log what the API actually returns
-        console.log('[StorefrontFeaturedProducts] API Response:', {
-          success: data.success,
-          count: data.products?.length || 0,
-          sample: data.products?.slice(0, 2).map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            categoryName: p.categoryName,
-            categorySlug: p.categorySlug,
-            allFields: Object.keys(p)
-          }))
-        });
+        // console.log('[StorefrontFeaturedProducts] API Response:', {
+        //   success: data.success,
+        //   count: data.products?.length || 0,
+        //   sample: data.products?.slice(0, 2).map((p: any) => ({
+        //     id: p.id,
+        //     name: p.name,
+        //     categoryName: p.categoryName,
+        //     categorySlug: p.categorySlug,
+        //     allFields: Object.keys(p)
+        //   }))
+        // });
         
         //console.log(`ShopsFeaturedProducts data:`, data);
         
@@ -829,9 +831,9 @@ export default function StorefrontFeaturedProducts({
             description: product.description,
             
             // Pricing
-            price: product.price || 0,
+            price: (product.priceCents || 0) / 100, // Convert cents to dollars for display
             priceCents: product.priceCents,
-            salePrice: product.salePrice,
+            salePrice: product.salePriceCents ? product.salePriceCents / 100 : undefined,
             salePriceCents: product.salePriceCents,
             listPriceCents: product.listPriceCents,
             currency: product.currency || 'USD',

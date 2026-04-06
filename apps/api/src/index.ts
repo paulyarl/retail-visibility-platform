@@ -7165,6 +7165,15 @@ if (process.env.NODE_ENV !== "test") {
       } catch (err) {
         console.error('⚠️ Failed to start GMC scheduled sync:', err);
       }
+      
+      // Start OAuth token refresh (every hour)
+      try {
+        const { startOAuthTokenRefresh } = await import('./jobs/oauth-token-refresh');
+        startOAuthTokenRefresh();
+        console.log('🔑 OAuth token refresh started (every hour)');
+      } catch (err) {
+        console.error('⚠️ Failed to start OAuth token refresh:', err);
+      }
     });
 
     // Handle server errors

@@ -98,7 +98,7 @@ class ExternalApiService extends ExternalApiSingleton {
 
       return null;
     } catch (error) {
-      console.error('[ExternalApiService] Failed to get IP geolocation:', error);
+      console.log('[ExternalApiService] Failed to get IP geolocation:', error);
       return null;
     }
   }

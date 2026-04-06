@@ -239,6 +239,7 @@ export default function RandomFeaturedProducts() {
                 tenantState={product.storeInfo?.storeState}
                 tenantSlug={product.storeInfo?.storeSlug}
                 distanceKm={product.distanceKm}
+                buttonLayout="stacked"
               />
             ))}
           </div>
@@ -295,6 +296,7 @@ export default function RandomFeaturedProducts() {
                 tenantState={product.storeInfo?.storeState}
                 tenantSlug={product.storeInfo?.storeSlug}
                 distanceKm={product.distanceKm}
+                buttonLayout="stacked"
               />
             ))}
           </div>

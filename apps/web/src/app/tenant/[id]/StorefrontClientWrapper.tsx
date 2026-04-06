@@ -38,13 +38,14 @@ import TenantMapSection from '@/components/tenant/TenantMapSection';
 import LastViewed from '@/components/directory/LastViewed';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
 import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalogSidebar';
-// import { StorefrontRecommendations } from './StorefrontClient';
+import { StorefrontRecommendations } from './StorefrontClient';
 
 // import { useStoreContactData } from '@/hooks/useStoreContactData';
 
 // import { computeStoreStatus } from '@/lib/hours-utils';
 // import { directoryService } from '@/services/DirectorySingletonService';
 import { useMultiCart } from '@/hooks/useMultiCart';
+import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 
 // store status
 import { useStoreStatus } from '@/hooks/useStoreStatus';
@@ -710,18 +711,20 @@ export default function StorefrontClientWrapper({
                   </div>
 
                   {/* Enhanced Product Display */}
-                  <EnhancedProductDisplay
-                    products={products}
-                    tenantId={tenantId} 
-                    tenantSlug={tenant.slug}
-                    tenantLogo={tenant.metadata?.logo_url}
-                    hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
-                    defaultGatewayType={tenant.metadata?.defaultGatewayType}
-                    useSingletonData={true}
-                    showFeaturedBadges={true}
-                    initialPageSize={12}
-                    showPageSizeControl={true}
-                  />
+                  <TenantPaymentProvider tenantId={tenantId}>
+                    <EnhancedProductDisplay
+                      products={products}
+                      tenantId={tenantId} 
+                      tenantSlug={tenant.slug}
+                      tenantLogo={tenant.metadata?.logo_url}
+                      hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
+                      defaultGatewayType={tenant.metadata?.defaultGatewayType}
+                      useSingletonData={true}
+                      showFeaturedBadges={true}
+                      initialPageSize={12}
+                      showPageSizeControl={true}
+                    />
+                  </TenantPaymentProvider>
 
                   {/* Pagination Info */}
                   {totalPages > 1 && (

@@ -131,9 +131,8 @@ export function UniversalProductCard({
   const formatPrice = (value: number | string | undefined): string => {
     if (value === undefined || value === null) return '0.00';
     if (typeof value === 'string') return value;
-    // If value looks like cents (large number), convert to dollars
-    if (value > 1000) return (value / 100).toFixed(2);
-    return value.toFixed(2);
+    // Always convert cents to dollars
+    return (value / 100).toFixed(2);
   };
 
   // Get formatted prices

@@ -159,19 +159,19 @@ const CONTEXT_CONFIGS: Record<AppContext, ContextCacheConfig> = {
   // Store context: Location-based, medium TTL, fast compression
   [AppContext.STORE]: {
     ttl: 20 * 60 * 1000, // 20 minutes
-    maxSize: 200,
-    isolation: CacheIsolation.STORE,
+    maxSize: 500,
+    isolation: CacheIsolation.GLOBAL,
     encryption: false,
     compression: true,
-    compressionLevel: CompressionLevel.BALANCED, // Fast compression for mobile performance
-    compressionType: CompressionType.GZIP, // Quick compression/decompression
+    compressionLevel: CompressionLevel.MAXIMUM, // Fast compression for mobile performance
+    compressionType: CompressionType.BROTLI, // Quick compression/decompression
     persistent: true
   },
 
   // Shop context: Location-based, medium TTL, fast compression
   [AppContext.SHOP]: {
     ttl: 25 * 60 * 1000, // 25 minutes
-    maxSize: 200,
+    maxSize: 500,
     isolation: CacheIsolation.SHOP,
     encryption: false,
     compression: true,
@@ -183,7 +183,7 @@ const CONTEXT_CONFIGS: Record<AppContext, ContextCacheConfig> = {
   // Directory context: Location-based, medium TTL, balanced compression
   [AppContext.DIRECTORY]: {
     ttl: 15 * 60 * 1000, // 15 minutes
-    maxSize: 200,
+    maxSize: 500,
     isolation: CacheIsolation.GLOBAL,
     encryption: false,
     compression: true,

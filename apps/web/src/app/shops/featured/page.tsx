@@ -223,7 +223,7 @@ export default function FeaturedProductsPage() {
         sortBy: sortBy === 'trending' ? 'trending' : sortBy,
         limit: 100 // Fetch 100 products (20 per bucket across 5 buckets)
       });
-      console.log(`fetchFeaturedProducts data: ${JSON.stringify(data)}`);
+      // console.log(`fetchFeaturedProducts data: ${JSON.stringify(data)}`);
       // Randomize buckets for better store diversity
       const randomizedData = randomizeBuckets(data);
       setData(randomizedData);
@@ -881,7 +881,7 @@ export default function FeaturedProductsPage() {
 
             {/* Featured Buckets */}
             {data && data.buckets ? (
-              console.log(`data.buckets: ${JSON.stringify(data.buckets)}`), 
+              // console.log(`data.buckets: ${JSON.stringify(data.buckets)}`), 
               FEATURED_BUCKETS.map((bucket) => {
                 const products = data.buckets[bucket.type] || [];
                 const count = data.bucketCounts?.[bucket.type] || 0;

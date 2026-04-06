@@ -247,6 +247,7 @@ export default function ProductDisplay({ products, tenantId, tenantName, tenantL
               variant="grid"
               showCategory={true}
               showDescription={true}
+              buttonLayout="stacked"
             />
           ))}
         </div>

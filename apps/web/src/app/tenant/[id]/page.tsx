@@ -331,6 +331,8 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
       ? (Array.isArray(productsData.items) ? productsData.items : [])
       : (Array.isArray(productsData) ? productsData : []);
 
+    // console.log('[TenantPage] Raw products:', rawProducts);
+
     // Deduplicate products by ID to prevent React key conflicts
     const uniqueRawProducts = rawProducts.filter((product, index, arr) => 
       arr.findIndex(p => p.id === product.id) === index

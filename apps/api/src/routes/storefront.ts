@@ -114,6 +114,9 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
         sp.access_duration_days,
         sp.download_limit,
         sp.tenant_category_id,
+        -- Payment gateway status from storefront_products view (sp2), not MV
+        sp2.has_active_payment_gateway,
+        sp2.default_gateway_type,
         -- Get category data from storefront_products view
         sp2.category_id,
         sp2.category_slug,
@@ -192,7 +195,7 @@ router.get('/:tenantId/products', async (req: Request, res: Response) => {
     
     // Debug logging for category mismatches
     if (category) {
-      console.log(`[Storefront] Category: ${category}, Count: ${totalCount}, Returned: ${itemsResult.rows.length}`);
+      // console.log(`[Storefront] Category: ${category}, Count: ${totalCount}, Returned: ${itemsResult.rows.length}`);
     }
     
     // Fetch categories by category_id and category_slug from the joined data

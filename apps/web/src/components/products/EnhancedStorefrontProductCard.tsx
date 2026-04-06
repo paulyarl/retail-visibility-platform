@@ -19,6 +19,7 @@ import {
 import { PriceDisplay } from './PriceDisplay';
 import { AddToCartButton } from './AddToCartButton';
 import VariantPopupModal from './VariantPopupModal';
+import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 
 // Enhanced product interface matching the new API response
 export interface EnhancedProductData {
@@ -75,6 +76,7 @@ export interface EnhancedProductData {
   product_review_count?: number;
   tenantId: string;
   hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
   // Additional fields from API
   metadata?: any;
   categoryName?: string;
@@ -129,6 +131,14 @@ export default function EnhancedStorefrontProductCard({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [showVariantModal, setShowVariantModal] = useState(false);
+
+  // Get payment gateway status from context with same priority as SmartProductCard
+  // Priority: context (when loaded) > prop > product data
+  const contextPayment = useTenantPaymentOptional();
+  const contextCanPurchase = contextPayment && !contextPayment.loading ? contextPayment.canPurchase : undefined;
+  const contextGatewayType = contextPayment && !contextPayment.loading ? contextPayment.defaultGatewayType : undefined;
+  const effectiveCanPurchase = contextCanPurchase ?? hasActivePaymentGateway ?? product.hasActivePaymentGateway ?? false;
+  const effectiveGatewayType = contextGatewayType ?? defaultGatewayType ?? product.defaultGatewayType;
 
   // Get display images
   const getDisplayImages = () => {
@@ -554,7 +564,7 @@ export default function EnhancedStorefrontProductCard({
                 >
                   View Details
                 </Button>
-                {product.hasActivePaymentGateway && (
+                {effectiveCanPurchase && (
                   <AddToCartButton
                     product={{
                       id: product.id,
@@ -567,6 +577,8 @@ export default function EnhancedStorefrontProductCard({
                       tenantId: product.tenantId,
                     }}
                     tenantName={tenantId} // Using tenantId as fallback since tenantName not available
+                    hasActivePaymentGateway={effectiveCanPurchase}
+                    defaultGatewayType={effectiveGatewayType}
                   />
                 )}
               </Group>
@@ -815,6 +827,27 @@ export default function EnhancedStorefrontProductCard({
                 )}
               </Group>
 
+              {/* Add to Cart Button */}
+              {effectiveCanPurchase && (
+                <AddToCartButton
+                  product={{
+                    id: product.id,
+                    sku: product.sku,
+                    name: product.name,
+                    priceCents: product.priceCents,
+                    salePriceCents: product.salePriceCents,
+                    stock: product.stock,
+                    imageUrl: product.imageUrl,
+                    tenantId: product.tenantId,
+                  }}
+                  tenantName={tenantId}
+                  hasActivePaymentGateway={effectiveCanPurchase}
+                  defaultGatewayType={effectiveGatewayType}
+                  layout="stacked"
+                  className="w-full mt-2"
+                />
+              )}
+
               {/* Features from metadata */}
               {product.metadata?.features && Array.isArray(product.metadata.features) && product.metadata.features.length > 0 && (
                 <div className="mb-2">
@@ -862,7 +895,7 @@ export default function EnhancedStorefrontProductCard({
           variants: product.variants || [],
           imageUrl: product.imageUrl,
           currency: product.currency || 'USD',
-          hasActivePaymentGateway: product.hasActivePaymentGateway
+          hasActivePaymentGateway: effectiveCanPurchase
         }}
         onVariantSelect={(variant) => {
           // Handle variant selection - could add to cart or navigate to product page with variant pre-selected
@@ -873,7 +906,7 @@ export default function EnhancedStorefrontProductCard({
             window.open(`${productUrl}?variant=${variant.id}`, '_blank');
           }
         }}
-        hasActivePaymentGateway={product.hasActivePaymentGateway}
+        hasActivePaymentGateway={effectiveCanPurchase}
       />
     </>
   );

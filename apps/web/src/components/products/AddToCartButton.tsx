@@ -39,6 +39,7 @@ interface AddToCartButtonProps {
   className?: string;
   hasActivePaymentGateway?: boolean; // Simple boolean from MV - does tenant have payment gateway?
   defaultGatewayType?: string; // Tenant's default gateway type (no hardcoded fallback)
+  layout?: 'horizontal' | 'stacked'; // Layout for buttons in narrow cards
 }
 
 export function AddToCartButton({ 
@@ -49,7 +50,8 @@ export function AddToCartButton({
   quantity = 1, 
   className,
   hasActivePaymentGateway = false, // Default to false if not provided
-  defaultGatewayType // No default fallback - must come from tenant
+  defaultGatewayType, // No default fallback - must come from tenant
+  layout = 'horizontal' // Default to side-by-side layout
 }: AddToCartButtonProps) {
   const router = useRouter();
   const { addToCart, getCartByGateway } = useMultiCart();
@@ -205,11 +207,11 @@ export function AddToCartButton({
       )}
 
       {/* Action Buttons */}
-      <div className="flex gap-2">
+      <div className={`flex gap-2 ${layout === 'stacked' ? 'flex-col' : 'flex-row'}`}>
         <Button
           onClick={handleAddToCart}
           variant="outline"
-          className={`bg-white text-gray-900 ${added ? 'border-green-600' : 'border-gray-300 hover:border-gray-400'}`}
+          className={`bg-white text-gray-900 ${added ? 'border-green-600' : 'border-gray-300 hover:border-gray-400'} ${layout === 'stacked' ? 'w-full' : ''}`}
         >
           {added ? (
             <>
@@ -232,7 +234,7 @@ export function AddToCartButton({
         <Button 
           onClick={handleBuyNow} 
           variant="outline"
-          className="bg-white text-gray-900 border-gray-300 hover:border-gray-400"
+          className={`bg-white text-gray-900 border-gray-300 hover:border-gray-400 ${layout === 'stacked' ? 'w-full' : ''}`}
         >
           {hoursStatus && (
             <div

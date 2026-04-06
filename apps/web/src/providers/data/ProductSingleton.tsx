@@ -460,14 +460,18 @@ export class ProductSingleton extends PublicApiSingleton {
       // Generate cache key based on filters
       const cacheKey = `products-${JSON.stringify(filters || {})}`;
       
-      // Use the correct Public API endpoint
+      // Use the correct Public API endpoint with proper persistent caching
       const url = `/api/public/products${params.toString() ? `?${params.toString()}` : ''}`;
-      const result = await this.makeDefaultRequest<{ products: any[] }>(url, {}, cacheKey);
+      const result = await this.makeDefaultRequest<{ products: any[] }>(url, {}, cacheKey, undefined, {
+        context: this.defaultContext,
+        isolation: this.defaultIsolation
+      });
       
       if (!result.success) {
         console.error('[ProductSingleton] Error fetching products:', result.error);
         return [];
       }
+      // console.log(`[ProductSingleton] Fetched products:`, result.data);
       
       const products: PublicProduct[] = result.data?.products || [];
       
@@ -514,6 +518,7 @@ export class ProductSingleton extends PublicApiSingleton {
       transformedProducts.forEach((product: PublicProduct) => {
         this.products.set(`${product.id}-${product.tenantId}`, product);
       });
+      // console.log(`[ProductSingleton] Stored products:`, transformedProducts);
       
       return transformedProducts;
     } catch (error) {
@@ -527,10 +532,14 @@ export class ProductSingleton extends PublicApiSingleton {
       // Generate cache key based on product ID and tenant
       const cacheKey = `product-${productId}-${tenantId || 'default'}`;
       
-      // Use the correct Public API endpoint
+      // Use the correct Public API endpoint with proper persistent caching
       const url = `/api/public/products/${productId}`;
-      const result = await this.makeDefaultRequest(url, {}, cacheKey);
+      const result = await this.makeDefaultRequest(url, {}, cacheKey, undefined, {
+        context: this.defaultContext,
+        isolation: this.defaultIsolation
+      });
       const product = (result as any)?.product || (result as any) || null;
+      // console.log(`[ProductSingleton] Fetched product:`, product);
       
       // Handle null product case
       if (!product) {
@@ -570,6 +579,7 @@ export class ProductSingleton extends PublicApiSingleton {
       
       // Store individual product
       this.products.set(`${transformedProduct.id}-${transformedProduct.tenantId}`, transformedProduct);
+      // console.log(`[ProductSingleton] Stored product:`, transformedProduct);
       
       return transformedProduct;
     } catch (error) {

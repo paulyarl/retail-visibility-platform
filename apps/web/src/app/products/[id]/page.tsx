@@ -19,6 +19,7 @@ import { Badge, Group } from '@mantine/core';
 import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame } from 'lucide-react';
 import { productDataService } from '@/services/ProductDataService';
 import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
+import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 
 // Define the product interface based on the API response
 interface ProductImage {
@@ -287,7 +288,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Tier-Based Landing Page with Gallery */}
-      <TierBasedLandingPage 
+      <TenantPaymentProvider tenantId={product.tenantId}>
+        <TierBasedLandingPage 
         product={{
           id: product.id,
           tenantId: product.tenantId,
@@ -348,9 +350,10 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           },
         } as any}
         storeStatus={null}
-        gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
-        fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenantId} />}
-      />
+          gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
+          fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenantId} />}
+        />
+      </TenantPaymentProvider>
 
       {/* Business Information - Contact Us */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -400,6 +403,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           entityType="product"
           limit={4}
           showEmptyState={false}
+          currentProductId={product.id}
         />
       </div>
 

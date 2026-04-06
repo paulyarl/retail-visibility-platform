@@ -181,8 +181,8 @@ export class UniversalStorageManager {
    */
   private async estimateStorageQuotas(): Promise<StorageQuota> {
     const quotas: StorageQuota = {
-      [StorageType.CACHE_STORAGE]: null,
       [StorageType.INDEXED_DB]: null,
+      [StorageType.CACHE_STORAGE]: null,
       [StorageType.LOCAL_STORAGE]: null,
       [StorageType.SESSION_STORAGE]: null,
       [StorageType.COOKIES]: null
@@ -192,8 +192,8 @@ export class UniversalStorageManager {
     if ('storage' in navigator && 'estimate' in navigator.storage) {
       try {
         const estimate = await navigator.storage.estimate();
-        quotas[StorageType.CACHE_STORAGE] = estimate.quota || null;
         quotas[StorageType.INDEXED_DB] = estimate.quota || null;
+        quotas[StorageType.CACHE_STORAGE] = estimate.quota || null;
       } catch (error) {
         console.warn('[UniversalStorageManager] Storage quota estimation failed:', error);
       }
@@ -344,10 +344,10 @@ export class UniversalStorageManager {
    */
   private createStoreStrategy(): StorageStrategy {
     return {
-      primary: this.capabilities[StorageType.CACHE_STORAGE] ? StorageType.CACHE_STORAGE : 
-              this.capabilities[StorageType.INDEXED_DB] ? StorageType.INDEXED_DB :
+      primary: this.capabilities[StorageType.INDEXED_DB] ? StorageType.INDEXED_DB : 
+              this.capabilities[StorageType.CACHE_STORAGE] ? StorageType.CACHE_STORAGE :
               StorageType.LOCAL_STORAGE,
-      fallbacks: this.getFallbacks([StorageType.CACHE_STORAGE, StorageType.INDEXED_DB, StorageType.LOCAL_STORAGE]),
+      fallbacks: this.getFallbacks([StorageType.INDEXED_DB, StorageType.CACHE_STORAGE, StorageType.LOCAL_STORAGE]),
       encryption: false,       // Store data is public
       compression: true,        // Compress store data
       maxSize: 200,            // Medium cache for stores
@@ -409,10 +409,10 @@ export class UniversalStorageManager {
    */
   private createShopStrategy(): StorageStrategy {
     return {
-      primary: this.capabilities[StorageType.CACHE_STORAGE] ? StorageType.CACHE_STORAGE : 
-              this.capabilities[StorageType.INDEXED_DB] ? StorageType.INDEXED_DB :
+      primary: this.capabilities[StorageType.INDEXED_DB] ? StorageType.INDEXED_DB : 
+              this.capabilities[StorageType.CACHE_STORAGE] ? StorageType.CACHE_STORAGE :
               StorageType.LOCAL_STORAGE,
-      fallbacks: this.getFallbacks([StorageType.CACHE_STORAGE, StorageType.INDEXED_DB, StorageType.LOCAL_STORAGE]),
+      fallbacks: this.getFallbacks([StorageType.INDEXED_DB, StorageType.CACHE_STORAGE, StorageType.LOCAL_STORAGE]),
       encryption: false,       // Store data is public
       compression: true,        // Compress store data
       maxSize: 200,            // Medium cache for stores
@@ -554,7 +554,7 @@ export class UniversalStorageManager {
     // 📊 Try memory first (fastest)
     const memoryEntry = this.cache.get(key);
     if (memoryEntry && this.isValidEntry(memoryEntry)) {
-      console.log(`[UniversalStorageManager] Memory HIT for ${context}:${key}`);
+      // console.log(`[UniversalStorageManager] Memory HIT for ${context}:${key}`);
       return await this.processEntryForRetrieval<T>(memoryEntry, options);
     }
 
@@ -564,7 +564,7 @@ export class UniversalStorageManager {
     try {
       entry = await this.getFromStorage<T>(key, strategy.primary);
       if (entry) {
-        console.log(`[UniversalStorageManager] ${strategy.primary} HIT for ${context}:${key}`);
+        // console.log(`[UniversalStorageManager] ${strategy.primary} HIT for ${context}:${key}`);
       }
     } catch (error) {
       console.warn(`[UniversalStorageManager] ${strategy.primary} access failed:`, error);

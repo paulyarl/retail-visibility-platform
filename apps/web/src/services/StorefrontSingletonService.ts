@@ -125,7 +125,11 @@ class StorefrontSingletonService extends PublicApiSingleton {
         `/api/storefront/${tenantId}/categories`,
         {},
         `storefront-categories-${tenantId}`,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: this.defaultContext,
+          isolation: this.defaultIsolation
+        }
       );
       
       // console.log('[StorefrontSingleton] getStorefrontCategories result:', {
@@ -181,15 +185,24 @@ class StorefrontSingletonService extends PublicApiSingleton {
       if (options.limit) queryParams.append('limit', options.limit.toString());
       if (options.search) queryParams.append('search', options.search);
       if (options.category) queryParams.append('category', options.category);
+      // console.log(`[StorefrontSingleton] getStorefrontProducts query params:`, queryParams.toString());
 
       const endpoint = `/api/storefront/${tenantId}/products?${queryParams.toString()}`;
-      
+      const cacheKey = `storefront-products-v2-${tenantId}-${queryParams.toString()}`;
+      // console.log(`[StorefrontSingleton] getStorefrontProducts endpoint:`, endpoint);
+      // console.log(`[StorefrontSingleton] getStorefrontProducts cache key:`, cacheKey);
+
       const result = await this.makeDefaultRequest<{
         items: StorefrontProduct[];
         pagination?: {
           totalItems: number;
         };
-      }>(endpoint, {}, `storefront-products-${tenantId}-${queryParams.toString()}`, this.cacheTTL);
+      }>(endpoint, {}, cacheKey, this.cacheTTL, {
+        context:AppContext.PRODUCT,
+        isolation: CacheIsolation.PRODUCT
+      });
+      // console.log(`[StorefrontSingleton] getStorefrontProducts result:`, result.data);
+      // console.log(`[StorefrontSingleton] getStorefrontProducts result:`, result.data?.items?.length);
       
       return {
         items: result.data?.items || [],
@@ -242,7 +255,11 @@ class StorefrontSingletonService extends PublicApiSingleton {
       const result = await this.makeDefaultRequest<{
         items: StorefrontProduct[];
         count?: number;
-      }>(endpoint, {}, cacheKey, this.cacheTTL);
+      }>(endpoint, {}, cacheKey, this.cacheTTL, {
+        
+        context:AppContext.PRODUCT,
+        isolation: CacheIsolation.PRODUCT
+      });
       
       return result.data || { items: [] };
     } catch (error) {
@@ -296,7 +313,11 @@ class StorefrontSingletonService extends PublicApiSingleton {
         endpoint,
         {},
         cacheKey,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: AppContext.PRODUCT,
+          isolation: CacheIsolation.PRODUCT
+        }
       ) as any;  // Cast to any to handle nested response structure
       
       // console.log('[StorefrontSingleton] Request result:', {
@@ -355,7 +376,11 @@ class StorefrontSingletonService extends PublicApiSingleton {
         `/api/directory/${tenantId}`,
         {},
         `directory-listing-${tenantId}`,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: this.defaultContext,
+          isolation: this.defaultIsolation
+        }
       );
       
       if (!result.success) {
@@ -394,7 +419,11 @@ class StorefrontSingletonService extends PublicApiSingleton {
         `/api/storefront/${tenantId}/products?page=1&limit=1`,
         {},
         `total-product-count-${tenantId}`,
-        this.cacheTTL
+        this.cacheTTL,
+        {
+          context: this.defaultContext,
+          isolation: this.defaultIsolation
+        }
       );
       
       return result.data?.pagination?.totalItems || 0;

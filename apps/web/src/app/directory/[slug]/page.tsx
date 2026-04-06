@@ -726,6 +726,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                           variant="featured"
                           showCategory={true}
                           showDescription={true}
+                          
                         />
                         ))
                       })()}

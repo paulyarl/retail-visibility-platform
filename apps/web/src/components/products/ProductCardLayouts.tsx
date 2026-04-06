@@ -328,6 +328,7 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
             hasActivePaymentGateway={hasActivePaymentGateway}
             defaultGatewayType={defaultGatewayType}
             className="w-full"
+            layout="stacked"
           />
         )}
       </div>
@@ -623,6 +624,7 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
               hasActivePaymentGateway={hasActivePaymentGateway}
               defaultGatewayType={defaultGatewayType}
               className="w-full"
+              layout="stacked"
             />
           )}
         </div>
@@ -867,6 +869,7 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
             hasActivePaymentGateway={hasActivePaymentGateway}
             defaultGatewayType={defaultGatewayType}
             className="w-full"
+            layout="stacked"
           />
         )}
       </div>
@@ -1165,6 +1168,7 @@ function PremiumLayout({ product, className = '', trackingContext, tenantId, ten
                 hasActivePaymentGateway={hasActivePaymentGateway}
                 defaultGatewayType={defaultGatewayType}
                 className="w-full"
+                layout="stacked"
               />
             )}
           </div>
@@ -1469,7 +1473,24 @@ export default function ProductCard({
               )}
             </div>
 
-            {/* Add to Cart Button */}
+
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                ${(product.priceCents / 100).toFixed(2)}
+                 {product.ratingAvg && (
+                <div className="flex items-center gap-0.5">
+                  <Star className="w-2 h-2 text-yellow-400 fill-current" />
+                  <span className="text-xs text-gray-600 dark:text-gray-400">
+                    {product.ratingAvg!.toFixed(1)}
+                  </span>
+                </div>
+              )}
+              </span>
+             
+              
+           
+            </div>
+             {/* Add to Cart Button */}
             {hasActivePaymentGateway && (
               <AddToCartButton
                 product={{
@@ -1490,22 +1511,9 @@ export default function ProductCard({
                 hasActivePaymentGateway={hasActivePaymentGateway}
                 defaultGatewayType={defaultGatewayType}
                 className="w-full"
+                layout="stacked"
               />
             )}
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
-                ${(product.priceCents / 100).toFixed(2)}
-              </span>
-              {product.ratingAvg && (
-                <div className="flex items-center gap-0.5">
-                  <Star className="w-2 h-2 text-yellow-400 fill-current" />
-                  <span className="text-xs text-gray-600 dark:text-gray-400">
-                    {product.ratingAvg!.toFixed(1)}
-                  </span>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       );

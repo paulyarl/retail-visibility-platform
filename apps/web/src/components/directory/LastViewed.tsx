@@ -112,6 +112,7 @@ interface LastViewedProps {
   limit?: number;
   entityType?: 'all' | 'store' | 'product';
   showEmptyState?: boolean;
+  currentProductId?: string; // Exclude this product from the list
 }
 
 
@@ -119,7 +120,8 @@ export default function LastViewed({
   title = "Recently Viewed",
   limit = 6,
   entityType = 'all',
-  showEmptyState = true
+  showEmptyState = true,
+  currentProductId
 }: LastViewedProps) {
   
   const { userId, sessionId, isAuthenticated } = useLastViewedSession();
@@ -329,7 +331,12 @@ export default function LastViewed({
           <div className="space-y-8">
             {/* Products Section */}
             {(() => {
-              const products = items.filter(item => item.type === 'product');
+              const products = items
+                .filter(item => item.type === 'product')
+                .filter(item => {
+                  const productData = item.data as LastViewedProduct;
+                  return productData.productId !== currentProductId;
+                });
               return products.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Recently Viewed Products</h3>
@@ -424,6 +431,10 @@ export default function LastViewed({
                             hasBrand: productData.hasBrand,
                             hasPrice: productData.hasPrice,
                             inStock: productData.inStock,
+
+                            // Payment Gateway
+                            hasActivePaymentGateway: productData.hasActivePaymentGateway,
+                            defaultGatewayType: productData.defaultGatewayType,
                             
                             // Categories
                             productCategory: productData.productCategory,
@@ -439,9 +450,14 @@ export default function LastViewed({
                           }}
                           tenantName={productData.businessName || productData.storeName}
                           tenantLogo={productData.tenantLogo || productData.storeLogo}
+
+                          hasActivePaymentGateway={productData.hasActivePaymentGateway}
+                          defaultGatewayType={productData.defaultGatewayType}
+
                           variant={productData.isFeatured ? 'featured' : 'grid'}
                           showCategory={true}
                           showDescription={true}
+                          buttonLayout="stacked"
                           className="h-full"
                         />
                       );

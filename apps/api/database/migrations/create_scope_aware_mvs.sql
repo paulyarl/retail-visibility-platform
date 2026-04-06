@@ -405,11 +405,12 @@ SELECT
       tpg.gateway_type not in ('square', 'paypal')
       or 
       -- For OAuth gateways, verify OAuth is completed and not expired
+      -- 24-hour grace period allows time for token refresh
       exists (
         select 1 from oauth_tokens ot 
         where ot.tenant_id = tpg.tenant_id 
         and ot.gateway_type = tpg.gateway_type 
-        and ot.expires_at > now()
+        and ot.expires_at > now() - interval '24 hours'
       )
     )
   ) then true else false end as has_active_payment_gateway,

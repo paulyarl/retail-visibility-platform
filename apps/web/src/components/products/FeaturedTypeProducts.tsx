@@ -295,6 +295,7 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
                   variant="grid"
                   showCategory={true}
                   showDescription={true}
+                  buttonLayout="stacked"
                 />
               ))}
             </div>

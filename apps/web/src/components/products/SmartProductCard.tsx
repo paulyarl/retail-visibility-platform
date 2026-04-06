@@ -368,6 +368,9 @@ interface ProductData {
   createdAt?: string;
   updatedAt?: string;
   publishedAt?: string;
+  
+  hasActivePaymentGateway?: boolean;
+  defaultGatewayType?: string;
 }
 
 interface SmartProductCardProps {
@@ -388,6 +391,8 @@ interface SmartProductCardProps {
   // Payment gateway status to avoid individual API calls
   hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
+  // Button layout for narrow cards
+  buttonLayout?: 'horizontal' | 'stacked';
 }
 
 export default function SmartProductCard({
@@ -407,6 +412,7 @@ export default function SmartProductCard({
   productCategorySlug,
   hasActivePaymentGateway: propHasActivePaymentGateway,
   defaultGatewayType: propDefaultGatewayType,
+  buttonLayout = 'horizontal',
 }: SmartProductCardProps) {
   // Try to use context first (performance optimization)
   // console.log(`[SmartProductCard] productCategory: ${productCategory}, productCategorySlug: ${productCategorySlug}`);
@@ -418,9 +424,14 @@ export default function SmartProductCard({
   const [canPurchase, setCanPurchase] = useState(false);
   const [defaultGatewayType, setDefaultGatewayType] = useState<string | undefined>();
 
-  // Priority: context > props > product data (from MV) > individual API fetch
-  const effectiveCanPurchase = contextPayment?.canPurchase ?? propHasActivePaymentGateway ?? product.has_active_payment_gateway ?? canPurchase;
-  const effectiveGatewayType = propDefaultGatewayType ?? product.payment_gateway_type ?? contextPayment?.defaultGatewayType ?? defaultGatewayType;
+  // Priority: context (fresh API, only when loaded) > props > product data (from MV) > individual API fetch
+  // Context takes priority as it fetches fresh gateway status from /public/tenant/:tenantId/payment-gateways
+  // IMPORTANT: Only use context when not loading, since context initializes with canPurchase: false
+  // and false ?? nextValue returns false (nullish coalescing doesn't skip false)
+  const contextCanPurchase = contextPayment && !contextPayment.loading ? contextPayment.canPurchase : undefined;
+  const contextGatewayType = contextPayment && !contextPayment.loading ? contextPayment.defaultGatewayType : undefined;
+  const effectiveCanPurchase = contextCanPurchase ?? propHasActivePaymentGateway ?? product.has_active_payment_gateway ?? canPurchase;
+  const effectiveGatewayType = contextGatewayType ?? propDefaultGatewayType ?? product.payment_gateway_type ?? defaultGatewayType;
   const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
    // Status indicator color
   const getStatusColor = () => {
@@ -824,6 +835,7 @@ export default function SmartProductCard({
                       tenantLogo={tenantLogo}
                       hasActivePaymentGateway={effectiveCanPurchase}
                       defaultGatewayType={effectiveGatewayType}
+                      layout={buttonLayout}
                       className="w-full"
                     />
                   )}
@@ -1100,6 +1112,7 @@ export default function SmartProductCard({
                     tenantLogo={tenantLogo}
                     hasActivePaymentGateway={effectiveCanPurchase}
                     defaultGatewayType={effectiveGatewayType}
+                    layout={buttonLayout}
                     className="text-xs py-1"
                   />
                 )}
@@ -1342,6 +1355,7 @@ export default function SmartProductCard({
                   tenantLogo={tenantLogo}
                   hasActivePaymentGateway={effectiveCanPurchase}
                   defaultGatewayType={effectiveGatewayType}
+                  layout={buttonLayout}
                 />
               )
             )}
@@ -1553,6 +1567,7 @@ export default function SmartProductCard({
                 tenantLogo={tenantLogo}
                 hasActivePaymentGateway={effectiveCanPurchase}
                 defaultGatewayType={effectiveGatewayType}
+                layout={buttonLayout}
                 className="w-full"
               />
             )

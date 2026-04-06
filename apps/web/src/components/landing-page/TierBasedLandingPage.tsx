@@ -13,7 +13,7 @@ import ProductVariantSelector from '@/components/products/ProductVariantSelector
 import ProductGallery from '@/components/products/ProductGallery';
 import BasicProductGallery from '@/components/products/BasicProductGallery';
 import Link from 'next/link';
-import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
+import { TenantPaymentProvider, useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 import { Package, Download, Globe, ThumbsUp } from 'lucide-react';
 import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame, DollarSign, Calendar } from 'lucide-react';
@@ -589,6 +589,13 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   
   // Move all hooks to the top - Rules of Hooks
   const { status: hoursStatus } = useStoreStatus(tenant.id, true); // Public scope
+  
+  // Get fresh payment gateway status from context
+  const contextPayment = useTenantPaymentOptional();
+  const contextCanPurchase = contextPayment && !contextPayment.loading ? contextPayment.canPurchase : undefined;
+  const contextGatewayType = contextPayment && !contextPayment.loading ? contextPayment.defaultGatewayType : undefined;
+  const effectiveCanPurchase = contextCanPurchase ?? tenant.hasActivePaymentGateway ?? false;
+  const effectiveGatewayType = contextGatewayType ?? (product as any).defaultGatewayType;
 
   // Debug logging for variants
   // console.log('[TierBasedLandingPage] Product:', product);
@@ -935,7 +942,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
          
 
           {/* Add to Cart Button - Only show if tenant has order processing enabled */}
-          {tenant.hasActivePaymentGateway && (
+          {effectiveCanPurchase && (
             <div className="mb-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 rounded-xl border-2 border-blue-200 dark:border-blue-800 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -951,12 +958,13 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
                   imageUrl: selectedVariant?.image_url || product.imageUrl,
                   stock: currentAvailability === 'in_stock' ? (currentStock || 999) : 0,
                   tenantId: product.tenantId,
+                  
                 }}
                 variant={selectedVariant}
                 tenantName={tenant.metadata?.businessName || tenant.name}
                 tenantLogo={businessLogo}
-                hasActivePaymentGateway={tenant.hasActivePaymentGateway}
-                defaultGatewayType={(product as any).defaultGatewayType}
+                hasActivePaymentGateway={effectiveCanPurchase}
+                defaultGatewayType={effectiveGatewayType}
               />
             </div>
           )}
