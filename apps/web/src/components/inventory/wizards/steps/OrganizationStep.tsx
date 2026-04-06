@@ -41,11 +41,10 @@ import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { Separator } from '@/components/ui/Separator';
 import { Checkbox } from '@/components/ui/Checkbox';
 
-// Helper component to display category name by ID using CategorySingleton for caching
-function CategoryNameDisplay({ categoryId, tenantId }: { categoryId: string; tenantId?: string }) {
+// Helper component to display category name by ID
+function CategoryNameDisplay({ categoryId, tenantId, categoryPath }: { categoryId: string; tenantId?: string; categoryPath?: string }) {
   const [categoryName, setCategoryName] = useState<string>('Loading...');
   const [fullCategoryPath, setFullCategoryPath] = useState<string>('');
-  const { state, actions } = useCategorySingleton();
 
   useEffect(() => {
     async function loadCategoryName() {
@@ -54,68 +53,57 @@ function CategoryNameDisplay({ categoryId, tenantId }: { categoryId: string; ten
         return;
       }
 
-      console.log('[OrganizationStep CategoryNameDisplay] Looking for category:', categoryId);
-
-      // First try to find in tenant categories (using CategorySingleton)
-      if (state.categories.length > 0) {
-        const category = actions.getCategoryById(categoryId);
-        if (category) {
-          console.log('[OrganizationStep CategoryNameDisplay] Found in tenant categories:', category.name);
-          setCategoryName(category.name);
-          return;
-        }
-      } else {
-        // Load tenant categories if not already loaded
+      // For tenant categories (scid- prefix), fetch from tenant service
+      if (categoryId.startsWith('scid-')) {
         try {
-          await actions.fetchCategories({
-            includeChildren: true,
-            includeProductCount: false
-          });
+          const { tenantCategoriesService } = await import('@/services/TenantCategoriesService');
+          const categories = await tenantCategoriesService.getTenantCategories(tenantId || '');
+          const category = categories.find(cat => cat.id === categoryId);
           
-          const category = actions.getCategoryById(categoryId);
           if (category) {
-            console.log('[OrganizationStep CategoryNameDisplay] Found in tenant categories after load:', category.name);
             setCategoryName(category.name);
             return;
           }
         } catch (error) {
-          console.error('[OrganizationStep CategoryNameDisplay] Error loading tenant categories:', error);
+          console.error('[OrganizationStep CategoryNameDisplay] Error loading tenant category:', error);
+        }
+      } else {
+        // For Google categories (numeric IDs), fetch from Google taxonomy
+        try {
+          const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
+          const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(categoryId);
+          
+          if (data && data.path && Array.isArray(data.path)) {
+            const pathString = data.path.join(' > ');
+            const finalCategoryName = data.path[data.path.length - 1];
+            setCategoryName(finalCategoryName);
+            setFullCategoryPath(pathString);
+            return;
+          }
+        } catch (error) {
+          console.error('[OrganizationStep CategoryNameDisplay] Error fetching Google taxonomy:', error);
         }
       }
 
-      // If not found in tenant categories, try Google taxonomy
-      console.log('[OrganizationStep CategoryNameDisplay] Not found in tenant categories, trying Google taxonomy...');
-      try {
-        const { googleTaxonomyPublicService } = await import('@/services/GoogleTaxonomyPublicService');
-        const data = await googleTaxonomyPublicService.getGoogleTaxonomyPath(categoryId);
-        
-        if (data && data.path && Array.isArray(data.path)) {
-          const pathString = data.path.join(' > ');
-          const finalCategoryName = data.path[data.path.length - 1]; // Get last element
-          console.log('[OrganizationStep CategoryNameDisplay] Found in Google taxonomy:', pathString);
-          setCategoryName(finalCategoryName);
-          setFullCategoryPath(pathString); // Store full path separately
-          return;
-        }
-      } catch (error) {
-        console.error('[OrganizationStep CategoryNameDisplay] Error fetching Google taxonomy:', error);
-      }
-
-      // If still not found, show unknown category
-      console.log('[OrganizationStep CategoryNameDisplay] Category not found anywhere:', categoryId);
+      // If not found anywhere
       setCategoryName('Unknown category');
     }
 
     loadCategoryName();
-  }, [categoryId, state.categories.length]);
+  }, [categoryId, tenantId]);
 
   return (
     <div className="space-y-1">
       <div className="font-medium">{categoryName}</div>
       <div className="text-xs text-blue-600 dark:text-blue-400 font-mono bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded inline-block">ID: {categoryId}</div>
+      {categoryPath && (
+        <div className="text-xs text-green-600 dark:text-green-400 italic">
+          Category Path: {categoryPath}
+        </div>
+      )}
       {fullCategoryPath && categoryName !== 'Unknown category' && categoryName !== 'Loading...' && (
         <div className="text-xs text-gray-500 dark:text-gray-400 italic">
-          Path: {fullCategoryPath}
+          Taxonomy Path: {fullCategoryPath}
         </div>
       )}
     </div>
@@ -125,6 +113,7 @@ function CategoryNameDisplay({ categoryId, tenantId }: { categoryId: string; ten
 interface OrganizationStepProps {
   data: {
     categoryId: string;
+    categoryPath?: string;
     googleCategoryId?: string;
     shopCategoryId?: string;
     tags: string[];
@@ -171,20 +160,17 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
     console.log('[OrganizationStep] Data changed:', {
       categoryId: data.categoryId,
       googleCategoryId: data.googleCategoryId,
+      categoryPath: data.categoryPath,
       hasCategoryId: !!data.categoryId
     });
-  }, [data.categoryId, data.googleCategoryId]);
+  }, [data.categoryId, data.googleCategoryId, data.categoryPath]);
 
   const handleCategoryChange = (categoryId: string, googleCategoryPath?: string, googleTaxonomyId?: string) => {
     console.log('[OrganizationStep] Category change received:', {
       categoryId,
       googleCategoryPath,
       googleTaxonomyId,
-      currentData: {
-        categoryId: data.categoryId,
-        googleCategoryId: data.googleCategoryId,
-        shopCategoryId: data.shopCategoryId
-      }
+      currentData: data
     });
 
     const newData = {
@@ -196,6 +182,12 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
     if (googleTaxonomyId) {
       newData.googleCategoryId = googleTaxonomyId;
       console.log('[OrganizationStep] Updating Google category ID:', googleTaxonomyId);
+    }
+
+    // Store category path if provided
+    if (googleCategoryPath) {
+      newData.categoryPath = googleCategoryPath;
+      console.log('[OrganizationStep] Updating category path:', googleCategoryPath);
     }
 
     console.log('[OrganizationStep] Calling onChange with new data:', newData);
@@ -398,9 +390,10 @@ export default function OrganizationStep({ data, errors, onChange, tenantId }: O
                           console.log('[OrganizationStep] About to render CategoryNameDisplay:', {
                             categoryId: data.categoryId,
                             googleCategoryId: data.googleCategoryId,
+                            categoryPath: data.categoryPath,
                             hasCategoryId: !!data.categoryId
                           });
-                          return <CategoryNameDisplay categoryId={data.categoryId} tenantId={tenantId} />;
+                          return <CategoryNameDisplay categoryId={data.categoryId} tenantId={tenantId} categoryPath={data.categoryPath} />;
                         })()}
                       </div>
                     </div>

@@ -84,8 +84,8 @@ class PaymentGatewaySingleton extends PublicApiSingleton {
 
     try {
       console.log(`PaymentGatewaySingleton: Fetching gateways for tenant ${this.tenantId}`);
-      const result = await this.makeDefaultRequest<{ gateways: PaymentGateway[] }>(`/tenants/${this.tenantId}/payment-gateways/public`);
-      
+      const result = await this.makeDefaultRequest<{ gateways: PaymentGateway[] }>(`/api/tenants/${this.tenantId}/payment-gateways/public`);
+
       if (!result.success || !result.data) {
         throw new Error(`Failed to fetch payment gateways`);
       }

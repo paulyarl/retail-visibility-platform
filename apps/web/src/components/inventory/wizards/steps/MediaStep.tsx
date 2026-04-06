@@ -379,7 +379,7 @@ export default function MediaStep({ data, errors, productType, variants, onChang
                     {(data.primaryImage.size / 1024 / 1024).toFixed(2)} MB
                   </div>
                   <div className="text-xs text-gray-500">
-                    Uploaded {data.primaryImage.uploadedAt.toLocaleTimeString()}
+                    Uploaded {new Date(data.primaryImage.uploadedAt).toLocaleTimeString()}
                   </div>
                 </div>
                 <Button

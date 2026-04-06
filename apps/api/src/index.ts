@@ -2373,6 +2373,64 @@ app.get("/public/tenant/:tenant_id/payment-gateways", async (req, res) => {
   }
 });
 
+// Public endpoint to get tenant OAuth status for payment gateways (no auth required)
+app.get("/public/tenant/:tenant_id/oauth-status/:gateway_type", async (req, res) => {
+  try {
+    const { tenant_id, gateway_type } = req.params;
+    if (!tenant_id || !gateway_type) {
+      return res.status(400).json({ 
+        success: false,
+        error: "tenant_id and gateway_type required" 
+      });
+    }
+
+    console.log(`[Public OAuth Status] Checking ${gateway_type} OAuth for tenant: ${tenant_id}`);
+
+    // Get the OAuth tokens for this gateway
+    const tokens = await prisma.oauth_tokens.findFirst({
+      where: {
+        tenant_id: tenant_id,
+        gateway_type: gateway_type.toLowerCase(),
+      },
+      select: {
+        id: true,
+        access_token: true,
+        refresh_token: true,
+        expires_at: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+
+    if (!tokens) {
+      return res.json({
+        success: true,
+        connected: false,
+        isExpired: false,
+        message: 'No OAuth tokens found for this gateway'
+      });
+    }
+
+    // Check if token is expired
+    const isExpired = tokens.expires_at ? new Date(tokens.expires_at) < new Date() : false;
+
+    res.json({
+      success: true,
+      connected: !!tokens.access_token && !isExpired,
+      isExpired,
+      expiresAt: tokens.expires_at,
+    });
+    
+  } catch (error) {
+    console.error('Public OAuth status error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'internal_error',
+      connected: false
+    });
+  }
+});
+
 // Get all tenant categories (for category assignment - includes categories without products)
 app.get("/api/categories/tenant/:tenant_id", async (req, res) => {
   try {

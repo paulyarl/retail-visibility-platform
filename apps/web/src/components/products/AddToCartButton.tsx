@@ -59,6 +59,7 @@ export function AddToCartButton({
   const [showSuccess, setShowSuccess] = useState(false);
   const [addedToGateway, setAddedToGateway] = useState<string | null>(null);
   const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
+  
   // Status indicator color
   const getStatusColor = () => {
     if (!hoursStatus) return 'bg-gray-400';
@@ -79,8 +80,20 @@ export function AddToCartButton({
       return;
     }
 
-    // Determine gateway type: product's assignment > tenant's default (no hardcoded fallback)
-    const gatewayType = product.payment_gateway_type || defaultGatewayType;
+    // Determine gateway type: product's assignment > tenant's default
+    // If neither available, we need to fetch from tenant config
+    let gatewayType = product.payment_gateway_type || defaultGatewayType;
+    
+    // If no gateway type available, try to fetch tenant's default gateway
+    if (!gatewayType && product.tenantId) {
+      try {
+        const { publicTenantInfoService } = await import('@/services/PublicTenantInfoService');
+        const gatewayStatus = await publicTenantInfoService.getPaymentGatewayStatus(product.tenantId);
+        gatewayType = gatewayStatus?.defaultGatewayType;
+      } catch (error) {
+        console.warn('[AddToCartButton] Failed to fetch gateway status:', error);
+      }
+    }
     
     // First check if tenant has active payment gateway
     if (!hasActivePaymentGateway) {

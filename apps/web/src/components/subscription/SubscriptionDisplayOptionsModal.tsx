@@ -259,6 +259,7 @@ export function SubscriptionDisplayOptionsModal({
             leftSection={<IconCheck size={16} />}
             onClick={handleSave}
             disabled={!hasChanges}
+            style={{ color: '#9ca3af' }}
           >
             Save Changes
           </Button>

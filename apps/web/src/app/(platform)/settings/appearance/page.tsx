@@ -629,19 +629,19 @@ export default function ThemeSettingsPage() {
                     <h4 className="font-semibold text-lg mb-4">Buttons</h4>
                     <div className="space-y-4">
                       <div className="flex flex-wrap gap-4">
-                        <Button variant="filled" size="sm">Filled Small</Button>
-                        <Button variant="filled" size="md">Filled Medium</Button>
-                        <Button variant="filled" size="lg">Filled Large</Button>
+                        <Button variant="filled" size="sm" style={{ backgroundColor: customColors.primary, color: 'white' }}>Filled Small</Button>
+                        <Button variant="filled" size="md" style={{ backgroundColor: customColors.primary, color: 'white' }}>Filled Medium</Button>
+                        <Button variant="filled" size="lg" style={{ backgroundColor: customColors.primary, color: 'white' }}>Filled Large</Button>
                       </div>
                       <div className="flex flex-wrap gap-4">
-                        <Button variant="light" size="sm">Light Small</Button>
-                        <Button variant="light" size="md">Light Medium</Button>
-                        <Button variant="light" size="lg">Light Large</Button>
+                        <Button variant="light" size="sm" style={{ color: customColors.secondary }}>Light Small</Button>
+                        <Button variant="light" size="md" style={{ color: customColors.secondary }}>Light Medium</Button>
+                        <Button variant="light" size="lg" style={{ color: customColors.secondary }}>Light Large</Button>
                       </div>
                       <div className="flex flex-wrap gap-4">
-                        <Button variant="outline" size="sm">Outline Small</Button>
-                        <Button variant="outline" size="md">Outline Medium</Button>
-                        <Button variant="outline" size="lg">Outline Large</Button>
+                        <Button variant="outline" size="sm" style={{ borderColor: customColors.accent, color: customColors.accent }}>Outline Small</Button>
+                        <Button variant="outline" size="md" style={{ borderColor: customColors.accent, color: customColors.accent }}>Outline Medium</Button>
+                        <Button variant="outline" size="lg" style={{ borderColor: customColors.accent, color: customColors.accent }}>Outline Large</Button>
                       </div>
                       <div className="flex flex-wrap gap-4">
                         <Button variant="subtle" size="sm">Subtle Small</Button>

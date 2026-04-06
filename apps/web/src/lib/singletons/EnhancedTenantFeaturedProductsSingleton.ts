@@ -35,6 +35,8 @@ interface UniversalProduct {
   formattedPrice?: string;
   isOnSale?: boolean;
   stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
+  has_active_payment_gateway?: boolean;
+  payment_gateway_type?: string;
 }
 
 // Featured product assignment (what the manager produces)

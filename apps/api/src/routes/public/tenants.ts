@@ -285,6 +285,65 @@ router.get('/tenant/:tenantId/payment-gateways', async (req: Request, res: Respo
   }
 });
 
+// GET /api/public/tenant/:tenantId/oauth-status/:gatewayType - Check OAuth status for a gateway (public endpoint)
+router.get('/tenant/:tenantId/oauth-status/:gatewayType', async (req: Request, res: Response) => {
+  try {
+    const { tenantId, gatewayType } = req.params;
+    
+    if (!tenantId || !gatewayType) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Tenant ID and gateway type are required' 
+      });
+    }
+
+    console.log(`[Public OAuth Status] Checking ${gatewayType} OAuth for tenant: ${tenantId}`);
+
+    // Get the OAuth tokens for this gateway
+    const tokens = await prisma.oauth_tokens.findFirst({
+      where: {
+        tenant_id: tenantId,
+        gateway_type: gatewayType.toLowerCase(),
+      },
+      select: {
+        id: true,
+        access_token: true,
+        refresh_token: true,
+        expires_at: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+
+    if (!tokens) {
+      return res.json({
+        success: true,
+        connected: false,
+        isExpired: false,
+        message: 'No OAuth tokens found for this gateway'
+      });
+    }
+
+    // Check if token is expired
+    const isExpired = tokens.expires_at ? new Date(tokens.expires_at) < new Date() : false;
+
+    res.json({
+      success: true,
+      connected: !!tokens.access_token && !isExpired,
+      isExpired,
+      expiresAt: tokens.expires_at,
+    });
+    
+  } catch (error) {
+    console.error('Public OAuth status error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error',
+      connected: false
+    });
+  }
+});
+
 // Mount individual tenant routes
 router.use('/:tenantId/reviews', tenantReviewsRoutes);
 

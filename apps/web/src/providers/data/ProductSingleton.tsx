@@ -7,6 +7,7 @@ import { SingletonCacheOptions } from '@/providers/base/FlexibleApiSingleton';
 import { CacheManager } from '@/utils/cacheManager';
 import { AutoUserCacheOptions } from '@/utils/userIdentification';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 
 // ====================
 // PRODUCT INTERFACES
@@ -53,6 +54,7 @@ export interface PublicProduct {
   distanceKm?: number | null;
   hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
+  payment_gateway_type?: string | null;
 }
 
 export interface ProductCategory {
@@ -150,75 +152,88 @@ export class ProductSingleton extends PublicApiSingleton {
         if (randomFeaturedProducts && randomFeaturedProducts.length > 0) {
           // console.log('[ProductSingleton] Using featured products API data, found', randomFeaturedProducts.length, 'products');
           
-          // Transform to PublicProduct interface (data is already rich)
-          const enrichedProducts: PublicProduct[] = randomFeaturedProducts.map((product: any): PublicProduct => ({
-            // Core fields - already in correct format
-            id: product.id,
-            sku: product.sku,
-            name: product.name,
-            title: product.title,
-            description: product.description,
-            brand: product.brand || '',
-            
-            // Pricing - already rich
-            priceCents: product.priceCents,
-            salePriceCents: product.salePriceCents,
-            
-            // Stock and availability - already complete
-            stock: product.stock || 0,
-            availability: product.availability || 'in_stock',
-            
-            // Media - already complete
-            imageUrl: product.imageUrl,
-            
-            // Tenant info - already complete
-            tenantId: product.tenantId,
-            
-            // Category - map to proper PublicProduct interface
-            category: product.categoryName ? {
-              id: product.googleCategoryId || '',
-              name: product.categoryName,
-              slug: product.categorySlug || '',
-              googleCategoryId: product.googleCategoryId,
-            } : undefined,
-            
-            // Featured info - Only store_selection for directory display
-            featuredType: 'store_selection',
-            featuredPriority: 1,
-            featuredAt: new Date().toISOString(),
-            
-            // Store info mapping - already complete
-            storeInfo: {
-              storeId: product.tenantId,
-              storeName: product.tenantName,
-              storeSlug: product.tenantSlug,
-              storeLogo: product.tenantLogoUrl,
-              storeCity: '', // Not available in this API
-              storeState: '', // Not available in this API
-              storeWebsite: '',
-              storePhone: '',
-            },
-            
-            // Additional fields
-            hasVariants: false,
-            hasActivePaymentGateway: product.hasActivePaymentGateway || false,
-            defaultGatewayType: product.defaultGatewayType || null,
-            distanceKm: null,
-            
-            // Metadata with rich data
-            metadata: {
-              source: 'featured_products_api',
-              marketingDescription: product.marketingDescription,
-              condition: product.condition,
-              gtin: product.gtin,
-              mpn: product.mpn,
-              currency: product.currency,
-              features: product.metadata?.features || [],
-              specifications: product.metadata?.specifications || {},
-              enhancedDescription: product.metadata?.enhancedDescription || '',
-              originalData: product
-            }
-          }));
+          // Transform to PublicProduct interface with payment gateway enrichment
+          const enrichedProducts: PublicProduct[] = await Promise.all(
+            randomFeaturedProducts.map(async (product: any): Promise<PublicProduct> => {
+              // Fetch payment gateway status for this tenant
+              let gatewayStatus = null;
+              try {
+                gatewayStatus = await publicTenantInfoService.getPaymentGatewayStatus(product.tenantId);
+              } catch (error) {
+                console.warn(`[ProductSingleton] Failed to fetch gateway status for tenant ${product.tenantId}:`, error);
+              }
+              
+              return {
+                // Core fields - already in correct format
+                id: product.id,
+                sku: product.sku,
+                name: product.name,
+                title: product.title,
+                description: product.description,
+                brand: product.brand || '',
+                
+                // Pricing - already rich
+                priceCents: product.priceCents,
+                salePriceCents: product.salePriceCents,
+                
+                // Stock and availability - already complete
+                stock: product.stock || 0,
+                availability: product.availability || 'in_stock',
+                
+                // Media - already complete
+                imageUrl: product.imageUrl,
+                
+                // Tenant info - already complete
+                tenantId: product.tenantId,
+                
+                // Category - map to proper PublicProduct interface
+                category: product.categoryName ? {
+                  id: product.googleCategoryId || '',
+                  name: product.categoryName,
+                  slug: product.categorySlug || '',
+                  googleCategoryId: product.googleCategoryId,
+                } : undefined,
+                
+                // Featured info - Only store_selection for directory display
+                featuredType: 'store_selection',
+                featuredPriority: 1,
+                featuredAt: new Date().toISOString(),
+                
+                // Store info mapping - already complete
+                storeInfo: {
+                  storeId: product.tenantId,
+                  storeName: product.tenantName,
+                  storeSlug: product.tenantSlug,
+                  storeLogo: product.tenantLogoUrl,
+                  storeCity: '', // Not available in this API
+                  storeState: '', // Not available in this API
+                  storeWebsite: '',
+                  storePhone: '',
+                },
+                
+                // Additional fields with enriched payment gateway info
+                hasVariants: false,
+                hasActivePaymentGateway: gatewayStatus?.hasActiveGateway || product.hasActivePaymentGateway || false,
+                defaultGatewayType: gatewayStatus?.defaultGatewayType || product.defaultGatewayType || product.payment_gateway_type || null,
+                payment_gateway_type: gatewayStatus?.defaultGatewayType || product.payment_gateway_type || product.defaultGatewayType || null,
+                distanceKm: null,
+                
+                // Metadata with rich data
+                metadata: {
+                  source: 'featured_products_api',
+                  marketingDescription: product.marketingDescription,
+                  condition: product.condition,
+                  gtin: product.gtin,
+                  mpn: product.mpn,
+                  currency: product.currency,
+                  features: product.metadata?.features || [],
+                  specifications: product.metadata?.specifications || {},
+                  enhancedDescription: product.metadata?.enhancedDescription || '',
+                  originalData: product
+                }
+              };
+            })
+          );
           
           this.featuredProducts = enrichedProducts;
           

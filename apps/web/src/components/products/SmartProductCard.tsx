@@ -14,6 +14,7 @@ import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 import { distanceUtils } from '@/lib/utils';
+import HoursStatusBadge from '../storefront/HoursStatusBadge';
 
 // Helper functions for storefront featured type badges
 const getStorefrontBadgeStyle = (typeId: string): string => {
@@ -415,9 +416,6 @@ export default function SmartProductCard({
   buttonLayout = 'horizontal',
 }: SmartProductCardProps) {
   // Try to use context first (performance optimization)
-  // console.log(`[SmartProductCard] productCategory: ${productCategory}, productCategorySlug: ${productCategorySlug}`);
-  // console.log(`[SmartProductCard] propHasActivePaymentGateway: ${propHasActivePaymentGateway}, propDefaultGatewayType: ${propDefaultGatewayType}`);
-  // console.log(`[SmartProductCard] product: ${JSON.stringify(product)}`);
   const contextPayment = useTenantPaymentOptional();
   
   // Fallback state for when context is not available
@@ -429,9 +427,11 @@ export default function SmartProductCard({
   // IMPORTANT: Only use context when not loading, since context initializes with canPurchase: false
   // and false ?? nextValue returns false (nullish coalescing doesn't skip false)
   const contextCanPurchase = contextPayment && !contextPayment.loading ? contextPayment.canPurchase : undefined;
-  const contextGatewayType = contextPayment && !contextPayment.loading ? contextPayment.defaultGatewayType : undefined;
+  const contextGatewayType = contextPayment && !contextPayment.loading ? contextPayment.defaultGatewayType : product.payment_gateway_type ?? defaultGatewayType;
+
   const effectiveCanPurchase = contextCanPurchase ?? propHasActivePaymentGateway ?? product.has_active_payment_gateway ?? canPurchase;
   const effectiveGatewayType = contextGatewayType ?? propDefaultGatewayType ?? product.payment_gateway_type ?? defaultGatewayType;
+  
   const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
    // Status indicator color
   const getStatusColor = () => {
@@ -445,23 +445,9 @@ export default function SmartProductCard({
     }
   };
 
-  // Log effective values
- /*  console.log('[SMARTCARD-DEBUG] Effective Payment Gateway Values:', {
-    product_id: product.id,
-    tenant_id: product.tenantId,
-    effectiveCanPurchase,
-    effectiveGatewayType,
-    sources: {
-      contextPayment: contextPayment?.canPurchase,
-      propHasActivePaymentGateway,
-      product_has_active_payment_gateway: product.has_active_payment_gateway,
-      fallbackCanPurchase: canPurchase
-    }
-  }); */
-
   useEffect(() => {
     // Skip individual fetch if props are provided
-    if (propHasActivePaymentGateway !== undefined) {
+    if (effectiveGatewayType && effectiveCanPurchase) {
       return;
     }
 
@@ -492,7 +478,7 @@ export default function SmartProductCard({
     };
 
     checkPurchaseAbility();
-  }, [product.tenantId, contextPayment, product.has_active_payment_gateway, propHasActivePaymentGateway]);
+  }, [product.tenantId, contextPayment, product.has_active_payment_gateway, propHasActivePaymentGateway||product.has_active_payment_gateway]);
 
   // Debug: Log when effectiveCanPurchase changes
  /* useEffect(() => {
@@ -629,61 +615,7 @@ export default function SmartProductCard({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
-                  {/* Hours Badge - Status */}
-            {(() => {
-              switch (hoursStatus?.status) {
-                case 'open':
-                  return (
-                    <MantineBadge 
-                      color="green"
-                      variant="light"
-                      size="xs"
-                      className="animate-pulse"
-                      title={hoursStatus?.label || 'Open now'}
-                    >
-                      🟢 Open
-                    </MantineBadge>
-                  );
-                case 'closed':
-                  return (
-                    <MantineBadge 
-                      color="red"
-                      variant="light"
-                      size="xs"
-                      className="animate-bounce"
-                      title={hoursStatus?.label || 'Closed'}
-                    >
-                      🔴 Closed
-                    </MantineBadge>
-                  );
-                case 'opening-soon':
-                  return (
-                    <MantineBadge 
-                      color="blue"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Opening soon'}
-                    >
-                      🟡 Opening
-                    </MantineBadge>
-                  );
-                case 'closing-soon':
-                  return (
-                    <MantineBadge 
-                      color="orange"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Closing soon'}
-                    >
-                      🟡 Closing
-                    </MantineBadge>
-                  );
-                default:
-                  return null;
-              }
-            })()}
+                <HoursStatusBadge status={hoursStatus} />
 			
               </Link>
             )}
@@ -826,18 +758,21 @@ export default function SmartProductCard({
                       tenantName={tenantName || ''}
                       tenantLogo={tenantLogo}
                       defaultGatewayType={effectiveGatewayType}
+                      hasActivePaymentGateway={effectiveCanPurchase||propHasActivePaymentGateway}
                       className="w-full"
                     />
                   ) : (
-                    <AddToCartButton
-                      product={product}
-                      tenantName={tenantName || ''}
-                      tenantLogo={tenantLogo}
-                      hasActivePaymentGateway={effectiveCanPurchase}
-                      defaultGatewayType={effectiveGatewayType}
-                      layout={buttonLayout}
-                      className="w-full"
-                    />
+                    <>
+                      <AddToCartButton
+                        product={product}
+                        tenantName={tenantName || ''}
+                        tenantLogo={tenantLogo}
+                        hasActivePaymentGateway={effectiveCanPurchase||propHasActivePaymentGateway}
+                        defaultGatewayType={effectiveGatewayType||propDefaultGatewayType}
+                        layout={buttonLayout}
+                        className="w-full"
+                      />
+                    </>
                   )}
                 </div>
               );

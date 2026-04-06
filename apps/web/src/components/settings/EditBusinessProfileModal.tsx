@@ -762,7 +762,7 @@ export default function EditBusinessProfileModal({
             Cancel
           </Button>
           <Button type="submit" disabled={saving} loading={saving}>
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? 'Saving...' : 'Save Changes'} 
           </Button>
         </ModalFooter>
       </form>

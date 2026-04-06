@@ -232,32 +232,32 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
             <div className="hidden sm:flex items-center gap-2 md:gap-3">
               <Tooltip label="Store profile and branding">
                 <Link href={`/t/${tenantId}/settings/tenant`}>
-                  <Button variant="ghost" size="sm">Profile</Button>
+                  <Button variant="ghost" size="sm" style={{ color: 'white' }}>Profile</Button>
                 </Link>
               </Tooltip>
               <Tooltip label="Manage products and inventory">
                 <Link href={`/t/${tenantId}/items`}>
-                  <Button variant="ghost" size="sm">Inventory</Button>
+                  <Button variant="ghost" size="sm" style={{ color: 'white' }}>Inventory</Button>
                 </Link>
               </Tooltip>
               <Tooltip label="View and manage orders">
                 <Link href={`/t/${tenantId}/orders`}>
-                  <Button variant="ghost" size="sm">Orders</Button>
+                  <Button variant="ghost" size="sm" style={{ color: 'white' }}>Orders</Button>
                 </Link>
               </Tooltip>
               <Tooltip label="Google Business Profile integration">
                 <Link href={`/t/${tenantId}/settings/integrations/google`}>
-                  <Button variant="ghost" size="sm">Google</Button>
+                  <Button variant="ghost" size="sm" style={{ color: 'white' }}>Google</Button>
                 </Link>
               </Tooltip>
               <Tooltip label="Data sync and feed status">
                 <Link href={`/t/${tenantId}/settings/integrations/google/sync-status`}>
-                  <Button variant="ghost" size="sm">Sync</Button>
+                  <Button variant="ghost" size="sm" style={{ color: 'white' }}>Sync</Button>
                 </Link>
               </Tooltip>
               <Tooltip label="Store settings and configuration">
                 <Link href={`/t/${tenantId}/settings`}>
-                  <Button variant="ghost" size="sm">Settings</Button>
+                  <Button variant="ghost" size="sm" style={{ color: 'white' }}>Settings</Button>
                 </Link>
               </Tooltip>
             </div>
@@ -625,7 +625,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                     </div>
                   </div>
                   <Link href={`/tenant/${tenantId}`} target="_blank">
-                    <Button fullWidth mt="md" variant="filled">View Storefront →</Button>
+                    <Button fullWidth mt="md" variant="filled" style={{ color: 'white' }}>View Storefront →</Button>
                   </Link>
                 </Box>
               </MantineCard>
@@ -652,7 +652,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                     </div>
                   </div>
                   <Link href={`/t/${tenantId}/settings`}>
-                    <Button fullWidth mt="md" variant="filled">Manage Integration →</Button>
+                    <Button fullWidth mt="md" variant="filled" style={{ color: 'white' }}>Manage Integration →</Button>
                   </Link>
                 </Box>
               </MantineCard>

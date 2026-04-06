@@ -361,6 +361,7 @@ export default function AccountPage() {
                 leftSection={<IconDeviceFloppy size={16} />}
                 onClick={handleSaveProfile}
                 loading={savingProfile}
+                style={{ color: 'white' }}
               >
                 Save Changes
               </Button>

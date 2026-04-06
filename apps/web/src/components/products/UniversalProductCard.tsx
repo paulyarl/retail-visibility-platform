@@ -7,7 +7,8 @@ import { useState, useEffect } from 'react';
 import { useProductSingleton } from '@/providers/data/ProductSingleton';
 import { useStoreData } from '@/providers/StoreProviderSingleton';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
-import { Badge as MantineBadge } from '@mantine/core';
+import { AddToCartButton } from './AddToCartButton';
+import { HoursStatusBadge } from '@/components/storefront/HoursStatusBadge';
 
 // ====================
 // UNIVERSAL PRODUCT CARD
@@ -409,7 +410,7 @@ export function UniversalProductCard({
             )}
             {product.availability === 'in_stock' && product.stock !== undefined && (
               <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs rounded">
-                In Stock ({product.stock} available)
+                In Stock ({product.stock} available) <HoursStatusBadge status={hoursStatus} />
               </span>
             )}
           </div>
@@ -443,61 +444,7 @@ export function UniversalProductCard({
             {store.city && store.state && (
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {store.city}, {store.state}
-                 {/* Hours Badge - Status */}
-            {(() => {
-              switch (hoursStatus?.status) {
-                case 'open':
-                  return (
-                    <MantineBadge 
-                      color="green"
-                      variant="light"
-                      size="xs"
-                      className="animate-pulse"
-                      title={hoursStatus?.label || 'Open now'}
-                    >
-                      🟢 Open
-                    </MantineBadge>
-                  );
-                case 'closed':
-                  return (
-                    <MantineBadge 
-                      color="red"
-                      variant="light"
-                      size="xs"
-                      className="animate-bounce"
-                      title={hoursStatus?.label || 'Closed'}
-                    >
-                      🔴 Closed
-                    </MantineBadge>
-                  );
-                case 'opening-soon':
-                  return (
-                    <MantineBadge 
-                      color="blue"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Opening soon'}
-                    >
-                      🟡 Opening
-                    </MantineBadge>
-                  );
-                case 'closing-soon':
-                  return (
-                    <MantineBadge 
-                      color="orange"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Closing soon'}
-                    >
-                      🟡 Closing
-                    </MantineBadge>
-                  );
-                default:
-                  return null;
-              }
-            })()}
+                <HoursStatusBadge status={hoursStatus} />
               </p>
             )}
           </div>
@@ -508,10 +455,13 @@ export function UniversalProductCard({
           <div className="flex items-center gap-2">
             {hasActivePaymentGateway ? (
               <>
-                <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
-                  <ShoppingCart className="w-4 h-4" />
-                  Add to Cart
-                </button>
+                <AddToCartButton
+                  product={product}
+                  hasActivePaymentGateway={hasActivePaymentGateway}
+                  defaultGatewayType={defaultGatewayType}
+                  tenantName={product.tenantName}
+                  className="flex-1"
+                />
                 {defaultGatewayType && (
                   <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                     {defaultGatewayType === 'paypal' && (
@@ -523,68 +473,18 @@ export function UniversalProductCard({
                     {defaultGatewayType === 'square' && (
                       <span className="text-green-600">💳</span>
                     )}
+                   
                   </span>
+                  
                 )}
               </>
             ) : (
-              <span className="text-xs text-gray-500 dark:text-gray-400 italic">
-                Contact store for purchase
-                 {/* Hours Badge - Status */}
-            {(() => {
-              switch (hoursStatus?.status) {
-                case 'open':
-                  return (
-                    <MantineBadge 
-                      color="green"
-                      variant="light"
-                      size="xs"
-                      className="animate-pulse"
-                      title={hoursStatus?.label || 'Open now'}
-                    >
-                      🟢 Open
-                    </MantineBadge>
-                  );
-                case 'closed':
-                  return (
-                    <MantineBadge 
-                      color="red"
-                      variant="light"
-                      size="xs"
-                      className="animate-bounce"
-                      title={hoursStatus?.label || 'Closed'}
-                    >
-                      🔴 Closed
-                    </MantineBadge>
-                  );
-                case 'opening-soon':
-                  return (
-                    <MantineBadge 
-                      color="blue"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Opening soon'}
-                    >
-                      🟡 Opening
-                    </MantineBadge>
-                  );
-                case 'closing-soon':
-                  return (
-                    <MantineBadge 
-                      color="orange"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Closing soon'}
-                    >
-                      🟡 Closing
-                    </MantineBadge>
-                  );
-                default:
-                  return null;
-              }
-            })()}
-              </span>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-gray-500 dark:text-gray-400 italic">
+                  Contact store for purchase
+                </span>
+                <HoursStatusBadge status={hoursStatus} />
+              </div>
             )}
           </div>
         )}

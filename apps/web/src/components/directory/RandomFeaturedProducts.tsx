@@ -31,7 +31,7 @@ export default function RandomFeaturedProducts() {
         },
         (error) => {
        //   console.log('Geolocation not available, using default location');
-          // Default to New York if geolocation fails
+          // Default to New York if geolocation fails 
           setUserLocation({ lat: 40.7128, lng: -74.0060 });
         }
       );

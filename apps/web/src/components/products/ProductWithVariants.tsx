@@ -25,11 +25,14 @@ interface ProductWithVariantsProps {
     featuredType?: string;
     featuredPriority?: number;
     isFeaturedActive?: boolean;
+    has_active_payment_gateway?: boolean;
+    payment_gateway_type?: string | null;
   };
   tenantId: string;
   tenantName: string;
   tenantLogo?: string;
   defaultGatewayType?: string;
+  hasActivePaymentGateway?: boolean;
   className?: string;
   showImage?: boolean;
   onImageChange?: (imageUrl: string | undefined) => void;
@@ -41,6 +44,7 @@ export default function ProductWithVariants({
   tenantName,
   tenantLogo,
   defaultGatewayType,
+  hasActivePaymentGateway,
   className = '',
   showImage = false,
   onImageChange,
@@ -317,7 +321,9 @@ export default function ProductWithVariants({
           tenantName={tenantName}
           tenantLogo={tenantLogo}
           defaultGatewayType={defaultGatewayType}
+          hasActivePaymentGateway={hasActivePaymentGateway}
           className="w-full"
+          layout="stacked"
         />
         
         {effectiveStock <= 0 && (
