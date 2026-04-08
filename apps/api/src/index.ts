@@ -7147,7 +7147,7 @@ app.get('/api/data/bulk-operations', authenticateToken, requirePermission('CAN_B
 console.log('✅ Bulk operations route mounted at /api/data/bulk-operations (CAN_BULK_OPERATIONS)');
 
 /* ------------------------------ tenant trial setup ------------------------------ */
-app.use('/api/tenants', trialSetupRoutes);
+app.use('/api/tenants', authenticateToken, trialSetupRoutes);
 console.log(' Tenant trial setup routes mounted at /api/tenants');
 
 /* ------------------------------ tenant categories (GBP) ------------------------------ */

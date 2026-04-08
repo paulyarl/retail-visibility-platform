@@ -80,7 +80,7 @@ export class TrialService extends TenantApiSingleton {
   async getTrialStatus(tenantId: string): Promise<TrialStatus> {
     const cacheKey = `trial-status:${tenantId}`;
     
-    const response = await this.makeDefaultRequest<TrialStatus>(
+    const response = await this.makeWebRequest<TrialStatus>(
       `/api/tenants/${tenantId}/trial-setup`,
       {
         method: 'GET',
@@ -98,7 +98,7 @@ export class TrialService extends TenantApiSingleton {
   async activateTrial(tenantId: string, request: TrialActivationRequest): Promise<TrialActivationResponse> {
     const cacheKey = `trial-activation:${tenantId}`;
     
-    const response = await this.makeDefaultRequest<TrialActivationResponse>(
+    const response = await this.makeWebRequest<TrialActivationResponse>(
       `/api/tenants/${tenantId}/trial-setup`,
       {
         method: 'POST',

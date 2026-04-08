@@ -198,8 +198,13 @@ export default function OnboardingWizard({
     if (onComplete) {
       onComplete(businessData);
     } else {
-      // Show trial modal instead of direct redirect
-      setShowTrialModal(true);
+      // Check if tenant can start trial before showing modal
+      if (canStartTrial) {
+        setShowTrialModal(true);
+      } else {
+        // Direct to dashboard if already has trial/subscription
+        router.push(`/t/${tenantId}/dashboard`);
+      }
     }
   };
 

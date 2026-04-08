@@ -1433,9 +1433,9 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     
     // Fetch from network - include credentials for Auth0 HTTP-only cookies
     
-    // console.log(`[${this.constructor.name}] about to fetch from: ${fullUrl}`);
+    console.log(`[${this.constructor.name}] about to fetch from: ${fullUrl}`);
     
-    // console.log(`[${this.constructor.name}] options: ${JSON.stringify(options)}`);
+    console.log(`[${this.constructor.name}] options: ${JSON.stringify(options)}`);
     
     let response: Response;
     try {
