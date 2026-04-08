@@ -16,33 +16,41 @@ import { getSubscriptionBillingService } from '../services/subscription/Subscrip
 import { prisma } from '../prisma';
 
 const router = Router();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16' as any,
-});
 
-const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+// Check if Stripe is properly configured
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+if (!stripeSecretKey) {
+  console.warn('[Stripe Webhook] STRIPE_SECRET_KEY not configured. Stripe webhook routes will be disabled.');
+}
+
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, {
+  apiVersion: '2023-10-16' as any,
+}) : null;
+
+const WEBHOOK_SECRET = webhookSecret;
 
 /**
  * POST /api/webhooks/stripe
  * Handle Stripe webhook events
  */
 router.post('/', async (req: Request, res: Response) => {
+  // Check if Stripe is configured
+  if (!stripe || !WEBHOOK_SECRET) {
+    console.warn('[Stripe Webhook] Stripe not properly configured. Skipping webhook processing.');
+    return res.status(503).json({ error: 'Stripe webhook service not available' });
+  }
+
   // Verify webhook signature
   const sig = req.headers['stripe-signature'] as string;
   let event: Stripe.Event;
 
   try {
-    if (!WEBHOOK_SECRET) {
-      console.error('[StripeWebhook] Missing STRIPE_WEBHOOK_SECRET');
-      return res.status(500).json({ error: 'Webhook secret not configured' });
-    }
-
-    // Get raw body for signature verification
-    const rawBody = req.body;
-    event = stripe.webhooks.constructEvent(rawBody, sig, WEBHOOK_SECRET);
-  } catch (err: any) {
-    console.error('[StripeWebhook] Signature verification failed:', err.message);
-    return res.status(400).json({ error: `Webhook Error: ${err.message}` });
+    event = stripe.webhooks.constructEvent(req.body, sig, WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('[Stripe Webhook] Webhook signature verification failed:', err);
+    return res.status(400).json({ error: 'Webhook signature verification failed' });
   }
 
   console.log(`[StripeWebhook] Received event: ${event.type} (${event.id})`);
