@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Pagination } from '@/components/ui';
@@ -20,6 +20,7 @@ import FeaturedBucketsShowcase from '@/components/storefront/FeaturedBucketsShow
 // import StorefrontActions from '@/components/products/StorefrontActions';
 // import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 import { StoreRatingDisplay } from '@/components/reviews/StoreRatingDisplay';
+import { StorefrontStatusPanel, useStorefrontStatus } from '@/components/storefront/StorefrontStatusPanel';
 
 // Product Discovery & Navigation
 import ProductSearch from '@/components/storefront/ProductSearch';
@@ -82,6 +83,9 @@ interface StorefrontClientWrapperProps {
   currentPage?: number;
   totalPages?: number;
   totalItems?: number;
+  // Location status fields from public API
+  locationStatus?: string | null;
+  statusInfo?: any;
 }
 
 export default function StorefrontClientWrapper({
@@ -115,6 +119,8 @@ export default function StorefrontClientWrapper({
   currentPage = 1,
   totalPages = 1,
   totalItems = 0,
+  locationStatus,
+  statusInfo,
 }: StorefrontClientWrapperProps) {
   // Extract contact information from tenant metadata with fallbacks
   const contactInfo = {
@@ -147,6 +153,23 @@ export default function StorefrontClientWrapper({
     router.push('/carts');
   };
    const { status: hoursStatus } = useStoreStatus(tenantId, true); // Public scope
+
+  // Memoize tenant info object to prevent infinite re-renders
+  const tenantInfoForStatus = useMemo(() => ({
+    id: tenantId,
+    name: businessName,
+    slug: tenantSlug,
+    subscriptionStatus: tenant?.subscriptionStatus || 'unknown',
+    subscriptionTier: tier,
+    locationStatus,
+    statusInfo,
+    hasDirectory: directoryPublished,
+    createdAt: '',
+    updatedAt: '',
+  }), [tenantId, businessName, tenantSlug, tenant?.subscriptionStatus, tier, locationStatus, statusInfo, directoryPublished]);
+
+  // Check if storefront status panel should be shown
+  const storefrontStatus = useStorefrontStatus(tenantId, tenantInfoForStatus as any);
 
    // Status indicator color
   // const getStatusColor = () => {
@@ -674,56 +697,65 @@ export default function StorefrontClientWrapper({
                 <ProductSearch tenantId={tenantId} />
               </div>
 
-              {/* Category Navigation */}
+              {/* Status Panel - shows when products/categories are hidden */}
+              {storefrontStatus.shouldShowPanel && storefrontStatus.tenant && (
+                <div className="mb-8">
+                  <StorefrontStatusPanel tenantInfo={storefrontStatus.tenant as any} />
+                </div>
+              )}
+            </div>
+
+            {/* Category Navigation - hidden when status panel shows */}
+            {!storefrontStatus.shouldShowPanel && (
               <div className="flex flex-col lg:flex-row gap-6">
-                {/* Desktop Category Sidebar */}
-                <div className="hidden lg:block lg:w-64 flex-shrink-0">
-                  <ProductCategorySidebar
-                    tenantId={tenantId}
-                    categories={categories}
-                    totalProducts={totalItems || 0}
-                  />
-                </div>
-
-                {/* Mobile Category Dropdown */}
-                <div className="lg:hidden">
-                  <CategoryMobileDropdown
-                    tenantId={tenantId}
-                    categories={categories}
-                    totalProducts={totalItems || 0}
-                  />
-                </div>
-
-                {/* Main Content Area */}
-                <div className="flex-1">
-                  {/* Section Header */}
-                  <div className="mb-6">
-                    <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-2">
-                      Our Products
-                    </h2>
-                    <p className="text-lg text-neutral-600 dark:text-neutral-400">
-                      Browse our complete catalog of {totalItems} products
-                      {search && ` matching "${search}"`}
-                      {category && ` in ${categories.find((c: any) => c.slug === category)?.name || category}`}
-                    </p>
-                    
-                  
+                  {/* Desktop Category Sidebar */}
+                  <div className="hidden lg:block lg:w-64 flex-shrink-0">
+                    <ProductCategorySidebar
+                      tenantId={tenantId}
+                      categories={categories}
+                      totalProducts={totalItems || 0}
+                    />
                   </div>
 
-                  {/* Enhanced Product Display */}
-                  <TenantPaymentProvider tenantId={tenantId}>
-                    <EnhancedProductDisplay
-                      products={products}
-                      tenantId={tenantId} 
-                      tenantSlug={tenant.slug}
-                      tenantLogo={tenant.metadata?.logo_url}
-                      hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
-                      defaultGatewayType={tenant.metadata?.defaultGatewayType}
-                      useSingletonData={true}
-                      showFeaturedBadges={true}
-                      initialPageSize={12}
-                      showPageSizeControl={true}
+                  {/* Mobile Category Dropdown */}
+                  <div className="lg:hidden">
+                    <CategoryMobileDropdown
+                      tenantId={tenantId}
+                      categories={categories}
+                      totalProducts={totalItems || 0}
                     />
+                  </div>
+
+                  {/* Main Content Area */}
+                  <div className="flex-1">
+                    {/* Section Header */}
+                    <div className="mb-6">
+                      <h2 className="text-3xl font-bold text-neutral-900 dark:text-white mb-2">
+                        Our Products
+                      </h2>
+                      <p className="text-lg text-neutral-600 dark:text-neutral-400">
+                        Browse our complete catalog of {totalItems} products
+                        {search && ` matching "${search}"`}
+                        {category && ` in ${categories.find((c: any) => c.slug === category)?.name || category}`}
+                      </p>
+                      
+                    
+                    </div>
+
+                    {/* Enhanced Product Display */}
+                    <TenantPaymentProvider tenantId={tenantId}>
+                      <EnhancedProductDisplay
+                        products={products}
+                        tenantId={tenantId} 
+                        tenantSlug={tenant.slug}
+                        tenantLogo={tenant.metadata?.logo_url}
+                        hasActivePaymentGateway={tenant.metadata?.hasActivePaymentGateway}
+                        defaultGatewayType={tenant.metadata?.defaultGatewayType}
+                        useSingletonData={true}
+                        showFeaturedBadges={true}
+                        initialPageSize={12}
+                        showPageSizeControl={true}
+                      />
                   </TenantPaymentProvider>
 
                   {/* Pagination Info */}
@@ -760,18 +792,15 @@ export default function StorefrontClientWrapper({
                       />
                     </div>
                   )}
+                  </div>
                 </div>
-              </div>
-            </div>
-
-          
-
+              )}
           </div>
         </div>
       )}
 
-      {/* Featured Products Showcase - SECONDARY (After Main Catalog) */}
-      {featuredData && featuredData.totalCount > 0 && (
+      {/* Featured Products Showcase - hidden when status panel shows */}
+      {!storefrontStatus.shouldShowPanel && featuredData && featuredData.totalCount > 0 && (
         <div className="bg-neutral-50 dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-700">
           <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12'}>
             <div className="mb-8">

@@ -450,13 +450,13 @@ class RecommendationsSingletonService extends ApiSystemSingleton {
       );
 
       if (!response.success) {
-        console.error('[RecommendationsSingleton] Failed to get product page recommendations:', response.error);
+        console.log('[RecommendationsSingleton] Failed to get product page recommendations:', response.error);
         return null;
       }
 
       return response.data;
     } catch (error) {
-      console.error('[RecommendationsSingleton] Failed to get product page recommendations:', error);
+      console.log('[RecommendationsSingleton] Failed to get product page recommendations:', error);
       return null;
     }
   }

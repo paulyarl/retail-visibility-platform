@@ -7,12 +7,17 @@
 
 import { prisma } from '../prisma';
 import { UniversalSingleton, SingletonCacheOptions } from '../lib/UniversalSingleton';
+import { getLocationStatusInfo, LocationStatusInfo } from '../utils/location-status';
 
 export interface ResolvedTenant {
   id: string;
   slug: string | null;
   name: string;
   subscriptionStatus: string;
+  subscriptionTier?: string | null;
+  trialEndsAt?: string | null;
+  locationStatus?: string | null;
+  statusInfo?: LocationStatusInfo;
   metadata: any;
   type: 'tenant_id' | 'slug' | 'auto_id';
 }
@@ -153,6 +158,9 @@ export class UniversalIdentifierCache extends UniversalSingleton {
           slug: true,
           name: true,
           subscription_status: true,
+          subscription_tier: true,
+          trial_ends_at: true,
+          location_status: true,
           metadata: true
         }
       });
@@ -166,6 +174,10 @@ export class UniversalIdentifierCache extends UniversalSingleton {
           slug: tenant.slug,
           name: tenant.name,
           subscriptionStatus: tenant.subscription_status || 'unknown',
+          subscriptionTier: tenant.subscription_tier,
+          trialEndsAt: tenant.trial_ends_at?.toISOString() || null,
+          locationStatus: tenant.location_status,
+          statusInfo: tenant.location_status ? getLocationStatusInfo(tenant.location_status as any) : undefined,
           metadata: tenant.metadata,
           type: 'tenant_id'
         };
@@ -181,6 +193,9 @@ export class UniversalIdentifierCache extends UniversalSingleton {
           slug: true,
           name: true,
           subscription_status: true,
+          subscription_tier: true,
+          trial_ends_at: true,
+          location_status: true,
           metadata: true
         }
       });
@@ -194,6 +209,10 @@ export class UniversalIdentifierCache extends UniversalSingleton {
           slug: tenant.slug,
           name: tenant.name,
           subscriptionStatus: tenant.subscription_status || 'unknown',
+          subscriptionTier: tenant.subscription_tier,
+          trialEndsAt: tenant.trial_ends_at?.toISOString() || null,
+          locationStatus: tenant.location_status,
+          statusInfo: tenant.location_status ? getLocationStatusInfo(tenant.location_status as any) : undefined,
           metadata: tenant.metadata,
           type: 'slug'
         };
@@ -214,6 +233,9 @@ export class UniversalIdentifierCache extends UniversalSingleton {
           slug: true,
           name: true,
           subscription_status: true,
+          subscription_tier: true,
+          trial_ends_at: true,
+          location_status: true,
           metadata: true
         }
       });
@@ -228,6 +250,10 @@ export class UniversalIdentifierCache extends UniversalSingleton {
           slug: tenant.slug,
           name: tenant.name,
           subscriptionStatus: tenant.subscription_status || 'unknown',
+          subscriptionTier: tenant.subscription_tier,
+          trialEndsAt: tenant.trial_ends_at?.toISOString() || null,
+          locationStatus: tenant.location_status,
+          statusInfo: tenant.location_status ? getLocationStatusInfo(tenant.location_status as any) : undefined,
           metadata: tenant.metadata,
           type: 'auto_id'
         };

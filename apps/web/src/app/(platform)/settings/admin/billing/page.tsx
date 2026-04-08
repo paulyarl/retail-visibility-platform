@@ -9,21 +9,27 @@ import BillingFilters from './components/BillingFilters';
 import { useBillingData } from './hooks/useBillingData';
 import { useBillingFilters } from './hooks/useBillingFilters';
 import PageHeader, { Icons } from '@/components/PageHeader';
+import { tenantTierService } from '@/services/TenantTierService';
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
 export default function AdminBillingPage() {
   const [mounted, setMounted] = useState(false);
+  const [updating, setUpdating] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
   const theme = useMantineTheme();
 
-  const { tenants, tiers, loading, tiersLoading, error } = useBillingData();
+  const { tenants, tiers, loading, tiersLoading, error: dataError, refetch } = useBillingData(refetchTrigger);
 
   const {
     searchQuery,
     setSearchQuery,
     selectedTierFilter,
     setSelectedTierFilter,
+    selectedStatusFilter,
+    setSelectedStatusFilter,
     currentPage,
     setCurrentPage,
     paginatedTenants,
@@ -39,6 +45,41 @@ export default function AdminBillingPage() {
   const handleClearFilters = () => {
     setSearchQuery('');
     setSelectedTierFilter('all');
+    setSelectedStatusFilter('all');
+  };
+
+  const updateTenant = async (tenantId: string, updates: { tier?: string; status?: string }) => {
+    try {
+      setUpdating(tenantId);
+      setError(null);
+
+      // Get current tenant data to preserve unchanged values
+      const currentTenant = tenants.find(t => t.id === tenantId);
+      if (!currentTenant) throw new Error('Tenant not found');
+
+      const responseData = await tenantTierService.updateTenantTier(tenantId, {
+        subscriptionTier: updates.tier || currentTenant.subscriptionTier || 'starter',
+        subscriptionStatus: updates.status || currentTenant.subscriptionStatus || 'active',
+        reason: 'Updated via billing page',
+      });
+
+      if (!responseData) throw new Error('Failed to update tenant');
+
+      // Show success notification
+      const tenantName = currentTenant.name;
+      const changeType = updates.tier ? 'tier' : 'status';
+      console.log(`Successfully updated ${changeType} for ${tenantName}`);
+
+      // Refetch data to show updated values
+      setRefetchTrigger(prev => prev + 1);
+      
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to update tenant';
+      setError(errorMessage);
+      console.error('Failed to update tenant:', err);
+    } finally {
+      setUpdating(null);
+    }
   };
 
   return mounted ? (
@@ -56,6 +97,8 @@ export default function AdminBillingPage() {
           onSearchChange={setSearchQuery}
           selectedTierFilter={selectedTierFilter}
           onTierFilterChange={setSelectedTierFilter}
+          selectedStatusFilter={selectedStatusFilter}
+          onStatusFilterChange={setSelectedStatusFilter}
           tiers={tiers}
           onClearFilters={handleClearFilters}
         />
@@ -158,14 +201,20 @@ export default function AdminBillingPage() {
             </div>
             {loading || tiersLoading ? (
               <div className="flex items-center justify-center py-12"><Spinner size="lg" /></div>
-            ) : error ? (
-              <div className="text-center py-12 text-red-600 dark:text-red-400">{error}</div>
+            ) : (error || dataError) ? (
+              <div className="text-center py-12 text-red-600 dark:text-red-400">{error || dataError}</div>
             ) : paginatedTenants.length === 0 ? (
               <div className="text-center py-12 text-neutral-500 dark:text-neutral-400">No tenants found matching your filters.</div>
             ) : (
               <div className="space-y-3">
                 {paginatedTenants.map((tenant: any) => (
-                  <TenantCard key={`${tenant.id}-${tiers.length}`} tenant={tenant} tiers={tiers} />
+                  <TenantCard 
+                    key={`${tenant.id}-${tiers.length}`} 
+                    tenant={tenant} 
+                    tiers={tiers}
+                    onUpdateTenant={updateTenant}
+                    isUpdating={updating === tenant.id}
+                  />
                 ))}
               </div>
             )}

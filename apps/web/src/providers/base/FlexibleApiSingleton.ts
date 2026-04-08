@@ -1437,11 +1437,26 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
     
     // console.log(`[${this.constructor.name}] options: ${JSON.stringify(options)}`);
     
-
-    const response = await fetch(fullUrl, {
-      ...options,
-      credentials: this.defaultIncludeCredentials !== false ? 'include' : 'omit', // Use service default
-    });
+    let response: Response;
+    try {
+      response = await fetch(fullUrl, {
+        ...options,
+        credentials: this.defaultIncludeCredentials !== false ? 'include' : 'omit', // Use service default
+      });
+    } catch (fetchError: any) {
+      // Handle timeout/abort errors gracefully - log and return error response
+      if (fetchError?.name === 'TimeoutError' || fetchError?.name === 'AbortError') {
+        console.log(`[${this.constructor.name}] Request timed out or aborted for: ${fullUrl}`);
+        // Return a 504 Gateway Timeout response - callers will handle !response.ok
+        return new Response(JSON.stringify({ error: 'timeout', message: fetchError.message || 'Request timed out' }), {
+          status: 504,
+          statusText: 'Gateway Timeout',
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      // Re-throw other errors to be handled by callers
+      throw fetchError;
+    }
     
     // console.log(`[${this.constructor.name}] response: ${JSON.stringify(response)}`);
     // console.log(`[${this.constructor.name}] response status: ${response.status}`);

@@ -144,8 +144,8 @@ const buildAdminNavItems = (): NavItem[] => [
     href: '/settings/admin/tier-system',
     children: [
       { label: 'Tier Management',  href: '/settings/admin/tier-system' },
-      { label: 'Tenant Tier Mgmt', href: '/settings/admin/tiers' },
-      { label: 'Billing',      href: '/settings/admin/billing' },
+      { label: 'Subscription Mgmt', href: '/settings/admin/tiers' },
+      { label: 'Billing Mgmt',      href: '/settings/admin/billing' },
     ],
   },
   {

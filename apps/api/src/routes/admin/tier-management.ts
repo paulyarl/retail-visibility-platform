@@ -214,6 +214,11 @@ const updateTenantTierSchema = z.object({
     'chain_starter',
     'chain_professional',
     'chain_enterprise',
+    'trial_google_only',
+    'trial_starter',
+    'trial_professional',
+    'trial_chain_starter',
+    'expired_trial',
   ]).optional(),
   subscriptionStatus: z.enum([
     'trial',
@@ -295,6 +300,39 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     if (updateData.subscriptionStatus) updatePayload.subscription_status = updateData.subscriptionStatus;
     if (updateData.trialEndsAt) updatePayload.trial_ends_at = new Date(updateData.trialEndsAt);
     if (updateData.subscriptionEndsAt) updatePayload.subscription_ends_at = new Date(updateData.subscriptionEndsAt);
+
+    // Auto-handle trial expiration for trial tiers
+    if (updateData.subscriptionTier?.startsWith('trial_')) {
+      const now = new Date();
+      const trialEndsAt = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000)); // 14 days from now
+      const graceEndsAt = new Date(now.getTime() + (28 * 24 * 60 * 60 * 1000)); // 28 days from now (14 + 14 grace)
+      
+      updatePayload.trial_ends_at = trialEndsAt;
+      updatePayload.subscription_status = updateData.subscriptionStatus || 'trial';
+      
+      console.log(`[Tier Management] Auto-set trial expiration for tenant ${tenantId}:`, {
+        trialTier: updateData.subscriptionTier,
+        trialEndsAt: trialEndsAt.toISOString(),
+        graceEndsAt: graceEndsAt.toISOString(),
+      });
+    } else if (updateData.subscriptionTier === 'expired_trial') {
+      // Handle expired trial tier
+      updatePayload.trial_ends_at = null;
+      updatePayload.subscription_status = 'expired';
+      
+      console.log(`[Tier Management] Set tenant ${tenantId} to expired_trial status`);
+    } else if (updateData.subscriptionTier && !updateData.subscriptionTier.startsWith('trial_')) {
+      // Moving from trial to paid tier - clear trial dates
+      if (currentTenant.subscription_tier?.startsWith('trial_')) {
+        updatePayload.trial_ends_at = null;
+        updatePayload.subscription_status = updateData.subscriptionStatus || 'active';
+        
+        console.log(`[Tier Management] Converted tenant ${tenantId} from trial to paid tier:`, {
+          fromTier: currentTenant.subscription_tier,
+          toTier: updateData.subscriptionTier,
+        });
+      }
+    }
 
     // Update tenant
     const updatedTenant = await prisma.tenants.update({

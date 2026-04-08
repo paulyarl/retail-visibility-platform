@@ -2,6 +2,8 @@ export interface Tenant {
   id: string;
   name: string;
   subscriptionTier?: string;
+  subscriptionStatus?: string;
+  trialEndsAt?: string;
   organization?: {
     id: string;
     name: string;

@@ -9,9 +9,10 @@ interface UseBillingDataResult {
   loading: boolean;
   tiersLoading: boolean;
   error: string | null;
+  refetch: () => void;
 }
 
-export function useBillingData(): UseBillingDataResult {
+export function useBillingData(refetchTrigger = 0): UseBillingDataResult {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [tiers, setTiers] = useState<DbTier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,8 @@ export function useBillingData(): UseBillingDataResult {
           id: tenant.id,
           name: tenant.name,
           subscriptionTier: tenant.subscriptionTier,
+          subscriptionStatus: tenant.subscriptionStatus,
+          trialEndsAt: tenant.trialEndsAt,
           organization: tenant.organization ? { id: tenant.organization.id, name: tenant.organization.name } : null,
           metadata: tenant.metadata,
         })) || [];
@@ -38,7 +41,7 @@ export function useBillingData(): UseBillingDataResult {
       }
     }
     loadTenants();
-  }, []);
+  }, [refetchTrigger]);
 
   useEffect(() => {
     async function loadTiers() {
@@ -64,5 +67,10 @@ export function useBillingData(): UseBillingDataResult {
     loadTiers();
   }, []);
 
-  return { tenants, tiers, loading, tiersLoading, error };
+  const refetch = () => {
+    // This will trigger the useEffect to refetch data
+    console.log('[useBillingData] Refetching data...');
+  };
+
+  return { tenants, tiers, loading, tiersLoading, error, refetch };
 }

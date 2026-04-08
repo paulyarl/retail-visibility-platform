@@ -1,5 +1,6 @@
 import { UniversalIdentifierCache } from './UniversalIdentifierCache';
 import { UniversalSingleton } from '../lib/UniversalSingleton';
+import { transformTenantForFrontend } from '../utils/trial-tier-transparency';
 
 export interface StoreQuery {
   limit?: number;
@@ -30,6 +31,10 @@ export interface StoreResult {
   phone?: string | null;
   website?: string | null;
   primaryCategory?: string | null;
+  subscription_tier?: string;
+  is_trial?: boolean;
+  trial_status?: string;
+  trial_ends_at?: Date | null;
 }
 
 export interface StorePagination {
@@ -103,6 +108,7 @@ export class StoreService extends UniversalSingleton {
 
     const where: any = {
       subscription_status: 'active',
+      subscription_tier: { not: 'expired_trial' }, // Hide expired trials from public
     };
 
     // Add search filter
@@ -163,8 +169,11 @@ export class StoreService extends UniversalSingleton {
 
     //console.log(`[StoreService] Found ${stores.length} stores out of ${total}`);
 
-    // Transform results
+    // Transform results with trial tier transparency
     const transformedStores: StoreResult[] = stores.map((store: any) => {
+      // Apply trial tier transparency for frontend
+      const transparentStore = transformTenantForFrontend(store);
+      
       const metadata = store.metadata as any || {};
       return {
         id: store.id,
@@ -183,7 +192,13 @@ export class StoreService extends UniversalSingleton {
         logoUrl: metadata.logo_url || null,
         phone: metadata.phone || null,
         website: metadata.website || null,
-        primaryCategory: metadata.primary_category || null
+        primaryCategory: metadata.primary_category || null,
+        // Use effective tier for frontend consumption
+        subscription_tier: transparentStore.subscription_tier,
+        // Preserve trial information for status display
+        is_trial: transparentStore.is_trial,
+        trial_status: transparentStore.trial_status,
+        trial_ends_at: transparentStore.trial_ends_at
       };
     });
 
@@ -229,7 +244,8 @@ export class StoreService extends UniversalSingleton {
     const store = await prisma.tenants.findFirst({
       where: {
         id: resolvedTenant.id,
-        subscription_status: 'active'
+        subscription_status: 'active',
+        subscription_tier: { not: 'expired_trial' }, // Hide expired trials from public
       },
       select: {
         id: true,
@@ -246,6 +262,9 @@ export class StoreService extends UniversalSingleton {
       return null;
     }
 
+    // Apply trial tier transparency for frontend
+    const transparentStore = transformTenantForFrontend(store);
+    
     const metadata = store.metadata as any || {};
     return {
       id: store.id,
@@ -264,7 +283,13 @@ export class StoreService extends UniversalSingleton {
       logoUrl: metadata.logo_url || null,
       phone: metadata.phone || null,
       website: metadata.website || null,
-      primaryCategory: metadata.primary_category || null
+      primaryCategory: metadata.primary_category || null,
+      // Use effective tier for frontend consumption
+      subscription_tier: transparentStore.subscription_tier,
+      // Preserve trial information for status display
+      is_trial: transparentStore.is_trial,
+      trial_status: transparentStore.trial_status,
+      trial_ends_at: transparentStore.trial_ends_at
     };
   }
 
@@ -280,6 +305,7 @@ export class StoreService extends UniversalSingleton {
 
     const where: any = {
       subscription_status: 'active',
+      subscription_tier: { not: 'expired_trial' }, // Hide expired trials from public
       OR: [
         { name: { contains: query.search, mode: 'insensitive' as const } },
         { metadata: { path: ['description'], string_contains: query.search } },
@@ -310,6 +336,9 @@ export class StoreService extends UniversalSingleton {
     const total = stores.length; // Approximate for search results
 
     const transformedStores: StoreResult[] = stores.map((store: any) => {
+      // Apply trial tier transparency for frontend
+      const transparentStore = transformTenantForFrontend(store);
+      
       const metadata = store.metadata as any || {};
       return {
         id: store.id,
@@ -328,7 +357,13 @@ export class StoreService extends UniversalSingleton {
         logoUrl: metadata.logo_url || null,
         phone: metadata.phone || null,
         website: metadata.website || null,
-        primaryCategory: metadata.primary_category || null
+        primaryCategory: metadata.primary_category || null,
+        // Use effective tier for frontend consumption
+        subscription_tier: transparentStore.subscription_tier,
+        // Preserve trial information for status display
+        is_trial: transparentStore.is_trial,
+        trial_status: transparentStore.trial_status,
+        trial_ends_at: transparentStore.trial_ends_at
       };
     });
 

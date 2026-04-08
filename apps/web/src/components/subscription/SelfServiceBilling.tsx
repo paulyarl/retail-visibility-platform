@@ -1,0 +1,751 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { Card, Badge, Button, Modal, Group, Text, Stack, Alert, Loader, SegmentedControl } from '@mantine/core';
+import { IconCreditCard, IconPlus, IconTrash, IconStar, IconCheck, IconAlertCircle, IconBrandPaypal } from '@tabler/icons-react';
+import { subscriptionBillingService, type TierPricing, type PaymentMethod, type SubscriptionPreview } from '@/services/SubscriptionBillingService';
+import { PayPalSmartButtons } from './PayPalButtons';
+
+// Stripe packages are optional - may not be installed or configured
+let stripePromise: Promise<any> | null = null;
+let StripeElements: React.ComponentType<any> | null = null;
+let StripeCardElement: React.ComponentType<any> | null = null;
+let useStripeHook: (() => any) | null = null;
+let useElementsHook: (() => any) | null = null;
+
+// Get Stripe publishable key from either env var name
+function getStripePublishableKey(): string | undefined {
+  return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY;
+}
+
+// Check if Stripe is properly configured
+function isStripeConfigured(): boolean {
+  const key = getStripePublishableKey();
+  return !!(key && key.length > 0 && key.startsWith('pk_'));
+}
+
+// Dynamically load Stripe packages (optional - may not be installed)
+async function loadStripePackages(): Promise<boolean> {
+  // Check if Stripe is configured before loading
+  if (!isStripeConfigured()) {
+    console.warn('[SelfServiceBilling] Stripe not configured - missing or invalid Stripe publishable key');
+    return false;
+  }
+  
+  try {
+    const [stripeJs, stripeReact] = await Promise.all([
+      import('@stripe/stripe-js').catch(() => null),
+      import('@stripe/react-stripe-js').catch(() => null),
+    ]);
+    
+    if (stripeJs && stripeReact) {
+      stripePromise = stripeJs.loadStripe(getStripePublishableKey()!);
+      StripeElements = stripeReact.Elements;
+      StripeCardElement = stripeReact.CardElement;
+      useStripeHook = stripeReact.useStripe;
+      useElementsHook = stripeReact.useElements;
+      return true;
+    }
+  } catch (e) {
+    console.warn('[SelfServiceBilling] Stripe packages not available');
+  }
+  return false;
+}
+
+interface SelfServiceBillingProps {
+  tenantId: string;
+  currentTier?: string;
+  subscriptionStatus?: string;
+  onTierChange?: (newTier: string) => void;
+}
+
+export function SelfServiceBilling({ 
+  tenantId, 
+  currentTier = 'starter',
+  subscriptionStatus = 'active',
+  onTierChange 
+}: SelfServiceBillingProps) {
+  const [tiers, setTiers] = useState<TierPricing[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [preview, setPreview] = useState<SubscriptionPreview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  
+  // Modal states
+  const [showAddCard, setShowAddCard] = useState(false);
+  const [showConfirmTier, setShowConfirmTier] = useState(false);
+
+  // Load data
+  useEffect(() => {
+    loadData();
+  }, [tenantId]);
+
+  // Handle PayPal return URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paypalToken = urlParams.get('paypal-token');
+    // PayPal returns 'token' (order ID) after approval
+    const tokenId = urlParams.get('token') || urlParams.get('approval_token_id') || urlParams.get('token_id');
+    
+    if (paypalToken === 'success' && tokenId) {
+      // PayPal billing agreement approved - save the payment method
+      const savePayPalMethod = async () => {
+        try {
+          setProcessing(true);
+          await subscriptionBillingService.savePayPalPaymentMethod(tokenId);
+          setSuccess('PayPal payment method added successfully!');
+          // Clean up URL
+          window.history.replaceState({}, '', window.location.pathname);
+          // Reload data
+          loadData();
+        } catch (err: any) {
+          setError(err.message || 'Failed to save PayPal payment method');
+        } finally {
+          setProcessing(false);
+        }
+      };
+      savePayPalMethod();
+    } else if (paypalToken === 'cancel') {
+      setError('PayPal authorization was cancelled');
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [tiersData, methodsData] = await Promise.all([
+        subscriptionBillingService.getTierPricing(),
+        subscriptionBillingService.getPaymentMethods(),
+      ]);
+      setTiers(Array.isArray(tiersData) ? tiersData : []);
+      setPaymentMethods(Array.isArray(methodsData) ? methodsData : []);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load billing data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Preview tier change
+  const handlePreviewTier = useCallback(async (tier: string) => {
+    if (tier === currentTier) return;
+    
+    try {
+      const previewData = await subscriptionBillingService.previewSubscriptionChange(tier, billingCycle);
+      setPreview(previewData);
+      setSelectedTier(tier);
+      setShowConfirmTier(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to preview tier change');
+    }
+  }, [currentTier, billingCycle]);
+
+  // Confirm tier change
+  const handleConfirmTierChange = async () => {
+    if (!selectedTier) return;
+
+    try {
+      setProcessing(true);
+      setError(null);
+
+      // Check if payment method is needed
+      const tier = tiers.find(t => t.tier === selectedTier);
+      const price = billingCycle === 'monthly' 
+        ? (tier?.monthlyPriceCents || 0) 
+        : (tier?.annualPriceCents || 0);
+
+      let paymentMethodId: string | undefined;
+      if (price > 0) {
+        const defaultMethod = paymentMethods.find(m => m.isDefault);
+        if (!defaultMethod) {
+          setError('Please add a payment method before subscribing');
+          setShowConfirmTier(false);
+          setShowAddCard(true);
+          return;
+        }
+        paymentMethodId = defaultMethod.id;
+      }
+
+      const result = await subscriptionBillingService.subscribe(
+        selectedTier,
+        paymentMethodId,
+        billingCycle
+      );
+
+      if (result.success) {
+        setSuccess(`Successfully subscribed to ${selectedTier} tier!`);
+        setShowConfirmTier(false);
+        onTierChange?.(selectedTier);
+        await loadData();
+      } else {
+        setError(result.error || 'Failed to subscribe');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to process subscription');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Remove payment method
+  const handleRemovePaymentMethod = async (methodId: string) => {
+    if (!confirm('Are you sure you want to remove this payment method?')) return;
+
+    try {
+      await subscriptionBillingService.removePaymentMethod(methodId);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to remove payment method');
+    }
+  };
+
+  // Set default payment method
+  const handleSetDefault = async (methodId: string) => {
+    try {
+      await subscriptionBillingService.setDefaultPaymentMethod(methodId);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to set default payment method');
+    }
+  };
+
+  // Add PayPal payment method
+  const handleAddPayPal = async () => {
+    try {
+      setProcessing(true);
+      const result = await subscriptionBillingService.createPayPalBillingAgreement();
+      console.log('[PayPal] Billing agreement result:', result);
+      // Handle nested response structure
+      const approvalUrl = (result as any)?.data?.approvalUrl || result?.approvalUrl;
+      if (approvalUrl) {
+        window.location.href = approvalUrl;
+      } else {
+        throw new Error('No approval URL returned from PayPal');
+      }
+    } catch (err: any) {
+      console.error('[PayPal] Error:', err);
+      setError(err.message || 'Failed to add PayPal');
+      setProcessing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader size="lg" />
+      </div>
+    );
+  }
+
+  const formatPrice = (cents: number) => {
+    const safeCents = cents || 0;
+    return `$${(safeCents / 100).toFixed(2)}`;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Error/Success Alerts */}
+      {error && (
+        <Alert 
+          icon={<IconAlertCircle size="1rem" />} 
+          title="Error" 
+          color="red" 
+          onClose={() => setError(null)}
+          withCloseButton
+        >
+          {error}
+        </Alert>
+      )}
+      
+      {success && (
+        <Alert 
+          icon={<IconCheck size="1rem" />} 
+          title="Success" 
+          color="green" 
+          onClose={() => setSuccess(null)}
+          withCloseButton
+        >
+          {success}
+        </Alert>
+      )}
+
+      {/* Payment Methods Section */}
+      <Card withBorder padding="lg" radius="md">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <IconCreditCard size="1.25rem" />
+              Payment Methods
+            </h3>
+            <Button 
+              size="xs" 
+              variant="light" 
+              leftSection={<IconCreditCard size="1rem" />}
+              onClick={() => setShowAddCard(true)}
+            >
+              Add Card (Stripe)
+            </Button>
+          </div>
+
+          {paymentMethods.length === 0 ? (
+            <div className="space-y-4">
+              <div className="text-center py-4 text-neutral-500">
+                <IconCreditCard size="2rem" className="mx-auto mb-2 opacity-50" />
+                <p>No saved payment methods</p>
+              </div>
+              
+              {/* Payment Options when no saved methods */}
+              <div className="space-y-3 pt-2 border-t">
+                <Text size="sm" fw={500}>Add a payment method:</Text>
+                
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    leftSection={<IconCreditCard size="1rem" />}
+                    onClick={() => setShowAddCard(true)}
+                  >
+                    Add Card (Stripe)
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {paymentMethods.map((method) => (
+                <div 
+                  key={method.id}
+                  className={`flex items-center justify-between p-4 rounded-lg border ${
+                    method.isDefault ? 'border-primary-500 bg-primary-50' : 'border-neutral-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {method.gatewayType === 'paypal' ? (
+                      <>
+                        <div className="w-10 h-6 bg-blue-600 rounded flex items-center justify-center text-white">
+                          <IconBrandPaypal size="1rem" />
+                        </div>
+                        <div>
+                          <Text size="sm" fw={500}>
+                            PayPal
+                          </Text>
+                          <Text size="xs" c="neutral">
+                            {method.paypalEmail || 'PayPal Account'}
+                            {method.isDefault && ' · Default'}
+                          </Text>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-10 h-6 bg-gradient-to-r from-blue-600 to-blue-400 rounded flex items-center justify-center text-white text-xs font-bold">
+                          {method.cardBrand?.toUpperCase() || 'CARD'}
+                        </div>
+                        <div>
+                          <Text size="sm" fw={500}>
+                            {method.cardBrand} ending in {method.cardLast4}
+                          </Text>
+                          <Text size="xs" c="neutral">
+                            Expires {method.expiryMonth}/{method.expiryYear}
+                            {method.isDefault && ' · Default'}
+                          </Text>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <Group gap="xs">
+                    {!method.isDefault && (
+                      <Button 
+                        size="xs" 
+                        variant="subtle" 
+                        onClick={() => handleSetDefault(method.id)}
+                      >
+                        Set Default
+                      </Button>
+                    )}
+                    <Button 
+                      size="xs" 
+                      variant="subtle" 
+                      color="red"
+                      onClick={() => handleRemovePaymentMethod(method.id)}
+                    >
+                      <IconTrash size="1rem" />
+                    </Button>
+                  </Group>
+                </div>
+              ))}
+              
+              {/* Add Payment Method Buttons */}
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  leftSection={<IconCreditCard size="1rem" />}
+                  onClick={() => setShowAddCard(true)}
+                >
+                  Add Card (Stripe)
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Tier Selection Section */}
+      <Card withBorder padding="lg" radius="md">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <IconStar size="1.25rem" />
+              Change Plan
+            </h3>
+            <SegmentedControl
+              value={billingCycle}
+              onChange={(value) => setBillingCycle(value as 'monthly' | 'annual')}
+              data={[
+                { label: 'Monthly', value: 'monthly' },
+                { label: 'Annual (Save 20%)', value: 'annual' },
+              ]}
+              size="xs"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {tiers.map((tier) => {
+              const price = billingCycle === 'monthly' 
+                ? (tier.monthlyPriceCents || 0)
+                : (tier.annualPriceCents || 0);
+              const isCurrent = tier.tier === currentTier;
+              const isSelected = tier.tier === selectedTier;
+
+              return (
+                <div
+                  key={tier.id}
+                  className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    isCurrent 
+                      ? 'border-primary-500 bg-primary-50' 
+                      : isSelected
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-neutral-200 hover:border-neutral-300'
+                  }`}
+                  onClick={() => !isCurrent && handlePreviewTier(tier.tier)}
+                >
+                  {isCurrent && (
+                    <Badge 
+                      color="green" 
+                      variant="filled" 
+                      className="absolute -top-2 left-4"
+                    >
+                      Current
+                    </Badge>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <h4 className="font-semibold capitalize">
+                      {tier.tier.replace(/_/g, ' ')}
+                    </h4>
+                    <div className="text-2xl font-bold">
+                      {price === 0 ? 'Free' : formatPrice(price)}
+                      {price > 0 && (
+                        <span className="text-sm font-normal text-neutral-500">
+                          /{billingCycle === 'monthly' ? 'mo' : 'yr'}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Payment methods indicator for paid tiers */}
+                    {price > 0 && (
+                      <div className="flex items-center gap-2 text-xs text-neutral-500">
+                        <span>Pay with:</span>
+                        <div className="flex items-center gap-1">
+                          <IconCreditCard size="0.875rem" />
+                          <span>Card</span>
+                        </div>
+                        <span>·</span>
+                        <div className="flex items-center gap-1 text-blue-600">
+                          <IconBrandPaypal size="0.875rem" />
+                          <span>PayPal</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <ul className="space-y-1 text-xs text-neutral-600">
+                      {(tier.features || []).slice(0, 3).map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-1">
+                          <IconCheck size="0.75rem" className="text-green-500 mt-0.5" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </Card>
+
+      {/* Add Card Modal */}
+      <Modal
+        opened={showAddCard}
+        onClose={() => setShowAddCard(false)}
+        title="Add Payment Method"
+        size="md"
+      >
+        <StripeCardForm 
+          onSuccess={async () => {
+            setShowAddCard(false);
+            await loadData();
+          }}
+          onCancel={() => setShowAddCard(false)}
+        />
+      </Modal>
+
+      {/* Confirm Tier Change Modal */}
+      <Modal
+        opened={showConfirmTier}
+        onClose={() => setShowConfirmTier(false)}
+        title="Confirm Plan Change"
+        size="md"
+      >
+        {preview && (
+          <Stack gap="md">
+            <Alert color="blue" variant="light">
+              <Text size="sm">
+                You are changing from <strong>{preview.currentTier}</strong> to <strong>{preview.newTier}</strong>
+              </Text>
+            </Alert>
+
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Text>Current plan:</Text>
+                <Text fw={500}>{formatPrice(preview.currentPrice || 0)}/{billingCycle === 'monthly' ? 'mo' : 'yr'}</Text>
+              </div>
+              <div className="flex justify-between">
+                <Text>New plan:</Text>
+                <Text fw={500}>{formatPrice(preview.newPrice || 0)}/{billingCycle === 'monthly' ? 'mo' : 'yr'}</Text>
+              </div>
+              {preview.proratedAmount !== 0 && (
+                <div className="flex justify-between pt-2 border-t">
+                  <Text>Prorated charge today:</Text>
+                  <Text fw={700} color={preview.proratedAmount > 0 ? 'red' : 'green'}>
+                    {preview.proratedAmount > 0 ? '' : '-'}{formatPrice(Math.abs(preview.proratedAmount || 0))}
+                  </Text>
+                </div>
+              )}
+            </div>
+
+            {/* Payment Method Selection - Only Stripe cards can be charged directly */}
+            {preview.newPrice > 0 && paymentMethods.filter(m => m.gatewayType === 'stripe').length > 0 && (
+              <div className="pt-2 border-t">
+                <Text size="sm" fw={500} mb="xs">Pay with saved card (Stripe):</Text>
+                <div className="space-y-2">
+                  {paymentMethods.filter(m => m.gatewayType === 'stripe' && m.isDefault).map(method => (
+                    <div key={method.id} className="flex items-center gap-2 p-2 bg-neutral-50 rounded">
+                      <div className="w-8 h-5 bg-purple-600 rounded flex items-center justify-center text-white text-xs font-bold">
+                        Stripe
+                      </div>
+                      <Text size="sm">Card ending in {method.cardLast4}</Text>
+                      {method.isDefault && (
+                        <Badge size="xs" variant="light" color="green">Default</Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* PayPal Smart Buttons - Direct Payment Option */}
+            {preview.newPrice > 0 && (
+              <div className="pt-3 border-t">
+                <Text size="xs" c="dimmed" mb="sm">Or pay directly with PayPal:</Text>
+                <PayPalSmartButtons
+                  tier={selectedTier!}
+                  billingCycle={billingCycle}
+                  amount={preview.newPrice}
+                  tenantId={tenantId}
+                  onSuccess={(result) => {
+                    setSuccess(`Successfully subscribed to ${result.tier} tier!`);
+                    setShowConfirmTier(false);
+                    onTierChange?.(result.tier);
+                    loadData();
+                  }}
+                  onError={(err) => setError(err)}
+                />
+              </div>
+            )}
+
+            {/* Card Payment Button */}
+            {preview.newPrice > 0 && paymentMethods.length > 0 && (
+              <Group justify="flex-end" mt="md">
+                <Button variant="subtle" onClick={() => setShowConfirmTier(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleConfirmTierChange} 
+                  loading={processing}
+                  leftSection={<IconCreditCard size="1rem" />}
+                >
+                  Pay with Stripe Card
+                </Button>
+              </Group>
+            )}
+          </Stack>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+// Stripe Card Form Component
+function StripeCardForm({ 
+  onSuccess, 
+  onCancel 
+}: { 
+  onSuccess: () => void; 
+  onCancel: () => void;
+}) {
+  const stripe = useStripeHook?.();
+  const elements = useElementsHook?.();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!stripe || !elements || !StripeCardElement) {
+      setError('Stripe not loaded. Please refresh and try again.');
+      return;
+    }
+
+    const cardElement = elements.getElement(StripeCardElement);
+    if (!cardElement) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Create payment method
+      const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+      });
+
+      if (stripeError) {
+        setError(stripeError.message || 'Failed to create payment method');
+        return;
+      }
+
+      // Save to backend
+      await subscriptionBillingService.addPaymentMethod({
+        gatewayType: 'stripe',
+        paymentMethodToken: paymentMethod.id,
+        cardLast4: paymentMethod.card?.last4,
+        cardBrand: paymentMethod.card?.brand,
+        expiryMonth: paymentMethod.card?.exp_month,
+        expiryYear: paymentMethod.card?.exp_year,
+      });
+
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Failed to add payment method');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <Stack gap="md">
+        {error && (
+          <Alert color="red" variant="light">
+            {error}
+          </Alert>
+        )}
+
+        <div className="p-4 border rounded-lg">
+          {StripeCardElement ? (
+            <StripeCardElement
+              options={{
+                style: {
+                  base: {
+                    fontSize: '16px',
+                    color: '#1f2937',
+                    '::placeholder': {
+                      color: '#9ca3af',
+                    },
+                  },
+                  invalid: {
+                    color: '#ef4444',
+                  },
+                },
+              }}
+            />
+          ) : (
+            <Text c="neutral.500">Loading payment form...</Text>
+          )}
+        </div>
+
+        <Group justify="flex-end">
+          <Button variant="subtle" onClick={onCancel} disabled={loading}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={loading} disabled={!stripe} leftSection={<IconCreditCard size="1rem" />}>
+            Add Card (Stripe)
+          </Button>
+        </Group>
+      </Stack>
+    </form>
+  );
+}
+
+// Wrapper component with Stripe Elements
+export function SelfServiceBillingWithStripe(props: SelfServiceBillingProps) {
+  const [stripeLoaded, setStripeLoaded] = useState(false);
+  const [stripeAvailable, setStripeAvailable] = useState(false);
+
+  useEffect(() => {
+    loadStripePackages().then(available => {
+      setStripeAvailable(available);
+      setStripeLoaded(true);
+    });
+  }, []);
+
+  // Show loading state
+  if (!stripeLoaded) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader size="lg" />
+      </div>
+    );
+  }
+
+  // Stripe not configured - show billing UI with info banner
+  if (!stripeAvailable || !StripeElements || !stripePromise) {
+    return (
+      <div className="space-y-4">
+        <Alert color="blue" title="Payment Processing Not Configured" icon={<IconAlertCircle size="1rem" />}>
+          <Text size="sm">
+            Online payments are not yet configured for this platform. You can still view your subscription and tier options.
+            Contact support to add a payment method.
+          </Text>
+        </Alert>
+        <SelfServiceBilling {...props} />
+      </div>
+    );
+  }
+
+  // Stripe configured - wrap with Elements
+  return (
+    <StripeElements stripe={stripePromise}>
+      <SelfServiceBilling {...props} />
+    </StripeElements>
+  );
+}

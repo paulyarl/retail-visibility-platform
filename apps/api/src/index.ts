@@ -111,6 +111,7 @@ import rateLimitWarningsRoutes from './routes/rate-limit-warnings';
    import taxonomyAdminRoutes from './routes/taxonomy-admin';
    import feedValidationRoutes from './routes/feed-validation';
    import businessProfileValidationRoutes from './routes/business-profile-validation';
+import trialSetupRoutes from './routes/tenant/trial-setup';
 
 import cacheRoutes from './routes/cache';
 
@@ -421,19 +422,62 @@ app.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res) =
       return res.json(cachedResult)
     }
 
-    // Get business hours data
-    const hoursRow = await prisma.business_hours_list.findUnique({ 
-      where: { tenant_id: tenantId } 
+    // Get tenant location status first to override hours-based status
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { location_status: true, closure_reason: true, reopening_date: true }
     });
-    
+
+    // If tenant has non-active location status, return that status instead of hours-based status
+    if (tenant?.location_status && tenant.location_status !== 'active') {
+      const { getLocationStatusInfo } = await import('./utils/location-status');
+      const statusInfo = getLocationStatusInfo(tenant.location_status as any);
+
+      let label = statusInfo.label;
+      if (tenant.closure_reason) {
+        label = `${statusInfo.label} - ${tenant.closure_reason}`;
+      }
+      if (tenant.reopening_date) {
+        const reopenDate = new Date(tenant.reopening_date);
+        label += ` (Reopens ${reopenDate.toLocaleDateString()})`;
+      }
+
+      const result = {
+        success: true,
+        data: {
+          isOpen: false,
+          status: 'closed', // Frontend expects 'closed' for non-active status
+          label,
+          locationStatus: tenant.location_status, // Actual location status for reference
+          statusInfo: {
+            showStorefront: statusInfo.showStorefront,
+            showInDirectory: statusInfo.showInDirectory,
+            description: statusInfo.description,
+            icon: statusInfo.icon,
+            color: statusInfo.color
+          },
+          reopeningDate: tenant.reopening_date?.toISOString() || null,
+          closureReason: tenant.closure_reason || null
+        }
+      };
+
+      memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS);
+      return res.json(result);
+    }
+
+    // Get business hours data
+    const hoursRow = await prisma.business_hours_list.findUnique({
+      where: { tenant_id: tenantId }
+    });
+
     if (!hoursRow) {
-      const result = { 
-        success: true, 
-        data: { 
-          isOpen: false, 
-          status: 'closed', 
-          label: 'Closed' 
-        } 
+      const result = {
+        success: true,
+        data: {
+          isOpen: false,
+          status: 'closed',
+          label: 'Closed'
+        }
       }
       // Cache the result
       memoryCache.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
@@ -441,15 +485,15 @@ app.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res) =
     }
 
     // Get special hours
-    const specialHours = await prisma.business_hours_special_list.findMany({ 
-      where: { tenant_id: tenantId }, 
-      orderBy: { date: 'asc' } 
+    const specialHours = await prisma.business_hours_special_list.findMany({
+      where: { tenant_id: tenantId },
+      orderBy: { date: 'asc' }
     });
 
     // Build hours object
     const periods = hoursRow.periods as any[] || [];
     const hours: any = { timezone: hoursRow.timezone };
-    
+
     // Convert periods to day-based format for computeStoreStatus
     periods.forEach((period: any) => {
       const dayName = period.day?.toLowerCase();
@@ -460,12 +504,12 @@ app.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res) =
         };
       }
     });
-    
+
     // Include periods array for updated computeStoreStatus
     if (periods.length > 0) {
       hours.periods = periods;
     }
-    
+
     // Add special hours
     if (specialHours.length > 0) {
       hours.special = specialHours.map((sh: any) => ({
@@ -480,14 +524,14 @@ app.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res) =
     // Import and use computeStoreStatus
     const { computeStoreStatus } = await import('./lib/hours-utils');
     const status = computeStoreStatus(hours);
-    
-    const result = { 
-      success: true, 
-      data: status || { 
-        isOpen: false, 
-        status: 'closed', 
-        label: 'Closed' 
-      } 
+
+    const result = {
+      success: true,
+      data: status || {
+        isOpen: false,
+        status: 'closed',
+        label: 'Closed'
+      }
     }
 
     // Cache the result
@@ -496,9 +540,9 @@ app.get('/api/public/tenant/:tenantId/business-hours/status', async (req, res) =
     res.json(result);
   } catch (error) {
     console.error('Error computing store status:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to compute store status' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to compute store status'
     });
   }
 });
@@ -1292,6 +1336,17 @@ app.patch("/api/tenants/:id/status", authenticateToken, checkTenantAccess, async
       });
 
     // TODO: Send notifications (Phase 6)
+
+    // Invalidate UniversalIdentifierCache so public API returns fresh data
+    try {
+      const { UniversalIdentifierCache } = await import('./services/UniversalIdentifierCache');
+      const cache = UniversalIdentifierCache.getInstance();
+      await cache.invalidateTenant(id as string);
+      console.log(`[PATCH /tenants/${id}/status] Cache invalidated for tenant ${id}`);
+    } catch (cacheError) {
+      console.error(`[PATCH /tenants/${id}/status] Failed to invalidate cache:`, cacheError);
+      // Don't fail the request if cache invalidation fails
+    }
 
     const responseTime = Date.now() - startTime;
     console.log(`[PATCH /tenants/${id}/status] Completed successfully in ${responseTime}ms`);
@@ -7091,6 +7146,10 @@ app.get('/api/data/bulk-operations', authenticateToken, requirePermission('CAN_B
 });
 console.log('✅ Bulk operations route mounted at /api/data/bulk-operations (CAN_BULK_OPERATIONS)');
 
+/* ------------------------------ tenant trial setup ------------------------------ */
+app.use('/api/t', trialSetupRoutes);
+console.log(' Tenant trial setup routes mounted at /api/t');
+
 /* ------------------------------ tenant categories (GBP) ------------------------------ */
 app.use('/api/tenant', authenticateToken, tenantCategoriesRoutes);
 console.log('✅ Tenant categories routes mounted at /api/tenant');
@@ -7191,6 +7250,16 @@ import queueRoutes from './routes/queue-routes';
 app.use('/api/queue', queueRoutes);
 console.log('✅ Product queue routes mounted at /api/queue');
 
+/* ------------------------------ subscription billing ------------------------------ */
+import subscriptionBillingRoutes from './routes/subscription-billing';
+app.use('/api/subscription', subscriptionBillingRoutes);
+console.log('✅ Subscription billing routes mounted at /api/subscription');
+
+/* ------------------------------ stripe webhooks ------------------------------ */
+import stripeWebhookRoutes from './routes/stripe-webhook';
+app.use('/api/webhooks/stripe', stripeWebhookRoutes);
+console.log('✅ Stripe webhook routes mounted at /api/webhooks/stripe');
+
 // Sentry error handler must be after all routes but before other error handlers
 if (sentryEnabled) {
   Sentry.setupExpressErrorHandler(app);
@@ -7231,6 +7300,15 @@ if (process.env.NODE_ENV !== "test") {
         console.log('🔑 OAuth token refresh started (every hour)');
       } catch (err) {
         console.error('⚠️ Failed to start OAuth token refresh:', err);
+      }
+
+      // Start subscription grace period job (daily at midnight)
+      try {
+        const { startGracePeriodJob } = await import('./jobs/subscription-grace-period');
+        startGracePeriodJob();
+        console.log('💸 Subscription grace period job started (daily at midnight)');
+      } catch (err) {
+        console.error('⚠️ Failed to start grace period job:', err);
       }
     });
 

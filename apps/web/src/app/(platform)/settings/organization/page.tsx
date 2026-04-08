@@ -473,6 +473,39 @@ export default function OrganizationPage() {
         {/* 2. KEY METRICS - Unified Capacity Display */}
         <SubscriptionUsageBadge variant="card" showUpgradeLink={true} />
 
+        {/* 2.5. ORGANIZATION BILLING - Payment & Invoices */}
+        <Card withBorder padding="lg" radius="md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold text-neutral-900">Organization Billing</h3>
+                <p className="text-sm text-neutral-600">Manage payment methods, view invoices, and upgrade your organization plan</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="light"
+                size="sm"
+                onClick={() => window.location.href = '/settings/subscription'}
+              >
+                Manage Plan
+              </Button>
+              <Button
+                variant="light"
+                size="sm"
+                onClick={() => window.location.href = '/settings/billing/invoices'}
+              >
+                View Invoices
+              </Button>
+            </div>
+          </div>
+        </Card>
+
         {/* 3. QUICK ACTIONS - Primary CTAs */}
         <Card withBorder padding="lg" radius="md">
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">

@@ -778,11 +778,12 @@ router.get('/tenant/:identifier', async (req, res) => {
           created_at: true,
           language: true,
           currency: true,
-          region: true, 
+          region: true,
           trial_ends_at: true,
-          subscription_ends_at: true, 
-          organization_id: true,           
-          location_status: true
+          subscription_ends_at: true,
+          organization_id: true,
+          location_status: true,
+          status_changed_at: true
         }
       });
 
@@ -832,14 +833,60 @@ router.get('/tenant/:identifier', async (req, res) => {
     // Return basic tenant information
     res.setHeader('Cache-Control', 'public, max-age=900'); // 15 min cache
     res.setHeader('X-Service-Source', 'Universal-Identifier-Cache');
-    
+
+    // Compute subscription status info for panel display
+    const subscriptionStatus = tenant?.subscription_status || resolvedTenant.subscriptionStatus;
+    const organizationId = tenant?.organization_id;
+    const statusChangedAt = tenant?.status_changed_at;
+
+    // Determine if subscription status should trigger panel
+    let subscriptionStatusInfo: any = null;
+    let showSubscriptionPanel = false;
+
+    if (subscriptionStatus === 'canceled' && !organizationId) {
+      // Canceled and not part of an organization - show panel
+      showSubscriptionPanel = true;
+      subscriptionStatusInfo = {
+        status: 'canceled',
+        label: 'Subscription Canceled',
+        description: 'This store\'s subscription has been canceled and is no longer active.',
+        showStorefront: false,
+        showInDirectory: false
+      };
+    } else if (subscriptionStatus === 'past_due' && statusChangedAt) {
+      // Past due - check if 30-day grace period has passed
+      const gracePeriodEnd = new Date(statusChangedAt);
+      gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 30);
+      const now = new Date();
+
+      if (now > gracePeriodEnd) {
+        showSubscriptionPanel = true;
+        subscriptionStatusInfo = {
+          status: 'past_due',
+          label: 'Subscription Past Due',
+          description: 'This store\'s subscription is past due. Please contact the store owner.',
+          showStorefront: false,
+          showInDirectory: false,
+          gracePeriodEnded: true
+        };
+      }
+    }
+
     res.json({
       success: true,
       data: {
         id: resolvedTenant.id,
         name: resolvedTenant.name,
         slug: resolvedTenant.slug,
-        subscriptionStatus: resolvedTenant.subscriptionStatus,
+        subscriptionStatus: subscriptionStatus,
+        subscriptionTier: resolvedTenant.subscriptionTier,
+        trialEndsAt: resolvedTenant.trialEndsAt,
+        locationStatus: resolvedTenant.locationStatus,
+        statusInfo: resolvedTenant.statusInfo,
+        organizationId: organizationId,
+        statusChangedAt: statusChangedAt?.toISOString() || null,
+        subscriptionStatusInfo: subscriptionStatusInfo,
+        showSubscriptionPanel: showSubscriptionPanel,
         hasDirectory: hasDirectory,
         directoryData: tenantResult,
         profileData: profileResult,

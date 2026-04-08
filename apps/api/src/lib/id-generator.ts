@@ -59,7 +59,7 @@ export function generateCategoryMirrorId(catId: string,tenantId: string = 'tid')
  */
 export function generateItemId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 8);
-  return `sid-${nanoid()}`;
+  return `pid-${nanoid()}`;
 }
 // id: `ciid_${tenantId}_${user.id}`,
 /**
@@ -111,7 +111,7 @@ export function generateQuickStartSku(index?: number): string {
  */
 export function generatePhotoId(tenantId?: string,itemId?: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `pid-${tenantId}-${itemId}-${nanoid()}`;
+  return `phid-${tenantId}-${itemId}-${nanoid()}`;
 }
 
 /**
@@ -201,7 +201,7 @@ export function generateCloverCatId(): string {
  */
 export function generateCloverOauthChangeLogId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `ocid-${nanoid()}`;
+  return `cocid-${nanoid()}`;
 }
 
 /**
@@ -210,7 +210,7 @@ export function generateCloverOauthChangeLogId(): string {
  */
 export function generateCloverSyncLogId(): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
-  return `csid-${nanoid()}`;
+  return `cpid-${nanoid()}`;
 }
 
 /**
@@ -344,6 +344,42 @@ export async function generateOrderNumber(tenantId: string): Promise<string> {
 export function generatePaymentId(tenantId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 10);
   return `pay-${tenantId}-${nanoid()}`;
+}
+
+/**
+ * Generates billing method IDs (merchant payment methods)
+ * Format: mbg-tid-abc123 (16 chars)
+ */
+export function generateBillingMethodId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `mbg-${tenantId}-${nanoid()}`;
+}
+
+/**
+ * Generates subscription invoice IDs
+ * Format: inv-tid-abc123 (15 chars)
+ */
+export function generateInvoiceId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `inv-${tenantId}-${nanoid()}`;
+}
+
+/**
+ * Generates subscription payment IDs
+ * Format: spay-invoiceId-abc (16 chars)
+ */
+export function generateSubscriptionPaymentId(invoiceId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
+  return `spay-${invoiceId}-${nanoid()}`;
+}
+
+/**
+ * Generates tier pricing IDs
+ * Format: tpr-abc123 (10 chars)
+ */
+export function generateTierPricingId(): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `tpr-${nanoid()}`;
 }
 
 /**

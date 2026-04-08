@@ -21,6 +21,8 @@ import ProductCategoriesCollapsible from '@/components/directory/ProductCategori
 import SmartProductCard from '@/components/products/SmartProductCard';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { externalApiService } from '@/services/ExternalApiService';
+import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
+import { tenantPublicService } from '@/services/TenantPublicService';
 
 // tenant public data
 import { directoryService } from '@/services/DirectorySingletonService';
@@ -461,6 +463,17 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
   const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
   const currentUrl = `${baseUrl}/directory/${identifier}`;
 
+  // Fetch tenant info for status panel
+  const tenantInfo = await tenantPublicService.getPublicTenantInfo(listing.tenantId);
+
+  // Server-side check: show panel for google_only tier, non-active status, or subscription issues
+  const showStatusPanel = tenantInfo ? (
+    tenantInfo.subscriptionTier === 'google_only' ||
+    (tenantInfo.locationStatus && tenantInfo.locationStatus !== 'active') ||
+    (tenantInfo.statusInfo && !tenantInfo.statusInfo.showStorefront) ||
+    tenantInfo.showSubscriptionPanel === true
+  ) : false;
+
   // For RelatedStores, we need the slug (not tenant ID)
   const slugForRelated = identifier.startsWith('tid-') ? listing.slug : identifier;
 
@@ -492,83 +505,89 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
             </Link>
             
             
-            {/* Visit Storefront Hero Banner */}
-            <div className="mt-4 bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-100 border-2 border-blue-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-8 sm:px-8 sm:py-10 text-center">
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
-                  Shop {listing.businessName}
-                </h2>
-                <p className="text-gray-700 mb-6 text-sm sm:text-base max-w-2xl mx-auto">
-                  Browse {(listing.productCount ?? 0) > 0 ? `${listing.productCount} products` : 'our full catalog'} and shop directly from their online storefront
-                </p>
-                <Link
-                  href={`${slugForRelated ? `/tenant/${slugForRelated}` : `/tenant/${listing.tenantId}`}`}
-                  className="inline-flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-lg shadow-md"
-                >
-                  <Globe className="w-5 h-5" />
-                  Visit Storefront
-                </Link>
+            {/* Status Panel or Visit Storefront Hero Banner */}
+            {showStatusPanel && tenantInfo ? (
+              <div className="mt-4">
+                <StorefrontStatusPanel tenantInfo={tenantInfo} />
               </div>
-              <div className="px-4 py-4 lg:px-4 lg:py-4 text-center">
+            ) : (
+              <div className="mt-4 bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-100 border-2 border-blue-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-6 py-8 sm:px-8 sm:py-10 text-center">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+                    Shop {listing.businessName}
+                  </h2>
+                  <p className="text-gray-700 mb-6 text-sm sm:text-base max-w-2xl mx-auto">
+                    Browse {(listing.productCount ?? 0) > 0 ? `${listing.productCount} products` : 'our full catalog'} and shop directly from their online storefront
+                  </p>
+                  <Link
+                    href={`${slugForRelated ? `/tenant/${slugForRelated}` : `/tenant/${listing.tenantId}`}`}
+                    className="inline-flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-lg shadow-md"
+                  >
+                    <Globe className="w-5 h-5" />
+                    Visit Storefront
+                  </Link>
+                </div>
+                <div className="px-4 py-4 lg:px-4 lg:py-4 text-center">
 
-                
-             {/* Hours Badge - Status */}
-                        {(() => {
-                          switch (storeStatus?.status) {
-                            case 'open':
-                              return (
-                                <MantineBadge 
-                                  color="green"
-                                  variant="light"
-                                  size="lg"
-                                  className="animate-pulse"
-                                  title={storeStatus?.label || 'Open now'}
-                                >
-                                  🟢 Open
-                                </MantineBadge>
-                              );
-                            case 'closed':
-                              return (
-                                <MantineBadge 
-                                  color="red"
-                                  variant="light"
-                                  size="lg"
-                                  className="animate-bounce"
-                                  title={storeStatus?.label || 'Closed'}
-                                >
-                                  🔴 Closed
-                                </MantineBadge>
-                              );
-                            case 'opening-soon':
-                              return (
-                                <MantineBadge 
-                                  color="blue"
-                                  variant="filled"
-                                  size="lg"
-                                  className="animate-ping"
-                                  title={storeStatus?.label || 'Opening soon'}
-                                >
-                                  🟡 Opening
-                                </MantineBadge>
-                              );
-                            case 'closing-soon':
-                              return (
-                                <MantineBadge 
-                                  color="orange"
-                                  variant="filled"
-                                  size="lg"
-                                  className="animate-ping"
-                                  title={storeStatus?.label || 'Closing soon'}
-                                >
-                                  🟡 Closing
-                                </MantineBadge>
-                              );
-                            default:
-                              return null;
-                          }
-                        })()} {storeStatus?.label}
+                  
+               {/* Hours Badge - Status */}
+                          {(() => {
+                            switch (storeStatus?.status) {
+                              case 'open':
+                                return (
+                                  <MantineBadge 
+                                    color="green"
+                                    variant="light"
+                                    size="lg"
+                                    className="animate-pulse"
+                                    title={storeStatus?.label || 'Open now'}
+                                  >
+                                    &#x1F7E2; Open
+                                  </MantineBadge>
+                                );
+                              case 'closed':
+                                return (
+                                  <MantineBadge 
+                                    color="red"
+                                    variant="light"
+                                    size="lg"
+                                    className="animate-bounce"
+                                    title={storeStatus?.label || 'Closed'}
+                                  >
+                                    &#x1F534; Closed
+                                  </MantineBadge>
+                                );
+                              case 'opening-soon':
+                                return (
+                                  <MantineBadge 
+                                    color="blue"
+                                    variant="filled"
+                                    size="lg"
+                                    className="animate-ping"
+                                    title={storeStatus?.label || 'Opening soon'}
+                                  >
+                                    &#x1F7E1; Opening
+                                  </MantineBadge>
+                                );
+                              case 'closing-soon':
+                                return (
+                                  <MantineBadge 
+                                    color="orange"
+                                    variant="filled"
+                                    size="lg"
+                                    className="animate-ping"
+                                    title={storeStatus?.label || 'Closing soon'}
+                                  >
+                                    &#x1F7E1; Closing
+                                  </MantineBadge>
+                                );
+                              default:
+                                return null;
+                            }
+                          })()} {storeStatus?.label}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -676,11 +695,8 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                 </div>
               </div>
 
-              {/* Featured Products - MOVED UP FOR CONVERSION! */}
-              {(() => {
-                //console.log('[Directory Page] Rendering featured products check:', featuredProducts.length);
-                return featuredProducts.length > 0;
-              })() && (
+              {/* Featured Products - hidden when status panel shows */}
+              {!showStatusPanel && featuredProducts.length > 0 && (
                 <TenantPaymentProvider tenantId={listing.tenantId}>
                   <div className="bg-white rounded-lg shadow-sm p-6">
                     <div className="flex items-center justify-between mb-6">

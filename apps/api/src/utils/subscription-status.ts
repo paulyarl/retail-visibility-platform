@@ -11,7 +11,7 @@ export type InternalStatus =
   | 'active'        // Paid subscription in good standing
   | 'past_due'      // Payment failed, within grace period
   | 'maintenance'   // google_only tier, can maintain but not grow
-  | 'frozen'        // Read-only visibility mode
+  | 'frozen'        // Read-only visibility mode (expired_trial)
   | 'canceled'      // Explicitly canceled
   | 'expired';      // Trial or subscription expired
 
@@ -71,10 +71,10 @@ export function getMaintenanceState(ctx: MaintenanceContext): MaintenanceState {
  * This is the single source of truth for determining what a tenant can do.
  * 
  * Lifecycle:
- * 1. Trial (14 days) → Full access within tier limits
- * 2. Trial expires → Auto-downgrade to google_only (maintenance tier)
- * 3. Maintenance (google_only + within trialEndsAt) → Can maintain, no growth
- * 4. Freeze (google_only + past trialEndsAt OR canceled/expired) → Read-only
+ * 1. Trial (14 days) -> Full access within tier limits
+ * 2. Trial ends -> Auto-charge payment method
+ * 3. Grace period (14 days) -> Retry payment every 3 days
+ * 4. Grace expires -> Auto-downgrade to expired_trial (invisible on public pages)
  * 
  * @param tenant - Tenant object with subscription fields
  * @returns InternalStatus enum value
@@ -89,22 +89,27 @@ export function deriveInternalStatus(tenant: {
   const status = tenant.subscription_status || 'active';
   const tier = tenant.subscription_tier || 'starter';
 
-  // 1. Check for explicit canceled status
+  // 1. Check for expired_trial tier (invisible on public pages)
+  if (tier === 'expired_trial') {
+    return 'frozen';
+  }
+
+  // 2. Check for explicit canceled status
   if (status === 'canceled') {
     return 'canceled';
   }
 
-  // 2. Check for explicit expired status
+  // 3. Check for explicit expired status
   if (status === 'expired') {
     return 'expired';
   }
 
-  // 3. Check for past_due status (payment failed, grace period)
+  // 4. Check for past_due status (payment failed, grace period)
   if (status === 'past_due') {
     return 'past_due';
   }
 
-  // 4. Check for active trial
+  // 5. Check for active trial
   if (status === 'trial') {
     // If trial hasn't expired yet, it's trialing
     if (!tenant.trialEndsAt || tenant.trialEndsAt > now) {
@@ -115,27 +120,17 @@ export function deriveInternalStatus(tenant: {
     return 'expired';
   }
 
-  // 5. Check for active paid subscription
+  // 6. Check for active paid subscription
   if (status === 'active') {
     // Check if subscription has expired
     if (tenant.subscription_ends_at && tenant.subscription_ends_at < now) {
       return 'expired';
     }
 
-    // Check if this is google_only tier (internal maintenance tier)
+    // Check if this is google_only tier (paid tier, not maintenance)
     if (tier === 'google_only') {
-      // google_only is maintenance tier for expired trials
-      // Check if still within maintenance window (uses trialEndsAt as boundary)
-      const maintenanceState = getMaintenanceState({
-        tier,
-        status,
-        trialEndsAt: tenant.trialEndsAt,
-      });
-
-      if (maintenanceState === 'freeze') {
-        return 'frozen';
-      }
-      return 'maintenance';
+      // google_only is now a paid tier ($29/mo), not a downgrade target
+      return 'active';
     }
 
     // Regular paid tier with active subscription

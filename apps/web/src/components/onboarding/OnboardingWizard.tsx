@@ -17,6 +17,8 @@ import { useOnboardingSteps } from '@/hooks/useOnboardingSteps';
 import { useOnboardingSave } from '@/hooks/useOnboardingSave';
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
 import { onboardingStateService } from '@/services/OnboardingStateService';
+import { trialService } from '@/services/TrialService';
+import TrialSetupModal from './TrialSetupModal';
 
 interface OnboardingWizardProps {
   tenantId: string;
@@ -48,6 +50,7 @@ export default function OnboardingWizard({
 }: OnboardingWizardProps) {
   const router = useRouter();
   const search = useSearchParams();
+  const [showTrialModal, setShowTrialModal] = useState(false);
   
   // Parse URL params
   const forceParam = search?.get('force');
@@ -57,6 +60,10 @@ export default function OnboardingWizard({
   // Determine if we should skip account step
   const isComingFromPhase1 = fromPhase1 || onboardingStateService.isComingFromPhase1();
   const skipAccountStep = propSkipAccountStep || isComingFromPhase1;
+
+  // Check if tenant can start trial (not already subscribed)
+  const [canStartTrial, setCanStartTrial] = useState(true);
+  const [tenantSubscription, setTenantSubscription] = useState<any>(null);
   
   // Use appropriate steps array
   const steps = skipAccountStep ? phase2Steps : fullSteps;
@@ -68,9 +75,8 @@ export default function OnboardingWizard({
   const { 
     data: businessData, 
     setData: setBusinessData, 
-    loading, 
-    error: loadError, 
-    initialStep: loadedStep 
+    loading: dataLoading, 
+    error: dataError 
   } = useOnboardingData({ 
     tenantId, 
     forced, 
@@ -78,16 +84,35 @@ export default function OnboardingWizard({
     phase1Data: skipAccountStep ? (onboardingStateService.getPhase1DataForPhase2() as Partial<BusinessProfile>) : undefined,
   });
   
+  // Check tenant subscription status
+  useEffect(() => {
+    const checkSubscription = async () => {
+      try {
+        const data = await trialService.getTrialStatus(tenantId);
+        setTenantSubscription(data);
+        setCanStartTrial(data.canStartTrial);
+      } catch (error) {
+        console.error('Failed to check subscription status:', error);
+        // Default to showing trial option if we can't check
+        setCanStartTrial(true);
+      }
+    };
+
+    if (tenantId) {
+      checkSubscription();
+    }
+  }, [tenantId]);
+
   // Manage step navigation with localStorage persistence
   const { 
     currentStep, 
-    goNext, 
+    setStep, 
     goBack, 
-    setStep 
+    goNext 
   } = useOnboardingSteps({ 
     tenantId, 
-    initialStep: loadedStep, 
-    businessData, 
+    initialStep: effectiveInitialStep, 
+    businessData,
     forced 
   });
   
@@ -142,7 +167,7 @@ export default function OnboardingWizard({
   }, [tenantId]);
   
   // Combined error state
-  const error = loadError || saveError;
+  const error = dataError || saveError;
   
   // Handlers
   const handleNext = async () => {
@@ -173,6 +198,25 @@ export default function OnboardingWizard({
     if (onComplete) {
       onComplete(businessData);
     } else {
+      // Show trial modal instead of direct redirect
+      setShowTrialModal(true);
+    }
+  };
+
+  const handleStartTrial = async (selectedTier: string) => {
+    try {
+      // Call trial setup API through service
+      const result = await trialService.activateTrial(tenantId, {
+        trialTier: selectedTier as any,
+      });
+      
+      console.log('Trial activated:', result);
+      
+      // Redirect to dashboard with success message
+      router.push(`/t/${tenantId}/dashboard?trialActivated=true`);
+    } catch (error) {
+      console.error('Trial setup error:', error);
+      // Still redirect to dashboard
       router.push(`/t/${tenantId}/dashboard`);
     }
   };
@@ -186,7 +230,7 @@ export default function OnboardingWizard({
   };
   
   // Show loading state
-  if (loading) {
+  if (dataLoading) {
     return (
       <div className="relative min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center p-4">
         <div className="text-center">
@@ -409,6 +453,117 @@ export default function OnboardingWizard({
                   </motion.div>
                 )}
 
+                {/* Trial Promotion Card */}
+                {canStartTrial && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-6 max-w-md mx-auto mb-6"
+                  >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-amber-100 rounded-lg">
+                      <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-amber-900">Start Your Free Trial</h3>
+                      <p className="text-sm text-amber-700">Unlock premium features for 14 days</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-sm text-amber-800">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Up to 2000 SKUs</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Multiple locations</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Advanced analytics</span>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={() => setShowTrialModal(true)} 
+                    className="w-full mt-4 bg-amber-600 hover:bg-amber-700 text-white border-amber-600"
+                  >
+                    Start Free Trial
+                  </Button>
+                  </motion.div>
+                )}
+
+                {/* Subscription Status for Existing Subscribers */}
+                {!canStartTrial && tenantSubscription && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className={`rounded-xl p-6 max-w-md mx-auto mb-6 border ${
+                      tenantSubscription.hasActiveTrial 
+                        ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'
+                        : 'bg-gradient-to-r from-orange-50 to-red-50 border-orange-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`p-2 rounded-lg ${
+                        tenantSubscription.hasActiveTrial ? 'bg-green-100' : 'bg-orange-100'
+                      }`}>
+                        <svg className={`w-6 h-6 ${
+                          tenantSubscription.hasActiveTrial ? 'text-green-600' : 'text-orange-600'
+                        }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          {tenantSubscription.hasActiveTrial ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          )}
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className={`text-lg font-semibold ${
+                          tenantSubscription.hasActiveTrial ? 'text-green-900' : 'text-orange-900'
+                        }`}>
+                          {tenantSubscription.hasActiveTrial ? 'Premium Plan Active' : 'Subscription Expired'}
+                        </h3>
+                        <p className={`text-sm ${
+                          tenantSubscription.hasActiveTrial ? 'text-green-700' : 'text-orange-700'
+                        }`}>
+                          {tenantSubscription.trialTier ? 'Trial in progress' : 'Subscription active'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className={`text-sm mb-4 ${
+                      tenantSubscription.hasActiveTrial ? 'text-green-800' : 'text-orange-800'
+                    }`}>
+                      {tenantSubscription.trialEndsAt && (
+                        <p>Trial ends: {new Date(tenantSubscription.trialEndsAt).toLocaleDateString()}</p>
+                      )}
+                      <p>Status: {tenantSubscription.subscriptionStatus}</p>
+                    </div>
+                    
+                    {/* Renewal Action for Expired Trials */}
+                    {!tenantSubscription.hasActiveTrial && (
+                      <Button 
+                        onClick={() => router.push(`/t/${tenantId}/settings/billing`)}
+                        className="w-full bg-orange-600 hover:bg-orange-700 text-white border-orange-600"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                        </svg>
+                        Renew Subscription
+                      </Button>
+                    )}
+                  </motion.div>
+                )}
+
                 <div className="space-y-3">
                   <div className="flex items-center justify-center gap-2 text-sm text-neutral-600">
                     <svg className="w-5 h-5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -488,7 +643,15 @@ export default function OnboardingWizard({
           {currentStep === 5 && (
             <div className="mt-8">
               {/* Primary Actions */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              <div className={`grid gap-3 mb-4 ${canStartTrial ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
+                {canStartTrial && (
+                  <Button variant="secondary" onClick={() => setShowTrialModal(true)} className="bg-amber-600 hover:bg-amber-700 text-white border-amber-600">
+                    <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                    </svg>
+                    Start Free Trial
+                  </Button>
+                )}
                 <Button onClick={() => router.push(`/t/${tenantId}/dashboard`)}>
                   Go to Tenant Dashboard
                   <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -496,7 +659,7 @@ export default function OnboardingWizard({
                   </svg>
                 </Button>
                 <Button variant="primary" onClick={() => router.push(`/t/${tenantId}/quick-start`)}>
-                  🚀 Quick Start (Recommended)
+                  Quick Start (Recommended)
                 </Button>
               </div>
               
@@ -556,6 +719,14 @@ export default function OnboardingWizard({
             </a>
           </p>
         </motion.div>
+
+        {/* Trial Setup Modal */}
+        <TrialSetupModal
+          isOpen={showTrialModal}
+          onClose={() => setShowTrialModal(false)}
+          onStartTrial={handleStartTrial}
+          tenantId={tenantId}
+        />
       </div>
     </div>
   );

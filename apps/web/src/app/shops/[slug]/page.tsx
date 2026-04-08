@@ -12,6 +12,7 @@ import ShopProfileClient from './ShopProfileClient';
 import { shopsService } from '@/services/ShopsService';
 import { tenantPublicService } from '@/services/TenantPublicService';
 import { publicDirectoryService } from '@/services/PublicDirectoryService';
+import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
 
 // Types
 interface ShopData {
@@ -151,51 +152,80 @@ function ShopProfileSkeleton() {
 // Main Page Component
 export default async function ShopProfilePage({ params, searchParams }: ShopProfilePageProps) {
   const { slug } = await params;
-  // console.log('[ShopProfilePage] Params:', { slug });
-  // console.log('[ShopProfilePage] Search Params:', { searchParams });
-  // console.log('[ShopProfilePage] Fetching shop for slug:', slug);
-  
-  // Fetch shop data using singleton service
-  const shop = await getShopBySlug(slug);
-  
-  // console.log('[ShopProfilePage] Shop response:', {
-  //   hasShop: !!shop,
-  //   shopSuccess: shop?.success,
-  //   hasData: !!shop?.data,
-  //   dataSuccess: shop?.data?.success,
-  //   hasInnerData: !!shop?.data?.data,
-  //   innerDataId: shop?.data?.data?.id,
-  //   innerDataName: shop?.data?.data?.name,
-  //   innerDataKeys: shop?.data?.data ? Object.keys(shop.data.data) : 'null',
-  //   fullShop: JSON.stringify(shop, null, 2)
-  // });
-  //  const idResolvedBySlug = await publicDirectoryService.resolveBySlug(tenantId);
-  //     const tenant = await tenantPublicService.getPublicTenantInfo(idResolvedBySlug);
-  //     const hoursResponse = await tenantPublicService.getBusinessHours(idResolvedBySlug);
-      
-  
-  // Fetch business hours using singleton service
+
+  // First, resolve tenant ID and fetch tenant info from base tables
+  // This works even when MV excludes non-active tenants
   let businessHours = null;
-  // console.log('[ShopProfilePage] Shop:', shop);
-  if (shop?.success && shop?.data?.data?.id) {
-    try {
-      // console.log('[ShopProfilePage] Resolving slug:', slug);
-      const idResolvedBySlug = await publicDirectoryService.resolveBySlug(slug);
-      // console.log('[ShopProfilePage] Resolved ID:', idResolvedBySlug);
-      businessHours = await tenantPublicService.getBusinessHours(idResolvedBySlug);
-      // console.log('[ShopProfilePage] Business hours:', businessHours);
-      // console.log('[ShopProfilePage] Business hours:', {
-      //   hasHours: !!businessHours,
-      //   hoursData: JSON.stringify(businessHours, null, 2)
-      // });
-    } catch (error) {
-      console.error('Error fetching business hours:', error);
+  let tenantInfo = null;
+  let tenantId: string | null = null;
+
+  try {
+    tenantId = await publicDirectoryService.resolveBySlug(slug);
+    if (tenantId) {
+      businessHours = await tenantPublicService.getBusinessHours(tenantId);
+      tenantInfo = await tenantPublicService.getPublicTenantInfo(tenantId);
     }
+  } catch (error) {
+    console.error('Error fetching tenant info:', error);
   }
-  
-  // If no shop found, show not found page
+
+  // Check if tenant has non-active status - show status panel instead of "not found"
+  const showStatusPanel = tenantInfo ? (
+    tenantInfo.subscriptionTier === 'google_only' ||
+    (tenantInfo.locationStatus && tenantInfo.locationStatus !== 'active') ||
+    (tenantInfo.statusInfo && !tenantInfo.statusInfo.showStorefront) ||
+    tenantInfo.showSubscriptionPanel === true
+  ) : false;
+
+  // For non-active tenants, construct minimal shop object from tenantInfo
+  // This allows full page layout with status panel
+  if (showStatusPanel && tenantInfo) {
+    const profileData = tenantInfo.profileData || {};
+    const minimalShopData: ShopData = {
+      id: tenantInfo.id,
+      name: tenantInfo.name,
+      slug: tenantInfo.slug || slug,
+      business_name: profileData.business_name || tenantInfo.name,
+      imageUrl: profileData.logo_url,
+      address: profileData.address_line1,
+      city: profileData.city,
+      state: profileData.state,
+      zip_code: profileData.postal_code,
+      location: `${profileData.city || ''}${profileData.city && profileData.state ? ', ' : ''}${profileData.state || ''}`,
+      phone: profileData.phone_number,
+      email: profileData.email,
+      website: profileData.website,
+      productCount: 0,
+      is_published: tenantInfo.hasDirectory,
+      primary_category: tenantInfo.directoryData?.primary_category,
+      created_at: tenantInfo.createdAt,
+    };
+
+    const minimalShopResponse: ShopResponse = {
+      success: true,
+      data: {
+        success: true,
+        data: minimalShopData
+      }
+    };
+
+    return (
+      <Suspense fallback={<ShopProfileSkeleton />}>
+        <ShopProfileClient
+          shop={minimalShopResponse}
+          businessHours={businessHours?.data}
+          tenantInfo={tenantInfo}
+          showStatusPanel={true}
+        />
+      </Suspense>
+    );
+  }
+
+  // Fetch shop data from MV (only for active tenants)
+  const shop = await getShopBySlug(slug);
+
+  // If no shop found and no status panel, show not found page
   if (!shop || !shop.success || !shop.data || !shop.data.success || !shop.data.data) {
-    // console.log('[ShopProfilePage] Showing not found page');
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -212,10 +242,15 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
       </div>
     );
   }
-  
+
   return (
     <Suspense fallback={<ShopProfileSkeleton />}>
-      <ShopProfileClient shop={shop} businessHours={businessHours?.data} />
+      <ShopProfileClient 
+        shop={shop} 
+        businessHours={businessHours?.data} 
+        tenantInfo={tenantInfo}
+        showStatusPanel={showStatusPanel}
+      />
     </Suspense>
   );
 }

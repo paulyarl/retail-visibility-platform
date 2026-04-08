@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, Badge } from '@mantine/core';
 import { Button } from '@mantine/core';
 import PageHeader, { Icons } from '@/components/PageHeader';
@@ -18,6 +19,7 @@ import { useTenant } from '@/hooks/useApiQueries';
 import { useUpgradeRequests } from '@/hooks/useApiQueries';
 import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
+import { SelfServiceBillingWithStripe } from '@/components/subscription/SelfServiceBilling';
 
 interface Tenant {
   id: string;
@@ -46,9 +48,21 @@ interface PendingRequest {
 
 export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?: string } = {}) {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   
-  // Get tenant ID for capacity data - declare this first
-  const tenantId = propTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
+  // Get tenant ID from URL parameter, prop, or localStorage (in priority order)
+  const urlTenantId = searchParams?.get('tenantId');
+  let tenantId = urlTenantId || propTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
+  
+  // Validate tenant ownership to prevent URL spoofing
+  if (urlTenantId && user?.tenants) {
+    const userTenants = user.tenants.map((t: any) => t.id);
+    if (!userTenants.includes(urlTenantId)) {
+      console.warn(`[Subscription] User ${user.id} attempted to access tenant ${urlTenantId} without authorization`);
+      // Fall back to user's first tenant or localStorage
+      tenantId = propTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null) || user.tenants[0]?.id || null;
+    }
+  }
   
   // Use React Query hooks instead of manual API calls
   const { data: tenant, isLoading: tenantLoading, error: tenantError } = useTenant(tenantId || '');
@@ -683,6 +697,50 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
             </div>
           </div>
         </Card>
+
+        {/* Self-Service Billing - Payment Methods & Tier Selection */}
+        {tenant && (
+          <SelfServiceBillingWithStripe 
+            tenantId={tenant.id}
+            currentTier={currentTier}
+            subscriptionStatus={tenant.subscriptionStatus}
+            onTierChange={(newTier) => {
+              // Refresh tenant data after tier change
+              window.location.reload();
+            }}
+          />
+        )}
+
+        {/* Invoice History Link */}
+        {tenant && (
+          <Card withBorder padding="lg" radius="md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-neutral-900">Invoice History</h3>
+                  <p className="text-sm text-neutral-600">View past invoices and download receipts</p>
+                </div>
+              </div>
+              <Button
+                variant="light"
+                onClick={() => {
+                  if (tenant?.id) {
+                    window.location.href = `/t/${tenant.id}/settings/billing/invoices`;
+                  } else {
+                    window.location.href = '/settings/billing/invoices';
+                  }
+                }}
+              >
+                View Invoices
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {/* Pending Requests */}
         {pendingRequests.length > 0 && (

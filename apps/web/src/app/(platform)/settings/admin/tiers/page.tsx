@@ -47,6 +47,11 @@ const TIER_FILTERS = [
   { value: 'starter', label: '🌱 Starter', color: 'bg-blue-100 text-blue-800' },
   { value: 'professional', label: '👔 Professional', color: 'bg-purple-100 text-purple-800' },
   { value: 'enterprise', label: '🏢 Enterprise', color: 'bg-amber-100 text-amber-800' },
+  { value: 'trial_google_only', label: 'Trial: Google Only', color: 'bg-emerald-100 text-emerald-800' },
+  { value: 'trial_starter', label: 'Trial: Starter', color: 'bg-sky-100 text-sky-800' },
+  { value: 'trial_professional', label: 'Trial: Professional', color: 'bg-indigo-100 text-indigo-800' },
+  { value: 'trial_chain_starter', label: 'Trial: Chain Starter', color: 'bg-cyan-100 text-cyan-800' },
+  { value: 'expired_trial', label: 'Expired Trial', color: 'bg-red-100 text-red-800' },
 ];
 
 const ITEMS_PER_PAGE = 10;
@@ -161,12 +166,97 @@ export default function AdminTiersPage() {
     }
   };
 
-  const getTierOptions = () => dbTiers.map(tier => ({
+  const startTrial = async (tenantId: string) => {
+    try {
+      setUpdating(tenantId);
+      setError(null);
+
+      // Get current tenant to determine target tier
+      const currentTenant = tenants.find(t => t.id === tenantId);
+      if (!currentTenant?.subscriptionTier?.startsWith('trial_')) {
+        throw new Error('Invalid trial tier selected');
+      }
+
+      // Extract target tier from trial tier (e.g., trial_starter -> starter)
+      const targetTier = currentTenant.subscriptionTier.replace('trial_', '');
+
+      // Call trial management API
+      const response = await fetch('/api/admin/trials/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tenantId,
+          targetTier,
+          reason: 'Trial started by admin via tiers page'
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to start trial');
+      }
+
+      const result = await response.json();
+
+      // Update tenant data with trial information
+      setTenants(prev => prev.map(t => t.id === tenantId ? {
+        ...t,
+        subscriptionTier: result.tenant.subscription_tier,
+        subscriptionStatus: result.tenant.subscription_status,
+        trialEndsAt: result.tenant.trial_ends_at,
+        subscriptionEndsAt: result.tenant.subscription_ends_at,
+      } : t));
+
+      const tenantName = currentTenant.metadata?.businessName || currentTenant.name;
+      toast(`14-day trial started for ${tenantName}`, { variant: 'success' });
+    } catch (err: any) {
+      setError(err.message || 'Failed to start trial');
+      toast(err.message || 'Failed to start trial', { variant: 'error' });
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const getTierOptions = () => {
+  const options = dbTiers.map(tier => ({
     value: tier.tierKey,
     label: `${tier.displayName} ($${tier.priceMonthly}/mo)`,
     color: getTierColor(tier.tierType, tier.tierKey),
     tier,
   }));
+
+  // Add trial tiers
+  const trialTiers = [
+    { key: 'trial_google_only', name: 'Trial: Google Only', price: 0 },
+    { key: 'trial_starter', name: 'Trial: Starter', price: 0 },
+    { key: 'trial_professional', name: 'Trial: Professional', price: 0 },
+    { key: 'trial_chain_starter', name: 'Trial: Chain Starter', price: 0 },
+    { key: 'expired_trial', name: 'Expired Trial', price: 0 },
+  ];
+
+  trialTiers.forEach(trial => {
+    options.push({
+      value: trial.key,
+      label: `${trial.name} ($${trial.price}/mo)`,
+      color: getTierColor('individual', trial.key),
+      tier: {
+        id: trial.key,
+        tierKey: trial.key,
+        displayName: trial.name,
+        priceMonthly: trial.price,
+        maxSkus: null,
+        maxLocations: null,
+        tierType: 'trial',
+        isActive: true,
+        sortOrder: 999,
+      } as DbTier,
+    });
+  });
+
+  return options;
+};
 
   const getTierColor = (tierType: string, tierKey: string) => {
     if (tierType === 'organization') return 'bg-gradient-to-r from-purple-500 to-pink-600 text-white';
@@ -175,6 +265,11 @@ export default function AdminTiersPage() {
       starter: 'bg-blue-100 text-blue-800',
       professional: 'bg-purple-100 text-purple-800',
       enterprise: 'bg-amber-100 text-amber-800',
+      trial_google_only: 'bg-emerald-100 text-emerald-800',
+      trial_starter: 'bg-sky-100 text-sky-800',
+      trial_professional: 'bg-indigo-100 text-indigo-800',
+      trial_chain_starter: 'bg-cyan-100 text-cyan-800',
+      expired_trial: 'bg-red-100 text-red-800',
     };
     return colors[tierKey] || 'bg-neutral-100 text-neutral-800';
   };
@@ -419,6 +514,28 @@ export default function AdminTiersPage() {
                                 className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg bg-white disabled:opacity-50">
                                 {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                               </select>
+                            </div>
+                            <div className="w-40">
+                              <label className="text-xs font-medium text-neutral-700 mb-1 block">Actions</label>
+                              <div className="flex flex-col gap-1">
+                                {/* Start Trial Button - Only visible for trial tier + trial status combination */}
+                                {(tenant.subscriptionTier?.startsWith('trial_') || false) && tenant.subscriptionStatus === 'trial' && (
+                                  <Button 
+                                    variant="filled" 
+                                    size="sm" 
+                                    className="w-full text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    onClick={() => startTrial(tenant.id)}
+                                    disabled={isUpdating}
+                                  >
+                                    Start 14-Day Trial
+                                  </Button>
+                                )}
+                                <Link href={`/settings/subscription?tenantId=${tenant.id}`}>
+                                  <Button variant="outline" size="sm" className="w-full text-xs">
+                                    Manage Subscription
+                                  </Button>
+                                </Link>
+                              </div>
                             </div>
                             {isUpdating && <div className="flex items-center gap-2 text-xs text-primary-600"><svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>Updating...</div>}
                           </div>

@@ -55,6 +55,8 @@ import StoreStatusIndicator from '@/components/storefront/StoreStatusIndicator';
 import { featuredProductsSingleton } from '@/providers/data/FeaturedProductsSingleton';
 import {  Badge as MantineBadge } from '@mantine/core';
 import { useStoreStatus } from "@/hooks/useStoreStatus";
+import { StorefrontStatusPanel } from '@/components/storefront/StorefrontStatusPanel';
+import { PublicTenantInfo } from '@/services/TenantPublicService';
 
 // Types
 interface DirectoryConsolidated {
@@ -157,6 +159,8 @@ interface ShopProfileClientProps {
     };
   };
   businessHours?: any;
+  tenantInfo?: PublicTenantInfo | null;
+  showStatusPanel?: boolean;
 }
 
 // Shop profile header component
@@ -448,7 +452,12 @@ function ShopProfileHeader({ shop, shopData, businessHours }: {
 }
 
 // Main Shop Profile Client Component
-export default function ShopProfileClient({ shop, businessHours }: {
+export default function ShopProfileClient({ 
+  shop, 
+  businessHours, 
+  tenantInfo, 
+  showStatusPanel 
+}: {
   shop: {
     success: boolean;
     data: {
@@ -457,6 +466,8 @@ export default function ShopProfileClient({ shop, businessHours }: {
     };
   };
   businessHours: any;
+  tenantInfo?: PublicTenantInfo | null;
+  showStatusPanel?: boolean;
 }) {
   // Extract shop data once at the top
   const shopData = (shop.data as any)?.data;
@@ -580,6 +591,7 @@ export default function ShopProfileClient({ shop, businessHours }: {
         category={shopData.category || null}
         pageType="shop_detail"
       />
+      
       {/* Navigation Header */}
       <div className="bg-white border-b sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
@@ -709,10 +721,18 @@ export default function ShopProfileClient({ shop, businessHours }: {
                 tenantId={shopData.id}
               />
             </div>
+            
+            {/* Status Panel - shows when products/categories are hidden */}
+            {showStatusPanel && tenantInfo && (
+              <div className="mt-6">
+                <StorefrontStatusPanel tenantInfo={tenantInfo} />
+              </div>
+            )}
           </div>
 
-          {/* Category Navigation */}
-          <div className="flex flex-col lg:flex-row gap-6">
+          {/* Category Navigation - hidden when status panel shows */}
+          {!showStatusPanel && (
+            <div className="flex flex-col lg:flex-row gap-6">
             {/* Desktop Category Sidebar */}
             <div className="hidden lg:block lg:w-64 flex-shrink-0">
               <ProductCategorySidebar
@@ -870,9 +890,9 @@ export default function ShopProfileClient({ shop, businessHours }: {
                   />
                 </div>
               )}
-
-                          </div>
-          </div>
+              </div>
+            </div>
+          )}
 
           {/* Recently Viewed - Centered with page margins */}
           <div className="mb-12">

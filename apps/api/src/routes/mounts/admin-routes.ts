@@ -10,6 +10,7 @@ import adminUsersRoutes from '../admin-users';
 import featureOverridesRoutes from '../admin/feature-overrides';
 import tierManagementRoutes from '../admin/tier-management';
 import tierSystemRoutes from '../admin/tier-system';
+import trialManagementRoutes from '../admin/trial-management';
 import taxonomyAdminRoutes from '../taxonomy-admin';
 import adminTenantsRoutes from '../admin/tenants';
 import platformCategoriesRoutes from '../admin/platform-categories';
@@ -48,7 +49,8 @@ export function mountAdminRoutes(app: Express) {
   app.use('/api/admin/ticker-config', authenticateToken,  tickerConfigRoutes);
   app.use('/api/admin/ticker-messages', authenticateToken,  tickerMessagesRoutes);
   app.use('/api/admin/tiers', authenticateToken,  tiersRoutes);
-  app.use('/api/admin/analytics', authenticateToken,  adminAnalyticsRoutes);
+  app.use('/api/admin/trials', authenticateToken, trialManagementRoutes);
+  app.use('/api/admin/analytics', authenticateToken, adminAnalyticsRoutes);
   app.use('/api/admin/security', authenticateToken,  adminSecurityMonitoringRoutes);
   app.use('/api/admin/navigation-links', authenticateToken,  navigationLinksRoutes);
   app.use('/api/admin/categories', authenticateToken, categoriesPropagateRoutes);

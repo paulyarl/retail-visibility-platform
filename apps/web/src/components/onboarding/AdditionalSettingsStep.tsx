@@ -125,77 +125,79 @@ export default function AdditionalSettingsStep({
         These settings help improve your store's visibility in search results and on maps. All fields are optional.
       </Alert>
 
-      {/* Map Coordinates (Geocoding) */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="space-y-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800"
-      >
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <h4 className="text-sm font-medium text-neutral-900 dark:text-white mb-1">
-              Map Coordinates
-            </h4>
-            <p className="text-xs text-neutral-600 dark:text-neutral-400">
-              Get latitude and longitude for map display from your business address
+      {/* Map Coordinates - Hidden in Additional Settings (handled in Step 2) */}
+      {false && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="space-y-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800"
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-neutral-900 dark:text-white mb-1">
+                Map Coordinates
+              </h4>
+              <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                Get latitude and longitude for map display from your business address
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleGeocodeAddress}
+              disabled={geocoding || !canGeocode}
+              loading={geocoding}
+            >
+              {geocoding ? 'Getting...' : 'Get Coordinates'}
+            </Button>
+          </div>
+
+          {!canGeocode && (
+            <p className="text-xs text-amber-600">
+              Complete your address in Step 2 to enable geocoding
             </p>
+          )}
+
+          {initialData.latitude && initialData.longitude && (
+            <div className="flex items-center gap-2 text-xs text-green-700 dark:text-green-400">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>
+                Coordinates: {Number(initialData.latitude).toFixed(6)}, {Number(initialData.longitude).toFixed(6)}
+              </span>
+            </div>
+          )}
+
+          {/* Manual Coordinate Entry */}
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <Input
+              label="Latitude"
+              placeholder="e.g., 40.7128"
+              value={initialData.latitude?.toString() || ''}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                handleChange('latitude', isNaN(val) ? undefined : val);
+              }}
+              type="number"
+              step="any"
+            />
+            <Input
+              label="Longitude"
+              placeholder="e.g., -74.0060"
+              value={initialData.longitude?.toString() || ''}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                handleChange('longitude', isNaN(val) ? undefined : val);
+              }}
+              type="number"
+              step="any"
+            />
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={handleGeocodeAddress}
-            disabled={geocoding || !canGeocode}
-            loading={geocoding}
-          >
-            {geocoding ? 'Getting...' : 'Get Coordinates'}
-          </Button>
-        </div>
-
-        {!canGeocode && (
-          <p className="text-xs text-amber-600">
-            ⚠️ Complete your address in Step 2 to enable geocoding
-          </p>
-        )}
-
-        {initialData.latitude && initialData.longitude && (
-          <div className="flex items-center gap-2 text-xs text-green-700 dark:text-green-400">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>
-              Coordinates: {Number(initialData.latitude).toFixed(6)}, {Number(initialData.longitude).toFixed(6)}
-            </span>
-          </div>
-        )}
-
-        {/* Manual Coordinate Entry */}
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          <Input
-            label="Latitude"
-            placeholder="e.g., 40.7128"
-            value={initialData.latitude?.toString() || ''}
-            onChange={(e) => {
-              const val = parseFloat(e.target.value);
-              handleChange('latitude', isNaN(val) ? undefined : val);
-            }}
-            type="number"
-            step="any"
-          />
-          <Input
-            label="Longitude"
-            placeholder="e.g., -74.0060"
-            value={initialData.longitude?.toString() || ''}
-            onChange={(e) => {
-              const val = parseFloat(e.target.value);
-              handleChange('longitude', isNaN(val) ? undefined : val);
-            }}
-            type="number"
-            step="any"
-          />
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
 
       {/* SEO Tags */}
       <motion.div
@@ -273,12 +275,6 @@ export default function AdditionalSettingsStep({
       >
         <h4 className="text-sm font-medium text-neutral-700 mb-3">Settings Summary</h4>
         <div className="space-y-2 text-xs">
-          <div className="flex justify-between">
-            <span className="text-neutral-600">Map Coordinates:</span>
-            <span className={initialData.latitude ? 'text-green-600' : 'text-neutral-400'}>
-              {initialData.latitude ? '✓ Set' : 'Not set'}
-            </span>
-          </div>
           <div className="flex justify-between">
             <span className="text-neutral-600">SEO Keywords:</span>
             <span className={(initialData.seo_tags || []).length > 0 ? 'text-green-600' : 'text-neutral-400'}>

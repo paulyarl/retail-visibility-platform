@@ -6,13 +6,19 @@
  */
 
 import { PublicApiSingleton } from '@/providers/base/PublicApiSingleton';
-import { tenantPublicService } from '@/services/TenantPublicService';
+import { tenantPublicService, LocationStatusInfo } from '@/services/TenantPublicService';
 import { BusinessProfile } from '@/lib/validation/businessProfile';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface TenantInfo {
   id: string;
   name: string;
+  slug?: string | null;
+  subscriptionStatus?: string;
+  subscriptionTier?: string | null;
+  trialEndsAt?: string | null;
+  locationStatus?: string | null;
+  statusInfo?: LocationStatusInfo;
   metadata?: {
     businessName?: string;
     phone?: string;

@@ -1,6 +1,63 @@
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { PublicApiSingleton } from '../providers/base/PublicApiSingleton';
 
+/**
+ * Location status info returned by public API
+ * Mirrors API's LocationStatusInfo from location-status.ts
+ */
+export interface LocationStatusInfo {
+  status: string;
+  label: string;
+  description: string;
+  color: 'green' | 'yellow' | 'orange' | 'red' | 'gray';
+  icon: string;
+  canSync: boolean;
+  showInDirectory: boolean;
+  showStorefront: boolean;
+  countsTowardLimits: boolean;
+  shouldBeBilled: boolean;
+}
+
+/**
+ * Subscription status info returned by public API
+ * Used for subscription-based panel display
+ */
+export interface SubscriptionStatusInfo {
+  status: 'canceled' | 'past_due';
+  label: string;
+  description: string;
+  showStorefront: boolean;
+  showInDirectory: boolean;
+  gracePeriodEnded?: boolean;
+}
+
+/**
+ * Public tenant info returned by /api/public/tenant/:identifier
+ * Used for storefront visibility control
+ */
+export interface PublicTenantInfo {
+  id: string;
+  name: string;
+  slug: string | null;
+  subscriptionStatus: string;
+  subscriptionTier?: string | null;
+  trialEndsAt?: string | null;
+  locationStatus?: string | null;
+  statusInfo?: LocationStatusInfo;
+  organizationId?: string | null;
+  statusChangedAt?: string | null;
+  subscriptionStatusInfo?: SubscriptionStatusInfo | null;
+  showSubscriptionPanel?: boolean;
+  hasDirectory: boolean;
+  directoryData?: any;
+  profileData?: any;
+  metadata?: any;
+  logoUrl?: string;
+  bannerUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TenantProfile {
   id: string;
   business_name: string;
@@ -77,9 +134,9 @@ class TenantPublicService extends PublicApiSingleton {
    * Get public tenant info (basic)
    * Uses the /api/public/tenant/:tenantId endpoint
    */
-  async getPublicTenantInfo(tenantId: string): Promise<any | null> {
+  async getPublicTenantInfo(tenantId: string): Promise<PublicTenantInfo | null> {
     try {
-      const response = await this.makeDefaultRequest<any>(
+      const response = await this.makeDefaultRequest<PublicTenantInfo>(
         `/api/public/tenant/${tenantId}`,
         {},
         `public-tenant-info-${tenantId}`,
@@ -90,17 +147,12 @@ class TenantPublicService extends PublicApiSingleton {
         console.error('[TenantPublicService] Failed to get public tenant info:', response.error);
         return null;
       }
-      
-      // console.log('[TenantPublicService] getPublicTenantInfo result:', {
-      //   success: response.success,
-      //   hasData: !!response.data,
-      //   dataKeys: response.data ? Object.keys(response.data) : 'null',
-      //   nestedKeys: response.data?.data ? Object.keys(response.data.data) : 'null',
-      //   metadata: response.data?.metadata ? Object.keys(response.data.metadata) : 'null',
-      //   fullData: JSON.stringify(response.data, null, 2)
-      // });
 
-      return response.data;
+      // The API returns { success, data: { id, name, locationStatus, ... }, metadata }
+      // makeDefaultRequest wraps this, so response.data contains the full API response
+      // The actual tenant data is in response.data.data
+      const data = response.data as any;
+      return data?.data || data;
     } catch (error) {
       console.error('[TenantPublicService] Failed to get public tenant info:', error);
       return null;

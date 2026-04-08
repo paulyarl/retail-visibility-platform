@@ -8,6 +8,8 @@ interface UseBillingFiltersResult {
   setSearchQuery: (query: string) => void;
   selectedTierFilter: string;
   setSelectedTierFilter: (tier: string) => void;
+  selectedStatusFilter: string;
+  setSelectedStatusFilter: (status: string) => void;
   currentPage: number;
   setCurrentPage: (page: number) => void;
   filteredTenants: Tenant[];
@@ -20,11 +22,12 @@ interface UseBillingFiltersResult {
 export function useBillingFilters(tenants: Tenant[], tiers: DbTier[]): UseBillingFiltersResult {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTierFilter, setSelectedTierFilter] = useState<string>('all');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedTierFilter]);
+  }, [searchQuery, selectedTierFilter, selectedStatusFilter]);
 
   const filteredTenants = useMemo(() => {
     return tenants.filter((tenant) => {
@@ -35,9 +38,10 @@ export function useBillingFilters(tenants: Tenant[], tiers: DbTier[]): UseBillin
         tenant.organization?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         `${tenant.metadata?.city || ''} ${tenant.metadata?.state || ''}`.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTier = selectedTierFilter === 'all' || tenant.subscriptionTier === selectedTierFilter;
-      return matchesSearch && matchesTier;
+      const matchesStatus = selectedStatusFilter === 'all' || tenant.subscriptionStatus === selectedStatusFilter;
+      return matchesSearch && matchesTier && matchesStatus;
     });
-  }, [tenants, searchQuery, selectedTierFilter]);
+  }, [tenants, searchQuery, selectedTierFilter, selectedStatusFilter]);
 
   const paginatedTenants = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -58,6 +62,8 @@ export function useBillingFilters(tenants: Tenant[], tiers: DbTier[]): UseBillin
     setSearchQuery,
     selectedTierFilter,
     setSelectedTierFilter,
+    selectedStatusFilter,
+    setSelectedStatusFilter,
     currentPage,
     setCurrentPage,
     filteredTenants,

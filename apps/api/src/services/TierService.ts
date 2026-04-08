@@ -10,6 +10,23 @@
 
 import { prisma } from '../prisma';
 
+/**
+ * Map trial tiers to their base tiers for feature/limit proxying
+ */
+function getBaseTierForTrial(tierKey: string): string | null {
+  const trialToBaseMap: Record<string, string> = {
+    'trial_google_only': 'google_only',
+    'trial_starter': 'starter',
+    'trial_professional': 'professional',
+    'trial_chain_starter': 'chain_starter',
+    'trial_chain_professional': 'chain_professional',
+    'trial_chain_enterprise': 'chain_enterprise',
+    // expired_trial has no base tier - it's a terminal state
+  };
+  
+  return trialToBaseMap[tierKey] || null;
+}
+
 interface TierWithFeatures {
   id: string;
   tier_key: string;
@@ -105,9 +122,14 @@ export async function getAllTiers(): Promise<TierWithFeatures[]> {
 
 /**
  * Check if a tier has access to a feature
+ * ALWAYS proxies trial tiers to base tiers, ignoring stored values
  */
 export async function checkTierFeatureAccess(tierKey: string, featureKey: string): Promise<boolean> {
-  const tier = await getTierByKey(tierKey);
+  // ALWAYS proxy trial tiers to base tiers - ignore stored values completely
+  const baseTierKey = getBaseTierForTrial(tierKey);
+  const effectiveTierKey = baseTierKey || tierKey;
+  
+  const tier = await getTierByKey(effectiveTierKey);
   if (!tier) return false;
 
   // Check if feature exists in tier's features (handle undefined features array)
@@ -117,9 +139,14 @@ export async function checkTierFeatureAccess(tierKey: string, featureKey: string
 
 /**
  * Get all features for a tier (including inherited)
+ * ALWAYS proxies trial tiers to base tiers, ignoring stored values
  */
 export async function getTierFeatures(tierKey: string): Promise<string[]> {
-  const tier = await getTierByKey(tierKey);
+  // ALWAYS proxy trial tiers to base tiers - ignore stored values completely
+  const baseTierKey = getBaseTierForTrial(tierKey);
+  const effectiveTierKey = baseTierKey || tierKey;
+  
+  const tier = await getTierByKey(effectiveTierKey);
   if (!tier) return [];
 
   const features = tier.features || [];
@@ -130,12 +157,18 @@ export async function getTierFeatures(tierKey: string): Promise<string[]> {
 
 /**
  * Get SKU limit for a tier
+ * ALWAYS proxies trial tiers to base tiers, ignoring stored values
  */
 export async function getTierSKULimit(tierKey: string): Promise<number> {
-  const tier = await getTierByKey(tierKey);
+  // ALWAYS proxy trial tiers to base tiers - ignore stored values completely
+  const baseTierKey = getBaseTierForTrial(tierKey);
+  const effectiveTierKey = baseTierKey || tierKey;
+  
+  const tier = await getTierByKey(effectiveTierKey);
   if (!tier) return 500; // Default to starter limit
   
-  return tier.max_skus ?? Infinity;
+  // Use base tier's actual limit (ignore trial tier's stored value)
+  return tier.max_skus ?? 500;
 }
 
 /**

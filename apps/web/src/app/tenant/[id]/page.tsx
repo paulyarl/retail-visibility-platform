@@ -213,11 +213,12 @@ async function getTenantWithProducts(tenantId: string, page: number = 1, limit: 
     // Fetch full shop details using the resolved tenant ID
 
     const tenant = await tenantPublicService.getPublicTenantInfo(idResolvedBySlug);
-    const directoryData = tenant?.data.directoryData;
+    const directoryData = tenant?.directoryData;
 
-    // if (directoryData.is_published){
+    // Fetch shop info from MV only if tenant is active (MV excludes non-active tenants)
     let shopInfo: any = null;
-    if (directoryData.is_published) {
+    const isActiveTenant = !tenant?.locationStatus || tenant.locationStatus === 'active';
+    if (directoryData?.is_published && isActiveTenant) {
       shopInfo = await publicDirectoryService.getShopInfoById(idResolvedBySlug);
     }
 
@@ -640,6 +641,8 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
           currentPage={currentPage}
           totalPages={totalPages}
           totalItems={total}
+          locationStatus={tenant?.locationStatus}
+          statusInfo={tenant?.statusInfo}
         />
       </TenantPaymentProvider>
     </ProductSingletonProvider>

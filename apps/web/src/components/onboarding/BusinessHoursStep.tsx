@@ -23,6 +23,18 @@ const DAYS_OF_WEEK = [
   { key: 'sunday', label: 'Sunday' },
 ];
 
+/**
+ * Convert 24-hour time format to 12-hour format
+ * e.g., "09:00" -> "9:00 AM", "21:00" -> "9:00 PM"
+ */
+const formatTimeTo12Hour = (time24: string): string => {
+  const [hours, minutes] = time24.split(':');
+  const hour = parseInt(hours, 10);
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12; // 0 becomes 12
+  return `${hour12}:${minutes} ${suffix}`;
+};
+
 const DEFAULT_HOURS = {
   monday: '9:00 AM - 5:00 PM',
   tuesday: '9:00 AM - 5:00 PM',
@@ -60,12 +72,43 @@ export default function BusinessHoursStep({
 }: BusinessHoursStepProps) {
   const [hours, setHours] = useState<Record<string, string>>(() => {
     const initialHours = (initialData.hours as Record<string, string>);
-    // Filter out timezone from hours state
+    
+    // Handle API hours format with periods array
+    if (initialHours?.periods && Array.isArray(initialHours.periods)) {
+      const transformedHours: Record<string, string> = {};
+      
+      initialHours.periods.forEach((period: any) => {
+        if (period.day && period.open && period.close) {
+          const dayKey = period.day.toLowerCase();
+          const openTime = formatTimeTo12Hour(period.open);
+          const closeTime = formatTimeTo12Hour(period.close);
+          transformedHours[dayKey] = `${openTime} - ${closeTime}`;
+        }
+      });
+      
+      // Add missing days as closed
+      DAYS_OF_WEEK.forEach(({ key }) => {
+        if (!transformedHours[key]) {
+          transformedHours[key] = 'Closed';
+        }
+      });
+      
+      return transformedHours;
+    }
+    
+    // Handle simple key-value format
     const { timezone: _, ...hoursWithoutTimezone } = initialHours || {};
     return Object.keys(hoursWithoutTimezone).length > 0 ? hoursWithoutTimezone : DEFAULT_HOURS;
   });
   const [useDefaultHours, setUseDefaultHours] = useState(() => {
     const initialHours = (initialData.hours as Record<string, string>);
+    
+    // Check if we have API hours with periods
+    if (initialHours?.periods && Array.isArray(initialHours.periods)) {
+      return initialHours.periods.length === 0;
+    }
+    
+    // Check simple key-value format
     return !initialHours || Object.keys(initialHours).filter(k => k !== 'timezone').length === 0;
   });
   const [timezone, setTimezone] = useState<string>(() => {
