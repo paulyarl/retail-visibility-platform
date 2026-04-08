@@ -483,7 +483,6 @@ export function UniversalProductCard({
                 <span className="text-xs text-gray-500 dark:text-gray-400 italic">
                   Contact store for purchase
                 </span>
-                <HoursStatusBadge status={hoursStatus} />
               </div>
             )}
           </div>
