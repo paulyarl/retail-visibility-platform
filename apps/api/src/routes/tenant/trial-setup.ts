@@ -58,10 +58,10 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    if (rawTenant?.subscription_tier?.startsWith('trial_') && rawTenant.trial_ends_at && rawTenant.trial_ends_at > new Date()) {
+    if (rawTenant?.subscription_tier?.startsWith('trial_') && rawTenant?.trial_ends_at && rawTenant?.trial_ends_at > new Date()) {
       return NextResponse.json({ 
         error: 'Active trial already exists',
-        trialEndsAt: rawTenant.trial_ends_at
+        trialEndsAt: rawTenant?.trial_ends_at
       }, { status: 409 });
     }
 
@@ -84,6 +84,27 @@ export async function POST(request: NextRequest) {
     // TODO: Schedule trial expiration reminder
     // TODO: Track trial activation analytics
 
+    // Calculate effective expiration for trial response
+    const effectiveExpiration = updatedTenant.manual_subscription_control 
+      ? {
+          expiresAt: updatedTenant.manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : updatedTenant.subscription_status === 'trial' && updatedTenant.trial_ends_at
+        ? {
+            expiresAt: updatedTenant.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : updatedTenant.subscription_ends_at
+          ? {
+              expiresAt: updatedTenant.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
+
     return NextResponse.json({
       success: true,
       tenant: {
@@ -91,6 +112,14 @@ export async function POST(request: NextRequest) {
         subscriptionTier: updatedTenant.subscription_tier,
         subscriptionStatus: updatedTenant.subscription_status,
         trialEndsAt: updatedTenant.trial_ends_at,
+        // Manual subscription control fields
+        manualSubscriptionControl: updatedTenant.manual_subscription_control,
+        manualSubscriptionExpiresAt: updatedTenant.manual_subscription_expires_at,
+        manualSubscriptionReason: updatedTenant.manual_subscription_reason,
+        // Effective expiration fields
+        effectiveExpiresAt: effectiveExpiration?.expiresAt,
+        effectiveExpiresType: effectiveExpiration?.type,
+        effectiveExpiresSource: effectiveExpiration?.source
       },
       message: 'Trial activated successfully'
     });
@@ -134,22 +163,57 @@ export async function GET(request: NextRequest) {
     const rawTenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
+        id: true,
         subscription_tier: true,
         subscription_status: true,
         trial_ends_at: true,
+        manual_subscription_control: true,
+        manual_subscription_expires_at: true,
+        manual_subscription_reason: true,
+        subscription_ends_at: true,
       }
     });
 
+    // Calculate effective expiration for trial status response
+    const effectiveExpiration = rawTenant?.manual_subscription_control 
+      ? {
+          expiresAt: rawTenant?.manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : rawTenant?.subscription_status === 'trial' && rawTenant?.trial_ends_at
+        ? {
+            expiresAt: rawTenant?.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : rawTenant?.subscription_ends_at
+          ? {
+              expiresAt: rawTenant?.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
+
     // Return trial status
     return NextResponse.json({
+      tenantId: rawTenant?.id || '',
       hasActiveTrial: rawTenant?.subscription_tier?.startsWith('trial_') && 
-                     rawTenant.trial_ends_at && 
-                     rawTenant.trial_ends_at > new Date(),
-      trialTier: rawTenant?.subscription_tier,
+                     rawTenant?.trial_ends_at && 
+                     rawTenant?.trial_ends_at > new Date(),
+      trialTier: rawTenant?.subscription_tier || '',
       trialEndsAt: rawTenant?.trial_ends_at,
-      subscriptionStatus: rawTenant?.subscription_status,
+      subscriptionStatus: rawTenant?.subscription_status || '',
       canStartTrial: !rawTenant?.subscription_tier?.startsWith('trial_') || 
-                     (rawTenant.trial_ends_at && rawTenant.trial_ends_at <= new Date())
+                     (rawTenant?.trial_ends_at && rawTenant?.trial_ends_at <= new Date()),
+      // Manual subscription control fields
+      manualSubscriptionControl: rawTenant?.manual_subscription_control || false,
+      manualSubscriptionExpiresAt: rawTenant?.manual_subscription_expires_at,
+      manualSubscriptionReason: rawTenant?.manual_subscription_reason || '',
+      // Effective expiration fields
+      effectiveExpiresAt: effectiveExpiration?.expiresAt,
+      effectiveExpiresType: effectiveExpiration?.type,
+      effectiveExpiresSource: effectiveExpiration?.source
     });
 
   } catch (error) {
@@ -205,10 +269,10 @@ router.post('/:tenantId/trial-setup', async (req: any, res: any) => {
       }
     });
 
-    if (rawTenant?.subscription_tier?.startsWith('trial_') && rawTenant.trial_ends_at && rawTenant.trial_ends_at > new Date()) {
+    if (rawTenant?.subscription_tier?.startsWith('trial_') && rawTenant?.trial_ends_at && rawTenant?.trial_ends_at > new Date()) {
       return res.status(409).json({ 
         error: 'Active trial already exists',
-        trialEndsAt: rawTenant.trial_ends_at
+        trialEndsAt: rawTenant?.trial_ends_at
       });
     }
 
@@ -227,6 +291,27 @@ router.post('/:tenantId/trial-setup', async (req: any, res: any) => {
       },
     });
 
+    // Calculate effective expiration for trial response
+    const effectiveExpiration = updatedTenant.manual_subscription_control 
+      ? {
+          expiresAt: updatedTenant.manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : updatedTenant.subscription_status === 'trial' && updatedTenant.trial_ends_at
+        ? {
+            expiresAt: updatedTenant.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : updatedTenant.subscription_ends_at
+          ? {
+              expiresAt: updatedTenant.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
+
     return res.json({
       success: true,
       tenant: {
@@ -234,6 +319,14 @@ router.post('/:tenantId/trial-setup', async (req: any, res: any) => {
         subscriptionTier: updatedTenant.subscription_tier,
         subscriptionStatus: updatedTenant.subscription_status,
         trialEndsAt: updatedTenant.trial_ends_at,
+        // Manual subscription control fields
+        manualSubscriptionControl: updatedTenant.manual_subscription_control,
+        manualSubscriptionExpiresAt: updatedTenant.manual_subscription_expires_at,
+        manualSubscriptionReason: updatedTenant.manual_subscription_reason,
+        // Effective expiration fields
+        effectiveExpiresAt: effectiveExpiration?.expiresAt,
+        effectiveExpiresType: effectiveExpiration?.type,
+        effectiveExpiresSource: effectiveExpiration?.source
       },
       message: 'Trial activated successfully'
     });
@@ -275,22 +368,56 @@ router.get('/:tenantId/trial-setup', async (req: any, res: any) => {
     const rawTenant = await prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
+        id: true,
         subscription_tier: true,
         subscription_status: true,
         trial_ends_at: true,
+        manual_subscription_control: true,
+        manual_subscription_expires_at: true,
+        manual_subscription_reason: true,
+        subscription_ends_at: true,
       }
     });
+
+    // Calculate effective expiration for trial status response
+    const effectiveExpiration = rawTenant?.manual_subscription_control 
+      ? {
+          expiresAt: rawTenant?.manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : rawTenant?.subscription_status === 'trial' && rawTenant?.trial_ends_at
+        ? {
+            expiresAt: rawTenant?.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : rawTenant?.subscription_ends_at
+          ? {
+              expiresAt: rawTenant?.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
 
     // Return trial status
     return res.json({
       hasActiveTrial: rawTenant?.subscription_tier?.startsWith('trial_') && 
-                     rawTenant.trial_ends_at && 
-                     rawTenant.trial_ends_at > new Date(),
-      trialTier: rawTenant?.subscription_tier,
+                     rawTenant?.trial_ends_at && 
+                     rawTenant?.trial_ends_at > new Date(),
+      trialTier: rawTenant?.subscription_tier || '',
       trialEndsAt: rawTenant?.trial_ends_at,
-      subscriptionStatus: rawTenant?.subscription_status,
+      subscriptionStatus: rawTenant?.subscription_status || '',
       canStartTrial: !rawTenant?.subscription_tier?.startsWith('trial_') || 
-                     (rawTenant.trial_ends_at && rawTenant.trial_ends_at <= new Date())
+                     (rawTenant?.trial_ends_at && rawTenant?.trial_ends_at <= new Date()),
+      // Manual subscription control fields
+      manualSubscriptionControl: rawTenant?.manual_subscription_control || false,
+      manualSubscriptionExpiresAt: rawTenant?.manual_subscription_expires_at,
+      manualSubscriptionReason: rawTenant?.manual_subscription_reason || '',
+      // Effective expiration fields
+      effectiveExpiresAt: effectiveExpiration?.expiresAt,
+      effectiveExpiresType: effectiveExpiration?.type,
+      effectiveExpiresSource: effectiveExpiration?.source
     });
 
   } catch (error: any) {

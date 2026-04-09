@@ -395,6 +395,7 @@ export function requireAnyTierFeature(features: string[]) {
       });
       
       if (!tenant) {
+        console.log(`${req.method} ${req.path} - route: requireAnyTierFeature`);
         return res.status(404).json({ error: 'tenant_not_found' });
       }
       
@@ -449,6 +450,7 @@ export async function requireWritableSubscription(req: Request, res: Response, n
     });
 
     if (!tenant) {
+      console.log(`${req.method} ${req.path} - route: requireWritableSubscription`);
       return res.status(404).json({
         error: 'tenant_not_found',
         message: 'Tenant not found',

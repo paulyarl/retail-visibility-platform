@@ -113,7 +113,6 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     const auth0Email = req.headers['x-auth0-email'] as string || req.cookies?.auth0_email as string;
 
     if (!auth0Id && !auth0Email) {
-      console.log('[AUTH] No Auth0 session provided');
       return res.status(401).json({ error: 'authentication_required', message: 'No Auth0 session provided' });
     }
 
@@ -154,7 +153,6 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     }
 
     if (!user) {
-      console.log('[AUTH] User not found for Auth0 session');
       return res.status(401).json({ error: 'user_not_found', message: 'User not found in platform' });
     }
 

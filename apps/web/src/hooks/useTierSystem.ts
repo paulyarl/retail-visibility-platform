@@ -89,7 +89,7 @@ function getFallbackTierInfo(tierKey: string): TierLimits | ChainTierLimits {
 function tierToLimits(tier: Tier): TierLimits {
   return {
     name: tier.displayName,
-    price: `$${tier.priceMonthly}/month`,
+    price: tier.priceMonthly === 0 ? 'Free / 14-day' : `$${tier.priceMonthly}/month`,
     pricePerMonth: tier.priceMonthly,
     maxSkus: tier.maxSkus || Infinity,
     maxLocations: tier.maxLocations || 1,

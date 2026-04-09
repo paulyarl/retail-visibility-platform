@@ -134,7 +134,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   // Trial wrapper tiers - provide full tier benefits during trial
   trial_google_only: {
     name: 'Trial: Google-Only',
-    price: 'Free (14 days)',
+    price: 'Free / 14-day',
     pricePerMonth: 0,
     maxSkus: 250,
     maxLocations: 1,
@@ -154,7 +154,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   },
   trial_starter: {
     name: 'Trial: Starter',
-    price: 'Free (14 days)',
+    price: 'Free / 14-day',
     pricePerMonth: 0,
     maxSkus: 500,
     maxLocations: 3,
@@ -175,7 +175,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   },
   trial_professional: {
     name: 'Trial: Professional',
-    price: 'Free (14 days)',
+    price: 'Free / 14-day',
     pricePerMonth: 0,
     maxSkus: 5000,
     maxLocations: 10,
@@ -197,7 +197,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   },
   trial_chain_starter: {
     name: 'Trial: Chain Starter',
-    price: 'Free (14 days)',
+    price: 'Free / 14-day',
     pricePerMonth: 0,
     maxSkus: 2000,
     maxLocations: 5,

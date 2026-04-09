@@ -197,6 +197,11 @@ router.get('/featured-products', authenticateToken, async (req, res) => {
       select: {
         subscription_tier: true,
         subscription_status: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
+        manual_subscription_control: true,
+        manual_subscription_expires_at: true,
+        manual_subscription_reason: true,
         organization_id: true,
         organizations_list: {
           select: {
@@ -304,10 +309,39 @@ router.get('/featured-products', authenticateToken, async (req, res) => {
       recommended: tierLimits.featured_recommended || 0
     };
 
+    // Calculate effective expiration for tenant limits
+    const effectiveExpiration = tenant.manual_subscription_control 
+      ? {
+          expiresAt: tenant.manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : tenant.subscription_status === 'trial' && tenant.trial_ends_at
+        ? {
+            expiresAt: tenant.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : tenant.subscription_ends_at
+          ? {
+              expiresAt: tenant.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
+
     return res.json({
       limits,
       tier: tenant.subscription_tier,
       status: tenant.subscription_status,
+      // Manual subscription control fields
+      manualSubscriptionControl: tenant.manual_subscription_control,
+      manualSubscriptionExpiresAt: tenant.manual_subscription_expires_at,
+      manualSubscriptionReason: tenant.manual_subscription_reason,
+      // Effective expiration fields
+      effectiveExpiresAt: effectiveExpiration?.expiresAt,
+      effectiveExpiresType: effectiveExpiration?.type,
+      effectiveExpiresSource: effectiveExpiration?.source,
       // Add display names for frontend
       displayNames: {
         store_selection: 'Directory Featured',

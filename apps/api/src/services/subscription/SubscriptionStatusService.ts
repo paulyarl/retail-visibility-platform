@@ -37,7 +37,8 @@ export class SubscriptionStatusService {
     // Get current status
     const current = await this.getTenantSubscriptionState(tenantId);
     
-    // Update to active status
+    // Always process payments and update to active status
+    // Manual control only prevents expiration, not activation
     await prisma.tenants.update({
       where: { id: tenantId },
       data: {
@@ -76,8 +77,43 @@ export class SubscriptionStatusService {
     reason: string,
     attemptCount: number = 1
   ): Promise<StatusTransitionResult> {
-    // Get current status
-    const current = await this.getTenantSubscriptionState(tenantId);
+    // Get current status and manual control settings
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        subscription_status: true,
+        subscription_tier: true,
+        status_changed_at: true,
+        manual_subscription_control: true,
+        manual_subscription_expires_at: true,
+      }
+    });
+
+    if (!tenant) {
+      throw new Error(`Tenant ${tenantId} not found`);
+    }
+
+    // Check if manual subscription control is enabled
+    if (tenant.manual_subscription_control) {
+      if (!tenant.manual_subscription_expires_at || 
+          tenant.manual_subscription_expires_at > new Date()) {
+        // Manual control is active - don't change status
+        return {
+          previousStatus: tenant.subscription_status as any,
+          newStatus: tenant.subscription_status as any,
+          previousTier: tenant.subscription_tier,
+          newTier: tenant.subscription_tier,
+          changedAt: new Date(),
+          reason: 'manual_subscription_control_active',
+        };
+      }
+    }
+
+    const current = {
+      status: tenant.subscription_status as any,
+      tier: tenant.subscription_tier,
+      statusChangedAt: tenant.status_changed_at,
+    };
 
     // Only transition to past_due if currently active
     if (current.status !== 'active') {
@@ -87,7 +123,7 @@ export class SubscriptionStatusService {
         previousTier: current.tier,
         newTier: current.tier,
         changedAt: new Date(),
-        reason: 'no_change_not_active',
+        reason: 'not_active',
       };
     }
 

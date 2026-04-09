@@ -553,6 +553,7 @@ router.post('/:id/tenants', requireAdmin, async (req, res) => {
     });
 
     if (!tenant) {
+        console.log(`${req.method} ${req.path} - route: addUserToTenant`);
       return res.status(404).json({ error: 'tenant_not_found' });
     }
 

@@ -219,10 +219,37 @@ export default function AdminTiersPage() {
     }
   };
 
-  const getTierOptions = () => {
+const formatPriceLabel = (price: number, tierType: string, tierKey: string) => {
+  // For trial tiers with $0 price, show 14-day duration
+  if (tierType === 'trial' || tierKey.startsWith('trial_')) {
+    if (price > 0) {
+      return `$${price}/mo`;
+    }
+    return '$0/14-day';
+  }
+  return `$${price}/mo`;
+};
+
+const getTierColor = (tierType: string, tierKey: string) => {
+  if (tierType === 'organization') return 'bg-gradient-to-r from-purple-500 to-pink-600 text-white';
+  const colors: Record<string, string> = {
+    google_only: 'bg-green-100 text-green-800',
+    starter: 'bg-blue-100 text-blue-800',
+    professional: 'bg-purple-100 text-purple-800',
+    enterprise: 'bg-amber-100 text-amber-800',
+    trial_google_only: 'bg-emerald-100 text-emerald-800',
+    trial_starter: 'bg-sky-100 text-sky-800',
+    trial_professional: 'bg-indigo-100 text-indigo-800',
+    trial_chain_starter: 'bg-cyan-100 text-cyan-800',
+    expired_trial: 'bg-red-100 text-red-800',
+  };
+  return colors[tierKey] || 'bg-neutral-100 text-neutral-800';
+};
+
+const getTierOptions = () => {
   const options = dbTiers.map(tier => ({
     value: tier.tierKey,
-    label: `${tier.displayName} ($${tier.priceMonthly}/mo)`,
+    label: `${tier.displayName} (${formatPriceLabel(tier.priceMonthly, tier.tierType, tier.tierKey)})`,
     color: getTierColor(tier.tierType, tier.tierKey),
     tier,
   }));
@@ -239,7 +266,7 @@ export default function AdminTiersPage() {
   trialTiers.forEach(trial => {
     options.push({
       value: trial.key,
-      label: `${trial.name} ($${trial.price}/mo)`,
+      label: `${trial.name} (${formatPriceLabel(trial.price, 'trial', trial.key)})`,
       color: getTierColor('individual', trial.key),
       tier: {
         id: trial.key,
@@ -258,26 +285,52 @@ export default function AdminTiersPage() {
   return options;
 };
 
-  const getTierColor = (tierType: string, tierKey: string) => {
-    if (tierType === 'organization') return 'bg-gradient-to-r from-purple-500 to-pink-600 text-white';
-    const colors: Record<string, string> = {
-      google_only: 'bg-green-100 text-green-800',
-      starter: 'bg-blue-100 text-blue-800',
-      professional: 'bg-purple-100 text-purple-800',
-      enterprise: 'bg-amber-100 text-amber-800',
-      trial_google_only: 'bg-emerald-100 text-emerald-800',
-      trial_starter: 'bg-sky-100 text-sky-800',
-      trial_professional: 'bg-indigo-100 text-indigo-800',
-      trial_chain_starter: 'bg-cyan-100 text-cyan-800',
-      expired_trial: 'bg-red-100 text-red-800',
-    };
-    return colors[tierKey] || 'bg-neutral-100 text-neutral-800';
-  };
+const getGroupedTierOptions = () => {
+  const individualTiers = dbTiers.filter(tier => tier.tierType === 'individual').map(tier => ({
+    value: tier.tierKey,
+    label: `${tier.displayName} (${formatPriceLabel(tier.priceMonthly, tier.tierType, tier.tierKey)})`,
+    tier,
+  }));
 
-  const getTierInfo = (tierKey?: string) => {
+  const organizationTiers = dbTiers.filter(tier => tier.tierType === 'organization').map(tier => ({
+    value: tier.tierKey,
+    label: `${tier.displayName} (${formatPriceLabel(tier.priceMonthly, tier.tierType, tier.tierKey)})`,
+    tier,
+  }));
+
+  const trialTiers = [
+    { key: 'trial_google_only', name: 'Trial: Google Only', price: 0 },
+    { key: 'trial_starter', name: 'Trial: Starter', price: 0 },
+    { key: 'trial_professional', name: 'Trial: Professional', price: 0 },
+    { key: 'trial_chain_starter', name: 'Trial: Chain Starter', price: 0 },
+    { key: 'expired_trial', name: 'Expired Trial', price: 0 },
+  ].map(trial => ({
+    value: trial.key,
+    label: `${trial.name} (${formatPriceLabel(trial.price, 'trial', trial.key)})`,
+    tier: {
+      id: trial.key,
+      tierKey: trial.key,
+      displayName: trial.name,
+      priceMonthly: trial.price,
+      maxSkus: null,
+      maxLocations: null,
+      tierType: 'trial',
+      isActive: true,
+      sortOrder: 999,
+    } as DbTier,
+  }));
+
+  return [
+    { label: 'Individual Tiers', options: individualTiers },
+    { label: 'Organization Tiers', options: organizationTiers },
+    { label: 'Trial Tiers', options: trialTiers },
+  ];
+};
+
+const getTierInfo = (tierKey?: string) => {
     const tier = dbTiers.find(t => t.tierKey === tierKey);
     if (!tier) return null;
-    return { value: tier.tierKey, label: `${tier.displayName} ($${tier.priceMonthly}/mo)`, color: getTierColor(tier.tierType, tier.tierKey), tier };
+    return { value: tier.tierKey, label: `${tier.displayName} (${formatPriceLabel(tier.priceMonthly, tier.tierType, tier.tierKey)})`, color: getTierColor(tier.tierType, tier.tierKey), tier };
   };
 
   const getStatusInfo = (status?: string) => STATUSES.find(s => s.value === status) || STATUSES[0];
@@ -342,8 +395,8 @@ export default function AdminTiersPage() {
               <div>
                 <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Subscription Tiers</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {getTierOptions().map(tierOption => (
-                    <div key={`${tierOption.value}-${tierOption.tier.id}`} className="p-4 border border-neutral-200 rounded-lg">
+                  {getTierOptions().map((tierOption, index) => (
+                    <div key={`tier-${index}-${tierOption.value}`} className="p-4 border border-neutral-200 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-2xl">
                           {tierOption.value === 'google_only' && '🔍'}
@@ -505,7 +558,13 @@ export default function AdminTiersPage() {
                               <label className="text-xs font-medium text-neutral-700 mb-1 block">Subscription Tier</label>
                               <select value={tenant.subscriptionTier || 'starter'} onChange={(e) => updateTier(tenant.id, e.target.value, tenant.subscriptionStatus || 'active')} disabled={isUpdating}
                                 className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg bg-white disabled:opacity-50">
-                                {getTierOptions().map(t => <option key={`${t.value}-${t.tier.id}`} value={t.value}>{t.tier.displayName} (${t.tier.priceMonthly}/mo)</option>)}
+                                {getGroupedTierOptions().map((group, groupIndex) => (
+                                  <optgroup key={`group-${groupIndex}`} label={group.label}>
+                                    {group.options.map((t, optionIndex) => (
+                                      <option key={`option-${groupIndex}-${optionIndex}-${t.value}`} value={t.value}>{t.tier.displayName} ({formatPriceLabel(t.tier.priceMonthly, t.tier.tierType, t.tier.tierKey)})</option>
+                                    ))}
+                                  </optgroup>
+                                ))}
                               </select>
                             </div>
                             <div className="w-40">

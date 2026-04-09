@@ -106,10 +106,32 @@ async function loadTiers(): Promise<Map<string, TierWithFeatures>> {
 
 /**
  * Get a tier by key
+ * For trial tiers, returns the base tier with proxy features
  */
 export async function getTierByKey(tierKey: string): Promise<TierWithFeatures | null> {
   const tiers = await loadTiers();
-  return tiers.get(tierKey) || null;
+  
+  // First try to get the tier directly
+  let tier = tiers.get(tierKey);
+  
+  // If it's a trial tier, proxy to base tier for features
+  if (tier && tierKey.startsWith('trial_')) {
+    const baseTierKey = getBaseTierForTrial(tierKey);
+    if (baseTierKey) {
+      const baseTier = tiers.get(baseTierKey);
+      if (baseTier) {
+        // Return trial tier metadata with base tier features
+        tier = {
+          ...tier,
+          features: baseTier.features,
+          max_skus: baseTier.max_skus, // Use base tier limits
+          max_locations: baseTier.max_locations,
+        };
+      }
+    }
+  }
+  
+  return tier || null;
 }
 
 /**

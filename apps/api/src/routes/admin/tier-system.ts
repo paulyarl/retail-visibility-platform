@@ -21,13 +21,52 @@ router.use(authenticateToken);
 
 /**
  * Helper to transform tier data from Prisma format to frontend format
+ * Uses TierService proxy pattern for trial tiers
  */
-function transformTier(tier: any) {
+async function transformTier(tier: any) {
   // Convert Decimal price to number for JSON serialization
   const priceMonthly = tier.price_monthly;
   const numericPrice = typeof priceMonthly?.toNumber === 'function' 
     ? priceMonthly.toNumber() 
     : Number(priceMonthly);
+  
+  let features: any[] = [];
+  
+  // Use TierService proxy pattern for trial tiers
+  if (tier.tier_key.startsWith('trial_')) {
+    console.log(`[Tier System] Processing trial tier: ${tier.tier_key}`);
+    try {
+      const { getTierFeatures, getTierByKey } = await import('../../services/TierService');
+      const tierFeatures = await getTierFeatures(tier.tier_key);
+      const baseTier = await getTierByKey(tier.tier_key);
+      
+      console.log(`[Tier System] Trial tier ${tier.tier_key} got ${tierFeatures.length} features`);
+      
+      // Map feature keys to feature objects
+      features = tierFeatures.map((featureKey: string, index: number) => ({
+        id: `proxy-${index}`,
+        featureKey: featureKey,
+        featureName: featureKey,
+        isEnabled: true,
+        isInherited: true,
+      }));
+      
+      console.log(`[Tier System] Mapped ${features.length} features for trial tier ${tier.tier_key}`);
+    } catch (error) {
+      console.warn(`[Tier System] Failed to get proxy features for trial tier ${tier.tier_key}:`, error);
+      // Fallback to empty features
+      features = [];
+    }
+  } else {
+    // Non-trial tiers: use stored features
+    features = (tier.tier_features_list || []).map((feature: any) => ({
+      id: feature.id,
+      featureKey: feature.feature_key,
+      featureName: feature.feature_name,
+      isEnabled: feature.is_enabled,
+      isInherited: feature.is_inherited,
+    }));
+  }
   
   return {
     id: tier.id,
@@ -41,13 +80,7 @@ function transformTier(tier: any) {
     tierType: tier.tier_type,
     isActive: tier.is_active,
     sortOrder: tier.sort_order,
-    features: (tier.tier_features_list || []).map((feature: any) => ({
-      id: feature.id,
-      featureKey: feature.feature_key,
-      featureName: feature.feature_name,
-      isEnabled: feature.is_enabled,
-      isInherited: feature.is_inherited,
-    })),
+    features,
     createdAt: tier.created_at,
     updatedAt: tier.updated_at,
   };
@@ -132,14 +165,21 @@ async function logTierChange(params: {
  */
 router.get('/tiers', requirePlatformStaff, async (req, res) => {
   try {
-    const { includeInactive } = req.query;
+    const { includeInactive, bustCache } = req.query;
 
-    // Check cache first
+    // Check cache first (unless cache busting is requested)
     const { memoryCache } = require('../../utils/cache');
     const cacheKey = `tier-system:tiers:${includeInactive === 'true' ? 'all' : 'active'}`;
+    
+    // Clear cache if bustCache=true or if we suspect trial tier cache issues
+    if (bustCache === 'true') {
+      memoryCache.delete(cacheKey);
+      console.log(`[Tier System] Cache busted for ${cacheKey}`);
+    }
+    
     const cachedResult = memoryCache.get(cacheKey);
     
-    if (cachedResult) {
+    if (cachedResult && bustCache !== 'true') {
       console.log(`[Tier System] Cache hit for ${cacheKey}`);
       return res.json(cachedResult);
     }
@@ -165,8 +205,12 @@ router.get('/tiers', requirePlatformStaff, async (req, res) => {
       },
     });
 
-    // Transform the response to match frontend expectations
-    const transformedTiers = tiers.map(transformTier);
+    console.log(`[Tier System] Found ${tiers.length} tiers in database`);
+    const trialTiers = tiers.filter(t => t.tier_key.startsWith('trial_'));
+    console.log(`[Tier System] Found ${trialTiers.length} trial tiers: ${trialTiers.map(t => t.tier_key).join(', ')}`);
+
+    // Transform the response to match frontend expectations (handle async transformTier)
+    const transformedTiers = await Promise.all(tiers.map(transformTier));
     const result = { tiers: transformedTiers };
 
     // Cache for 5 minutes (tier data changes infrequently)
@@ -231,8 +275,8 @@ router.get('/tiers/:tierId', requirePlatformStaff, async (req, res) => {
       return res.status(400).json({ error: 'tier_not_found' });
     }
 
-    // Transform the response to match frontend expectations
-    const transformedTier = transformTier(tier);
+    // Transform the response to match frontend expectations (handle async transformTier)
+    const transformedTier = await transformTier(tier);
 
     res.json({ tier: transformedTier });
   } catch (error) {
@@ -345,8 +389,8 @@ router.post('/tiers', requirePlatformAdmin, async (req, res) => {
 
     // console.log(`[Tier System] Tier created by ${req.user?.email}:`, tier.tier_key);
 
-    // Transform the response to match frontend expectations
-    const transformedTier = transformTier(tier);
+    // Transform the response to match frontend expectations (handle async transformTier)
+    const transformedTier = await transformTier(tier);
 
     res.status(201).json({ tier: transformedTier });
   } catch (error) {
@@ -485,8 +529,8 @@ router.patch('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
 
     // console.log(`[Tier System] Tier updated by ${req.user?.email}:`, updatedTier.tier_key);
 
-    // Transform the response to match frontend expectations
-    const transformedTier = transformTier(updatedTier);
+    // Transform the response to match frontend expectations (handle async transformTier)
+    const transformedTier = await transformTier(updatedTier);
 
     res.json({ tier: transformedTier });
   } catch (error) {
@@ -603,8 +647,8 @@ router.put('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
 
     // console.log(`[Tier System] Tier updated by ${req.user?.email}:`, updatedTier.tier_key);
 
-    // Transform the response to match frontend expectations
-    const transformedTier = transformTier(updatedTier);
+    // Transform the response to match frontend expectations (handle async transformTier)
+    const transformedTier = await transformTier(updatedTier);
 
     res.json({ tier: transformedTier });
   } catch (error) {
@@ -708,8 +752,8 @@ router.delete('/tiers/:tierId', requirePlatformAdmin, async (req, res) => {
 
       // console.log(`[Tier System] Tier soft deleted by ${req.user?.email}:`, currentTier.tier_key);
 
-    // Transform the response to match frontend expectations
-    const transformedTier = transformTier(updatedTier);
+    // Transform the response to match frontend expectations (handle async transformTier)
+    const transformedTier = await transformTier(updatedTier);
 
     res.json({ success: true, deactivated: true, tier: transformedTier });
     }

@@ -44,28 +44,51 @@ router.get('/tiers', async (req, res) => {
       orderBy: { sort_order: 'asc' },
     });
 
-    // Group tiers by type
-    const groupedTiers = tiers.reduce((acc, tier) => {
-      const tierData = {
-        id: tier.tier_key,
-        name: tier.name,
-        displayName: tier.display_name,
-        price: tier.price_monthly, // Already stored as dollars (DECIMAL)
-        maxSkus: tier.max_skus,
-        maxLocations: tier.max_locations,
-        description: tier.description || '',
-        type: tier.tier_type,
-        features: tier.tier_features_list.map((f: { feature_key: string }) => f.feature_key),
-        sortOrder: tier.sort_order,
-        isActive: tier.is_active,
-      };
-
-      if (!acc[tier.tier_type]) {
-        acc[tier.tier_type] = [];
+    // Group tiers by type with proxy pattern for trial tiers
+    const groupedTiers = await Promise.all(tiers.map(async (tier) => {
+      let features: string[] = [];
+      
+      // Use TierService proxy pattern for trial tiers
+      if (tier.tier_key.startsWith('trial_')) {
+        try {
+          const { getTierFeatures } = await import('../../services/TierService');
+          features = await getTierFeatures(tier.tier_key);
+          console.log(`[Tier Management] Trial tier ${tier.tier_key} got ${features.length} features via proxy`);
+        } catch (error) {
+          console.warn(`[Tier Management] Failed to get proxy features for trial tier ${tier.tier_key}:`, error);
+          // Fallback to empty features
+          features = [];
+        }
+      } else {
+        // Non-trial tiers: use stored features
+        features = tier.tier_features_list.map((f: { feature_key: string }) => f.feature_key);
       }
-      acc[tier.tier_type].push(tierData);
-      return acc;
-    }, {} as Record<string, any[]>);
+      
+      return {
+        tier,
+        tierData: {
+          id: tier.tier_key,
+          name: tier.name,
+          displayName: tier.display_name,
+          price: tier.price_monthly, // Already stored as dollars (DECIMAL)
+          maxSkus: tier.max_skus,
+          maxLocations: tier.max_locations,
+          description: tier.description || '',
+          type: tier.tier_type,
+          features,
+          sortOrder: tier.sort_order,
+          isActive: tier.is_active,
+        }
+      };
+    })).then(tierResults => {
+      return tierResults.reduce((acc, { tier, tierData }) => {
+        if (!acc[tier.tier_type]) {
+          acc[tier.tier_type] = [];
+        }
+        acc[tier.tier_type].push(tierData);
+        return acc;
+      }, {} as Record<string, any[]>);
+    });
 
     res.json(groupedTiers);
   } catch (error) {
@@ -256,6 +279,11 @@ router.patch('/tenants/:tenantId', async (req, res) => {
         subscription_status: true,
         trial_ends_at: true,
         subscription_ends_at: true,
+        ...(true as any && {
+          manual_subscription_control: true,
+          manual_subscription_expires_at: true,
+          manual_subscription_reason: true,
+        }),
         _count: {
           select: {
             inventory_items: true,
@@ -269,7 +297,7 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     }
 
     // Check SKU limits if changing tier
-    if (updateData.subscriptionTier && updateData.subscriptionTier !== currentTenant.subscription_tier) {
+    if (updateData.subscriptionTier && updateData.subscriptionTier !== (currentTenant as any).subscription_tier) {
       const tierLimits: Record<string, number> = {
         google_only: 250,
         starter: 500,
@@ -282,7 +310,7 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       };
 
       const newLimit = tierLimits[updateData.subscriptionTier];
-      const currentSKUs = currentTenant._count.inventory_items;
+      const currentSKUs = (currentTenant as any)._count.inventory_items;
 
       if (newLimit !== Infinity && currentSKUs > newLimit) {
         return res.status(400).json({
@@ -303,18 +331,34 @@ router.patch('/tenants/:tenantId', async (req, res) => {
 
     // Auto-handle trial expiration for trial tiers
     if (updateData.subscriptionTier?.startsWith('trial_')) {
-      const now = new Date();
-      const trialEndsAt = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000)); // 14 days from now
-      const graceEndsAt = new Date(now.getTime() + (28 * 24 * 60 * 60 * 1000)); // 28 days from now (14 + 14 grace)
-      
-      updatePayload.trial_ends_at = trialEndsAt;
-      updatePayload.subscription_status = updateData.subscriptionStatus || 'trial';
-      
-      console.log(`[Tier Management] Auto-set trial expiration for tenant ${tenantId}:`, {
-        trialTier: updateData.subscriptionTier,
-        trialEndsAt: trialEndsAt.toISOString(),
-        graceEndsAt: graceEndsAt.toISOString(),
-      });
+      // Check if manual subscription control is active
+      if ((currentTenant as any).manual_subscription_control) {
+        console.log(`[Tier Management] Manual subscription control active - skipping auto trial expiration for tenant ${tenantId}:`, {
+          trialTier: updateData.subscriptionTier,
+          manualControl: true,
+          manualExpiresAt: (currentTenant as any).manual_subscription_expires_at,
+        });
+        
+        // Don't override manual expiration - only update status if needed
+        if (updateData.subscriptionStatus) {
+          updatePayload.subscription_status = updateData.subscriptionStatus;
+        }
+      } else {
+        // Only set trial expiration if manual control is NOT active
+        const now = new Date();
+        const trialEndsAt = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000)); // 14 days from now
+        const graceEndsAt = new Date(now.getTime() + (28 * 24 * 60 * 60 * 1000)); // 28 days from now (14 + 14 grace)
+        
+        updatePayload.trial_ends_at = trialEndsAt;
+        updatePayload.subscription_status = updateData.subscriptionStatus || 'trial';
+        
+        console.log(`[Tier Management] Auto-set trial expiration for tenant ${tenantId}:`, {
+          trialTier: updateData.subscriptionTier,
+          trialEndsAt: trialEndsAt.toISOString(),
+          graceEndsAt: graceEndsAt.toISOString(),
+          manualControl: false,
+        });
+      }
     } else if (updateData.subscriptionTier === 'expired_trial') {
       // Handle expired trial tier
       updatePayload.trial_ends_at = null;
@@ -323,12 +367,12 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       console.log(`[Tier Management] Set tenant ${tenantId} to expired_trial status`);
     } else if (updateData.subscriptionTier && !updateData.subscriptionTier.startsWith('trial_')) {
       // Moving from trial to paid tier - clear trial dates
-      if (currentTenant.subscription_tier?.startsWith('trial_')) {
+      if ((currentTenant as any).subscription_tier?.startsWith('trial_')) {
         updatePayload.trial_ends_at = null;
         updatePayload.subscription_status = updateData.subscriptionStatus || 'active';
         
         console.log(`[Tier Management] Converted tenant ${tenantId} from trial to paid tier:`, {
-          fromTier: currentTenant.subscription_tier,
+          fromTier: (currentTenant as any).subscription_tier,
           toTier: updateData.subscriptionTier,
         });
       }
@@ -348,10 +392,10 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       payload: {
         reason,
         before: {
-          subscriptionTier: currentTenant.subscription_tier,
-          subscriptionStatus: currentTenant.subscription_status,
-          trialEndsAt: currentTenant.trial_ends_at?.toISOString(),
-          subscriptionEndsAt: currentTenant.subscription_ends_at?.toISOString(),
+          subscriptionTier: (currentTenant as any).subscription_tier,
+          subscriptionStatus: (currentTenant as any).subscription_status,
+          trialEndsAt: (currentTenant as any).trial_ends_at?.toISOString(),
+          subscriptionEndsAt: (currentTenant as any).subscription_ends_at?.toISOString(),
         },
         after: {
           subscriptionTier: updatedTenant.subscription_tier,
@@ -370,6 +414,27 @@ router.patch('/tenants/:tenantId', async (req, res) => {
       reason,
     });
 
+    // Calculate effective expiration for response
+    const effectiveExpiration = (updatedTenant as any).manual_subscription_control 
+      ? {
+          expiresAt: (updatedTenant as any).manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : updatedTenant.subscription_status === 'trial' && updatedTenant.trial_ends_at
+        ? {
+            expiresAt: updatedTenant.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : updatedTenant.subscription_ends_at
+          ? {
+              expiresAt: updatedTenant.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
+
     res.json({
       success: true,
       tenant: updatedTenant,
@@ -377,10 +442,19 @@ router.patch('/tenants/:tenantId', async (req, res) => {
         before: {
           subscriptionTier: currentTenant.subscription_tier,
           subscriptionStatus: currentTenant.subscription_status,
+          manualSubscriptionControl: (currentTenant as any).manual_subscription_control,
+          manualSubscriptionExpiresAt: (currentTenant as any).manual_subscription_expires_at,
+          manualSubscriptionReason: (currentTenant as any).manual_subscription_reason,
         },
         after: {
           subscriptionTier: updatedTenant.subscription_tier,
           subscriptionStatus: updatedTenant.subscription_status,
+          manualSubscriptionControl: (updatedTenant as any).manual_subscription_control,
+          manualSubscriptionExpiresAt: (updatedTenant as any).manual_subscription_expires_at,
+          manualSubscriptionReason: (updatedTenant as any).manual_subscription_reason,
+          effectiveExpiresAt: effectiveExpiration?.expiresAt,
+          effectiveExpiresType: effectiveExpiration?.type,
+          effectiveExpiresSource: effectiveExpiration?.source,
         },
       },
     });

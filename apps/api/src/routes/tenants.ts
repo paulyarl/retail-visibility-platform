@@ -83,6 +83,14 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
           organization_id: true,
           subscription_tier: true,
           subscription_status: true,
+          subscription_ends_at: true,
+          trial_ends_at: true,
+          grace_ends_at: true,
+          ...(true as any && {
+            manual_subscription_control: true,
+            manual_subscription_expires_at: true,
+            manual_subscription_reason: true,
+          }),
           location_status: true,
           created_at: true,
           organizations_list: {
@@ -112,6 +120,14 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
               organization_id: true,
               subscription_tier: true,
               subscription_status: true,
+              subscription_ends_at: true,
+              trial_ends_at: true,
+              grace_ends_at: true,
+              ...(true as any && {
+                manual_subscription_control: true,
+                manual_subscription_expires_at: true,
+                manual_subscription_reason: true,
+              }),
               location_status: true,
               created_at: true,
               organizations_list: {
@@ -132,33 +148,59 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
       });
       tenants = userTenants.map(ut => ut.tenants);
     }
-     // Check if tenant has published directory listing
-    // const directoryResult = await prisma.$queryRaw`
-    //   SELECT is_published FROM "directory_settings_list" WHERE tenant_id = ${tenant.id}
-    // `;
-    // const hasPublishedDirectory = directoryResult && (directoryResult as any[])?.[0]?.is_published === true;
 
+    // Transform the data to match the expected format
+    const transformedTenants = tenants.map(tenant => {
+      // Calculate effective expiration: Manual takes priority over automatic
+      const effectiveExpiration = (tenant as any).manual_subscription_control 
+        ? {
+            expiresAt: (tenant as any).manual_subscription_expires_at,
+            type: 'manual' as const,
+            source: 'manual_override' as const
+          }
+        : (tenant as any).subscription_status === 'trial' && (tenant as any).trial_ends_at
+          ? {
+              expiresAt: (tenant as any).trial_ends_at,
+              type: 'trial' as const,
+              source: 'automatic_trial' as const
+            }
+          : (tenant as any).subscription_ends_at
+            ? {
+                expiresAt: (tenant as any).subscription_ends_at,
+                type: 'subscription' as const,
+                source: 'automatic_subscription' as const
+              }
+            : null;
 
-    // Transform for frontend compatibility
-    const transformedTenants = tenants.map((tenant: any) => ({
-      id: tenant.id,
-      name: tenant.name,
-      organizationId: tenant.organization_id,
-      subscriptionTier: tenant.subscription_tier,
-      subscriptionStatus: tenant.subscription_status,
-      trialEndsAt: tenant.trial_ends_at,
-      subscriptionEndsAt: tenant.subscription_ends_at,
-      createdAt: tenant.created_at,
-      // hasPublishedDirectory: hasPublishedDirectory,
-      organization: tenant.organizations_list ? {
-        id: tenant.organizations_list.id,
-        name: tenant.organizations_list.name,
-      } : null,
-      _count: {
-        items: tenant._count.inventory_items,
-        users: tenant._count.user_tenants,
-      },
-    }));
+      return {
+        id: tenant.id,
+        name: tenant.name,
+        organizationId: tenant.organization_id,
+        subscriptionTier: tenant.subscription_tier,
+        subscriptionStatus: tenant.subscription_status,
+        trialEndsAt: tenant.trial_ends_at,
+        subscriptionEndsAt: tenant.subscription_ends_at,
+        graceEndsAt: tenant.grace_ends_at,
+        createdAt: tenant.created_at,
+        // hasPublishedDirectory: hasPublishedDirectory,
+        organization: (tenant as any).organizations_list ? {
+          id: (tenant as any).organizations_list.id,
+          name: (tenant as any).organizations_list.name,
+        } : null,
+        _count: {
+          items: (tenant as any)._count.inventory_items,
+          users: (tenant as any)._count.user_tenants,
+        },
+        // Manual subscription control fields
+        manualSubscriptionControl: (tenant as any).manual_subscription_control,
+        manualSubscriptionExpiresAt: (tenant as any).manual_subscription_expires_at,
+        manualSubscriptionReason: (tenant as any).manual_subscription_reason,
+        // Effective expiration fields
+        effectiveExpiresAt: effectiveExpiration?.expiresAt,
+        effectiveExpiresType: effectiveExpiration?.type,
+        effectiveExpiresSource: effectiveExpiration?.source
+      };
+    });
 
     // Add caching headers for better performance (5 minute cache for tenant lists)
     res.setHeader('Cache-Control', 'private, max-age=300'); // 5 minutes
@@ -304,6 +346,11 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
         subscription_status: true,
         trial_ends_at: true,
         subscription_ends_at: true,
+        ...(true as any && {
+          manual_subscription_control: true,
+          manual_subscription_expires_at: true,
+          manual_subscription_reason: true,
+        }),
         location_status: true,
         subdomain: true,
         created_at: true,
@@ -312,12 +359,7 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
             logo_url: true,
           },
         },
-        payment_gateways: {
-          where: { is_active: true },
-          take: 1,
-          select: { id: true },
-        },
-        _count: {
+                _count: {
           select: {
             inventory_items: true,
             user_tenants: true,
@@ -345,8 +387,8 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
     }
 
     // Determine effective tier (org tier overrides tenant tier for chain members)
-    const effectiveTier = tenant.organizations_list?.subscription_tier || tenant.subscription_tier || 'starter';
-    const isChainMember = !!tenant.organizations_list;
+    const effectiveTier = (tenant as any).organizations_list?.subscription_tier || tenant.subscription_tier || 'starter';
+    const isChainMember = !!(tenant as any).organizations_list;
 
     // Check if tenant has active payment gateway for cart feature
     const hasActivePaymentGateway = (tenant as any).payment_gateways?.length > 0;
@@ -362,15 +404,36 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
 
       const hasDirectory = tenantResult?.is_published === true;
 
+    // Calculate effective expiration for single tenant
+    const effectiveExpiration = (tenant as any).manual_subscription_control 
+      ? {
+          expiresAt: (tenant as any).manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : (tenant as any).subscription_status === 'trial' && tenant.trial_ends_at
+        ? {
+            expiresAt: tenant.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : tenant.subscription_ends_at
+          ? {
+              expiresAt: tenant.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
+
     // Transform for frontend compatibility
     const transformedTenant = {
       id: tenant.id,
       name: tenant.name,
       organizationId: tenant.organization_id,
-      organization: tenant.organizations_list ? {
-        id: tenant.organizations_list.id,
-        name: tenant.organizations_list.name,
-        tier: tenant.organizations_list.subscription_tier,
+      organization: (tenant as any).organizations_list ? {
+        id: (tenant as any).organizations_list.id,
+        name: (tenant as any).organizations_list.name,
+        tier: tenant.subscription_tier,
       } : null,
       subscriptionTier: effectiveTier, // Use effective tier, not raw tenant tier
       subscriptionStatus: tenant.subscription_status,
@@ -387,6 +450,14 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
         productCount: (tenant as any)._count.inventory_items,
         userCount: (tenant as any)._count.user_tenants,
       },
+      // Manual subscription control fields
+      manualSubscriptionControl: (tenant as any).manual_subscription_control,
+      manualSubscriptionExpiresAt: (tenant as any).manual_subscription_expires_at,
+      manualSubscriptionReason: (tenant as any).manual_subscription_reason,
+      // Effective expiration fields
+      effectiveExpiresAt: effectiveExpiration?.expiresAt,
+      effectiveExpiresType: effectiveExpiration?.type,
+      effectiveExpiresSource: effectiveExpiration?.source
     };
 
     console.log(`[TENANTS] Returning tenant data:`, {

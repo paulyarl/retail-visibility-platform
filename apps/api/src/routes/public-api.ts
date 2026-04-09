@@ -781,6 +781,9 @@ router.get('/tenant/:identifier', async (req, res) => {
           region: true,
           trial_ends_at: true,
           subscription_ends_at: true,
+          manual_subscription_control: true,
+          manual_subscription_expires_at: true,
+          manual_subscription_reason: true,
           organization_id: true,
           location_status: true,
           status_changed_at: true
@@ -872,6 +875,27 @@ router.get('/tenant/:identifier', async (req, res) => {
       }
     }
 
+    // Calculate effective expiration for public API response
+    const effectiveExpiration = tenant.manual_subscription_control 
+      ? {
+          expiresAt: tenant.manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : tenant.subscription_status === 'trial' && tenant.trial_ends_at
+        ? {
+            expiresAt: tenant.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : tenant.subscription_ends_at
+          ? {
+              expiresAt: tenant.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
+
     res.json({
       success: true,
       data: {
@@ -892,7 +916,15 @@ router.get('/tenant/:identifier', async (req, res) => {
         profileData: profileResult,
         metadata: resolvedTenant.metadata,
         createdAt: new Date().toISOString(), // We don't have created_at in cache
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        // Manual subscription control fields
+        manualSubscriptionControl: tenant.manual_subscription_control,
+        manualSubscriptionExpiresAt: tenant.manual_subscription_expires_at,
+        manualSubscriptionReason: tenant.manual_subscription_reason,
+        // Effective expiration fields
+        effectiveExpiresAt: effectiveExpiration?.expiresAt,
+        effectiveExpiresType: effectiveExpiration?.type,
+        effectiveExpiresSource: effectiveExpiration?.source
       },
       metadata: {
         tenant: {

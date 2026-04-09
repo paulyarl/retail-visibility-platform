@@ -357,6 +357,11 @@ app.use("/uploads", express.static(UPLOAD_DIR));
 /* ------------------------------ tenants ------------------------------ */
 import tenantCategoriesRoutes from './routes/tenant-categories';
 
+// Mount admin service charges routes BEFORE universal tenants to prevent interception
+import serviceChargesRoutes from './routes/admin/service-charges';
+app.use('/api/admin/service-charges', serviceChargesRoutes);
+console.log('✅ Admin service charges routes mounted at /api/admin/service-charges');
+
 // Mount universal tenant routes (NEW - Phase 3)
 import universalTenantsRoutes from './routes/universal-tenants';
 app.use('/api', universalTenantsRoutes);
@@ -1002,6 +1007,7 @@ app.post("/api/tenants/:id/geocode", async (req, res) => {
     `;
     
     if (!listingResult || listingResult.length === 0) {
+      console.log(`route: /api/tenants/:id/geocode`);
       return res.status(400).json({ error: "tenant_not_found" });
     }
     
@@ -6777,6 +6783,11 @@ console.log('✅ Admin tools routes mounted at /api/admin/tools');
 import sentryRoutes from './routes/admin/sentry';
 app.use('/api/admin/sentry', authenticateToken, requireAdmin, sentryRoutes);
 console.log('✅ Admin sentry routes mounted at /api/admin/sentry');
+
+/* ------------------------------ admin manual billing ------------------------------ */
+import manualBillingRoutes from './routes/admin/manual-billing';
+app.use('/api/admin/manual-billing', manualBillingRoutes);
+console.log('✅ Admin manual billing routes mounted at /api/admin/manual-billing');
 
 /* ------------------------------ gbp advanced sync singleton ------------------------------ */
 import gbpAdvancedSyncSingletonRoutes from './routes/gbp-advanced-sync-singleton';

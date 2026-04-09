@@ -23,6 +23,9 @@ router.get("/status", async (req, res) => {
         subscription_tier: true,
         trial_ends_at: true,
         subscription_ends_at: true,
+        manual_subscription_control: true,
+        manual_subscription_expires_at: true,
+        manual_subscription_reason: true,
         stripe_customer_id: true,
         _count: {
           select: {
@@ -34,18 +37,39 @@ router.get("/status", async (req, res) => {
     });
 
     if (!tenant) {
+      
+        console.log(`${req.method} ${req.path} - route: getSubscriptionStatus`);
       return res.status(404).json({ error: "tenant_not_found" });
     }
 
     const now = new Date();
 
-    // Calculate days remaining (trial or subscription)
+    // Calculate effective expiration with manual priority
+    const effectiveExpiration = tenant.manual_subscription_control 
+      ? {
+          expiresAt: tenant.manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : tenant.subscription_status === 'trial' && tenant.trial_ends_at
+        ? {
+            expiresAt: tenant.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : tenant.subscription_ends_at
+          ? {
+              expiresAt: tenant.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
+
+    // Calculate days remaining using effective expiration
     let daysRemaining = null;
     
-    if (tenant.subscription_status === "trial" && tenant.trial_ends_at) {
-      daysRemaining = Math.ceil((tenant.trial_ends_at.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    } else if (tenant.subscription_ends_at) {
-      daysRemaining = Math.ceil((tenant.subscription_ends_at.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (effectiveExpiration?.expiresAt) {
+      daysRemaining = Math.ceil((effectiveExpiration.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     }
 
     // Get tier limits
@@ -70,6 +94,14 @@ router.get("/status", async (req, res) => {
         subscriptionEndsAt: tenant.subscription_ends_at,
         daysRemaining,
         hasStripeAccount: !!tenant.stripe_customer_id,
+        // Manual subscription control fields
+        manualSubscriptionControl: tenant.manual_subscription_control,
+        manualSubscriptionExpiresAt: tenant.manual_subscription_expires_at,
+        manualSubscriptionReason: tenant.manual_subscription_reason,
+        // Effective expiration fields
+        effectiveExpiresAt: effectiveExpiration?.expiresAt,
+        effectiveExpiresType: effectiveExpiration?.type,
+        effectiveExpiresSource: effectiveExpiration?.source
       },
       usage: {
         _count: {

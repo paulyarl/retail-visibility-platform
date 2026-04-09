@@ -12,6 +12,7 @@
 import { prisma } from '../prisma';
 import { getBillingNotificationService } from '../services/subscription/BillingNotificationService';
 import { getTrialManagementService, GRACE_DURATION_DAYS } from '../services/subscription/TrialManagementService';
+import { expireManualSubscriptionControl } from './expireManualSubscriptionControl';
 
 export interface GracePeriodResult {
   processed: number;
@@ -33,6 +34,15 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
     trialEndsProcessed: 0,
     errors: [],
   };
+
+  // First, check for expired manual subscription control
+  try {
+    await expireManualSubscriptionControl();
+    console.log('[GracePeriodJob] Manual subscription control check completed');
+  } catch (error) {
+    console.error('[GracePeriodJob] Error checking manual subscription control:', error);
+    result.errors.push('Failed to check manual subscription control');
+  }
 
   const trialService = getTrialManagementService();
 

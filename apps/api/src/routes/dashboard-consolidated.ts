@@ -34,6 +34,9 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
           subscription_status: true,
           trial_ends_at: true,
           subscription_ends_at: true,
+          manual_subscription_control: true,
+          manual_subscription_expires_at: true,
+          manual_subscription_reason: true,
           organization_id: true,
           monthly_sku_quota: true,
           skus_added_this_month: true,
@@ -72,6 +75,27 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
     }
 
     const [totalItems, activeItems, syncIssues] = itemCounts;
+
+    // Calculate effective expiration for tenant dashboard
+    const effectiveExpiration = tenant.manual_subscription_control 
+      ? {
+          expiresAt: tenant.manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : tenant.subscription_status === 'trial' && tenant.trial_ends_at
+        ? {
+            expiresAt: tenant.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : tenant.subscription_ends_at
+          ? {
+              expiresAt: tenant.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
 
     // Calculate tier info (from tenant-tier.ts logic)
     const effectiveTier = tenant.organizations_list?.subscription_tier || tenant.subscription_tier || 'starter';
@@ -139,6 +163,14 @@ router.get('/consolidated/:tenantId', authenticateToken, checkTenantAccess, asyn
         organizationTier: tenant.organizations_list?.subscription_tier,
         tenantTier: tenantTierData,
         organizationTierData: orgTierData,
+        // Manual subscription control fields
+        manualSubscriptionControl: tenant.manual_subscription_control,
+        manualSubscriptionExpiresAt: tenant.manual_subscription_expires_at,
+        manualSubscriptionReason: tenant.manual_subscription_reason,
+        // Effective expiration fields
+        effectiveExpiresAt: effectiveExpiration?.expiresAt,
+        effectiveExpiresType: effectiveExpiration?.type,
+        effectiveExpiresSource: effectiveExpiration?.source
       },
       usage: {
         sku: {

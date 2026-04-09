@@ -409,6 +409,24 @@ export function generateShipmentId(tenantId: string): string {
   return `ship-${tenantId}-${nanoid()}`;
 }
 
+/**
+ * Generates service charge IDs
+ * Format: svc-tid-abc123 (12 chars)
+ */
+export function generateServiceChargeId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `svc-${tenantId}-${nanoid()}`;
+}
+
+/**
+ * Generates manual invoice IDs
+ * Format: miv-tid-abc123 (12 chars)
+ */
+export function generateManualInvoiceId(tenantId: string): string {
+  const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 6);
+  return `miv-${tenantId}-${nanoid()}`;
+}
+
 // Generate variant ID function
 export function generateVariantId(parentItemId: string): string {
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 3);

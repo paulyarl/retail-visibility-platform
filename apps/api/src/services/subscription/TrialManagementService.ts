@@ -29,7 +29,7 @@ export interface TrialStartResult {
 export interface TrialChargeResult {
   success: boolean;
   charged: boolean;
-  newStatus: 'active' | 'past_due' | 'expired_trial';
+  newStatus: 'active' | 'past_due' | 'expired_trial' | 'trial';
   error?: string;
 }
 
@@ -131,6 +131,8 @@ export class TrialManagementService {
         grace_ends_at: true,
         billing_payment_method_id: true,
         trial_payment_retry_count: true,
+        manual_subscription_control: true,
+        manual_subscription_expires_at: true,
       },
     });
 
@@ -141,6 +143,19 @@ export class TrialManagementService {
         newStatus: 'expired_trial',
         error: 'Tenant not in trial status',
       };
+    }
+
+    // Check if manual subscription control is enabled
+    if (tenant.manual_subscription_control) {
+      if (!tenant.manual_subscription_expires_at || 
+          tenant.manual_subscription_expires_at > new Date()) {
+        return {
+          success: true,
+          charged: false,
+          newStatus: 'trial'
+        };
+      }
+      // Manual control has expired, proceed with normal processing
     }
 
     const selectedTier = tenant.trial_selected_tier as TrialEligibleTier;
@@ -301,6 +316,24 @@ export class TrialManagementService {
    * Tenant becomes invisible on public pages
    */
   async downgradeToExpired(tenantId: string): Promise<void> {
+    // Check manual subscription control before downgrading
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        manual_subscription_control: true,
+        manual_subscription_expires_at: true,
+      }
+    });
+
+    if (tenant?.manual_subscription_control) {
+      if (!tenant.manual_subscription_expires_at || 
+          tenant.manual_subscription_expires_at > new Date()) {
+        // Manual control is active - don't downgrade
+        console.log(`[TrialManagement] Skipping downgrade for tenant ${tenantId} - manual control active`);
+        return;
+      }
+    }
+
     await prisma.tenants.update({
       where: { id: tenantId },
       data: {

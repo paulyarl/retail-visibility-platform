@@ -787,22 +787,39 @@ export class TenantService {
         };
       }
 
-      // Get features for the tier
-      const tierFeatures = await prisma.tier_features_list.findMany({
-        where: {
-          tier_id: `tier_${tenant.subscription_tier || 'starter'}`,
-          is_enabled: true,
-        },
-        select: {
-          feature_key: true,
+      // Get features for the tier using TierService proxy pattern
+      let features: string[] = [];
+      const tierKey = tenant.subscription_tier || 'starter';
+      
+      if (tierKey.startsWith('trial_')) {
+        // Use TierService proxy pattern for trial tiers
+        try {
+          const { getTierFeatures } = await import('./TierService');
+          features = await getTierFeatures(tierKey);
+          console.log(`[TenantService] Trial tier ${tierKey} got ${features.length} features via proxy`);
+        } catch (error) {
+          console.warn(`[TenantService] Failed to get proxy features for trial tier ${tierKey}:`, error);
+          features = [];
         }
-      });
+      } else {
+        // Non-trial tiers: use stored features
+        const tierFeatures = await prisma.tier_features_list.findMany({
+          where: {
+            tier_id: `tier_${tierKey}`,
+            is_enabled: true,
+          },
+          select: {
+            feature_key: true,
+          }
+        });
+        features = tierFeatures.map(f => f.feature_key);
+      }
 
       return {
         status: tenant.subscription_status || 'active',
-        plan: tenant.subscription_tier || 'starter',
+        plan: tierKey,
         expiresAt: tenant.subscription_ends_at?.toISOString() || tenant.trial_ends_at?.toISOString(),
-        features: tierFeatures.map(f => f.feature_key),
+        features,
       };
     } catch (error) {
       console.error(`[TenantService] Error getting subscription info for ${tenantId}:`, error);

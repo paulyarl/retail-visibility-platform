@@ -161,16 +161,14 @@ export function SelfServiceBilling({
         : (tier?.annualPriceCents || 0);
 
       let paymentMethodId: string | undefined;
-      if (price > 0) {
-        const defaultMethod = paymentMethods.find(m => m.isDefault);
-        if (!defaultMethod) {
-          setError('Please add a payment method before subscribing');
-          setShowConfirmTier(false);
-          setShowAddCard(true);
-          return;
-        }
-        paymentMethodId = defaultMethod.id;
+      const defaultMethod = paymentMethods.find(m => m.isDefault);
+      if (!defaultMethod) {
+        setError('Please add a payment method before subscribing');
+        setShowConfirmTier(false);
+        setShowAddCard(true);
+        return;
       }
+      paymentMethodId = defaultMethod.id;
 
       const result = await subscriptionBillingService.subscribe(
         selectedTier,
@@ -415,8 +413,14 @@ export function SelfServiceBilling({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {tiers.map((tier) => {
+          {/* Individual Plans Section */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-1 h-5 bg-blue-500 rounded-full"></div>
+              <h4 className="text-lg font-semibold text-neutral-900">Individual Plans</h4>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {tiers.filter(tier => !tier.tier.includes('trial') && !tier.tier.includes('chain') && !tier.tier.includes('expired')).map((tier) => {
               const price = billingCycle === 'monthly' 
                 ? (tier.monthlyPriceCents || 0)
                 : (tier.annualPriceCents || 0);
@@ -450,7 +454,7 @@ export function SelfServiceBilling({
                       {tier.tier.replace(/_/g, ' ')}
                     </h4>
                     <div className="text-2xl font-bold">
-                      {price === 0 ? 'Free' : formatPrice(price)}
+                      {price === 0 ? 'Free / 14-day' : formatPrice(price)}
                       {price > 0 && (
                         <span className="text-sm font-normal text-neutral-500">
                           /{billingCycle === 'monthly' ? 'mo' : 'yr'}
@@ -486,6 +490,153 @@ export function SelfServiceBilling({
                 </div>
               );
             })}
+            </div>
+          </div>
+
+          {/* Trial Plans Section */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-1 h-5 bg-green-500 rounded-full"></div>
+              <h4 className="text-lg font-semibold text-neutral-900">Trial Plans</h4>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {tiers.filter(tier => tier.tier.startsWith('trial_') && !tier.tier.includes('expired')).map((tier) => {
+              const price = billingCycle === 'monthly' 
+                ? (tier.monthlyPriceCents || 0)
+                : (tier.annualPriceCents || 0);
+              const isCurrent = tier.tier === currentTier;
+              const isSelected = tier.tier === selectedTier;
+
+              return (
+                <div
+                  key={tier.id}
+                  className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    isCurrent 
+                      ? 'border-primary-500 bg-primary-50' 
+                      : isSelected
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-neutral-200 hover:border-neutral-300'
+                  }`}
+                  onClick={() => !isCurrent && handlePreviewTier(tier.tier)}
+                >
+                  {isCurrent && (
+                    <Badge 
+                      color="green" 
+                      variant="filled" 
+                      className="absolute -top-2 left-4"
+                    >
+                      Current
+                    </Badge>
+                  )}
+                  <div className="space-y-3">
+                    <div>
+                      <h4 className="font-semibold text-neutral-900">
+                        {tier.tier.replace(/_/g, ' ')}
+                      </h4>
+                      <div className="text-lg font-bold text-neutral-900">
+                        {price === 0 ? 'Free / 14-day' : formatPrice(price)}
+                        {price > 0 && (
+                          <span className="text-sm font-normal text-neutral-500">
+                            /{billingCycle === 'monthly' ? 'mo' : 'yr'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <ul className="space-y-1 text-xs text-neutral-600">
+                      {(tier.features || []).slice(0, 3).map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-1">
+                          <IconCheck size="0.75rem" className="text-green-500 mt-0.5" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              );
+            })}
+            </div>
+          </div>
+
+          {/* Organization Plans Section */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-1 h-5 bg-purple-500 rounded-full"></div>
+              <h4 className="text-lg font-semibold text-neutral-900">Organization Plans</h4>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {tiers.filter(tier => tier.tier.startsWith('chain_') && !tier.tier.includes('expired')).map((tier) => {
+              const price = billingCycle === 'monthly' 
+                ? (tier.monthlyPriceCents || 0)
+                : (tier.annualPriceCents || 0);
+              const isCurrent = tier.tier === currentTier;
+              const isSelected = tier.tier === selectedTier;
+
+              return (
+                <div
+                  key={tier.id}
+                  className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    isCurrent 
+                      ? 'border-primary-500 bg-primary-50' 
+                      : isSelected
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-neutral-200 hover:border-neutral-300'
+                  }`}
+                  onClick={() => !isCurrent && handlePreviewTier(tier.tier)}
+                >
+                  {isCurrent && (
+                    <Badge 
+                      color="green" 
+                      variant="filled" 
+                      className="absolute -top-2 left-4"
+                    >
+                      Current
+                    </Badge>
+                  )}
+                  <div className="space-y-3">
+                    <div>
+                      <h4 className="font-semibold text-neutral-900">
+                        {tier.tier.replace(/_/g, ' ')}
+                      </h4>
+                      <div className="text-lg font-bold text-neutral-900">
+                        {price === 0 ? 'Free / 14-day' : formatPrice(price)}
+                        {price > 0 && (
+                          <span className="text-sm font-normal text-neutral-500">
+                            /{billingCycle === 'monthly' ? 'mo' : 'yr'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Payment methods indicator for paid tiers */}
+                    {price > 0 && (
+                      <div className="flex items-center gap-2 text-xs text-neutral-500">
+                        <span>Pay with:</span>
+                        <div className="flex items-center gap-1">
+                          <IconCreditCard size="0.875rem" />
+                          <span>Card</span>
+                        </div>
+                        <span>·</span>
+                        <div className="flex items-center gap-1 text-blue-600">
+                          <IconBrandPaypal size="0.875rem" />
+                          <span>PayPal</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <ul className="space-y-1 text-xs text-neutral-600">
+                      {(tier.features || []).slice(0, 3).map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-1">
+                          <IconCheck size="0.75rem" className="text-green-500 mt-0.5" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              );
+            })}
+            </div>
           </div>
         </div>
       </Card>
