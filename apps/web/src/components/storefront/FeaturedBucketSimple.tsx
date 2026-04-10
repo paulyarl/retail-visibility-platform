@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import ProductCard, { ProductData } from '@/components/products/ProductCardLayouts';
+import { ProductCard, ProductData } from '@/components/products/ProductCardLayouts';
 import { useProductLayout, layoutVariantDescriptions } from '@/contexts/ProductLayoutContext';
 
 interface FeaturedBucketSimpleProps {
@@ -197,7 +197,6 @@ export default function FeaturedBucketSimple({
             tenantId={product.tenantId || tenantId}
             tenantName={product.tenantName || tenantName}
             tenantLogo={product.tenantLogo || tenantLogo}
-            hasActivePaymentGateway={product.hasActivePaymentGateway || false}
             defaultGatewayType={product.defaultGatewayType || getDefaultGatewayType(product.tenantId)}
           />
         ))}

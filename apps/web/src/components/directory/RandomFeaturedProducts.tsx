@@ -220,7 +220,6 @@ export default function RandomFeaturedProducts() {
                   hasDescription: product.hasDescription,
                   hasBrand: product.hasBrand,
                   hasPrice: product.hasPrice,
-                  has_active_payment_gateway: product.hasActivePaymentGateway,
                   payment_gateway_type: product.defaultGatewayType,
                   categoryName: product.categoryName,
                   categorySlug: product.categorySlug,
@@ -231,7 +230,6 @@ export default function RandomFeaturedProducts() {
                 variant="featured"
                 showCategory={true}
                 showDescription={true}
-                hasActivePaymentGateway={product.hasActivePaymentGateway}
                 defaultGatewayType={product.defaultGatewayType}
                 tenantName={product.storeInfo?.storeName}
                 tenantLogo={product.storeInfo?.storeLogo}
@@ -277,7 +275,6 @@ export default function RandomFeaturedProducts() {
                   hasDescription: product.hasDescription,
                   hasBrand: product.hasBrand,
                   hasPrice: product.hasPrice,
-                  has_active_payment_gateway: product.hasActivePaymentGateway,
                   payment_gateway_type: product.defaultGatewayType,
                   categoryName: product.categoryName,
                   categorySlug: product.categorySlug,
@@ -288,7 +285,6 @@ export default function RandomFeaturedProducts() {
                 variant="featured"
                 showCategory={true}
                 showDescription={true}
-                hasActivePaymentGateway={product.hasActivePaymentGateway}
                 defaultGatewayType={product.defaultGatewayType}
                 tenantName={product.storeInfo?.storeName}
                 tenantLogo={product.storeInfo?.storeLogo}

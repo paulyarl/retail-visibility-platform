@@ -21,6 +21,12 @@ export interface Shop {
   seo_tags?: any;
   default_gateway_type?: string;
   has_active_payment_gateway?: boolean;
+  payment_gateways?: Array<{
+    id: string;
+    gateway_type: string;
+    is_active: boolean;
+    is_default: boolean;
+  }>;
   rating?: number;
   rating_count?: number;
   reviewCount?: number;
@@ -560,6 +566,12 @@ class ShopService extends UniversalSingleton {
 
       const result = await this.pool.query(query, params);
 
+      // Get payment gateways for all shops in parallel
+      const tenantIds = result.rows.map((row: any) => row.tenant_id);
+      const paymentGatewaysPromise = this.getPaymentGatewaysForTenants(tenantIds);
+
+      const [paymentGatewaysMap] = await Promise.all([paymentGatewaysPromise]);
+
       const shops: Shop[] = result.rows.map((row: any) => ({
         id: row.tenant_id,
         tenantId: row.tenant_id,
@@ -575,6 +587,9 @@ class ShopService extends UniversalSingleton {
         location: `${row.tenant_city || ''}${row.tenant_city && row.tenant_state ? ', ' : ''}${row.tenant_state || ''}`,
         phone: undefined,
         website: undefined,
+        default_gateway_type: paymentGatewaysMap[row.tenant_id]?.find((pg: any) => pg.is_default)?.gateway_type,
+        has_active_payment_gateway: paymentGatewaysMap[row.tenant_id]?.length > 0,
+        payment_gateways: paymentGatewaysMap[row.tenant_id] || [],
         rating: row.rating_avg ? parseFloat(row.rating_avg) : null,
         rating_count: row.rating_count ? parseInt(row.rating_count) : null,
         reviewCount: row.rating_count ? parseInt(row.rating_count) : null,
@@ -592,10 +607,56 @@ class ShopService extends UniversalSingleton {
 
       // Store in UniversalSingleton cache
       await this.setCache(cacheKey, shops, { ttl: 600 }); // 10 minutes
+      this.logInfo(`Fetched ${shops.length} shops from database`);
       return shops;
     } catch (error) {
-      this.logError('Error fetching shops directory', error);
+      this.logError('Error fetching shops directory:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get payment gateways for multiple tenants
+   */
+  private async getPaymentGatewaysForTenants(tenantIds: string[]): Promise<Record<string, any[]>> {
+    if (tenantIds.length === 0) {
+      return {};
+    }
+
+    try {
+      const query = `
+        SELECT 
+          tenant_id,
+          id,
+          gateway_type,
+          is_active,
+          is_default
+        FROM tenant_payment_gateways
+        WHERE tenant_id = ANY($1)
+          AND is_active = true
+        ORDER BY is_default DESC, created_at DESC
+      `;
+
+      const result = await this.pool.query(query, [tenantIds]);
+
+      // Group by tenant_id
+      const paymentGatewaysMap: Record<string, any[]> = {};
+      result.rows.forEach((row: any) => {
+        if (!paymentGatewaysMap[row.tenant_id]) {
+          paymentGatewaysMap[row.tenant_id] = [];
+        }
+        paymentGatewaysMap[row.tenant_id].push({
+          id: row.id,
+          gateway_type: row.gateway_type,
+          is_active: row.is_active,
+          is_default: row.is_default
+        });
+      });
+
+      return paymentGatewaysMap;
+    } catch (error) {
+      this.logError('Error fetching payment gateways for tenants:', error);
+      return {};
     }
   }
 

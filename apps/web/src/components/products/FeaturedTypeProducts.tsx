@@ -268,7 +268,6 @@ export function FeaturedTypeProducts({ currentProductId, tenantId, featuredTypes
                 <SmartProductCard
                   key={product.id}
                   tenantId={product.tenantId}
-                  hasActivePaymentGateway={product.hasActivePaymentGateway}
                   defaultGatewayType={product.defaultGatewayType || undefined}
                   product={{
                     id: product.id,

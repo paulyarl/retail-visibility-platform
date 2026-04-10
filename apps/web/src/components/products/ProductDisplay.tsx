@@ -29,6 +29,7 @@ import { SalePrice } from './SalePrice';
 import { cn } from '@/lib/utils';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Badge as MantineBadge } from '@mantine/core';
+import HoursStatusBadge from '../storefront/HoursStatusBadge';
 
 interface ProductDisplayProps {
   product: ProductDisplay;
@@ -65,16 +66,16 @@ export function ProductDisplay({
   const { status: hoursStatus } = useStoreStatus(validatedProduct.tenantId, true); // Public scope
   console.log(`ProductDisplay hoursStatus: ${JSON.stringify(hoursStatus)}`)
    // Status indicator color
-  const getStatusColor = () => {
-    if (!hoursStatus) return 'bg-gray-400';
-    switch (hoursStatus.status) {
-      case 'open': return 'bg-green-500';
-      case 'closed': return 'bg-red-500';
-      case 'opening-soon': return 'bg-blue-500';
-      case 'closing-soon': return 'bg-yellow-500';
-      default: return 'bg-gray-400';
-    }
-  };
+  // const getStatusColor = () => {
+  //   if (!hoursStatus) return 'bg-gray-400';
+  //   switch (hoursStatus.status) {
+  //     case 'open': return 'bg-green-500';
+  //     case 'closed': return 'bg-red-500';
+  //     case 'opening-soon': return 'bg-blue-500';
+  //     case 'closing-soon': return 'bg-yellow-500';
+  //     default: return 'bg-gray-400';
+  //   }
+  // };
   // Handle click behavior
   const handleClick = () => {
     if (onClick) {
@@ -226,18 +227,18 @@ function ProductCard({
   tenantId
 }: ProductCardProps) {
     const { status: hoursStatus } = useStoreStatus(tenantId || '', true); // Public scope
-    console.log(`ProductCard hoursStatus: ${JSON.stringify(hoursStatus)}`)
+    // console.log(`ProductCard hoursStatus: ${JSON.stringify(hoursStatus)}`);
    // Status indicator color
-  const getStatusColor = () => {
-    if (!hoursStatus) return 'bg-gray-400';
-    switch (hoursStatus.status) {
-      case 'open': return 'bg-green-500';
-      case 'closed': return 'bg-red-500';
-      case 'opening-soon': return 'bg-blue-500';
-      case 'closing-soon': return 'bg-yellow-500';
-      default: return 'bg-gray-400';
-    }
-  };
+  // const getStatusColor = () => {
+  //   if (!hoursStatus) return 'bg-gray-400';
+  //   switch (hoursStatus.status) {
+  //     case 'open': return 'bg-green-500';
+  //     case 'closed': return 'bg-red-500';
+  //     case 'opening-soon': return 'bg-blue-500';
+  //     case 'closing-soon': return 'bg-yellow-500';
+  //     default: return 'bg-gray-400';
+  //   }
+  // };
   return (
     <div className="group hover:shadow-lg transition-shadow duration-200 cursor-pointer border rounded-lg" onClick={onClick}>
       <div className="p-4">
@@ -267,61 +268,7 @@ function ProductCard({
               />
             </div>
           )}
-           {/* Hours Badge - Status */}
-            {(() => {
-              switch (hoursStatus?.status) {
-                case 'open':
-                  return (
-                    <MantineBadge 
-                      color="green"
-                      variant="light"
-                      size="xs"
-                      className="animate-pulse"
-                      title={hoursStatus?.label || 'Open now'}
-                    >
-                      🟢 Open
-                    </MantineBadge>
-                  );
-                case 'closed':
-                  return (
-                    <MantineBadge 
-                      color="red"
-                      variant="light"
-                      size="xs"
-                      className="animate-bounce"
-                      title={hoursStatus?.label || 'Closed'}
-                    >
-                      🔴 Closed
-                    </MantineBadge>
-                  );
-                case 'opening-soon':
-                  return (
-                    <MantineBadge 
-                      color="blue"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Opening soon'}
-                    >
-                      🟡 Opening
-                    </MantineBadge>
-                  );
-                case 'closing-soon':
-                  return (
-                    <MantineBadge 
-                      color="orange"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Closing soon'}
-                    >
-                      🟡 Closing
-                    </MantineBadge>
-                  );
-                default:
-                  return null;
-              }
-            })()}
+         <HoursStatusBadge status={hoursStatus} />
           
           {/* Stock Status Badge */}
           {showStock && (
@@ -476,16 +423,16 @@ function ProductListItem({
 }: ProductCardProps) {
     const { status: hoursStatus } = useStoreStatus(tenantId || '', true); // Public scope
    // Status indicator color
-  const getStatusColor = () => {
-    if (!hoursStatus) return 'bg-gray-400';
-    switch (hoursStatus.status) {
-      case 'open': return 'bg-green-500';
-      case 'closed': return 'bg-red-500';
-      case 'opening-soon': return 'bg-blue-500';
-      case 'closing-soon': return 'bg-yellow-500';
-      default: return 'bg-gray-400';
-    }
-  };
+  // const getStatusColor = () => {
+  //   if (!hoursStatus) return 'bg-gray-400';
+  //   switch (hoursStatus.status) {
+  //     case 'open': return 'bg-green-500';
+  //     case 'closed': return 'bg-red-500';
+  //     case 'opening-soon': return 'bg-blue-500';
+  //     case 'closing-soon': return 'bg-yellow-500';
+  //     default: return 'bg-gray-400';
+  //   }
+  // };
   
   return (
     <div className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer" onClick={onClick}>

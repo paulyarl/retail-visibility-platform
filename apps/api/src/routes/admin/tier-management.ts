@@ -53,7 +53,7 @@ router.get('/tiers', async (req, res) => {
         try {
           const { getTierFeatures } = await import('../../services/TierService');
           features = await getTierFeatures(tier.tier_key);
-          console.log(`[Tier Management] Trial tier ${tier.tier_key} got ${features.length} features via proxy`);
+          // console.log(`[Tier Management] Trial tier ${tier.tier_key} got ${features.length} features via proxy`);
         } catch (error) {
           console.warn(`[Tier Management] Failed to get proxy features for trial tier ${tier.tier_key}:`, error);
           // Fallback to empty features

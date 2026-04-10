@@ -3,7 +3,6 @@ import { prisma } from '../../prisma';
 import { Prisma } from '@prisma/client';
 import { getDirectPool } from '../../utils/db-pool';
 import TenantProfileService from '../../services/TenantProfileService';
-const tenantReviewsRoutes = require('./[tenantId]/reviews').default;
 
 const router = Router();
 
@@ -133,11 +132,29 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
     // Get the tenant profile (this includes contact information)
     const profile = await tenantService.getTenantProfile(tenantId);
     
-    // Check if tenant has published directory listing
+    // Check if tenant has published directory listing and get subscription data
     const { prisma } = await import('../../prisma');
-    const directoryResult = await prisma.$queryRaw`
-      SELECT is_published FROM "directory_settings_list" WHERE tenant_id = ${tenantId}
-    `;
+    const [directoryResult, tenantData] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT is_published FROM "directory_settings_list" WHERE tenant_id = ${tenantId}
+      `,
+      prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: {
+          subscription_status: true,
+          subscription_tier: true,
+          trial_ends_at: true,
+          subscription_ends_at: true,
+          grace_ends_at: true,
+          manual_subscription_control: true,
+          manual_subscription_expires_at: true,
+          manual_subscription_reason: true,
+          organization_id: true,
+          location_status: true,
+        }
+      } as any)
+    ]);
+    
     const hasPublishedDirectory = directoryResult && (directoryResult as any[])?.[0]?.is_published === true;
     
     if (!profile) {
@@ -155,6 +172,27 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
       hasAddress: !!profile.contact?.address
     });
 
+    // Calculate effective expiration
+    const effectiveExpiration = tenantData?.manual_subscription_control 
+      ? {
+          expiresAt: tenantData.manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : tenantData?.subscription_status === 'trial' && tenantData?.trial_ends_at
+        ? {
+            expiresAt: tenantData.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : tenantData?.subscription_ends_at
+          ? {
+              expiresAt: tenantData.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
+
     // Return the profile data (contact info is included in the profile object)
     res.json({
       success: true,
@@ -162,26 +200,16 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
         id: profile.id,
         name: profile.name,
         slug: profile.slug,
-        description: profile.description,
-        logo: profile.logo,
-        banner: profile.banner,
-        business_name: profile.name, // For compatibility with frontend
-        phone_number: profile.contact?.phone, // For compatibility with frontend
-        email: profile.contact?.email,
-        website: profile.contact?.website,
-        address_line1: profile.contact?.address?.street,
-        address_line2: null,
-        city: profile.contact?.address?.city,
-        state: profile.contact?.address?.state,
-        postal_code: profile.contact?.address?.zipCode,
-        country: profile.contact?.address?.country,
-        business_description: profile.description,
-        logo_url: profile.logo,
-        contact: profile.contact, // Include full contact object
-        business: profile.business,
-        branding: profile.branding,
-        settings: profile.settings,
-        has_published_directory: hasPublishedDirectory,
+        subscriptionStatus: tenantData?.subscription_status,
+        subscriptionTier: tenantData?.subscription_tier,
+        hasPublishedDirectory: hasPublishedDirectory,
+        primaryCategory: profile.business?.category,
+        seoKeywords: profile.seo?.keywords || [],
+        seoDescriptions: profile.description || '',
+        isFeatured: false, // Could be derived from directory data
+        featuredUntil: null,
+        isPublished: hasPublishedDirectory,
+        secondaryCategories: profile.business?.subcategory ? [profile.business.subcategory] : [],
         metadata: {
           // Merge branding info for frontend compatibility
           theme: profile.branding?.theme || 'professional',
@@ -191,9 +219,52 @@ router.get('/tenant/:tenantId/profile', async (req: Request, res: Response) => {
           // Include other metadata
           ...profile.business,
           ...profile.branding
-        }
+        },
+        createdAt: profile.createdAt,
+        updatedAt: profile.updatedAt,
+        settings: profile.settings,
+        addressLine1: profile.contact?.address?.street,
+        addressLine2: null,
+        city: profile.contact?.address?.city,
+        state: profile.contact?.address?.state,
+        phoneNumber: profile.contact?.phone,
+        email: profile.contact?.email,
+        website: profile.contact?.website,
+        logoUrl: profile.logo,
+        bannerUrl: profile.banner,
+        businessDescription: profile.description,
+        hours: {}, // Could be added from business hours data
+        socialLinks: profile.social,
+        latitude: null, // Could be added from address geocoding
+        longitude: null,
+        gbpCategoryName: profile.business?.category,
+        countryCode: profile.contact?.address?.country,
+        postalCode: profile.contact?.address?.zipCode,
+        contactPerson: profile.name,
+        businessInfo: profile.business,
+        language: profile.settings?.language || 'en-US',
+        currency: profile.settings?.currency || 'USD',
+        region: 'us-east-1', // Could be derived from tenant data
+        trialEndsAt: tenantData?.trial_ends_at,
+        subscriptionEndsAt: tenantData?.subscription_ends_at,
+        organizationId: tenantData?.organization_id,
+        locationStatus: tenantData?.location_status,
+        manualSubscriptionControl: tenantData?.manual_subscription_control,
+        manualSubscriptionExpiresAt: tenantData?.manual_subscription_expires_at,
+        manualSubscriptionReason: tenantData?.manual_subscription_reason,
+        effectiveExpiresAt: effectiveExpiration?.expiresAt,
+        effectiveExpiresType: effectiveExpiration?.type,
+        effectiveExpiresSource: effectiveExpiration?.source,
       },
-      message: 'Public tenant profile retrieved successfully'
+      metadata: {
+        tenant: {
+          id: tenantId,
+          name: profile.name,
+          slug: profile.slug,
+          type: 'tenant_id'
+        },
+        identifierType: 'tenant_id'
+      }
     });
     
   } catch (error) {
@@ -343,8 +414,5 @@ router.get('/tenant/:tenantId/oauth-status/:gatewayType', async (req: Request, r
     });
   }
 });
-
-// Mount individual tenant routes
-router.use('/:tenantId/reviews', tenantReviewsRoutes);
 
 export default router;

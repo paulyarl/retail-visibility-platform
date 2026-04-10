@@ -429,8 +429,9 @@ export default function SmartProductCard({
   const contextCanPurchase = contextPayment && !contextPayment.loading ? contextPayment.canPurchase : undefined;
   const contextGatewayType = contextPayment && !contextPayment.loading ? contextPayment.defaultGatewayType : product.payment_gateway_type ?? defaultGatewayType;
 
-  const effectiveCanPurchase = contextCanPurchase ?? propHasActivePaymentGateway ?? product.has_active_payment_gateway ?? canPurchase;
+  // Simplified: Check for gateway_type instead of boolean status
   const effectiveGatewayType = contextGatewayType ?? propDefaultGatewayType ?? product.payment_gateway_type ?? defaultGatewayType;
+  const effectiveCanPurchase = !!effectiveGatewayType; // Has gateway if gateway_type exists
   
   const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
    // Status indicator color
@@ -810,61 +811,8 @@ export default function SmartProductCard({
           <div className="flex-1 min-w-0">
             <Link href={`/products/${product.id}`}>
               <h4 className="font-medium text-sm text-neutral-900 dark:text-white truncate">
-                 {/* Hours Badge - Status */}
-            {(() => {
-              switch (hoursStatus?.status) {
-                case 'open':
-                  return (
-                    <MantineBadge 
-                      color="green"
-                      variant="light"
-                      size="xs"
-                      className="animate-pulse"
-                      title={hoursStatus?.label || 'Open now'}
-                    >
-                      🟢 Open
-                    </MantineBadge>
-                  );
-                case 'closed':
-                  return (
-                    <MantineBadge 
-                      color="red"
-                      variant="light"
-                      size="xs"
-                      className="animate-bounce"
-                      title={hoursStatus?.label || 'Closed'}
-                    >
-                      🔴 Closed
-                    </MantineBadge>
-                  );
-                case 'opening-soon':
-                  return (
-                    <MantineBadge 
-                      color="blue"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Opening soon'}
-                    >
-                      🟡 Opening
-                    </MantineBadge>
-                  );
-                case 'closing-soon':
-                  return (
-                    <MantineBadge 
-                      color="orange"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Closing soon'}
-                    >
-                      🟡 Closing
-                    </MantineBadge>
-                  );
-                default:
-                  return null;
-              }
-            })()}
+              
+                <HoursStatusBadge status={hoursStatus} />
 			
                 {displayTitle}
               </h4>
@@ -1157,61 +1105,8 @@ export default function SmartProductCard({
                     
                     {displayTitle}
 
-                                   {/* Hours Badge - Status */}
-                                {(() => {
-                                  switch (hoursStatus?.status) {
-                                    case 'open':
-                                      return (
-                                        <MantineBadge 
-                                          color="green"
-                                          variant="light"
-                                          size="xs"
-                                          className="animate-pulse"
-                                          title={hoursStatus?.label || 'Open now'}
-                                        >
-                                          🟢 Open
-                                        </MantineBadge>
-                                      );
-                                    case 'closed':
-                                      return (
-                                        <MantineBadge 
-                                          color="red"
-                                          variant="light"
-                                          size="xs"
-                                          className="animate-bounce"
-                                          title={hoursStatus?.label || 'Closed'}
-                                        >
-                                          🔴 Closed
-                                        </MantineBadge>
-                                      );
-                                    case 'opening-soon':
-                                      return (
-                                        <MantineBadge 
-                                          color="blue"
-                                          variant="filled"
-                                          size="xs"
-                                          className="animate-ping"
-                                          title={hoursStatus?.label || 'Opening soon'}
-                                        >
-                                          🟡 Opening
-                                        </MantineBadge>
-                                      );
-                                    case 'closing-soon':
-                                      return (
-                                        <MantineBadge 
-                                          color="orange"
-                                          variant="filled"
-                                          size="xs"
-                                          className="animate-ping"
-                                          title={hoursStatus?.label || 'Closing soon'}
-                                        >
-                                          🟡 Closing
-                                        </MantineBadge>
-                                      );
-                                    default:
-                                      return null;
-                                  }
-                                })()}
+                             
+                <HoursStatusBadge status={hoursStatus} />
                   </h3>
                 </Link>
               </div>
@@ -1361,61 +1256,8 @@ export default function SmartProductCard({
            
             {displayTitle}
 
-                           {/* Hours Badge - Status */}
-                        {(() => {
-                          switch (hoursStatus?.status) {
-                            case 'open':
-                              return (
-                                <MantineBadge 
-                                  color="green"
-                                  variant="light"
-                                  size="xs"
-                                  className="animate-pulse"
-                                  title={hoursStatus?.label || 'Open now'}
-                                >
-                                  🟢 Open
-                                </MantineBadge>
-                              );
-                            case 'closed':
-                              return (
-                                <MantineBadge 
-                                  color="red"
-                                  variant="light"
-                                  size="xs"
-                                  className="animate-bounce"
-                                  title={hoursStatus?.label || 'Closed'}
-                                >
-                                  🔴 Closed
-                                </MantineBadge>
-                              );
-                            case 'opening-soon':
-                              return (
-                                <MantineBadge 
-                                  color="blue"
-                                  variant="filled"
-                                  size="xs"
-                                  className="animate-ping"
-                                  title={hoursStatus?.label || 'Opening soon'}
-                                >
-                                  🟡 Opening
-                                </MantineBadge>
-                              );
-                            case 'closing-soon':
-                              return (
-                                <MantineBadge 
-                                  color="orange"
-                                  variant="filled"
-                                  size="xs"
-                                  className="animate-ping"
-                                  title={hoursStatus?.label || 'Closing soon'}
-                                >
-                                  🟡 Closing
-                                </MantineBadge>
-                              );
-                            default:
-                              return null;
-                          }
-                        })()}
+                      
+                <HoursStatusBadge status={hoursStatus} />
           </h3>
         </Link>
         

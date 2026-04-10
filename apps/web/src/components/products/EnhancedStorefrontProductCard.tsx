@@ -137,8 +137,9 @@ export default function EnhancedStorefrontProductCard({
   const contextPayment = useTenantPaymentOptional();
   const contextCanPurchase = contextPayment && !contextPayment.loading ? contextPayment.canPurchase : undefined;
   const contextGatewayType = contextPayment && !contextPayment.loading ? contextPayment.defaultGatewayType : undefined;
-  const effectiveCanPurchase = contextCanPurchase ?? hasActivePaymentGateway ?? product.hasActivePaymentGateway ?? false;
+  // Simplified: Check for gateway_type instead of boolean status
   const effectiveGatewayType = contextGatewayType ?? defaultGatewayType ?? product.defaultGatewayType;
+  const effectiveCanPurchase = !!effectiveGatewayType; // Has gateway if gateway_type exists
 
   // Get display images
   const getDisplayImages = () => {

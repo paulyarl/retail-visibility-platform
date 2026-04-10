@@ -14,6 +14,7 @@ import { AddToCartButton } from '@/components/products/AddToCartButton';
 import { useTenantPaymentOptional } from '@/contexts/TenantPaymentContext';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
+import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 
 
 // Common data interface for all layouts
@@ -56,7 +57,6 @@ interface ProductCardProps {
   tenantId: string;
   tenantName?: string;
   tenantLogo?: string;
-  hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
   className?: string;
   trackingContext?: {
@@ -69,7 +69,8 @@ interface ProductCardProps {
 /**
  * Classic Layout - Original design with all essential fields
  */
-function ClassicLayout({ product, className = '', trackingContext, tenantId, tenantName, tenantLogo, hasActivePaymentGateway, defaultGatewayType }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext' | 'tenantId' | 'tenantName' | 'tenantLogo' | 'hasActivePaymentGateway' | 'defaultGatewayType'>) {
+function ClassicLayout({ product, className = '', trackingContext, tenantId, tenantName, tenantLogo, defaultGatewayType }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext' | 'tenantId' | 'tenantName' | 'tenantLogo' | 'defaultGatewayType'>) {
+  const hasGateway = !!(defaultGatewayType || product.payment_gateway_type);
   const formattedPrice = (product.priceCents / 100).toFixed(2);
   const formattedSalePrice = product.salePriceCents ? (product.salePriceCents / 100).toFixed(2) : null;
   const isOnSale = product.salePriceCents && product.salePriceCents < product.priceCents;
@@ -302,13 +303,12 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
           </div>
           {isOnSale && (
             <span className="bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium">
-              Sale
+                          Sale
             </span>
           )}
         </div>
-
         {/* Add to Cart Button */}
-        {hasActivePaymentGateway && (
+        {hasGateway && (
           <AddToCartButton
             product={{
               id: product.id,
@@ -320,13 +320,12 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
               stock: product.stock,
               tenantId,
               tenantLogo,
-              payment_gateway_type: defaultGatewayType,
+              payment_gateway_type: defaultGatewayType || product.payment_gateway_type,
               has_variants: product.hasVariants
             }}
             tenantName={tenantName || ''}
             tenantLogo={tenantLogo}
-            hasActivePaymentGateway={hasActivePaymentGateway}
-            defaultGatewayType={defaultGatewayType}
+            defaultGatewayType={defaultGatewayType || product.payment_gateway_type}
             className="w-full"
             layout="stacked"
           />
@@ -339,7 +338,8 @@ function ClassicLayout({ product, className = '', trackingContext, tenantId, ten
 /**
  * Enhanced Layout - Modern design with improved visual hierarchy
  */
-function EnhancedLayout({ product, className = '', trackingContext, tenantId, tenantName, tenantLogo, hasActivePaymentGateway, defaultGatewayType }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext' | 'tenantId' | 'tenantName' | 'tenantLogo' | 'hasActivePaymentGateway' | 'defaultGatewayType'>) {
+function EnhancedLayout({ product, className = '', trackingContext, tenantId, tenantName, tenantLogo, defaultGatewayType }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext' | 'tenantId' | 'tenantName' | 'tenantLogo' | 'defaultGatewayType'>) {
+  const hasGateway = !!(defaultGatewayType || product.payment_gateway_type);
   const formattedPrice = (product.priceCents / 100).toFixed(2);
   const formattedSalePrice = product.salePriceCents ? (product.salePriceCents / 100).toFixed(2) : null;
   const isOnSale = product.salePriceCents && product.salePriceCents < product.priceCents;
@@ -604,7 +604,7 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
           </div>
           
           {/* Action Button */}
-          {hasActivePaymentGateway && (
+          {hasGateway && (
             <AddToCartButton
               product={{
                 id: product.id,
@@ -616,13 +616,12 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
                 stock: product.stock,
                 tenantId,
                 tenantLogo,
-                payment_gateway_type: defaultGatewayType,
+                payment_gateway_type: defaultGatewayType || product.payment_gateway_type,
                 has_variants: product.hasVariants
               }}
               tenantName={tenantName || ''}
               tenantLogo={tenantLogo}
-              hasActivePaymentGateway={hasActivePaymentGateway}
-              defaultGatewayType={defaultGatewayType}
+              defaultGatewayType={defaultGatewayType || product.payment_gateway_type}
               className="w-full"
               layout="stacked"
             />
@@ -636,7 +635,8 @@ function EnhancedLayout({ product, className = '', trackingContext, tenantId, te
 /**
  * Compact Layout - Space-efficient design for grid views
  */
-function CompactLayout({ product, className = '', trackingContext, tenantId, tenantName, tenantLogo, hasActivePaymentGateway, defaultGatewayType }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext' | 'tenantId' | 'tenantName' | 'tenantLogo' | 'hasActivePaymentGateway' | 'defaultGatewayType'>) {
+function CompactLayout({ product, className = '', trackingContext, tenantId, tenantName, tenantLogo, defaultGatewayType }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext' | 'tenantId' | 'tenantName' | 'tenantLogo' | 'defaultGatewayType'>) {
+  const hasGateway = !!(defaultGatewayType || product.payment_gateway_type);
   const formattedPrice = (product.priceCents / 100).toFixed(2);
   const formattedSalePrice = product.salePriceCents ? (product.salePriceCents / 100).toFixed(2) : null;
   const isOnSale = product.salePriceCents && product.salePriceCents < product.priceCents;
@@ -849,7 +849,7 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
 
       {/* Add to Cart Button - Outside Link to avoid conflicts */}
       <div className="px-3 pb-3">
-        {hasActivePaymentGateway && (
+        {hasGateway && (
           <AddToCartButton
             product={{
               id: product.id,
@@ -861,13 +861,12 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
               stock: product.stock,
               tenantId,
               tenantLogo,
-              payment_gateway_type: defaultGatewayType,
+              payment_gateway_type: defaultGatewayType || product.payment_gateway_type,
               has_variants: product.hasVariants
             }}
             tenantName={tenantName || ''}
             tenantLogo={tenantLogo}
-            hasActivePaymentGateway={hasActivePaymentGateway}
-            defaultGatewayType={defaultGatewayType}
+            defaultGatewayType={defaultGatewayType || product.payment_gateway_type}
             className="w-full"
             layout="stacked"
           />
@@ -880,7 +879,8 @@ function CompactLayout({ product, className = '', trackingContext, tenantId, ten
 /**
  * Premium Layout - High-end design with luxury styling
  */
-function PremiumLayout({ product, className = '', trackingContext, tenantId, tenantName, tenantLogo, hasActivePaymentGateway, defaultGatewayType }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext' | 'tenantId' | 'tenantName' | 'tenantLogo' | 'hasActivePaymentGateway' | 'defaultGatewayType'>) {
+function PremiumLayout({ product, className = '', trackingContext, tenantId, tenantName, tenantLogo, defaultGatewayType }: Pick<ProductCardProps, 'product' | 'className' | 'trackingContext' | 'tenantId' | 'tenantName' | 'tenantLogo' | 'defaultGatewayType'>) {
+  const hasGateway = !!(defaultGatewayType || product.payment_gateway_type);
   const formattedPrice = (product.priceCents / 100).toFixed(2);
   const formattedSalePrice = product.salePriceCents ? (product.salePriceCents / 100).toFixed(2) : null;
   const isOnSale = product.salePriceCents && product.salePriceCents < product.priceCents;
@@ -1148,7 +1148,7 @@ function PremiumLayout({ product, className = '', trackingContext, tenantId, ten
             </div>
             
             {/* Premium Action Button */}
-            {hasActivePaymentGateway && (
+            {hasGateway && (
               <AddToCartButton
                 product={{
                   id: product.id,
@@ -1160,13 +1160,12 @@ function PremiumLayout({ product, className = '', trackingContext, tenantId, ten
                   stock: product.stock,
                   tenantId,
                   tenantLogo,
-                  payment_gateway_type: defaultGatewayType,
+                  payment_gateway_type: defaultGatewayType || product.payment_gateway_type,
                   has_variants: product.hasVariants
                 }}
                 tenantName={tenantName || ''}
                 tenantLogo={tenantLogo}
-                hasActivePaymentGateway={hasActivePaymentGateway}
-                defaultGatewayType={defaultGatewayType}
+                defaultGatewayType={defaultGatewayType || product.payment_gateway_type}
                 className="w-full"
                 layout="stacked"
               />
@@ -1181,17 +1180,16 @@ function PremiumLayout({ product, className = '', trackingContext, tenantId, ten
 /**
  * Main Product Card Component with Layout Variants
  */
-export default function ProductCard({ 
+export const ProductCard: React.FC<ProductCardProps> = ({ 
   product, 
   variant = 'classic', 
-  tenantId, 
+  className = '', 
+  trackingContext,
+  tenantId,
   tenantName,
   tenantLogo,
-  hasActivePaymentGateway,
-  defaultGatewayType,
-  className = '',
-  trackingContext 
-}: ProductCardProps) {
+  defaultGatewayType
+}) => {
   // Get payment context directly (like SmartProductCard does)
   const contextPayment = useTenantPaymentOptional();
   
@@ -1253,14 +1251,15 @@ export default function ProductCard({
   // Render based on variant
   switch (variant) {
     case 'enhanced':
-      return <EnhancedLayout product={product} className={className} trackingContext={trackingContext} tenantId={tenantId} tenantName={tenantName} tenantLogo={tenantLogo} hasActivePaymentGateway={hasActivePaymentGateway} defaultGatewayType={effectiveGatewayType} />;
+      return <EnhancedLayout product={product} className={className} trackingContext={trackingContext} tenantId={tenantId} tenantName={tenantName} tenantLogo={tenantLogo} defaultGatewayType={effectiveGatewayType} />;
     case 'classic':
-      return <ClassicLayout product={product} className={className} trackingContext={trackingContext} tenantId={tenantId} tenantName={tenantName} tenantLogo={tenantLogo} hasActivePaymentGateway={hasActivePaymentGateway} defaultGatewayType={effectiveGatewayType} />;
+      return <ClassicLayout product={product} className={className} trackingContext={trackingContext} tenantId={tenantId} tenantName={tenantName} tenantLogo={tenantLogo} defaultGatewayType={effectiveGatewayType} />;
     case 'premium':
-      return <PremiumLayout product={product} className={className} trackingContext={trackingContext} tenantId={tenantId} tenantName={tenantName} tenantLogo={tenantLogo} hasActivePaymentGateway={hasActivePaymentGateway} defaultGatewayType={effectiveGatewayType} />;
+      return <PremiumLayout product={product} className={className} trackingContext={trackingContext} tenantId={tenantId} tenantName={tenantName} tenantLogo={tenantLogo} defaultGatewayType={effectiveGatewayType} />;
     case 'zoom':
       // For featured products, use the catalog's ZoomLayout
       // Import dynamically to avoid circular dependency
+      const zoomHasGateway = !!(effectiveGatewayType || product.payment_gateway_type);
       return (
         <div className={`bg-white dark:bg-neutral-800 rounded-lg shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:scale-110 hover:z-10 ${className}`}>
           {/* Product Image with Zoom Effect */}
@@ -1378,60 +1377,7 @@ export default function ProductCard({
                 </Link>
                 
                {/* Hours Badge - Status */}
-            {(() => {
-              switch (hoursStatus?.status) {
-                case 'open':
-                  return (
-                    <MantineBadge 
-                      color="green"
-                      variant="light"
-                      size="xs"
-                      className="animate-pulse"
-                      title={hoursStatus?.label || 'Open now'}
-                    >
-                      🟢 Open
-                    </MantineBadge>
-                  );
-                case 'closed':
-                  return (
-                    <MantineBadge 
-                      color="red"
-                      variant="light"
-                      size="xs"
-                      className="animate-bounce"
-                      title={hoursStatus?.label || 'Closed'}
-                    >
-                      🔴 Closed
-                    </MantineBadge>
-                  );
-                case 'opening-soon':
-                  return (
-                    <MantineBadge 
-                      color="blue"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Opening soon'}
-                    >
-                      🟡 Opening
-                    </MantineBadge>
-                  );
-                case 'closing-soon':
-                  return (
-                    <MantineBadge 
-                      color="orange"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Closing soon'}
-                    >
-                      🟡 Closing
-                    </MantineBadge>
-                  );
-                default:
-                  return null;
-              }
-            })()}
+           <HoursStatusBadge status={hoursStatus} />
               </div>
             )}
            
@@ -1491,7 +1437,7 @@ export default function ProductCard({
            
             </div>
              {/* Add to Cart Button */}
-            {hasActivePaymentGateway && (
+            {zoomHasGateway && (
               <AddToCartButton
                 product={{
                   id: product.id,
@@ -1503,13 +1449,12 @@ export default function ProductCard({
                   stock: product.stock,
                   tenantId,
                   tenantLogo,
-                  payment_gateway_type: defaultGatewayType,
+                  payment_gateway_type: defaultGatewayType || product.payment_gateway_type,
                   has_variants: product.hasVariants
                 }}
                 tenantName={tenantName || ''}
                 tenantLogo={tenantLogo}
-                hasActivePaymentGateway={hasActivePaymentGateway}
-                defaultGatewayType={defaultGatewayType}
+                defaultGatewayType={defaultGatewayType || product.payment_gateway_type}
                 className="w-full"
                 layout="stacked"
               />
@@ -1518,7 +1463,7 @@ export default function ProductCard({
         </div>
       );
     default:
-      return <ClassicLayout product={product} className={className} trackingContext={trackingContext} tenantId={tenantId} tenantName={tenantName} tenantLogo={tenantLogo} hasActivePaymentGateway={hasActivePaymentGateway} defaultGatewayType={effectiveGatewayType} />;
+      return <ClassicLayout product={product} className={className} trackingContext={trackingContext} tenantId={tenantId} tenantName={tenantName} tenantLogo={tenantLogo} defaultGatewayType={effectiveGatewayType} />;
   }
 }
 

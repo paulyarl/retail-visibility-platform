@@ -19,6 +19,13 @@ router.get('/tenants/:id/tier/public', async (req, res) => {
       select: {
         id: true,
         subscription_tier: true,
+        subscription_status: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
+        grace_ends_at: true,
+        manual_subscription_control: true,
+        manual_subscription_expires_at: true,
+        manual_subscription_reason: true,
         organization_id: true,
         organizations_list: {
           select: {
@@ -77,6 +84,27 @@ router.get('/tenants/:id/tier/public', async (req, res) => {
       };
     }
 
+    // Calculate effective expiration for public response
+    const effectiveExpiration = tenant.manual_subscription_control 
+      ? {
+          expiresAt: tenant.manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : tenant.subscription_status === 'trial' && tenant.trial_ends_at
+        ? {
+            expiresAt: tenant.trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : tenant.subscription_ends_at
+          ? {
+              expiresAt: tenant.subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
+
     res.json({
       tenantId: tenant.id,
       tier: effectiveTier,
@@ -84,6 +112,16 @@ router.get('/tenants/:id/tier/public', async (req, res) => {
       organizationTier: orgTierData,
       tenantTier: tenantTierData,
       effective: orgTierData || tenantTierData,
+      subscriptionStatus: tenant.subscription_status,
+      trialEndsAt: tenant.trial_ends_at,
+      subscriptionEndsAt: tenant.subscription_ends_at,
+      graceEndsAt: tenant.grace_ends_at,
+      manualSubscriptionControl: tenant.manual_subscription_control,
+      manualSubscriptionExpiresAt: tenant.manual_subscription_expires_at,
+      manualSubscriptionReason: tenant.manual_subscription_reason,
+      effectiveExpiresAt: effectiveExpiration?.expiresAt,
+      effectiveExpiresType: effectiveExpiration?.type,
+      effectiveExpiresSource: effectiveExpiration?.source,
     });
   } catch (error) {
     console.error('[GET /tenants/:id/tier/public] Error:', error);

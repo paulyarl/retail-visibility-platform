@@ -740,14 +740,11 @@ export default function DirectoryClient() {
         </div>
       </StoreSingletonProvider>
 
-         {/* Gradient border line */}
-      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
 
         {/* Directory Home Recommendations */}
         <DirectoryHomeRecommendations />
 
-         {/* Gradient border line */}
-      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+        
         {/* Last Viewed Items */}
         <LastViewed />
 

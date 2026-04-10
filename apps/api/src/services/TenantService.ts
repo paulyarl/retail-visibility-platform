@@ -796,7 +796,7 @@ export class TenantService {
         try {
           const { getTierFeatures } = await import('./TierService');
           features = await getTierFeatures(tierKey);
-          console.log(`[TenantService] Trial tier ${tierKey} got ${features.length} features via proxy`);
+          // console.log(`[TenantService] Trial tier ${tierKey} got ${features.length} features via proxy`);
         } catch (error) {
           console.warn(`[TenantService] Failed to get proxy features for trial tier ${tierKey}:`, error);
           features = [];

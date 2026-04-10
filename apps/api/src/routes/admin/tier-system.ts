@@ -40,7 +40,7 @@ async function transformTier(tier: any) {
       const tierFeatures = await getTierFeatures(tier.tier_key);
       const baseTier = await getTierByKey(tier.tier_key);
       
-      console.log(`[Tier System] Trial tier ${tier.tier_key} got ${tierFeatures.length} features`);
+      // console.log(`[Tier System] Trial tier ${tier.tier_key} got ${tierFeatures.length} features`);
       
       // Map feature keys to feature objects
       features = tierFeatures.map((featureKey: string, index: number) => ({
@@ -51,7 +51,7 @@ async function transformTier(tier: any) {
         isInherited: true,
       }));
       
-      console.log(`[Tier System] Mapped ${features.length} features for trial tier ${tier.tier_key}`);
+      // console.log(`[Tier System] Mapped ${features.length} features for trial tier ${tier.tier_key}`);
     } catch (error) {
       console.warn(`[Tier System] Failed to get proxy features for trial tier ${tier.tier_key}:`, error);
       // Fallback to empty features

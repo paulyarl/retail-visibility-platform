@@ -49,7 +49,7 @@ export function AddToCartButton({
   tenantLogo,
   quantity = 1, 
   className,
-  hasActivePaymentGateway = false, // Default to false if not provided
+  hasActivePaymentGateway = false, // Keep for backward compatibility
   defaultGatewayType, // No default fallback - must come from tenant
   layout = 'horizontal' // Default to side-by-side layout
 }: AddToCartButtonProps) {
@@ -95,17 +95,8 @@ export function AddToCartButton({
       }
     }
     
-    // First check if tenant has active payment gateway
-    if (!hasActivePaymentGateway) {
-      alert('Unable to add to cart: Payment gateway is not active for this tenant.');
-      return;
-    }
-    
-    // If no gateway type available, cannot add to cart
-    if (!gatewayType) {
-      alert('Unable to add to cart: No payment gateway configured for this tenant.');
-      return;
-    }
+    // Note: Gateway validation handled during checkout process
+    // Product cards only need to know if gateway exists
     
     // Use variant data if available, otherwise use product data
     const itemSku = variant?.sku || product.sku;
@@ -114,7 +105,7 @@ export function AddToCartButton({
     const itemSalePriceCents = variant?.sale_price_cents || product.salePriceCents;
     
     // Check if adding this quantity would exceed available stock
-    const cart = getCartByGateway(product.tenantId, gatewayType);
+    const cart = gatewayType ? getCartByGateway(product.tenantId, gatewayType) : null;
     const existingItem = cart?.cart.items.find(
       item => item.product_id === product.id && item.variant_id === variant?.id
     );
@@ -134,6 +125,10 @@ export function AddToCartButton({
     const discountCents = isOnSale ? (product.priceCents - product.salePriceCents!) * quantity : undefined;
 
     // Add to gateway-specific cart
+    if (!gatewayType) {
+      console.error('[AddToCartButton] No gateway type available');
+      return;
+    }
     await addToCart(product.tenantId, tenantName, gatewayType, {
       product_id: product.id,
       product_name: product.name,
@@ -152,7 +147,9 @@ export function AddToCartButton({
 
     setAdded(true);
     setShowSuccess(true);
-    setAddedToGateway(gatewayType);
+    if (gatewayType) {
+      setAddedToGateway(gatewayType);
+    }
     setTimeout(() => {
       setAdded(false);
       setShowSuccess(false);
@@ -166,7 +163,8 @@ export function AddToCartButton({
   };
 
   // Simple check: if tenant doesn't have payment gateway, don't show button
-  if (!hasActivePaymentGateway) {
+  // Note: Gateway validation handled during checkout process
+  if (!defaultGatewayType) {
     return null;
   }
 

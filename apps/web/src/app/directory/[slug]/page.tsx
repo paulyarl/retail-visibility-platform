@@ -1,6 +1,8 @@
-import { Metadata } from 'next';
+'use client';
+
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { useState, useEffect, use } from 'react';
 import { MapPin, Phone, Mail, Globe, Clock, Share2, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
 
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
@@ -27,6 +29,7 @@ import { tenantPublicService } from '@/services/TenantPublicService';
 // tenant public data
 import { directoryService } from '@/services/DirectorySingletonService';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+import { publicDirectoryService } from '@/services/PublicDirectoryService';
 
 // recommendation data
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
@@ -39,10 +42,18 @@ import { tenantDirectoryService } from '@/services/TenantDirectorySingletonServi
 // platform branding
 import { PoweredByFooter } from '@/components/PoweredByFooter';
 
+// shopping cart
+import { useMultiCart } from '@/hooks/useMultiCart';
+import { useRouter } from 'next/navigation';
+
+// store status
+import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import { useStoreStatus } from "@/hooks/useStoreStatus";
+
 interface StoreDetailPageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 async function getConsolidatedDirectoryData(identifier: string) {
@@ -354,58 +365,96 @@ async function getUserLocation(): Promise<{
   }
 }
 
-export async function generateMetadata({ params }: StoreDetailPageProps): Promise<Metadata> {
-  const { slug: identifier } = await params;
-  // console.log(`[Directory] Generating metadata for identifier: ${identifier}`);
-  const consolidatedData = await getConsolidatedDirectoryData(identifier);
-  // console.log(`[Directory] Consolidated data 1:`, consolidatedData);
+export default function StoreDetailPage({ params }: StoreDetailPageProps) {
+  const [loading, setLoading] = useState(true);
+  const [consolidatedData, setConsolidatedData] = useState<any>(null);
+  const [tenantLogo, setTenantLogo] = useState<string | null>(null);
+  const [businessProfile, setBusinessProfile] = useState<any>(null);
+  const [businessHours, setBusinessHours] = useState<any>(null);
+  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
+  const [storefrontCategories, setStorefrontCategories] = useState<any>({ categories: [], uncategorizedCount: 0 });
+  const [actualProductCount, setActualProductCount] = useState<number>(0);
+  const [tenantInfo, setTenantInfo] = useState<any>(null);
+  const [slugForRelated, setSlugForRelated] = useState<string>('');
+  
+  const router = useRouter();
+  const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
+  const { status: hoursStatus } = useStoreStatus(consolidatedData?.listing?.tenantId || '', true); // Public scope
+  
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { slug: identifier } = await params;
+        // console.log(`[Directory] Fetching data for identifier: ${identifier}`);
+        const data = await getConsolidatedDirectoryData(identifier);
+        // console.log(`[Directory] Consolidated data 2:`, data);
 
-  if (!consolidatedData?.listing) {
-    return {
-      title: 'Store Not Found',
+        if (!data?.listing) {
+          notFound();
+          return;
+        }
+        
+        setConsolidatedData(data);
+        
+        // Fetch tenant logo
+        const logo = await publicTenantInfoService.getTenantLogoFromDiscovery(data.listing.tenantId);
+        setTenantLogo(logo);
+        
+        // Get primary category for additional data fetching
+        const primaryCategory = data.listing.categories?.find((c: any) => c.isPrimary) || data.listing.categories?.[0];
+
+        // Fetch remaining data that's not in the consolidated endpoint
+        const [
+          profile,
+          hours,
+          related,
+          categories,
+          productCount
+        ] = await Promise.all([
+          getBusinessProfile(data.listing.tenantId),
+          getBusinessHours(data.listing.tenantId),
+          primaryCategory ? getRelatedProducts(primaryCategory.slug, data.listing.tenantId, 6) : Promise.resolve([]),
+          getStorefrontCategories(data.listing.tenantId),
+          getActualProductCount(data.listing.tenantId)
+        ]);
+        
+        setBusinessProfile(profile);
+        setBusinessHours(hours);
+        setRelatedProducts(related);
+        setStorefrontCategories(categories);
+        setActualProductCount(productCount);
+        
+        // Fetch tenant info for status panel
+        const info = await tenantPublicService.getPublicTenantInfo(data.listing.tenantId);
+        setTenantInfo(info);
+        
+        // Resolve slug for RelatedStores using publicDirectoryService
+        const idResolvedBySlug = await publicDirectoryService.resolveBySlug(identifier);
+        setSlugForRelated(idResolvedBySlug || identifier);
+        
+        // Track user behavior for recommendations (fire and forget, don't await)
+        trackStoreView(data.listing.tenantId, data.listing.categories).catch(err => 
+          console.error('Failed to track store view:', err)
+        );
+        
+      } catch (error) {
+        console.error('Error fetching store data:', error);
+      } finally {
+        setLoading(false);
+      }
     };
-  }
-
-  const tenantLogo = await publicTenantInfoService.getTenantLogoFromDiscovery(consolidatedData.listing.tenantId);
-  // console.log(`[Directory] Tenant logo 1:`, tenantLogo);
-
-  const listing = consolidatedData.listing;
-  const businessName = listing.businessName || 'Business';
-  const title = `${businessName} - ${listing.city}, ${listing.state}`;
-  const description = listing.description || 
-    `Visit ${businessName} in ${listing.city}, ${listing.state}. ${listing.productCount || 0} products available.`;
-
-  return {
-    title,
-    description,
-    openGraph: {
-      title,
-      description,
-      type: 'website',
-      images: tenantLogo ? [tenantLogo.toString()] : listing.logoUrl ? [listing.logoUrl] : [],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-      images: tenantLogo ? [tenantLogo.toString()] : listing.logoUrl ? [listing.logoUrl] : [],
-    },
-  };
-}
-
-export default async function StoreDetailPage({ params }: StoreDetailPageProps) {
-  const { slug: identifier } = await params;
-  // console.log(`[Directory] Fetching data for identifier: ${identifier}`);
-  const consolidatedData = await getConsolidatedDirectoryData(identifier);
-  // console.log(`[Directory] Consolidated data 2:`, consolidatedData);
-
-  if (!consolidatedData?.listing) {
-    notFound();
+    
+    fetchData();
+  }, [params]);
+  
+  if (loading || !consolidatedData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
   
-  const tenantLogo = await publicTenantInfoService.getTenantLogoFromDiscovery(consolidatedData.listing.tenantId);
-  // console.log(`[Directory] Tenant logo 2:`, tenantLogo);
-
   const listing = consolidatedData.listing;
   const featuredProductsRaw = consolidatedData.featuredProducts || [];
   // TODO: Remove this temporary logging once we confirm the data is being fetched correctly
@@ -420,38 +469,9 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
     const productId = product.id || product.inventory_item_id;
     return arr.findIndex((p: any) => (p.id || p.inventory_item_id) === productId) === index;
   });
-  // Debug logging for featured products
-  /* console.log('[Directory Page] Featured products data:', {
-    count: featuredProducts.length,
-    products: featuredProducts.slice(0, 2), // Show first 2 products
-    consolidatedDataKeys: Object.keys(consolidatedData)
-  }); */
-
-  // Get primary category early for additional data fetching
-  const primaryCategory = listing.categories?.find((c: any) => c.isPrimary) || listing.categories?.[0];
-
-  // Fetch remaining data that's not in the consolidated endpoint
-  const [
-    businessProfile,
-    businessHours,
-    relatedProducts,
-    storefrontCategories,
-    actualProductCount
-  ] = await Promise.all([
-    getBusinessProfile(listing.tenantId),
-    getBusinessHours(listing.tenantId),
-    primaryCategory ? getRelatedProducts(primaryCategory.slug, listing.tenantId, 6) : Promise.resolve([]),
-    getStorefrontCategories(listing.tenantId),
-    getActualProductCount(listing.tenantId)
-  ]);
   
   // Compute store status from business hours data
   const storeStatus = businessHours ? computeStoreStatus(businessHours) : null;
-  
-  // Track user behavior for recommendations (fire and forget, don't await)
-  trackStoreView(listing.tenantId, listing.categories).catch(err => 
-    console.error('Failed to track store view:', err)
-  );
   
   const fullAddress = [
     listing.address,
@@ -460,11 +480,10 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
     listing.zipCode,
   ].filter(Boolean).join(', ');
 
+  const resolvedParams = use(params);
+  const { slug: identifier } = resolvedParams;
   const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
   const currentUrl = `${baseUrl}/directory/${identifier}`;
-
-  // Fetch tenant info for status panel
-  const tenantInfo = await tenantPublicService.getPublicTenantInfo(listing.tenantId);
 
   // Server-side check: show panel for google_only tier, non-active status, or subscription issues
   const showStatusPanel = tenantInfo ? (
@@ -474,8 +493,10 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
     tenantInfo.showSubscriptionPanel === true
   ) : false;
 
-  // For RelatedStores, we need the slug (not tenant ID)
-  const slugForRelated = identifier.startsWith('tid-') ? listing.slug : identifier;
+ // Handle view cart
+  const handleViewCart = () => {
+    router.push('/carts');
+  };
 
   return (
     <>
@@ -531,60 +552,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
 
                   
                {/* Hours Badge - Status */}
-                          {(() => {
-                            switch (storeStatus?.status) {
-                              case 'open':
-                                return (
-                                  <MantineBadge 
-                                    color="green"
-                                    variant="light"
-                                    size="lg"
-                                    className="animate-pulse"
-                                    title={storeStatus?.label || 'Open now'}
-                                  >
-                                    &#x1F7E2; Open
-                                  </MantineBadge>
-                                );
-                              case 'closed':
-                                return (
-                                  <MantineBadge 
-                                    color="red"
-                                    variant="light"
-                                    size="lg"
-                                    className="animate-bounce"
-                                    title={storeStatus?.label || 'Closed'}
-                                  >
-                                    &#x1F534; Closed
-                                  </MantineBadge>
-                                );
-                              case 'opening-soon':
-                                return (
-                                  <MantineBadge 
-                                    color="blue"
-                                    variant="filled"
-                                    size="lg"
-                                    className="animate-ping"
-                                    title={storeStatus?.label || 'Opening soon'}
-                                  >
-                                    &#x1F7E1; Opening
-                                  </MantineBadge>
-                                );
-                              case 'closing-soon':
-                                return (
-                                  <MantineBadge 
-                                    color="orange"
-                                    variant="filled"
-                                    size="lg"
-                                    className="animate-ping"
-                                    title={storeStatus?.label || 'Closing soon'}
-                                  >
-                                    &#x1F7E1; Closing
-                                  </MantineBadge>
-                                );
-                              default:
-                                return null;
-                            }
-                          })()} {storeStatus?.label}
+                      <HoursStatusBadge status={hoursStatus} /> {hoursStatus?.label}
                 </div>
               </div>
             )}
@@ -673,14 +641,50 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                 {/* Action Buttons - Clean inline layout */}
                 <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
                   {/* Visit Storefront - Left side */}
-                  <Link
+                  <a
                     href={`/tenant/${slugForRelated ? slugForRelated : listing.tenantId}`}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-                    title="Browse products on the storefront"
+                    className="flex items-left gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
+                    title="View Store"
                   >
-                    <Globe className="w-4 h-4" />
-                    <span>Visit Storefront</span>
-                  </Link>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" />
+                    </svg>
+                    <span className="hidden lg:inline">Storefront</span>
+                  </a>
+              
+				
+                 
+                  <a
+                    href={`/shops/${slugForRelated ? slugForRelated : listing.tenantId}`}
+                    className="flex items-left gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
+                    title="View Store in Shops"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4zm0 0v10a2 2 0 002 2h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" />
+                  </svg>
+                    <span className="hidden lg:inline">Shop</span>
+                  </a>
+
+                  
+                
+				  
+                  <a
+                    onClick={() => {
+                    const reviewsSection = document.getElementById('hours-section');
+                    if (reviewsSection) {
+                      reviewsSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                    title="View Store Hours"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                    <span className="hidden lg:inline">Hours</span>
+                  </a>
+				  
+                 
                   
                   {/* Share/Print Actions - Right side */}
                   <DirectoryActions 
@@ -694,7 +698,7 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   />
                 </div>
               </div>
-
+ <div id="products-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
               {/* Featured Products - hidden when status panel shows */}
               {!showStatusPanel && featuredProducts.length > 0 && (
                 <TenantPaymentProvider tenantId={listing.tenantId}>
@@ -732,12 +736,10 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                             productCategory: product.category_name,
                             has_variants: product.has_variants,
                             // Use fresh payment gateway status from consolidated data instead of inconsistent context
-                            has_active_payment_gateway: paymentGatewayStatus.hasActiveGateway,
                             payment_gateway_type: paymentGatewayStatus.defaultGatewayType,
                           }}
                           tenantName={listing.businessName}
                           tenantLogo={tenantLogo?.toString() || listing.logoUrl}
-                          hasActivePaymentGateway={paymentGatewayStatus.hasActiveGateway}
                           defaultGatewayType={paymentGatewayStatus.defaultGatewayType}
                           variant="featured"
                           showCategory={true}
@@ -765,9 +767,11 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   </div>
                 </div>
               )}
+               <div id="gallery-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
 
               {/* Photo Gallery - Visual Proof */}
               <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
+               <div id="categories-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
 
               {/* Product Categories - Browse More */}
               {storefrontCategories.categories.length > 0 && (
@@ -779,9 +783,10 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
               )}
 
               {/* Store Ratings and Reviews - Social Proof */}
+               <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
               <StoreRatingsSection tenantId={listing.tenantId} showWriteReview={true} />
             </div>
-
+ <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
             {/* Right Column - Contact Info */}
             <div className="space-y-6">
               <div className="bg-white rounded-lg shadow-sm p-6">
@@ -881,12 +886,12 @@ export default async function StoreDetailPage({ params }: StoreDetailPageProps) 
                   )}
                 </div>
               </div>
-
+ <div id="hours-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
               {/* Business Hours - Collapsible */}
               {businessHours && (
                 <BusinessHoursCollapsible businessHours={businessHours} />
               )}
-
+ <div id="map-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
               {/* Map Location */}
               {listing.address && (
                 <div className="bg-white rounded-lg shadow-sm p-6">

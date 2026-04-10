@@ -25,6 +25,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useStoreStatus } from "@/hooks/useStoreStatus";
 import { trackBehaviorClient } from '@/utils/behaviorTracking';
+import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 
 // Lazy load secondary components (non-critical for initial render)
 const QuickActions = lazy(() => import("./QuickActions"));
@@ -357,56 +358,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
               {tenantId}
             </code>
               {/* Hours Badge - Status */}
-            {(() => {
-              switch (hoursStatus?.status) {
-                case 'open':
-                  return (
-                    <Badge 
-                      color="green"
-                      variant="light"
-                      size="xs"
-                      className="animate-pulse"
-                    >
-                      🟢 Open
-                    </Badge>
-                  );
-                case 'closed':
-                  return (
-                    <Badge 
-                      color="red"
-                      variant="light"
-                      size="xs"
-                      className="animate-bounce"
-                    >
-                      🔴 Closed
-                    </Badge>
-                  );
-                case 'opening-soon':
-                  return (
-                    <Badge 
-                      color="blue"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                    >
-                      🟡 Opening
-                    </Badge>
-                  );
-                case 'closing-soon':
-                  return (
-                    <Badge 
-                      color="orange"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                    >
-                      🟡 Closing
-                    </Badge>
-                  );
-                default:
-                  return null;
-              }
-            })()}
+         <HoursStatusBadge status={hoursStatus} />
           </div>
           
           {/* Debug Refresh Button */}
@@ -524,56 +476,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                   {hoursInfo?.hasHours ? (
                     <div className="flex items-center gap-2 flex-wrap">
                       {/* Hours Badge - Status */}
-              {(() => {
-                switch (hoursStatus?.status) {
-                  case 'open':
-                    return (
-                      <Badge 
-                        color="green"
-                        variant="light"
-                        size="lg"
-                        className="animate-pulse"
-                      >
-                        🟢 Open
-                      </Badge>
-                    );
-                  case 'closed':
-                    return (
-                      <Badge 
-                        color="red"
-                        variant="light"
-                        size="lg"
-                        className="animate-bounce"
-                      >
-                        🔴 Closed
-                      </Badge>
-                    );
-                  case 'opening-soon':
-                    return (
-                      <Badge 
-                        color="blue"
-                        variant="filled"
-                        size="lg"
-                        className="animate-ping"
-                      >
-                        🟡 Opening
-                      </Badge>
-                    );
-                  case 'closing-soon':
-                    return (
-                      <Badge 
-                        color="orange"
-                        variant="filled"
-                        size="lg"
-                        className="animate-ping"
-                      >
-                        🟡 Closing
-                      </Badge>
-                    );
-                  default:
-                    return null;
-                }
-              })()}
+          <HoursStatusBadge status={hoursStatus} />
             <Text>{hoursStatus?.label}</Text>
                   </div>
                 ) : (

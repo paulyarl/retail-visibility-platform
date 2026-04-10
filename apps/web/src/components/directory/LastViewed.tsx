@@ -451,7 +451,6 @@ export default function LastViewed({
                           tenantName={productData.businessName || productData.storeName}
                           tenantLogo={productData.tenantLogo || productData.storeLogo}
 
-                          hasActivePaymentGateway={productData.hasActivePaymentGateway}
                           defaultGatewayType={productData.defaultGatewayType}
 
                           variant={productData.isFeatured ? 'featured' : 'grid'}

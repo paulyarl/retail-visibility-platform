@@ -51,6 +51,7 @@ import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 // store status
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Badge as MantineBadge } from '@mantine/core';
+import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 
 interface StorefrontClientWrapperProps {
   tenantId: string;
@@ -300,7 +301,7 @@ export default function StorefrontClientWrapper({
             </div>
             
 
-            {/* Quick Actions */}
+           {/* Quick Actions */}
             <div className="flex items-center gap-3">
               {/* Navigation Pills */}
               <div className="hidden sm:flex items-center gap-2">
@@ -308,7 +309,7 @@ export default function StorefrontClientWrapper({
                   <a
                     href={`/directory/${tenantSlug}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
-                    title="View in Directory"
+                    title="View Store in Directory"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" />
@@ -316,11 +317,12 @@ export default function StorefrontClientWrapper({
                     <span className="hidden lg:inline">Directory</span>
                   </a>
                 )}
+				
                 {directoryPublished && tenantSlug && (
                   <a
                     href={`/shops/${tenantSlug}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
-                    title="View in Directory"
+                    title="View Store in Shops"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 000 4zm0 0v10a2 2 0 002 2h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" />
@@ -329,40 +331,63 @@ export default function StorefrontClientWrapper({
                   </a>
                 )}
               
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-1">
-                <button 
-                  onClick={() => {
+             {/* {directoryPublished && tenantSlug && (  */}
+			 
+                  <a
+                    onClick={() => {
                     const reviewsSection = document.getElementById('reviews-section');
                     if (reviewsSection) {
                       reviewsSection.scrollIntoView({ behavior: 'smooth' });
                     }
                   }}
-                  className="p-2.5 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" 
-                  title="Reviews"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                    title="View Store Reviews"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                   </svg>
-                </button>
-
-                <button 
-                  onClick={handleViewCart}
-                  className="p-2.5 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors relative" 
-                  title="Cart"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 014 4z" />
+                    <span className="hidden lg:inline">Reviews</span>
+                  </a>
+                  
+                  <a
+                    onClick={() => {
+                    const hoursSection = document.getElementById('hours-section');
+                    if (hoursSection) {
+                      hoursSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                    title="View Store Hours"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  {cartTotalItems > 0 && (
-                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
+                    <span className="hidden lg:inline">Hours</span>
+                  </a>
+				  
+                  <a
+                     onClick={handleViewCart}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                    title="View Shopping Cart"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 014 4z" />
+                  </svg>
+                    {cartTotalItems > 0 && (
+                    <span className="flex -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
                       {cartTotalItems > 99 ? '99+' : cartTotalItems}
                     </span>
                   )}
-                </button>
+                    <span className="hidden lg:inline">Cart</span>
+                  </a>
+				  
+             {/*   )}  */}
+              
+              </div>
 
+              {/* Action Buttons */}
+              <div className="flex items-center gap-1">
+                
                 <button className="p-2.5 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Share">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
@@ -410,6 +435,70 @@ export default function StorefrontClientWrapper({
                 <span>Shop</span>
               </a>
             )}
+            
+                  <a
+                    onClick={() => {
+                    const reviewsSection = document.getElementById('reviews-section');
+                    if (reviewsSection) {
+                      reviewsSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                    title="View Store Reviews"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                    <span className="hidden lg:inline">Reviews</span>
+                  </a>
+				  
+                  <a
+                     onClick={handleViewCart}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                    title="View Shopping Cart"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 014 4z" />
+                  </svg>
+                    {cartTotalItems > 0 && (
+                    <span className="flex -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
+                      {cartTotalItems > 99 ? '99+' : cartTotalItems}
+                    </span>
+                  )}
+                    <span className="hidden lg:inline">Cart</span>
+                  </a>
+          
+                  <a
+                    onClick={() => {
+                    const hoursSection = document.getElementById('hours-section');
+                    if (hoursSection) {
+                      hoursSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                    title="View Store Hours"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                    <span className="hidden lg:inline">Hours</span>
+                  </a>
+				  
+                  <a
+                     onClick={handleViewCart}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+                    title="View Shopping Cart"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 014 4z" />
+                  </svg>
+                    {cartTotalItems > 0 && (
+                    <span className="flex -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
+                      {cartTotalItems > 99 ? '99+' : cartTotalItems}
+                    </span>
+                  )}
+                    <span className="hidden lg:inline">Cart</span>
+                  </a>
           
           </div>
         </div>
@@ -660,30 +749,12 @@ export default function StorefrontClientWrapper({
               })}
             </div>
 
-            {/* Second Row - Store Information */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400 whitespace-nowrap">Store Info:</span>
-              
-              {/* Reviews - Always Show */}
-              <button
-                onClick={() => {
-                  const element = document.getElementById('reviews-section');
-                  element?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
-                title="Jump to Customer Reviews"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h1.519l1.519-4.674a1 1 0 00-.95-.69zM11.049 4.927l1.519 4.674a1 1 0 001.519-.69l1.519-4.674a1 1 0 00-1.519.69l-1.519 4.674a1 1 0 00-.95.69z" />
-                </svg>
-                <span>Customer Reviews</span>
-              </button>
-
-              {/* Map/Directions - Show if address available */}
-              </div>
+          
           </div>
         </div>
       )}
+       {/* Gradient border line */}
+      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
 
       {/* Main Product Catalog Section - PRIMARY CONTENT (Above-the-Fold) */}
       {!isProductsOnly && products.length > 0 && (
@@ -822,6 +893,8 @@ export default function StorefrontClientWrapper({
           </div>
         </div>
       )}
+       {/* Gradient border line */}
+      <div id="hours-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
 
       {/* Store Information Card - Consolidated Location, Contact, Hours */}
       <div className="bg-neutral-50 dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-700">
@@ -897,60 +970,10 @@ export default function StorefrontClientWrapper({
                   )}
                   
                    {/* Hours Badge - Status */}
-            {(() => {
-              switch (hoursStatus?.status) {
-                case 'open':
-                  return (
-                    <MantineBadge 
-                      color="green"
-                      variant="light"
-                      size="lg"
-                      className="animate-pulse"
-                      title={hoursStatus?.label || 'Open now'}
-                    >
-                      🟢 Open
-                    </MantineBadge>
-                  );
-                case 'closed':
-                  return (
-                    <MantineBadge 
-                      color="red"
-                      variant="light"
-                      size="lg"
-                      className="animate-bounce"
-                      title={hoursStatus?.label || 'Closed'}
-                    >
-                      🔴 Closed
-                    </MantineBadge>
-                  );
-                case 'opening-soon':
-                  return (
-                    <MantineBadge 
-                      color="blue"
-                      variant="filled"
-                      size="lg"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Opening soon'}
-                    >
-                      🟡 Opening
-                    </MantineBadge>
-                  );
-                case 'closing-soon':
-                  return (
-                    <MantineBadge 
-                      color="orange"
-                      variant="filled"
-                      size="lg"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Closing soon'}
-                    >
-                      🟡 Closing
-                    </MantineBadge>
-                  );
-                default:
-                  return null;
-              }
-            })()} {hoursStatus?.label}
+                  <div className="flex items-center gap-2">
+                    <HoursStatusBadge status={hoursStatus} /> {hoursStatus?.label}
+                  </div>
+
                 </div>
                 
                 {/* Single Map Display */}
@@ -990,10 +1013,11 @@ export default function StorefrontClientWrapper({
           </div>
         </div>
       </div>
-
+ {/* Gradient border line */}
+      <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
       {/* Store Ratings and Reviews */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div id="reviews-section" className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
+        <div  className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
           <StoreRatingDisplay tenantId={tenantId} showWriteReview={true} isPublic={true} />
         </div>
       </div>
@@ -1018,9 +1042,10 @@ export default function StorefrontClientWrapper({
           />
         </div>
       )}
+     
 
       {/* Recently Viewed */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className=" mx-auto bg-gradient-to-r from-transparent via-orange-500 to-transparent">
         <LastViewed />
       </div>
 

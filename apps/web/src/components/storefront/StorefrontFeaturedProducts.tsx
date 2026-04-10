@@ -344,12 +344,11 @@ interface FeaturedSectionWithProductsProps {
   products: FeaturedProduct[];
   loading: boolean;
   maxProducts?: number;
-  hasActivePaymentGateway?: boolean;
   defaultGatewayType?: string;
   instanceId?: string;
 }
 
-function FeaturedSection({ tenantId, type, title, description, icon, color, products, loading, maxProducts = 8, hasActivePaymentGateway, defaultGatewayType, instanceId = 'default' }: FeaturedSectionWithProductsProps) {
+function FeaturedSection({ tenantId, type, title, description, icon, color, products, loading, maxProducts = 8, defaultGatewayType, instanceId = 'default' }: FeaturedSectionWithProductsProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const config = featuredTypeConfig[type as keyof typeof featuredTypeConfig];
   const contextPayment = useTenantPaymentOptional();
@@ -587,7 +586,6 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   }
                 }}
                 variant="featured"
-                hasActivePaymentGateway={hasActivePaymentGateway}
                 defaultGatewayType={defaultGatewayType}
                 showCategory={true}
                 showDescription={true}
@@ -756,7 +754,6 @@ function FeaturedSection({ tenantId, type, title, description, icon, color, prod
                   }
                 }}
                 variant="list"
-                hasActivePaymentGateway={hasActivePaymentGateway}
                 defaultGatewayType={defaultGatewayType}
                 showCategory={true}
                 showDescription={true}
@@ -1074,7 +1071,6 @@ export default function StorefrontFeaturedProducts({
             key={type}
             tenantId={tenantId}
             type={type}
-            hasActivePaymentGateway={hasActivePaymentGateway}
             defaultGatewayType={defaultGatewayType}
             instanceId={instanceId}
             {...config}

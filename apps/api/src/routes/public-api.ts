@@ -8,7 +8,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import shopsRoutes from './shops';
-import tenantsRoutes from './tenants';
+import tenantsRoutes from './public/tenants';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 

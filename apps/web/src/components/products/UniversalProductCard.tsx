@@ -124,9 +124,9 @@ export function UniversalProductCard({
   const storeData = tenantId ? useStoreData(tenantId) : { store: null, loading: false, error: null };
   const { store } = storeData;
 
-  // Payment gateway status: props > product data
-  const hasActivePaymentGateway = propHasActivePaymentGateway ?? product?.hasActivePaymentGateway ?? false;
+  // Payment gateway status: check for gateway_type instead of boolean
   const defaultGatewayType = propDefaultGatewayType ?? product?.defaultGatewayType;
+  const hasActivePaymentGateway = !!defaultGatewayType; // Has gateway if gateway_type exists
 
   // Format price - handle both raw values and pre-formatted values
   const formatPrice = (value: number | string | undefined): string => {
@@ -238,7 +238,7 @@ export function UniversalProductCard({
                       ${formattedSalePrice}
                     </span>
                   )}
-                  {product.hasActivePaymentGateway && (
+                  {defaultGatewayType && (
                     <ShoppingCart className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                   )}
                 </div>
