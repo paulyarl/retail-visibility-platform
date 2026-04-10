@@ -34,10 +34,33 @@ interface Tenant {
   subscriptionTier?: string;
   subscription_tier?: string; // snake_case version
   subscriptionStatus?: string;
+  subscription_status?: string; // snake_case version
   trialEndsAt?: string;
+  trial_ends_at?: string; // snake_case version
   subscriptionEndsAt?: string;
+  subscription_ends_at?: string; // snake_case version
+  graceEndsAt?: string;
+  grace_ends_at?: string; // snake_case version
+  manualSubscriptionControl?: boolean;
+  manual_subscription_control?: boolean; // snake_case version
+  manualSubscriptionExpiresAt?: string;
+  manual_subscription_expires_at?: string; // snake_case version
+  manualSubscriptionReason?: string;
+  manual_subscription_reason?: string; // snake_case version
+  effectiveExpiresAt?: string;
+  effectiveExpiresType?: 'trial' | 'subscription' | 'manual';
+  effectiveExpiresSource?: 'automatic_trial' | 'automatic_subscription' | 'manual_override';
   metadata?: any;
-  // Add other tenant fields as needed
+  organizationId?: string;
+  organization_id?: string; // snake_case version
+  createdAt?: string;
+  created_at?: string; // snake_case version
+  service_level?: string; // snake_case version
+  reopening_date?: string; // snake_case version
+  _count?: {
+    items: number;
+    users: number;
+  };
 }
 
 interface OrganizationData {

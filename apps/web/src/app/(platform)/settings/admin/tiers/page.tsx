@@ -19,6 +19,9 @@ type Tenant = {
   metadata?: { businessName?: string; city?: string; state?: string };
   organizationId?: string;
   organization?: { id: string; name: string } | null;
+  effectiveExpiresAt?: string;
+  effectiveExpiresType?: string;
+  effectiveExpiresSource?: string;
 };
 
 interface DbTier {
@@ -114,6 +117,9 @@ export default function AdminTiersPage() {
         createdAt: tenant.created_at,
         metadata: tenant.metadata,
         organization: tenant.organizations_list ? { id: tenant.organizations_list.id, name: tenant.organizations_list.name } : null,
+        effectiveExpiresAt: (tenant as any).effectiveExpiresAt,
+        effectiveExpiresType: (tenant as any).effectiveExpiresType,
+        effectiveExpiresSource: (tenant as any).effectiveExpiresSource,
       }));
       setTenants(transformedTenants);
     } catch (err: any) {
@@ -145,6 +151,9 @@ export default function AdminTiersPage() {
         organization_id?: string;
         organizations_list?: { name: string };
         name?: string;
+        effectiveExpiresAt?: string;
+        effectiveExpiresType?: string;
+        effectiveExpiresSource?: string;
       };
       const apiTenant = (responseData as { tenant?: ApiTenantResponse }).tenant || (responseData as ApiTenantResponse);
       setTenants(prev => prev.map(t => t.id === tenantId ? {
@@ -155,6 +164,9 @@ export default function AdminTiersPage() {
         subscriptionEndsAt: apiTenant.subscription_ends_at,
         metadata: apiTenant.metadata,
         organization: apiTenant.organization_id ? { id: apiTenant.organization_id, name: apiTenant.organizations_list?.name || 'Unknown Organization' } : null,
+        effectiveExpiresAt: (apiTenant as any).effectiveExpiresAt,
+        effectiveExpiresType: (apiTenant as any).effectiveExpiresType,
+        effectiveExpiresSource: (apiTenant as any).effectiveExpiresSource,
       } : t));
       const tenantName = apiTenant.name || apiTenant.metadata?.businessName || 'Location';
       toast(`Successfully updated ${tenantName}`, { variant: 'success' });
@@ -550,7 +562,7 @@ const getTierInfo = (tierKey?: string) => {
                             <div className="text-sm text-neutral-600 space-y-1">
                               <p>ID: {tenant.id}</p>
                               {tenant.metadata?.city && tenant.metadata?.state && <p>Location: {tenant.metadata.city}, {tenant.metadata.state}</p>}
-                              {tenant.trialEndsAt && <p>Trial Ends: {new Date(tenant.trialEndsAt).toLocaleDateString()}</p>}
+                              {tenant.effectiveExpiresAt && <p>Expires: {new Date(tenant.effectiveExpiresAt).toLocaleDateString()}</p>}
                             </div>
                           </div>
                           <div className="flex-shrink-0 flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>

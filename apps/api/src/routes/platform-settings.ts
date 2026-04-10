@@ -72,23 +72,39 @@ router.get('/platform-settings', async (_req, res) => {
     }
 
     // Map snake_case database fields to camelCase for frontend
-    const mappedSettings = {
-      id: settings.id,
+    const publicBranding = {
       platformName: settings.platform_name,
       platformDescription: settings.platform_description,
       logoUrl: settings.logo_url,
       faviconUrl: settings.favicon_url,
-      // Theme settings
+      bannerUrl: settings.banner_url,
       themePreset: settings.theme_preset,
       themeColors: settings.theme_colors,
       themeFontFamily: settings.theme_font_family,
       themeBorderRadius: settings.theme_border_radius,
       themeButtonSize: settings.theme_button_size,
       themeSpacing: settings.theme_spacing,
-      // Features
-      features: {
-        rateLimitingEnabled: settings.rate_limiting_enabled ?? true,
-      },
+      // Contact information
+      contactEmail: settings.contact_email,
+      contactPhone: settings.contact_phone,
+      contactAddress: settings.contact_address,
+      contactWebsite: settings.contact_website,
+      // Social media
+      socialFacebook: settings.social_facebook,
+      socialTwitter: settings.social_twitter,
+      socialInstagram: settings.social_instagram,
+      socialLinkedIn: settings.social_linkedin,
+      socialYoutube: settings.social_youtube,
+    };
+
+    // Features
+    const features = {
+      rateLimitingEnabled: settings.rate_limiting_enabled ?? true,
+    };
+
+    const mappedSettings = {
+      ...publicBranding,
+      ...features,
       createdAt: settings.created_at?.toISOString(),
       updatedAt: settings.updated_at?.toISOString(),
     };
@@ -106,6 +122,7 @@ router.post(
   upload.fields([
     { name: 'logo', maxCount: 1 },
     { name: 'favicon', maxCount: 1 },
+    { name: 'banner', maxCount: 1 },
   ]),
   async (req: any, res) => {
     try {
@@ -199,6 +216,67 @@ router.post(
         }
       }
 
+      // Handle banner upload
+      if (req.files?.banner?.[0]) {
+        const bannerFile = req.files.banner[0];
+        if (supabase) {
+          const pathKey = `platform/banner-${Date.now()}.${bannerFile.originalname.split('.').pop()}`;
+          const { error, data } = await supabase.storage
+            .from(StorageBuckets.BRANDS.name)
+            .upload(pathKey, bannerFile.buffer, {
+              cacheControl: '3600',
+              upsert: false,
+              contentType: bannerFile.mimetype,
+            });
+
+          if (error) {
+            console.error('Banner upload error:', error);
+            return res.status(500).json({ error: 'banner_upload_failed' });
+          }
+
+          updateData.banner_url = supabase.storage.from(StorageBuckets.BRANDS.name).getPublicUrl(data.path).data.publicUrl;
+        } else {
+          console.warn('Supabase not configured, skipping banner upload');
+          updateData.banner_url = 'https://via.placeholder.com/1200x400?text=Banner';
+        }
+      }
+
+      // Handle contact information
+      if (req.body.contactEmail !== undefined) {
+        updateData.contact_email = req.body.contactEmail;
+      }
+      if (req.body.contactPhone !== undefined) {
+        updateData.contact_phone = req.body.contactPhone;
+      }
+      if (req.body.contactAddress !== undefined) {
+        updateData.contact_address = req.body.contactAddress;
+      }
+      if (req.body.contactWebsite !== undefined) {
+        updateData.contact_website = req.body.contactWebsite;
+      }
+
+      // Handle social media
+      if (req.body.socialFacebook !== undefined) {
+        updateData.social_facebook = req.body.socialFacebook;
+      }
+      if (req.body.socialTwitter !== undefined) {
+        updateData.social_twitter = req.body.socialTwitter;
+      }
+      if (req.body.socialInstagram !== undefined) {
+        updateData.social_instagram = req.body.socialInstagram;
+      }
+      if (req.body.socialLinkedIn !== undefined) {
+        updateData.social_linkedin = req.body.socialLinkedIn;
+      }
+      if (req.body.socialYoutube !== undefined) {
+        updateData.social_youtube = req.body.socialYoutube;
+      }
+
+      // Handle banner URL from form data
+      if (req.body.bannerUrl !== undefined) {
+        updateData.banner_url = req.body.bannerUrl;
+      }
+
       // Update or create settings
       const settings = await prisma.platform_settings_list.upsert({
         where: { id: 1 },
@@ -209,6 +287,16 @@ router.post(
           platform_description: updateData.platform_description || 'Manage your retail operations with ease',
           logo_url: updateData.logo_url,
           favicon_url: updateData.favicon_url,
+          banner_url: updateData.banner_url,
+          contact_email: updateData.contact_email,
+          contact_phone: updateData.contact_phone,
+          contact_address: updateData.contact_address,
+          contact_website: updateData.contact_website,
+          social_facebook: updateData.social_facebook,
+          social_twitter: updateData.social_twitter,
+          social_instagram: updateData.social_instagram,
+          social_linkedin: updateData.social_linkedin,
+          social_youtube: updateData.social_youtube,
           updated_at: new Date(),
         },
       });
@@ -220,14 +308,24 @@ router.post(
         platformDescription: settings.platform_description,
         logoUrl: settings.logo_url,
         faviconUrl: settings.favicon_url,
-        // Theme settings
+        bannerUrl: settings.banner_url,
         themePreset: settings.theme_preset,
         themeColors: settings.theme_colors,
         themeFontFamily: settings.theme_font_family,
         themeBorderRadius: settings.theme_border_radius,
         themeButtonSize: settings.theme_button_size,
         themeSpacing: settings.theme_spacing,
-        // Features
+        // Contact information
+        contactEmail: settings.contact_email,
+        contactPhone: settings.contact_phone,
+        contactAddress: settings.contact_address,
+        contactWebsite: settings.contact_website,
+        // Social media
+        socialFacebook: settings.social_facebook,
+        socialTwitter: settings.social_twitter,
+        socialInstagram: settings.social_instagram,
+        socialLinkedIn: settings.social_linkedin,
+        socialYoutube: settings.social_youtube,
         features: {
           rateLimitingEnabled: settings.rate_limiting_enabled ?? true,
         },

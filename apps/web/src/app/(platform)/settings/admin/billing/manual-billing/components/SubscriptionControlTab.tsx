@@ -43,9 +43,13 @@ interface Tenant {
   subscriptionStatus: string;
   subscriptionTier: string;
   subscriptionEndsAt?: Date;
+  trialEndsAt?: Date;
+  graceEndsAt?: Date;
   manualSubscriptionControl: boolean;
   manualSubscriptionExpiresAt?: Date;
   manualSubscriptionReason?: string;
+  effectiveExpiresAt?: Date;
+  effectiveExpiresType?: string;
 }
 
 export default function SubscriptionControlTab() {
@@ -106,7 +110,9 @@ export default function SubscriptionControlTab() {
         graceEndsAt: tenant.graceEndsAt ? new Date(tenant.graceEndsAt) : undefined,
         manualSubscriptionControl: tenant.manualSubscriptionControl || false,
         manualSubscriptionExpiresAt: tenant.manualSubscriptionExpiresAt ? new Date(tenant.manualSubscriptionExpiresAt) : undefined,
-        manualSubscriptionReason: tenant.manualSubscriptionReason
+        manualSubscriptionReason: tenant.manualSubscriptionReason,
+        effectiveExpiresAt: tenant.effectiveExpiresAt ? new Date(tenant.effectiveExpiresAt) : undefined,
+        effectiveExpiresType: tenant.effectiveExpiresType || null
       }));
       setTenants(transformedTenants);
       setTotalPages(Math.ceil(transformedTenants.length / itemsPerPage));
@@ -223,15 +229,14 @@ export default function SubscriptionControlTab() {
     }
   };
 
-  const openControlModal = (tenant: any) => {
+  const openControlModal = (tenant: Tenant) => {
     setSelectedTenant(tenant);
-    const expiresAt = (tenant as any).manualSubscriptionExpiresAt ? new Date((tenant as any).manualSubscriptionExpiresAt) : null;
     
     controlForm.setValues({
-      enabled: (tenant as any).manualSubscriptionControl || false,
-      hasExpirationDate: !!expiresAt,
-      expiresAt: expiresAt,
-      reason: (tenant as any).manualSubscriptionReason || ''
+      enabled: tenant.manualSubscriptionControl || false,
+      hasExpirationDate: !!tenant.manualSubscriptionExpiresAt,
+      expiresAt: tenant.manualSubscriptionExpiresAt,
+      reason: tenant.manualSubscriptionReason || ''
     });
     
     setControlModalOpen(true);
@@ -514,40 +519,40 @@ export default function SubscriptionControlTab() {
                   </Table.Td>
                   <Table.Td>
                     <Text size="sm">
-                      {(tenant as any).effectiveExpiresAt 
-                        ? new Date((tenant as any).effectiveExpiresAt).toLocaleDateString()
+                      {tenant.effectiveExpiresAt 
+                        ? tenant.effectiveExpiresAt.toLocaleDateString()
                         : 'Never'
                       }
                     </Text>
-                    {(tenant as any).effectiveExpiresAt && (
+                    {tenant.effectiveExpiresAt && (
                       <Text size="xs" c="dimmed" mt={2}>
-                        {getTimeRemaining((tenant as any).effectiveExpiresAt)}
-                        {(tenant as any).effectiveExpiresType === 'manual' && (
+                        {getTimeRemaining(tenant.effectiveExpiresAt)}
+                        {tenant.effectiveExpiresType === 'manual' && (
                           <Text span c="blue" ml={4}>
                             (Manual Override)
                           </Text>
                         )}
                       </Text>
                     )}
-                    {!(tenant as any).effectiveExpiresAt && (tenant as any).subscriptionStatus === 'trial' && (tenant as any).trialEndsAt && (
+                    {!tenant.effectiveExpiresAt && tenant.subscriptionStatus === 'trial' && tenant.trialEndsAt && (
                       <Text size="xs" c="blue" mt={2}>
-                        Trial: {getTimeRemaining((tenant as any).trialEndsAt, 'trial')}
+                        Trial: {getTimeRemaining(tenant.trialEndsAt, 'trial')}
                       </Text>
                     )}
                   </Table.Td>
                   <Table.Td>
-                    {getControlBadge((tenant as any).manualSubscriptionControl || false, (tenant as any).manualSubscriptionExpiresAt)}
+                    {getControlBadge(tenant.manualSubscriptionControl || false, tenant.manualSubscriptionExpiresAt)}
                   </Table.Td>
                   <Table.Td>
                     <Text size="sm">
-                      {(tenant as any).manualSubscriptionExpiresAt 
-                        ? new Date((tenant as any).manualSubscriptionExpiresAt).toLocaleDateString()
-                        : (tenant as any).manualSubscriptionControl ? 'Indefinite' : '-'
+                      {tenant.manualSubscriptionExpiresAt 
+                        ? tenant.manualSubscriptionExpiresAt.toLocaleDateString()
+                        : tenant.manualSubscriptionControl ? 'Indefinite' : '-'
                       }
                     </Text>
-                    {(tenant as any).manualSubscriptionExpiresAt && (
+                    {tenant.manualSubscriptionExpiresAt && (
                       <Text size="xs" c="dimmed" mt={2}>
-                        {getTimeRemaining((tenant as any).manualSubscriptionExpiresAt)}
+                        {getTimeRemaining(tenant.manualSubscriptionExpiresAt)}
                       </Text>
                     )}
                   </Table.Td>

@@ -133,8 +133,43 @@ export function SelfServiceBilling({
   };
 
   // Preview tier change
+  // Quick validation function for immediate feedback
+  const getTierValidationStatus = useCallback((tier: string) => {
+    if (tier === currentTier) return { allowed: true, reason: 'Current plan' };
+    
+    const isCurrentTrial = currentTier?.startsWith('trial_');
+    const isCurrentPaid = currentTier && !currentTier.startsWith('trial_') && currentTier !== 'starter';
+    const isNewTrial = tier.startsWith('trial_');
+    const isNewPaid = !tier.startsWith('trial_') && tier !== 'starter';
+
+    // Quick frontend validation (same logic as backend)
+    if (isCurrentPaid && isNewTrial) {
+      return { allowed: false, reason: 'Cannot downgrade from paid plan to trial' };
+    }
+    
+    // Allow trial tier switching during active trial, but not during grace period
+    if (isCurrentTrial && isNewTrial) {
+      // For frontend, we'll allow different trial tiers but block same tier
+      // Backend will handle grace period validation
+      if (tier === currentTier) {
+        return { allowed: false, reason: 'Cannot renew or extend current trial' };
+      }
+      // Different trial tiers are allowed (backend will validate grace period)
+      return { allowed: true, reason: null };
+    }
+
+    return { allowed: true, reason: null };
+  }, [currentTier]);
+
   const handlePreviewTier = useCallback(async (tier: string) => {
     if (tier === currentTier) return;
+    
+    // Quick frontend validation first
+    const validation = getTierValidationStatus(tier);
+    if (!validation.allowed) {
+      setError(validation.reason || 'This plan change is not allowed');
+      return;
+    }
     
     try {
       const previewData = await subscriptionBillingService.previewSubscriptionChange(tier, billingCycle);
@@ -142,9 +177,43 @@ export function SelfServiceBilling({
       setSelectedTier(tier);
       setShowConfirmTier(true);
     } catch (err: any) {
-      setError(err.message || 'Failed to preview tier change');
+      // Handle specific validation errors with user-friendly messages
+      let errorMessage = 'Failed to preview tier change';
+      
+      if (err.errorCode) {
+        switch (err.errorCode) {
+          case 'PAID_TO_TRIAL_NOT_ALLOWED':
+            errorMessage = 'Cannot downgrade from paid plan to trial. Please contact support for assistance.';
+            break;
+          case 'TRIAL_RENEWAL_NOT_ALLOWED':
+          case 'TRIAL_CHANGE_NOT_ALLOWED':
+            errorMessage = err.message || 'Trial renewals are not allowed. Please select a paid plan to continue.';
+            break;
+          case 'TRIAL_ALREADY_USED':
+            errorMessage = 'You have already used a trial. Only one trial per customer is allowed.';
+            break;
+          case 'SUBSCRIPTION_CANCELED':
+            errorMessage = 'Your subscription is canceled. Please contact support to reactivate.';
+            break;
+          case 'SUBSCRIPTION_PAST_DUE':
+            errorMessage = 'Please update your payment method before changing your subscription.';
+            break;
+          case 'GRACE_PERIOD_RESTRICTION':
+            errorMessage = 'Only plan upgrades are allowed during the grace period.';
+            break;
+          case 'MANUAL_CONTROL_RESTRICTION':
+            errorMessage = 'This subscription is manually managed. Please contact support to make changes.';
+            break;
+          default:
+            errorMessage = err.message || errorMessage;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     }
-  }, [currentTier, billingCycle]);
+  }, [currentTier, billingCycle, getTierValidationStatus]);
 
   // Confirm tier change
   const handleConfirmTierChange = async () => {
@@ -426,18 +495,22 @@ export function SelfServiceBilling({
                 : (tier.annualPriceCents || 0);
               const isCurrent = tier.tier === currentTier;
               const isSelected = tier.tier === selectedTier;
+              const validation = getTierValidationStatus(tier.tier);
+              const isDisabled = !validation.allowed && !isCurrent;
 
               return (
                 <div
                   key={tier.id}
-                  className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  className={`relative p-4 rounded-lg border-2 transition-all group ${
                     isCurrent 
                       ? 'border-primary-500 bg-primary-50' 
                       : isSelected
                         ? 'border-blue-500 bg-blue-50'
-                        : 'border-neutral-200 hover:border-neutral-300'
+                        : isDisabled
+                          ? 'border-neutral-200 bg-neutral-50 opacity-60 cursor-not-allowed'
+                          : 'border-neutral-200 hover:border-blue-300 hover:shadow-md cursor-pointer'
                   }`}
-                  onClick={() => !isCurrent && handlePreviewTier(tier.tier)}
+                  onClick={() => !isCurrent && !isDisabled && handlePreviewTier(tier.tier)}
                 >
                   {isCurrent && (
                     <Badge 
@@ -449,10 +522,41 @@ export function SelfServiceBilling({
                     </Badge>
                   )}
                   
+                  {/* Click indicator for non-current tiers */}
+                  {!isCurrent && !isDisabled && (
+                    <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Disabled indicator */}
+                  {!isCurrent && isDisabled && (
+                    <div className="absolute -top-2 -right-2">
+                      <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="space-y-2">
-                    <h4 className="font-semibold capitalize">
-                      {tier.tier.replace(/_/g, ' ')}
-                    </h4>
+                    <div className="flex items-center justify-between">
+                      <h4 className={`font-semibold capitalize ${isDisabled ? 'text-neutral-500' : ''}`}>
+                        {tier.tier.replace(/_/g, ' ')}
+                      </h4>
+                      {!isCurrent && !isDisabled && (
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
                     <div className="text-2xl font-bold">
                       {price === 0 ? 'Free / 14-day' : formatPrice(price)}
                       {price > 0 && (
@@ -506,18 +610,23 @@ export function SelfServiceBilling({
                 : (tier.annualPriceCents || 0);
               const isCurrent = tier.tier === currentTier;
               const isSelected = tier.tier === selectedTier;
+              const validation = getTierValidationStatus(tier.tier);
+              const isDisabled = !validation.allowed && !isCurrent;
 
               return (
                 <div
                   key={tier.id}
-                  className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  className={`relative p-4 rounded-lg border-2 transition-all group ${
                     isCurrent 
                       ? 'border-primary-500 bg-primary-50' 
                       : isSelected
                         ? 'border-blue-500 bg-blue-50'
-                        : 'border-neutral-200 hover:border-neutral-300'
+                        : isDisabled
+                          ? 'border-neutral-200 bg-neutral-50 opacity-60 cursor-not-allowed'
+                          : 'border-neutral-200 hover:border-blue-300 hover:shadow-md cursor-pointer'
                   }`}
-                  onClick={() => !isCurrent && handlePreviewTier(tier.tier)}
+                  onClick={() => !isCurrent && !isDisabled && handlePreviewTier(tier.tier)}
+                  title={isDisabled ? (validation.reason || undefined) : undefined}
                 >
                   {isCurrent && (
                     <Badge 
@@ -528,19 +637,38 @@ export function SelfServiceBilling({
                       Current
                     </Badge>
                   )}
+                  
+                  {/* Click indicator for non-current tiers */}
+                  {!isCurrent && (
+                    <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="space-y-3">
-                    <div>
+                    <div className="flex items-center justify-between">
                       <h4 className="font-semibold text-neutral-900">
                         {tier.tier.replace(/_/g, ' ')}
                       </h4>
-                      <div className="text-lg font-bold text-neutral-900">
-                        {price === 0 ? 'Free / 14-day' : formatPrice(price)}
-                        {price > 0 && (
-                          <span className="text-sm font-normal text-neutral-500">
-                            /{billingCycle === 'monthly' ? 'mo' : 'yr'}
-                          </span>
-                        )}
-                      </div>
+                      {!isCurrent && (
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-lg font-bold text-neutral-900">
+                      {price === 0 ? 'Free / 14-day' : formatPrice(price)}
+                      {price > 0 && (
+                        <span className="text-sm font-normal text-neutral-500">
+                          /{billingCycle === 'monthly' ? 'mo' : 'yr'}
+                        </span>
+                      )}
                     </div>
                     
                     <ul className="space-y-1 text-xs text-neutral-600">
@@ -571,18 +699,23 @@ export function SelfServiceBilling({
                 : (tier.annualPriceCents || 0);
               const isCurrent = tier.tier === currentTier;
               const isSelected = tier.tier === selectedTier;
+              const validation = getTierValidationStatus(tier.tier);
+              const isDisabled = !validation.allowed && !isCurrent;
 
               return (
                 <div
                   key={tier.id}
-                  className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  className={`relative p-4 rounded-lg border-2 transition-all group ${
                     isCurrent 
                       ? 'border-primary-500 bg-primary-50' 
                       : isSelected
                         ? 'border-blue-500 bg-blue-50'
-                        : 'border-neutral-200 hover:border-neutral-300'
+                        : isDisabled
+                          ? 'border-neutral-200 bg-neutral-50 opacity-60 cursor-not-allowed'
+                          : 'border-neutral-200 hover:border-blue-300 hover:shadow-md cursor-pointer'
                   }`}
-                  onClick={() => !isCurrent && handlePreviewTier(tier.tier)}
+                  onClick={() => !isCurrent && !isDisabled && handlePreviewTier(tier.tier)}
+                  title={isDisabled ? (validation.reason || undefined) : undefined}
                 >
                   {isCurrent && (
                     <Badge 
@@ -593,19 +726,38 @@ export function SelfServiceBilling({
                       Current
                     </Badge>
                   )}
+                  
+                  {/* Click indicator for non-current tiers */}
+                  {!isCurrent && (
+                    <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="space-y-3">
-                    <div>
+                    <div className="flex items-center justify-between">
                       <h4 className="font-semibold text-neutral-900">
                         {tier.tier.replace(/_/g, ' ')}
                       </h4>
-                      <div className="text-lg font-bold text-neutral-900">
-                        {price === 0 ? 'Free / 14-day' : formatPrice(price)}
-                        {price > 0 && (
-                          <span className="text-sm font-normal text-neutral-500">
-                            /{billingCycle === 'monthly' ? 'mo' : 'yr'}
-                          </span>
-                        )}
-                      </div>
+                      {!isCurrent && (
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-lg font-bold text-neutral-900">
+                      {price === 0 ? 'Free / 14-day' : formatPrice(price)}
+                      {price > 0 && (
+                        <span className="text-sm font-normal text-neutral-500">
+                          /{billingCycle === 'monthly' ? 'mo' : 'yr'}
+                        </span>
+                      )}
                     </div>
                     
                     {/* Payment methods indicator for paid tiers */}

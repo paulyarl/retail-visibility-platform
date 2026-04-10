@@ -873,7 +873,94 @@ export class SubscriptionBillingService {
       },
     });
 
+    // Send branded invoice email
+    this.sendInvoiceEmail(tenantId, id, tier, amountCents, 'paid', now, now, cycleEnd).catch(error => {
+      console.error('[SubscriptionBillingService] Failed to send invoice email:', error);
+    });
+
     return id;
+  }
+
+  /**
+   * Send branded invoice email notification
+   */
+  private async sendInvoiceEmail(
+    tenantId: string,
+    invoiceId: string,
+    tier: string,
+    amountCents: number,
+    status: 'paid' | 'pending' | 'overdue' | 'cancelled',
+    billingPeriodStart: Date,
+    billingPeriodEnd: Date,
+    paymentDate?: Date
+  ): Promise<void> {
+    try {
+      // Get tenant information
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: {
+          name: true,
+          organization_id: true,
+        },
+      });
+
+      if (!tenant) {
+        console.error(`[SubscriptionBillingService] Tenant not found: ${tenantId}`);
+        return;
+      }
+
+      // Get tenant owner for email
+      const userTenant = await prisma.user_tenants.findFirst({
+        where: { 
+          tenant_id: tenantId,
+          role: 'OWNER'
+        },
+      } as any);
+
+      if (!userTenant) {
+        console.error(`[SubscriptionBillingService] No owner found for tenant: ${tenantId}`);
+        return;
+      }
+
+      // Get user details separately
+      const user = await prisma.users.findUnique({
+        where: { id: userTenant.user_id },
+        select: {
+          email: true,
+          name: true,
+        },
+      } as any);
+
+      if (!user) {
+        console.error(`[SubscriptionBillingService] No user found for tenant owner: ${userTenant.user_id}`);
+        return;
+      }
+
+      // Import and use the InvoiceEmailService
+      const { InvoiceEmailService } = await import('../email/InvoiceEmailService');
+      const invoiceEmailService = new InvoiceEmailService();
+
+      await invoiceEmailService.sendInvoiceNotification({
+        customerEmail: (user as any).email,
+        customerName: (user as any).name,
+        tenantName: tenant.name,
+        invoiceId,
+        amount: amountCents,
+        currency: 'USD',
+        dueDate: billingPeriodEnd,
+        status,
+        billingPeriodStart,
+        billingPeriodEnd,
+        tier,
+        paymentDate,
+        paymentMethod: 'Stripe',
+      });
+
+      console.log(`[SubscriptionBillingService] Invoice email sent to ${(user as any).email} for invoice ${invoiceId}`);
+    } catch (error) {
+      console.error('[SubscriptionBillingService] Error sending invoice email:', error);
+      throw error;
+    }
   }
 
   /**

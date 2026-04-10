@@ -333,8 +333,13 @@ router.patch('/:id', authenticateToken, requirePlatformAdmin, async (req: Reques
  * Get details for a specific tenant
  */
 router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, res: Response) => {
+  console.log('=========================================');
+  console.log(`[TENANTS] SINGLE TENANT ENDPOINT HIT!!! ID: ${req.params.id}`);
+  console.log('=========================================');
+  
   try {
     const { id } = req.params;
+    console.log(`[TENANTS] DEBUG: Single tenant endpoint hit for ID: ${id}`);
 
     const tenant = await prisma.tenants.findUnique({
       where: { id },
@@ -346,6 +351,7 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
         subscription_status: true,
         trial_ends_at: true,
         subscription_ends_at: true,
+        grace_ends_at: true,
         ...(true as any && {
           manual_subscription_control: true,
           manual_subscription_expires_at: true,
@@ -405,25 +411,35 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
       const hasDirectory = tenantResult?.is_published === true;
 
     // Calculate effective expiration for single tenant
+    // console.log('[TENANTS] Debug: Tenant data for effective expiration:', {
+    //   subscription_status: (tenant as any).subscription_status,
+    //   trial_ends_at: (tenant as any).trial_ends_at,
+    //   subscription_ends_at: (tenant as any).subscription_ends_at,
+    //   manual_subscription_control: (tenant as any).manual_subscription_control,
+    //   manual_subscription_expires_at: (tenant as any).manual_subscription_expires_at,
+    // });
+
     const effectiveExpiration = (tenant as any).manual_subscription_control 
       ? {
           expiresAt: (tenant as any).manual_subscription_expires_at,
           type: 'manual' as const,
           source: 'manual_override' as const
         }
-      : (tenant as any).subscription_status === 'trial' && tenant.trial_ends_at
+      : (tenant as any).subscription_status === 'trial' && (tenant as any).trial_ends_at
         ? {
-            expiresAt: tenant.trial_ends_at,
+            expiresAt: (tenant as any).trial_ends_at,
             type: 'trial' as const,
             source: 'automatic_trial' as const
           }
-        : tenant.subscription_ends_at
+        : (tenant as any).subscription_ends_at
           ? {
-              expiresAt: tenant.subscription_ends_at,
+              expiresAt: (tenant as any).subscription_ends_at,
               type: 'subscription' as const,
               source: 'automatic_subscription' as const
             }
           : null;
+
+    // console.log('[TENANTS] Debug: Calculated effective expiration:', effectiveExpiration);
 
     // Transform for frontend compatibility
     const transformedTenant = {

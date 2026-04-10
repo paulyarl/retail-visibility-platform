@@ -1454,6 +1454,16 @@ model platform_settings_list {
   theme_border_radius   String?  @default("md") @db.VarChar(50)
   theme_button_size     String?  @default("sm") @db.VarChar(50)
   theme_spacing         Int?     @default(16)
+  contact_email         String?  @db.VarChar(255)
+  contact_phone         String?  @db.VarChar(50)
+  contact_address       String?
+  contact_website       String?  @db.VarChar(500)
+  social_facebook       String?  @db.VarChar(500)
+  social_twitter        String?  @db.VarChar(500)
+  social_instagram      String?  @db.VarChar(500)
+  social_linkedin       String?  @db.VarChar(500)
+  social_youtube        String?  @db.VarChar(500)
+  banner_url            String?  @db.VarChar(500)
 }
 
 model product_performances {

@@ -807,4 +807,103 @@ router.get('/payment-methods/:tenantId', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/manual-billing/tenants
+ * Get all tenants with effective expiration data for manual billing management
+ */
+router.get('/tenants', async (req, res) => {
+  try {
+    const tenants = await prisma.tenants.findMany({
+      select: {
+        id: true,
+        name: true,
+        organization_id: true,
+        subscription_tier: true,
+        subscription_status: true,
+        trial_ends_at: true,
+        subscription_ends_at: true,
+        grace_ends_at: true,
+        created_at: true,
+        _count: {
+          select: {
+            inventory_items: true,
+            user_tenants: true,
+          },
+        },
+        ...(true as any && {
+          manual_subscription_control: true,
+          manual_subscription_expires_at: true,
+          manual_subscription_reason: true,
+        }),
+        organizations_list: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+
+    // Transform tenants data with effective expiration calculation
+    const transformedTenants = tenants.map((tenant: any) => {
+      // Calculate effective expiration for each tenant
+      const effectiveExpiration = (tenant as any).manual_subscription_control 
+        ? {
+            expiresAt: (tenant as any).manual_subscription_expires_at,
+            type: 'manual' as const,
+            source: 'manual_override' as const
+          }
+        : tenant.subscription_status === 'trial' && tenant.trial_ends_at
+          ? {
+              expiresAt: tenant.trial_ends_at,
+              type: 'trial' as const,
+              source: 'automatic_trial' as const
+            }
+          : tenant.subscription_ends_at
+            ? {
+                expiresAt: tenant.subscription_ends_at,
+                type: 'subscription' as const,
+                source: 'automatic_subscription' as const
+              }
+            : null;
+
+      return {
+        id: tenant.id,
+        name: tenant.name,
+        organizationId: tenant.organization_id,
+        subscriptionTier: tenant.subscription_tier,
+        subscriptionStatus: tenant.subscription_status,
+        trialEndsAt: tenant.trial_ends_at,
+        subscriptionEndsAt: tenant.subscription_ends_at,
+        graceEndsAt: tenant.grace_ends_at,
+        createdAt: tenant.created_at,
+        organization: tenant.organizations_list,
+        _count: tenant._count,
+        manualSubscriptionControl: (tenant as any).manual_subscription_control,
+        manualSubscriptionExpiresAt: (tenant as any).manual_subscription_expires_at,
+        manualSubscriptionReason: (tenant as any).manual_subscription_reason,
+        effectiveExpiresAt: effectiveExpiration?.expiresAt,
+        effectiveExpiresType: effectiveExpiration?.type,
+        effectiveExpiresSource: effectiveExpiration?.source,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: transformedTenants,
+    });
+
+  } catch (error: any) {
+    console.error('[GET /api/admin/manual-billing/tenants] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_server_error',
+      message: 'Failed to fetch tenants',
+    });
+  }
+});
+
 export default router;

@@ -596,8 +596,9 @@ class ManualBillingService extends AdminApiSingleton {
 
   async getAllTenants(): Promise<any[]> {
     try {
-      const result = await this.makeDefaultRequest('/api/tenants', {}, 'tenants-list', 300000);
-      return result.success ? ((result.data as any) || []) : [];
+      const result = await this.makeDefaultRequest('/api/admin/manual-billing/tenants', {}, 'tenants-list', 300000);
+      // Handle nested structure: result.data.data contains the actual array
+      return result.success ? ((result.data as any).data || []) : [];
     } catch (error) {
       console.error('Error fetching all tenants:', error);
       return [];

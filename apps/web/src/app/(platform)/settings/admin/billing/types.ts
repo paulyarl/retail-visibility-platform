@@ -4,11 +4,25 @@ export interface Tenant {
   subscriptionTier?: string;
   subscriptionStatus?: string;
   trialEndsAt?: string;
+  subscriptionEndsAt?: string;
+  graceEndsAt?: string;
+  manualSubscriptionControl?: boolean;
+  manualSubscriptionExpiresAt?: string;
+  manualSubscriptionReason?: string;
+  effectiveExpiresAt?: string;
+  effectiveExpiresType?: 'trial' | 'subscription' | 'manual';
+  effectiveExpiresSource?: 'automatic_trial' | 'automatic_subscription' | 'manual_override';
   organization?: {
     id: string;
     name: string;
   } | null;
   metadata?: { city?: string; state?: string };
+  organizationId?: string;
+  createdAt?: string;
+  _count?: {
+    items: number;
+    users: number;
+  };
 }
 
 export interface DbTier {

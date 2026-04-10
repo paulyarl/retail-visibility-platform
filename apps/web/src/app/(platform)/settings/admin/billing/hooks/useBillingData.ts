@@ -30,8 +30,19 @@ export function useBillingData(refetchTrigger = 0): UseBillingDataResult {
           subscriptionTier: tenant.subscriptionTier,
           subscriptionStatus: tenant.subscriptionStatus,
           trialEndsAt: tenant.trialEndsAt,
+          subscriptionEndsAt: tenant.subscriptionEndsAt,
+          graceEndsAt: tenant.graceEndsAt,
+          manualSubscriptionControl: tenant.manualSubscriptionControl,
+          manualSubscriptionExpiresAt: tenant.manualSubscriptionExpiresAt,
+          manualSubscriptionReason: tenant.manualSubscriptionReason,
+          effectiveExpiresAt: tenant.effectiveExpiresAt,
+          effectiveExpiresType: tenant.effectiveExpiresType,
+          effectiveExpiresSource: tenant.effectiveExpiresSource,
           organization: tenant.organization ? { id: tenant.organization.id, name: tenant.organization.name } : null,
           metadata: tenant.metadata,
+          organizationId: tenant.organizationId,
+          createdAt: tenant.createdAt,
+          _count: tenant._count,
         })) || [];
         setTenants(transformedTenants);
       } catch (e) {

@@ -12,6 +12,7 @@ export interface PlatformSettings {
   platformName: string;
   logoUrl: string | null;
   faviconUrl: string | null;
+  bannerUrl: string | null;
   primaryColor: string;
   secondaryColor: string;
   theme?: {
@@ -35,6 +36,17 @@ export interface PlatformSettings {
     tagline?: string;
     description?: string;
   };
+  // Contact information
+  contactEmail?: string;
+  contactPhone?: string;
+  contactAddress?: string;
+  contactWebsite?: string;
+  // Social media
+  socialFacebook?: string;
+  socialTwitter?: string;
+  socialInstagram?: string;
+  socialLinkedIn?: string;
+  socialYoutube?: string;
   features?: Record<string, any>;
 }
 
@@ -84,6 +96,7 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
         platformName: 'Visible Shelf',
         logoUrl: null,
         faviconUrl: null,
+        bannerUrl: null,
         primaryColor: '#3b82f6',
         secondaryColor: '#8b5cf6',
         themePreset: 'default',
@@ -97,6 +110,15 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
         themeBorderRadius: 'md',
         themeButtonSize: 'sm',
         themeSpacing: 16,
+        contactEmail: 'billing@visible-shelf.com',
+        contactPhone: '',
+        contactAddress: '',
+        contactWebsite: 'https://visible-shelf.com',
+        socialFacebook: '',
+        socialTwitter: '',
+        socialInstagram: '',
+        socialLinkedIn: '',
+        socialYoutube: '',
       };
     } catch (error) {
       console.error('[PlatformSettingsSingleton] Failed to get platform settings:', error);
@@ -106,6 +128,7 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
         platformName: 'Visible Shelf',
         logoUrl: null,
         faviconUrl: null,
+        bannerUrl: null,
         primaryColor: '#3b82f6',
         secondaryColor: '#8b5cf6',
         themePreset: 'default',
@@ -119,6 +142,15 @@ class PlatformSettingsSingletonService extends PublicApiSingleton {
         themeBorderRadius: 'md',
         themeButtonSize: 'sm',
         themeSpacing: 16,
+        contactEmail: 'billing@visible-shelf.com',
+        contactPhone: '',
+        contactAddress: '',
+        contactWebsite: 'https://visible-shelf.com',
+        socialFacebook: '',
+        socialTwitter: '',
+        socialInstagram: '',
+        socialLinkedIn: '',
+        socialYoutube: '',
       };
     }
   }

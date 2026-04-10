@@ -156,13 +156,49 @@ router.get('/tenants', async (req, res) => {
               inventory_items: true,
             },
           },
+          ...(true as any && {
+            manual_subscription_control: true,
+            manual_subscription_expires_at: true,
+            manual_subscription_reason: true,
+          }),
         },
       }),
       prisma.tenants.count({ where }),
     ]);
 
+    // Transform tenants data with effective expiration calculation
+    const transformedTenants = tenants.map((tenant: any) => {
+      // Calculate effective expiration for each tenant
+      const effectiveExpiration = (tenant as any).manual_subscription_control 
+        ? {
+            expiresAt: (tenant as any).manual_subscription_expires_at,
+            type: 'manual' as const,
+            source: 'manual_override' as const
+          }
+        : tenant.subscription_status === 'trial' && tenant.trial_ends_at
+          ? {
+              expiresAt: tenant.trial_ends_at,
+              type: 'trial' as const,
+              source: 'automatic_trial' as const
+            }
+          : tenant.subscription_ends_at
+            ? {
+                expiresAt: tenant.subscription_ends_at,
+                type: 'subscription' as const,
+                source: 'automatic_subscription' as const
+              }
+            : null;
+
+      return {
+        ...tenant,
+        effectiveExpiresAt: effectiveExpiration?.expiresAt,
+        effectiveExpiresType: effectiveExpiration?.type,
+        effectiveExpiresSource: effectiveExpiration?.source,
+      };
+    });
+
     res.json({
-      tenants,
+      tenants: transformedTenants,
       pagination: {
         page: pageNum,
         limit: limitNum,

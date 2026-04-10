@@ -98,9 +98,9 @@ export default function TenantCard({ tenant, tiers, onUpdateTenant, isUpdating =
             <Badge variant="default" className={getStatusColor(tenant.subscriptionStatus)}>
               {tenant.subscriptionStatus || 'active'}
             </Badge>
-            {tenant.trialEndsAt && (
+            {tenant.effectiveExpiresAt && (
               <Badge variant="light" className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
-                Trial: {new Date(tenant.trialEndsAt).toLocaleDateString()}
+                {tenant.effectiveExpiresType === 'trial' ? 'Trial' : 'Expires'}: {new Date(tenant.effectiveExpiresAt).toLocaleDateString()}
               </Badge>
             )}
             {tenant.organization && (

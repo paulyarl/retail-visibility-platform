@@ -3013,6 +3013,26 @@ router.get('/platform/branding', async (_req, res) => {
         platformDescription: 'Retail visibility platform empowering local businesses with AI-powered inventory management, automated product enrichment, Google Business Profile sync, customizable digital storefronts, and a public directory connecting customers to local merchants—all designed to increase discoverability and drive sales.',
         logoUrl: null,
         faviconUrl: null,
+        bannerUrl: null,
+        themePreset: 'vibrant',
+        themeColors: {
+          primary: '#7c3aed',
+          accent: '#f59e0b',
+          neutral: '#64748b',
+        },
+        themeFontFamily: '"Poppins", sans-serif',
+        themeBorderRadius: 'md',
+        themeButtonSize: 'md',
+        themeSpacing: 16,
+        contactEmail: 'billing@visible-shelf.com',
+        contactPhone: '',
+        contactAddress: '',
+        contactWebsite: 'https://visible-shelf.com',
+        socialFacebook: '',
+        socialTwitter: '',
+        socialInstagram: '',
+        socialLinkedIn: '',
+        socialYoutube: '',
       });
     }
 
@@ -3038,6 +3058,7 @@ router.get('/platform/branding', async (_req, res) => {
       platformDescription: settings.platform_description,
       logoUrl: settings.logo_url,
       faviconUrl: settings.favicon_url,
+      bannerUrl: settings.banner_url,
       // Include only safe theme settings
       themePreset: settings.theme_preset,
       themeColors: settings.theme_colors,
@@ -3045,6 +3066,17 @@ router.get('/platform/branding', async (_req, res) => {
       themeBorderRadius: settings.theme_border_radius,
       themeButtonSize: settings.theme_button_size,
       themeSpacing: settings.theme_spacing,
+      // Include public contact information
+      contactEmail: settings.contact_email,
+      contactPhone: settings.contact_phone,
+      contactAddress: settings.contact_address,
+      contactWebsite: settings.contact_website,
+      // Include public social media links
+      socialFacebook: settings.social_facebook,
+      socialTwitter: settings.social_twitter,
+      socialInstagram: settings.social_instagram,
+      socialLinkedIn: settings.social_linkedin,
+      socialYoutube: settings.social_youtube,
     };
 
     res.json(publicBranding);
@@ -3056,6 +3088,26 @@ router.get('/platform/branding', async (_req, res) => {
       platformDescription: 'Retail visibility platform empowering local businesses with AI-powered inventory management, automated product enrichment, Google Business Profile sync, customizable digital storefronts, and a public directory connecting customers to local merchants—all designed to increase discoverability and drive sales.',
       logoUrl: null,
       faviconUrl: null,
+      bannerUrl: null,
+      themePreset: 'vibrant',
+      themeColors: {
+        primary: '#7c3aed',
+        accent: '#f59e0b',
+        neutral: '#64748b',
+      },
+      themeFontFamily: '"Poppins", sans-serif',
+      themeBorderRadius: 'md',
+      themeButtonSize: 'md',
+      themeSpacing: 16,
+      contactEmail: 'billing@visible-shelf.com',
+      contactPhone: '',
+      contactAddress: '',
+      contactWebsite: 'https://visible-shelf.com',
+      socialFacebook: '',
+      socialTwitter: '',
+      socialInstagram: '',
+      socialLinkedIn: '',
+      socialYoutube: '',
     });
   }
 });

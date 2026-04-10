@@ -702,7 +702,7 @@ app.get("/api/tenants/my-subdomains", authenticateToken, async (req, res) => {
 
 app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, res) => {
   try {
-    let tenant = await prisma.tenants.findUnique({ 
+    let tenant: any = await prisma.tenants.findUnique({ 
       where: { id: req.params.id as string },
       select: {
         id: true,
@@ -715,6 +715,7 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
         subscription_tier: true,
         trial_ends_at: true,
         subscription_ends_at: true,
+        grace_ends_at: true,
         stripe_customer_id: true,
         stripe_subscription_id: true,
         organization_id: true,
@@ -739,6 +740,11 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
         directory_visible: true,
         metadata: true,
         data_policy_accepted: true,
+        ...(true as any && {
+          manual_subscription_control: true,
+          manual_subscription_expires_at: true,
+          manual_subscription_reason: true,
+        }),
       }
     });
     if (!tenant) return res.status(400).json({ error: "tenant_not_found" });
@@ -803,11 +809,50 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
     const { getLocationStatusInfo } = await import('./utils/location-status');
     const statusInfo = getLocationStatusInfo(tenant.location_status);
     
+    // Calculate effective expiration
+    // console.log('[INDEX TENANTS] Debug: Tenant data for effective expiration:', {
+    //   subscription_status: (tenant as any).subscription_status,
+    //   trial_ends_at: (tenant as any).trial_ends_at,
+    //   subscription_ends_at: (tenant as any).subscription_ends_at,
+    //   manual_subscription_control: (tenant as any).manual_subscription_control,
+    //   manual_subscription_expires_at: (tenant as any).manual_subscription_expires_at,
+    // });
+
+    const effectiveExpiration = (tenant as any).manual_subscription_control 
+      ? {
+          expiresAt: (tenant as any).manual_subscription_expires_at,
+          type: 'manual' as const,
+          source: 'manual_override' as const
+        }
+      : (tenant as any).subscription_status === 'trial' && (tenant as any).trial_ends_at
+        ? {
+            expiresAt: (tenant as any).trial_ends_at,
+            type: 'trial' as const,
+            source: 'automatic_trial' as const
+          }
+        : (tenant as any).subscription_ends_at
+          ? {
+              expiresAt: (tenant as any).subscription_ends_at,
+              type: 'subscription' as const,
+              source: 'automatic_subscription' as const
+            }
+          : null;
+
+    // console.log('[INDEX TENANTS] Debug: Calculated effective expiration:', effectiveExpiration);
+    
     res.json({
       ...tenant,
       slug: currentSlug, // Use slug from directory_settings_list (source of truth)
       hasPublishedDirectory,
       statusInfo,
+      // Manual subscription control fields
+      manualSubscriptionControl: (tenant as any).manual_subscription_control,
+      manualSubscriptionExpiresAt: (tenant as any).manual_subscription_expires_at,
+      manualSubscriptionReason: (tenant as any).manual_subscription_reason,
+      // Effective expiration fields
+      effectiveExpiresAt: effectiveExpiration?.expiresAt,
+      effectiveExpiresType: effectiveExpiration?.type,
+      effectiveExpiresSource: effectiveExpiration?.source
     });
   } catch (e: any) {
     console.error('[GET /tenants/:id] Error:', e);

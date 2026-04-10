@@ -11,6 +11,7 @@ import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/role-validation';
 import { getSubscriptionBillingService } from '../services/subscription/SubscriptionBillingService';
+import { SubscriptionValidationService } from '../services/subscription/SubscriptionValidationService';
 import { prisma } from '../prisma';
 
 const router = Router();
@@ -300,6 +301,22 @@ router.get('/preview', requirePermission('CAN_MANAGE_TENANT_BILLING'), async (re
       return res.status(400).json({
         success: false,
         error: 'Missing required query param: tier',
+      });
+    }
+
+    // Validate subscription change before proceeding
+    const validationService = SubscriptionValidationService.getInstance();
+    const validation = await validationService.validateSubscriptionChange(
+      tenantId,
+      tier as string,
+      (req as any).user?.id
+    );
+
+    if (!validation.allowed) {
+      return res.status(400).json({
+        success: false,
+        error: validation.reason,
+        errorCode: validation.errorCode,
       });
     }
 

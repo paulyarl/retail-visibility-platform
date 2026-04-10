@@ -12,6 +12,29 @@ export interface PublicBrandingSettings {
   platformDescription?: string; // Make optional for compatibility
   logoUrl: string | null;
   faviconUrl: string | null;
+  bannerUrl: string | null;
+  themePreset: string;
+  themeColors: {
+    primary: string;
+    accent: string;
+    neutral: string;
+    [key: string]: string;
+  };
+  themeFontFamily: string;
+  themeBorderRadius: string;
+  themeButtonSize: string;
+  themeSpacing: number;
+  // Contact information
+  contactEmail: string;
+  contactPhone: string;
+  contactAddress: string;
+  contactWebsite: string;
+  // Social media
+  socialFacebook: string;
+  socialTwitter: string;
+  socialInstagram: string;
+  socialLinkedIn: string;
+  socialYoutube: string;
 }
 
 class PublicBrandingService extends PublicApiSingleton {

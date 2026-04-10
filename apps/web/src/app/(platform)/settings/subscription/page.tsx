@@ -14,10 +14,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ContextBadges } from '@/components/ContextBadges';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
 import { useTenant } from '@/hooks/useApiQueries';
+import { useQueryClient } from '@tanstack/react-query';
 import { useUpgradeRequests } from '@/hooks/useApiQueries';
 import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
 import { SubscriptionStatusGuide } from '@/components/subscription/SubscriptionStatusGuide';
 import { SelfServiceBillingWithStripe } from '@/components/subscription/SelfServiceBilling';
+
+// Simple icon component for subscription page
+const SubscriptionIcon = () => (
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
 
 interface Tenant {
   id: string;
@@ -26,6 +34,9 @@ interface Tenant {
   subscriptionStatus?: string;
   trialEndsAt?: string;
   subscriptionEndsAt?: string;
+  effectiveExpiresAt?: string;
+  effectiveExpiresType?: 'trial' | 'subscription' | 'manual';
+  effectiveExpiresSource?: 'automatic_trial' | 'automatic_subscription' | 'manual_override';
   metadata?: any;
   _count?: {
     items: number;
@@ -52,22 +63,63 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   const urlTenantId = searchParams?.get('tenantId');
   let tenantId = urlTenantId || propTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null);
   
-  // Validate tenant ownership to prevent URL spoofing
+  // Debug: Log tenant ID resolution
+  // console.log('[SubscriptionPage] Tenant ID resolution:', {
+  //   urlTenantId,
+  //   propTenantId,
+  //   localStorageId: typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null,
+  //   initialTenantId: tenantId,
+  //   userTenants: user?.tenants?.map((t: any) => t.id)
+  // });
+  
+  // Validate tenant ownership - PLATFORM_ADMIN and PLATFORM_SUPPORT can access any tenant
   if (urlTenantId && user?.tenants) {
     const userTenants = user.tenants.map((t: any) => t.id);
-    if (!userTenants.includes(urlTenantId)) {
+    const isPlatformAdmin = user.role === 'PLATFORM_ADMIN' || user.role === 'PLATFORM_SUPPORT';
+    const isAuthorized = isPlatformAdmin || userTenants.includes(urlTenantId);
+    
+    // console.log('[SubscriptionPage] Validating URL tenant ID:', {
+    //   urlTenantId,
+    //   userTenants,
+    //   userRole: user.role,
+    //   isPlatformAdmin,
+    //   isAuthorized
+    // });
+    
+    if (!isAuthorized) {
       console.warn(`[Subscription] User ${user.id} attempted to access tenant ${urlTenantId} without authorization`);
       // Fall back to user's first tenant or localStorage
       tenantId = propTenantId || (typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null) || user.tenants[0]?.id || null;
+      // console.log('[SubscriptionPage] Fell back to tenant ID:', tenantId);
+    } else {
+      // console.log('[SubscriptionPage] Access granted to tenant:', urlTenantId);
     }
   }
   
   // Use React Query hooks instead of manual API calls
-  const { data: tenant, isLoading: tenantLoading, error: tenantError } = useTenant(tenantId || '');
+  const { data: tenant, isLoading, error } = useTenant(tenantId || '');
+
+  // Debug: Log tenant data to check effective expiration fields
+  // console.log('[SubscriptionPage] Tenant data:', tenant);
+  // console.log('[SubscriptionPage] Effective expiration:', {
+  //   effectiveExpiresAt: tenant?.effectiveExpiresAt,
+  //   effectiveExpiresType: tenant?.effectiveExpiresType,
+  //   effectiveExpiresSource: tenant?.effectiveExpiresSource,
+  // });
+
+  // Cache invalidation for debugging
+  const queryClient = useQueryClient();
+  const invalidateCache = () => {
+    if (tenantId) {
+      queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
+      // console.log('[SubscriptionPage] Cache invalidated for tenant:', tenantId);
+    }
+  };
+
   const { data: pendingRequests = [], isLoading: pendingLoading } = useUpgradeRequests(tenantId || undefined, 'new,pending,waiting');
   const { data: requestHistory = [], isLoading: historyLoading } = useUpgradeRequests(tenantId || undefined, 'complete,denied');
 
-  const combinedLoading = tenantLoading || pendingLoading || historyLoading;
+  const combinedLoading = isLoading || pendingLoading || historyLoading;
 
   // Use centralized subscription usage hook
   const { usage: capacityData } = useSubscriptionUsage(tenantId || undefined);
@@ -408,15 +460,20 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
     }));
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <PageHeader
-        title="Subscription"
-        description="Manage your subscription plan and view features"
-        icon={Icons.Settings}
-        backLink={{
-          href: '/settings',
-          label: 'Back to Settings'
-        }}
+        title="Subscription Management"
+        icon={<SubscriptionIcon />}
+        actions={
+          <Button
+            onClick={invalidateCache}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+          >
+            Clear Cache & Refresh
+          </Button>
+        }
       />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -600,13 +657,145 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                 </Badge>
               </div>
               
-              {/* Trial Expiration */}
-              {isTrialStatus(tenant.subscriptionStatus) && tenant.trialEndsAt && (
+              {/* Service Level */}
+              {tenant.service_level && (
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-neutral-600">Trial Ends</span>
-                  <span className="text-sm font-medium text-neutral-900">
-                    {getTrialEndLabel(tenant.trialEndsAt) ?? ''}
+                  <span className="text-sm text-neutral-600">Service Level</span>
+                  <span className="text-sm font-medium text-neutral-900 capitalize">
+                    {tenant.service_level.replace('_', ' ')}
                   </span>
+                </div>
+              )}
+              
+              {/* Account Created */}
+              {tenant.created_at && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-600">Account Created</span>
+                  <span className="text-sm font-medium text-neutral-900">
+                    {new Date(tenant.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+              
+              {/* Grace Period */}
+              {tenant.grace_ends_at && (
+                <div className="flex items-center justify-between p-2 rounded bg-blue-50 border border-blue-200">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-sm font-medium text-blue-800">Grace Period</span>
+                  </div>
+                  <span className="text-sm font-bold text-blue-900">
+                    {new Date(tenant.grace_ends_at).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+              
+              {/* Effective Expiration */}
+              {(() => {
+                // console.log('[SubscriptionPage] Effective expiration check:', {
+                //   effectiveExpiresAt: tenant?.effectiveExpiresAt,
+                //   effectiveExpiresType: tenant?.effectiveExpiresType,
+                //   effectiveExpiresSource: tenant?.effectiveExpiresSource,
+                //   shouldShow: !!tenant?.effectiveExpiresAt
+                // });
+                return tenant?.effectiveExpiresAt;
+              })() && (
+                <div className="p-3 rounded-lg border-l-4 bg-amber-50 border-amber-400 dark:bg-amber-900/20 dark:border-amber-500">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                        {tenant.effectiveExpiresType === 'trial' 
+                          ? 'Trial Ends' 
+                          : tenant.effectiveExpiresType === 'manual'
+                            ? 'Expires'
+                            : 'Renews On'
+                        }
+                      </span>
+                    </div>
+                    <span className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                      {getTrialEndLabel(tenant.effectiveExpiresAt) ?? ''}
+                    </span>
+                  </div>
+                  {tenant.effectiveExpiresSource && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-amber-700 dark:text-amber-300">Source:</span>
+                      <span className="font-medium text-amber-800 dark:text-amber-200 capitalize">
+                        {tenant.effectiveExpiresSource.replace('_', ' ')}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Organization Info */}
+              {tenant.organization_id && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-600">Organization ID</span>
+                  <span className="text-sm font-medium text-neutral-900">
+                    {tenant.organization_id}
+                  </span>
+                </div>
+              )}
+
+              {/* Reopening Date */}
+              {tenant.reopening_date && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-600">Reopening Date</span>
+                  <span className="text-sm font-medium text-neutral-900">
+                    {new Date(tenant.reopening_date).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+
+              {/* Metadata Summary Card */}
+              {tenant.metadata && Object.keys(tenant.metadata).length > 0 && (
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 dark:bg-slate-800 dark:border-slate-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-4 h-4 text-slate-600 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Tenant Information</span>
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    {tenant.metadata.city && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-600 dark:text-slate-400">City:</span>
+                        <span className="font-medium text-slate-800 dark:text-slate-200">{tenant.metadata.city}</span>
+                      </div>
+                    )}
+                    {tenant.metadata.state && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-600 dark:text-slate-400">State:</span>
+                        <span className="font-medium text-slate-800 dark:text-slate-200">{tenant.metadata.state}</span>
+                      </div>
+                    )}
+                    {tenant.metadata.country_code && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-600 dark:text-slate-400">Country:</span>
+                        <span className="font-medium text-slate-800 dark:text-slate-200">{tenant.metadata.country_code}</span>
+                      </div>
+                    )}
+                    {tenant.metadata.banner_url && (
+                      <div className="mt-2">
+                        <span className="text-slate-600 dark:text-slate-400">Banner:</span>
+                        <div className="mt-1 rounded overflow-hidden border border-slate-300 dark:border-slate-600">
+                          <img 
+                            src={tenant.metadata.banner_url} 
+                            alt="Tenant Banner" 
+                            className="w-full h-16 object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               
@@ -626,6 +815,35 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
             </div>
           </div>
         </Card>
+
+        {/* Action Guidance */}
+        {tenant && (
+          <Card withBorder padding="lg" radius="md" className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 dark:from-blue-900/20 dark:to-indigo-900/20 dark:border-blue-700">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Ready to Manage Your Subscription?</h3>
+                <div className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
+                  <p className="flex items-center gap-2">
+                    <span className="font-medium">Click "Add Card"</span> to activate Stripe for secure card payments
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <span className="font-medium">Click "Change Plan"</span> to activate PayPal or select a different subscription tier
+                  </p>
+                </div>
+                <div className="mt-3 p-2 bg-blue-100/50 rounded-md border border-blue-200 dark:bg-blue-800/30 dark:border-blue-600">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    <strong>Note:</strong> Your current subscription is manually managed. Adding a payment method will enable automatic renewals and prevent service interruption.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Self-Service Billing - Payment Methods & Tier Selection */}
         {tenant && (
