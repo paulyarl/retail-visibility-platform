@@ -54,12 +54,12 @@ class PublicBrandingService extends PublicApiSingleton {
 
   /**
    * Get public platform branding settings
-   * Uses the /api/public/platform/branding endpoint
+   * Uses the /api/platform-settings endpoint
    */
   async getPublicBrandingSettings(): Promise<PublicBrandingSettings | null> {
     try {
       const response = await super.makeDefaultRequest<PublicBrandingSettings>(
-        '/api/public/platform/branding',
+        '/platform-settings',
         {},
         'public-platform-branding'
       );

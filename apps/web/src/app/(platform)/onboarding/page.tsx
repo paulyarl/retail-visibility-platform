@@ -48,8 +48,10 @@ function OnboardingContent() {
   useEffect(() => {
     // Try to restore existing state
     const existingState = onboardingStateService.getPhase1();
+    console.log('[Onboarding] Restoring from onboardingStateService:', existingState);
     
     if (existingState) {
+      console.log('[Onboarding] Setting formData from existingState');
       setFormData({
         firstName: existingState.firstName || user?.firstName || '',
         lastName: existingState.lastName || user?.lastName || '',
@@ -57,7 +59,9 @@ function OnboardingContent() {
         businessType: existingState.businessType || user?.businessType || '',
         phone: existingState.phone || user?.phone || '',
       });
+      setHasRestored(true);
     } else {
+      console.log('[Onboarding] No existingState, starting new phase 1');
       // Start new phase 1 - load all available user data
       onboardingStateService.startPhase1();
       if (user) {
@@ -69,11 +73,18 @@ function OnboardingContent() {
           phone: user.phone || '',
         });
       }
+      setHasRestored(true);
     }
   }, [user]);
 
-  // Save form data to shared state on change
+  // Track if we've restored data (to prevent overwriting on mount)
+  const [hasRestored, setHasRestored] = useState(false);
+
+  // Save form data to shared state on change (only after restoration)
   useEffect(() => {
+    // Don't save on initial mount - wait for restoration to complete
+    if (!hasRestored) return;
+    
     onboardingStateService.savePhase1({
       firstName: formData.firstName,
       lastName: formData.lastName,
@@ -82,7 +93,7 @@ function OnboardingContent() {
       phone: formData.phone,
       email: user?.email,
     });
-  }, [formData, user?.email]);
+  }, [formData, user?.email, hasRestored]);
 
   const handleNext = async () => {
     if (currentStep < ONBOARDING_STEPS.length - 2) {

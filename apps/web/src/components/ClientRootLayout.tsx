@@ -4,6 +4,7 @@ import * as React from "react";
 import { QueryClientWrapper } from "@/components/QueryClientWrapper";
 import dynamic from "next/dynamic";
 import { PlatformThemeProvider } from "@/contexts/PlatformThemeProvider";
+import { PlatformSettingsProvider } from "@/contexts/PlatformSettingsContext";
 import { AuthProvider as CustomAuthProvider } from "@/contexts/AuthContext";
 import { CartWidgetProvider } from "@/contexts/CartWidgetContext";
 import { ProductLayoutProvider } from "@/contexts/ProductLayoutContext";
@@ -46,21 +47,23 @@ export function ClientRootLayout({ children }: ClientRootLayoutProps) {
     <QueryClientWrapper>
       <ThemeProvider>
         <PlatformThemeProvider>
-          <CustomAuthProvider>
-            <CartWidgetProvider>
-              <ProductLayoutProvider>
-                <GlobalAlertProvider>
-                  <UniversalProvider>
-                    <Notifications position="top-right" />
-                    <ErrorBoundary>
-                      {children}
-                    </ErrorBoundary>
-                    <FloatingCartWidget />
-                  </UniversalProvider>
-                </GlobalAlertProvider>
-              </ProductLayoutProvider>
-            </CartWidgetProvider>
-          </CustomAuthProvider>
+          <PlatformSettingsProvider>
+            <CustomAuthProvider>
+              <CartWidgetProvider>
+                <ProductLayoutProvider>
+                  <GlobalAlertProvider>
+                    <UniversalProvider>
+                      <Notifications position="top-right" />
+                      <ErrorBoundary>
+                        {children}
+                      </ErrorBoundary>
+                      <FloatingCartWidget />
+                    </UniversalProvider>
+                  </GlobalAlertProvider>
+                </ProductLayoutProvider>
+              </CartWidgetProvider>
+            </CustomAuthProvider>
+          </PlatformSettingsProvider>
         </PlatformThemeProvider>
       </ThemeProvider>
     </QueryClientWrapper>

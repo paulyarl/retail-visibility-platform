@@ -1,10 +1,33 @@
 import NextAuth, { NextAuthOptions } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
 import { applyRateLimit } from '@/lib/rate-limiting';
 
-// Simplified auth configuration for now
-// TODO: Implement full authentication with Prisma adapter when User model is ready
+// Auth configuration with credentials provider
 export const authOptions: NextAuthOptions = {
-  providers: [],
+  providers: [
+    CredentialsProvider({
+      name: 'credentials',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' }
+      },
+      async authorize(credentials) {
+        // This is a placeholder - in production, you'd validate against your database
+        // For now, we'll accept any email/password for demo purposes
+        if (credentials?.email && credentials?.password) {
+          // TODO: Implement actual user validation against database
+          // For demo, return a mock user
+          return {
+            id: 'demo-user',
+            email: credentials.email,
+            name: 'Demo User',
+            role: 'user',
+          };
+        }
+        return null;
+      }
+    })
+  ],
   session: {
     strategy: 'jwt' as const,
   },
@@ -12,6 +35,22 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/auth/signin',
     error: '/auth/error',
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.role = user.role;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token && session.user) {
+        session.user.id = token.sub || '';
+        session.user.role = token.role || 'user';
+        session.user.tenants = token.tenants;
+      }
+      return session;
+    },
   },
 };
 

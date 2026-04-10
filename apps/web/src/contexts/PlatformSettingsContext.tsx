@@ -35,12 +35,14 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
 
       // Map PlatformSettings to the context's PlatformSettings interface
       if (settingsData) {
+        // console.log('[PlatformSettingsProvider] Raw settings data:', settingsData);
         const mappedSettings: PlatformSettings = {
           platformName: settingsData.platformName || 'Visible Shelf',
           platformDescription: settingsData.platformDescription || 'Manage your retail operations with ease',
           logoUrl: settingsData.logoUrl || null,
           faviconUrl: settingsData.faviconUrl || null,
         };
+        // console.log('[PlatformSettingsProvider] Mapped settings:', mappedSettings);
         setSettings(mappedSettings);
       } else {
         console.warn('[PlatformSettingsProvider] No public branding settings found, using defaults');

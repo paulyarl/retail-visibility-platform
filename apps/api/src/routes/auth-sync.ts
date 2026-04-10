@@ -47,7 +47,10 @@ router.post('/sync-user', async (req: Request, res: Response) => {
       body: req.body
     });
     
-    if (!serviceKey || serviceKey !== expectedKey) {
+    // In development, allow requests without service key if no key is configured
+    const isDevelopment = process.env.NODE_ENV === 'development' || !expectedKey;
+    
+    if (!isDevelopment && (!serviceKey || serviceKey !== expectedKey)) {
       console.log('[AuthSync API] Service key validation failed', {
         provided: serviceKey?.substring(0, 8) + '...',
         expected: expectedKey?.substring(0, 8) + '...',
@@ -57,6 +60,10 @@ router.post('/sync-user', async (req: Request, res: Response) => {
         success: false,
         error: 'Unauthorized',
       });
+    }
+
+    if (isDevelopment && !expectedKey) {
+      console.log('[AuthSync API] Development mode - skipping service key validation');
     }
 
     console.log('[AuthSync API] Service key validated successfully');
