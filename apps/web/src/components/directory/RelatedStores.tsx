@@ -57,9 +57,9 @@ export default function RelatedStores({
         const looksLikeId = /^[a-zA-Z0-9]{8,}$/.test(currentSlug) || currentSlug.startsWith('tid-') || currentSlug.startsWith('t-');
         
         if (looksLikeId) {
-          const resolved = await publicDirectoryService.resolveIdentifier(currentSlug, 'tenant');
-          if (resolved?.slug) {
-            resolvedSlug = resolved.slug;
+          const resolved = await publicDirectoryService.resolveBySlug(currentSlug);
+          if (resolved) {
+            resolvedSlug = resolved.slug || currentSlug;
           }
         }
         
