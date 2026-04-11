@@ -91,27 +91,27 @@ export default function SignupWizardPage() {
 
   const benefitSteps = [
     {
+      icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+      title: "Your Products, Visible Everywhere",
+      description: "Get your inventory discovered by local shoppers through your own Storefront page and our Store Directory. Every product you carry becomes searchable and visible to customers nearby.",
+      highlight: "Free Storefront page + Directory listing included"
+    },
+    {
+      icon: "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4",
+      title: "POS Integration Made Simple",
+      description: "Connect your existing point-of-sale system and watch your inventory sync automatically. Support for Clover, Square, and other popular POS platforms. No manual updates needed.",
+      highlight: "Works with Clover, Square & more"
+    },
+    {
       icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zM9 5a2 2 0 012-2h2a2 2 0 012 2v6a2 2 0 01-2 2H11a2 2 0 01-2-2V5z",
-      title: "Get Discovered Locally",
-      description: "Connect with customers actively searching for products in your neighborhood. Your inventory appears in local searches when people need what you sell.",
-      highlight: "Increase foot traffic by up to 40%"
-    },
-    {
-      icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1",
-      title: "Real-Time Inventory Sync",
-      description: "Automatically sync your POS data to show customers exactly what's in stock right now. No more disappointed customers finding out you're sold out.",
-      highlight: "Reduce out-of-stock inquiries by 60%"
-    },
-    {
-      icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z",
-      title: "Customer Behavior Insights",
-      description: "See what products customers are searching for, when they're shopping, and which items get the most attention. Make data-driven decisions.",
-      highlight: "Optimize inventory based on real demand"
+      title: "Real-Time Inventory Visibility",
+      description: "Customers see exactly what you have in stock right now. When something sells in-store, it's instantly updated online. No more disappointed shoppers finding out you're sold out.",
+      highlight: "Inventory syncs in real-time"
     },
     {
       icon: "M13 10V3L4 14h7v7l9-11h-7z",
-      title: "Setup in Minutes, Not Hours",
-      description: "Connect your existing POS system and go live the same day. No technical expertise required. We handle the complexity so you can focus on your business.",
+      title: "Go Live in Minutes",
+      description: "Connect your POS, customize your Storefront, and start reaching local customers the same day. No technical expertise required. We handle the complexity so you can focus on your business.",
       highlight: "Average setup time: 15 minutes"
     }
   ];
@@ -517,7 +517,7 @@ export default function SignupWizardPage() {
             <div className="mt-6 text-center">
               <p className="text-sm text-neutral-600">
                 Already have an account?{' '}
-                <Link href="/auth/signin" className="text-primary-600 hover:text-primary-700 font-medium">
+                <Link href="/auth/login" className="text-primary-600 hover:text-primary-700 font-medium">
                   Sign in
                 </Link>
               </p>
