@@ -95,7 +95,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="hidden md:flex items-center gap-2 lg:gap-3">
               {hydrated && user ? (
                 <>
-                  <Link href="/settings">
+                  <Link href="/settings/account">
                     <Button 
                       variant="ghost" 
                       size="sm"
@@ -183,7 +183,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <div className="pt-2 border-t border-neutral-200 space-y-2">
                   {hydrated && user ? (
                     <>
-                      <Link href="/settings" className="block" onClick={() => setMobileMenuOpen(false)}>
+                      <Link href="/settings/account" className="block" onClick={() => setMobileMenuOpen(false)}>
                         <Button 
                           variant="ghost" 
                           className="w-full justify-start flex items-center gap-2 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" 
