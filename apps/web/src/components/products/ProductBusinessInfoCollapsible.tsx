@@ -36,7 +36,8 @@ export default function ProductBusinessInfoCollapsible({
     tenant,
     storeStatus,
 }: ProductBusinessInfoCollapsibleProps) {
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(true);
+
 
     const metadata = tenant.metadata as any;
     const businessName = metadata?.businessName || tenant.name;

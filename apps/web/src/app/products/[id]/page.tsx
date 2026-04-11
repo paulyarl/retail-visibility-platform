@@ -20,6 +20,7 @@ import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame } from 'lucid
 import { productDataService } from '@/services/ProductDataService';
 import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 
 // Define the product interface based on the API response
 interface ProductImage {
@@ -122,6 +123,17 @@ async function getShopData(tenantId: string) {
   }
 }
 
+async function getTenantProfile(tenantId: string) {
+  try {
+    const profile = await publicTenantInfoService.getTenantProfile(tenantId);
+    // console.log(`[ProductPage] Tenant profile for ${tenantId}:`, profile);
+    return profile || null;
+  } catch (error) {
+    console.error('Error fetching tenant profile:', error);
+    return null;
+  }
+}
+
 async function getBucketCounts(tenantId: string): Promise<Record<string, number> | undefined> {
   try {
     const featuredData = await storefrontSingletonService.getFeaturedProductsByType(tenantId, undefined, 1);
@@ -148,16 +160,65 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     };
   }
 
-  const businessName = product.tenant?.name || 'Unknown Store';
+  const tenantProfile = await getTenantProfile(product.tenantId);
+  const businessName = tenantProfile?.business_name || product.tenant?.name || 'Unknown Store';
+  const businessDescription = tenantProfile?.business_description;
+  const seoTags = tenantProfile?.seo_tags || [];
+
+  // Create enhanced description with business info
+  const baseDescription = product.description || `Buy ${product.title} from ${businessName}. ${product.brand} - ${product.currency} ${product.price}`;
+  const enhancedDescription = businessDescription 
+    ? `${baseDescription}. ${businessDescription}`
+    : baseDescription;
+
+  // Create SEO schema
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": product.title,
+    "description": enhancedDescription,
+    "brand": {
+      "@type": "Brand",
+      "name": product.brand || businessName
+    },
+    "offers": {
+      "@type": "Offer",
+      "price": product.price,
+      "priceCurrency": product.currency,
+      "availability": product.itemStatus === 'active' ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+    },
+    "seller": {
+      "@type": "Organization",
+      "name": businessName,
+      "description": businessDescription,
+      "address": tenantProfile ? {
+        "@type": "PostalAddress",
+        "streetAddress": tenantProfile.address_line1,
+        "addressLocality": tenantProfile.city,
+        "addressRegion": tenantProfile.state,
+        "postalCode": tenantProfile.postal_code,
+        "addressCountry": tenantProfile.country_code
+      } : undefined,
+      "telephone": tenantProfile?.phone_number,
+      "email": tenantProfile?.email,
+      "website": tenantProfile?.website
+    },
+    "keywords": seoTags.join(", "),
+    "image": product.images?.map(img => img.url) || []
+  };
 
   return {
     title: `${product.title} - ${businessName}`,
-    description: product.description || `Buy ${product.title} from ${businessName}. ${product.brand} - ${product.currency} ${product.price}`,
+    description: enhancedDescription,
+    keywords: seoTags.join(", "),
     openGraph: {
       title: product.title,
-      description: product.description,
+      description: enhancedDescription,
       images: product.images?.map(img => img.url) || [],
       type: 'website',
+    },
+    other: {
+      "application/ld+json": JSON.stringify(schema),
     },
   };
 }
@@ -172,6 +233,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
   const shopData = await getShopData(product.tenantId);
   const bucketCounts = await getBucketCounts(product.tenantId);
+  const tenantProfile = await getTenantProfile(product.tenantId);
+  // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
   const businessName = product.tenant?.name || 'Unknown Store';
   
   // Convert images to gallery format for ProductGallery component
@@ -200,18 +263,21 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const statusLabel = product.itemStatus === 'draft' ? 'Draft' : product.itemStatus === 'archived' ? 'Archived' : product.itemStatus;
   const visibilityLabel = product.visibility === 'private' ? 'Private' : 'Public';
 
-  // Structured data for Google
+  // Enhanced structured data with business profile and SEO tags
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.title,
-    description: product.description,
+    description: tenantProfile?.business_description 
+      ? `${product.description}. ${tenantProfile.business_description}`
+      : product.description,
     brand: {
       '@type': 'Brand',
-      name: product.brand,
+      name: product.brand || tenantProfile?.business_name || businessName,
     },
     sku: product.sku,
     image: gallery.map(p => p.url),
+    keywords: tenantProfile?.seo_tags?.join(", ") || "",
     offers: {
       '@type': 'Offer',
       url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://rvp.vercel.app'}/products/${product.id}`,
@@ -221,7 +287,19 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       itemCondition: `https://schema.org/${product.condition === 'used' ? 'UsedCondition' : product.condition === 'refurbished' ? 'RefurbishedCondition' : 'NewCondition'}`,
       seller: {
         '@type': 'Organization',
-        name: businessName,
+        name: tenantProfile?.business_name || businessName,
+        description: tenantProfile?.business_description,
+        address: tenantProfile ? {
+          '@type': 'PostalAddress',
+          streetAddress: tenantProfile.address_line1,
+          addressLocality: tenantProfile.city,
+          addressRegion: tenantProfile.state,
+          postalCode: tenantProfile.postal_code,
+          addressCountry: tenantProfile.country_code
+        } : undefined,
+        telephone: tenantProfile?.phone_number,
+        email: tenantProfile?.email,
+        website: tenantProfile?.website,
       },
     },
   };
@@ -229,6 +307,15 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   return (
     <>
     <ProductLikeProvider>
+      {/* SEO Meta Tags */}
+      {tenantProfile?.seo_tags && tenantProfile.seo_tags.length > 0 && (
+        <>
+          {tenantProfile.seo_tags.map((tag, index) => (
+            <meta key={index} name="keywords" content={tag} />
+          ))}
+        </>
+      )}
+
       {/* Structured Data */}
       <script
         type="application/ld+json"
@@ -359,27 +446,42 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <ProductBusinessInfoCollapsible 
           product={product as any} 
-          tenant={{
-            id: product.tenantId, 
-            name: product.tenant?.name, 
+          tenant={ {
+            id: product.tenantId,
+            name: tenantProfile?.business_name || product.tenant?.name || '',
             metadata: {
-              businessName: product.tenant?.name,
-              phone: undefined,
-              email: undefined,
-              website: undefined,
-              address: undefined,
-              logo_url: undefined,
-              social_links: undefined,
+              businessName: tenantProfile?.business_name,
+              phone: tenantProfile?.phone_number,
+              email: tenantProfile?.email,
+              website: tenantProfile?.website,
+              address: `${tenantProfile?.address_line1}, ${tenantProfile?.city}, ${tenantProfile?.state} ${tenantProfile?.postal_code}`,
+              logo_url: tenantProfile?.logo_url,
+              social_links: tenantProfile?.social_links ? {
+                facebook: tenantProfile.social_links.facebook || undefined,
+                instagram: tenantProfile.social_links.instagram || undefined,
+                twitter: tenantProfile.social_links.twitter || undefined,
+                linkedin: tenantProfile.social_links.linkedin || undefined,
+              } : undefined,
             }
           }} 
         />
       </div>
 
-      {/* Product Recommendations */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <ProductRecommendations productId={product.id} tenantId={product.tenantId} tenantSlug={product.tenant?.slug || ''} />
-      </div>
+      {/* Business Description - Merchant Branding */}
+      {tenantProfile?.business_description && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 p-6">
+            <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+              About {tenantProfile.business_name}
+            </h2>
+            <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
+              {tenantProfile.business_description}
+            </p>
+          </div>
+        </div>
+      )}
 
+     
       {/* Featured Type Products - other products with same featured types */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <FeaturedTypeProducts 
@@ -388,6 +490,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           featuredTypes={product.featuredTypes || []}
         />
       </div>
+
+      {/* Product Recommendations */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <ProductRecommendations productId={product.id} tenantId={product.tenantId} tenantSlug={product.tenant?.slug || ''} />
+      </div>
+
 
       {/* Product Reviews */}
       <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">

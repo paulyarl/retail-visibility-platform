@@ -124,10 +124,46 @@ class PublicTenantInfoService extends PublicApiSingleton {
     }
 
     try {
-      // Use public service for public endpoint
-      const profile = await tenantPublicService.getPublicTenantProfile(tenantId); 
+      // Make direct API call and properly unwrap response
+      const response = await this.makeDefaultRequest<any>(
+        `/api/public/tenant/${tenantId}/profile`,
+        {},
+        `public-tenant-profile-${tenantId}`,
+        this.cacheTTL
+      );
+      
+      if (!response.success) {
+        console.error('[PublicTenantInfoService] Failed to get business profile:', response.error);
+        return null;
+      }
 
-      return profile || null;
+      const profile = response.data.data;
+      if (!profile) return null;
+
+      // Transform camelCase API response to snake_case BusinessProfile format
+      return {
+        business_name: profile.name || '',
+        address_line1: profile.addressLine1 || '',
+        address_line2: profile.addressLine2 || undefined,
+        city: profile.city || '',
+        state: profile.state || undefined,
+        postal_code: profile.postalCode || '',
+        country_code: profile.countryCode || '',
+        phone_number: profile.phoneNumber || undefined,
+        email: profile.email || undefined,
+        website: profile.website || undefined,
+        contact_person: profile.contactPerson || undefined,
+        admin_email: profile.adminEmail || undefined,
+        logo_url: profile.logoUrl || undefined,
+        banner_url: profile.bannerUrl || undefined,
+        business_description: profile.businessDescription || undefined,
+        hours: profile.hours || undefined,
+        social_links: profile.socialLinks || undefined,
+        seo_tags: profile.seoKeywords || undefined,
+        latitude: profile.latitude ? parseFloat(profile.latitude) : undefined,
+        longitude: profile.longitude ? parseFloat(profile.longitude) : undefined,
+        slug: profile.slug || undefined,
+      };
     } catch (error) {
       console.error('[PublicTenantInfoService] Failed to get business profile:', error);
       return null;
