@@ -56,24 +56,7 @@ export default function QuickActions({ tenantId, canManageSettings = false }: Qu
             <Button className="w-full">Start Scanning</Button>
           </Link>
         </CardContent>
-      </Card>
-
-      {/* Settings (conditional) */}
-      {canManageSettings && (
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <CardTitle>Settings</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-neutral-600 mb-4">
-              Configure your store settings
-            </p>
-            <Link href={`/t/${tenantId}/settings`}>
-              <Button className="w-full">Manage Settings</Button>
-            </Link>
-          </CardContent>
-        </Card>
-      )}
+      </Card>    
     </div>
   );
 }

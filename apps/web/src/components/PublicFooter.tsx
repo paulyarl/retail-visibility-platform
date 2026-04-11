@@ -66,11 +66,6 @@ export default function PublicFooter() {
                   Pricing
                 </Link>
               </li>
-              <li>
-                <Link href="/settings/subscription" className="text-neutral-600 hover:text-neutral-900 text-sm transition-colors">
-                  Subscription
-                </Link>
-              </li>
             </ul>
           </div>
 

@@ -37,7 +37,7 @@ export default function SignupWizardPage() {
   // Restore form data from onboarding state service (persists across Auth0 redirect)
   useEffect(() => {
     const existingState = onboardingStateService.getPhase1();
-    console.log('[SignupWizard] Restoring from onboardingStateService:', existingState);
+    // console.log('[SignupWizard] Restoring from onboardingStateService:', existingState);
     if (existingState) {
       setFormData(prev => ({
         ...prev,
@@ -60,7 +60,7 @@ export default function SignupWizardPage() {
     
     const checkExistingUser = async () => {
       if (isAuthenticated && user) {
-        console.log('[SignupWizard] Existing authenticated user detected:', user.email);
+        // console.log('[SignupWizard] Existing authenticated user detected:', user.email);
         setCheckingExistingUser(true);
         
         // Check if user has tenants
@@ -69,15 +69,15 @@ export default function SignupWizardPage() {
         if (hasTenants) {
           // User has tenants - redirect to their dashboard
           const tenantId = user.tenants[0]?.id;
-          console.log('[SignupWizard] User has tenants, redirecting to dashboard:', tenantId);
+          // console.log('[SignupWizard] User has tenants, redirecting to dashboard:', tenantId);
           router.replace(`/t/${tenantId}/dashboard`);
         } else if (user.onboardingCompleted) {
           // User completed onboarding but has no tenants - redirect to dashboard
-          console.log('[SignupWizard] User completed onboarding, redirecting to dashboard');
+          // console.log('[SignupWizard] User completed onboarding, redirecting to dashboard');
           router.replace('/dashboard');
         } else {
           // User needs onboarding - redirect to onboarding
-          console.log('[SignupWizard] User needs onboarding, redirecting');
+          // console.log('[SignupWizard] User needs onboarding, redirecting');
           router.replace('/onboarding');
         }
       }
@@ -146,7 +146,7 @@ export default function SignupWizardPage() {
 
     try {
       // Save form data to onboarding state service (localStorage persists across Auth0 redirect)
-      console.log('[SignupWizard] Saving formData to onboardingStateService:', formData);
+      // console.log('[SignupWizard] Saving formData to onboardingStateService:', formData);
       onboardingStateService.savePhase1({
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -158,7 +158,7 @@ export default function SignupWizardPage() {
       
       // Verify it was saved
       const saved = onboardingStateService.getPhase1();
-      console.log('[SignupWizard] Verified saved data:', saved);
+      // console.log('[SignupWizard] Verified saved data:', saved);
 
       // Redirect to Auth0 signup
       // Auth0 will handle account creation and authentication

@@ -112,11 +112,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Check for Auth0 cookies (non-HTTP-only) that indicate user might be authenticated
       const hasAuthCookies = typeof window !== 'undefined' && 
         (document.cookie.includes('auth0_email=') || 
-         document.cookie.includes('auth0_id='));
+         document.cookie.includes('auth0_id=') ||
+         document.cookie.includes('auth0.')); // Also check for auth0 session cookies
 
-      // Skip auth check for public pages only if no auth cookies present
-      // This allows public page components (like reviews) to query isAuthenticated
-      if (!isAdminContext && !isTenantContext && !hasAuthCookies && !forceRefresh) {
+      // Skip auth check if no auth cookies present - prevents 401 errors
+      // This applies to all contexts, not just public pages
+      if (!hasAuthCookies && !forceRefresh) {
         setUser(null);
         setIsLoading(false);
         return;

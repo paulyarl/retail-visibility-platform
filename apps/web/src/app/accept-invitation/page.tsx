@@ -169,7 +169,7 @@ function AcceptInvitationContent() {
       // Redirect to login or dashboard after a delay
       setTimeout(() => {
         if (acceptedInvitation.status === 'accepted') {
-          router.push('/login?message=Invitation accepted. Please log in to access your account.');
+          router.push('/auth/login?message=Invitation accepted. Please log in to access your account.');
         }
       }, 2000);
       
@@ -209,7 +209,7 @@ function AcceptInvitationContent() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
             <Button 
-              onClick={() => router.push('/login')} 
+              onClick={() => router.push('/auth/login')} 
               className="w-full mt-4"
               variant="secondary"
             >
@@ -352,7 +352,7 @@ function AcceptInvitationContent() {
           <div className="mt-4 text-center">
             <Button 
               variant="ghost" 
-              onClick={() => router.push('/login')}
+              onClick={() => router.push('/auth/login')}
               className="text-sm"
             >
               Already have an account? Sign in

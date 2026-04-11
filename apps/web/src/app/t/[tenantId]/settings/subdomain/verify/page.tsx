@@ -54,7 +54,7 @@ export default function SubdomainVerificationPage() {
   useEffect(() => {
     if (tenantId && !accessLoading) {
       if (!hasAccess) {
-        router.push('/login');
+        router.push('/auth/login');
         return;
       }
       loadVerificationStatus();

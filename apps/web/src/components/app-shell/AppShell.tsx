@@ -12,12 +12,12 @@ import Link from "next/link";
 import { Button } from "@/components/ui";
 import MobileCapacityIndicator from "@/components/capacity/MobileCapacityIndicator";
 import { GlobalAlertBar } from "@/components/ui/GlobalAlertProvider";
-import ShellWithTicker from "@/components/layout/ShellWithTicker";
+import ShellWithTicker from "@/components/layout/ShellWithTicker"; 
 
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { settings } = usePlatformSettings();
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [tenantName, setTenantName] = useState<string | null>(null);
   
@@ -43,6 +43,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [tenantId, user]);
 
+
+  // Don't render children if not authenticated
+ 
 
   return (
     <ShellWithTicker shellHeader={
@@ -93,22 +96,44 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               {hydrated && user ? (
                 <>
                   <Link href="/settings">
-                    <Button variant="ghost" size="sm">Account</Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="flex items-center gap-1.5 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      Account
+                    </Button>
                   </Link>
                   <Button
                     variant="secondary"
                     size="sm"
+                    className="bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 border border-neutral-300 hover:border-red-300 shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2"
                     onClick={async () => {
                       try { await logout(); } catch {}
                       if (typeof window !== 'undefined') window.location.href = '/';
                     }}
                   >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
                     Sign Out
                   </Button>
                 </>
               ) : (
-                <Link href="/login">
-                  <Button variant="secondary" size="sm">Sign In</Button>
+                <Link href="/auth/login">
+                  <Button 
+                    variant="primary" 
+                    size="sm"
+                    className="bg-primary-600 hover:bg-primary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    </svg>
+                    Sign In
+                  </Button>
                 </Link>
               )}
             </div>
@@ -145,7 +170,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 space-y-2">
                 {/* Mobile Navigation */}
                 {hydrated && (
-                  <NavLinks
+                  <NavLinks 
                     links={links}
                     tenantScopedLinksOn={tenantScopedLinksOn}
                     className="space-y-1"
@@ -159,11 +184,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   {hydrated && user ? (
                     <>
                       <Link href="/settings" className="block" onClick={() => setMobileMenuOpen(false)}>
-                        <Button variant="ghost" className="w-full justify-start" size="md">Account</Button>
+                        <Button 
+                          variant="ghost" 
+                          className="w-full justify-start flex items-center gap-2 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200" 
+                          size="md"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          Account
+                        </Button>
                       </Link>
                       <Button
                         variant="secondary"
-                        className="w-full"
+                        className="w-full bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 border border-neutral-300 hover:border-red-300 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center gap-2"
                         size="md"
                         onClick={async () => {
                           setMobileMenuOpen(false);
@@ -171,12 +205,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                           if (typeof window !== 'undefined') window.location.href = '/';
                         }}
                       >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
                         Sign Out
                       </Button>
                     </>
                   ) : (
-                    <Link href="/login" className="block" onClick={() => setMobileMenuOpen(false)}>
-                      <Button variant="secondary" className="w-full" size="md">Sign In</Button>
+                    <Link href="/auth/login" className="block" onClick={() => setMobileMenuOpen(false)}>
+                      <Button 
+                        variant="primary" 
+                        className="w-full bg-primary-600 hover:bg-primary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2" 
+                        size="md"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                        </svg>
+                        Sign In
+                      </Button>
                     </Link>
                   )}
                 </div>

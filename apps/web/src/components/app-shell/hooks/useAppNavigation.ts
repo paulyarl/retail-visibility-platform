@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from "@/contexts/AuthContext";
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { ROLE_GROUPS } from '@/config/rbac';
 interface AppLinks {
   dashboard: string;
   tenants: string;
@@ -64,14 +65,20 @@ export function useAppNavigation({ tenantId }: UseAppNavigationProps): UseAppNav
       
       // Only fetch tenant info if user is authenticated and we have auth cookies
       if (user && isAuthenticated && tenantId && (decodedEmail || decodedAuth0Id)) {
-        // Check if user has access to this tenant
-        const hasTenantAccess = user.tenants?.some(t => t.id === tenantId);
-        // console.log('Tenant access check:', { 
-        //   tenantId, 
+        // Platform users (admin, support, viewer) have access to all tenants
+        const isPlatformUser = ROLE_GROUPS.IS_PLATFORM_ADMIN.includes(user.role as any) ||
+                               ROLE_GROUPS.IS_PLATFORM_SUPPORT.includes(user.role as any) ||
+                               user.role === 'PLATFORM_VIEWER';
+
+        // Check if user has access to this tenant (or is a platform user)
+        const hasTenantAccess = isPlatformUser || user.tenants?.some(t => t.id === tenantId);
+        // console.log('Tenant access check:', {
+        //   tenantId,
         //   userTenants: user.tenants?.map(t => ({ id: t.id, name: t.name })),
-        //   hasAccess: hasTenantAccess
+        //   hasAccess: hasTenantAccess,
+        //   isPlatformUser
         // });
-        
+
         if (!hasTenantAccess) {
           console.warn('User does not have access to tenant:', tenantId);
         } else {

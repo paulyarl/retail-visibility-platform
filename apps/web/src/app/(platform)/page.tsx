@@ -666,12 +666,12 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
               </p>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
                 <a href="/auth/signup" className="w-full sm:w-auto">
-                  <Button variant="primary" size="lg" className="w-full sm:w-auto">
+                  <Button variant="primary" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
                     Start Free Trial →
                   </Button>
                 </a>
                 <Link href="/features" className="w-full sm:w-auto">
-                  <Button variant="secondary" size="lg" className="w-full sm:w-auto">
+                  <Button variant="secondary" size="lg" className="w-full sm:w-auto" style={{ color: 'white' }}>
                     Learn More
                   </Button>
                 </Link>
@@ -1099,7 +1099,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                   </div>
                   <div className="space-y-3 sm:space-y-4">
                     <a href="/auth/signup" className="block">
-                      <Button variant="primary" className="w-full justify-start" size="md">
+                      <Button variant="primary" className="w-full justify-start" size="md" style={{ color: 'white' }}>
                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                         </svg>
@@ -1107,7 +1107,7 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
                       </Button>
                     </a>
                     <a href="/auth/login" className="block">
-                      <Button variant="secondary" className="w-full justify-start" size="md">
+                      <Button variant="secondary" className="w-full justify-start" size="md" style={{ color: 'white' }}>
                         <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                         </svg>
@@ -1217,8 +1217,8 @@ function Home({ embedded = false }: { embedded?: boolean } = {}) {
           </div>
         </AnimatedCard>
 
-        {/* Value Showcase - Only show when user has products */}
-        {!loading && stats.total > 0 && (
+        {/* Value Showcase - Only show to authenticated users with products */}
+        {isAuthenticated && !loading && stats.total > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
             {/* Storefront Status */}
             <AnimatedCard delay={0.6} hover={false}>

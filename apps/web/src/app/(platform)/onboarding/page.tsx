@@ -48,10 +48,10 @@ function OnboardingContent() {
   useEffect(() => {
     // Try to restore existing state
     const existingState = onboardingStateService.getPhase1();
-    console.log('[Onboarding] Restoring from onboardingStateService:', existingState);
+    // console.log('[Onboarding] Restoring from onboardingStateService:', existingState);
     
     if (existingState) {
-      console.log('[Onboarding] Setting formData from existingState');
+      // console.log('[Onboarding] Setting formData from existingState');
       setFormData({
         firstName: existingState.firstName || user?.firstName || '',
         lastName: existingState.lastName || user?.lastName || '',
@@ -61,7 +61,7 @@ function OnboardingContent() {
       });
       setHasRestored(true);
     } else {
-      console.log('[Onboarding] No existingState, starting new phase 1');
+      // console.log('[Onboarding] No existingState, starting new phase 1');
       // Start new phase 1 - load all available user data
       onboardingStateService.startPhase1();
       if (user) {

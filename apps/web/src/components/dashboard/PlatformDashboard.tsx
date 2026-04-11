@@ -136,12 +136,31 @@ export default function PlatformDashboard() {
             <div className="hidden sm:flex items-center gap-2 md:gap-3">
               <Tooltip label="Manage your store locations">
                 <Link href="/tenants">
-                  <Button variant="ghost" size="sm">My Stores</Button>
+                  <Button 
+                    variant="subtle" 
+                    size="sm"
+                                       className="flex items-center gap-2 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    My Stores
+                  </Button>
                 </Link>
               </Tooltip>
               <Tooltip label="Account and platform settings">
                 <Link href="/settings">
-                  <Button variant="ghost" size="sm">Settings</Button>
+                  <Button 
+                    variant="subtle" 
+                    size="sm"
+                    className="flex items-center gap-2 text-neutral-700 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Settings
+                  </Button>
                 </Link>
               </Tooltip>
               {isAuthenticated ? (
@@ -149,15 +168,28 @@ export default function PlatformDashboard() {
                   <Button 
                     variant="secondary" 
                     size="sm"
+                    className="bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 border border-neutral-300 hover:border-red-300 shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2"
                     onClick={async () => { await logout(); }}
                   >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
                     Sign Out
                   </Button>
                 </Tooltip>
               ) : (
                 <Tooltip label="Sign in to your account">
                   <a href="/auth/login">
-                    <Button variant="secondary" size="sm">Sign In</Button>
+                    <Button 
+                      variant="primary" 
+                      size="sm"
+                      className="bg-primary-600 hover:bg-primary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                      </svg>
+                      Sign In
+                    </Button>
                   </a>
                 </Tooltip>
               )}
@@ -183,23 +215,54 @@ export default function PlatformDashboard() {
           {mobileMenuOpen && (
             <div className="sm:hidden mt-4 pb-2 space-y-2 border-t border-neutral-200 pt-4">
               <Link href="/tenants" className="block" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="ghost" className="w-full justify-start" size="md">My Stores</Button>
+                <Button 
+                  variant="subtle" 
+                  className="w-full justify-start flex items-center gap-2 text-neutral-700 hover:text-primary-600"
+                  size="md"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  My Stores
+                </Button>
               </Link>
               <Link href="/settings" className="block" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="ghost" className="w-full justify-start" size="md">Settings</Button>
+                <Button 
+                  variant="subtle" 
+                  className="w-full justify-start flex items-center gap-2 text-neutral-700 hover:text-primary-600"
+                  size="md"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Settings
+                </Button>
               </Link>
               {isAuthenticated ? (
                 <Button 
                   variant="secondary" 
-                  className="w-full"
+                  className="w-full bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 border border-neutral-300 hover:border-red-300 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center gap-2"
                   size="md"
                   onClick={async () => { setMobileMenuOpen(false); await logout(); }}
                 >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
                   Sign Out
                 </Button>
               ) : (
                 <a href="/auth/login" className="block" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="secondary" className="w-full" size="md">Sign In</Button>
+                  <Button 
+                    variant="primary" 
+                    className="w-full bg-primary-600 hover:bg-primary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2" 
+                    size="md"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    </svg>
+                    Sign In
+                  </Button>
                 </a>
               )}
             </div>

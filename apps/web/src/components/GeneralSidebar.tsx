@@ -180,7 +180,7 @@ export default function GeneralSidebar({
 
   const handleLogout = async () => {
     await logout()
-    router.push('/login')
+    router.push('/auth/login')
   }
 
   const handleCollapseToggle = useCallback(() => {

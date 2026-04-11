@@ -252,7 +252,7 @@ export const StoreRatingDisplay: React.FC<StoreRatingDisplayProps> = ({
                       </button>
                     ) : (
                       <span className="text-gray-400 dark:text-gray-500 text-sm">
-                        <a href="/login" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">Login</a> to vote
+                        <a href="/auth/login" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">Login</a> to vote
                       </span>
                     )}
                   </div>

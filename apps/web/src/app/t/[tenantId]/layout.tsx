@@ -29,7 +29,7 @@ export default async function TenantPageLayout({ children, params }: { children:
   // console.log(`[TenantPageLayout] tenantId:`, tenantId);
 
   if (!isAuthenticated) {
-    redirect(`/login?next=/t/${tenantId}`);
+    redirect(`/auth/login?next=/t/${tenantId}`);
   }
   
   if (!tenantId) {

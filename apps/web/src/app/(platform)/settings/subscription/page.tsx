@@ -1299,7 +1299,8 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
               </div>
               <Button
                 variant="primary"
-                onClick={() => window.location.href = '/settings/offerings'}
+                onClick={() => window.location.href = '/settings/offerings' as any}
+                style={{ color: 'white' }}
               >
                 View All Offerings
               </Button>
