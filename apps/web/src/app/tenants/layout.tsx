@@ -1,15 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SettingsFooter from '@/components/SettingsFooter';
 import GeneralSidebar from '@/components/GeneralSidebar';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+import { Spinner } from '@/components/ui';
 
 export default function TenantsLayout({ children }: { children: React.ReactNode }) {
   
   const params = useParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const tenantId = params.tenantId as string;
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const nav = [
@@ -17,6 +22,22 @@ export default function TenantsLayout({ children }: { children: React.ReactNode 
     { label: 'My Account', href: '/settings/account' },
     { label: 'Subscription', href: '/settings/subscription' },
   ];
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push(`/auth/login?returnTo=${encodeURIComponent(pathname)}`);
+    }
+  }, [authLoading, isAuthenticated, router, pathname]);
+
+  // Show loading while checking auth
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
