@@ -102,7 +102,7 @@ export function UnifiedStoreCard({
 
   // Determine link destination based on linkType
   const linkHref = linkType === 'storefront' 
-    ? `/tenant/${listing.tenantId}`
+    ? `/tenant/${listing.slug || listing.tenantId}`
     : `/directory/${listing.slug || listing.tenantId}`;
 
   // Prioritize category display: enhancedStats → contextCategory → gbpPrimaryCategoryName → primaryCategory → category.name
