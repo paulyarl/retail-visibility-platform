@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { UnifiedStoreCard } from './UnifiedStoreCard';
 import { Skeleton } from '@/components/ui';
 import { directoryService } from '@/services/DirectorySingletonService';
+import { publicDirectoryService } from '@/services/PublicDirectoryService';
 
 interface RelatedStore {
   id: string;
@@ -50,7 +51,19 @@ export default function RelatedStores({
       setError(null);
 
       try {
-        const data = await directoryService.getRelatedStores(currentSlug, limit);
+        // Resolve identifier to slug if it looks like an ID (not a URL-friendly slug)
+        // Slugs typically contain hyphens and lowercase letters, IDs are often alphanumeric without hyphens
+        let resolvedSlug = currentSlug;
+        const looksLikeId = /^[a-zA-Z0-9]{8,}$/.test(currentSlug) || currentSlug.startsWith('tid-') || currentSlug.startsWith('t-');
+        
+        if (looksLikeId) {
+          const resolved = await publicDirectoryService.resolveIdentifier(currentSlug, 'tenant');
+          if (resolved?.slug) {
+            resolvedSlug = resolved.slug;
+          }
+        }
+        
+        const data = await directoryService.getRelatedStores(resolvedSlug, limit);
         
         // Ensure data is always an array
         const dataArray = Array.isArray(data) ? data : [];

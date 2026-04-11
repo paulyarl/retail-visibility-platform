@@ -255,7 +255,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
         `public-tenant-gateway-status-${tenantId}`
       ) as any;
 
-      console.log(`[PublicTenantInfoService] getPaymentGatewayStatus response:`, response);
+      // console.log(`[PublicTenantInfoService] getPaymentGatewayStatus response:`, response);
       
       if (response?.success && response.data) {
         const { gateways } = response.data;
@@ -291,7 +291,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
             );
 
             if (!oauthResponse?.success || !oauthResponse.data?.connected || oauthResponse.data?.isExpired) {
-              console.log(`[PublicTenantInfoService] Square OAuth not completed or expired for tenant: ${tenantId}`);
+              // console.log(`[PublicTenantInfoService] Square OAuth not completed or expired for tenant: ${tenantId}`);
               return {
                 hasActiveGateway: false,
                 defaultGatewayType: undefined
@@ -339,7 +339,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
         };
       }
 
-      console.log(`[PublicTenantInfoService] getPaymentGatewayStatus NO DATA for tenant: ${tenantId}`, new Date().toISOString());
+      // console.log(`[PublicTenantInfoService] getPaymentGatewayStatus NO DATA for tenant: ${tenantId}`, new Date().toISOString());
       return null;
     } catch (error) {
       console.error(`[PublicTenantInfoService] getPaymentGatewayStatus ERROR for tenant: ${tenantId}`, error);
@@ -378,7 +378,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
         return response.data.gateways;
       }
 
-      console.log(`[PublicTenantInfoService] getPaymentGateways NO DATA for tenant: ${tenantId}`, new Date().toISOString());
+      // console.log(`[PublicTenantInfoService] getPaymentGateways NO DATA for tenant: ${tenantId}`, new Date().toISOString());
       return [];
     } catch (error) {
       console.error(`[PublicTenantInfoService] getPaymentGateways ERROR for tenant: ${tenantId}`, error);

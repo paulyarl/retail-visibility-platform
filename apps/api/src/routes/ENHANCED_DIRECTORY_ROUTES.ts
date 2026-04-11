@@ -57,9 +57,10 @@ router.get('/:slug/related', async (req: Request, res: Response) => {
     console.log(`[DEBUG] Related stores API called for slug: ${slug}, limit: ${limit}`);
     console.log(`[Related Stores] Finding related stores for: ${slug}`);
 
-    // First, get the current listing
+    // First, get the current listing - handle both slug and tenantId
+    const isTenantId = slug.startsWith('tid-');
     const currentListing = await getDirectPool().query(
-      `SELECT * FROM directory_listings_list WHERE slug = $1 AND is_published = true
+      `SELECT * FROM directory_listings_list WHERE ${isTenantId ? 'tenant_id' : 'slug'} = $1 AND is_published = true
          AND (business_hours IS NULL OR business_hours::text != 'null') LIMIT 1`,
       [slug]
     );

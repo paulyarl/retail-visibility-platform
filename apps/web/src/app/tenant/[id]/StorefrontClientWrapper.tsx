@@ -1044,8 +1044,13 @@ export default function StorefrontClientWrapper({
       )}
      
 
-      {/* Recently Viewed */}
-      <div className=" mx-auto bg-gradient-to-r from-transparent via-orange-500 to-transparent">
+      {/* Storefront Recommendations */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <StorefrontRecommendations tenantId={tenantId} />
+      </div>
+
+      {/* Recently Viewed - always last for consistency with other public pages */}
+      <div className="mx-auto bg-gradient-to-r from-transparent via-orange-500 to-transparent">
         <LastViewed />
       </div>
 
