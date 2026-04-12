@@ -132,6 +132,7 @@ export type BusinessProfile = {
   latitude?: number | null;
   longitude?: number | null;
   slug?: string;
+  tenant_id?: string;
 };
 
 // Onboarding schema - only validates fields shown on the StoreIdentityStep form

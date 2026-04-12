@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
+import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 
 interface Product {
   id: string;
@@ -161,38 +162,7 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
     <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {variant === 'product' && (
-            <button
-              onClick={handleFavorite}
-              className="flex items-center gap-1 p-2 hover:bg-gray-100 rounded-lg transition-colors group"
-              title={favorited ? "Remove from favorites" : "Add to favorites"}
-            >
-              <svg 
-                className={`w-5 h-5 transition-colors ${
-                  favorited 
-                    ? 'fill-red-500 text-red-500' 
-                    : 'text-gray-600 group-hover:text-red-500'
-                }`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                />
-              </svg>
-              {favoriteCount > 0 && (
-                <span className="text-xs font-medium text-gray-600">{favoriteCount}</span>
-              )}
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Visit Storefront Link - Only on product pages */}
+            {/* Visit Storefront Link - Only on product pages */}
           {variant === 'product' && (
             <a
               href={`/tenant/${tenant.slug ? tenant.slug : product.tenantId}`}
@@ -209,69 +179,18 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
               </svg>
               <span className="text-sm font-medium hidden sm:inline">Storefront
 
- {/* Hours Badge - Status */}
-            {(() => {
-              switch (hoursStatus?.status) {
-                case 'open':
-                  return (
-                    <MantineBadge
-                      color="green"
-                      variant="light"
-                      size="xs"
-                      className="animate-pulse"
-                      title={hoursStatus?.label || 'Open now'}
-                    >
-                      🟢 Open
-                    </MantineBadge>
-                  );
-                case 'closed':
-                  return (
-                    <MantineBadge
-                      color="red"
-                      variant="light"
-                      size="xs"
-                      className="animate-bounce"
-                      title={hoursStatus?.label || 'Closed'}
-                    >
-                      🔴 Closed
-                    </MantineBadge>
-                  );
-                case 'opening-soon':
-                  return (
-                    <MantineBadge
-                      color="blue"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Opening soon'}
-                    >
-                      🟡 Opening
-                    </MantineBadge>
-                  );
-                case 'closing-soon':
-                  return (
-                    <MantineBadge
-                      color="orange"
-                      variant="filled"
-                      size="xs"
-                      className="animate-ping"
-                      title={hoursStatus?.label || 'Closing soon'}
-                    >
-                      🟡 Closing
-                    </MantineBadge>
-                  );
-                default:
-                  return null;
-              }
-            })()}
 
               </span>
             </a>
           )}
-           
+        </div>
+
+        <div className="flex items-center gap-2">
+      
+           <HoursStatusBadge status={hoursStatus} />{hoursStatus?.label}
 
           {/* Write Review Button - Only on product pages */}
-          {variant === 'product' && (
+          {/* {variant === 'product' && (
             <button
               onClick={handleReview}
               className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
@@ -287,10 +206,10 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
               </svg>
               <span className="text-sm font-medium hidden sm:inline">Review</span>
             </button>
-          )}
+          )} */}
 
           {/* Cart Button - Only on product pages */}
-          {variant === 'product' && (
+          {/* {variant === 'product' && (
             <button
               onClick={handleViewCart}
               className="relative flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -311,10 +230,10 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
                 </span>
               )}
             </button>
-          )}
+          )} */}
 
           {/* Print Button */}
-          <button
+          {/* <button
             onClick={handlePrint}
             className="flex items-center gap-2 px-3 py-2 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors"
             title="Print this product page"
@@ -328,11 +247,11 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
               />
             </svg>
             <span className="text-sm font-medium hidden sm:inline">Print</span>
-          </button>
+          </button> */}
 
           {/* Share Button */}
           <div className="relative" ref={dropdownRef}>
-            <button
+            {/* <button
               onClick={handleShare}
               className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               title="Share this product"
@@ -346,10 +265,10 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
                 />
               </svg>
               <span className="text-sm font-medium hidden sm:inline">Share</span>
-            </button>
+            </button> */}
 
             {/* Share Options Dropdown */}
-            {showShareOptions && (
+            {/* {showShareOptions && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-neutral-200 z-10">
                 <div className="p-2">
                   <div className="text-xs font-medium text-neutral-500 mb-2 px-2">Share via:</div>
@@ -399,7 +318,7 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
                   </div>
                 </div>
               </div>
-            )}
+            )} */}
           </div>
         </div>
       </div>

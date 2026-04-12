@@ -138,6 +138,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
       }
 
       const profile = response.data.data;
+      // console.log(`[PublicTenantInfoService] Business profile for ${tenantId}:`, profile);
       if (!profile) return null;
 
       // Transform camelCase API response to snake_case BusinessProfile format
@@ -158,11 +159,12 @@ class PublicTenantInfoService extends PublicApiSingleton {
         banner_url: profile.bannerUrl || undefined,
         business_description: profile.businessDescription || undefined,
         hours: profile.hours || undefined,
-        social_links: profile.socialLinks || undefined,
-        seo_tags: profile.seoKeywords || undefined,
+        social_links: profile.social_links || profile.socialLinks || undefined,
+        seo_tags: profile.seo_tags || profile.seoKeywords || undefined,
         latitude: profile.latitude ? parseFloat(profile.latitude) : undefined,
         longitude: profile.longitude ? parseFloat(profile.longitude) : undefined,
         slug: profile.slug || undefined,
+        tenant_id: profile.tenantId || profile.id || undefined,
       };
     } catch (error) {
       console.error('[PublicTenantInfoService] Failed to get business profile:', error);

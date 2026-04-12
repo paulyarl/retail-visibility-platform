@@ -14,18 +14,20 @@ interface DirectoryActionsProps {
     id?: string;
   };
   currentUrl: string;
+  variant?: 'directory' | 'product';
+  entity_name?: string;
 }
 
 
 
-export default function DirectoryActions({ listing, currentUrl }: DirectoryActionsProps) {
+export default function DirectoryActions({ listing, currentUrl, variant = 'directory', entity_name }: DirectoryActionsProps) {
   const router = useRouter();
   const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [favorited, setFavorited] = useState(false);
   const [favoriteCount, setFavoriteCount] = useState(0);
 
-  const shareText = `Check out ${listing.business_name} in our business directory!`;
+  const shareText = `Check out ${entity_name || listing.business_name} in our ${variant === 'product' ? 'product' : 'business'} directory!`;
   const shareUrl = currentUrl;
 
   // Load favorite status from localStorage
@@ -66,7 +68,7 @@ export default function DirectoryActions({ listing, currentUrl }: DirectoryActio
     if (navigator.share) {
       try {
         await navigator.share({
-          title: listing.business_name,
+          title: entity_name || listing.business_name,
           text: shareText,
           url: shareUrl,
         });
@@ -93,7 +95,7 @@ export default function DirectoryActions({ listing, currentUrl }: DirectoryActio
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`,
     twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
     linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`,
-    email: `mailto:?subject=${encodeURIComponent(listing.business_name)}&body=${encodeURIComponent(`${shareText}\n\n${shareUrl}`)}`,
+    email: `mailto:?subject=${encodeURIComponent(entity_name || listing.business_name)}&body=${encodeURIComponent(`${shareText}\n\n${shareUrl}`)}`,
   };
 
   return (
@@ -153,8 +155,7 @@ export default function DirectoryActions({ listing, currentUrl }: DirectoryActio
         )}
                   </a>
                    {/* Print Button */}
-      <a
-                    onClick={handlePrint}
+      <a               onClick={handlePrint}
                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"
         title="Print this page"
       
@@ -166,15 +167,16 @@ export default function DirectoryActions({ listing, currentUrl }: DirectoryActio
 
                    
                   </a>
-   {/* Share Button */}
-      <a
-                    onClick={handleShare}
+ 
+ {/* Share Button */}
+      <a                 onClick={handleShare}
                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"
        
           title="Share this business"
       
                   >
                     <Share2 className="w-5 h-5 text-gray-600" />
+					</a>
                      
       {showShareOptions && (
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
@@ -227,11 +229,6 @@ export default function DirectoryActions({ listing, currentUrl }: DirectoryActio
           </div>
         </div>
       )}
-                  
-
-                   
-                  </a>
-
 
      
     </div>

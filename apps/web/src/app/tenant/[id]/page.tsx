@@ -172,6 +172,20 @@ interface PageProps {
   searchParams: Promise<{ page?: string; search?: string; category?: string; products_only?: string; featured?: string; view?: string }>;
 }
 
+interface StorefrontDetailPageProps extends PageProps {
+  tenant?: Tenant;
+  products?: Product[];
+  categories?: Category[];
+  totalProducts?: number;
+  currentPage?: number;
+  totalPages?: number;
+  hasMore?: boolean;
+  businessHours?: any;
+  platformSettings?: PlatformSettings;
+  slug?: string;
+}
+
+
 async function getTenantWithProducts(tenantId: string, page: number = 1, limit: number = 12, search?: string, category?: string, featured?: string) {
   try {
     // console.log(`[getTenantWithProducts] Resolving tenant ID for slug: ${tenantId}`);
@@ -408,17 +422,21 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function TenantStorefrontPage({ params, searchParams }: PageProps) {
+export default async function TenantStorefrontPage({ params, searchParams }: StorefrontDetailPageProps) {
   const { id } = await params;
+  // console.log(`[TenantStorefrontPage] id:`, id);
   const { page: pageParam, search, category, products_only, featured, view } = await searchParams;
+  // console.log(`[TenantStorefrontPage] searchParams:`, searchParams);
   const currentPage = parseInt(pageParam || '1', 10);
+  // console.log(`[TenantStorefrontPage] currentPage:`, currentPage);
+  
   
   // Check if products_only mode is enabled
   const isProductsOnly = products_only === 'true';
+  // console.log(`[TenantStorefrontPage] isProductsOnly:`, isProductsOnly);
 
   const data = await getTenantWithProducts(id, currentPage, 12, search, category, featured);
-  // console.log('[TenantStorefrontPage] data:', data);
- // console.log('[TenantStorefrontPage] data:', data);
+  // console.log('[TenantStorefrontPage] data:', data); 
 
   if (!data) {
     notFound();
@@ -432,6 +450,12 @@ export default async function TenantStorefrontPage({ params, searchParams }: Pag
       case 'seasonal': return 'Seasonal Specials';
       case 'sale': return 'Sale Items';
       case 'staff_pick': return 'Staff Picks';
+      case 'best_seller': return 'Best Sellers';
+      case 'trending': return 'Trending Items';
+      case 'clearance': return 'Clearance Items';
+      case 'recommended': return 'Recommended Items';
+      case 'featured': return 'Featured Items';
+      
       default: return 'Products';
     }
   };

@@ -53,6 +53,8 @@ import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Badge as MantineBadge } from '@mantine/core';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 
+import DirectoryActions from '@/components/directory/DirectoryActions';
+
 interface StorefrontClientWrapperProps {
   tenantId: string;
   tenant: any;
@@ -137,17 +139,16 @@ export default function StorefrontClientWrapper({
   // console.log(`[StorefrontClientWrapper] tenant secondaryGBPCategories:`, secondaryGBPCategories);
   // Extract logo URL with multiple fallbacks
   const logoUrl = tenant?.metadata?.logo_url || tenant?.logo_url || tenant?.branding?.logoUrl || null;
-  
-  // console.log('[StorefrontClientWrapper] Contact data:', contactData.listing);
-  // console.log('[StorefrontClientWrapper] Tenant metadata phone:', tenant.metadata?.phone);
-  // console.log('[StorefrontClientWrapper] Tenant metadata email:', tenant.metadata?.email);
-  
+    
   const [featuredCounts, setFeaturedCounts] = useState<Record<string, number>>({});
 
   const [isFullWidth, setIsFullWidth] = useState(fullWidthLayout);
   const [featuredData, setFeaturedData] = useState<any>(null);
   const { totalItems: cartTotalItems } = useMultiCart();
   const router = useRouter();
+
+  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+  const currentUrl = `${baseUrl}/tenant/${tenantId}`;
 
   // Handle view cart
   const handleViewCart = () => {
@@ -333,21 +334,6 @@ export default function StorefrontClientWrapper({
               
              {/* {directoryPublished && tenantSlug && (  */}
 			 
-                  <a
-                    onClick={() => {
-                    const reviewsSection = document.getElementById('reviews-section');
-                    if (reviewsSection) {
-                      reviewsSection.scrollIntoView({ behavior: 'smooth' });
-                    }
-                  }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
-                    title="View Store Reviews"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                  </svg>
-                    <span className="hidden lg:inline">Reviews</span>
-                  </a>
                   
                   <a
                     onClick={() => {
@@ -365,35 +351,23 @@ export default function StorefrontClientWrapper({
                     <span className="hidden lg:inline">Hours</span>
                   </a>
 				  
-                  <a
-                     onClick={handleViewCart}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
-                    title="View Shopping Cart"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 014 4z" />
-                  </svg>
-                    {cartTotalItems > 0 && (
-                    <span className="flex -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
-                      {cartTotalItems > 99 ? '99+' : cartTotalItems}
-                    </span>
-                  )}
-                    <span className="hidden lg:inline">Cart</span>
-                  </a>
 				  
              {/*   )}  */}
               
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-1">
-                
-                <button className="p-2.5 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors" title="Share">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                  </svg>
-                </button>
-              </div>
+                {/* Share/Print Actions - Right side */}
+                  <DirectoryActions 
+                    listing={{
+                      business_name: tenant.name,
+                      slug: tenant.slug,
+                      tenantId: tenant.id,
+                      id: tenant.id
+                    }}
+                    currentUrl={currentUrl}
+                  />
+            
             </div>
             
           </div>
@@ -522,13 +496,13 @@ export default function StorefrontClientWrapper({
                 </div>
 
                 {/* Social Links */}
-                {tenant.metadata?.social_links && (
+                {tenant.profileData?.social_links && (
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">Connect With Us</h3>
                     <div className="flex flex-wrap gap-3">
-                      {tenant.metadata.social_links.facebook && (
+                      {tenant.profileData.social_links.facebook && (
                         <a 
-                          href={tenant.metadata.social_links.facebook}
+                          href={tenant.profileData.social_links.facebook}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -539,9 +513,9 @@ export default function StorefrontClientWrapper({
                           Facebook
                         </a>
                       )}
-                      {tenant.metadata.social_links.instagram && (
+                      {tenant.profileData.social_links?.instagram && (
                         <a 
-                          href={tenant.metadata.social_links.instagram}
+                          href={tenant.profileData.social_links.instagram}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all"
@@ -552,9 +526,9 @@ export default function StorefrontClientWrapper({
                           Instagram
                         </a>
                       )}
-                      {tenant.metadata.social_links.twitter && (
+                      {tenant.profileData.social_links?.twitter && (
                         <a 
-                          href={tenant.metadata.social_links.twitter}
+                          href={tenant.profileData.social_links.twitter}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-colors"
@@ -565,9 +539,9 @@ export default function StorefrontClientWrapper({
                           Twitter
                         </a>
                       )}
-                      {tenant.metadata.social_links.linkedin && (
+                      {tenant.profileData.social_links?.linkedin && (
                         <a 
-                          href={tenant.metadata.social_links.linkedin}
+                          href={tenant.profileData.social_links.linkedin}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors"

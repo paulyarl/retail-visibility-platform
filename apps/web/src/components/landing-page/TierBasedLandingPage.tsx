@@ -19,6 +19,7 @@ import { Package, Download, Globe, ThumbsUp } from 'lucide-react';
 import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame, DollarSign, Calendar } from 'lucide-react';
 // Store status
 import { useStoreStatus } from '@/hooks/useStoreStatus';
+import DirectoryActions from '@/components/directory/DirectoryActions';
 
 // Landing page features interface
 interface LandingPageFeatures {
@@ -599,10 +600,15 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
 
   // Debug logging for variants
   // console.log('[TierBasedLandingPage] Product:', product);
+  // console.log('[TierBasedLandingPage] Tenant:', tenant);
   // console.log('[TierBasedLandingPage] Product variants:', product.variants);
   // console.log('[TierBasedLandingPage] Variants length:', product.variants?.length);
   // console.log('[TierBasedLandingPage] Variants type:', typeof product.variants);
   // console.log('[TierBasedLandingPage] Product object keys:', Object.keys(product));
+  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+  const currentUrl = `${baseUrl}/products/${product.id}`;
+  // console.log('[TierBasedLandingPage] Current URL:', currentUrl);
+  
 
   // Calculate current pricing based on selected variant
   const currentPrice = selectedVariant?.price_cents ? selectedVariant.price_cents / 100 : product.price;
@@ -945,7 +951,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           {effectiveCanPurchase && (
             <div className="mb-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 rounded-xl border-2 border-blue-200 dark:border-blue-800 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
-                <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <Package className="flex items-center justify-center h-5 text-blue-600 dark:text-blue-400" />
                 <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Add to Cart</span>
               </div>
               <AddToCartButton

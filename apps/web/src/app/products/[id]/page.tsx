@@ -14,7 +14,8 @@ import { PoweredByFooter } from '@/components/PoweredByFooter';
 import ProductBusinessInfoCollapsible from '@/components/products/ProductBusinessInfoCollapsible';
 import ProductReviewsSection from '@/components/products/ProductReviewsSection';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
-import StorefrontActionsWrapper from '@/components/storefront/StorefrontActionsWrapper';
+// import StorefrontActionsWrapper from '@/components/storefront/StorefrontActionsWrapper';
+import DirectoryActions from '@/components/directory/DirectoryActions';
 import { Badge, Group } from '@mantine/core';
 import { Sparkles, TrendingUp, Star, Tag, Clock, Award, Zap, Flame } from 'lucide-react';
 import { productDataService } from '@/services/ProductDataService';
@@ -262,6 +263,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const isPubliclyAccessible = product.itemStatus === 'active' && product.visibility === 'public';
   const statusLabel = product.itemStatus === 'draft' ? 'Draft' : product.itemStatus === 'archived' ? 'Archived' : product.itemStatus;
   const visibilityLabel = product.visibility === 'private' ? 'Private' : 'Public';
+  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+  const currentUrl = `${baseUrl}/products/${product.id}`;
 
   // Enhanced structured data with business profile and SEO tags
   const structuredData = {
@@ -337,13 +340,22 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         {/* Featured Type Badges - moved below, keeping space */}
         
         {/* Storefront Actions */}
+        
         <div className="flex justify-end mt-4">
-          <StorefrontActionsWrapper 
-            tenantId={product.tenantId}
-            businessName={businessName}
-            showBackButton={true}
-          />
+           <DirectoryActions 
+                    listing={{
+                      business_name: tenantProfile?.business_name || '',
+                      slug: tenantProfile?.slug || '',
+                      tenantId: product.tenantId || '',
+                      id: product.id || ''
+                    }}
+                    currentUrl={currentUrl}
+                    entity_name={product.name}
+                    variant="product"
+                  />
         </div>
+        <div id="action-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
+                 
         
         {/* Alert for non-public products (only shown to authenticated users) */}
         {!isPubliclyAccessible && (
@@ -443,11 +455,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </TenantPaymentProvider>
 
       {/* Business Information - Contact Us */}
+      <div id="info-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <ProductBusinessInfoCollapsible 
           product={product as any} 
           tenant={ {
-            id: product.tenantId,
+            id: product.tenantId || tenantProfile?.tenant_id || '',
             name: tenantProfile?.business_name || product.tenant?.name || '',
             metadata: {
               businessName: tenantProfile?.business_name,
@@ -456,18 +469,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               website: tenantProfile?.website,
               address: `${tenantProfile?.address_line1}, ${tenantProfile?.city}, ${tenantProfile?.state} ${tenantProfile?.postal_code}`,
               logo_url: tenantProfile?.logo_url,
-              social_links: tenantProfile?.social_links ? {
-                facebook: tenantProfile.social_links.facebook || undefined,
-                instagram: tenantProfile.social_links.instagram || undefined,
-                twitter: tenantProfile.social_links.twitter || undefined,
-                linkedin: tenantProfile.social_links.linkedin || undefined,
-              } : undefined,
+              social_links: tenantProfile?.social_links || undefined,
             }
           }} 
         />
       </div>
 
       {/* Business Description - Merchant Branding */}
+      <div id="about-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
       {tenantProfile?.business_description && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
           <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 p-6">
@@ -483,6 +492,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
      
       {/* Featured Type Products - other products with same featured types */}
+      <div id="featured-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <FeaturedTypeProducts 
           currentProductId={product.id} 
@@ -492,12 +502,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Product Recommendations */}
+      <div id="recommendations-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <ProductRecommendations productId={product.id} tenantId={product.tenantId} tenantSlug={product.tenant?.slug || ''} />
       </div>
 
 
       {/* Product Reviews */}
+      <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
       <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <ProductReviewsSection productId={product.id} tenantId={product.tenantId} />

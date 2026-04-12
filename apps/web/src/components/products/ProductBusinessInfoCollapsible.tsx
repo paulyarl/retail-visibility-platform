@@ -4,7 +4,8 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { SafeImage } from '@/components/SafeImage';
 import { computeStoreStatus } from '@/lib/hours-utils';
-
+import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import { useStoreStatus } from "@/hooks/useStoreStatus";
 interface ProductBusinessInfoCollapsibleProps {
     product: {
         tenantId: string;
@@ -40,7 +41,9 @@ export default function ProductBusinessInfoCollapsible({
 
 
     const metadata = tenant.metadata as any;
+    // console.log(`metadata: ${JSON.stringify(metadata)}`);
     const businessName = metadata?.businessName || tenant.name;
+     const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
 
     // Count available information items
     const infoCount = [
@@ -162,6 +165,26 @@ export default function ProductBusinessInfoCollapsible({
                                     <div>
                                         <p className="text-sm font-medium text-neutral-900 dark:text-white">Address</p>
                                         <p className="text-lg text-neutral-700 dark:text-neutral-300">{metadata.address}</p>
+                                    </div>
+                                    <div>
+                                        
+                                    </div>
+                                </div>
+                            )}
+                            {/* Map */}
+                            {metadata?.address && (
+                                <div className="flex items-start gap-3 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                                    <svg className="h-6 w-6 text-neutral-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <div>
+                                        <p className="text-sm font-medium text-neutral-900 dark:text-white">Store Status</p>
+                                        <HoursStatusBadge status={hoursStatus} />
+                                        {hoursStatus?.label}
+                                    </div>
+                                    <div>
+                                        
                                     </div>
                                 </div>
                             )}
