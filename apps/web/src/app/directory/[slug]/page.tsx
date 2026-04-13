@@ -368,13 +368,16 @@ async function getUserLocation(): Promise<{
 export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   const [loading, setLoading] = useState(true);
   const [consolidatedData, setConsolidatedData] = useState<any>(null);
+  // console.log(`[Directory] consolidatedData:`, consolidatedData);
   const [tenantLogo, setTenantLogo] = useState<string | null>(null);
   const [businessProfile, setBusinessProfile] = useState<any>(null);
+  // console.log(`[Directory] businessProfile:`, businessProfile);
   const [businessHours, setBusinessHours] = useState<any>(null);
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const [storefrontCategories, setStorefrontCategories] = useState<any>({ categories: [], uncategorizedCount: 0 });
   const [actualProductCount, setActualProductCount] = useState<number>(0);
   const [tenantInfo, setTenantInfo] = useState<any>(null);
+  // console.log(`[Directory] tenantInfo:`, tenantInfo);
   const [slugForRelated, setSlugForRelated] = useState<string>('');
   
   const router = useRouter();

@@ -3,12 +3,16 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Mail, MapPin, Phone } from "lucide-react";
 
+import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
+import { useStoreStatus } from "@/hooks/useStoreStatus";
+
 interface ContactInformationCollapsibleProps {
     
         tenant?: {
             phone?: string;
             email?: string;
             address?: string;
+            id?: string;
         },
     fullAddress: any;
     initialExpanded?: boolean;
@@ -20,7 +24,8 @@ export default function ContactInformationCollapsible({
     tenant,fullAddress, initialExpanded = false
 }: ContactInformationCollapsibleProps) {
     const [isExpanded, setIsExpanded] = useState(initialExpanded);
-
+    // console.log(`[ContactInformationCollapsible] tenant:`, tenant);
+    // console.log(`[ContactInformationCollapsible] fullAddress:`, fullAddress);
     // Count available contact methods
     const contactCount = [
         tenant?.phone,
@@ -28,6 +33,8 @@ export default function ContactInformationCollapsible({
         tenant?.address,
         fullAddress?.fullAddress
     ].filter(Boolean).length;
+
+    const { status: hoursStatus } = useStoreStatus(tenant?.id, true); // Public scope
 
     return (
         <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
@@ -54,12 +61,19 @@ export default function ContactInformationCollapsible({
             {/* Collapsible Content */}
             {isExpanded && (
                 <div className="px-4 pb-4 border-t border-neutral-200 dark:border-neutral-700">
+                   <div><HoursStatusBadge status={hoursStatus} />
+                       {hoursStatus?.label}</div>
+                       <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-transparent" />
                     {fullAddress && (
                                        <div className="flex items-start gap-2 mb-3">
                                          <MapPin className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
                                          <p className="text-sm text-gray-700">{fullAddress}</p>
+                                        
                                        </div>
+                                       
                                      )}
+                                     
+                                    
                                      {tenant?.phone && (
                                        <div className="flex items-center gap-2 mb-3">
                                          <Phone className="w-4 h-4 text-gray-500 flex-shrink-0" />
@@ -80,6 +94,8 @@ export default function ContactInformationCollapsible({
                                          </a>
                                        </div>
                                      )}
+                  
+                                    
                 </div>
             )}
         </div>

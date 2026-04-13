@@ -1,5 +1,6 @@
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
+import { StoreStatus } from '@/hooks/useStoreStatus';
 
 export interface TenantUsage {
   items: number;
@@ -495,21 +496,29 @@ class TenantManagementService extends TenantApiSingleton {
   /**
    * Get store status for tenant (private endpoint)
    * Uses inherited base cache for automatic deduplication
+   * Aligned with public service for consistent messaging
    */
-  async getStoreStatus(tenantId: string): Promise<any> {
-    const result = await this.makeDefaultRequest<any>(
+  async getStoreStatus(tenantId: string): Promise<StoreStatus | null> {
+    if (!tenantId) {
+      return null;
+    }
+
+    const result = await this.makeDefaultRequest<StoreStatus>(
       `/api/tenant/${tenantId}/business-hours/status`,
       {},
       `tenant-store-status-${tenantId}`,
       5 * 60 * 1000 // 5 minutes for status
     );
-    
-    // The API returns { success: true, data: { statusObject } }
-    // We need to extract the actual status object from the nested data
-    const responseData = result.data as any;
-    const statusData = (result.success && responseData && typeof responseData === 'object' && 'data' in responseData) 
-      ? responseData.data 
-      : result.data;
+
+    if (!result.success || !result.data) {
+      console.error('[TenantManagementService] Failed to get store status:', result.error);
+      return null;
+    }
+
+    // The API returns { success, data: { isOpen, status, label } }
+    // makeDefaultRequest wraps it as { success, data: { success, data: {...} } }
+    // So result.data is the API response, and we need result.data.data for the actual status
+    const statusData: StoreStatus = (result.data as any).data || result.data;
     
     return statusData;
   }

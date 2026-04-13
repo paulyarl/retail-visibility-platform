@@ -172,6 +172,50 @@ router.get('/tenant/:tenantId/business-hours/status',
 
     console.log(`[Business Hours] Cache miss for tenant ${tenantId}, fetching from database`)
 
+    // Get tenant location status first to override hours-based status (aligned with public endpoint)
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { location_status: true, closure_reason: true, reopening_date: true }
+    });
+
+    // If tenant has non-active location status, return that status instead of hours-based status
+    if (tenant?.location_status && tenant.location_status !== 'active') {
+      const { getLocationStatusInfo } = await import('../utils/location-status');
+      const statusInfo = getLocationStatusInfo(tenant.location_status as any);
+
+      let label = statusInfo.label;
+      if (tenant.closure_reason) {
+        label = `${statusInfo.label} - ${tenant.closure_reason}`;
+      }
+      if (tenant.reopening_date) {
+        const reopenDate = new Date(tenant.reopening_date);
+        label += ` (Reopens ${reopenDate.toLocaleDateString()})`;
+      }
+
+      const result = {
+        success: true,
+        data: {
+          isOpen: false,
+          status: 'closed', // Frontend expects 'closed' for non-active status
+          label,
+          locationStatus: tenant.location_status, // Actual location status for reference
+          statusInfo: {
+            showStorefront: statusInfo.showStorefront,
+            showInDirectory: statusInfo.showInDirectory,
+            description: statusInfo.description,
+            icon: statusInfo.icon,
+            color: statusInfo.color
+          },
+          reopeningDate: tenant.reopening_date?.toISOString() || null,
+          closureReason: tenant.closure_reason || null
+        }
+      };
+
+      // Cache the result
+      await CacheService.set(cacheKey, result, CACHE_TTL.BUSINESS_HOURS_STATUS)
+      return res.json(result);
+    }
+
     // Get business hours data
     const hoursRow = await prisma.business_hours_list.findUnique({
       where: { tenant_id: tenantId }

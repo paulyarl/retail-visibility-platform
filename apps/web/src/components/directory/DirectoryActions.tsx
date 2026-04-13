@@ -99,12 +99,12 @@ export default function DirectoryActions({ listing, currentUrl, variant = 'direc
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 flex-wrap">
       {/* Review Button */}
      
         <a
                      onClick={handleReview}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors lg:whitespace-nowrap"
                     title="View and write reviews"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -117,7 +117,7 @@ export default function DirectoryActions({ listing, currentUrl, variant = 'direc
      
        <a
                      onClick={handleViewCart}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors lg:whitespace-nowrap"
                     title="View your shopping cart"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -135,7 +135,7 @@ export default function DirectoryActions({ listing, currentUrl, variant = 'direc
      
       <a
                     onClick={handleFavorite}
-                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"
+                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors lg:whitespace-nowrap"
         title={favorited ? "Remove from favorites" : "Add to favorites"}
       
                   >
@@ -156,7 +156,7 @@ export default function DirectoryActions({ listing, currentUrl, variant = 'direc
                   </a>
                    {/* Print Button */}
       <a               onClick={handlePrint}
-                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"
+                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors lg:whitespace-nowrap"
         title="Print this page"
       
                   >
@@ -170,7 +170,7 @@ export default function DirectoryActions({ listing, currentUrl, variant = 'direc
  
  {/* Share Button */}
       <a                 onClick={handleShare}
-                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors whitespace-nowrap"
+                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors lg:whitespace-nowrap"
        
           title="Share this business"
       

@@ -260,9 +260,9 @@ export default function StorefrontClientWrapper({
       <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Main Header Row */}
-          <div className="flex items-center justify-between py-4">
+          <div className="flex items-center gap-4 py-4">
             {/* Brand Identity */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-shrink-0 min-w-0">
               {/* Store Logo */}
               <div className="flex-shrink-0">
                 {logoUrl ? (
@@ -284,12 +284,12 @@ export default function StorefrontClientWrapper({
               </div>
 
               {/* Store Name, Category, and Status */}
-              <div className="flex flex-col">
+              <div className="flex flex-col min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold text-neutral-900 dark:text-white">
+                  <h1 className="text-xl font-bold text-neutral-900 dark:text-white truncate">
                     {businessName || 'Store Name Not Available'}
                   </h1>
-                
+				
 			
                 </div>
                 {primaryGBPCategory && (
@@ -303,9 +303,9 @@ export default function StorefrontClientWrapper({
             
 
            {/* Quick Actions */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
               {/* Navigation Pills */}
-              <div className="hidden sm:flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2 flex-wrap">
                 {directoryPublished && tenantSlug && (
                   <a
                     href={`/directory/${tenantSlug}`}
@@ -356,19 +356,7 @@ export default function StorefrontClientWrapper({
               
               </div>
 
-              {/* Action Buttons */}
-                {/* Share/Print Actions - Right side */}
-                  <DirectoryActions 
-                    listing={{
-                      business_name: tenant.name,
-                      slug: tenant.slug,
-                      tenantId: tenant.id,
-                      id: tenant.id
-                    }}
-                    currentUrl={currentUrl}
-                  />
-            
-            </div>
+              </div>
             
           </div>
           {/* Category Badges */}
@@ -383,7 +371,18 @@ export default function StorefrontClientWrapper({
                       </div>
                     )}
 
-                    
+          {/* Action Buttons - Below categories for better responsive behavior */}
+          <div className="hidden sm:flex justify-end mt-3">
+            <DirectoryActions 
+              listing={{
+                business_name: tenant.name,
+                slug: tenant.slug,
+                tenantId: tenant.id,
+                id: tenant.id
+              }}
+              currentUrl={currentUrl}
+            />
+          </div>
 
           {/* Mobile Navigation */}
           <div className="sm:hidden pb-3 flex items-center gap-2 overflow-x-auto">
@@ -426,21 +425,7 @@ export default function StorefrontClientWrapper({
                     <span className="hidden lg:inline">Reviews</span>
                   </a>
 				  
-                  <a
-                     onClick={handleViewCart}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors whitespace-nowrap"
-                    title="View Shopping Cart"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 110-4 2 2 0 014 4z" />
-                  </svg>
-                    {cartTotalItems > 0 && (
-                    <span className="flex -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
-                      {cartTotalItems > 99 ? '99+' : cartTotalItems}
-                    </span>
-                  )}
-                    <span className="hidden lg:inline">Cart</span>
-                  </a>
+                
           
                   <a
                     onClick={() => {
@@ -730,6 +715,12 @@ export default function StorefrontClientWrapper({
        {/* Gradient border line */}
       <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
 
+              {/* Status Panel - shows when products/categories are hidden */}
+              {storefrontStatus.shouldShowPanel && storefrontStatus.tenant && (
+                <div className="mb-8">
+                  <StorefrontStatusPanel tenantInfo={storefrontStatus.tenant as any} />
+                </div>
+              )}
       {/* Main Product Catalog Section - PRIMARY CONTENT (Above-the-Fold) */}
       {!isProductsOnly && products.length > 0 && (
         <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
@@ -742,12 +733,6 @@ export default function StorefrontClientWrapper({
                 <ProductSearch tenantId={tenantId} />
               </div>
 
-              {/* Status Panel - shows when products/categories are hidden */}
-              {storefrontStatus.shouldShowPanel && storefrontStatus.tenant && (
-                <div className="mb-8">
-                  <StorefrontStatusPanel tenantInfo={storefrontStatus.tenant as any} />
-                </div>
-              )}
             </div>
 
             {/* Category Navigation - hidden when status panel shows */}
