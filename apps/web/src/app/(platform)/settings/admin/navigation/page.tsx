@@ -3,26 +3,15 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
+import { navigationLinksService, type SidebarTarget, type BadgeVariant, type DynamicTemplate, type NavLink } from '@/services/NavigationLinksService';
+import { invalidateNavLinksCache } from '@/hooks/useNavLinks';
+import { securitySingletonService } from '@/services/SecuritySingletonService';
+import { tenantInfoService } from '@/services/TenantInfoService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SidebarTarget = 'all' | 'tenant' | 'admin';
-type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'new';
-
-type NavLink = {
-  id: string;
-  label: string;
-  href: string;
-  icon: string;
-  badge: string;
-  badgeVariant: BadgeVariant;
-  targets: SidebarTarget[];
-  order: number;
-  enabled: boolean;
-  dividerBefore: boolean;
-  requiredPermission: string;
-  requiredGroup: string;
-  requiredRole: string;
+type NavLinkWithChildren = NavLink & {
+  children?: NavLinkWithChildren[];
 };
 
 const SIDEBAR_LABELS: Record<SidebarTarget, { label: string; description: string; color: string }> = {
@@ -44,6 +33,285 @@ const SIDEBAR_LABELS: Record<SidebarTarget, { label: string; description: string
 };
 
 const BADGE_VARIANTS: BadgeVariant[] = ['default', 'success', 'warning', 'error', 'new'];
+
+const DYNAMIC_TEMPLATES: Record<DynamicTemplate, { label: string; description: string; icon: string; requiredGroup?: string }> = {
+  none: {
+    label: 'Static Link',
+    description: 'Manual configuration with fixed href and children',
+    icon: 'link',
+  },
+  'tenant-locations': {
+    label: 'My Locations (Dynamic)',
+    description: 'Automatically generates links for user\'s tenant locations',
+    icon: 'building',
+    requiredGroup: 'IS_TENANT_USER',
+  },
+  'organization-locations': {
+    label: 'Organization (Dynamic)',
+    description: 'Automatically generates organization links for tenants in organizations',
+    icon: 'building',
+    requiredGroup: 'IS_TENANT_USER',
+  },
+};
+
+// Decoding function: Transform flat database links to nested structure
+function decodeNestedStructure(flatLinks: NavLink[]): NavLink[] {
+  const itemMap = new Map<string, NavLink & { children?: NavLink[] }>();
+  const rootItems: (NavLink & { children?: NavLink[] })[] = [];
+  
+  // First pass: Create map of all items, preserving existing children from dynamic templates
+  flatLinks.forEach(link => {
+    const item = { ...link, children: link.children || [] };
+    itemMap.set(link.id, item);
+  });
+  
+  // Second pass: Build parent-child relationships
+  flatLinks.forEach(link => {
+    const item = itemMap.get(link.id)!;
+    
+    // Debug logging
+    // console.log(`Decoding item: ${link.label}, parentKey: ${link.metadata.parentKey}`);
+    
+    // If this item already has children from dynamic templates, preserve them
+    if (item.children && item.children.length > 0) {
+      // This is a dynamic template item with children, treat as root item
+      rootItems.push(item);
+    } else if (link.metadata.parentKey) {
+      // This is a child item from database relationships
+      const parent = itemMap.get(link.metadata.parentKey);
+      if (parent) {
+        // console.log(`  Adding ${link.label} as child of ${parent.label}`);
+        parent.children!.push(item);
+      } else {
+        // Parent not found, treat as root item
+        // console.log(`  Parent ${link.metadata.parentKey} not found, treating ${link.label} as root`);
+        rootItems.push(item);
+      }
+    } else {
+      // This is a root item
+      rootItems.push(item);
+    }
+  });
+  
+  // Third pass: Sort root items and children within each parent
+  rootItems.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+  rootItems.forEach(item => {
+    if (item.children && item.children.length > 0) {
+      item.children.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+      // console.log(`Parent ${item.label} has children:`, item.children.map(c => c.label));
+    }
+  });
+  
+  // console.log('Final root items:', rootItems.map(item => ({
+  //   label: item.label,
+  //   parentKey: item.metadata.parentKey,
+  //   children: item.children?.map(c => c.label) || []
+  // })));
+  
+  return rootItems;
+}
+
+// Encoding function: Transform nested structure to flat database links
+function encodeNestedStructure(nestedLinks: NavLink[]): NavLink[] {
+  const flatLinks: NavLink[] = [];
+  
+  function processItem(item: NavLink & { children?: NavLink[] }, level: number = 0, parentKey?: string) {
+    // Debug logging
+    // console.log(`Encoding item: ${item.label}, level: ${level}, parentKey: ${parentKey}`);
+    
+    // Update metadata for current item
+    const flatItem: NavLink = {
+      ...item,
+      metadata: {
+        nestingLevel: level,
+        parentKey,
+        hasChildren: !!(item.children && item.children.length > 0),
+        childrenKeys: item.children?.map(child => child.id) || []
+      }
+    };
+    
+    // Remove children from flat item (they're encoded in metadata)
+    const { children, ...itemWithoutChildren } = item;
+    flatLinks.push(flatItem);
+    
+    // Process children recursively
+    if (item.children && item.children.length > 0) {
+      item.children.forEach(child => {
+        processItem(child, level + 1, item.id);
+      });
+    }
+  }
+  
+  nestedLinks.forEach(item => processItem(item));
+  return flatLinks;
+}
+
+// Icon components matching the sidebar components
+function HomeIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+    </svg>
+  );
+}
+
+function BuildingIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+    </svg>
+  );
+}
+
+function PaletteIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function CreditCardIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+    </svg>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+    </svg>
+  );
+}
+
+function AdminIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+    </svg>
+  );
+}
+
+// Role-based icons for tenant navigation preview
+function CrownIcon() {
+  return (
+    <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm2.86-2h8.28l.96-5.88-3.96 3.68L12 8.12l-1.14 3.68-3.96-3.68.96 5.88z"/>
+    </svg>
+  );
+}
+
+function ShieldRoleIcon() {
+  return (
+    <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  );
+}
+
+function StarIcon() {
+  return (
+    <svg className="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+    </svg>
+  );
+}
+
+function BriefcaseIcon() {
+  return (
+    <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
+function UsersIcon() {
+  return (
+    <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  );
+}
+
+const IconComponents = {
+  home: HomeIcon,
+  user: UserIcon,
+  shield: ShieldIcon,
+  lock: LockIcon,
+  building: BuildingIcon,
+  palette: PaletteIcon,
+  globe: GlobeIcon,
+  'credit-card': CreditCardIcon,
+  chat: ChatIcon,
+  admin: AdminIcon,
+  bell: BellIcon,
+  // Role-based icons for tenant navigation
+  crown: CrownIcon,
+  'shield-role': ShieldRoleIcon,
+  star: StarIcon,
+  briefcase: BriefcaseIcon,
+  users: UsersIcon,
+  eye: EyeIcon,
+};
+
+// Convert icon string to React component
+function getIconComponent(iconName: string): React.ReactNode {
+  const IconComponent = IconComponents[iconName as keyof typeof IconComponents];
+  return IconComponent ? <IconComponent /> : null;
+}
 
 const ICON_OPTIONS = [
   { value: '', label: 'None' },
@@ -105,12 +373,18 @@ const DEFAULT_LINK: Omit<NavLink, 'id' | 'order'> = {
   icon: '',
   badge: '',
   badgeVariant: 'default',
-  targets: ['all'],
+  targets: [],
   enabled: true,
   dividerBefore: false,
   requiredPermission: '',
   requiredGroup: '',
   requiredRole: '',
+  metadata: {
+    nestingLevel: 0,
+    parentKey: undefined,
+    hasChildren: false,
+    childrenKeys: []
+  }
 };
 
 // ─── Seed data (static defaults — replace with DB fetch when API is ready) ────
@@ -130,6 +404,12 @@ const SEED_LINKS: NavLink[] = [
     requiredPermission: '',
     requiredGroup: '',
     requiredRole: '',
+    metadata: {
+      nestingLevel: 0,
+      parentKey: undefined,
+      hasChildren: false,
+      childrenKeys: []
+    }
   },
   {
     id: 'built-in-account',
@@ -145,6 +425,12 @@ const SEED_LINKS: NavLink[] = [
     requiredPermission: '',
     requiredGroup: '',
     requiredRole: '',
+    metadata: {
+      nestingLevel: 0,
+      parentKey: undefined,
+      hasChildren: false,
+      childrenKeys: []
+    }
   },
   {
     id: 'built-in-security',
@@ -160,6 +446,12 @@ const SEED_LINKS: NavLink[] = [
     requiredPermission: '',
     requiredGroup: '',
     requiredRole: '',
+    metadata: {
+      nestingLevel: 0,
+      parentKey: undefined,
+      hasChildren: false,
+      childrenKeys: []
+    }
   },
   {
     id: 'built-in-admin',
@@ -175,6 +467,12 @@ const SEED_LINKS: NavLink[] = [
     requiredPermission: 'CAN_ADMIN_PLATFORM',
     requiredGroup: 'IS_PLATFORM_ADMIN',
     requiredRole: '',
+    metadata: {
+      nestingLevel: 0,
+      parentKey: undefined,
+      hasChildren: false,
+      childrenKeys: []
+    }
   },
 ];
 
@@ -267,6 +565,11 @@ function LinkRow({
           {isBuiltIn && (
             <span className="text-[10px] text-violet-600 bg-violet-50 border border-violet-200 rounded px-1.5 py-0.5">built-in</span>
           )}
+          {link.metadata?.dynamicTemplate && link.metadata.dynamicTemplate !== 'none' && (
+            <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5">
+              {DYNAMIC_TEMPLATES[link.metadata.dynamicTemplate].label}
+            </span>
+          )}
         </div>
         <p className="text-xs text-neutral-400 font-mono truncate mt-0.5">{link.href || '—'}</p>
       </div>
@@ -343,10 +646,12 @@ function LinkEditor({
   link,
   onSave,
   onCancel,
+  links,
 }: {
   link: Partial<NavLink>;
   onSave: (link: NavLink) => void;
   onCancel: () => void;
+  links: NavLink[];
 }) {
   const [form, setForm] = useState<Omit<NavLink, 'id' | 'order'>>({
     label: link.label ?? '',
@@ -354,12 +659,20 @@ function LinkEditor({
     icon: link.icon ?? '',
     badge: link.badge ?? '',
     badgeVariant: link.badgeVariant ?? 'default',
-    targets: link.targets ?? ['all'],
+    targets: link.targets ?? [],
     enabled: link.enabled ?? true,
     dividerBefore: link.dividerBefore ?? false,
     requiredPermission: link.requiredPermission ?? '',
     requiredGroup: link.requiredGroup ?? '',
     requiredRole: link.requiredRole ?? '',
+    metadata: {
+      ...link.metadata,
+      nestingLevel: link.metadata?.nestingLevel ?? 0,
+      parentKey: link.metadata?.parentKey,
+      hasChildren: link.metadata?.hasChildren ?? false,
+      childrenKeys: link.metadata?.childrenKeys ?? [],
+      dynamicTemplate: link.metadata?.dynamicTemplate ?? 'none'
+    }
   });
 
   const toggleTarget = (t: SidebarTarget) => {
@@ -372,7 +685,10 @@ function LinkEditor({
   };
 
   const handleSave = () => {
-    if (!form.label.trim() || !form.href.trim()) return;
+    if (!form.label.trim()) return;
+    // href is optional - groups can have their own page or be group-only
+    // console.log(`Saving item: ${form.label}, parentKey: ${form.metadata.parentKey}`);
+    // console.log('Full form data:', form);
     onSave({
       ...form,
       id: link.id ?? `custom-${Date.now()}`,
@@ -395,23 +711,46 @@ function LinkEditor({
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-neutral-600 mb-1">URL / Path *</label>
+          <label className="block text-xs font-medium text-neutral-600 mb-1">
+            URL / Path <span className="text-neutral-400 font-normal">(optional - groups can have their own page)</span>
+          </label>
           <input
             value={form.href}
             onChange={e => setForm(p => ({ ...p, href: e.target.value }))}
-            placeholder="e.g. /settings/reports"
-            className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            placeholder="e.g. /settings/reports (leave empty for group-only navigation)"
+            disabled={form.metadata.dynamicTemplate !== 'none'}
+            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+              form.metadata.dynamicTemplate !== 'none' 
+                ? 'bg-neutral-100 border-neutral-200 text-neutral-500 cursor-not-allowed' 
+                : 'border-neutral-300'
+            }`}
           />
+          <p className="text-xs text-neutral-500 mt-1">
+            {form.metadata.dynamicTemplate !== 'none' 
+              ? 'Dynamic templates automatically generate their own links'
+              : 'Leave empty if this item only groups other items without its own page'
+            }
+          </p>
         </div>
         <div>
           <label className="block text-xs font-medium text-neutral-600 mb-1">Icon</label>
           <select
             value={form.icon}
             onChange={e => setForm(p => ({ ...p, icon: e.target.value }))}
-            className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            disabled={form.metadata.dynamicTemplate !== 'none'}
+            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+              form.metadata.dynamicTemplate !== 'none' 
+                ? 'bg-neutral-100 border-neutral-200 text-neutral-500 cursor-not-allowed' 
+                : 'border-neutral-300'
+            }`}
           >
             {ICON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
+          {form.metadata.dynamicTemplate !== 'none' && (
+            <p className="text-xs text-neutral-500 mt-1">
+              Icon is automatically set by the dynamic template
+            </p>
+          )}
         </div>
         <div>
           <label className="block text-xs font-medium text-neutral-600 mb-1">Badge Text</label>
@@ -430,6 +769,61 @@ function LinkEditor({
               {BADGE_VARIANTS.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
           </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-neutral-600 mb-1">Parent Item (for nesting)</label>
+          <select
+            value={form.metadata.parentKey ?? ''}
+            onChange={e => setForm(p => ({ 
+              ...p, 
+              metadata: { 
+                ...p.metadata, 
+                parentKey: e.target.value || undefined 
+              }
+            }))}
+            className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="">None (Root Level)</option>
+            {links
+              .filter((l: NavLink) => l.id !== link.id) // Exclude self
+              .map((l: NavLink) => (
+                <option key={l.id} value={l.id}>
+                  {'  '.repeat(l.metadata.nestingLevel)}{l.label}
+                </option>
+              ))
+            }
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-neutral-600 mb-1">Dynamic Template</label>
+          <select
+            value={form.metadata.dynamicTemplate ?? 'none'}
+            onChange={e => {
+              const template = e.target.value as DynamicTemplate;
+              const templateConfig = DYNAMIC_TEMPLATES[template];
+              setForm(p => ({ 
+                ...p, 
+                metadata: { 
+                  ...p.metadata, 
+                  dynamicTemplate: template
+                },
+                // Auto-populate template-specific fields
+                icon: template === 'none' ? p.icon : templateConfig.icon,
+                requiredGroup: template === 'none' ? p.requiredGroup : (templateConfig.requiredGroup || ''),
+                href: template === 'none' ? p.href : '', // Dynamic templates don't need href
+              }));
+            }}
+            className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            {Object.entries(DYNAMIC_TEMPLATES).map(([key, config]) => (
+              <option key={key} value={key}>{config.label}</option>
+            ))}
+          </select>
+          {form.metadata.dynamicTemplate && form.metadata.dynamicTemplate !== 'none' && (
+            <p className="text-xs text-neutral-500 mt-1">
+              {DYNAMIC_TEMPLATES[form.metadata.dynamicTemplate].description}
+            </p>
+          )}
         </div>
       </div>
 
@@ -535,7 +929,7 @@ function LinkEditor({
         </button>
         <button
           onClick={handleSave}
-          disabled={!form.label.trim() || !form.href.trim() || form.targets.length === 0}
+          disabled={!form.label.trim() || form.targets.length === 0}
           className="px-4 py-2 text-sm font-semibold bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           Save Link
@@ -546,7 +940,199 @@ function LinkEditor({
 }
 
 function SidebarPreview({ links, target }: { links: NavLink[]; target: SidebarTarget }) {
-  const visible = links.filter(l => l.enabled && l.targets.includes(target)).sort((a, b) => a.order - b.order);
+  // Role icon mapping for dynamic templates
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'OWNER':
+        return 'crown'; // Will be handled by getIconComponent
+      case 'ADMIN':
+        return 'shield-role';
+      case 'SUPPORT':
+        return 'star';
+      case 'MANAGER':
+        return 'briefcase';
+      case 'MEMBER':
+        return 'users';
+      case 'VIEWER':
+        return 'eye';
+      default:
+        return null;
+    }
+  };
+
+  // Process dynamic templates for preview
+  const processDynamicTemplates = async (items: NavLink[]): Promise<NavLink[]> => {
+    // Get real tenant data from SecuritySingletonService
+    let tenants: { id: string; name: string; role: string; organizationId?: string; organizationName?: string }[] = [];
+    try {
+      const sessionInfo = await securitySingletonService.getSessionInfo();
+      tenants = sessionInfo.user?.tenants || [];
+      // console.log('SidebarPreview: Fetched real tenant data:', tenants);
+    } catch (error) {
+      console.error('SidebarPreview: Error fetching tenant data:', error);
+      // Fallback to mock data for preview
+      tenants = [
+        { id: '1', name: 'Main Store', role: 'OWNER' },
+        { id: '2', name: 'Branch Office', role: 'ADMIN' },
+        { id: '3', name: 'Satellite Location', role: 'MEMBER' },
+        { id: '4', name: 'Warehouse', role: 'MANAGER' },
+      ];
+    }
+
+    // console.log('SidebarPreview: Processing items:', items);
+    // console.log('SidebarPreview: Looking for dynamic templates...');
+
+    return items.map(item => {
+      // Handle tenant-locations dynamic template
+      if (item.metadata?.dynamicTemplate === 'tenant-locations') {
+        // console.log('SidebarPreview: Found tenant-locations template for item:', item.label);
+        const processedItem = {
+          ...item,
+          href: '/tenants',
+          children: tenants.slice(0, 8).map(t => ({
+            ...item,
+            id: `${item.id}-${t.id}`,
+            label: t.name,
+            href: `/t/${t.id}/dashboard`,
+            icon: getRoleIcon(t.role) || '',
+            metadata: {
+              ...item.metadata,
+              dynamicTemplate: undefined,
+              nestingLevel: 1,
+              parentKey: item.id,
+              hasChildren: false,
+              childrenKeys: []
+            }
+          })),
+        };
+        // console.log('SidebarPreview: Processed item with children:', processedItem);
+        return processedItem;
+      }
+      
+      // Handle organization-locations dynamic template
+      if (item.metadata?.dynamicTemplate === 'organization-locations') {
+        // console.log('SidebarPreview: Found organization-locations template for item:', item.label);
+        
+        // Find tenants that belong to organizations using organization_id from session
+        const organizationTenants = tenants.filter(t => t.organizationId);
+        // console.log('SidebarPreview: Found organization tenants:', organizationTenants);
+        
+        if (organizationTenants.length > 0) {
+          // Create organization links for each tenant in an organization
+          const organizationLinks = organizationTenants.map(tenant => ({
+            ...item,
+            id: `${item.id}-org-${tenant.id}`,
+            label: tenant.name,
+            href: `/t/${tenant.id}/settings/organization`,
+            icon: 'building',
+            children: [
+              {
+                ...item,
+                id: `${item.id}-org-${tenant.id}-dashboard`,
+                label: 'Organization Dashboard',
+                href: `/t/${tenant.id}/settings/organization`,
+                icon: 'building',
+                metadata: {
+                  ...item.metadata,
+                  dynamicTemplate: undefined,
+                  nestingLevel: 2,
+                  parentKey: `${item.id}-org-${tenant.id}`,
+                  hasChildren: false,
+                  childrenKeys: []
+                }
+              },
+              {
+                ...item,
+                id: `${item.id}-org-${tenant.id}-propagation`,
+                label: 'Propagation Settings',
+                href: `/t/${tenant.id}/settings/propagation`,
+                icon: 'building',
+                metadata: {
+                  ...item.metadata,
+                  dynamicTemplate: undefined,
+                  nestingLevel: 2,
+                  parentKey: `${item.id}-org-${tenant.id}`,
+                  hasChildren: false,
+                  childrenKeys: []
+                }
+              },
+              {
+                ...item,
+                id: `${item.id}-org-${tenant.id}-center`,
+                label: 'Propagation Center',
+                href: `/t/${tenant.id}/propagation`,
+                icon: 'building',
+                metadata: {
+                  ...item.metadata,
+                  dynamicTemplate: undefined,
+                  nestingLevel: 2,
+                  parentKey: `${item.id}-org-${tenant.id}`,
+                  hasChildren: false,
+                  childrenKeys: []
+                }
+              },
+            ],
+            metadata: {
+              ...item.metadata,
+              dynamicTemplate: undefined,
+              nestingLevel: 1,
+              parentKey: item.id,
+              hasChildren: true,
+              childrenKeys: [
+                `${item.id}-org-${tenant.id}-dashboard`,
+                `${item.id}-org-${tenant.id}-propagation`,
+                `${item.id}-org-${tenant.id}-center`
+              ]
+            }
+          }));
+          
+          const processedItem = {
+            ...item,
+            children: organizationLinks,
+          };
+          // console.log('SidebarPreview: Processed organization item with real organization data:', processedItem);
+          return processedItem;
+        } else {
+          // console.log('SidebarPreview: No organization tenants found');
+          return item;
+        }
+      }
+      
+      return item;
+    });
+  };
+
+  // State for processed links
+  const [visible, setVisible] = useState<NavLink[]>([]);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // Process links when dependencies change
+  useEffect(() => {
+    const processLinks = async () => {
+      const processedLinks = await processDynamicTemplates(links);
+      // console.log('SidebarPreview: Processed links:', processedLinks);
+      const nestedLinks = decodeNestedStructure(processedLinks);
+      // console.log('SidebarPreview: Nested links:', nestedLinks);
+      const filteredLinks = nestedLinks.filter(l => l.enabled && l.targets.includes(target));
+      // console.log('SidebarPreview: Visible links for target', target, ':', filteredLinks);
+      setVisible(filteredLinks);
+    };
+
+    processLinks();
+  }, [links, target]);
+  
+  const toggleExpanded = (key: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden">
       <div className="px-4 py-3 border-b border-neutral-100 bg-neutral-50">
@@ -558,16 +1144,50 @@ function SidebarPreview({ links, target }: { links: NavLink[]; target: SidebarTa
         {visible.length === 0 && (
           <p className="text-xs text-neutral-400 italic py-4 text-center">No links</p>
         )}
-        {visible.map(link => (
-          <div key={link.id}>
-            {link.dividerBefore && <div className="my-1.5 border-t border-neutral-100" />}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-neutral-50 group">
-              <div className="w-4 h-4 bg-neutral-200 rounded flex-shrink-0" title={link.icon || 'icon'} />
-              <span className="text-xs font-medium text-neutral-700 truncate flex-1">{link.label}</span>
-              {link.badge && <BadgePill variant={link.badgeVariant} />}
+        {visible.map(link => {
+          const key = link.id;
+          const hasChildren = !!(link.children && link.children.length > 0);
+          const isExpanded = expanded.has(key);
+          
+          return (
+            <div key={link.id}>
+              {link.dividerBefore && <div className="my-1.5 border-t border-neutral-100" />}
+              
+              {/* Parent item with potential children */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-neutral-50 group">
+                {link.icon && getIconComponent(link.icon)}
+                {!link.icon && <div className="w-4 h-4 bg-neutral-200 rounded flex-shrink-0" title="No icon" />}
+                <span className="text-xs font-medium text-neutral-700 truncate flex-1">{link.label}</span>
+                {link.badge && <BadgePill variant={link.badgeVariant} />}
+                {hasChildren && (
+                  <button
+                    onClick={() => toggleExpanded(key)}
+                    className="p-1 rounded hover:bg-neutral-100 transition-colors"
+                    aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                  >
+                    <svg className={`w-3 h-3 text-neutral-500 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              
+              {/* Render children if expanded */}
+              {isExpanded && hasChildren && (
+                <div className="ml-6 mt-0.5 space-y-0.5">
+                  {link.children!.map((child: NavLink) => (
+                    <div key={child.id} className="flex items-center gap-2 px-3 py-1 rounded-lg hover:bg-neutral-50 group">
+                      {child.icon && getIconComponent(child.icon)}
+                      {!child.icon && <div className="w-3 h-3 bg-neutral-100 rounded flex-shrink-0 ml-2" title="No icon" />}
+                      <span className="text-xs text-neutral-600 truncate flex-1">{child.label}</span>
+                      {child.badge && <BadgePill variant={child.badgeVariant} />}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -579,6 +1199,7 @@ export default function NavigationControlPage() {
   const { hasAccess, loading } = useAccessControl(null, AccessPresets.PLATFORM_ADMIN_ONLY);
 
   const [links, setLinks] = useState<NavLink[]>(SEED_LINKS);
+  // console.log(`Initial links:`, links);
   const [apiLoading, setApiLoading] = useState(true);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [editing, setEditing] = useState<NavLink | null>(null);
@@ -587,17 +1208,29 @@ export default function NavigationControlPage() {
   const [activePreview, setActivePreview] = useState<SidebarTarget>('all');
 
   // Fetch persisted links from API on mount; fall back to SEED_LINKS on error
-  useEffect(() => {
-    fetch('/api/admin/navigation-links')
-      .then(r => r.json())
-      .then(json => {
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setLinks(json.data);
-        }
-      })
-      .catch(() => { /* keep SEED_LINKS */ })
-      .finally(() => setApiLoading(false));
+  const loadLinksFromAPI = useCallback(async () => {
+    try {
+      const result = await navigationLinksService.getLinks();
+      // console.log('Loaded links from API:', result);
+      
+      // Handle double-wrapped response: { success: true, data: { success: true, data: [links] } }
+      const innerData = (result.data as any)?.data;
+      
+      if (result.success && Array.isArray(innerData) && innerData.length > 0) {
+        // console.log('Setting links from database:', innerData);
+        setLinks(innerData);
+      }
+    } catch (error) {
+      console.error('Failed to load navigation links:', error);
+      /* keep SEED_LINKS */
+    } finally {
+      setApiLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadLinksFromAPI();
+  }, [loadLinksFromAPI]);
 
   const handleSave = useCallback((link: NavLink) => {
     setLinks(prev => {
@@ -636,14 +1269,22 @@ export default function NavigationControlPage() {
   const handlePublish = async () => {
     setPublishError(null);
     try {
-      const res = await fetch('/api/admin/navigation-links', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ links }),
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error || 'Publish failed');
-      if (Array.isArray(json.data)) setLinks(json.data);
+      // Links are already in flat format with metadata, no encoding needed
+      const result = await navigationLinksService.saveLinks(links);
+      if (!result.success) {
+        const errorMessage = typeof result.error === 'string' 
+          ? result.error 
+          : result.error?.message || 'Publish failed';
+        throw new Error(errorMessage);
+      }
+      if (Array.isArray(result.data)) setLinks(result.data);
+      
+      // Invalidate navigation links cache to refresh sidebar
+      invalidateNavLinksCache();
+      
+      // Also refresh admin page data from database
+      await loadLinksFromAPI();
+      
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err: any) {
@@ -736,6 +1377,7 @@ export default function NavigationControlPage() {
               link={{ ...DEFAULT_LINK }}
               onSave={handleSave}
               onCancel={() => setCreating(false)}
+              links={links}
             />
           )}
 
@@ -744,6 +1386,7 @@ export default function NavigationControlPage() {
               link={editing}
               onSave={handleSave}
               onCancel={() => setEditing(null)}
+              links={links}
             />
           )}
 

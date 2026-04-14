@@ -28,6 +28,7 @@ export interface User {
     id: string;
     name: string;
     role: 'OWNER' | 'ADMIN' | 'SUPPORT' | 'MEMBER' | 'VIEWER';
+    organizationId?: string;
   }[];
   // Auth0 profile fields
   picture?: string;
@@ -142,7 +143,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           tenants: sessionInfo.user.tenants || (sessionInfo.user.tenant ? [{
             id: sessionInfo.user.tenant.id,
             name: sessionInfo.user.tenant.name,
-            role: 'OWNER'
+            role: 'OWNER',
+            organizationId: sessionInfo.user.tenant.organizationId
           }] : []),
           picture: sessionInfo.user.picture,
           auth0Id: sessionInfo.user.auth0Id,

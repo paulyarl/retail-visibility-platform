@@ -1023,6 +1023,7 @@ model mv_refresh_throttle {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model navigation_links {
   id                  String   @id @default(dbgenerated("(gen_random_uuid())::text"))
   label               String
@@ -1040,9 +1041,11 @@ model navigation_links {
   created_at          DateTime @default(now()) @db.Timestamptz(6)
   updated_at          DateTime @default(now()) @db.Timestamptz(6)
   created_by          String?
+  metadata            Json?    @default("{\"parentKey\": null, \"hasChildren\": false, \"childrenKeys\": [], \"nestingLevel\": 0}")
 
   @@index([is_enabled], map: "idx_navigation_links_is_enabled")
   @@index([targets], map: "idx_navigation_links_targets", type: Gin)
+  @@index([metadata], map: "idx_navigation_links_metadata_gin", type: Gin)
 }
 
 model notification_logs {

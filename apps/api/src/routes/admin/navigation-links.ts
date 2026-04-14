@@ -39,6 +39,12 @@ function toApiShape(row: any) {
     requiredPermission:  row.required_permission,
     requiredGroup:       row.required_group,
     requiredRole:        row.required_role,
+    metadata:            row.metadata || {
+      nestingLevel: 0,
+      parentKey: null,
+      hasChildren: false,
+      childrenKeys: []
+    },
     createdAt:           row.created_at,
     updatedAt:           row.updated_at,
   };
@@ -92,11 +98,12 @@ router.post('/', async (req: Request, res: Response) => {
           userMessage: 'All links must have a label',
         });
       }
-      if (!link.href || typeof link.href !== 'string' || !link.href.trim()) {
+      // Href is optional - groups can have their own page or be group-only
+      if (link.href && (typeof link.href !== 'string' || !link.href.trim())) {
         return res.status(400).json({
           success: false,
-          error: 'Each link must have an href',
-          userMessage: 'All links must have a destination URL',
+          error: 'If provided, href must be a non-empty string',
+          userMessage: 'URL/Path must be empty or a valid destination',
         });
       }
       if (!Array.isArray(link.targets) || link.targets.length === 0) {
@@ -151,7 +158,7 @@ router.post('/', async (req: Request, res: Response) => {
         const link = links[i];
         const data = {
           label:               link.label.trim(),
-          href:                link.href.trim(),
+          href:                link.href ? link.href.trim() : '',
           icon:                link.icon || '',
           badge:               link.badge || '',
           badge_variant:       link.badgeVariant || 'default',
@@ -162,6 +169,12 @@ router.post('/', async (req: Request, res: Response) => {
           required_permission: link.requiredPermission || '',
           required_group:      link.requiredGroup || '',
           required_role:       link.requiredRole || '',
+          metadata:            link.metadata || {
+            nestingLevel: 0,
+            parentKey: null,
+            hasChildren: false,
+            childrenKeys: []
+          },
           updated_at:          new Date(),
         };
 

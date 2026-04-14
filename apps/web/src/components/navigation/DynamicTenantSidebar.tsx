@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useEffect, useRef, ReactNode } from 'react';
+import { useState, useEffect, useRef, ReactNode, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { useRBAC, RBACNavGates } from '@/lib/auth/useRBAC';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavLinks, type ProcessedNavLink } from '@/hooks/useNavLinks';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type NavItem = RBACNavGates & {
+  id?: string;
   label: string;
   href?: string;
   icon?: ReactNode;
@@ -25,6 +27,15 @@ interface DynamicTenantSidebarProps {
   slug?: string;
   hasPublishedDirectory?: boolean;
   children: ReactNode;
+}
+
+// Tenant type for dynamic templates
+interface Tenant {
+  id: string;
+  name: string;
+  role: string;
+  organizationId?: string;
+  organizationName?: string;
 }
 
 // ─── SVG Icons ────────────────────────────────────────────────────────────────
@@ -97,7 +108,76 @@ const Icon = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
     </svg>
   ),
+  Crown: () => (
+    <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm2.86-2h8.28l.96-5.88-3.96 3.68L12 8.12l-1.14 3.68-3.96-3.68.96 5.88z"/>
+    </svg>
+  ),
+  ShieldRole: () => (
+    <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  ),
+  Eye: () => (
+    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  ),
+  Briefcase: () => (
+    <svg className="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  ),
+  Users: () => (
+    <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  ),
 };
+
+// Role icon mapping for dynamic templates
+const getRoleIcon = (role: string) => {
+  switch (role) {
+    case 'OWNER':
+      return <Icon.Crown />;
+    case 'ADMIN':
+      return <Icon.ShieldRole />;
+    case 'SUPPORT':
+      return <Icon.Star />;
+    case 'MANAGER':
+      return <Icon.Briefcase />;
+    case 'MEMBER':
+      return <Icon.Users />;
+    case 'VIEWER':
+      return <Icon.Eye />;
+    default:
+      return null;
+  }
+};
+
+// Compute expanded state from items and pathname
+function computeExpanded(items: NavItem[], pathname: string): Set<string> {
+  const expanded = new Set<string>();
+  const walk = (nodes: NavItem[]) => {
+    for (const node of nodes) {
+      if (!node.href) continue;
+      const key = node.id ?? node.href ?? node.label;
+      if (pathname === node.href || pathname.startsWith(node.href + '/')) {
+        expanded.add(key);
+      }
+      if (node.children) {
+        const hasActive = node.children.some(
+          c => c.href && (pathname === c.href || pathname.startsWith(c.href + '/'))
+        );
+        if (hasActive) expanded.add(key);
+        walk(node.children);
+      }
+    }
+  };
+  walk(items);
+  return expanded;
+}
 
 // ─── Nav builder ─────────────────────────────────────────────────────────────
 
@@ -201,24 +281,6 @@ function buildTenantNav(
 }
 
 // ─── Shared nav item helpers ──────────────────────────────────────────────────
-
-function computeExpanded(items: NavItem[], pathname: string): Set<string> {
-  const result = new Set<string>();
-  const walk = (nodes: NavItem[]) => {
-    for (const node of nodes) {
-      const key = node.href ?? node.label;
-      if (node.children) {
-        const hasActive = node.children.some(
-          c => c.href && (pathname === c.href || pathname.startsWith(c.href + '/'))
-        );
-        if (hasActive) result.add(key);
-        walk(node.children);
-      }
-    }
-  };
-  walk(items);
-  return result;
-}
 
 function NavBadge({ text, variant = 'default' }: { text: string; variant?: NavItem['badgeVariant'] }) {
   const colors: Record<NonNullable<NavItem['badgeVariant']>, string> = {
@@ -579,12 +641,34 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
   const pathname = usePathname();
   const { filterNavItems } = useRBAC();
   const { user } = useAuth();
+  const { tenantLinks } = useNavLinks();
 
   const [directorySlug, setDirectorySlug] = useState<string | undefined>(slug);
   const [isPublished, setIsPublished] = useState(false);
   const [tenantName, setTenantName] = useState('My Store');
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  
+  // Stabilize user.tenants to prevent infinite re-renders
+  const prevTenantsRef = useRef<Tenant[] | undefined>(undefined);
+  const stableTenants = useMemo(() => {
+    const tenants = user?.tenants as Tenant[] | undefined;
+    // Only update if tenants actually changed (deep comparison)
+    if (
+      prevTenantsRef.current &&
+      tenants &&
+      tenants.length === prevTenantsRef.current.length &&
+      tenants.every((t, i) => 
+        t.id === prevTenantsRef.current![i].id &&
+        t.role === prevTenantsRef.current![i].role &&
+        t.organizationId === prevTenantsRef.current![i].organizationId
+      )
+    ) {
+      return prevTenantsRef.current;
+    }
+    prevTenantsRef.current = tenants;
+    return tenants;
+  }, [user?.tenants]);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -615,15 +699,83 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
     fetch();
   }, [tenantId, slug, hasPublishedDirectory]);
 
-  const rawItems = buildTenantNav(tenantId, slug, directorySlug, isPublished);
-  const items = filterNavItems(rawItems);
+  // Compute navigation items using useMemo to avoid infinite loops
+  const items = useMemo(() => {
+    let processedItems: NavItem[] = [];
+    
+    if (tenantLinks.length > 0) {
+      // Use stableTenants to avoid additional API calls
+      const tenants: Tenant[] = stableTenants || [];
+      
+      processedItems = tenantLinks.map(item => {
+        // Handle tenant-locations dynamic template
+        if (item.metadata?.dynamicTemplate === 'tenant-locations' && tenants.length > 0) {
+          return {
+            ...item,
+            href: '/tenants',
+            children: tenants.slice(0, 8).map((t: Tenant) => ({
+              label: t.name,
+              href: `/t/${t.id}/dashboard`,
+              icon: getRoleIcon(t.role),
+            })),
+          };
+        }
+        
+        // Handle organization-locations dynamic template
+        if (item.metadata?.dynamicTemplate === 'organization-locations' && tenants.length > 0) {
+          // Find tenants that belong to organizations by checking organizationId
+          const organizationTenants = tenants.filter((t: Tenant) => t.organizationId);
+          
+          if (organizationTenants.length > 0) {
+            // Create organization links for each tenant in an organization
+            const organizationLinks = organizationTenants.map((tenant: Tenant) => ({
+              label: tenant.name,
+              href: `/t/${tenant.id}/settings/organization`,
+              icon: getRoleIcon(tenant.role),
+              children: [
+                {
+                  label: 'Organization Dashboard',
+                  href: `/t/${tenant.id}/settings/organization`,
+                  icon: <Icon.Dashboard />,
+                },
+                {
+                  label: 'Propagation Settings',
+                  href: `/t/${tenant.id}/settings/propagation`,
+                  icon: <Icon.Settings />,
+                },
+                {
+                  label: 'Propagation Center',
+                  href: `/t/${tenant.id}/propagation`,
+                  icon: <Icon.ChevronRight />,
+                },
+              ],
+            }));
+            
+            return {
+              ...item,
+              children: organizationLinks,
+            };
+          }
+        }
+        
+        return item;
+      });
+    } else {
+      processedItems = buildTenantNav(tenantId, slug, directorySlug, isPublished);
+    }
+    
+    return filterNavItems(processedItems);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantLinks, stableTenants, tenantId, slug, directorySlug, isPublished]);
 
+  // Expanded state for navigation items
   const [expanded, setExpanded] = useState<Set<string>>(() => computeExpanded(items, pathname));
 
+  // Only update expanded when pathname changes, not when items change
   useEffect(() => {
     setExpanded(computeExpanded(items, pathname));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, isPublished]);
+  }, [pathname]);
 
   const toggleExpanded = (key: string) => {
     setExpanded(prev => {

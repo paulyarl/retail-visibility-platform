@@ -6,10 +6,15 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRBAC, RBACNavGates } from '@/lib/auth/useRBAC';
 import { cn } from '@/lib/utils';
+import { securitySingletonService } from '@/services/SecuritySingletonService';
+import { tenantInfoService } from '@/services/TenantInfoService';
+import { type NavLink, type DynamicTemplate } from '@/services/NavigationLinksService';
+import { type ProcessedNavLink } from '@/hooks/useNavLinks';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type NavItem = RBACNavGates & {
+  id?: string;
   label: string;
   href?: string;
   icon?: ReactNode;
@@ -19,12 +24,19 @@ type NavItem = RBACNavGates & {
   adminOnly?: boolean;
   tenantOnly?: boolean;
   dividerBefore?: boolean;
+  metadata?: {
+    dynamicTemplate?: DynamicTemplate;
+    nestingLevel: number;
+    parentKey?: string;
+    hasChildren: boolean;
+    childrenKeys: string[];
+  };
 };
 
 interface UniversalNavContentProps {
   children: ReactNode;
   /** Optional injected links from the Navigation Control Panel */
-  injectedItems?: NavItem[];
+  injectedItems?: ProcessedNavLink[];
 }
 
 // ─── SVG Icons ───────────────────────────────────────────────────────────────
@@ -106,11 +118,74 @@ const Icon = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
     </svg>
   ),
+  Dashboard: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+    </svg>
+  ),
+  Settings: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+  // Role-based icons for tenant navigation
+  Crown: () => (
+    <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm2.86-2h8.28l.96-5.88-3.96 3.68L12 8.12l-1.14 3.68-3.96-3.68.96 5.88z"/>
+    </svg>
+  ),
+  ShieldRole: () => (
+    <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  ),
+  Star: () => (
+    <svg className="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+    </svg>
+  ),
+  Users: () => (
+    <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  ),
+  Briefcase: () => (
+    <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  ),
+  Eye: () => (
+    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  ),
 };
 
 // ─── Nav Definition ───────────────────────────────────────────────────────────
 
-const buildNavItems = (userRole: string, tenants: { id: string; name: string }[]): NavItem[] => {
+// Role icon mapping
+const getRoleIcon = (role: string) => {
+  switch (role) {
+    case 'OWNER':
+      return <Icon.Crown />;
+    case 'ADMIN':
+      return <Icon.ShieldRole />;
+    case 'SUPPORT':
+      return <Icon.Star />;
+    case 'MANAGER':
+      return <Icon.Briefcase />;
+    case 'MEMBER':
+      return <Icon.Users />;
+    case 'VIEWER':
+      return <Icon.Eye />;
+    default:
+      return null;
+  }
+};
+
+const buildNavItems = (userRole: string, tenants: { id: string; name: string; role: string }[]): NavItem[] => {
   const hasTenants = tenants.length > 0;
 
   const items: NavItem[] = [
@@ -160,6 +235,7 @@ const buildNavItems = (userRole: string, tenants: { id: string; name: string }[]
       children: tenants.slice(0, 8).map(t => ({
         label: t.name,
         href: `/t/${t.id}/dashboard`,
+        icon: getRoleIcon(t.role),
       })),
     });
   }
@@ -253,9 +329,9 @@ function NavItemRow({
 
         {isExpanded && (
           <div className="mt-0.5 space-y-0.5">
-            {item.children!.map(child => (
+            {item.children!.map((child, childIndex) => (
               <NavItemRow
-                key={child.href ?? child.label}
+                key={child.id ?? `${item.id ?? item.label}-${childIndex}-${child.href ?? child.label}`}
                 item={child}
                 level={level + 1}
                 pathname={pathname}
@@ -342,7 +418,7 @@ function SidebarContent({
       {/* Nav items */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
         {items.map((item, i) => (
-          <div key={item.href ?? item.label}>
+          <div key={item.id ?? `${item.label}-${i}`}>
             {item.dividerBefore && (
               <div className="my-2 border-t border-neutral-100 dark:border-neutral-800" />
             )}
@@ -599,12 +675,119 @@ export function UniversalNavContent({ children, injectedItems = [] }: UniversalN
   const { filterNavItems } = useRBAC();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const rawItems: NavItem[] = [
-    ...(user ? buildNavItems(user.role, user.tenants ?? []) : []),
-    ...injectedItems,
-  ];
+  // Role icon mapping (inside component for dynamic templates)
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'OWNER':
+        return <Icon.Crown />;
+      case 'ADMIN':
+        return <Icon.ShieldRole />;
+      case 'SUPPORT':
+        return <Icon.Star />;
+      case 'MANAGER':
+        return <Icon.Briefcase />;
+      case 'MEMBER':
+        return <Icon.Users />;
+      case 'VIEWER':
+        return <Icon.Eye />;
+      default:
+        return null;
+    }
+  };
 
-  const items = filterNavItems(rawItems);
+  // Process dynamic templates in injected items
+  const processDynamicTemplates = async (items: ProcessedNavLink[], user: any): Promise<NavItem[]> => {
+    // Get real tenant data from SecuritySingletonService
+    let tenants: { id: string; name: string; role: string; organizationId?: string; organizationName?: string }[] = [];
+    if (user) {
+      try {
+        const sessionInfo = await securitySingletonService.getSessionInfo();
+        tenants = sessionInfo.user?.tenants || [];
+      } catch (error) {
+        console.error('[UniversalNavContent] Error fetching tenant data:', error);
+        // Fallback to user.tenants if available
+        tenants = user.tenants || [];
+      }
+    }
+
+    return items.map(item => {
+      // Handle tenant-locations dynamic template
+      if (item.metadata?.dynamicTemplate === 'tenant-locations' && tenants.length > 0) {
+        return {
+          ...item,
+          href: '/tenants',
+          children: tenants.slice(0, 8).map(t => ({
+            label: t.name,
+            href: `/t/${t.id}/dashboard`,
+            icon: getRoleIcon(t.role),
+          })),
+        };
+      }
+      
+      // Handle organization-locations dynamic template
+      if (item.metadata?.dynamicTemplate === 'organization-locations' && tenants.length > 0) {
+        // Find tenants that belong to organizations using organization_id from session
+        const organizationTenants = tenants.filter(t => t.organizationId);
+        // console.log('[UniversalNavContent] Found organization tenants:', organizationTenants);
+        
+        if (organizationTenants.length > 0) {
+          // Create organization links for each tenant in an organization
+          const organizationLinks = organizationTenants.map(tenant => ({
+            label: tenant.name,
+            href: `/t/${tenant.id}/settings/organization`,
+            icon: getRoleIcon(tenant.role),
+            children: [
+              {
+                label: 'Organization Dashboard',
+                href: `/t/${tenant.id}/settings/organization`,
+                icon: <Icon.Dashboard />,
+              },
+              {
+                label: 'Propagation Settings',
+                href: `/t/${tenant.id}/settings/propagation`,
+                icon: <Icon.Settings />,
+              },
+              {
+                label: 'Propagation Center',
+                href: `/t/${tenant.id}/propagation`,
+                icon: <Icon.ChevronRight />,
+              },
+            ],
+          }));
+          
+          return {
+            ...item,
+            children: organizationLinks,
+          };
+        }
+      }
+      
+      return item;
+    });
+  };
+
+  // Database-first approach: use injected items if available, fallback to hardcoded
+  const [rawItems, setRawItems] = useState<NavItem[]>([]);
+  const [items, setItems] = useState<NavItem[]>([]);
+
+  // Process navigation items when dependencies change
+  useEffect(() => {
+    const processItems = async () => {
+      let processedItems: NavItem[] = [];
+      
+      if (injectedItems.length > 0) {
+        processedItems = await processDynamicTemplates(injectedItems, user);
+      } else if (user) {
+        processedItems = buildNavItems(user.role, user.tenants ?? []);
+      }
+      
+      const filteredItems = filterNavItems(processedItems);
+      setRawItems(processedItems);
+      setItems(filteredItems);
+    };
+
+    processItems();
+  }, [injectedItems, user]);
 
   const [expanded, setExpanded] = useState<Set<string>>(() =>
     computeExpanded(items, pathname)

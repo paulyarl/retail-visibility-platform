@@ -360,7 +360,7 @@ export default function StorefrontClientWrapper({
             
           </div>
           {/* Category Badges */}
-                    {primaryGBPCategory && (
+                    {!storefrontStatus.shouldShowPanel && primaryGBPCategory && (
                       <div className="flex-1">
                         <GBPCategoryBadges
                           categories={[primaryGBPCategory, ...secondaryGBPCategories]}
@@ -372,6 +372,7 @@ export default function StorefrontClientWrapper({
                     )}
 
           {/* Action Buttons - Below categories for better responsive behavior */}
+          {!storefrontStatus.shouldShowPanel && (
           <div className="hidden sm:flex justify-end mt-3">
             <DirectoryActions 
               listing={{
@@ -383,7 +384,7 @@ export default function StorefrontClientWrapper({
               currentUrl={currentUrl}
             />
           </div>
-
+          )}
           {/* Mobile Navigation */}
           <div className="sm:hidden pb-3 flex items-center gap-2 overflow-x-auto">
             {directoryPublished && tenantSlug && (
@@ -470,6 +471,7 @@ export default function StorefrontClientWrapper({
             {/* Shop Description */}
             <div className="lg:col-span-2">
               <div className="space-y-6">
+                {!storefrontStatus.shouldShowPanel && (
                 <div>
                   <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">About {businessName}</h2>
                   <div className="prose prose-neutral dark:prose-invert max-w-none">
@@ -479,9 +481,10 @@ export default function StorefrontClientWrapper({
                     </p>
                   </div>
                 </div>
+                )}
 
                 {/* Social Links */}
-                {tenant.profileData?.social_links && (
+                {tenant.profileData?.social_links && !storefrontStatus.shouldShowPanel && (
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">Connect With Us</h3>
                     <div className="flex flex-wrap gap-3">
@@ -545,6 +548,7 @@ export default function StorefrontClientWrapper({
 
             {/* Store Image/Logo Display */}
             <div>
+              {!storefrontStatus.shouldShowPanel && (
               <div className="bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden">
                 {tenant.metadata?.logo_url ? (
                   <div className="relative aspect-square">
@@ -566,7 +570,7 @@ export default function StorefrontClientWrapper({
                   </div>
                 )}
               </div>
-              
+              )}
             </div>
           </div>
         </div>
@@ -722,13 +726,14 @@ export default function StorefrontClientWrapper({
                 </div>
               )}
       {/* Main Product Catalog Section - PRIMARY CONTENT (Above-the-Fold) */}
-      {!isProductsOnly && products.length > 0 && (
+      {!isProductsOnly && products.length > 0 && !storefrontStatus.shouldShowPanel && (
         <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
           <div className="py-8">
             
             {/* Product Search and Navigation */}
             <div className="mb-8">
               {/* Search Bar */}
+
               <div className="mb-6">
                 <ProductSearch tenantId={tenantId} />
               </div>
@@ -796,7 +801,7 @@ export default function StorefrontClientWrapper({
                   )}
 
                   {/* Pagination Component */}
-                  {totalPages > 1 && (
+                  {totalPages > 1 && !storefrontStatus.shouldShowPanel && (
                     <div className="mt-6 flex justify-center">
                       <Pagination
                         currentPage={currentPage}
@@ -875,7 +880,11 @@ export default function StorefrontClientWrapper({
                   Our Store Hours
                 </h3>
                 {businessHours ? (
-                  <BusinessHoursCollapsible businessHours={businessHours} />
+                  !storefrontStatus.shouldShowPanel ? (
+                    <BusinessHoursCollapsible businessHours={businessHours} />
+                  ) : (
+                    <p className="text-neutral-500 dark:text-neutral-400 italic">Business hours not available</p>
+                  )
                 ) : (
                   <p className="text-neutral-500 dark:text-neutral-400 italic">Business hours not available</p>
                 )}
@@ -936,11 +945,11 @@ export default function StorefrontClientWrapper({
                 </div>
                 
                 {/* Single Map Display */}
-                {mapLocation ? (
+                {mapLocation && !storefrontStatus.shouldShowPanel ? (
                   <TenantMapSection location={mapLocation} />
                 ) : contactInfo.address ? (
                   <GoogleMapEmbed address={contactInfo.address} height="h-80" showDirections={true} />
-                ) : tenant && (
+                ) : tenant && !storefrontStatus.shouldShowPanel && (
                   <StorefrontMap
                     tenant={{
                       id: tenantId,
@@ -967,7 +976,9 @@ export default function StorefrontClientWrapper({
               
 
               {/* Fulfillment Options */}
-              <FulfillmentOptionsPane tenantId={tenantId} compact={true} />
+              {!storefrontStatus.shouldShowPanel && (
+                <FulfillmentOptionsPane tenantId={tenantId} compact={true} />
+              )}
             </div>
           </div>
         </div>
@@ -975,14 +986,16 @@ export default function StorefrontClientWrapper({
  {/* Gradient border line */}
       <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
       {/* Store Ratings and Reviews */}
+      {!storefrontStatus.shouldShowPanel && (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div  className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
           <StoreRatingDisplay tenantId={tenantId} showWriteReview={true} isPublic={true} />
         </div>
       </div>
+      )}
 
       {/* Advanced Catalog Navigation */}
-      {(categories.length > 0 || productCategories.length > 0 || storeCategories.length > 0) && (
+      {!storefrontStatus.shouldShowPanel && (categories.length > 0 || productCategories.length > 0 || storeCategories.length > 0) && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <CollapsibleCatalogSidebar
             tenantId={tenantId}
@@ -1004,7 +1017,9 @@ export default function StorefrontClientWrapper({
      
 
       {/* Storefront Recommendations */}
-      <StorefrontRecommendations tenantId={tenantId} />
+      {!storefrontStatus.shouldShowPanel && (
+        <StorefrontRecommendations tenantId={tenantId} />
+      )}
 
       {/* Recently Viewed - always last for consistency with other public pages */}
       <div className="mx-auto bg-gradient-to-r from-transparent via-orange-500 to-transparent">
@@ -1012,6 +1027,7 @@ export default function StorefrontClientWrapper({
       </div>
 
       {/* Tier-Based Footer */}
+      
       <footer className="bg-white dark:bg-neutral-800 border-t border-neutral-200 dark:border-neutral-700 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">

@@ -582,7 +582,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                     </h1>
                 
                     {/* GBP Categories - Clean badges below store name */}
-                    {listing.categories && listing.categories.length > 0 && (
+                    {!showStatusPanel && listing.categories && listing.categories.length > 0 && (
                       <div className="flex flex-wrap items-center gap-2 mt-3">
                         {listing.categories
                           .sort((a: any, b: any) => {
@@ -622,13 +622,13 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                     )}
                 
                     {/* Keywords */}
-                    {listing.keywords && listing.keywords.length > 0 && (
+                    {!showStatusPanel && listing.keywords && listing.keywords.length > 0 && (
                       <div className="mt-3">
                         <DirectoryKeywordTags keywords={listing.keywords} />
                       </div>
                     )}
                 
-                    {storefrontCategories.categories.length > 0 && (
+                    {!showStatusPanel && storefrontCategories.categories.length > 0 && (
                       <div className="mt-4">
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-700 border border-green-200">
                           <svg className="w-4 h-4 mr-1.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -690,6 +690,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                  
                   
                   {/* Share/Print Actions - Right side */}
+                  {!showStatusPanel && (
                   <DirectoryActions 
                     listing={{
                       business_name: listing.businessName,
@@ -699,6 +700,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                     }}
                     currentUrl={currentUrl}
                   />
+                  )}
                 </div>
               </div>
  <div id="products-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
@@ -757,7 +759,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
               )}
 
               {/* Business Description - Brief Trust Building */}
-              {businessProfile?.business_description && (
+              {!showStatusPanel && businessProfile?.business_description && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">About {listing.businessName}</h2>
                   <div className="prose prose-gray max-w-none">
@@ -773,24 +775,28 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                <div id="gallery-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
 
               {/* Photo Gallery - Visual Proof */}
-              <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
+              {!showStatusPanel && (
+                <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
+              )}
                <div id="categories-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
 
               {/* Product Categories - Browse More */}
-              {storefrontCategories.categories.length > 0 && (
+              {!showStatusPanel && storefrontCategories.categories.length > 0 && (
                 <ProductCategoriesCollapsible
                   categories={storefrontCategories.categories}
                   tenantId={listing.tenantId}
                   uncategorizedCount={storefrontCategories.uncategorizedCount}
                 />
               )}
+              
 
               {/* Store Ratings and Reviews - Social Proof */}
                <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
-              <StoreRatingsSection tenantId={listing.tenantId} showWriteReview={true} />
+              {!showStatusPanel && <StoreRatingsSection tenantId={listing.tenantId} showWriteReview={true} />}
             </div>
  <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
             {/* Right Column - Contact Info */}
+            {!showStatusPanel && (
             <div className="space-y-6">
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -802,7 +808,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                 
                   
                   {/* Social Links */}
-                  {businessProfile?.social_links && Object.keys(businessProfile.social_links).length > 0 && (
+                  {!showStatusPanel && businessProfile?.social_links && Object.keys(businessProfile.social_links).length > 0 && (
                     <div className="pt-3 border-t border-neutral-200 dark:border-neutral-600 mt-3">
                       <h2 className="text-lg font-semibold text-neutral-500 dark:text-neutral-400 mb-3">Follow Us</h2>
                       <div className="flex flex-wrap gap-4">
@@ -889,14 +895,15 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                   )}
                 </div>
               </div>
+              )}
  <div id="hours-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
               {/* Business Hours - Collapsible */}
-              {businessHours && (
+              {!showStatusPanel && businessHours && (
                 <BusinessHoursCollapsible businessHours={businessHours} />
               )}
  <div id="map-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
               {/* Map Location */}
-              {listing.address && (
+              {!showStatusPanel && listing.address && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">
                     Our Location
@@ -909,11 +916,13 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
         </div>
 
       {/* Related Stores */}
+      {!showStatusPanel && (
       <RelatedStores 
         currentSlug={slugForRelated} 
         limit={3}
         title="Similar Stores"
       />
+      )}
 
       {/* Recently Viewed */}
       <LastViewed />

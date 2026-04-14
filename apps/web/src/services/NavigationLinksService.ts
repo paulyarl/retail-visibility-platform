@@ -13,6 +13,7 @@ import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export type SidebarTarget = 'all' | 'tenant' | 'admin';
 export type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'new';
+export type DynamicTemplate = 'none' | 'tenant-locations' | 'organization-locations';
 
 export interface NavLink {
   id: string;
@@ -28,6 +29,14 @@ export interface NavLink {
   requiredPermission: string;
   requiredGroup: string;
   requiredRole: string;
+  metadata: {
+    nestingLevel: number;
+    parentKey?: string;
+    hasChildren: boolean;
+    childrenKeys: string[];
+    dynamicTemplate?: DynamicTemplate;
+  };
+  children?: NavLink[];
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -76,7 +85,7 @@ class NavigationLinksService extends AdminApiSingleton {
       '/api/admin/navigation-links',
       {
         method: 'POST',
-        body: JSON.stringify(links),
+        body: JSON.stringify({ links }),
       }
     );
   }

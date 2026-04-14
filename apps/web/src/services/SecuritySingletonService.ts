@@ -94,8 +94,12 @@ class SecuritySingletonService extends AuthenticatedApiSingleton {
           tenants: userData.user_tenants?.map((ut: any) => ({
             id: ut.tenant_id || ut.tenantId,
             name: ut.tenants?.name || ut.tenant?.name || 'Unknown',
-            role: ut.role
-          })) || userData.tenants || [],
+            role: ut.role,
+            organizationId: ut.tenants?.organization_id || ut.tenant?.organizationId || ut.organization_id || ut.organizationId || ut.organization_id
+          })) || userData.tenants?.map((t: any) => ({
+            ...t,
+            organizationId: t.organization_id || t.organizationId
+          })) || [],
           picture: userData.picture,
           auth0Id: userData.auth0_id || userData.auth0Id,
           onboardingCompleted: userData.onboarding_completed ?? userData.onboardingCompleted,

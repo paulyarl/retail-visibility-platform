@@ -28,6 +28,9 @@ export function SettingsLayoutRouter({ children }: SettingsLayoutRouterProps) {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const isAdminPath = pathname.startsWith('/settings/admin');
   const { adminLinks, allLinks } = useNavLinks();
+  // console.log(`SettingsLayoutRouter - isAdminPath:`, isAdminPath);
+  // console.log(`SettingsLayoutRouter - adminLinks:`, adminLinks);
+  // console.log(`SettingsLayoutRouter - allLinks:`, allLinks);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -55,8 +58,10 @@ export function SettingsLayoutRouter({ children }: SettingsLayoutRouterProps) {
   }
 
   if (isAdminPath) {
+    // console.log(`Using AdminNavContent with links:`, adminLinks);
     return <AdminNavContent injectedItems={adminLinks}>{children}</AdminNavContent>;
   }
+  // console.log(`Using UniversalNavContent with links:`, allLinks);
 
   return <UniversalNavContent injectedItems={allLinks}>{children}</UniversalNavContent>;
 }

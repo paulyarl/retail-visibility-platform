@@ -546,7 +546,7 @@ export default function SubscriptionControlTab() {
                   <Table.Td>
                     <Text size="sm">
                       {tenant.manualSubscriptionExpiresAt 
-                        ? tenant.manualSubscriptionExpiresAt.toLocaleDateString()
+                        ? (new Date(tenant.manualSubscriptionExpiresAt)).toLocaleDateString()
                         : tenant.manualSubscriptionControl ? 'Indefinite' : '-'
                       }
                     </Text>

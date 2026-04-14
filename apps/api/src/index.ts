@@ -764,7 +764,7 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
     const directorySlug = directoryResult?.slug;
     const currentSlug = directorySlug || tenant.slug;
     const hasPublishedDirectory = directoryResult?.is_published === true;
-    console.log('[GET /tenants/:id] Slug from directory_settings_list:', currentSlug, 'hasPublishedDirectory:', hasPublishedDirectory);
+    // console.log('[GET /tenants/:id] Slug from directory_settings_list:', currentSlug, 'hasPublishedDirectory:', hasPublishedDirectory);
     
     const now = new Date();
     
@@ -7237,6 +7237,11 @@ console.log('✅ Account deletion request routes mounted (30-day grace period)')
 import mfaRoutes from './routes/mfa';
 app.use('/api/auth/mfa', mfaRoutes);
 console.log('✅ MFA routes mounted (two-factor authentication)');
+
+/* ------------------------------ Auth0 MFA (Custom UI + Auth0 Backend) ------------------------------ */
+import auth0MFARoutes from './routes/auth0-mfa';
+app.use('/api/auth0-mfa', auth0MFARoutes);
+console.log('✅ Auth0 MFA routes mounted (custom UI + Auth0 backend)');
 
 /* ------------------------------ Security Sessions & Alerts ------------------------------ */
 import authSyncRoutes from './routes/auth-sync';

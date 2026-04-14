@@ -404,7 +404,7 @@ class TenantManagementService extends TenantApiSingleton {
    * Updates both the dedicated business-hours endpoint and the profile
    */
   async updateBusinessHours(tenantId: string, hours: { timezone?: string; periods: any[] }): Promise<any> {
-    console.log('[TenantManagementService] updateBusinessHours', tenantId, hours);
+    // console.log('[TenantManagementService] updateBusinessHours', tenantId, hours);
 
     // 1. Update via dedicated endpoint
     const result = await this.makeDefaultRequest(

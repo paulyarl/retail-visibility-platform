@@ -1,17 +1,17 @@
 /**
  * MFA Settings Page
- * Multi-factor authentication management
+ * Multi-factor authentication management (Auth0-powered)
  */
 
-import { MFASettings } from '@/components/security/mfa/MFASettings';
+import { Auth0MFASettings } from '@/components/security/auth0-mfa/Auth0MFASettings';
 
 
 // Force dynamic rendering to prevent prerendering issues
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Two-Factor Authentication',
-  description: 'Manage your two-factor authentication settings and backup codes',
+  title: 'Two-Factor Authentication (Auth0)',
+  description: 'Manage your Auth0-powered two-factor authentication settings and backup codes',
 };
 
 export default function MFASettingsPage() {
@@ -20,11 +20,11 @@ export default function MFASettingsPage() {
       <div>
         <h1 className="text-3xl font-bold">Two-Factor Authentication</h1>
         <p className="text-muted-foreground mt-2">
-          Add an extra layer of security to your account with 2FA
+          Add an extra layer of security to your account with Auth0-powered 2FA
         </p>
       </div>
       
-      <MFASettings />
+      <Auth0MFASettings />
     </div>
   );
 }

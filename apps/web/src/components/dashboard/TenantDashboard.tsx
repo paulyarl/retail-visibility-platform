@@ -15,10 +15,8 @@ import TenantLimitBadge from "@/components/tenant/TenantLimitBadge";
 import SubscriptionStateBanner from "@/components/subscription/SubscriptionStateBanner";
 import { SubscriptionDisplayCard } from "@/components/subscription/SubscriptionDisplayCard";
 import LocationStatusBanner from "@/components/tenant/LocationStatusBanner";
-import { useState, useEffect } from "react";
-import { computeStoreStatus } from "@/lib/hours-utils";
+import { useState, useEffect, useCallback } from "react";
 import { tenantSlugService } from '../../services/TenantSlugService';
-import { tenantInfoService } from '../../services/TenantInfoService';
 import { platformHomeService } from '../../services/PlatformHomeSingletonService';
 import Image from "next/image";
 import Link from "next/link";
@@ -69,9 +67,6 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
   // Business profile for logo
   const [businessProfile, setBusinessProfile] = useState<any>(null);
   const [businessProfileLoading, setBusinessProfileLoading] = useState(true);
-
-  // Tenant hours information
-  const [hoursInfo, setHoursInfo] = useState<{ hasHours: boolean; today: string | null } | null>(null);
 
   // Tenant banner and social links information  
   const [tenantBanner, setTenantBanner] = useState<{ bannerUrl?: string; name: string; socialLinks?: { facebook?: string; instagram?: string } } | null>(null);
@@ -128,45 +123,6 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
     if (tenantId) {
       fetchBusinessProfile();
     }
-  }, [tenantId]);
-
-  // Fetch tenant business hours
-  useEffect(() => {
-    const fetchHours = async () => {
-      try {
-        if (!tenantId) { setHoursInfo(null); return; }
-        
-        // Use tenantInfoService for business hours data (authenticated endpoint)
-        const hours = await tenantInfoService.getBusinessHours(tenantId);
-        
-        if (!hours) { 
-          setHoursInfo({ hasHours: false, today: null }); 
-          return; 
-        }
-        
-        // Check if hours are configured
-        let hasHours = false;
-        if (typeof hours === 'object') {
-          // Check for periods array format or day-based format
-          const hoursObj = hours as any;
-          if (hoursObj.periods && Array.isArray(hoursObj.periods)) {
-            hasHours = hoursObj.periods.length > 0;
-          } else {
-            // Check day-based format (Monday, Tuesday, etc.)
-            hasHours = Object.keys(hoursObj).some(k => k !== 'timezone' && k !== 'special' && hoursObj[k]);
-          }
-        }
-
-        // Use shared utility to compute store status (handles special hours too!)
-        const status = computeStoreStatus(hours);
-        const today = status?.label;
-
-        setHoursInfo({ hasHours, today: status?.label ?? null });
-      } catch {
-        setHoursInfo(null);
-      }
-    };
-    fetchHours();
   }, [tenantId]);
 
   // Show skeleton while loading
@@ -383,6 +339,8 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
 
         {/* Subscription State Banner (Maintenance/Freeze) */}
         <SubscriptionStateBanner tenantId={tenantId} />
+        <HoursStatusBadge status={hoursStatus} size="lg"/>
+         <span>{hoursStatus?.label}</span>
 
         {/* Location Status Banner (Inactive/Closed/Pending/Archived) */}
         {tenantData?.locationStatus && (
@@ -394,6 +352,8 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
             variant="full"
           />
         )}
+         {/* Hours Badge - Status */}
+         
 
         {/* Header */}
         <DashboardHeader 
@@ -422,8 +382,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
             <code className="text-xs font-mono text-neutral-700 bg-white px-2 py-0.5 rounded border select-all">
               {tenantId}
             </code>
-              {/* Hours Badge - Status */}
-         <HoursStatusBadge status={hoursStatus} />
+             
           </div>
           
           {/* Debug Refresh Button */}
@@ -538,7 +497,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                     </svg>
                     <Title order={4} className="text-base sm:text-lg font-bold text-neutral-900">Business Hours</Title>
                   </div>
-                  {hoursInfo?.hasHours ? (
+                  {hoursStatus ? (
                     <div className="flex items-center gap-2 flex-wrap">
                       {/* Hours Badge - Status */}
           <HoursStatusBadge status={hoursStatus} />
@@ -556,7 +515,7 @@ export default function TenantDashboard({ tenantId }: TenantDashboardProps) {
                 return (
                   <Link href={`/t/${tenantId}/settings/hours`} className="w-full sm:w-auto">
                     <button className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors text-sm sm:text-base whitespace-nowrap">
-                      {hoursInfo?.hasHours ? '⚙️ Manage Hours' : '➕ Set Hours'}
+                      {hoursStatus ? '⚙️ Manage Hours' : '➕ Set Hours'}
                     </button>
                   </Link>
                 );
