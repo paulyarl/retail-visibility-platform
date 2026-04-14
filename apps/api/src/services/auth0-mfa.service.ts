@@ -34,17 +34,19 @@ export class Auth0MFAService {
   private readonly domain: string;
   private readonly clientId: string;
   private readonly clientSecret: string;
+  private readonly isConfigured: boolean;
 
   constructor() {
     this.domain = process.env.AUTH0_DOMAIN || '';
     this.clientId = process.env.AUTH0_CLIENT_ID || '';
     this.clientSecret = process.env.AUTH0_CLIENT_SECRET || '';
 
-    if (!this.domain || !this.clientId || !this.clientSecret) {
-      logger.error('Auth0 configuration missing', { 
+    this.isConfigured = !!(this.domain && this.clientId && this.clientSecret);
+    
+    if (!this.isConfigured) {
+      logger.warn('Auth0 MFA service not configured - MFA features will be disabled', { 
         region: process.env.AWS_REGION || 'unknown'
       });
-      throw new Error('Auth0 configuration missing for MFA service');
     }
   }
 
@@ -54,6 +56,14 @@ export class Auth0MFAService {
    * In production, you would call Auth0's Management API to get the user's MFA factors
    */
   async getMFAStatus(userId: string): Promise<Auth0MFAStatus> {
+    if (!this.isConfigured) {
+      logger.warn('MFA not configured - returning disabled status', { region: process.env.AWS_REGION || 'unknown', userId });
+      return {
+        enabled: false,
+        methods: {},
+      };
+    }
+
     try {
       // TODO: Implement actual Auth0 Management API call
       // const management = new ManagementClient({
@@ -92,6 +102,11 @@ export class Auth0MFAService {
     qrCode: string;
     manualEntryKey: string;
   }> {
+    if (!this.isConfigured) {
+      logger.warn('MFA not configured - cannot initiate TOTP enrollment', { region: process.env.AWS_REGION || 'unknown', userId });
+      throw new Error('MFA service not configured');
+    }
+
     try {
       // TODO: Implement actual Auth0 Management API call
       // const enrollment = await management.users.createAuthenticationFactor({
@@ -163,6 +178,11 @@ export class Auth0MFAService {
     factorId: string;
     message: string;
   }> {
+    if (!this.isConfigured) {
+      logger.warn('MFA not configured - cannot initiate SMS enrollment', { region: process.env.AWS_REGION || 'unknown', userId });
+      throw new Error('MFA service not configured');
+    }
+
     try {
       // TODO: Implement actual Auth0 Management API call
       // const enrollment = await management.users.createAuthenticationFactor({
@@ -227,6 +247,11 @@ export class Auth0MFAService {
    * Note: This is a placeholder implementation
    */
   async deleteMFAFactor(userId: string, factorId: string): Promise<void> {
+    if (!this.isConfigured) {
+      logger.warn('MFA not configured - cannot delete MFA factor', { region: process.env.AWS_REGION || 'unknown', userId });
+      throw new Error('MFA service not configured');
+    }
+
     try {
       // TODO: Implement actual Auth0 Management API call
       // await management.users.deleteAuthenticationFactor({
@@ -249,6 +274,11 @@ export class Auth0MFAService {
    * Note: This is a placeholder implementation
    */
   async generateBackupCodes(userId: string): Promise<string[]> {
+    if (!this.isConfigured) {
+      logger.warn('MFA not configured - cannot generate backup codes', { region: process.env.AWS_REGION || 'unknown', userId });
+      throw new Error('MFA service not configured');
+    }
+
     try {
       // TODO: Implement actual Auth0 Management API call
       // const recoveryCodes = await management.users.createRecoveryCodes({
@@ -276,6 +306,11 @@ export class Auth0MFAService {
    * Get available MFA factors for enrollment
    */
   async getAvailableFactors(): Promise<string[]> {
+    if (!this.isConfigured) {
+      logger.warn('MFA not configured - returning empty factors list');
+      return [];
+    }
+
     try {
       // TODO: Get from Auth0 tenant settings
       // For now, return common factors
