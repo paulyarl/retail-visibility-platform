@@ -72,21 +72,22 @@ function decodeNestedStructure(flatLinks: NavLink[]): NavLink[] {
     const item = itemMap.get(link.id)!;
     
     // Debug logging
-    // console.log(`Decoding item: ${link.label}, parentKey: ${link.metadata.parentKey}`);
+    console.log(`Decoding item: ${link.label}, parentKey: ${link.metadata?.parentKey}, children count: ${link.children?.length || 0}`);
     
     // If this item already has children from dynamic templates, preserve them
     if (item.children && item.children.length > 0) {
       // This is a dynamic template item with children, treat as root item
+      console.log(`  ${link.label} has ${item.children.length} children, treating as root item`);
       rootItems.push(item);
-    } else if (link.metadata.parentKey) {
+    } else if (link.metadata?.parentKey) {
       // This is a child item from database relationships
       const parent = itemMap.get(link.metadata.parentKey);
       if (parent) {
-        // console.log(`  Adding ${link.label} as child of ${parent.label}`);
+        console.log(`  Adding ${link.label} as child of ${parent.label}`);
         parent.children!.push(item);
       } else {
         // Parent not found, treat as root item
-        // console.log(`  Parent ${link.metadata.parentKey} not found, treating ${link.label} as root`);
+        console.log(`  Parent ${link.metadata.parentKey} not found, treating ${link.label} as root`);
         rootItems.push(item);
       }
     } else {
@@ -640,6 +641,52 @@ const SEED_LINKS: NavLink[] = [
       childrenKeys: []
     }
   },
+  {
+    id: 'dynamic-tenant-locations',
+    label: 'My Locations',
+    href: '#',
+    icon: 'building',
+    badge: '',
+    badgeVariant: 'default',
+    targets: ['all', 'tenant'],
+    order: 15,
+    enabled: true,
+    dividerBefore: true,
+    requiredPermission: '',
+    requiredGroup: 'IS_TENANT_USER',
+    requiredRole: '',
+    prefetch: false,
+    metadata: {
+      dynamicTemplate: 'tenant-locations',
+      nestingLevel: 0,
+      parentKey: undefined,
+      hasChildren: true,
+      childrenKeys: []
+    }
+  },
+  {
+    id: 'dynamic-organization-locations',
+    label: 'Organization',
+    href: '#',
+    icon: 'building',
+    badge: '',
+    badgeVariant: 'default',
+    targets: ['all', 'tenant'],
+    order: 16,
+    enabled: true,
+    dividerBefore: false,
+    requiredPermission: '',
+    requiredGroup: 'IS_TENANT_USER',
+    requiredRole: '',
+    prefetch: false,
+    metadata: {
+      dynamicTemplate: 'organization-locations',
+      nestingLevel: 0,
+      parentKey: undefined,
+      hasChildren: true,
+      childrenKeys: []
+    }
+  },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -1184,11 +1231,11 @@ function SidebarPreview({ links, target }: { links: NavLink[]; target: SidebarTa
   useEffect(() => {
     const processLinks = async () => {
       const processedLinks = await processDynamicTemplates(links);
-      // console.log('SidebarPreview: Processed links:', processedLinks);
+      console.log('SidebarPreview: Processed links:', processedLinks);
       const nestedLinks = decodeNestedStructure(processedLinks);
-      // console.log('SidebarPreview: Nested links:', nestedLinks);
+      console.log('SidebarPreview: Nested links:', nestedLinks);
       const filteredLinks = nestedLinks.filter(l => l.enabled && l.targets.includes(target));
-      // console.log('SidebarPreview: Visible links for target', target, ':', filteredLinks);
+      console.log('SidebarPreview: Visible links for target', target, ':', filteredLinks);
       setVisible(filteredLinks);
     };
 

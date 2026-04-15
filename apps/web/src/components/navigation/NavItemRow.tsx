@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 // Icon components matching the navigation system
 const IconComponents = {
@@ -278,20 +279,19 @@ export function NavItemRow({
   }
 
   return (
-    <div>
-      <button
-        onClick={() => item.href && (onNavigate ? onNavigate(item.href) : window.location.href = item.href)}
-        className={sharedClass}
-        style={{ paddingLeft }}
-      >
-        {item.icon && (
-          <span className={cn('flex-shrink-0', isActive ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200')}>
-            {typeof item.icon === 'string' ? getIconComponent(item.icon) : item.icon}
-          </span>
-        )}
-        <span className="flex-1 text-left truncate">{item.label}</span>
-        {item.badge && <NavBadge text={item.badge} variant={item.badgeVariant || 'default'} />}
-      </button>
-    </div>
+    <Link
+      href={item.href || '#'}
+      className={sharedClass}
+      style={{ paddingLeft }}
+      prefetch={item.prefetch ?? true}
+    >
+      {item.icon && (
+        <span className={cn('flex-shrink-0', isActive ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200')}>
+          {typeof item.icon === 'string' ? getIconComponent(item.icon) : item.icon}
+        </span>
+      )}
+      <span className="flex-1 text-left truncate">{item.label}</span>
+      {item.badge && <NavBadge text={item.badge} variant={item.badgeVariant || 'default'} />}
+    </Link>
   );
 }
