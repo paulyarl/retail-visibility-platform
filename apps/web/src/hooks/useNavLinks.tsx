@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { navigationLinksService, NavLink } from '@/services/NavigationLinksService';
+import { navigationLinksService, NavLink, NavTemplateParser } from '@/services/NavigationLinksService';
 import { ReactNode } from 'react';
 
 // Type for navigation items with ReactNode icons
@@ -149,14 +149,20 @@ function decodeNestedStructure(flatLinks: NavLink[]): ProcessedNavLink[] {
   const itemMap = new Map<string, ProcessedNavLink>();
   const rootItems: ProcessedNavLink[] = [];
   
+  // Get template context for parsing - extract tenant ID from URL if available
+  const templateContext = NavTemplateParser.getContext();
+  
   // First pass: Create map of all items with empty children arrays and convert icons
   flatLinks.forEach(link => {
-    const { icon, ...linkWithoutIcon } = link;
+    // Apply template parsing to the link
+    const parsedLink = NavTemplateParser.parseNavLink(link, templateContext);
+    
+    const { icon, ...linkWithoutIcon } = parsedLink;
     const item: ProcessedNavLink = { 
       ...linkWithoutIcon, 
       children: [],
       // Convert icon string to React component
-      icon: icon ? getIconComponent(icon) : undefined
+      icon: (typeof icon === 'string' && icon) ? getIconComponent(icon) : icon
     };
     itemMap.set(link.id, item);
   });

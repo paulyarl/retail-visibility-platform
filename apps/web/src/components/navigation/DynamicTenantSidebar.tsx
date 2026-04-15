@@ -6,22 +6,14 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { directoryService } from '@/services/DirectorySingletonService';
 import { useRBAC, RBACNavGates } from '@/lib/auth/useRBAC';
+import { DynamicNavTemplates, type Tenant as NavTenant } from '@/services/DynamicNavTemplates';
+import { NavItemRow, type NavItem } from '@/components/navigation/NavItemRow';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavLinks, type ProcessedNavLink } from '@/hooks/useNavLinks';
+import { useNavLinks } from '@/hooks/useNavLinks';
+import { NavTemplateParser } from '@/services/NavigationLinksService';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type NavItem = RBACNavGates & {
-  id?: string;
-  label: string;
-  href?: string;
-  icon?: ReactNode;
-  badge?: string;
-  badgeVariant?: 'default' | 'success' | 'warning' | 'error' | 'new';
-  prefetch?: boolean;
-  children?: NavItem[];
-  dividerBefore?: boolean;
-};
+// Types are imported from NavItemRow component
+type NavItemWithRBAC = NavItem & RBACNavGates;
 
 interface DynamicTenantSidebarProps {
   tenantId: string;
@@ -321,163 +313,30 @@ function buildTenantNav(
 
 // ─── Shared nav item helpers ──────────────────────────────────────────────────
 
-function NavBadge({ text, variant = 'default' }: { text: string; variant?: NavItem['badgeVariant'] }) {
-  const colors: Record<NonNullable<NavItem['badgeVariant']>, string> = {
-    default: 'bg-neutral-100 text-neutral-600',
-    success: 'bg-green-100 text-green-700',
-    warning: 'bg-amber-100 text-amber-700',
-    error: 'bg-red-100 text-red-700',
-    new: 'bg-blue-100 text-blue-700',
-  };
-  return (
-    <span className={cn('ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none', colors[variant ?? 'default'])}>
-      {text}
-    </span>
-  );
-}
-
-function NavItemRow({
-  item,
-  level = 0,
-  pathname,
-  expanded,
-  onToggle,
-  onNavigate,
-}: {
-  item: NavItem;
-  level?: number;
-  pathname: string;
-  expanded: Set<string>;
-  onToggle: (key: string) => void;
-  onNavigate: () => void;
-}) {
-  const key = item.href ?? item.label;
-  const hasChildren = !!(item.children?.length);
-  const isExpanded = expanded.has(key);
-  const isActive = item.href
-    ? pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'))
-    : false;
-  const isParentActive = hasChildren && item.children!.some(
-    c => c.href && (pathname === c.href || pathname.startsWith(c.href + '/'))
-  );
-
-  const paddingLeft = 16 + level * 14;
-
-  const sharedClass = cn(
-    'group flex w-full items-center gap-3 rounded-lg py-2 text-sm font-medium transition-all duration-150',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-    isActive || isParentActive
-      ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-      : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
-  );
-
-  if (hasChildren) {
-    return (
-      <div>
-        <button
-          onClick={() => onToggle(key)}
-          className={sharedClass}
-          style={{ paddingLeft, paddingRight: 12 }}
-          aria-expanded={isExpanded}
-        >
-          {item.icon && (
-            <span className={cn('flex-shrink-0', isActive || isParentActive ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200')}>
-              {item.icon}
-            </span>
-          )}
-          <span className="flex-1 text-left truncate">{item.label}</span>
-          {item.badge && <NavBadge text={item.badge} variant={item.badgeVariant} />}
-          <Icon.ChevronRight className={isExpanded ? 'rotate-90 text-neutral-500' : 'text-neutral-400'} />
-        </button>
-        {isExpanded && (
-          <div className="mt-0.5 space-y-0.5">
-            {item.children!.map(child => (
-              <NavItemRow
-                key={child.href ?? child.label}
-                item={child}
-                level={level + 1}
-                pathname={pathname}
-                expanded={expanded}
-                onToggle={onToggle}
-                onNavigate={onNavigate}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <Link
-      href={item.href!}
-      onClick={onNavigate}
-      className={sharedClass}
-      style={{ paddingLeft, paddingRight: 12 }}
-      prefetch={item.prefetch ?? true}
-    >
-      {item.icon && (
-        <span className={cn('flex-shrink-0', isActive ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200')}>
-          {item.icon}
-        </span>
-      )}
-      <span className="flex-1 truncate">{item.label}</span>
-      {item.badge && <NavBadge text={item.badge} variant={item.badgeVariant} />}
-    </Link>
-  );
-}
-
-// ─── Sidebar scroll content ───────────────────────────────────────────────────
-
 function SidebarNav({
   items,
   pathname,
   expanded,
   onToggle,
   onNavigate,
-  collapsed,
 }: {
-  items: NavItem[];
+  items: NavItemWithRBAC[];
   pathname: string;
   expanded: Set<string>;
   onToggle: (key: string) => void;
   onNavigate: () => void;
-  collapsed?: boolean;
 }) {
   return (
-    <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+    <nav className="space-y-0.5" role="navigation" aria-label="Main navigation">
       {items.map(item => (
-        <div key={item.href ?? item.label}>
-          {item.dividerBefore && (
-            <div className="my-2 border-t border-neutral-100 dark:border-neutral-800" />
-          )}
-          {collapsed ? (
-            item.icon ? (
-              <Link
-                href={item.href ?? (item.children?.[0]?.href ?? '#')}
-                onClick={onNavigate}
-                title={item.label}
-                prefetch={item.prefetch ?? true}
-                className={cn(
-                  'flex items-center justify-center w-10 h-10 mx-auto rounded-lg transition-colors',
-                  item.href && (pathname === item.href || pathname.startsWith(item.href + '/'))
-                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                    : 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200'
-                )}
-              >
-                {item.icon}
-              </Link>
-            ) : null
-          ) : (
-            <NavItemRow
-              item={item}
-              pathname={pathname}
-              expanded={expanded}
-              onToggle={onToggle}
-              onNavigate={onNavigate}
-            />
-          )}
-        </div>
+        <NavItemRow
+          key={item.id || item.href || item.label}
+          item={item}
+          pathname={pathname}
+          expanded={expanded}
+          onToggle={onToggle}
+          onNavigate={onNavigate}
+        />
       ))}
     </nav>
   );
@@ -642,7 +501,6 @@ function DesktopSidebar({
         expanded={expanded}
         onToggle={onToggle}
         onNavigate={() => {}}
-        collapsed={collapsed}
       />
     </aside>
   );
@@ -667,7 +525,7 @@ function SidebarSkeleton() {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-/**
+ /**
  * DynamicTenantSidebar
  *
  * Aligned with the UniversalNavContent system:
@@ -684,15 +542,10 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
   const { user } = useAuth();
   const { tenantLinks } = useNavLinks();
 
-  const [directorySlug, setDirectorySlug] = useState<string | undefined>(slug);
-  const [isPublished, setIsPublished] = useState(false);
-  const [tenantName, setTenantName] = useState('My Store');
-  const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   // Stabilize user.tenants to prevent infinite re-renders
-  const prevTenantsRef = useRef<Tenant[] | undefined>(undefined);
+  const prevTenantsRef = useRef<NavTenant[] | undefined>(undefined);
   const stableTenants = useMemo(() => {
-    const tenants = user?.tenants as Tenant[] | undefined;
+    const tenants = user?.tenants as NavTenant[] | undefined;
     // Only update if tenants actually changed (deep comparison)
     if (
       prevTenantsRef.current &&
@@ -704,11 +557,81 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
         t.organizationId === prevTenantsRef.current![i].organizationId
       )
     ) {
-      return prevTenantsRef.current;
+      return prevTenantsRef.current; // Return previous stable version
     }
-    prevTenantsRef.current = tenants;
-    return tenants;
+    
+    prevTenantsRef.current = tenants || [];
+    return tenants || [];
   }, [user?.tenants]);
+
+  // Parse tenant links with template context
+  const parsedTenantLinks = useMemo(() => {
+    if (!tenantLinks.length) return [];
+    
+    // Extract clean tenant ID without $ prefix
+    const cleanTenantId = tenantId?.replace(/^\$/, '') || tenantId;
+    
+    const templateContext = NavTemplateParser.getContext({
+      tenantId: cleanTenantId,
+      slug,
+    });
+    
+    // Add organization info if available
+    if (user?.tenants) {
+      const currentTenant = (user.tenants as NavTenant[]).find(t => t.id === tenantId);
+      if (currentTenant) {
+        templateContext.organizationId = currentTenant.organizationId;
+        templateContext.organizationName = currentTenant.organizationName;
+      }
+    }
+    
+    return NavTemplateParser.parseNavLinks(tenantLinks, templateContext);
+  }, [tenantLinks, tenantId, slug, user?.tenants]);
+
+  // Process dynamic templates with shared logic
+  const processedTenantLinks = useMemo(() => {
+    if (!parsedTenantLinks.length) return [];
+    
+    // Convert ProcessedNavLink to NavLink for template processing
+    const linksForProcessing: any[] = parsedTenantLinks.map(link => ({
+      id: link.id,
+      label: link.label,
+      href: link.href,
+      icon: link.icon,
+      badge: link.badge || '',
+      badgeVariant: link.badgeVariant || 'default',
+      targets: link.targets || [],
+      order: link.order || 0,
+      enabled: link.enabled !== false,
+      dividerBefore: link.dividerBefore || false,
+      requiredPermission: link.requiredPermission || '',
+      requiredGroup: link.requiredGroup || '',
+      requiredRole: link.requiredRole || '',
+      prefetch: link.prefetch !== false,
+      metadata: link.metadata || {},
+      children: link.children || [],
+    }));
+    
+    // Apply dynamic template processing with fallback to empty array
+    const processedLinks = DynamicNavTemplates.processDynamicTemplates(linksForProcessing, stableTenants || []);
+    
+    // Convert back to ProcessedNavLink format
+    return processedLinks.map(link => ({
+      ...link,
+      children: link.children || [],
+    }));
+  }, [parsedTenantLinks, stableTenants]);
+
+  // Apply RBAC filtering
+  const filteredTenantLinks = useMemo(() => {
+    return filterNavItems(processedTenantLinks);
+  }, [processedTenantLinks, filterNavItems]);
+
+  const [directorySlug, setDirectorySlug] = useState<string | undefined>(slug);
+  const [isPublished, setIsPublished] = useState(false);
+  const [tenantName, setTenantName] = useState('My Store');
+  const [loading, setLoading] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -743,70 +666,31 @@ export default function DynamicTenantSidebar({ tenantId, slug, hasPublishedDirec
   const items = useMemo(() => {
     let processedItems: NavItem[] = [];
     
-    if (tenantLinks.length > 0) {
-      // Use stableTenants to avoid additional API calls
-      const tenants: Tenant[] = stableTenants || [];
-      
-      processedItems = tenantLinks.map(item => {
-        // Handle tenant-locations dynamic template
-        if (item.metadata?.dynamicTemplate === 'tenant-locations' && tenants.length > 0) {
-          return {
-            ...item,
-            href: '/tenants',
-            children: tenants.slice(0, 8).map((t: Tenant) => ({
-              label: t.name,
-              href: `/t/${t.id}/dashboard`,
-              icon: getRoleIcon(t.role),
-            })),
-          };
-        }
-        
-        // Handle organization-locations dynamic template
-        if (item.metadata?.dynamicTemplate === 'organization-locations' && tenants.length > 0) {
-          // Find tenants that belong to organizations by checking organizationId
-          const organizationTenants = tenants.filter((t: Tenant) => t.organizationId);
-          
-          if (organizationTenants.length > 0) {
-            // Create organization links for each tenant in an organization
-            const organizationLinks = organizationTenants.map((tenant: Tenant) => ({
-              label: tenant.name,
-              href: `/t/${tenant.id}/settings/organization`,
-              icon: getRoleIcon(tenant.role),
-              children: [
-                {
-                  label: 'Organization Dashboard',
-                  href: `/t/${tenant.id}/settings/organization`,
-                  icon: <Icon.Dashboard />,
-                },
-                {
-                  label: 'Propagation Settings',
-                  href: `/t/${tenant.id}/settings/propagation`,
-                  icon: <Icon.Settings />,
-                },
-                {
-                  label: 'Propagation Center',
-                  href: `/t/${tenant.id}/propagation`,
-                  icon: <Icon.ChevronRight />,
-                },
-              ],
-            }));
-            
-            return {
-              ...item,
-              children: organizationLinks,
-            };
-          }
-        }
-        
-        return item;
-      });
-    } else {
-      processedItems = buildTenantNav(tenantId, slug, directorySlug, isPublished);
+    if (processedTenantLinks.length > 0) {
+      // Convert ProcessedNavLink to NavItem format for rendering
+      processedItems = processedTenantLinks.map(link => ({
+        id: link.id,
+        label: link.label,
+        href: link.href,
+        icon: link.icon,
+        badge: link.badge || '',
+        badgeVariant: link.badgeVariant || 'default',
+        targets: link.targets || [],
+        order: link.order || 0,
+        enabled: link.enabled !== false,
+        dividerBefore: link.dividerBefore || false,
+        requiredPermission: link.requiredPermission || '',
+        requiredGroup: link.requiredGroup || '',
+        requiredRole: link.requiredRole || '',
+        prefetch: link.prefetch !== false,
+        metadata: link.metadata || {},
+        children: link.children || [],
+      }));
     }
     
     return filterNavItems(processedItems);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantLinks, stableTenants, tenantId, slug, directorySlug, isPublished]);
+  }, [processedTenantLinks, stableTenants, tenantId, slug, directorySlug, isPublished]);
 
   // Expanded state for navigation items
   const [expanded, setExpanded] = useState<Set<string>>(() => computeExpanded(items, pathname));

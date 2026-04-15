@@ -4,6 +4,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { useAccessControl, AccessPresets } from '@/lib/auth/useAccessControl';
 import AccessDenied from '@/components/AccessDenied';
 import { navigationLinksService, type SidebarTarget, type BadgeVariant, type DynamicTemplate, type NavLink } from '@/services/NavigationLinksService';
+import { DynamicNavTemplates, type Tenant } from '@/services/DynamicNavTemplates';
+import { NavItemRow } from '@/components/navigation/NavItemRow';
 import { invalidateNavLinksCache } from '@/hooks/useNavLinks';
 import { securitySingletonService } from '@/services/SecuritySingletonService';
 import { tenantInfoService } from '@/services/TenantInfoService';
@@ -507,23 +509,89 @@ const SEED_LINKS: NavLink[] = [
     }
   },
   {
-    id: 'built-in-account',
-    label: 'My Account',
-    href: '/settings/account',
-    icon: 'user',
-    badge: '',
-    badgeVariant: 'default',
-    targets: ['all', 'tenant'],
-    order: 1,
+    id: 'built-in-tenant-dashboard',
+    label: 'Tenant Dashboard',
+    href: '/t/{tenantId}/dashboard',
+    icon: 'dashboard',
+    badge: 'Tenant',
+    badgeVariant: 'success',
+    targets: ['tenant'],
+    order: 10,
+    enabled: true,
+    dividerBefore: true,
+    requiredPermission: '',
+    requiredGroup: '',
+    requiredRole: '',
+    prefetch: true,
+    metadata: {
+      nestingLevel: 0,
+      parentKey: undefined,
+      hasChildren: false,
+      childrenKeys: []
+    }
+  },
+  {
+    id: 'built-in-tenant-inventory',
+    label: 'Tenant Inventory',
+    href: '/t/{tenantId}/items',
+    icon: 'inventory',
+    badge: 'Tenant',
+    badgeVariant: 'success',
+    targets: ['tenant'],
+    order: 11,
     enabled: true,
     dividerBefore: false,
     requiredPermission: '',
     requiredGroup: '',
     requiredRole: '',
-    prefetch: false,
+    prefetch: true,
     metadata: {
       nestingLevel: 0,
       parentKey: undefined,
+      hasChildren: true,
+      childrenKeys: ['built-in-tenant-inventory-manager', 'built-in-tenant-inventory-create']
+    }
+  },
+  {
+    id: 'built-in-tenant-inventory-manager',
+    label: 'Product Manager',
+    href: '/t/{tenantId}/items',
+    icon: 'inventory',
+    badge: '',
+    badgeVariant: 'default',
+    targets: ['tenant'],
+    order: 12,
+    enabled: true,
+    dividerBefore: false,
+    requiredPermission: '',
+    requiredGroup: '',
+    requiredRole: '',
+    prefetch: true,
+    metadata: {
+      nestingLevel: 1,
+      parentKey: 'built-in-tenant-inventory',
+      hasChildren: false,
+      childrenKeys: []
+    }
+  },
+  {
+    id: 'built-in-tenant-inventory-create',
+    label: 'Add Product',
+    href: '/t/{tenantId}/items/create',
+    icon: 'inventory',
+    badge: '',
+    badgeVariant: 'default',
+    targets: ['tenant'],
+    order: 13,
+    enabled: true,
+    dividerBefore: false,
+    requiredPermission: '',
+    requiredGroup: '',
+    requiredRole: '',
+    prefetch: true,
+    metadata: {
+      nestingLevel: 1,
+      parentKey: 'built-in-tenant-inventory',
       hasChildren: false,
       childrenKeys: []
     }
@@ -650,6 +718,11 @@ function LinkRow({
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
+      </div>
+
+      {/* Icon */}
+      <div className="flex-shrink-0">
+        {getIconComponent(link.icon)}
       </div>
 
       {/* Label + href */}
@@ -1081,14 +1154,13 @@ function SidebarPreview({ links, target }: { links: NavLink[]; target: SidebarTa
     }
   };
 
-  // Process dynamic templates for preview
+  // Process dynamic templates for preview using shared service
   const processDynamicTemplates = async (items: NavLink[]): Promise<NavLink[]> => {
     // Get real tenant data from SecuritySingletonService
-    let tenants: { id: string; name: string; role: string; organizationId?: string; organizationName?: string }[] = [];
+    let tenants: Tenant[] = [];
     try {
       const sessionInfo = await securitySingletonService.getSessionInfo();
       tenants = sessionInfo.user?.tenants || [];
-      // console.log('SidebarPreview: Fetched real tenant data:', tenants);
     } catch (error) {
       console.error('SidebarPreview: Error fetching tenant data:', error);
       // Fallback to mock data for preview
@@ -1100,127 +1172,8 @@ function SidebarPreview({ links, target }: { links: NavLink[]; target: SidebarTa
       ];
     }
 
-    // console.log('SidebarPreview: Processing items:', items);
-    // console.log('SidebarPreview: Looking for dynamic templates...');
-
-    return items.map(item => {
-      // Handle tenant-locations dynamic template
-      if (item.metadata?.dynamicTemplate === 'tenant-locations') {
-        // console.log('SidebarPreview: Found tenant-locations template for item:', item.label);
-        const processedItem = {
-          ...item,
-          href: '/tenants',
-          children: tenants.slice(0, 8).map(t => ({
-            ...item,
-            id: `${item.id}-${t.id}`,
-            label: t.name,
-            href: `/t/${t.id}/dashboard`,
-            icon: getRoleIcon(t.role) || '',
-            metadata: {
-              ...item.metadata,
-              dynamicTemplate: undefined,
-              nestingLevel: 1,
-              parentKey: item.id,
-              hasChildren: false,
-              childrenKeys: []
-            }
-          })),
-        };
-        // console.log('SidebarPreview: Processed item with children:', processedItem);
-        return processedItem;
-      }
-      
-      // Handle organization-locations dynamic template
-      if (item.metadata?.dynamicTemplate === 'organization-locations') {
-        // console.log('SidebarPreview: Found organization-locations template for item:', item.label);
-        
-        // Find tenants that belong to organizations using organization_id from session
-        const organizationTenants = tenants.filter(t => t.organizationId);
-        // console.log('SidebarPreview: Found organization tenants:', organizationTenants);
-        
-        if (organizationTenants.length > 0) {
-          // Create organization links for each tenant in an organization
-          const organizationLinks = organizationTenants.map(tenant => ({
-            ...item,
-            id: `${item.id}-org-${tenant.id}`,
-            label: tenant.name,
-            href: `/t/${tenant.id}/settings/organization`,
-            icon: 'building',
-            children: [
-              {
-                ...item,
-                id: `${item.id}-org-${tenant.id}-dashboard`,
-                label: 'Organization Dashboard',
-                href: `/t/${tenant.id}/settings/organization`,
-                icon: 'building',
-                metadata: {
-                  ...item.metadata,
-                  dynamicTemplate: undefined,
-                  nestingLevel: 2,
-                  parentKey: `${item.id}-org-${tenant.id}`,
-                  hasChildren: false,
-                  childrenKeys: []
-                }
-              },
-              {
-                ...item,
-                id: `${item.id}-org-${tenant.id}-propagation`,
-                label: 'Propagation Settings',
-                href: `/t/${tenant.id}/settings/propagation`,
-                icon: 'building',
-                metadata: {
-                  ...item.metadata,
-                  dynamicTemplate: undefined,
-                  nestingLevel: 2,
-                  parentKey: `${item.id}-org-${tenant.id}`,
-                  hasChildren: false,
-                  childrenKeys: []
-                }
-              },
-              {
-                ...item,
-                id: `${item.id}-org-${tenant.id}-center`,
-                label: 'Propagation Center',
-                href: `/t/${tenant.id}/propagation`,
-                icon: 'building',
-                metadata: {
-                  ...item.metadata,
-                  dynamicTemplate: undefined,
-                  nestingLevel: 2,
-                  parentKey: `${item.id}-org-${tenant.id}`,
-                  hasChildren: false,
-                  childrenKeys: []
-                }
-              },
-            ],
-            metadata: {
-              ...item.metadata,
-              dynamicTemplate: undefined,
-              nestingLevel: 1,
-              parentKey: item.id,
-              hasChildren: true,
-              childrenKeys: [
-                `${item.id}-org-${tenant.id}-dashboard`,
-                `${item.id}-org-${tenant.id}-propagation`,
-                `${item.id}-org-${tenant.id}-center`
-              ]
-            }
-          }));
-          
-          const processedItem = {
-            ...item,
-            children: organizationLinks,
-          };
-          // console.log('SidebarPreview: Processed organization item with real organization data:', processedItem);
-          return processedItem;
-        } else {
-          // console.log('SidebarPreview: No organization tenants found');
-          return item;
-        }
-      }
-      
-      return item;
-    });
+    // Use the shared DynamicNavTemplates service
+    return DynamicNavTemplates.processDynamicTemplates(items, tenants);
   };
 
   // State for processed links
@@ -1265,50 +1218,26 @@ function SidebarPreview({ links, target }: { links: NavLink[]; target: SidebarTa
         {visible.length === 0 && (
           <p className="text-xs text-neutral-400 italic py-4 text-center">No links</p>
         )}
-        {visible.map(link => {
-          const key = link.id;
-          const hasChildren = !!(link.children && link.children.length > 0);
-          const isExpanded = expanded.has(key);
-          
-          return (
-            <div key={link.id}>
-              {link.dividerBefore && <div className="my-1.5 border-t border-neutral-100" />}
-              
-              {/* Parent item with potential children */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-neutral-50 group">
-                {link.icon && getIconComponent(link.icon)}
-                {!link.icon && <div className="w-4 h-4 bg-neutral-200 rounded flex-shrink-0" title="No icon" />}
-                <span className="text-xs font-medium text-neutral-700 truncate flex-1">{link.label}</span>
-                {link.badge && <BadgePill variant={link.badgeVariant} />}
-                {hasChildren && (
-                  <button
-                    onClick={() => toggleExpanded(key)}
-                    className="p-1 rounded hover:bg-neutral-100 transition-colors"
-                    aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                  >
-                    <svg className={`w-3 h-3 text-neutral-500 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-              
-              {/* Render children if expanded */}
-              {isExpanded && hasChildren && (
-                <div className="ml-6 mt-0.5 space-y-0.5">
-                  {link.children!.map((child: NavLink) => (
-                    <div key={child.id} className="flex items-center gap-2 px-3 py-1 rounded-lg hover:bg-neutral-50 group">
-                      {child.icon && getIconComponent(child.icon)}
-                      {!child.icon && <div className="w-3 h-3 bg-neutral-100 rounded flex-shrink-0 ml-2" title="No icon" />}
-                      <span className="text-xs text-neutral-600 truncate flex-1">{child.label}</span>
-                      {child.badge && <BadgePill variant={child.badgeVariant} />}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {visible.map(link => (
+          <div key={link.id}>
+            {link.dividerBefore && <div className="my-1.5 border-t border-neutral-100" />}
+            <NavItemRow
+              item={link}
+              pathname={typeof window !== 'undefined' ? window.location.pathname : ''}
+              expanded={expanded}
+              onToggle={(key) => setExpanded(prev => {
+                const newSet = new Set(prev);
+                if (newSet.has(key)) {
+                  newSet.delete(key);
+                } else {
+                  newSet.add(key);
+                }
+                return newSet;
+              })}
+              onNavigate={() => {}}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1517,20 +1446,22 @@ export default function NavigationControlPage() {
             </div>
           )}
 
-          <div className="space-y-2">
-            {sortedLinks.map((link, i) => (
-              <LinkRow
-                key={link.id}
-                link={link}
-                index={i}
-                total={sortedLinks.length}
-                onEdit={setEditing}
-                onToggle={handleToggle}
-                onDelete={handleDelete}
-                onMove={handleMove}
-              />
-            ))}
-          </div>
+          {sortedLinks.length > 0 && (
+            <div className="space-y-2">
+              {sortedLinks.map((link, i) => (
+                <LinkRow
+                  key={link.id}
+                  link={link}
+                  index={i}
+                  total={sortedLinks.length}
+                  onEdit={setEditing}
+                  onToggle={handleToggle}
+                  onDelete={handleDelete}
+                  onMove={handleMove}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Live preview */}
