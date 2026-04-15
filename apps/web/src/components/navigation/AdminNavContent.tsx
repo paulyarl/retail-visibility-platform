@@ -154,11 +154,13 @@ const buildAdminNavItems = (): NavItem[] => [
     label: 'Admin Dashboard',
     href: '/settings/admin',
     icon: <Icon.Dashboard />,
+    prefetch: false,
   },
   {
     label: 'Users',
     icon: <Icon.Users />,
     href: '/settings/admin/users',
+    prefetch: false,
     children: [
       { label: 'All Users',         href: '/settings/admin/users' },
       { label: 'Deletion Requests', href: '/settings/admin/deletion-requests' },
@@ -168,31 +170,37 @@ const buildAdminNavItems = (): NavItem[] => [
     label: 'Tenants',
     icon: <Icon.Building />,
     href: '/settings/admin/tenants',
+    prefetch: false,
     children: [
       { label: 'All Tenants',       href: '/settings/admin/tenants' },
-      { label: 'Organizations',     href: '/settings/admin/organizations' },
-      { label: 'Tenant Limits',     href: '/settings/admin/limits' },
-      {
-        label: 'Capacity',
-        children: [
-          { label: 'Overview',        href: '/settings/admin/capacity/overview' },
-          { label: 'Location Limits', href: '/settings/admin/capacity/location-limits' },
-          { label: 'Alerts',          href: '/settings/admin/capacity/alerts' },
-        ],
-      },
-      {
-        label: 'Quick Start',
-        children: [
-          { label: 'Seed Categories', href: '/settings/admin/quick-start/categories' },
-          { label: 'Seed Products',   href: '/settings/admin/quick-start/products' },
-        ],
-      },
+      { label: 'Tenant Limits',    href: '/settings/admin/limits' },
+    ],
+  },
+  {
+    label: 'Capacity',
+    icon: <Icon.Chart />,
+    href: '/settings/admin/capacity/overview',
+    prefetch: false,
+    children: [
+      { label: 'Overview',         href: '/settings/admin/capacity/overview' },
+      { label: 'Location Limits', href: '/settings/admin/capacity/location-limits' },
+      { label: 'Alerts',          href: '/settings/admin/capacity/alerts' },
+    ],
+  },
+  {
+    label: 'Quick Start',
+    icon: <Icon.Star />,
+    prefetch: false,
+    children: [
+      { label: 'Seed Categories', href: '/settings/admin/quick-start/categories' },
+      { label: 'Seed Products',   href: '/settings/admin/quick-start/products' },
     ],
   },
   {
     label: 'Subscriptions',
     icon: <Icon.Chart />,
     href: '/settings/admin/tier-system',
+    prefetch: false,
     children: [
       { label: 'Tier Management',  href: '/settings/admin/tier-system' },
       { label: 'Subscription Mgmt', href: '/settings/admin/tiers' },
@@ -203,6 +211,7 @@ const buildAdminNavItems = (): NavItem[] => [
     label: 'Catalog',
     icon: <Icon.Cog />,
     href: '/settings/admin/categories',
+    prefetch: false,
     children: [
       { label: 'Categories Quick Start',  href: '/settings/admin/quick-start/categories' },
       { label: 'Product Categories',  href: '/settings/admin/categories' },
@@ -214,6 +223,7 @@ const buildAdminNavItems = (): NavItem[] => [
     label: 'Directory',
     icon: <Icon.Globe />,
     href: '/settings/admin/directory/listings',
+    prefetch: false,
     children: [
       { label: 'Listings',          href: '/settings/admin/directory/listings' },
       { label: 'Featured',          href: '/settings/admin/directory/featured' },
@@ -224,6 +234,7 @@ const buildAdminNavItems = (): NavItem[] => [
     label: 'Content',
     icon: <Icon.Navigation />,
     href: '/settings/admin/reviews',
+    prefetch: false,
     children: [
       { label: 'Reviews',   href: '/settings/admin/reviews' },
       { label: 'Analytics', href: '/settings/admin/analytics' },
@@ -233,10 +244,11 @@ const buildAdminNavItems = (): NavItem[] => [
     label: 'Security & Platform',
     icon: <Icon.Shield />,
     href: '/settings/admin/security',
+    prefetch: false,
     children: [
       { label: 'Security',          href: '/settings/admin/security' },
       { label: 'Platform Settings', href: '/settings/admin/platform' },
-      { label: 'Sentry Monitoring', href: '/settings/admin/sentry' },
+      { label: 'Sentry',          href: '/settings/admin/sentry' },
       { label: 'Feature Overrides', href: '/settings/admin/feature-overrides' },
       { label: 'Subdomain Mgmt',    href: '/settings/admin/subdomain' },
       { label: 'Ticker',            href: '/settings/admin/ticker' },
@@ -246,6 +258,7 @@ const buildAdminNavItems = (): NavItem[] => [
     label: 'Analytics',
     icon: <Icon.Chart />,
     href: '/settings/admin/scan-metrics',
+    prefetch: false,
     children: [
       { label: 'Scan Metrics', href: '/settings/admin/scan-metrics' },
     ],
@@ -257,12 +270,14 @@ const buildAdminNavItems = (): NavItem[] => [
     badge: 'Admin',
     badgeVariant: 'warning',
     dividerBefore: true,
+    prefetch: false,
   },
   {
     label: 'Account Settings',
     href: '/settings',
     icon: <Icon.Admin />,
     dividerBefore: true,
+    prefetch: false,
   },
 ];
 
