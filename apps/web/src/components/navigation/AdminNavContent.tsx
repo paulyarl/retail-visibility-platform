@@ -345,7 +345,8 @@ function NavItemRow({
   onToggle: (key: string) => void;
   onNavigate: () => void;
 }) {
-  const key = item.href ?? item.label;
+  // Use id as primary key to avoid collision between items with same href
+  const key = item.id ?? item.href ?? item.label;
   const hasChildren = !!(item.children?.length);
   const isExpanded = expanded.has(key);
   const isActive = item.href

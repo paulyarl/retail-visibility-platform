@@ -12,7 +12,7 @@
 
 import { Router, Request, Response } from 'express';
 import { authenticateToken, requireAdmin } from '../../middleware/auth';
-import { prisma } from '../../prisma';
+import { prisma, basePrisma } from '../../prisma';
 
 const router = Router();
 
@@ -139,7 +139,9 @@ router.post('/', async (req: Request, res: Response) => {
     const builtInIds = builtInRows.map(r => r.id);
 
     // Run as a transaction: delete non-built-in rows, then upsert all submitted links
-    await prisma.$transaction(async (tx) => {
+    // Use basePrisma directly for transactions to avoid retry wrapper issues
+    // Increased timeout for bulk operations (default 5s is too short for large nav lists)
+    await basePrisma.$transaction(async (tx) => {
       // Delete all non-built-in links not present in the new payload
       const incomingIds = links
         .filter(l => l.id && !l.id.startsWith('built-in-'))
@@ -190,7 +192,7 @@ router.post('/', async (req: Request, res: Response) => {
           });
         }
       }
-    });
+    }, { timeout: 30000 }); // 30 second timeout for bulk nav operations
 
     // Return the updated full list
     const saved = await prisma.navigation_links.findMany({
