@@ -472,6 +472,7 @@ const DEFAULT_LINK: Omit<NavLink, 'id' | 'order'> = {
   requiredPermission: '',
   requiredGroup: '',
   requiredRole: '',
+  prefetch: true,
   metadata: {
     nestingLevel: 0,
     parentKey: undefined,
@@ -497,6 +498,7 @@ const SEED_LINKS: NavLink[] = [
     requiredPermission: '',
     requiredGroup: '',
     requiredRole: '',
+    prefetch: true,
     metadata: {
       nestingLevel: 0,
       parentKey: undefined,
@@ -518,6 +520,7 @@ const SEED_LINKS: NavLink[] = [
     requiredPermission: '',
     requiredGroup: '',
     requiredRole: '',
+    prefetch: false,
     metadata: {
       nestingLevel: 0,
       parentKey: undefined,
@@ -539,6 +542,7 @@ const SEED_LINKS: NavLink[] = [
     requiredPermission: '',
     requiredGroup: '',
     requiredRole: '',
+    prefetch: false,
     metadata: {
       nestingLevel: 0,
       parentKey: undefined,
@@ -560,6 +564,7 @@ const SEED_LINKS: NavLink[] = [
     requiredPermission: 'CAN_ADMIN_PLATFORM',
     requiredGroup: 'IS_PLATFORM_ADMIN',
     requiredRole: '',
+    prefetch: false,
     metadata: {
       nestingLevel: 0,
       parentKey: undefined,
@@ -758,6 +763,7 @@ function LinkEditor({
     requiredPermission: link.requiredPermission ?? '',
     requiredGroup: link.requiredGroup ?? '',
     requiredRole: link.requiredRole ?? '',
+    prefetch: link.prefetch ?? true,
     metadata: {
       ...link.metadata,
       nestingLevel: link.metadata?.nestingLevel ?? 0,
@@ -886,6 +892,28 @@ function LinkEditor({
               ))
             }
           </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-neutral-600 mb-1">Prefetch Behavior</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="prefetch"
+              checked={form.prefetch}
+              onChange={e => setForm(p => ({ ...p, prefetch: e.target.checked }))}
+              disabled={form.metadata.dynamicTemplate !== 'none'}
+              className="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500 focus:ring-2"
+            />
+            <label htmlFor="prefetch" className="text-sm text-neutral-700">
+              Enable prefetching
+              <span className="text-neutral-500 font-normal block text-xs">
+                {form.metadata.dynamicTemplate !== 'none' 
+                  ? 'Controlled by dynamic template'
+                  : 'Enable for faster navigation, disable for auth-protected routes to prevent CORS issues'
+                }
+              </span>
+            </label>
+          </div>
         </div>
         <div>
           <label className="block text-xs font-medium text-neutral-600 mb-1">Dynamic Template</label>

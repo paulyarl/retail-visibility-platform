@@ -20,6 +20,7 @@ type NavItem = RBACNavGates & {
   icon?: ReactNode;
   badge?: string;
   badgeVariant?: 'default' | 'success' | 'warning' | 'error' | 'new';
+  prefetch?: boolean;
   children?: NavItem[];
   dividerBefore?: boolean;
   metadata?: {
@@ -393,6 +394,7 @@ function NavItemRow({
       onClick={onNavigate}
       className={sharedClass}
       style={{ paddingLeft, paddingRight: 12 }}
+      prefetch={item.prefetch ?? false}
     >
       {item.icon && <span className={iconClass}>{item.icon}</span>}
       <span className="flex-1 truncate">{item.label}</span>
@@ -459,6 +461,7 @@ function SidebarContent({
                   href={item.href ?? (item.children?.[0]?.href ?? '#')}
                   onClick={onNavigate}
                   title={item.label}
+                  prefetch={item.prefetch ?? false}
                   className={cn(
                     'flex items-center justify-center w-10 h-10 mx-auto rounded-lg transition-colors',
                     item.href && (pathname === item.href || pathname.startsWith(item.href + '/'))

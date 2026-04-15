@@ -29,6 +29,7 @@ export interface NavLink {
   requiredPermission: string;
   requiredGroup: string;
   requiredRole: string;
+  prefetch: boolean;
   metadata: {
     nestingLevel: number;
     parentKey?: string;
