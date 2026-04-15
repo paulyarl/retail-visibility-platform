@@ -122,11 +122,11 @@ export class ContextAwareCacheManager {
     const capabilities = {
       indexedDB: typeof indexedDB !== 'undefined' && indexedDB !== null,
       localStorage: false,
-      deviceMemory: (navigator as any).deviceMemory || 4,
+      deviceMemory: typeof navigator !== 'undefined' ? (navigator as any).deviceMemory || 4 : 4,
       storageQuota: 'Unknown',
-      connectionSpeed: (navigator as any).connection?.effectiveType || '4g',
+      connectionSpeed: typeof navigator !== 'undefined' ? (navigator as any).connection?.effectiveType || '4g' : '4g',
       isPrivateMode: false,
-      hardwareConcurrency: navigator.hardwareConcurrency || 4
+      hardwareConcurrency: typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 4 : 4
     };
 
     // Test localStorage functionality
@@ -547,6 +547,7 @@ export class ContextAwareCacheManager {
         case 'global': return CacheIsolation.GLOBAL;
         case 'tenant': return CacheIsolation.TENANT;
         case 'user': return CacheIsolation.USER;
+        case 'system': return CacheIsolation.SYSTEM;
         case 'admin': return CacheIsolation.ADMIN;
         case 'store': return CacheIsolation.STORE;
         case 'product': return CacheIsolation.PRODUCT;
