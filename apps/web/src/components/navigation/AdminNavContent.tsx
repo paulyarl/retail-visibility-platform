@@ -8,6 +8,8 @@ import { useRBAC, RBACNavGates } from '@/lib/auth/useRBAC';
 import { cn } from '@/lib/utils';
 import { securitySingletonService } from '@/services/SecuritySingletonService';
 import { tenantInfoService } from '@/services/TenantInfoService';
+import { DynamicNavTemplates } from '@/services/DynamicNavTemplates';
+import { getIconComponent } from './NavItemRow';
 import { type NavLink, type DynamicTemplate } from '@/services/NavigationLinksService';
 import { type ProcessedNavLink } from '@/hooks/useNavLinks';
 
@@ -379,7 +381,7 @@ function NavItemRow({
           style={{ paddingLeft, paddingRight: 12 }}
           aria-expanded={isExpanded}
         >
-          {item.icon && <span className={iconClass}>{item.icon}</span>}
+          {item.icon && <span className={iconClass}>{typeof item.icon === 'string' ? getIconComponent(item.icon) : item.icon}</span>}
           <span className="flex-1 text-left truncate">{item.label}</span>
           {item.badge && <NavBadge text={item.badge} variant={item.badgeVariant} />}
           <Icon.ChevronRight className={isExpanded ? 'rotate-90 text-neutral-500' : 'text-neutral-400'} />
@@ -411,7 +413,7 @@ function NavItemRow({
       style={{ paddingLeft, paddingRight: 12 }}
       prefetch={item.prefetch ?? false}
     >
-      {item.icon && <span className={iconClass}>{item.icon}</span>}
+      {item.icon && <span className={iconClass}>{typeof item.icon === 'string' ? getIconComponent(item.icon) : item.icon}</span>}
       <span className="flex-1 truncate">{item.label}</span>
       {item.badge && <NavBadge text={item.badge} variant={item.badgeVariant} />}
     </Link>
@@ -718,7 +720,7 @@ export function AdminNavContent({ children, injectedItems = [] }: AdminNavConten
     }
   };
 
-  // Process dynamic templates in injected items
+  // Process dynamic templates in injected items using shared service
   const processDynamicTemplates = async (items: ProcessedNavLink[], user: any): Promise<NavItem[]> => {
     // Get real tenant data from SecuritySingletonService
     let tenants: { id: string; name: string; role: string; organizationId?: string; organizationName?: string }[] = [];
@@ -733,60 +735,10 @@ export function AdminNavContent({ children, injectedItems = [] }: AdminNavConten
       }
     }
 
-    return items.map(item => {
-      // Handle tenant-locations dynamic template
-      if (item.metadata?.dynamicTemplate === 'tenant-locations' && tenants.length > 0) {
-        return {
-          ...item,
-          href: '/tenants',
-          children: tenants.slice(0, 8).map(t => ({
-            label: t.name,
-            href: `/t/${t.id}/dashboard`,
-            icon: getRoleIcon(t.role),
-          })),
-        };
-      }
-      
-      // Handle organization-locations dynamic template
-      if (item.metadata?.dynamicTemplate === 'organization-locations' && tenants.length > 0) {
-        // Find tenants that belong to organizations using organization_id from session
-        const organizationTenants = tenants.filter(t => t.organizationId);
-        // console.log('[AdminNavContent] Found organization tenants:', organizationTenants);
-        
-        if (organizationTenants.length > 0) {
-          // Create organization links for each tenant in an organization
-          const organizationLinks = organizationTenants.map(tenant => ({
-            label: tenant.name,
-            href: `/t/${tenant.id}/settings/organization`,
-            icon: getRoleIcon(tenant.role),
-            children: [
-              {
-                label: 'Organization Dashboard',
-                href: `/t/${tenant.id}/settings/organization`,
-                icon: <Icon.Dashboard />,
-              },
-              {
-                label: 'Propagation Settings',
-                href: `/t/${tenant.id}/settings/propagation`,
-                icon: <Icon.Settings />,
-              },
-              {
-                label: 'Propagation Center',
-                href: `/t/${tenant.id}/propagation`,
-                icon: <Icon.ChevronRight />,
-              },
-            ],
-          }));
-          
-          return {
-            ...item,
-            children: organizationLinks,
-          };
-        }
-      }
-      
-      return item;
-    });
+    // Use the shared DynamicNavTemplates service
+    const processedLinks = DynamicNavTemplates.processDynamicTemplates(items as NavLink[], tenants);
+    
+    return processedLinks;
   };
 
   // Database-first approach: use injected items if available, fallback to hardcoded

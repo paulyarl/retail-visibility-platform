@@ -150,7 +150,7 @@ const IconComponents = {
 } as const;
 
 // Convert icon string to React component
-function getIconComponent(iconName: string): React.ReactNode {
+export function getIconComponent(iconName: string): React.ReactNode {
   const IconComponent = IconComponents[iconName as keyof typeof IconComponents];
   return IconComponent ? <IconComponent /> : null;
 }
