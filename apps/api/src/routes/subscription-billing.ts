@@ -559,6 +559,214 @@ router.get('/invoices/:id', requirePermission('CAN_MANAGE_TENANT_BILLING'), asyn
   }
 });
 
+/**
+ * GET /api/subscription/invoices/:id/pdf
+ * Generate PDF for a specific invoice
+ * Requires CAN_MANAGE_TENANT_BILLING permission
+ */
+router.get('/invoices/:id/pdf', requirePermission('CAN_MANAGE_TENANT_BILLING'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    const { id } = req.params;
+    
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'No tenant context',
+      });
+    }
+
+    const billingService = getSubscriptionBillingService();
+    const invoice = await billingService.getInvoiceById(id, tenantId);
+    
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        error: 'Invoice not found',
+      });
+    }
+
+    // Get platform branding settings
+    const platformSettings = await prisma.platform_settings_list.findFirst();
+    const branding = {
+      platformName: platformSettings?.platform_name || 'Visible Shelf',
+      logoUrl: platformSettings?.logo_url,
+      primaryColor: (platformSettings?.theme_colors as any)?.primary || '#0066ff',
+      contactEmail: platformSettings?.contact_email || 'billing@visible-shelf.com',
+      contactPhone: platformSettings?.contact_phone || '',
+      contactAddress: platformSettings?.contact_address || '',
+      contactWebsite: platformSettings?.contact_website || '',
+    };
+
+    // Get tenant info for billing address
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { name: true, slug: true },
+    });
+
+    // Generate PDF using jsPDF
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+    
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    let yPos = 20;
+
+    // Header with platform branding
+    doc.setFontSize(24);
+    doc.setTextColor(branding.primaryColor);
+    doc.text(branding.platformName, margin, yPos);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    yPos += 8;
+    if (branding.contactWebsite) {
+      doc.text(branding.contactWebsite, margin, yPos);
+    }
+    
+    // Invoice title
+    yPos += 15;
+    doc.setFontSize(18);
+    doc.setTextColor(0, 0, 0);
+    doc.text('INVOICE', pageWidth - margin - 30, 20, { align: 'left' });
+    
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`#${invoice.id}`, pageWidth - margin - 30, 28, { align: 'left' });
+
+    // From/To section
+    yPos = 50;
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    
+    // From
+    doc.setFont('helvetica', 'bold');
+    doc.text('From:', margin, yPos);
+    doc.setFont('helvetica', 'normal');
+    yPos += 5;
+    doc.text(branding.platformName, margin, yPos);
+    yPos += 5;
+    if (branding.contactEmail) doc.text(branding.contactEmail, margin, yPos);
+    yPos += 5;
+    if (branding.contactAddress) {
+      const addressLines = branding.contactAddress.split('\n');
+      for (const line of addressLines) {
+        doc.text(line, margin, yPos);
+        yPos += 5;
+      }
+    }
+
+    // To (right side)
+    yPos = 50;
+    const toX = pageWidth / 2;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Bill To:', toX, yPos);
+    doc.setFont('helvetica', 'normal');
+    yPos += 5;
+    doc.text(tenant?.name || 'Tenant', toX, yPos);
+
+    // Invoice details
+    yPos = Math.max(yPos, 85) + 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 10;
+
+    // Invoice info table
+    doc.setFontSize(10);
+    const formatDate = (date: string | Date | null) => {
+      if (!date) return '-';
+      return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    };
+
+    const formatPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+
+    const infoRows = [
+      ['Invoice Date:', formatDate(invoice.createdAt)],
+      ['Due Date:', formatDate(invoice.dueDate)],
+      ['Status:', invoice.status.toUpperCase()],
+      ['Billing Period:', `${formatDate(invoice.billingPeriodStart)} - ${formatDate(invoice.billingPeriodEnd)}`],
+    ];
+
+    for (const [label, value] of infoRows) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, margin, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value, margin + 40, yPos);
+      yPos += 6;
+    }
+
+    // Line items header
+    yPos += 10;
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, yPos, pageWidth - 2 * margin, 8, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.text('Description', margin + 2, yPos + 5);
+    doc.text('Amount', pageWidth - margin - 20, yPos + 5, { align: 'right' });
+    yPos += 12;
+
+    // Line item
+    doc.setFont('helvetica', 'normal');
+    const tierName = invoice.tier.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+    doc.text(`Subscription: ${tierName}`, margin + 2, yPos);
+    doc.text(formatPrice(invoice.amountCents), pageWidth - margin - 20, yPos, { align: 'right' });
+    yPos += 8;
+
+    // Total
+    yPos += 5;
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 8;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total:', margin + 2, yPos);
+    doc.text(formatPrice(invoice.amountCents), pageWidth - margin - 20, yPos, { align: 'right' });
+
+    // Payment history
+    if (invoice.payments && invoice.payments.length > 0) {
+      yPos += 15;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Payment History', margin, yPos);
+      yPos += 8;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      for (const payment of invoice.payments) {
+        doc.text(`${payment.gatewayType} - ${formatDate(payment.createdAt)} - ${formatPrice(payment.amountCents)} - ${payment.status}`, margin, yPos);
+        yPos += 5;
+      }
+    }
+
+    // Footer
+    yPos = doc.internal.pageSize.getHeight() - 30;
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 120);
+    doc.text('Thank you for your business!', margin, yPos);
+    yPos += 10;
+    if (branding.contactPhone) {
+      doc.text(`Phone: ${branding.contactPhone}  |  Email: ${branding.contactEmail}`, margin, yPos);
+    } else {
+      doc.text(`Email: ${branding.contactEmail}`, margin, yPos);
+    }
+
+    // Set response headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.id}.pdf"`);
+    
+    // Send PDF as buffer
+    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+    res.send(pdfBuffer);
+  } catch (error: any) {
+    console.error('[Subscription] Error generating invoice PDF:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate invoice PDF',
+    });
+  }
+});
+
 // ==================
 // PAYPAL INTEGRATION
 // ==================

@@ -76,10 +76,32 @@ export default function InvoiceHistoryPage() {
     setShowInvoiceModal(true);
   };
 
-  const handleDownloadInvoice = (invoice: Invoice) => {
-    // TODO: Implement PDF generation
-    console.log('Download invoice:', invoice.id);
-    alert('PDF download coming soon!');
+  const handleDownloadInvoice = async (invoice: Invoice) => {
+    try {
+      const tenantId = user?.tenants?.[0]?.id || '';
+      const response = await fetch(`/api/subscription/invoices/${invoice.id}/pdf`, {
+        headers: {
+          'X-Tenant-ID': tenantId,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${invoice.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      alert('Failed to download invoice PDF');
+    }
   };
 
   if (!user) {
