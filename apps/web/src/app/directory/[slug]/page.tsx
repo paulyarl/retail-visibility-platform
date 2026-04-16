@@ -371,10 +371,13 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
   // console.log(`[Directory] consolidatedData:`, consolidatedData);
   const [tenantLogo, setTenantLogo] = useState<string | null>(null);
   const [businessProfile, setBusinessProfile] = useState<any>(null);
+  // const businessProfile = tempbusinessProfile?.data;
+  // console.log(`[Directory] tempbusinessProfile:`, tempbusinessProfile);
   // console.log(`[Directory] businessProfile:`, businessProfile);
   const [businessHours, setBusinessHours] = useState<any>(null);
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const [storefrontCategories, setStorefrontCategories] = useState<any>({ categories: [], uncategorizedCount: 0 });
+  // console.log(`[Directory] storefrontCategories:`, storefrontCategories);
   const [actualProductCount, setActualProductCount] = useState<number>(0);
   const [tenantInfo, setTenantInfo] = useState<any>(null);
   // console.log(`[Directory] tenantInfo:`, tenantInfo);
@@ -421,7 +424,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
           getActualProductCount(data.listing.tenantId)
         ]);
         
-        setBusinessProfile(profile);
+        setBusinessProfile(profile?.data);
         setBusinessHours(hours);
         setRelatedProducts(related);
         setStorefrontCategories(categories);
@@ -541,7 +544,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                     Shop {listing.businessName}
                   </h2>
                   <p className="text-gray-700 mb-6 text-sm sm:text-base max-w-2xl mx-auto">
-                    Browse {(listing.productCount ?? 0) > 0 ? `${listing.productCount} products` : 'our full catalog'} and shop directly from their online storefront
+                    Browse {actualProductCount > 0 ? actualProductCount : (listing.productCount ?? 0)} products and shop directly from their online storefront
                   </p>
                   <Link
                     href={`${slugForRelated ? `/tenant/${slugForRelated}` : `/tenant/${listing.tenantId}`}`}
@@ -550,12 +553,24 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                     <Globe className="w-5 h-5" />
                     Visit Storefront
                   </Link>
+                   { storefrontCategories.categories.length > 0 && (
+                      <div className="mt-4">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-700 border border-green-200">
+                          <svg className="w-4 h-4 mr-1.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                          {actualProductCount > 0 ? actualProductCount : (listing.productCount || 0)} products available
+                        </span>
+                      </div>
+                    )}
                 </div>
+                
                 <div className="px-4 py-4 lg:px-4 lg:py-4 text-center">
 
                   
                {/* Hours Badge - Status */}
-                      <HoursStatusBadge status={hoursStatus} /> {hoursStatus?.label}
+                      <HoursStatusBadge status={hoursStatus} size='lg' /> {hoursStatus?.label} 
+                      
                 </div>
               </div>
             )}
@@ -582,7 +597,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                     </h1>
                 
                     {/* GBP Categories - Clean badges below store name */}
-                    {!showStatusPanel && listing.categories && listing.categories.length > 0 && (
+                    {listing.categories && listing.categories.length > 0 && (
                       <div className="flex flex-wrap items-center gap-2 mt-3">
                         {listing.categories
                           .sort((a: any, b: any) => {
@@ -622,22 +637,13 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                     )}
                 
                     {/* Keywords */}
-                    {!showStatusPanel && listing.keywords && listing.keywords.length > 0 && (
+                    {showStatusPanel && listing.keywords && listing.keywords.length > 0 && (
                       <div className="mt-3">
                         <DirectoryKeywordTags keywords={listing.keywords} />
                       </div>
                     )}
                 
-                    {!showStatusPanel && storefrontCategories.categories.length > 0 && (
-                      <div className="mt-4">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-700 border border-green-200">
-                          <svg className="w-4 h-4 mr-1.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                          </svg>
-                          {actualProductCount > 0 ? actualProductCount : (listing.productCount || 0)} products available
-                        </span>
-                      </div>
-                    )}
+                   
                   </div>
                 </div>
 
@@ -690,7 +696,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                  
                   
                   {/* Share/Print Actions - Right side */}
-                  {!showStatusPanel && (
+                  {showStatusPanel && (
                   <DirectoryActions 
                     listing={{
                       business_name: listing.businessName,
@@ -703,10 +709,11 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                   )}
                 </div>
               </div>
- <div id="products-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+
               {/* Featured Products - hidden when status panel shows */}
               {!showStatusPanel && featuredProducts.length > 0 && (
                 <TenantPaymentProvider tenantId={listing.tenantId}>
+                   <div id="products-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-green-500 to-transparent" />
                   <div className="bg-white rounded-lg shadow-sm p-6">
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="text-2xl font-bold text-gray-900">Featured Products</h2>
@@ -759,14 +766,14 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
               )}
 
               {/* Business Description - Brief Trust Building */}
-              {!showStatusPanel && businessProfile?.business_description && (
+              {showStatusPanel && (businessProfile?.business_description || businessProfile?.businessDescription) && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">About {listing.businessName}</h2>
                   <div className="prose prose-gray max-w-none">
                     <p className="text-gray-700 leading-relaxed text-base whitespace-pre-wrap">
-                      {businessProfile.business_description.length > 200 
-                        ? `${businessProfile.business_description.substring(0, 200)}...`
-                        : businessProfile.business_description
+                      {((businessProfile.business_description || businessProfile.businessDescription)?.length || 0) > 200 
+                        ? `${(businessProfile.business_description || businessProfile.businessDescription)?.substring(0, 200)}...`
+                        : (businessProfile.business_description || businessProfile.businessDescription)
                       }
                     </p>
                   </div>
@@ -775,10 +782,10 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                <div id="gallery-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
 
               {/* Photo Gallery - Visual Proof */}
-              {!showStatusPanel && (
+              {showStatusPanel && (
                 <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
               )}
-               <div id="categories-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+             
 
               {/* Product Categories - Browse More */}
               {!showStatusPanel && storefrontCategories.categories.length > 0 && (
@@ -791,12 +798,12 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
               
 
               {/* Store Ratings and Reviews - Social Proof */}
-               <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
-              {!showStatusPanel && <StoreRatingsSection tenantId={listing.tenantId} showWriteReview={true} />}
+               <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
+              {showStatusPanel && <StoreRatingsSection tenantId={listing.tenantId} showWriteReview={true} />}
             </div>
- <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+            <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
             {/* Right Column - Contact Info */}
-            {!showStatusPanel && (
+            {showStatusPanel && (
             <div className="space-y-6">
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -808,13 +815,13 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                 
                   
                   {/* Social Links */}
-                  {!showStatusPanel && businessProfile?.social_links && Object.keys(businessProfile.social_links).length > 0 && (
+                  {showStatusPanel && (businessProfile?.social_links || businessProfile?.socialLinks) && Object.keys(businessProfile.social_links || businessProfile.socialLinks).length > 0 && (
                     <div className="pt-3 border-t border-neutral-200 dark:border-neutral-600 mt-3">
                       <h2 className="text-lg font-semibold text-neutral-500 dark:text-neutral-400 mb-3">Follow Us</h2>
                       <div className="flex flex-wrap gap-4">
-                        {businessProfile.social_links.facebook && (
+                        {businessProfile.social_links?.facebook || businessProfile.socialLinks?.facebook && (
                           <a
-                            href={businessProfile.social_links.facebook}
+                            href={businessProfile.social_links?.facebook || businessProfile.socialLinks?.facebook}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 text-blue-600 hover:text-blue-700 transition-colors"
@@ -825,9 +832,9 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                             </svg>
                           </a>
                         )}
-                        {businessProfile.social_links.instagram && (
+                        {businessProfile.social_links?.instagram || businessProfile.socialLinks?.instagram && (
                           <a
-                            href={businessProfile.social_links.instagram}
+                            href={businessProfile.social_links?.instagram || businessProfile.socialLinks?.instagram}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 text-pink-600 hover:text-pink-700 transition-colors"
@@ -838,9 +845,9 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                             </svg>
                           </a>
                         )}
-                        {businessProfile.social_links.twitter && (
+                        {businessProfile.social_links?.twitter || businessProfile.socialLinks?.twitter && (
                           <a
-                            href={businessProfile.social_links.twitter}
+                            href={businessProfile.social_links?.twitter || businessProfile.socialLinks?.twitter}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 text-blue-400 hover:text-blue-500 transition-colors"
@@ -851,9 +858,9 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                             </svg>
                           </a>
                         )}
-                        {businessProfile.social_links.linkedin && (
+                        {businessProfile.social_links?.linkedin || businessProfile.socialLinks?.linkedin && (
                           <a
-                            href={businessProfile.social_links.linkedin}
+                            href={businessProfile.social_links?.linkedin || businessProfile.socialLinks?.linkedin}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 text-blue-700 hover:text-blue-800 transition-colors"
@@ -864,9 +871,9 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                             </svg>
                           </a>
                         )}
-                        {businessProfile.social_links.youtube && (
+                        {businessProfile.social_links?.youtube || businessProfile.socialLinks?.youtube && (
                           <a
-                            href={businessProfile.social_links.youtube}
+                            href={businessProfile.social_links?.youtube || businessProfile.socialLinks?.youtube}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 text-red-600 hover:text-red-700 transition-colors"
@@ -877,9 +884,9 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                             </svg>
                           </a>
                         )}
-                        {businessProfile.social_links.tiktok && (
+                        {businessProfile.social_links?.tiktok || businessProfile.socialLinks?.tiktok && (
                           <a
-                            href={businessProfile.social_links.tiktok}
+                            href={businessProfile.social_links?.tiktok || businessProfile.socialLinks?.tiktok}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 text-gray-700 hover:text-gray-800 transition-colors"
@@ -898,12 +905,12 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
               )}
  <div id="hours-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
               {/* Business Hours - Collapsible */}
-              {!showStatusPanel && businessHours && (
+              {showStatusPanel && businessHours && (
                 <BusinessHoursCollapsible businessHours={businessHours} />
               )}
  <div id="map-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
               {/* Map Location */}
-              {!showStatusPanel && listing.address && (
+              {showStatusPanel && listing.address && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">
                     Our Location
@@ -916,7 +923,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
         </div>
 
       {/* Related Stores */}
-      {!showStatusPanel && (
+      {showStatusPanel && (
       <RelatedStores 
         currentSlug={slugForRelated} 
         limit={3}

@@ -619,7 +619,7 @@ export default function OnboardingWizard({
                   disabled={!isValid || saving}
                   loading={saving} style={{color: 'white'}}
                 >
-                  {saving ? 'Saving...' : currentStep === 4 ? 'Complete Setup' : 'Continues'}
+                  {saving ? 'Saving...' : currentStep === 4 ? 'Complete Setup' : 'Continue'}
                   <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>

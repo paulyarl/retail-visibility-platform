@@ -20,7 +20,7 @@ export default function ProductCategoriesCollapsible({
 }: DirectoryProductCategoriesCollapsibleProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const totalProducts = categories.reduce((sum: number, cat: any) => sum + (cat.count || 0), 0) + uncategorizedCount;
+  const totalProducts = categories.reduce((sum: number, cat: any) => sum + (parseInt(cat.productCount) || 0), 0) + uncategorizedCount;
 
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">

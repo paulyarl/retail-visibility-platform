@@ -1,8 +1,13 @@
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import ProductGallery from '@/components/products/ProductGallery';
+
+// Tier Based Landing Page
 import { TierBasedLandingPage } from '@/components/landing-page/TierBasedLandingPage';
+
+// Product Components
 import { ProductNavigation } from '@/components/products/ProductNavigation';
 import { ProductRecommendations } from '@/components/products/ProductRecommendations';
 import { FeaturedTypeProducts } from '@/components/products/FeaturedTypeProducts';
@@ -22,6 +27,9 @@ import { productDataService } from '@/services/ProductDataService';
 import { storefrontSingletonService } from '@/services/StorefrontSingletonService';
 import { TenantPaymentProvider } from '@/contexts/TenantPaymentContext';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+import { directoryService } from '@/services/DirectorySingletonService';
+import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
+import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 
 // Define the product interface based on the API response
 interface ProductImage {
@@ -151,6 +159,16 @@ async function getBucketCounts(tenantId: string): Promise<Record<string, number>
   }
 }
 
+async function getStorefrontCategories(tenantId: string) {
+  try {
+    const data = await directoryService.getStorefrontCategories(tenantId);
+    return data;
+  } catch (error) {
+    console.error('Error fetching storefront categories:', error);
+    return { categories: [], uncategorizedCount: 0 };
+  }
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const product = await getProduct(id);
@@ -235,6 +253,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const shopData = await getShopData(product.tenantId);
   const bucketCounts = await getBucketCounts(product.tenantId);
   const tenantProfile = await getTenantProfile(product.tenantId);
+  const storefrontCategories = await getStorefrontCategories(product.tenantId);
+  const totalProducts = await directoryService.getStorefrontProductCount(product.tenantId);
   // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
   const businessName = product.tenant?.name || 'Unknown Store';
   
@@ -333,40 +353,133 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         categoryId={product.category?.id}
       />
 
-      {/* Navigation Buttons (for authenticated users) */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-        <ProductNavigation tenantId={product.tenantId} directorySlug={product.tenant?.slug} />
-        
-        {/* Featured Type Badges - moved below, keeping space */}
-        
-        {/* Storefront Actions */}
-        
-        <div className="flex justify-end mt-4">
-           <DirectoryActions 
-                    listing={{
-                      business_name: tenantProfile?.business_name || '',
-                      slug: tenantProfile?.slug || '',
-                      tenantId: product.tenantId || '',
-                      id: product.id || ''
-                    }}
-                    currentUrl={currentUrl}
-                    entity_name={product.name}
-                    variant="product"
-                  />
+      {/* Hero Header - Store Brand Identity, Navigation, Actions */}
+      <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 shadow-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Main Header Row */}
+          <div className="flex items-center gap-4 py-4">
+            {/* Brand Identity */}
+            <div className="flex items-center gap-4 flex-shrink-0 min-w-0">
+              {/* Store Logo */}
+              <div className="flex-shrink-0">
+                {tenantProfile?.logo_url ? (
+                  <div className="relative w-14 h-14">
+                    <Image
+                      src={tenantProfile.logo_url}
+                      alt={tenantProfile.business_name || businessName}
+                      fill
+                      className="object-contain rounded-lg shadow-sm"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 flex items-center justify-center shadow-sm">
+                    <svg className="w-7 h-7 text-primary-600 dark:text-primary-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+
+              {/* Store Name and Category */}
+              <div className="flex flex-col min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-neutral-900 dark:text-white truncate">
+                    {tenantProfile?.business_name || businessName || 'Store'}
+                  </h1>
+                </div>
+                {product.category && (
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    {product.category.name}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
+              {/* Navigation Pills */}
+              <div className="hidden sm:flex items-center gap-2 flex-wrap">
+                {tenantProfile?.slug && (
+                  <a
+                    href={`/directory/${tenantProfile.slug}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
+                    title="View Store in Directory"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <span className="hidden lg:inline">Directory</span>
+                  </a>
+                )}
+                
+                {tenantProfile?.slug && (
+                  <a
+                    href={`/tenant/${product.tenantId}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap"
+                    title="View Products"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    <span className="hidden lg:inline">Products</span>
+                  </a>
+                )}
+              </div>
+
+              {/* Directory Actions */}
+              <DirectoryActions 
+                listing={{
+                  business_name: tenantProfile?.business_name || '',
+                  slug: tenantProfile?.slug || '',
+                  tenantId: product.tenantId || '',
+                  id: product.id || ''
+                }}
+                currentUrl={currentUrl}
+                entity_name={product.name}
+                variant="product"
+              />
+            </div>
+          </div>
+
+          {/* Mobile Navigation */}
+          <div className="sm:hidden pb-3 flex items-center gap-2 overflow-x-auto">
+            {tenantProfile?.slug && (
+              <a
+                href={`/directory/${tenantProfile.slug}`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <span>Directory</span>
+              </a>
+            )}
+            {tenantProfile?.slug && (
+              <a
+                href={`/tenant/${product.tenantId}`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors whitespace-nowrap flex-shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+                <span>Products</span>
+              </a>
+            )}
+          </div>
         </div>
-        <div id="action-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
-                 
-        
-        {/* Alert for non-public products (only shown to authenticated users) */}
-        {!isPubliclyAccessible && (
-          <div className="mt-4 bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500 p-4 rounded-r-lg">
+      </header>
+
+      {/* Alert for non-public products (only shown to authenticated users) */}
+      {!isPubliclyAccessible && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500 p-4 rounded-r-lg">
             <div className="flex items-start gap-3">
               <svg className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <div className="flex-1">
                 <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
-                  ⚠️ This Product is Not Publicly Accessible
+                  This Product is Not Publicly Accessible
                 </h3>
                 <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
                   <strong>Status:</strong> {statusLabel} | <strong>Visibility:</strong> {visibilityLabel}
@@ -377,121 +490,152 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   {product.itemStatus === 'inactive' && 'This product is inactive. Activate it to make it publicly accessible.'}
                   {product.visibility === 'private' && product.itemStatus === 'active' && 'This product is set to private. Change visibility to public to make it accessible.'}
                 </p>
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                  💡 Only you can see this page because you're authenticated. Public visitors will see a 404 error.
-                </p>
               </div>
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* Tier-Based Landing Page with Gallery */}
-      <TenantPaymentProvider tenantId={product.tenantId}>
-        <TierBasedLandingPage 
-        product={{
-          id: product.id,
-          tenantId: product.tenantId,
-          name: product.name,
-          title: product.title,
-          description: product.description,
-          marketingDescription: product.metadata?.enhancedDescription,
-          price: product.price,
-          priceCents: product.priceCents,
-          listPriceCents: product.listPriceCents,
-          salePriceCents: product.salePriceCents,
-          currency: product.currency,
-          imageUrl: product.imageUrl,
-          imageGallery: productWithGallery.imageGallery,
-          brand: product.brand,
-          sku: product.sku,
-          stock: product.stock,
-          availability: product.availability,
-          condition: product.condition,
-          tenantCategoryId: product.category?.id,
-          tenantCategory: product.category ? {
-            id: product.category.id,
-            name: product.category.name,
-            slug: product.category.slug,
-          } : undefined,
-          featuredTypes: product.featuredTypes,
-          bucketCounts,
-          gtin: undefined, // Not available in new API
-          mpn: undefined, // Not available in new API
-          defaultGatewayType: undefined, // Will be determined by tenant
-          // Pass features from metadata
-          features: product.metadata?.features,
-          specifications: undefined, // Not available in current API
-          slug: product.tenant?.slug || '',
-          variants: product.variants,
-          productType: product.productType,
-          digitalDeliveryMethod: product.digitalDeliveryMethod,
-          digitalAssets: product.digitalAssets,
-          licenseType: product.licenseType,
-          accessDurationDays: product.accessDurationDays,
-          downloadLimit: product.downloadLimit,
-        } as any}
-        tenant={{
-          id: product.tenantId,
-          name: product.tenant?.name,
-          slug: product.tenant?.slug || '',
-          subscriptionTier: product.tenant?.subscriptionTier,
-          hasActivePaymentGateway: false, // Will be determined by service
-          defaultGatewayType: undefined,
-          metadata: {
-            businessName: product.tenant?.name,
-            phone: undefined,
-            email: undefined,
-            website: undefined,
-            address: undefined,
-            logo_url: undefined,
-            social_links: undefined,
-          },
-        } as any}
-        storeStatus={null}
-          gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
-          fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenantId} />}
-        />
-      </TenantPaymentProvider>
-
-      {/* Business Information - Contact Us */}
-      <div id="info-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <ProductBusinessInfoCollapsible 
-          product={product as any} 
-          tenant={ {
-            id: product.tenantId || tenantProfile?.tenant_id || '',
-            name: tenantProfile?.business_name || product.tenant?.name || '',
-            metadata: {
-              businessName: tenantProfile?.business_name,
-              phone: tenantProfile?.phone_number,
-              email: tenantProfile?.email,
-              website: tenantProfile?.website,
-              address: `${tenantProfile?.address_line1}, ${tenantProfile?.city}, ${tenantProfile?.state} ${tenantProfile?.postal_code}`,
-              logo_url: tenantProfile?.logo_url,
-              social_links: tenantProfile?.social_links || undefined,
-            }
-          }} 
-        />
-      </div>
-
-      {/* Business Description - Merchant Branding */}
-      <div id="about-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
-      {tenantProfile?.business_description && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-          <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 p-6">
-            <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
-              About {tenantProfile.business_name}
-            </h2>
-            <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
-              {tenantProfile.business_description}
-            </p>
           </div>
         </div>
       )}
 
-     
-      {/* Featured Type Products - other products with same featured types */}
+{/* Two-Column Layout: Categories + Product Description only */}
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Desktop Category Sidebar */}
+            <div className="hidden lg:block lg:w-64 flex-shrink-0">
+              <ProductCategorySidebar
+                tenantId={product.tenantId}
+                categories={storefrontCategories.categories.map((cat: any) => ({
+                  id: cat.id,
+                  name: cat.name,
+                  slug: cat.slug,
+                  count: parseInt(cat.productCount) || 0,
+                }))}
+                totalProducts={totalProducts || 0}
+              />
+            </div>
+
+            {/* Mobile Category Dropdown */}
+            <div className="lg:hidden">
+              <CategoryMobileDropdown
+                tenantId={product.tenantId}
+                categories={storefrontCategories.categories.map((cat: any) => ({
+                  id: cat.id,
+                  name: cat.name,
+                  slug: cat.slug,
+                  count: parseInt(cat.productCount) || 0,
+                }))}
+                totalProducts={totalProducts || 0}
+              />
+            </div>
+
+            {/* Product Description Section */}
+            <div className="flex-1 min-w-0">
+              <TenantPaymentProvider tenantId={product.tenantId}>
+                <TierBasedLandingPage 
+                product={{
+                  id: product.id,
+                  tenantId: product.tenantId,
+                  name: product.name,
+                  title: product.title,
+                  description: product.description,
+                  marketingDescription: product.metadata?.enhancedDescription,
+                  price: product.price,
+                  priceCents: product.priceCents,
+                  listPriceCents: product.listPriceCents,
+                  salePriceCents: product.salePriceCents,
+                  currency: product.currency,
+                  imageUrl: product.imageUrl,
+                  imageGallery: productWithGallery.imageGallery,
+                  brand: product.brand,
+                  sku: product.sku,
+                  stock: product.stock,
+                  availability: product.availability,
+                  condition: product.condition,
+                  tenantCategoryId: product.category?.id,
+                  tenantCategory: product.category ? {
+                    id: product.category.id,
+                    name: product.category.name,
+                    slug: product.category.slug,
+                  } : undefined,
+                  featuredTypes: product.featuredTypes,
+                  bucketCounts,
+                  gtin: undefined, // Not available in new API
+                  mpn: undefined, // Not available in new API
+                  defaultGatewayType: undefined, // Will be determined by tenant
+                  // Pass features from metadata
+                  features: product.metadata?.features,
+                  specifications: undefined, // Not available in current API
+                  slug: product.tenant?.slug || '',
+                  variants: product.variants,
+                  productType: product.productType,
+                  digitalDeliveryMethod: product.digitalDeliveryMethod,
+                  digitalAssets: product.digitalAssets,
+                  licenseType: product.licenseType,
+                  accessDurationDays: product.accessDurationDays,
+                  downloadLimit: product.downloadLimit,
+                } as any}
+                tenant={{
+                  id: product.tenantId,
+                  name: product.tenant?.name,
+                  slug: product.tenant?.slug || '',
+                  subscriptionTier: product.tenant?.subscriptionTier,
+                  hasActivePaymentGateway: false, // Will be determined by service
+                  defaultGatewayType: undefined,
+                  metadata: {
+                    businessName: product.tenant?.name,
+                    phone: undefined,
+                    email: undefined,
+                    website: undefined,
+                    address: undefined,
+                    logo_url: undefined,
+                    social_links: undefined,
+                  },
+                } as any}
+                storeStatus={null}
+                  gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
+                  fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenantId} />}
+                />
+              </TenantPaymentProvider>
+            </div>
+          </div>
+        </div>
+
+        {/* Business Information - Contact Us - Full Width */}
+        <div id="info-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ProductBusinessInfoCollapsible 
+            product={product as any} 
+            tenant={ {
+              id: product.tenantId || tenantProfile?.tenant_id || '',
+              name: tenantProfile?.business_name || product.tenant?.name || '',
+              metadata: {
+                businessName: tenantProfile?.business_name,
+                phone: tenantProfile?.phone_number,
+                email: tenantProfile?.email,
+                website: tenantProfile?.website,
+                address: `${tenantProfile?.address_line1}, ${tenantProfile?.city}, ${tenantProfile?.state} ${tenantProfile?.postal_code}`,
+                logo_url: tenantProfile?.logo_url,
+                social_links: tenantProfile?.social_links || undefined,
+              }
+            }} 
+          />
+        </div>
+
+        {/* Business Description - Merchant Branding - Full Width */}
+        <div id="about-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
+        {tenantProfile?.business_description && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 p-6">
+              <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                About {tenantProfile.business_name}
+              </h2>
+              <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                {tenantProfile.business_description}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Featured Type Products - Full Width */}
       <div id="featured-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <FeaturedTypeProducts 
@@ -501,14 +645,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         />
       </div>
 
-      {/* Product Recommendations */}
+      {/* Product Recommendations - Full Width */}
       <div id="recommendations-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <ProductRecommendations productId={product.id} tenantId={product.tenantId} tenantSlug={product.tenant?.slug || ''} />
       </div>
 
-
-      {/* Product Reviews */}
+      {/* Product Reviews - Full Width */}
       <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
       <div className="bg-neutral-50 dark:bg-neutral-900 border-y border-neutral-200 dark:border-neutral-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

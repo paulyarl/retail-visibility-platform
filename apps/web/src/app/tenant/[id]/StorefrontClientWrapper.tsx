@@ -319,7 +319,7 @@ export default function StorefrontClientWrapper({
                   </a>
                 )}
 				
-                {directoryPublished && tenantSlug && (
+                {directoryPublished && tenantSlug && storefrontStatus.shouldShowPanel && (
                   <a
                     href={`/shops/${tenantSlug}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
@@ -360,7 +360,7 @@ export default function StorefrontClientWrapper({
             
           </div>
           {/* Category Badges */}
-                    {!storefrontStatus.shouldShowPanel && primaryGBPCategory && (
+                    {primaryGBPCategory && (
                       <div className="flex-1">
                         <GBPCategoryBadges
                           categories={[primaryGBPCategory, ...secondaryGBPCategories]}
@@ -372,7 +372,7 @@ export default function StorefrontClientWrapper({
                     )}
 
           {/* Action Buttons - Below categories for better responsive behavior */}
-          {!storefrontStatus.shouldShowPanel && (
+          { tenantSlug && (
           <div className="hidden sm:flex justify-end mt-3">
             <DirectoryActions 
               listing={{
@@ -398,7 +398,7 @@ export default function StorefrontClientWrapper({
                 <span>Directory</span>
               </a>
             )}
-            {directoryPublished && tenantSlug && (
+            {directoryPublished && tenantSlug && storefrontStatus.shouldShowPanel && (
               <a
                 href={`/shops/${tenantSlug}`}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap flex-shrink-0"
@@ -471,7 +471,7 @@ export default function StorefrontClientWrapper({
             {/* Shop Description */}
             <div className="lg:col-span-2">
               <div className="space-y-6">
-                {!storefrontStatus.shouldShowPanel && (
+                {tenant.metadata?.businessDescription&& (
                 <div>
                   <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">About {businessName}</h2>
                   <div className="prose prose-neutral dark:prose-invert max-w-none">
@@ -484,7 +484,7 @@ export default function StorefrontClientWrapper({
                 )}
 
                 {/* Social Links */}
-                {tenant.profileData?.social_links && !storefrontStatus.shouldShowPanel && (
+                {tenant.profileData?.social_links && (
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-3">Connect With Us</h3>
                     <div className="flex flex-wrap gap-3">
@@ -548,7 +548,7 @@ export default function StorefrontClientWrapper({
 
             {/* Store Image/Logo Display */}
             <div>
-              {!storefrontStatus.shouldShowPanel && (
+              {(tenant.metadata.logo_url || tenant.metadata.logoUrl) &&(
               <div className="bg-neutral-100 dark:bg-neutral-800 rounded-lg overflow-hidden">
                 {tenant.metadata?.logo_url ? (
                   <div className="relative aspect-square">
@@ -581,6 +581,7 @@ export default function StorefrontClientWrapper({
         <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
           <div className="py-4 border-b border-neutral-200 dark:border-neutral-700 sticky top-[60px] z-30 bg-white dark:bg-neutral-900">
             {/* First Row - Product Categories */}
+            {!storefrontStatus.shouldShowPanel && (
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400 whitespace-nowrap">Quick Jump:</span>
               
@@ -711,13 +712,12 @@ export default function StorefrontClientWrapper({
                 );
               })}
             </div>
-
-          
+            )}          
           </div>
+          
         </div>
       )}
-       {/* Gradient border line */}
-      <div className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+     
 
               {/* Status Panel - shows when products/categories are hidden */}
               {storefrontStatus.shouldShowPanel && storefrontStatus.tenant && (
@@ -880,11 +880,7 @@ export default function StorefrontClientWrapper({
                   Our Store Hours
                 </h3>
                 {businessHours ? (
-                  !storefrontStatus.shouldShowPanel ? (
-                    <BusinessHoursCollapsible businessHours={businessHours} />
-                  ) : (
-                    <p className="text-neutral-500 dark:text-neutral-400 italic">Business hours not available</p>
-                  )
+                  <BusinessHoursCollapsible businessHours={businessHours} />
                 ) : (
                   <p className="text-neutral-500 dark:text-neutral-400 italic">Business hours not available</p>
                 )}
@@ -945,11 +941,11 @@ export default function StorefrontClientWrapper({
                 </div>
                 
                 {/* Single Map Display */}
-                {mapLocation && !storefrontStatus.shouldShowPanel ? (
+                {mapLocation ? (
                   <TenantMapSection location={mapLocation} />
                 ) : contactInfo.address ? (
                   <GoogleMapEmbed address={contactInfo.address} height="h-80" showDirections={true} />
-                ) : tenant && !storefrontStatus.shouldShowPanel && (
+                ) : tenant  && (
                   <StorefrontMap
                     tenant={{
                       id: tenantId,
@@ -983,16 +979,18 @@ export default function StorefrontClientWrapper({
           </div>
         </div>
       </div>
+        {/* Store Ratings and Reviews */}
  {/* Gradient border line */}
-      <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
-      {/* Store Ratings and Reviews */}
-      {!storefrontStatus.shouldShowPanel && (
+      
+    
+     
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" ></div>
         <div  className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
           <StoreRatingDisplay tenantId={tenantId} showWriteReview={true} isPublic={true} />
         </div>
       </div>
-      )}
+     
 
       {/* Advanced Catalog Navigation */}
       {!storefrontStatus.shouldShowPanel && (categories.length > 0 || productCategories.length > 0 || storeCategories.length > 0) && (
@@ -1017,9 +1015,9 @@ export default function StorefrontClientWrapper({
      
 
       {/* Storefront Recommendations */}
-      {!storefrontStatus.shouldShowPanel && (
+      
         <StorefrontRecommendations tenantId={tenantId} />
-      )}
+     
 
       {/* Recently Viewed - always last for consistency with other public pages */}
       <div className="mx-auto bg-gradient-to-r from-transparent via-orange-500 to-transparent">
@@ -1048,7 +1046,7 @@ export default function StorefrontClientWrapper({
                     View in Directory
                   </Link>
                 )}
-                {directoryPublished && tenantSlug && (
+                {directoryPublished && tenantSlug && !storefrontStatus.shouldShowPanel && (
                   <Link
                     href={`/shops/${tenantSlug}`}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors text-sm font-medium"

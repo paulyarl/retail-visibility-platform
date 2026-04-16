@@ -60,10 +60,10 @@ export default function ContactInformationCollapsible({
 
             {/* Collapsible Content */}
             {isExpanded && (
-                <div className="px-4 pb-4 border-t border-neutral-200 dark:border-neutral-700">
-                   <div><HoursStatusBadge status={hoursStatus} />
+                <div className="px-4 pb-16 border-t border-neutral-200 dark:border-neutral-700">
+                   <div><HoursStatusBadge status={hoursStatus} size="lg" />
                        {hoursStatus?.label}</div>
-                       <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-transparent" />
+                       <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-green-500 to-transparent" />
                     {fullAddress && (
                                        <div className="flex items-start gap-2 mb-3">
                                          <MapPin className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
