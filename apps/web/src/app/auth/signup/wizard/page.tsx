@@ -186,8 +186,8 @@ export default function SignupWizardPage() {
                 <Image
                   src={settings.logoUrl}
                   alt={settings.platformName || 'Platform Logo'}
-                  width={120}
-                  height={30}
+                  width={400}
+                  height={60}
                   className="max-h-8 w-auto object-contain mx-auto mb-6"
                   onError={(e) => {
                     console.error('[SignupWizard] Logo failed to load:', settings.logoUrl);
@@ -214,11 +214,7 @@ export default function SignupWizardPage() {
 
           <div className="text-center">
             <div className="mb-8">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-primary-100 rounded-2xl mb-6">
-                <svg className="w-10 h-10 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={benefit.icon} />
-                </svg>
-              </div>
+             
               <h2 className="text-3xl font-bold text-neutral-900 mb-4">{benefit.title}</h2>
               <p className="text-xl text-neutral-600 mb-6 max-w-2xl mx-auto">{benefit.description}</p>
               
@@ -274,8 +270,8 @@ export default function SignupWizardPage() {
               <Image
                 src={settings.logoUrl}
                 alt={settings.platformName || 'Platform Logo'}
-                width={120}
-                height={30}
+                width={240}
+                height={60}
                 className="max-h-8 w-auto object-contain mx-auto mb-6"
               />
             ) : (
@@ -475,8 +471,8 @@ export default function SignupWizardPage() {
                 <Image
                   src={settings.logoUrl}
                   alt={settings.platformName || 'Platform Logo'}
-                  width={200}
-                  height={50}
+                  width={400}
+                  height={100}
                   className="max-h-16 w-auto object-contain mx-auto mb-4"
                 />
               ) : (

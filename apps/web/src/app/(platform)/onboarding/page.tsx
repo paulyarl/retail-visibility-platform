@@ -8,6 +8,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { userManagementService } from '@/services/UserManagementService';
 import { onboardingStateService } from '@/services/OnboardingStateService';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext';
+import Image from 'next/image';
 
 const ONBOARDING_STEPS = [
   { id: 'welcome', title: 'Welcome to Visible Shelf!', description: 'Let\'s get your account set up' },
@@ -179,8 +181,9 @@ function OnboardingContent() {
       router.push(`/tenants${queryString ? `?${queryString}` : ''}`);
     }
   };
+  const { settings, loading: settingsLoading } = usePlatformSettings();
 
-  if (isLoading) {
+  if (isLoading || settingsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-neutral-50 flex items-center justify-center">
         <div className="text-center">
@@ -204,10 +207,39 @@ function OnboardingContent() {
           transition={{ duration: 0.5 }}
           className="text-center mb-8"
         >
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-2xl mb-4 shadow-lg">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
+          <div className="inline-flex items-center justify-center">
+            {/* Platform Logo */}
+          <div className="text-center w-full">
+            {settings?.logoUrl ? (
+              <div>
+                <Image
+                  src={settings.logoUrl}
+                  alt={settings.platformName || 'Platform Logo'}
+                  width={400}
+                  height={60}
+                  className="max-h-8 w-auto object-contain mx-auto mb-6"
+                  onError={(e) => {
+                    console.error('[SignupWizard] Logo failed to load:', settings.logoUrl);
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const fallback = target.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-primary-600 rounded-xl mb-6 shadow-lg mx-auto" style={{display: 'none'}}>
+                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+              </div>
+            ) : (
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-primary-600 rounded-xl mb-6 shadow-lg mx-auto">
+                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+            )}
+          </div>
           </div>
           <h1 className="text-3xl font-bold text-neutral-900 mb-2">
             Welcome to Visible Shelf
@@ -471,7 +503,9 @@ function OnboardingContent() {
                   <Button
                     onClick={handleNext}
                     loading={isSubmitting}
-                    disabled={currentStep === 2 && !formData.businessName}
+                    disabled={currentStep === 2 && !formData.businessName} 
+                    style={{color: 'white'}}
+                    size="lg"
                   >
                     {currentStep === 2 ? 'Complete Setup' : 'Continue'}
                   </Button>
