@@ -133,7 +133,7 @@ export default function StorefrontClientWrapper({
       (tenant?.address_line1 ? `${tenant.address_line1}${tenant.city ? ', ' + tenant.city : ''}${tenant.state ? ', ' + tenant.state : ''}${tenant.postal_code ? ' ' + tenant.postal_code : ''}` : null),
     website: tenant?.metadata?.website || tenant?.website || null
   };
-  console.log(`[StorefrontClientWrapper] tenant info:`, tenant);
+  // console.log(`[StorefrontClientWrapper] tenant info:`, tenant);
   // console.log(`[StorefrontClientWrapper] tenant category:`, category);
   // console.log(`[StorefrontClientWrapper] tenant primaryGBPCategory:`, primaryGBPCategory);
   // console.log(`[StorefrontClientWrapper] tenant secondaryGBPCategories:`, secondaryGBPCategories);
@@ -983,14 +983,7 @@ export default function StorefrontClientWrapper({
  {/* Gradient border line */}
       
     
-     
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" ></div>
-        <div  className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
-          <StoreRatingDisplay tenantId={tenantId} showWriteReview={true} isPublic={true} />
-        </div>
-      </div>
-     
+    
 
       {/* Advanced Catalog Navigation */}
       {!storefrontStatus.shouldShowPanel && (categories.length > 0 || productCategories.length > 0 || storeCategories.length > 0) && (
@@ -1012,11 +1005,22 @@ export default function StorefrontClientWrapper({
           />
         </div>
       )}
+
+       
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" ></div>
+        <div  className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-6">
+          <StoreRatingDisplay tenantId={tenantId} showWriteReview={true} isPublic={true} />
+        </div>
+      </div>
+     
      
 
       {/* Storefront Recommendations */}
       
         <StorefrontRecommendations tenantId={tenantId} />
+
+
      
 
       {/* Recently Viewed - always last for consistency with other public pages */}

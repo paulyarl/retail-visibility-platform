@@ -257,6 +257,10 @@ export function getStorefrontMessage(
         message: 'This location is permanently closed. Thank you for your patronage over the years.',
       };
     case 'pending':
+      return {
+        title: 'Pending',
+        message: 'New location being set up. Available soon.',
+      };
     case 'archived':
       return {
         title: 'Location Not Available',
