@@ -133,7 +133,7 @@ export default function StorefrontClientWrapper({
       (tenant?.address_line1 ? `${tenant.address_line1}${tenant.city ? ', ' + tenant.city : ''}${tenant.state ? ', ' + tenant.state : ''}${tenant.postal_code ? ' ' + tenant.postal_code : ''}` : null),
     website: tenant?.metadata?.website || tenant?.website || null
   };
-  // console.log(`[StorefrontClientWrapper] tenant info:`, tenant);
+  console.log(`[StorefrontClientWrapper] tenant info:`, tenant);
   // console.log(`[StorefrontClientWrapper] tenant category:`, category);
   // console.log(`[StorefrontClientWrapper] tenant primaryGBPCategory:`, primaryGBPCategory);
   // console.log(`[StorefrontClientWrapper] tenant secondaryGBPCategories:`, secondaryGBPCategories);
@@ -471,7 +471,7 @@ export default function StorefrontClientWrapper({
             {/* Shop Description */}
             <div className="lg:col-span-2">
               <div className="space-y-6">
-                {tenant.metadata?.businessDescription&& (
+                {tenant.profileData?.business_description|| tenant.profileData?.businessDescription||tenant.metadata?.businessDescription&& (
                 <div>
                   <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-4">About {businessName}</h2>
                   <div className="prose prose-neutral dark:prose-invert max-w-none">
@@ -935,7 +935,7 @@ export default function StorefrontClientWrapper({
                   
                    {/* Hours Badge - Status */}
                   <div className="flex items-center gap-2">
-                    <HoursStatusBadge status={hoursStatus} /> {hoursStatus?.label}
+                    <HoursStatusBadge status={hoursStatus} size="lg" /> 
                   </div>
 
                 </div>

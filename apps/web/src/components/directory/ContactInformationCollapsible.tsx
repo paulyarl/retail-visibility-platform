@@ -62,7 +62,7 @@ export default function ContactInformationCollapsible({
             {isExpanded && (
                 <div className="px-4 pb-16 border-t border-neutral-200 dark:border-neutral-700">
                    <div><HoursStatusBadge status={hoursStatus} size="lg" />
-                       {hoursStatus?.label}</div>
+                     </div>
                        <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-green-500 to-transparent" />
                     {fullAddress && (
                                        <div className="flex items-start gap-2 mb-3">
