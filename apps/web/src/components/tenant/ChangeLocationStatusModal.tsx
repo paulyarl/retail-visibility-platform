@@ -99,13 +99,13 @@ export default function ChangeLocationStatusModal({
     setStatusLoading(true);
     try {
       const tenantData = await tenantInfoService.getTenantDataWithCacheBusting(tenantId);
-      console.log('[ChangeLocationStatusModal] Tenant data from API:', tenantData);
-      console.log('[ChangeLocationStatusModal] Available fields:', Object.keys(tenantData));
-      console.log('[ChangeLocationStatusModal] locationStatus field:', tenantData.locationStatus);
-      console.log('[ChangeLocationStatusModal] location_status field:', tenantData.location_status);
+      // console.log('[ChangeLocationStatusModal] Tenant data from API:', tenantData);
+      // console.log('[ChangeLocationStatusModal] Available fields:', Object.keys(tenantData));
+      // console.log('[ChangeLocationStatusModal] locationStatus field:', tenantData.locationStatus);
+      // console.log('[ChangeLocationStatusModal] location_status field:', tenantData.location_status);
       
       const backendStatus = tenantData.locationStatus || tenantData.location_status || 'active';
-      console.log('[ChangeLocationStatusModal] Setting current status to:', backendStatus);
+      // console.log('[ChangeLocationStatusModal] Setting current status to:', backendStatus);
       setCurrentStatus(backendStatus);
       setSelectedStatus(backendStatus); // Reset selected status to current
     } catch (err) {
@@ -200,8 +200,8 @@ export default function ChangeLocationStatusModal({
     return opt.value !== currentStatus;
   });
   
-  console.log('[ChangeLocationStatusModal] Current status:', currentStatus);
-  console.log('[ChangeLocationStatusModal] Allowed transitions:', allowedTransitions.map(opt => opt.value));
+  // console.log('[ChangeLocationStatusModal] Current status:', currentStatus);
+  // console.log('[ChangeLocationStatusModal] Allowed transitions:', allowedTransitions.map(opt => opt.value));
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">

@@ -204,6 +204,10 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
   
   // Get tenant tier to determine if we should show logo
   const [tenantTier, setTenantTier] = useState<string>('starter');
+  // console.log('[TierBasedLandingPage] tenantTier: ', tenantTier);
+  // console.log('[TierBasedLandingPage] tenantId: ', tenantId);
+  // console.log('[TierBasedLandingPage] tenantLogo: ', tenantLogo);
+  // console.log('[TierBasedLandingPage] isFetchingTierAndLogo: ', isFetchingTierAndLogo);
   
   useEffect(() => {
     const fetchTenantInfo = async () => {
@@ -212,17 +216,57 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
         
         // Use public tier endpoint (no auth required for public product page)
         const tierData = await storefrontService.getPublicTier(tenantId);
+        // console.log(`[QR Code] Tier data: ${JSON.stringify(tierData)}`);
         if (tierData) {
-          // Use tier_key for clean single-word tier name (e.g., "professional")
-          const effectiveTier = tierData.effective?.tier_key || tierData.tier || 'starter';
-          setTenantTier(effectiveTier);
+          // Extract data from wrapper (API returns {success, data: {...}})
+          const data = tierData.data || tierData;
           
-          // Get tenant profile for logo if professional or above
-          if (effectiveTier === 'professional' || effectiveTier === 'enterprise' || effectiveTier === 'organization' || effectiveTier === 'chain_professional' || effectiveTier === 'chain_enterprise') {
+          // Determine effective tier for QR code features
+          // Compare individual tenant tier vs organization tier and pick the higher one
+          const individualTier = data.tenantTier?.tier_key || null;
+          const organizationTier = data.organizationTier?.tier_key || null;
+          
+          // Helper to get QR code level from tier key
+          const getQRCodeLevel = (tierKey: string): number => {
+            if (!tierKey) return 0;
+            if (tierKey.includes('enterprise') || tierKey.includes('professional')) return 3; // qr_codes_2048
+            if (tierKey === 'chain_starter') return 1; // qr_codes_512 only
+            if (tierKey === 'starter') return 0;
+            return 2; // default for professional/chain_professional
+          };
+          
+          // Pick the tier with higher QR code features
+          let effectiveTier: string;
+          const individualLevel = getQRCodeLevel(individualTier || '');
+          const orgLevel = getQRCodeLevel(organizationTier || '');
+          
+          if (individualTier && (!organizationTier || individualLevel >= orgLevel)) {
+            // Use individual tier if it's higher or equal to org tier
+            effectiveTier = individualTier;
+          } else if (organizationTier) {
+            // Use organization tier if it's higher
+            effectiveTier = organizationTier;
+          } else {
+            // Fallback to effective or tier field
+            effectiveTier = data.effective?.tier_key || data.tier || 'starter';
+          }
+          let effectiveTierPart = effectiveTier;
+          const tierParts = effectiveTier.split('_');
+          if (tierParts.length >= 2 && tierParts[0]=='trial') {
+            effectiveTierPart = tierParts[1];
+          }
+          // console.log(`[QR Code] Individual tier: ${effectiveTierPart} (level ${individualLevel}), Org tier: ${organizationTier} (level ${orgLevel}), Effective: ${effectiveTier}`);
+          setTenantTier(effectiveTierPart);
+          
+          // Get tenant profile for logo if professional or above (or chain tiers)
+          if (effectiveTierPart === 'professional' || effectiveTierPart === 'enterprise' || effectiveTierPart === 'organization' || effectiveTierPart === 'chain_professional' || effectiveTierPart === 'chain_enterprise' || effectiveTierPart === 'chain_starter' || effectiveTierPart === 'trial_professional') {
             try {
               const profile = await storefrontService.getPublicTenantProfile(tenantId);
+              // console.log('[QR Code] Tenant profile:', profile);
               if (profile) {
-                setTenantLogo(profile.logo_url || null);
+                // Extract data from wrapper (API returns {success, data: {...}})
+                const profileData = profile.data || profile;
+                setTenantLogo(profileData.logo_url || null);
               } else {
                 console.error('Failed to fetch tenant profile');
               }
@@ -317,6 +361,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
       qrCanvas.height = 256;
 
       // Generate QR code with higher error correction if logo will be applied
+      // console.log(`[QR Code] tenantTier: ${tenantTier}, tenantLogo: ${tenantLogo}`);
       const shouldApplyLogo = (
         tenantTier === 'professional' || 
         tenantTier === 'enterprise' || 

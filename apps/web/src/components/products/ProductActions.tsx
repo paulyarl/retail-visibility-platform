@@ -187,7 +187,7 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
 
         <div className="flex items-center gap-2">
       
-           <HoursStatusBadge status={hoursStatus} />{hoursStatus?.label}
+           <HoursStatusBadge status={hoursStatus} size='lg' />
 
           {/* Write Review Button - Only on product pages */}
           {/* {variant === 'product' && (

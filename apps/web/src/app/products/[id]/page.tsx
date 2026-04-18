@@ -91,6 +91,7 @@ interface ProductData {
   updatedAt: string;
   metadata?: {
     features?: string[];
+    specifications?: Record<string, any>;
     enhancedDescription?: string;
   };
   tenantId: string;
@@ -105,7 +106,7 @@ interface ProductData {
   licenseType?: string;
   accessDurationDays?: number;
   downloadLimit?: number;
-  featuredTypes?: string[];
+  featuredTypes?: string[]; 
 }
 
 // Force dynamic rendering for product pages
@@ -172,6 +173,7 @@ async function getStorefrontCategories(tenantId: string) {
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const product = await getProduct(id);
+  // console.log(`product: `, product);
 
   if (!product) {
     return {
@@ -180,6 +182,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const tenantProfile = await getTenantProfile(product.tenantId);
+  // console.log(`tenantProfile: `, tenantProfile);
   const businessName = tenantProfile?.business_name || product.tenant?.name || 'Unknown Store';
   const businessDescription = tenantProfile?.business_description;
   const seoTags = tenantProfile?.seo_tags || [];
@@ -563,7 +566,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   defaultGatewayType: undefined, // Will be determined by tenant
                   // Pass features from metadata
                   features: product.metadata?.features,
-                  specifications: undefined, // Not available in current API
+                  specifications: product.metadata?.specifications, // Not available in current API
                   slug: product.tenant?.slug || '',
                   variants: product.variants,
                   productType: product.productType,
@@ -581,13 +584,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   hasActivePaymentGateway: false, // Will be determined by service
                   defaultGatewayType: undefined,
                   metadata: {
-                    businessName: product.tenant?.name,
-                    phone: undefined,
-                    email: undefined,
-                    website: undefined,
-                    address: undefined,
-                    logo_url: undefined,
-                    social_links: undefined,
+                    businessName: product.tenant?.name||tenantProfile?.business_name,
+                    phone: tenantProfile?.phone_number,
+                    email: tenantProfile?.email,
+                    website: tenantProfile?.website,
+                    address: tenantProfile?.address_line1,
+                    logo_url: tenantProfile?.logo_url,
+                    social_links: tenantProfile?.social_links,
                   },
                 } as any}
                 storeStatus={null}
@@ -598,6 +601,21 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
         </div>
+        {/* Business Description - Merchant Branding - Full Width */}
+        <div id="about-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
+        {tenantProfile?.business_description && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 p-6">
+              <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                About {tenantProfile.business_name}
+              </h2>
+              <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                {tenantProfile.business_description}
+              </p>
+            </div>
+          </div>
+        )}
+
 
         {/* Business Information - Contact Us - Full Width */}
         <div id="info-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
@@ -620,21 +638,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           />
         </div>
 
-        {/* Business Description - Merchant Branding - Full Width */}
-        <div id="about-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
-        {tenantProfile?.business_description && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 p-6">
-              <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
-                About {tenantProfile.business_name}
-              </h2>
-              <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
-                {tenantProfile.business_description}
-              </p>
-            </div>
-          </div>
-        )}
-
+        
         {/* Featured Type Products - Full Width */}
       <div id="featured-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

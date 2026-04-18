@@ -569,7 +569,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
 
                   
                {/* Hours Badge - Status */}
-                      <HoursStatusBadge status={hoursStatus} size='lg' /> {hoursStatus?.label} 
+                      <HoursStatusBadge status={hoursStatus} size='lg' /> 
                       
                 </div>
               </div>
@@ -658,10 +658,10 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" />
                     </svg>
-                    <span className="hidden lg:inline">Storefront</span>
+                    <span className="hidden lg:inline">Products</span>
                   </a>
               
-				
+                   {showStatusPanel && (
                  
                   <a
                     href={`/shops/${slugForRelated ? slugForRelated : listing.tenantId}`}
@@ -673,6 +673,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                   </svg>
                     <span className="hidden lg:inline">Shop</span>
                   </a>
+                  )}
 
                   
                 
