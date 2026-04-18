@@ -618,7 +618,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
 
         {/* Business Information - Contact Us - Full Width */}
+       
         <div id="info-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
+        {product.productType != 'digital' ? (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <ProductBusinessInfoCollapsible 
             product={product as any} 
@@ -637,7 +639,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             }} 
           />
         </div>
-
+        ) : (
+           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+             <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                Digital Product
+              </h2>
+               <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                Download link will be available after successful checkout.
+              </p>
+           </div>
+        )}
         
         {/* Featured Type Products - Full Width */}
       <div id="featured-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
