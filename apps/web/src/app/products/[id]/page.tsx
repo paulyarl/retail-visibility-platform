@@ -31,6 +31,9 @@ import { directoryService } from '@/services/DirectorySingletonService';
 import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 
+import { tenantPublicService } from '@/services/TenantPublicService';
+import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageStatusWrapper';
+
 // Define the product interface based on the API response
 interface ProductImage {
   id: string;
@@ -182,6 +185,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const tenantProfile = await getTenantProfile(product.tenantId);
+  
   // console.log(`tenantProfile: `, tenantProfile);
   const businessName = tenantProfile?.business_name || product.tenant?.name || 'Unknown Store';
   const businessDescription = tenantProfile?.business_description;
@@ -256,11 +260,15 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const shopData = await getShopData(product.tenantId);
   const bucketCounts = await getBucketCounts(product.tenantId);
   const tenantProfile = await getTenantProfile(product.tenantId);
+  const tenant = await tenantPublicService.getPublicTenantInfo(product.tenantId);
   const storefrontCategories = await getStorefrontCategories(product.tenantId);
   const totalProducts = await directoryService.getStorefrontProductCount(product.tenantId);
   // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
   const businessName = product.tenant?.name || 'Unknown Store';
   
+
+  // console.log(`tenant: `, tenant);
+
   // Convert images to gallery format for ProductGallery component
   const gallery = product.images?.map(img => ({
     url: img.url,
@@ -268,6 +276,22 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     caption: null,
     position: img.position,
   })) || [];
+
+  
+
+   const tenantInfoForStatus = {
+    id: product.tenant?.id||tenant?.id,
+    name: product.tenant?.name||tenant?.name,
+    slug: product.tenant?.slug||tenant?.slug,
+    subscriptionStatus: tenant?.statusInfo?.status || 'unknown',
+    subscriptionTier: tenant?.subscriptionTier,
+    locationStatus: tenant?.locationStatus,
+    statusInfo: tenant?.statusInfo,
+    showSubscriptionPanel: tenant?.showSubscriptionPanel,
+    hasDirectory: tenant?.directoryData?.is_published||tenant?.hasDirectory||tenant?.statusInfo?.showInDirectory,
+    createdAt: tenant?.createdAt,
+    updatedAt: tenant?.updatedAt,
+  } as any;
 
   // Set imageGallery on product for TierBasedLandingPage
   const productWithGallery = {
@@ -531,6 +555,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* Product Description Section */}
+           
             <div className="flex-1 min-w-0">
               <TenantPaymentProvider tenantId={product.tenantId}>
                 <TierBasedLandingPage 
@@ -599,9 +624,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 />
               </TenantPaymentProvider>
             </div>
+          
           </div>
         </div>
         {/* Business Description - Merchant Branding - Full Width */}
+         <ProductPageStatusWrapper tenantInfo={tenantInfoForStatus}>
         <div id="about-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
         {tenantProfile?.business_description && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
@@ -616,7 +643,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
-
+      
         {/* Business Information - Contact Us - Full Width */}
        
         <div id="info-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
@@ -649,7 +676,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               </p>
            </div>
         )}
-        
+        </ProductPageStatusWrapper>
         {/* Featured Type Products - Full Width */}
       <div id="featured-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

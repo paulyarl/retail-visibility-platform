@@ -169,6 +169,7 @@ function getPanelType(tenant: PublicTenantInfo | null | undefined): 'google_only
  * Helper to determine if status panel should be shown
  */
 export function shouldShowStatusPanel(tenant: PublicTenantInfo | null): boolean {
+  // console.log(`[shouldShowStatusPanel] tenant: `, tenant);
   if (!tenant) return false;
 
   // Show for google_only tier
@@ -201,6 +202,7 @@ export function StorefrontStatusPanel({
   googleListingUrl,
 }: StorefrontStatusPanelProps) {
   const { tenant, isLoading, shouldShowPanel, panelType } = useStorefrontStatus(tenantId, providedTenantInfo);
+  console.log(``)
 
   if (isLoading) {
     return (
