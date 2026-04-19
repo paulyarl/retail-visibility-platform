@@ -371,9 +371,13 @@ export default function StorefrontClientWrapper({
                       </div>
                     )}
 
+            
+
           {/* Action Buttons - Below categories for better responsive behavior */}
           { tenantSlug && (
+            
           <div className="hidden sm:flex justify-end mt-3">
+            <HoursStatusBadge status={hoursStatus} size="lg" /> 
             <DirectoryActions 
               listing={{
                 business_name: tenant.name,
@@ -577,11 +581,11 @@ export default function StorefrontClientWrapper({
       </div>
 
       {/* Featured Navigation Controls - Top of Page */}
-      {featuredData && Object.keys(featuredCounts).length > 0 && Object.values(featuredCounts).some(count => count > 0) && (
+      {!storefrontStatus.shouldShowPanel && featuredData && Object.keys(featuredCounts).length > 0 && Object.values(featuredCounts).some(count => count > 0) && (
         <div className={isFullWidth ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
           <div className="py-4 border-b border-neutral-200 dark:border-neutral-700 sticky top-[60px] z-30 bg-white dark:bg-neutral-900">
             {/* First Row - Product Categories */}
-            {!storefrontStatus.shouldShowPanel && (
+            { (
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400 whitespace-nowrap">Quick Jump:</span>
               
@@ -879,7 +883,7 @@ export default function StorefrontClientWrapper({
                   </svg>
                   Our Store Hours
                 </h3>
-                {businessHours ? (
+                {!storefrontStatus.shouldShowPanel &&businessHours ? (
                   <BusinessHoursCollapsible businessHours={businessHours} />
                 ) : (
                   <p className="text-neutral-500 dark:text-neutral-400 italic">Business hours not available</p>

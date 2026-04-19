@@ -5,17 +5,20 @@ import { useRouter } from 'next/navigation';
 import { BookOpen, MessageSquare, ShoppingCart } from 'lucide-react';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import ProductActions from './ProductActions';
+import { PublicTenantInfo } from '@/services/TenantPublicService';
 
 interface StorefrontActionsProps {
   tenantId: string;
   businessName: string;
   tenantSlug?: string;
+  subscriptionStatus?: string;
   directoryPublished?: boolean;
+  tenant?: PublicTenantInfo;
 }
 
 
 
-export default function StorefrontActions({ tenantId, businessName, tenantSlug, directoryPublished }: StorefrontActionsProps) {
+export default function StorefrontActions({ tenantId, businessName, tenantSlug, subscriptionStatus, directoryPublished, tenant }: StorefrontActionsProps) {
   const router = useRouter();
   const { totalItems } = useMultiCart(); // Show total items across ALL carts, not just this tenant
 
@@ -83,11 +86,7 @@ export default function StorefrontActions({ tenantId, businessName, tenantSlug, 
           sku: '',
           tenantId,
         }}
-        tenant={{
-          id: tenantId,
-          name: businessName,
-          metadata: { businessName }
-        }}
+        tenant={tenant || {} as PublicTenantInfo}
         productUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/tenant/${tenantId}`}
         variant="storefront"
       />

@@ -31,7 +31,7 @@ import { directoryService } from '@/services/DirectorySingletonService';
 import ProductCategorySidebar from '@/components/storefront/ProductCategorySidebar';
 import CategoryMobileDropdown from '@/components/storefront/CategoryMobileDropdown';
 
-import { tenantPublicService } from '@/services/TenantPublicService';
+import { tenantPublicService,SubscriptionStatusInfo,LocationStatusInfo,PublicTenantInfo,TenantProfile } from '@/services/TenantPublicService';
 import { ProductPageStatusWrapper } from '@/components/storefront/ProductPageStatusWrapper';
 
 // Define the product interface based on the API response
@@ -259,11 +259,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
   const shopData = await getShopData(product.tenantId);
   const bucketCounts = await getBucketCounts(product.tenantId);
-  const tenantProfile = await getTenantProfile(product.tenantId);
+  // const tenantProfile2 = await getTenantProfile(product.tenantId);
+  const tenantProfile = await tenantPublicService.getPublicTenantInfo(product.tenantId);
   const tenant = await tenantPublicService.getPublicTenantInfo(product.tenantId);
   const storefrontCategories = await getStorefrontCategories(product.tenantId);
   const totalProducts = await directoryService.getStorefrontProductCount(product.tenantId);
   // console.log(`[ProductPage] Tenant profile for ${product.tenantId}:`, tenantProfile);
+  // console.log(`[ProductPage] Tenant profile2 for ${product.tenantId}:`, tenantProfile2);
+  // console.log(`[ProductPage] Tenant for ${product.tenantId}:`, tenant);
   const businessName = product.tenant?.name || 'Unknown Store';
   
 
@@ -318,16 +321,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.title,
-    description: tenantProfile?.business_description 
-      ? `${product.description}. ${tenantProfile.business_description}`
+    description: tenantProfile?.profileData?.business_description 
+      ? `${product.description}. ${tenantProfile?.profileData?.business_description}`
       : product.description,
     brand: {
       '@type': 'Brand',
-      name: product.brand || tenantProfile?.business_name || businessName,
+      name: product.brand || tenantProfile?.name || businessName,
     },
     sku: product.sku,
     image: gallery.map(p => p.url),
-    keywords: tenantProfile?.seo_tags?.join(", ") || "",
+    // keywords: tenantProfile?.seo_tags?.join(", ") || "",
     offers: {
       '@type': 'Offer',
       url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://rvp.vercel.app'}/products/${product.id}`,
@@ -337,19 +340,19 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       itemCondition: `https://schema.org/${product.condition === 'used' ? 'UsedCondition' : product.condition === 'refurbished' ? 'RefurbishedCondition' : 'NewCondition'}`,
       seller: {
         '@type': 'Organization',
-        name: tenantProfile?.business_name || businessName,
-        description: tenantProfile?.business_description,
+        name: tenantProfile?.profileData?.business_name || businessName,
+        description: tenantProfile?.profileData?.business_description,
         address: tenantProfile ? {
           '@type': 'PostalAddress',
-          streetAddress: tenantProfile.address_line1,
-          addressLocality: tenantProfile.city,
-          addressRegion: tenantProfile.state,
-          postalCode: tenantProfile.postal_code,
-          addressCountry: tenantProfile.country_code
+          streetAddress: tenantProfile.profileData?.address_line1,
+          addressLocality: tenantProfile.profileData?.city,
+          addressRegion: tenantProfile.profileData?.state,
+          postalCode: tenantProfile.profileData?.postal_code,
+          addressCountry: tenantProfile.profileData?.country_code
         } : undefined,
-        telephone: tenantProfile?.phone_number,
-        email: tenantProfile?.email,
-        website: tenantProfile?.website,
+        telephone: tenantProfile?.profileData?.phone_number,
+        email: tenantProfile?.profileData?.email,
+        website: tenantProfile?.profileData?.website,
       },
     },
   };
@@ -358,9 +361,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     <>
     <ProductLikeProvider>
       {/* SEO Meta Tags */}
-      {tenantProfile?.seo_tags && tenantProfile.seo_tags.length > 0 && (
+      {tenantProfile?.directoryData.seo_keywords && tenantProfile.directoryData.seo_keywords.length > 0 && (
         <>
-          {tenantProfile.seo_tags.map((tag, index) => (
+          {tenantProfile.directoryData.seo_keywords.map((tag: string, index: number) => (
             <meta key={index} name="keywords" content={tag} />
           ))}
         </>
@@ -389,11 +392,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <div className="flex items-center gap-4 flex-shrink-0 min-w-0">
               {/* Store Logo */}
               <div className="flex-shrink-0">
-                {tenantProfile?.logo_url ? (
+                {tenantProfile?.profileData?.logoUrl || tenantProfile?.profileData?.logo_url ? (
                   <div className="relative w-14 h-14">
                     <Image
-                      src={tenantProfile.logo_url}
-                      alt={tenantProfile.business_name || businessName}
+                      src={tenantProfile.profileData.logoUrl || tenantProfile.profileData.logo_url}
+                      alt={tenantProfile.profileData.businessName||tenantProfile.profileData.business_name || businessName}
                       fill
                       className="object-contain rounded-lg shadow-sm"
                     />
@@ -411,7 +414,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               <div className="flex flex-col min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-bold text-neutral-900 dark:text-white truncate">
-                    {tenantProfile?.business_name || businessName || 'Store'}
+                    {tenantProfile?.profileData?.businessName||tenantProfile?.profileData?.business_name || businessName || 'Store'}
                   </h1>
                 </div>
                 {product.category && (
@@ -456,7 +459,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               {/* Directory Actions */}
               <DirectoryActions 
                 listing={{
-                  business_name: tenantProfile?.business_name || '',
+                  business_name: tenantProfile?.profileData?.businessName||tenantProfile?.profileData?.business_name || '',
                   slug: tenantProfile?.slug || '',
                   tenantId: product.tenantId || '',
                   id: product.id || ''
@@ -608,15 +611,24 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   subscriptionTier: product.tenant?.subscriptionTier,
                   hasActivePaymentGateway: false, // Will be determined by service
                   defaultGatewayType: undefined,
-                  metadata: {
-                    businessName: product.tenant?.name||tenantProfile?.business_name,
-                    phone: tenantProfile?.phone_number,
-                    email: tenantProfile?.email,
-                    website: tenantProfile?.website,
-                    address: tenantProfile?.address_line1,
-                    logo_url: tenantProfile?.logo_url,
-                    social_links: tenantProfile?.social_links,
-                  },
+                  trialEndsAt: tenantProfile?.trialEndsAt,
+                  locationStatus: tenantProfile?.locationStatus,
+                  statusInfo: tenantProfile?.statusInfo,
+                  organizationId: tenantProfile?.organizationId,
+                  subscriptionStatusInfo: tenantProfile?.subscriptionStatusInfo,
+                  showSubscriptionPanel: tenantProfile?.showSubscriptionPanel,
+                  hasDirectory: tenantProfile?.hasDirectory,
+                  directoryData: tenantProfile?.directoryData,
+                  profileData: tenantProfile?.profileData,
+                    businessName: product.tenant?.name||tenantProfile?.profileData?.businessName||tenantProfile?.profileData?.business_name,
+                    phone: tenantProfile?.profileData?.phone_number,
+                    email: tenantProfile?.profileData?.email,
+                    website: tenantProfile?.profileData?.website,
+                    address: tenantProfile?.profileData?.address_line1,
+                    logo_url: tenantProfile?.profileData?.logo_url,
+                    social_links: tenantProfile?.profileData?.social_links,
+
+                  metadata: tenantProfile?.metadata,
                 } as any}
                 storeStatus={null}
                   gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
@@ -630,19 +642,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         {/* Business Description - Merchant Branding - Full Width */}
          <ProductPageStatusWrapper tenantInfo={tenantInfoForStatus}>
         <div id="about-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
-        {tenantProfile?.business_description && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-            <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-sm border border-neutral-200 dark:border-neutral-700 p-6">
-              <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
-                About {tenantProfile.business_name}
-              </h2>
-              <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed">
-                {tenantProfile.business_description}
-              </p>
-            </div>
-          </div>
-        )}
-
+        
       
         {/* Business Information - Contact Us - Full Width */}
        
@@ -652,16 +652,17 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           <ProductBusinessInfoCollapsible 
             product={product as any} 
             tenant={ {
-              id: product.tenantId || tenantProfile?.tenant_id || '',
-              name: tenantProfile?.business_name || product.tenant?.name || '',
+              id: product.tenantId || tenantProfile?.id || '',
+              name: tenantProfile?.profileData?.businessName||tenantProfile?.profileData?.business_name || product.tenant?.name || '',
               metadata: {
-                businessName: tenantProfile?.business_name,
-                phone: tenantProfile?.phone_number,
-                email: tenantProfile?.email,
-                website: tenantProfile?.website,
-                address: `${tenantProfile?.address_line1}, ${tenantProfile?.city}, ${tenantProfile?.state} ${tenantProfile?.postal_code}`,
-                logo_url: tenantProfile?.logo_url,
-                social_links: tenantProfile?.social_links || undefined,
+                businessName: tenantProfile?.profileData?.businessName||tenantProfile?.profileData?.business_name,
+                businessDescription: tenantProfile?.profileData?.business_description||tenantProfile?.profileData?.businessDescription,
+                phone: tenantProfile?.profileData?.phone_number,
+                email: tenantProfile?.profileData?.email,
+                website: tenantProfile?.profileData?.website,
+                address: `${tenantProfile?.profileData?.address_line1}, ${tenantProfile?.profileData?.city}, ${tenantProfile?.profileData?.state} ${tenantProfile?.profileData?.postal_code}`,
+                logoUrl: tenantProfile?.profileData?.logo_url,
+                socialLinks: tenantProfile?.profileData?.social_links || undefined,
               }
             }} 
           />
@@ -676,7 +677,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
               </p>
            </div>
         )}
-        </ProductPageStatusWrapper>
+      
         {/* Featured Type Products - Full Width */}
       <div id="featured-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -686,6 +687,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           featuredTypes={product.featuredTypes || []}
         />
       </div>
+
+      
 
       {/* Product Recommendations - Full Width */}
       <div id="recommendations-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
@@ -700,6 +703,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           <ProductReviewsSection productId={product.id} tenantId={product.tenantId} />
         </div>
       </div>
+
+        </ProductPageStatusWrapper>
 
       {/* Recently Viewed Products */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

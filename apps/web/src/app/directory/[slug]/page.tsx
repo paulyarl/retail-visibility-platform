@@ -635,6 +635,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                           ))}
                       </div>
                     )}
+                     <div id="gallery-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
                 
                     {/* Keywords */}
                     { listing.keywords && listing.keywords.length > 0 && (
@@ -653,10 +654,10 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                   <a
                     href={`/tenant/${slugForRelated ? slugForRelated : listing.tenantId}`}
                     className="flex items-left gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
-                    title="View Store"
+                    title="View Store Products"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
                     <span className="hidden lg:inline">Products</span>
                   </a>
@@ -780,10 +781,10 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                   </div>
                 </div>
               )}
-               <div id="gallery-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+              
 
               {/* Photo Gallery - Visual Proof */}
-              { (
+              { !showStatusPanel && (
                 <DirectoryPhotoGalleryDisplay listing={listing} {...businessProfile} isPublished={true} />
               )}
              
@@ -802,9 +803,9 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                <div id="reviews-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
               {<StoreRatingsSection tenantId={listing.tenantId} showWriteReview={true} />}
             </div>
-            <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
+           
             {/* Right Column - Contact Info */}
-            { (
+            { !showStatusPanel && (
             <div className="space-y-6">
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -812,6 +813,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                 </h2>
                 <div>
                             <ContactInformationCollapsible tenant={listing} fullAddress={fullAddress} initialExpanded={true} />
+                             <div id="contact-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent" />
                           </div>
                 
                   
@@ -904,15 +906,19 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                 </div>
               </div>
               )}
- <div id="hours-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+
               {/* Business Hours - Collapsible */}
-              {businessHours && (
-                <BusinessHoursCollapsible businessHours={businessHours} />
+              {!showStatusPanel && businessHours && (
+                <>
+                  <BusinessHoursCollapsible businessHours={businessHours} />
+                  <div id="hours-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+                </>
               )}
- <div id="map-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
+ 
               {/* Map Location */}
-              { listing.address && (
+              {!showStatusPanel && listing.address && (
                 <div className="bg-white rounded-lg shadow-sm p-6">
+                  <div id="map-section" className="flex w-full h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">
                     Our Location
                   </h2>
@@ -924,7 +930,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
         </div>
 
       {/* Related Stores */}
-      { (
+      {!showStatusPanel && (
       <RelatedStores 
         currentSlug={slugForRelated} 
         limit={3}

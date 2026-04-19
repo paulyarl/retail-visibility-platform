@@ -5,6 +5,8 @@ import { useStoreStatus } from '@/hooks/useStoreStatus';
 import { Card, Group, Text, ActionIcon, Button, Badge as MantineBadge } from '@mantine/core';
 import HoursStatusBadge from '@/components/storefront/HoursStatusBadge';
 
+import { PublicTenantInfo, LocationStatusInfo } from '@/services/TenantPublicService';
+
 interface Product {
   id: string;
   name: string;
@@ -18,18 +20,9 @@ interface Product {
   tenantId: string;
 }
 
-interface Tenant {
-  id: string;
-  name: string;
-  metadata?: {
-    businessName?: string;
-  };
-  slug?: string;
-}
-
 interface ProductActionsProps {
   product: Product;
-  tenant: Tenant;
+  tenant: PublicTenantInfo;
   productUrl: string;
   variant?: 'product' | 'storefront';
 }
@@ -60,6 +53,10 @@ export default function ProductActions({ product, tenant, productUrl, variant = 
       default: return 'bg-gray-400';
     }
   };
+
+  // console.log(`ProductActions - tenant:`, tenant);
+  // console.log(`ProductActions - product:`, product);
+  
 
   // Load favorite status from localStorage
   useEffect(() => {
