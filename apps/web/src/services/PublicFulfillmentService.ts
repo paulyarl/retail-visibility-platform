@@ -71,7 +71,7 @@ class PublicFulfillmentService extends PublicApiSingleton {
 
     try {
       const result = await this.makePublicRequest<{ success: boolean; settings: FulfillmentSettings }>(
-        `/public/tenant/${tenantId}/fulfillment-settings`,
+        `/api/public/tenant/${tenantId}/fulfillment-settings`,
         {},
         `fulfillment-settings-${tenantId}`,
         this.cacheTTL

@@ -244,12 +244,19 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
         });
 
         if (!orderResponse) {
-          throw new Error('Failed to create order');
+          throw new Error('Failed to create order - no response');
+        }
+
+        // Check for error response
+        if (!orderResponse.success) {
+          const errorMsg = orderResponse.message || orderResponse.error || 'Failed to create order';
+          console.error('[SquarePaymentForm] Order creation failed:', orderResponse);
+          throw new Error(errorMsg);
         }
 
         const { order } = orderResponse;
         setOrderId(order.id);
-        setOrderNumber(order.orderNumber);
+        setOrderNumber(order.order_number);
 
         // Create payment record
         const paymentResponse = await customerOrderService.createSquareCharge({

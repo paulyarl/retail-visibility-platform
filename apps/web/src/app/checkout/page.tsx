@@ -89,9 +89,9 @@ function CheckoutPageContent() {
       try {
         console.log('[Checkout] Fetching payment gateways for tenant:', tenantId);
         // Use CustomerOrderService for public checkout - no auth required
-        const gateways = await customerOrderService.getPaymentGateways(tenantId);
+        const { gateways, tenant_tier } = await customerOrderService.getPaymentGateways(tenantId);
         
-        console.log('[Checkout] Payment gateways data:', gateways);
+        console.log('[Checkout] Payment gateways data:', gateways, 'Tenant tier:', tenant_tier);
         
         // Extract active gateway types
         const activeTypes = gateways
@@ -108,9 +108,9 @@ function CheckoutPageContent() {
         }
 
         // Fetch tenant tier information for deposit calculation
-        // The first gateway should have tenant info attached
-        if (gateways.length > 0 && gateways[0].tenant_tier) {
-          const tier = gateways[0].tenant_tier;
+        const tier = tenant_tier;
+        
+        if (tier) {
           setTenantTier(tier);
           
           // Determine checkout mode based on tier
@@ -153,13 +153,22 @@ function CheckoutPageContent() {
   const fetchTenantContact = async (tid: string) => {
     try {
       const profile = await tenantPublicService.getPublicTenantProfile(tid);
+      console.log('[Checkout] Tenant profile:', profile);
       if (profile) {
+        // Handle both response formats - data nested or direct
+        const data = (profile as any).data || profile;
         setTenantContact({
-          business_name: profile.business_name || profile.name || cart?.tenant_name || 'Store',
-          phone_number: profile.phone_number,
-          email: profile.email,
-          website: profile.website,
-          address: profile.address,
+          business_name: data.name || data.business_name || cart?.tenant_name || 'Store',
+          phone_number: data.phoneNumber || data.phone_number,
+          email: data.email,
+          website: data.website,
+          address: data.addressLine1 ? {
+            street: data.addressLine1,
+            city: data.city,
+            state: data.state,
+            zip: data.postalCode,
+            country: data.countryCode || 'US',
+          } : undefined,
         });
       }
     } catch (error) {
@@ -475,7 +484,8 @@ function CheckoutPageContent() {
             </Card>
           )}
 
-          {/* Main Content */}
+          {/* Main Content - Only show if checkout is enabled */}
+          {checkoutMode !== 'disabled' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
             {/* Left Column - Forms */}
             <div className="lg:col-span-2 space-y-6">
@@ -667,6 +677,7 @@ function CheckoutPageContent() {
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
   );

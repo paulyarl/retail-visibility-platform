@@ -212,7 +212,14 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
       });
 
       if (!orderResponse) {
-        throw new Error('Failed to create order');
+        throw new Error('Failed to create order - no response');
+      }
+
+      // Check for error response
+      if (!orderResponse.success) {
+        const errorMsg = orderResponse.message || orderResponse.error || 'Failed to create order';
+        console.error('[PayPalPaymentForm] Order creation failed:', orderResponse);
+        throw new Error(errorMsg);
       }
 
       const orderData = orderResponse;
@@ -223,7 +230,7 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
       setLoading(false);
     } catch (error) {
       console.error('Order creation error:', error);
-      setError('Failed to initialize checkout. Please try again.');
+      setError(error instanceof Error ? error.message : 'Failed to initialize checkout. Please try again.');
       setLoading(false);
     }
   };

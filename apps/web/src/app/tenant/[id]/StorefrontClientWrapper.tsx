@@ -941,6 +941,9 @@ export default function StorefrontClientWrapper({
                   <div className="flex items-center gap-2">
                     <HoursStatusBadge status={hoursStatus} size="lg" /> 
                   </div>
+                  <div className="flex items-center gap-2">
+                    {hoursStatus?.label}
+                  </div>
 
                 </div>
                 

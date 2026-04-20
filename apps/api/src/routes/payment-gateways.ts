@@ -116,6 +116,7 @@ router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Respo
     res.json({
       success: true,
       gateways: gatewaysWithTier,
+      tenant_tier: tenant?.subscription_tier || null, // Also return tier at root level for empty gateways case
     });
   } catch (error: any) {
     console.error('[Payment Gateways] Public list error:', error);

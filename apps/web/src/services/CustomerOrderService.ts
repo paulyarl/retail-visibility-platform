@@ -128,10 +128,11 @@ class CustomerOrderService extends PublicApiSingleton {
   /**
    * Get available payment gateways for a tenant
    */
-  async getPaymentGateways(tenantId: string): Promise<PaymentGateway[]> {
+  async getPaymentGateways(tenantId: string): Promise<{ gateways: PaymentGateway[]; tenant_tier: string | null }> {
     const response = await this.makeDefaultRequest<{
       success: boolean;
       gateways: PaymentGateway[];
+      tenant_tier: string | null;
     }>(
       `/api/tenants/${tenantId}/payment-gateways/public`,
       {},
@@ -140,10 +141,13 @@ class CustomerOrderService extends PublicApiSingleton {
 
     if (!response.success) {
       console.error('[CustomerOrderService] Failed to get payment gateways:', response.error);
-      return [];
+      return { gateways: [], tenant_tier: null };
     }
 
-    return response.data?.gateways || [];
+    return {
+      gateways: response.data?.gateways || [],
+      tenant_tier: response.data?.tenant_tier || null,
+    };
   }
 
   /**
@@ -384,11 +388,29 @@ class CustomerOrderService extends PublicApiSingleton {
     paymentMethod: string;
   }): Promise<any> {
     try {
+      // Map frontend format to API expected format
+      const apiPayload = {
+        customer: {
+          email: orderData.customerInfo.email,
+          firstName: orderData.customerInfo.firstName,
+          lastName: orderData.customerInfo.lastName,
+          phone: orderData.customerInfo.phone,
+        },
+        items: orderData.cartItems.map((item: any) => ({
+          id: item.inventoryItemId || item.id,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        })),
+        fulfillment_method: orderData.fulfillmentMethod,
+        shipping_address: orderData.shippingAddress,
+        payment_method: orderData.paymentMethod,
+      };
+
       const response = await this.makeDefaultRequest<any>(
         '/api/checkout/orders',
         {
           method: 'POST',
-          body: JSON.stringify(orderData)
+          body: JSON.stringify(apiPayload)
         },
         `checkout-order-${orderData.paymentMethod}`
       );
