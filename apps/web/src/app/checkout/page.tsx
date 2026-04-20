@@ -12,9 +12,10 @@ import PayPalPaymentForm from '@/components/checkout/PayPalPaymentForm';
 import SquarePaymentForm from '@/components/checkout/SquarePaymentForm';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { ArrowLeft, ShoppingCart, Store, CreditCard, Wallet } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Store, CreditCard, Wallet, Phone, Mail, MapPin, Globe } from 'lucide-react';
 import { customerOrderService } from '@/services/CustomerOrderService';
 import { getCart, clearCart } from '@/lib/cart/cartManager';
+import { tenantPublicService } from '@/services/TenantPublicService';
 
 type CheckoutStep = 'review' | 'fulfillment' | 'shipping' | 'payment';
 type PaymentMethod = 'square' | 'paypal';
@@ -50,15 +51,39 @@ function CheckoutPageContent() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(gatewayType || 'square');
   const [isInitialized, setIsInitialized] = useState(false);
   const [availableGateways, setAvailableGateways] = useState<PaymentMethod[]>([]);
+  // Tier 3 Commitment - Deposit state
+  const [tenantTier, setTenantTier] = useState<string | null>(null);
+  const [checkoutMode, setCheckoutMode] = useState<'deposit' | 'full_payment' | 'disabled'>('full_payment');
+  const [depositOption, setDepositOption] = useState<'required' | 'optional' | 'none'>('none');
+  const [depositInfo, setDepositInfo] = useState<{
+    depositPercentage: number;
+    depositCents: number;
+    remainingBalanceCents: number;
+    pickupDeadline: Date;
+  } | null>(null);
+  // Tenant contact info for disabled checkout
+  const [tenantContact, setTenantContact] = useState<{
+    business_name: string;
+    phone_number?: string;
+    email?: string;
+    website?: string;
+    address?: {
+      street: string;
+      city: string;
+      state: string;
+      zip: string;
+      country: string;
+    };
+  } | null>(null);
 
   // Get the cart for this tenant and gateway type from multi-cart system
   const cart = tenantId && gatewayType ? getCart(tenantId, gatewayType) : null;
   const cartItems = cart?.items || [];
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price_cents * item.quantity), 0);
 
-  // Fetch available payment gateways (public endpoint for checkout)
+  // Fetch available payment gateways and tenant tier info (public endpoint for checkout)
   useEffect(() => {
-    const fetchPaymentGateways = async () => {
+    const fetchPaymentGatewaysAndTier = async () => {
       if (!tenantId) return;
       
       try {
@@ -81,13 +106,66 @@ function CheckoutPageContent() {
           console.log('[Checkout] Setting default payment method to:', activeTypes[0]);
           setPaymentMethod(activeTypes[0]);
         }
+
+        // Fetch tenant tier information for deposit calculation
+        // The first gateway should have tenant info attached
+        if (gateways.length > 0 && gateways[0].tenant_tier) {
+          const tier = gateways[0].tenant_tier;
+          setTenantTier(tier);
+          
+          // Determine checkout mode based on tier
+          const effectiveTier = tier.startsWith('trial_') ? tier.replace('trial_', '') : tier;
+          
+          // Storefront tier: checkout disabled
+          if (effectiveTier === 'storefront' || effectiveTier === 'starter' || effectiveTier === 'google_only' || effectiveTier === 'discovery') {
+            setCheckoutMode('disabled');
+            setDepositOption('none');
+            // Fetch tenant contact info for display
+            fetchTenantContact(tenantId);
+          }
+          // Commitment tier: deposit is required
+          else if (effectiveTier === 'commitment') {
+            setCheckoutMode('deposit');
+            setDepositOption('required');
+          } 
+          // Professional/Enterprise: customer can choose (default to full payment)
+          else if (effectiveTier === 'professional' || effectiveTier === 'enterprise') {
+            setCheckoutMode('full_payment'); // Default to full payment
+            setDepositOption('optional');
+          }
+          // Other tiers: full payment only
+          else {
+            setCheckoutMode('full_payment');
+            setDepositOption('none');
+          }
+          
+          console.log('[Checkout] Tenant tier:', tier, 'Checkout mode:', checkoutMode, 'Deposit option:', depositOption);
+        }
       } catch (error) {
         console.error('[Checkout] Failed to fetch payment gateways:', error);
       }
     };
 
-    fetchPaymentGateways();
+    fetchPaymentGatewaysAndTier();
   }, [tenantId]);
+
+  // Fetch tenant contact info for disabled checkout
+  const fetchTenantContact = async (tid: string) => {
+    try {
+      const profile = await tenantPublicService.getPublicTenantProfile(tid);
+      if (profile) {
+        setTenantContact({
+          business_name: profile.business_name || profile.name || cart?.tenant_name || 'Store',
+          phone_number: profile.phone_number,
+          email: profile.email,
+          website: profile.website,
+          address: profile.address,
+        });
+      }
+    } catch (error) {
+      console.error('[Checkout] Failed to fetch tenant contact:', error);
+    }
+  };
 
   // Initialize checkout - validate cart exists
   useEffect(() => {
@@ -137,6 +215,33 @@ function CheckoutPageContent() {
 
   const platformFee = Math.round(subtotal * 0.03); // 3% platform fee
   const total = subtotal + platformFee + fulfillmentFee;
+
+  // Calculate deposit for Tier 3 commitment
+  useEffect(() => {
+    if (checkoutMode === 'deposit' && total > 0) {
+      const depositPercentage = 10; // Default 10% deposit
+      const depositCents = Math.round(total * (depositPercentage / 100));
+      const remainingBalanceCents = total - depositCents;
+      const pickupDeadline = new Date();
+      pickupDeadline.setHours(pickupDeadline.getHours() + 48); // 48 hours
+      
+      setDepositInfo({
+        depositPercentage,
+        depositCents,
+        remainingBalanceCents,
+        pickupDeadline,
+      });
+      
+      console.log('[Checkout] Deposit calculated:', {
+        total,
+        depositPercentage,
+        depositCents,
+        remainingBalanceCents,
+      });
+    } else {
+      setDepositInfo(null);
+    }
+  }, [checkoutMode, total]);
 
   // Map cart items to payment form format
   const mappedCartItems = cartItems.map(item => ({
@@ -289,6 +394,87 @@ function CheckoutPageContent() {
           {/* Progress Indicator */}
           <CheckoutProgress currentStep={currentStep} />
 
+          {/* Checkout Disabled Panel for Storefront/Starter tier */}
+          {checkoutMode === 'disabled' && (
+            <Card className="mt-6 border-amber-200 bg-amber-50">
+              <CardHeader>
+                <CardTitle className="text-amber-800 flex items-center gap-2">
+                  <Store className="h-5 w-5" />
+                  Online Checkout Unavailable
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-amber-700">
+                  This store is currently unable to process online payments. However, you can still contact them directly to place your order!
+                </p>
+                
+                {tenantContact && (
+                  <div className="bg-white rounded-lg p-4 border border-amber-200">
+                    <h3 className="font-semibold text-gray-900 mb-3">Contact {tenantContact.business_name}</h3>
+                    <div className="space-y-2 text-sm">
+                      {tenantContact.phone_number && (
+                        <a 
+                          href={`tel:${tenantContact.phone_number}`}
+                          className="flex items-center gap-2 text-gray-700 hover:text-primary-600"
+                        >
+                          <Phone className="h-4 w-4 text-gray-400" />
+                          {tenantContact.phone_number}
+                        </a>
+                      )}
+                      {tenantContact.email && (
+                        <a 
+                          href={`mailto:${tenantContact.email}`}
+                          className="flex items-center gap-2 text-gray-700 hover:text-primary-600"
+                        >
+                          <Mail className="h-4 w-4 text-gray-400" />
+                          {tenantContact.email}
+                        </a>
+                      )}
+                      {tenantContact.website && (
+                        <a 
+                          href={tenantContact.website.startsWith('http') ? tenantContact.website : `https://${tenantContact.website}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-gray-700 hover:text-primary-600"
+                        >
+                          <Globe className="h-4 w-4 text-gray-400" />
+                          {tenantContact.website}
+                        </a>
+                      )}
+                      {tenantContact.address && (
+                        <div className="flex items-start gap-2 text-gray-700">
+                          <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                          <span>
+                            {tenantContact.address.street}
+                            {tenantContact.address.city && `, ${tenantContact.address.city}`}
+                            {tenantContact.address.state && `, ${tenantContact.address.state}`}
+                            {tenantContact.address.zip && ` ${tenantContact.address.zip}`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push(`/tenant/${tenantId}`)}
+                  >
+                    <Store className="mr-2 h-4 w-4" />
+                    Continue Browsing
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => router.push('/directory')}
+                  >
+                    Explore Other Stores
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
             {/* Left Column - Forms */}
@@ -432,7 +618,7 @@ function CheckoutPageContent() {
                     {/* Conditional Payment Form */}
                     {paymentMethod === 'square' ? (
                       <SquarePaymentForm
-                        amount={total}
+                        amount={checkoutMode === 'deposit' && depositInfo ? depositInfo.depositCents : total}
                         customerInfo={customerInfo}
                         shippingAddress={shippingAddress ?? undefined}
                         fulfillmentMethod={fulfillmentMethod}
@@ -442,7 +628,7 @@ function CheckoutPageContent() {
                       />
                     ) : (
                       <PayPalPaymentForm
-                        amount={total}
+                        amount={checkoutMode === 'deposit' && depositInfo ? depositInfo.depositCents : total}
                         customerInfo={customerInfo}
                         shippingAddress={shippingAddress ?? undefined}
                         fulfillmentMethod={fulfillmentMethod}
@@ -466,6 +652,17 @@ function CheckoutPageContent() {
                   shipping={fulfillmentFee}
                   total={total}
                   fulfillmentMethod={fulfillmentMethod || undefined}
+                  // Tier 3 Commitment - Deposit fields
+                  checkoutMode={checkoutMode}
+                  depositOption={depositOption}
+                  depositAmount={depositInfo?.depositCents}
+                  remainingBalance={depositInfo?.remainingBalanceCents}
+                  depositPercentage={depositInfo?.depositPercentage}
+                  pickupDeadline={depositInfo?.pickupDeadline}
+                  onCheckoutModeChange={(mode) => {
+                    setCheckoutMode(mode);
+                    console.log('[Checkout] Customer selected checkout mode:', mode);
+                  }}
                 />
               </div>
             </div>

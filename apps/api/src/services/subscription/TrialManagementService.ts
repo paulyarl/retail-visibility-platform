@@ -15,7 +15,7 @@ import { getBillingNotificationService } from './BillingNotificationService';
 // Trial constants
 export const TRIAL_DURATION_DAYS = 14;
 export const GRACE_DURATION_DAYS = 14;
-export const TRIAL_ELIGIBLE_TIERS = ['google_only', 'starter', 'professional', 'chain_starter'] as const;
+export const TRIAL_ELIGIBLE_TIERS = ['google_only','discovery','storefront','commitment','professional','chain_starter'] as const;
 export type TrialEligibleTier = typeof TRIAL_ELIGIBLE_TIERS[number];
 
 export interface TrialStartResult {

@@ -827,6 +827,9 @@ function TenantRow({ tenant, index, onSelect, onViewItems, onEditProfile, onRena
                         tenant.subscriptionTier === 'professional' ? 'violet' :
                         tenant.subscriptionTier === 'enterprise' ? 'indigo' :
                         tenant.subscriptionTier === 'starter' ? 'teal' :
+                        tenant.subscriptionTier === 'discovery' ? 'blue' :
+                        tenant.subscriptionTier === 'storefront' ? 'green' :
+                        tenant.subscriptionTier === 'commitment' ? 'purple' :
                         tenant.subscriptionTier === 'google_only' ? 'orange' :
                         'gray'
                       }

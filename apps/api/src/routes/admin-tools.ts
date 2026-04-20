@@ -111,7 +111,7 @@ const createTenantSchema = z.object({
   name: z.string().min(1),
   city: z.string().optional(),
   state: z.string().optional(),
-  subscription_tier: z.enum(['trial', 'google_only', 'starter', 'professional', 'enterprise', 'organization']).optional().default('professional'),
+  subscription_tier: z.enum(['trial', 'google_only','discovery', 'starter', 'storefront', 'commitment', 'professional', 'chain_starter', 'chain_professional', 'chain_enterprise']).optional().default('professional'),
   subscription_status: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional().default('trial'),
   organizationId: z.string().optional(), // Required for organization tier
   ownerId: z.string().optional(), // Link to user as owner

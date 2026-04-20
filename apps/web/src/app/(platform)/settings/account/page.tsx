@@ -227,6 +227,9 @@ export default function AccountPage() {
       case 'enterprise': return 'indigo';
       case 'professional': return 'green';
       case 'starter': return 'yellow';
+      case 'discovery': return 'purple';
+      case 'commitment': return 'pink';
+      case 'storefront': return 'teal';
       case 'google_only': return 'gray';
       case 'trial': return 'orange';
       default: return 'gray';

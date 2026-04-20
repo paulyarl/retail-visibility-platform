@@ -27,7 +27,7 @@ router.use(requirePlatformAdmin);
  */
 const startTrialSchema = z.object({
   tenantId: z.string().min(1, 'Tenant ID is required'),
-  targetTier: z.enum(['google_only', 'starter', 'professional', 'chain_starter']),
+  targetTier: z.enum(['google_only','discovery', 'storefront', 'commitment', 'professional', 'chain_starter']),
   reason: z.string().min(1, 'Reason is required for audit trail'),
 });
 

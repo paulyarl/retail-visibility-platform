@@ -46,6 +46,12 @@ export interface TenantOrder {
     completedAt?: string;
   }>;
   archived?: boolean;
+  // Deposit order fields
+  checkoutMode?: 'deposit' | 'full_payment';
+  depositCents?: number;
+  remainingBalanceCents?: number;
+  pickupDeadline?: string | null;
+  depositForfeitedAt?: string | null;
 }
 
 export interface TenantOrderItem {

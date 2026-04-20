@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export default function AdminDirectoryListingsPage() {
   const [filters, setFilters] = useState({
     status: undefined as 'published' | 'draft' | 'featured' | undefined,
-    tier: undefined as 'google_only' | 'starter' | 'professional' | 'enterprise' | 'chain_starter' | 'chain_pro' | 'chain_enterprise' | undefined,
+    tier: undefined as 'google_only' | 'starter' | 'discovery' | 'commitment' | 'storefront' | 'professional' | 'enterprise' | 'chain_starter' | 'chain_pro' | 'chain_enterprise' | undefined,
     quality: undefined as 'low' | 'medium' | 'high' | undefined,
     search: '',
   });
@@ -109,6 +109,9 @@ export default function AdminDirectoryListingsPage() {
               { value: undefined, label: 'All' },
               { value: 'google_only', label: 'Google Only' },
               { value: 'starter', label: 'Starter' },
+              { value: 'discovery', label: 'Discovery' },
+              { value: 'commitment', label: 'Commitment' },
+              { value: 'storefront', label: 'Storefront' },
               { value: 'professional', label: 'Professional' },
               { value: 'enterprise', label: 'Enterprise' },
               { value: 'chain_starter', label: 'Chain Starter' },

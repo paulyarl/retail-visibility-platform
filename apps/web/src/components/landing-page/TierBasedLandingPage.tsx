@@ -234,8 +234,9 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
           const getQRCodeLevel = (tierKey: string): number => {
             if (!tierKey) return 0;
             if (tierKey.includes('enterprise') || tierKey.includes('professional')) return 3; // qr_codes_2048
-            if (tierKey === 'chain_starter') return 1; // qr_codes_512 only
-            if (tierKey === 'starter') return 0;
+            if (tierKey === 'commitment' ) return 2; // qr_codes_1024
+            if (tierKey === 'chain_starter'|| tierKey === 'storefront') return 1; // qr_codes_512 only
+            if (tierKey === 'starter' || tierKey === 'discovery') return 0;
             return 2; // default for professional/chain_professional
           };
           
@@ -263,7 +264,16 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
           setTenantTier(effectiveTierPart);
           
           // Get tenant profile for logo if professional or above (or chain tiers)
-          if (effectiveTierPart === 'professional' || effectiveTierPart === 'enterprise' || effectiveTierPart === 'organization' || effectiveTierPart === 'chain_professional' || effectiveTierPart === 'chain_enterprise' || effectiveTierPart === 'chain_starter' || effectiveTierPart === 'trial_professional') {
+          if (effectiveTierPart === 'professional' 
+            || effectiveTierPart === 'commitment' 
+            || effectiveTierPart === 'enterprise' 
+            || effectiveTierPart === 'organization' 
+            || effectiveTierPart === 'chain_professional' 
+            || effectiveTierPart === 'chain_enterprise' 
+            || effectiveTierPart === 'chain_starter' 
+            || effectiveTierPart === 'trial_professional'
+            || effectiveTierPart === 'trial_commitment'
+            || effectiveTierPart === 'trial_enterprise') {
             try {
               // const profile = await storefrontService.getPublicTenantProfile(tenantId);
               const profile = await tenantPublicService.getPublicTenantInfo(tenantId)
@@ -814,10 +824,10 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
           
   
   // console.log(`[TierBasedLandingPage] effectiveTierPart: ${effectiveTierPart}`)
-   // Server-side check: show panel for google_only tier, non-active status, or subscription issues
+   // Server-side check: show panel for google_only and discovery tier, non-active status, or subscription issues
    
   const showStatusPanel = tenant ? (
-    effectiveTierPart === 'google_only' ||
+    effectiveTierPart === 'google_only' || effectiveTierPart === 'discovery' ||
     (tenant.locationStatus && tenant.locationStatus !== 'active') ||
     (tenant.statusInfo && !tenant.statusInfo.showStorefront) ||
     tenant.showSubscriptionPanel === true

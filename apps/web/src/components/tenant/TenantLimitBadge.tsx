@@ -69,6 +69,9 @@ export default function TenantLimitBadge({
     switch (tier) {
       case 'organization': return 'bg-blue-100 text-blue-700';
       case 'enterprise': return 'bg-indigo-100 text-indigo-700';
+      case 'discovery': return 'bg-blue-100 text-blue-700';
+      case 'storefront': return 'bg-green-100 text-green-700';
+      case 'commitment': return 'bg-purple-100 text-purple-700';
       case 'professional': return 'bg-green-100 text-green-700';
       case 'starter': return 'bg-amber-100 text-amber-700';
       case 'google_only': return 'bg-gray-100 text-gray-700';

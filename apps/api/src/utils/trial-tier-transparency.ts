@@ -13,6 +13,9 @@
 function getBaseTierForTrial(tierKey: string): string | null {
   const trialToBaseMap: Record<string, string> = {
     'trial_google_only': 'google_only',
+    'trial_discovery': 'discovery',
+    'trial_storefront': 'storefront',
+    'trial_commitment': 'commitment',
     'trial_starter': 'starter',
     'trial_professional': 'professional',
     'trial_chain_starter': 'chain_starter',
@@ -36,7 +39,7 @@ export function isTrialTier(tierKey: string): boolean {
  * Trial tiers are transparent and show as their base tiers
  */
 export function getEffectiveTier(tierKey: string | null | undefined): string {
-  if (!tierKey) return 'starter';
+  if (!tierKey) return 'discovery';
   
   // If it's a trial tier, return the base tier for frontend
   const baseTier = getBaseTierForTrial(tierKey);
@@ -54,7 +57,7 @@ export function getEffectiveTierWithTrialInfo(tierKey: string | null | undefined
   trialEndsAt?: Date | null;
 } {
   if (!tierKey) {
-    return { effectiveTier: 'starter', isTrial: false };
+    return { effectiveTier: 'discovery', isTrial: false };
   }
   
   const isTrial = isTrialTier(tierKey);

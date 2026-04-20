@@ -799,8 +799,8 @@ app.get("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
         where: { id: tenant.id },
         data: {
           subscription_status: "expired",
-          // For maintenance-only accounts without a paid subscription, force internal google_only tier
-          subscription_tier: hasStripeSubscription ? tenant.subscription_tier : "google_only",
+          // For maintenance-only accounts without a paid subscription, force internal discovery tier
+          subscription_tier: hasStripeSubscription ? tenant.subscription_tier : "discovery",
         },
       });
     }
@@ -1018,7 +1018,7 @@ app.put("/api/tenants/:id", authenticateToken, checkTenantAccess, async (req, re
 
 // PATCH /tenants/:id - Update tenant subscription tier (admin only)
 const patchTenantSchema = z.object({
-  subscription_tier: z.enum(['google_only', 'starter', 'professional', 'enterprise', 'organization']).optional(),
+  subscription_tier: z.enum(['google_only','discovery', 'starter','storefront', 'professional','commitment', 'enterprise', 'organization']).optional(),
   subscription_status: z.enum(['trial', 'active', 'past_due', 'canceled', 'expired']).optional(),
   organization_id: z.string().optional(), // For linking to organization
 });
@@ -2107,7 +2107,7 @@ app.get("/public/tenant/:tenant_id", async (req, res) => {
 
     // Check if tenant has storefront access (tier-based)
     const tier = tenant.subscription_tier as string;
-    const hasStorefrontAccess = tier !== 'google_only'; // google_only doesn't have storefront
+    const hasStorefrontAccess = tier !== 'google_only' && tier !== 'discovery'; // google_only and discovery don't have storefront
       // Check if tenant has published directory listing
     // Check if tenant has published directory listing
      const tenantResult = await prisma.directory_settings_list.findUnique({
@@ -6934,12 +6934,15 @@ import checkoutRoutes from './routes/checkout';
 import checkoutPaymentsRoutes from './routes/checkout-payments';
 import paypalRoutes from './routes/checkout/paypal';
 import squareCheckoutRoutes from './routes/checkout/square';
+import depositForfeitureRoutes from './routes/deposit-forfeiture';
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/checkout', checkoutPaymentsRoutes);
 app.use('/api/checkout/paypal', paypalRoutes);
 app.use('/api/checkout/square', squareCheckoutRoutes);
+app.use('/api/deposit-forfeiture', depositForfeitureRoutes);
 console.log('✅ PayPal checkout routes mounted at /api/checkout/paypal');
 console.log('✅ Square checkout routes mounted at /api/checkout/square');
+console.log('✅ Deposit forfeiture routes mounted at /api/deposit-forfeiture');
 
 /* ------------------------------ buyer orders (Public - No Auth) ------------------------------ */
 app.use('/api/orders', buyerOrdersRoutes);

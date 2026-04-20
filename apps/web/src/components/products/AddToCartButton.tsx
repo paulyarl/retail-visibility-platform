@@ -51,7 +51,7 @@ export function AddToCartButton({
   className,
   hasActivePaymentGateway = false, // Keep for backward compatibility
   defaultGatewayType, // No default fallback - must come from tenant
-  layout = 'horizontal' // Default to side-by-side layout
+  layout = 'horizontal', // Default to side-by-side layout
 }: AddToCartButtonProps) {
   const router = useRouter();
   const { addToCart, getCartByGateway } = useMultiCart();
@@ -163,7 +163,7 @@ export function AddToCartButton({
   };
 
   // Simple check: if tenant doesn't have payment gateway, don't show button
-  // Note: Gateway validation handled during checkout process
+  // Note: Tier validation is enforced at checkout API level
   if (!defaultGatewayType) {
     return null;
   }

@@ -65,7 +65,7 @@ export default function AdminBillingPage() {
       if (!currentTenant) throw new Error('Tenant not found');
 
       const responseData = await tenantTierService.updateTenantTier(tenantId, {
-        subscriptionTier: updates.tier || currentTenant.subscriptionTier || 'starter',
+        subscriptionTier: updates.tier || currentTenant.subscriptionTier || 'discovery',
         subscriptionStatus: updates.status || currentTenant.subscriptionStatus || 'active',
         reason: 'Updated via billing page',
       });

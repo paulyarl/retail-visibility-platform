@@ -11,6 +11,9 @@ interface TierLimits {
 
 const TIER_LIMITS: Record<string, TierLimits> = {
   google_only: { maxSkus: 250 },
+  discovery: { maxSkus: 1000 },
+  storefront: { maxSkus: 5000 },
+  commitment: { maxSkus: 10000 },
   starter: { maxSkus: 500 },
   professional: { maxSkus: 5000 },
   enterprise: { maxSkus: Infinity },

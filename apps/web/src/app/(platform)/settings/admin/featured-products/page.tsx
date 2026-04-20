@@ -242,6 +242,9 @@ export default function FeaturedProductsManagement() {
       'trial': 'bg-gray-100 text-gray-700',
       'google-only': 'bg-blue-100 text-blue-700',
       'starter': 'bg-green-100 text-green-700',
+      'discovery': 'bg-indigo-100 text-indigo-700',
+      'commitment': 'bg-cyan-100 text-cyan-700',
+      'storefront': 'bg-teal-100 text-teal-700',
       'professional': 'bg-purple-100 text-purple-700',
       'enterprise': 'bg-amber-100 text-amber-700',
       'organization': 'bg-red-100 text-red-700'
@@ -804,6 +807,9 @@ export default function FeaturedProductsManagement() {
                     <option value="trial">Trial</option>
                     <option value="google-only">Google Only</option>
                     <option value="starter">Starter</option>
+                    <option value="discovery">Discovery</option>
+                    <option value="commitment">Commitment</option>
+                    <option value="storefront">Storefront</option>
                     <option value="professional">Professional</option>
                     <option value="enterprise">Enterprise</option>
                     <option value="organization">Organization</option>

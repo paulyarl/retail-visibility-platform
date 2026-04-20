@@ -493,7 +493,8 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
 
   // Server-side check: show panel for google_only tier, non-active status, or subscription issues
   const showStatusPanel = tenantInfo ? (
-    tenantInfo.subscriptionTier === 'google_only' ||
+    tenantInfo.subscriptionTier === 'google_only' || 
+    tenantInfo.subscriptionTier === 'discovery' ||
     (tenantInfo.locationStatus && tenantInfo.locationStatus !== 'active') ||
     (tenantInfo.statusInfo && !tenantInfo.statusInfo.showStorefront) ||
     tenantInfo.showSubscriptionPanel === true

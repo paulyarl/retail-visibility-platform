@@ -61,6 +61,12 @@ interface BuyerOrder {
   cancellationReason?: string;
   trackingNumber?: string;
   shippingProvider?: string;
+  // Deposit order fields
+  checkoutMode?: 'deposit' | 'full_payment';
+  depositCents?: number;
+  remainingBalanceCents?: number;
+  pickupDeadline?: string | null;
+  depositForfeitedAt?: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -483,6 +489,85 @@ export default function BuyerOrderHistory() {
                     </div>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Deposit Order Info */}
+          {selectedOrder.checkoutMode === 'deposit' && (
+            <Card className="mb-6 border-amber-200 bg-amber-50">
+              <CardHeader>
+                <CardTitle className="text-amber-800 flex items-center gap-2">
+                  Deposit Order
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white p-3 rounded-lg border border-amber-200">
+                    <p className="text-xs text-gray-600 mb-1">Deposit Paid</p>
+                    <p className="text-lg font-bold text-gray-900">${((selectedOrder.depositCents || 0) / 100).toFixed(2)}</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-amber-200">
+                    <p className="text-xs text-gray-600 mb-1">Balance Due at Pickup</p>
+                    <p className="text-lg font-bold text-gray-900">${((selectedOrder.remainingBalanceCents || 0) / 100).toFixed(2)}</p>
+                  </div>
+                </div>
+                
+                {selectedOrder.pickupDeadline && !selectedOrder.depositForfeitedAt && selectedOrder.fulfillmentStatus !== 'fulfilled' && selectedOrder.fulfillmentStatus !== 'cancelled' && (
+                  <div className={`p-3 rounded-lg border ${
+                    new Date(selectedOrder.pickupDeadline) < new Date() 
+                      ? 'bg-red-100 border-red-300' 
+                      : new Date(selectedOrder.pickupDeadline).getTime() - Date.now() < 24 * 60 * 60 * 1000 
+                        ? 'bg-orange-100 border-orange-300'
+                        : 'bg-amber-100 border-amber-200'
+                  }`}>
+                    <p className={`text-sm font-medium ${
+                      new Date(selectedOrder.pickupDeadline) < new Date() 
+                        ? 'text-red-800' 
+                        : 'text-amber-800'
+                    }`}>
+                      {new Date(selectedOrder.pickupDeadline) < new Date() 
+                        ? ' Pickup deadline has passed!' 
+                        : 'Pickup Deadline'}
+                    </p>
+                    <p className={`text-xs ${
+                      new Date(selectedOrder.pickupDeadline) < new Date() 
+                        ? 'text-red-700' 
+                        : 'text-amber-700'
+                    }`}>
+                      {new Date(selectedOrder.pickupDeadline).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                    {new Date(selectedOrder.pickupDeadline) < new Date() ? (
+                      <p className="text-xs text-red-700 mt-1">
+                        Please pick up your order or contact the store to avoid deposit forfeiture.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-700 mt-1">
+                        Please pick up your order before this deadline.
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {selectedOrder.depositForfeitedAt && (
+                  <div className="p-3 rounded-lg bg-red-100 border border-red-300">
+                    <p className="text-sm font-medium text-red-800">Deposit Forfeited</p>
+                    <p className="text-xs text-red-700">This order was marked as forfeited due to non-pickup.</p>
+                  </div>
+                )}
+                
+                {selectedOrder.fulfillmentStatus === 'fulfilled' && !selectedOrder.depositForfeitedAt && (
+                  <div className="p-3 rounded-lg bg-green-100 border border-green-200">
+                    <p className="text-sm font-medium text-green-800">Deposit Order Completed</p>
+                    <p className="text-xs text-green-700">Your order was picked up successfully.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

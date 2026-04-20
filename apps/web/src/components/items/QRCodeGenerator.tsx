@@ -80,7 +80,7 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
       case 'chain_enterprise': // Chain enterprise gets same features as individual enterprise
         return {
           enabled: true,
-          maxResolution: 1024,
+          maxResolution: 2048,
           customColors: true,
           customLogo: true,
           bulkDownload: true,
@@ -89,6 +89,7 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
           whiteLabel: true,
           dynamicQR: true
         };
+      case 'commitment':
       case 'professional':
       case 'chain_professional': // Chain professional gets same features as individual professional
         return {
@@ -102,6 +103,8 @@ export function QRCodeGenerator({ url, productName, size = 256, tenantId, logoUr
           whiteLabel: false,
           dynamicQR: false
         };
+      case 'discovery':
+      case 'storefront':
       case 'starter':
       case 'chain_starter': // Chain starter gets same features as individual starter
       default:

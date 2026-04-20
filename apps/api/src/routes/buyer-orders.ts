@@ -216,6 +216,12 @@ router.get('/:orderId', async (req, res) => {
       platformFee: 0,
       fulfillmentFee: order.shipping_cents || 0,
       fulfillmentMethod: (order.metadata as any)?.fulfillment_method || null,
+      // Deposit order fields
+      checkoutMode: order.checkout_mode || 'full_payment',
+      depositCents: order.deposit_cents || 0,
+      remainingBalanceCents: order.remaining_balance_cents || 0,
+      pickupDeadline: order.pickup_deadline || null,
+      depositForfeitedAt: order.deposit_forfeited_at || null,
       customerInfo: {
         email: order.customer_email,
         phone: order.customer_phone || '',

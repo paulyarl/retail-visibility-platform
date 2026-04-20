@@ -74,32 +74,48 @@ router.get('/:tenantId/payment-gateway', async (req: Request, res: Response) => 
  * GET /api/tenants/:tenantId/payment-gateways/public
  * List active payment gateways for a tenant (public endpoint for checkout)
  * No authentication required - only returns gateway types, not credentials
+ * Includes tenant tier for Tier 3 deposit checkout mode detection
  */
 router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
 
-    const gateways = await prisma.tenant_payment_gateways.findMany({
-      where: { 
-        tenant_id: tenantId,
-        is_active: true, // Only return active gateways
-      },
-      select: {
-        id: true,
-        gateway_type: true,
-        is_active: true,
-        is_default: true,
-        // Don't expose sensitive config data
-      },
-      orderBy: [
-        { is_default: 'desc' },
-        { created_at: 'desc' },
-      ],
-    });
+    // Get gateways and tenant tier in parallel
+    const [gateways, tenant] = await Promise.all([
+      prisma.tenant_payment_gateways.findMany({
+        where: { 
+          tenant_id: tenantId,
+          is_active: true, // Only return active gateways
+        },
+        select: {
+          id: true,
+          gateway_type: true,
+          is_active: true,
+          is_default: true,
+          // Don't expose sensitive config data
+        },
+        orderBy: [
+          { is_default: 'desc' },
+          { created_at: 'desc' },
+        ],
+      }),
+      prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: {
+          subscription_tier: true,
+        },
+      }),
+    ]);
+
+    // Add tenant tier to each gateway for frontend deposit calculation
+    const gatewaysWithTier = gateways.map(gateway => ({
+      ...gateway,
+      tenant_tier: tenant?.subscription_tier || null,
+    }));
 
     res.json({
       success: true,
-      gateways,
+      gateways: gatewaysWithTier,
     });
   } catch (error: any) {
     console.error('[Payment Gateways] Public list error:', error);

@@ -15,13 +15,16 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { checkTierFeatureAccess, getMinimumTierForFeature, isValidTier, getValidTierKeys } from '../services/TierService';
 
-type SubscriptionTier = 'trial' | 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization'| 'chain_starter' | 'chain_professional' | 'chain_enterprise';
+type SubscriptionTier = 'trial' | 'google_only' | 'discovery' | 'starter' | 'storefront' | 'commitment' | 'professional' | 'enterprise' | 'organization'| 'chain_starter' | 'chain_professional' | 'chain_enterprise';
 
 // LEGACY: Kept for fallback only
 const VALID_TIERS: SubscriptionTier[] = [
   'trial',
   'google_only',
+  'discovery',
   'starter',
+  'storefront',
+  'commitment',
   'professional',
   'enterprise',
   'chain_starter',

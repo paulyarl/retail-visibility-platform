@@ -88,15 +88,19 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
   // Helper function to map tier keys to levels
   const mapTierKeyToLevel = (tierKey: string): TierInfo['level'] => {
     switch (tierKey) {
-      case 'google_only': return 'starter';
-      case 'starter': return 'starter';
-      case 'professional': return 'pro';
+      case 'google_only': return 'discovery';
+      case 'starter': return 'discovery';
+      case 'discovery': return 'discovery';
+      case 'storefront': return 'storefront';
+      case 'commitment': return 'commitment';
+      
+      case 'professional': return 'professional';
       case 'enterprise': return 'enterprise';
       case 'organization': return 'enterprise';
-      case 'chain_starter': return 'starter';
-      case 'chain_professional': return 'pro';
-      case 'chain_enterprise': return 'enterprise';
-      default: return 'starter';
+      case 'chain_starter': return 'chain_starter';
+      case 'chain_professional': return 'chain_professional';
+      case 'chain_enterprise': return 'chain_enterprise';
+      default: return 'discovery';
     }
   };
 
@@ -234,29 +238,29 @@ export function useTenantTier(tenantId: string | null): UseTenantTierReturn {
       
       // Professional tier features
       'barcode_scan': {
-        tier: 'professional',
-        badge: 'PRO+',
+        tier: 'discovery',
+        badge: 'DISCOVERY+',
         tooltip: 'Requires Professional tier or higher - Upgrade for barcode scanning',
-        color: 'bg-gradient-to-r from-purple-600 to-pink-600'
+        color: 'bg-gradient-to-r from-blue-600 to-cyan-600'
       },
       'quick_start_wizard': { 
-        tier: 'professional', 
-        badge: 'PRO+', 
-        tooltip: 'Requires Professional tier or higher - Upgrade for Quick Start wizard',
-        color: 'bg-gradient-to-r from-purple-600 to-pink-600'
+        tier: 'discovery', 
+        badge: 'DISCOVERY+', 
+        tooltip: 'Requires Discovery tier or higher - Upgrade for Quick Start wizard',
+        color: 'bg-gradient-to-r from-blue-600 to-cyan-600'
       },
       
       // Starter tier features
       'storefront': { 
-        tier: 'starter', 
-        badge: 'STARTER+', 
-        tooltip: 'Requires Starter tier or higher - Upgrade for public storefront',
-        color: 'bg-blue-600'
+        tier: 'storefront', 
+        badge: 'STOREFRONT+', 
+        tooltip: 'Requires Discovery tier or higher - Upgrade for public storefront',
+        color: 'bg-gradient-to-r from-blue-600 to-cyan-600'
       },
       'category_quick_start': { 
-        tier: 'starter', 
-        badge: 'STARTER+', 
-        tooltip: 'Requires Starter tier or higher - Upgrade for category quick start',
+        tier: 'discovery', 
+        badge: 'DISCOVERY+', 
+        tooltip: 'Requires Discovery tier or higher - Upgrade for category quick start',
         color: 'bg-blue-600'
       },
     };

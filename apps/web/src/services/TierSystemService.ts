@@ -754,8 +754,14 @@ export class TierSystemService extends AdminApiSingleton {
     switch (tier.tier_key) {
       case 'google_only':
         return '🎯 You\'re on Google-Only!';
+      case 'discovery':
+        return '🎯 Get Found on Google!';
       case 'starter':
         return '🏪 You Now Have Your Own Storefront!';
+      case 'storefront':
+        return '🏪 You Now Have Your Own Storefront!';
+      case 'commitment':
+        return '⚡ Commitment - Capture Intent and Drive Foot Traffic!';
       case 'professional':
         return '⚡ Professional Features Unlocked!';
       case 'enterprise':
@@ -779,6 +785,9 @@ export class TierSystemService extends AdminApiSingleton {
   private getTierCTA(tier: TierInfo): { text: string; href: string } {
     switch (tier.tier_key) {
       case 'google_only':
+      case 'discovery':
+      case 'commitment':
+      case 'storefront':
       case 'starter':
         return { text: 'View Your Stores', href: '/tenants' };
       case 'professional':

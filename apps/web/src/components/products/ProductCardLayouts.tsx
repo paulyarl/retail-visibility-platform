@@ -1188,7 +1188,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   tenantId,
   tenantName,
   tenantLogo,
-  defaultGatewayType
+  defaultGatewayType,
 }) => {
   // Get payment context directly (like SmartProductCard does)
   const contextPayment = useTenantPaymentOptional();

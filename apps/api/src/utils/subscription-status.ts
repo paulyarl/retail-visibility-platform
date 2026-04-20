@@ -39,7 +39,7 @@ interface MaintenanceContext {
  * - google_only outside maintenance window => freeze
  */
 export function getMaintenanceState(ctx: MaintenanceContext): MaintenanceState {
-  const tier = ctx.tier || 'starter';
+  const tier = ctx.tier || 'discovery';
   const status = ctx.status || 'active';
   const now = new Date();
 
@@ -47,7 +47,7 @@ export function getMaintenanceState(ctx: MaintenanceContext): MaintenanceState {
 
   let inMaintenanceWindow = false;
 
-  if (tier === 'google_only' && !isInactive) {
+  if ((tier === 'google_only' || tier === 'discovery') && !isInactive) {
     if (!ctx.trialEndsAt) {
       inMaintenanceWindow = true;
     } else {
@@ -58,7 +58,7 @@ export function getMaintenanceState(ctx: MaintenanceContext): MaintenanceState {
     }
   }
 
-  const isFullyFrozen = isInactive || (tier === 'google_only' && !inMaintenanceWindow);
+  const isFullyFrozen = isInactive || ((tier === 'google_only' || tier === 'discovery') && !inMaintenanceWindow);
 
   if (inMaintenanceWindow) return 'maintenance';
   if (isFullyFrozen) return 'freeze';
@@ -87,7 +87,7 @@ export function deriveInternalStatus(tenant: {
 }): InternalStatus {
   const now = new Date();
   const status = tenant.subscription_status || 'active';
-  const tier = tenant.subscription_tier || 'starter';
+  const tier = tenant.subscription_tier || 'discovery';
 
   // 1. Check for expired_trial tier (invisible on public pages)
   if (tier === 'expired_trial') {
@@ -128,7 +128,7 @@ export function deriveInternalStatus(tenant: {
     }
 
     // Check if this is google_only tier (paid tier, not maintenance)
-    if (tier === 'google_only') {
+    if (tier === 'google_only' || tier === 'discovery') {
       // google_only is now a paid tier ($29/mo), not a downgrade target
       return 'active';
     }

@@ -31,6 +31,9 @@ export default function BillingFilters({ searchQuery, onSearchChange, selectedTi
   const trialTiers = [
     { value: 'trial_google_only', label: 'Trial: Google Only' },
     { value: 'trial_starter', label: 'Trial: Starter' },
+    { value: 'trial_discovery', label: 'Trial: Discovery' },
+    { value: 'trial_commitment', label: 'Trial: Commitment' },
+    { value: 'trial_storefront', label: 'Trial: Storefront' },
     { value: 'trial_professional', label: 'Trial: Professional' },
     { value: 'trial_chain_starter', label: 'Trial: Chain Starter' },
   ];

@@ -24,7 +24,7 @@ export interface TierLimits {
 export interface TierInfo {
   id: string;
   name: string;
-  level: 'starter' | 'growth' | 'pro' | 'enterprise' | 'custom';
+  level: 'discovery' | 'storefront' | 'commitment'| 'professional' | 'enterprise' | 'custom' | 'chain_starter' | 'chain_professional' | 'chain_enterprise';
   source: 'organization' | 'tenant';
   features: TierFeature[];
   limits: TierLimits;
@@ -53,15 +53,17 @@ export function resolveTier(
   // Helper function to map tier levels to resolver format
   const mapTierLevel = (tierId: string): TierInfo['level'] => {
     switch (tierId) {
-      case 'google_only': return 'starter';
-      case 'starter': return 'starter';
-      case 'professional': return 'pro';
+      case 'google_only': return 'discovery';
+      case 'discovery': return 'discovery';
+      case 'storefront': return 'storefront';
+      case 'commitment': return 'commitment';
+      case 'professional': return 'professional';
       case 'enterprise': return 'enterprise';
       case 'organization': return 'enterprise'; // Map organization to enterprise level
-      case 'chain_starter': return 'starter';
-      case 'chain_professional': return 'pro';
-      case 'chain_enterprise': return 'enterprise';
-      default: return 'starter';
+      case 'chain_starter': return 'chain_starter';
+      case 'chain_professional': return 'chain_professional';
+      case 'chain_enterprise': return 'chain_enterprise';
+      default: return 'discovery';
     }
   };
 
@@ -108,7 +110,7 @@ export function resolveTier(
     effective: getDefaultTier(),
     isChain: false,
     canUpgrade: true,
-    upgradeOptions: ['growth', 'pro']
+    upgradeOptions: ['storefront', 'commitment']
   };
 }
 
@@ -189,7 +191,7 @@ function getHigherTierLevel(
   level1: TierInfo['level'],
   level2: TierInfo['level']
 ): TierInfo['level'] {
-  const hierarchy: TierInfo['level'][] = ['starter', 'growth', 'pro', 'enterprise', 'custom'];
+  const hierarchy: TierInfo['level'][] = ['discovery', 'storefront', 'commitment', 'professional', 'enterprise', 'custom'];
   const index1 = hierarchy.indexOf(level1);
   const index2 = hierarchy.indexOf(level2);
   return index1 > index2 ? level1 : level2;
@@ -199,7 +201,7 @@ function getHigherTierLevel(
  * Gets available upgrade options for a tier level
  */
 function getUpgradeOptions(currentLevel: TierInfo['level']): string[] {
-  const allTiers: TierInfo['level'][] = ['starter', 'growth', 'pro', 'enterprise'];
+  const allTiers: TierInfo['level'][] = ['discovery', 'commitment', 'storefront', 'professional', 'enterprise'];
   const currentIndex = allTiers.indexOf(currentLevel);
   return allTiers.slice(currentIndex + 1);
 }
@@ -209,9 +211,9 @@ function getUpgradeOptions(currentLevel: TierInfo['level']): string[] {
  */
 function getDefaultTier(): TierInfo {
   return {
-    id: 'starter',
-    name: 'Starter',
-    level: 'starter',
+    id: 'storefront',
+    name: 'Storefront',
+    level: 'storefront',
     source: 'tenant',
     features: [
       {

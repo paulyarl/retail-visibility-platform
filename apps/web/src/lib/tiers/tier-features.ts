@@ -269,8 +269,10 @@ export const FEATURE_DISPLAY_NAMES: Record<string, string> = {
 // NOTE: All tiers can be trialed for 14 days before payment is required
 export const TIER_PRICING: Record<string, number> = {
   google_only: 29,
-  starter: 49,
-  professional: 499,
+  discovery: 29,
+  storefront: 59,
+  commitment: 99,
+  professional: 199,
   enterprise: 999,
   organization: 999,
   chain_starter: 199,
@@ -283,6 +285,7 @@ export const TIER_PRICING: Record<string, number> = {
 * Used to restrict "taste test" features for lower tiers
 */
 export const TIER_FEATURE_LIMITS: Record<string, Record<string, any>> = {
+  
 starter: {
 category_quick_start: {
 maxCategories: 15,         // Up to 15 categories

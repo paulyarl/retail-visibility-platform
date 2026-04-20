@@ -46,6 +46,9 @@ export default function DirectoryListingsTable({
     const colors: Record<string, string> = {
       google_only: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
       starter: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      discovery: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      commitment: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
+      storefront: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
       professional: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
       enterprise: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
       chain_starter: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',

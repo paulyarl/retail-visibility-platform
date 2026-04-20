@@ -328,9 +328,9 @@ router.post('/:id/directory/publish', authenticateToken, checkTenantAccess, asyn
       return res.status(404).json({ error: 'tenant_not_found' });
     }
 
-    if (tenant.subscription_tier === 'google_only') {
-      return res.status(403).json({ error: 'directory_not_available_for_tier' });
-    }
+    // if (tenant.subscription_tier === 'google_only') {
+    //   return res.status(403).json({ error: 'directory_not_available_for_tier' });
+    // }
 
     // Verify business profile is complete enough
     const profile = await prisma.tenant_business_profiles_list.findUnique({ where: { tenant_id: tenantId } });

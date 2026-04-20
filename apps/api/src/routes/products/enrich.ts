@@ -115,11 +115,11 @@ router.post('/:productId/enrich', async (req: Request, res: Response) => {
     // trial_ends_at is treated as the current maintenance boundary and should be extended externally
     // in 6-month increments while the subscription remains active.
     const inMaintenanceWindow =
-      tier === 'google_only' &&
+      tier === 'google_only'||tier === 'discovery' &&
       status === 'active' &&
       (!tenant.trial_ends_at || now < tenant.trial_ends_at);
 
-    const isFullyFrozen = isInactive || (tier === 'google_only' && !inMaintenanceWindow);
+    const isFullyFrozen = isInactive || ((tier === 'google_only' || tier === 'discovery') && !inMaintenanceWindow);
 
     if (isFullyFrozen) {
       return res.status(403).json({

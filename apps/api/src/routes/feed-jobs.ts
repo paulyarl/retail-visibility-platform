@@ -144,11 +144,11 @@ router.post('/', async (req, res) => {
     const isInactive = status === 'canceled' || status === 'expired';
 
     const inMaintenanceWindow =
-      tier === 'google_only' &&
+      (tier === 'google_only' || tier === 'discovery') &&
       status === 'active' &&
       (!tenant.trial_ends_at || now < tenant.trial_ends_at);
 
-    const isFullyFrozen = isInactive || (tier === 'google_only' && !inMaintenanceWindow);
+    const isFullyFrozen = isInactive || (!inMaintenanceWindow && (tier === 'google_only' || tier === 'discovery'));
 
     if (isFullyFrozen) {
       return res.status(403).json({

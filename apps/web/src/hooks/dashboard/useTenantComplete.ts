@@ -415,22 +415,31 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
 // Helper functions (simplified versions for this consolidated hook)
 function mapTierLevel(tierId: string): TierInfo['level'] {
   switch (tierId) {
-    case 'google_only': return 'starter';
-    case 'starter': return 'starter';
-    case 'professional': return 'pro';
+    case 'google_only': return 'discovery';
+    case 'discovery': return 'discovery';
+    case 'storefront': return 'storefront';
+    case 'commitment': return 'commitment';
+    case 'starter': return 'discovery';
+    case 'professional': return 'professional';
     case 'enterprise': return 'enterprise';
     case 'organization': return 'enterprise';
-    default: return 'starter';
+    case 'chain_starter': return 'chain_starter';
+    default: return 'discovery';
   }
 }
 
 function getTierLimit(tierId: string, type: 'products' | 'locations' | 'users'): number {
   // Simplified tier limits - in production you'd have a proper tier configuration
   const limits: Record<string, Record<string, number>> = {
-    'free': { products: 10, locations: 1, users: 1 },
     'starter': { products: 100, locations: 1, users: 5 },
-    'professional': { products: 1000, locations: 3, users: 10 },
-    'enterprise': { products: 10000, locations: 10, users: 50 },
+    'discovery': { products: 100, locations: 1, users: 5 },
+    'storefront': { products: 250, locations: 1, users: 5 },
+    'commitment': { products: 500, locations: 1, users: 5 },
+    'professional': { products: 750, locations: 2, users: 10 },
+    'chain_starter': { products: 1000, locations: 1, users: 5 },
+    'chain_professional': { products: 1000, locations: 3, users: 10 },
+    'enterprise': { products: 10000, locations: 2, users: 50 },
+    'chain_enterprise': { products: 10000, locations: 10, users: 50 },
   };
   return limits[tierId]?.[type] || limits['free'][type];
 }
@@ -438,8 +447,10 @@ function getTierLimit(tierId: string, type: 'products' | 'locations' | 'users'):
 function getUpgradeOptions(currentLevel: TierInfo['level']): string[] {
   // Simplified upgrade options
   switch (currentLevel) {
-    case 'starter': return ['professional', 'enterprise'];
-    case 'pro': return ['enterprise'];
-    default: return ['starter', 'professional', 'enterprise'];
+    case 'discovery': return ['storefront', 'commitment', 'professional', 'enterprise'];
+    case 'storefront': return ['commitment', 'professional', 'enterprise'];
+    case 'commitment': return ['professional', 'enterprise'];
+    case 'professional': return ['enterprise'];
+    default: return ['discovery', 'storefront', 'commitment', 'professional', 'enterprise'];
   }
 }

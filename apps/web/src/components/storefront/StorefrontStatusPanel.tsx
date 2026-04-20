@@ -157,7 +157,7 @@ export function useStorefrontStatus(tenantId?: string, tenantInfo?: PublicTenant
 function getPanelType(tenant: PublicTenantInfo | null | undefined): 'google_only' | 'status' | 'subscription' | null {
   if (!tenant) return null;
 
-  if (tenant.subscriptionTier === 'google_only') return 'google_only';
+  if (tenant.subscriptionTier === 'google_only' || tenant.subscriptionTier === 'discovery') return 'google_only';
   if (tenant.showSubscriptionPanel && tenant.subscriptionStatusInfo) return 'subscription';
   if (tenant.locationStatus && tenant.locationStatus !== 'active') return 'status';
   if (tenant.statusInfo && !tenant.statusInfo.showStorefront) return 'status';
@@ -173,7 +173,7 @@ export function shouldShowStatusPanel(tenant: PublicTenantInfo | null): boolean 
   if (!tenant) return false;
 
   // Show for google_only tier
-  if (tenant.subscriptionTier === 'google_only') return true;
+  if (tenant.subscriptionTier === 'google_only' || tenant.subscriptionTier === 'discovery') return true;
 
   // Show for non-active statuses
   if (tenant.locationStatus && tenant.locationStatus !== 'active') return true;
@@ -217,7 +217,7 @@ export function StorefrontStatusPanel({
   }
 
   // Google-only tier panel
-  if (panelType === 'google_only' || tenant.subscriptionTier === 'google_only') {
+  if (panelType === 'google_only' || tenant.subscriptionTier === 'google_only' || tenant.subscriptionTier === 'discovery') {
     const config = GOOGLE_ONLY_CONFIG;
 
     return (

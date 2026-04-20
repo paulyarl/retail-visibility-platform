@@ -203,14 +203,16 @@ export async function checkSubscriptionLimits(
     // INDIVIDUAL TENANT LIMIT ENFORCEMENT
     // Define limits per tier for standalone tenants
     const limits: Record<string, { items: number }> = {
-      google_only: { items: 500 },
+      discovery: { items: 500 },
       starter: { items: 500 },
+      storefront: { items: 500 },
+      commitment: { items: 500 }, // This will be overridden by the actual commitment amount
       professional: { items: 5000 },
       enterprise: { items: Infinity },
     };
 
-    const tier = tenant.subscription_tier || "starter";
-    const limit = limits[tier] || limits.starter;
+    const tier = tenant.subscription_tier || "storefront";
+    const limit = limits[tier] || limits.storefront;
     const status = tenant.subscription_status || "active";
     const maintenanceState = getMaintenanceState({
       tier,

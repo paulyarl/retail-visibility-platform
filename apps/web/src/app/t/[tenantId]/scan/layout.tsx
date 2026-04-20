@@ -37,7 +37,7 @@ export default function ScanLayout({ children }: { children: React.ReactNode }) 
   return (
     <TierGate 
       feature="barcode_scan" 
-      tier={tier?.effective?.id || 'starter'} 
+      tier={tier?.effective?.id || 'discovery'} 
       tenantId={tenantId}
     >
       {children}

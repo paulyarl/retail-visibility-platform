@@ -81,9 +81,9 @@ export default function TierSystemPage() {
       setLoading(true);
       setError(null);
       
-      console.log('[TierSystem] Loading tiers with includeInactive:', showInactiveTiers);
+      // console.log('[TierSystem] Loading tiers with includeInactive:', showInactiveTiers);
       const tiers = await platformHomeService.getTierSystemTiers(showInactiveTiers);
-      console.log('[TierSystem] Loaded tiers:', tiers?.length, 'Inactive toggle:', showInactiveTiers);
+      // console.log('[TierSystem] Loaded tiers:', tiers?.length, 'Inactive toggle:', showInactiveTiers);
       
       // Fix corrupted prices from API and ensure proper number format
       const correctedTiers = (tiers || []).map((tier: any) => {
@@ -112,7 +112,7 @@ export default function TierSystemPage() {
 
   // Reload tiers when showInactiveTiers changes
   useEffect(() => {
-    console.log('[TierSystem] showInactiveTiers changed to:', showInactiveTiers);
+    // console.log('[TierSystem] showInactiveTiers changed to:', showInactiveTiers);
     loadTiers();
   }, [showInactiveTiers]);
 
@@ -122,8 +122,8 @@ export default function TierSystemPage() {
       const tier = tiers.find(t => t.id === tierId);
       if (tier) {
         setDeactivatingTier(tier);
-        setDeactivationReason('');
       }
+      setDeactivationReason('');
       return;
     }
 
@@ -131,7 +131,10 @@ export default function TierSystemPage() {
     try {
       setError(null);
       
-      const updatedTier = await platformHomeService.updateTierStatus(tierId, isActive);
+      // Use tierKey for API call
+      const tier = tiers.find(t => t.id === tierId);
+      const tierKey = tier?.tierKey || tierId;
+      const updatedTier = await platformHomeService.updateTierStatus(tierKey, isActive);
       
       if (updatedTier) {
         // 🎯 Use the response data to update the local state immediately
@@ -168,7 +171,9 @@ export default function TierSystemPage() {
       setError(null);
       setSaving(true);
       
-      const updatedTier = await platformHomeService.updateTierStatus(deactivatingTier.id, false, deactivationReason.trim());
+      // Use tierKey for API call
+      const tierKey = deactivatingTier.tierKey || deactivatingTier.id;
+      const updatedTier = await platformHomeService.updateTierStatus(tierKey, false, deactivationReason.trim());
       
       if (updatedTier) {
         // 🎯 Use the response data to update the local state immediately
@@ -221,22 +226,22 @@ export default function TierSystemPage() {
       setSaving(true);
       setError(null);
       
-      console.log('[TierSystem] Updating tier:', editingData.id, editingData);
+      // console.log('[TierSystem] Updating tier:', editingData.id, editingData);
       
-      // 🎯 Use tierKey for API calls (remove tier_ prefix if present)
-      const tierId = editingData.id.startsWith('tier_') ? editingData.tierKey : editingData.id;
-      console.log('[TierSystem] Using tierId for API call:', tierId);
+      // Always use tierKey for API calls as the API expects tierKey in the URL path
+      const tierId = editingData.tierKey || editingData.id;
+      // console.log('[TierSystem] Using tierId for API call:', tierId);
       
       const updatedTier = await platformHomeService.updateTier(tierId, editingData);
       
       if (updatedTier) {
-        console.log('[TierSystem] Update response:', updatedTier);
+        // console.log('[TierSystem] Update response:', updatedTier);
         
         // updatedTier is now the extracted tier data (not nested)
         const tierData = updatedTier;
-        console.log('[TierSystem] Extracted tier data:', tierData);
-        console.log('[TierSystem] displayName:', tierData.displayName);
-        console.log('[TierSystem] name:', tierData.name);
+        // console.log('[TierSystem] Extracted tier data:', tierData);
+        // console.log('[TierSystem] displayName:', tierData.displayName);
+        // console.log('[TierSystem] name:', tierData.name);
         
         // 🎯 Use the response data to update the local state immediately
         setTiers(prevTiers => 
@@ -253,7 +258,7 @@ export default function TierSystemPage() {
 
         // 🎯 Show success toast with detailed information
         const displayName = tierData.displayName || tierData.name || 'Unknown';
-        console.log('[TierSystem] Toast displayName:', displayName);
+        // console.log('[TierSystem] Toast displayName:', displayName);
         toast(`✅ Successfully updated "${displayName}"`, { variant: 'success' });
         
         setEditingTier(null);
@@ -392,7 +397,12 @@ export default function TierSystemPage() {
       setSaving(true);
       setError(null);
       
-      await platformHomeService.updateTierSortOrder(tierId, newSortOrder);
+      // Use tierKey for API call
+      const tier = tiers.find(t => t.id === tierId);
+      const tierKey = tier?.tierKey || tierId;
+      
+      // Use updateTier instead of updateTierSortOrder since the sort-order endpoint doesn't exist
+      await platformHomeService.updateTier(tierKey, { sortOrder: newSortOrder });
       setSuccess('Sort order updated successfully');
       loadTiers();
     } catch (err) {
@@ -766,24 +776,22 @@ export default function TierSystemPage() {
                         </>
                       )}
 
-                      {tier.features && tier.features.length > 0 && (
+                      {editingTier === tier.id && (
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-medium text-sm">Features:</span>
-                            {editingTier === tier.id && (
-                              <Button
-                                onClick={openFeatureManager}
-                                variant="outline"
-                                size="sm"
-                              >
-                                <Plus className="w-4 h-4 mr-1" />
-                                Manage Features
-                              </Button>
-                            )}
+                            <Button
+                              onClick={openFeatureManager}
+                              variant="outline"
+                              size="sm"
+                            >
+                              <Plus className="w-4 h-4 mr-1" />
+                              Manage Features
+                            </Button>
                           </div>
                           
                           {/* Group direct features */}
-                          {editingTier === tier.id && (
+                          {tier.features && tier.features.length > 0 ? (
                             <div className="mb-4">
                               <div className="text-xs font-medium text-gray-600 mb-2">Direct Features:</div>
                               <div className="flex flex-wrap gap-2">
@@ -805,6 +813,10 @@ export default function TierSystemPage() {
                                     </Badge>
                                   ))}
                               </div>
+                            </div>
+                          ) : (
+                            <div className="mb-4 text-sm text-gray-500 italic">
+                              No features added yet. Click "Manage Features" to add features to this tier.
                             </div>
                           )}
 
@@ -837,43 +849,51 @@ export default function TierSystemPage() {
                           {/* View mode: Show all features with inheritance status */}
                           {editingTier !== tier.id && (
                             <div className="space-y-3">
-                              {/* Direct features */}
-                              {tier.features.filter(f => !f.isInherited).length > 0 && (
-                                <div>
-                                  <div className="text-xs font-medium text-gray-600 mb-2">Direct Features:</div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {tier.features
-                                      .filter(f => !f.isInherited)
-                                      .map((feature, index) => (
-                                        <Badge 
-                                          key={feature.featureKey || `${feature.featureName}-${index}`} 
-                                          variant="success" 
-                                          className="text-xs"
-                                        >
-                                          {feature.featureName}
-                                        </Badge>
-                                      ))}
-                                  </div>
-                                </div>
-                              )}
+                              {tier.features && tier.features.length > 0 ? (
+                                <>
+                                  {/* Direct features */}
+                                  {tier.features.filter(f => !f.isInherited).length > 0 && (
+                                    <div>
+                                      <div className="text-xs font-medium text-gray-600 mb-2">Direct Features:</div>
+                                      <div className="flex flex-wrap gap-2">
+                                        {tier.features
+                                          .filter(f => !f.isInherited)
+                                          .map((feature, index) => (
+                                            <Badge 
+                                              key={feature.featureKey || `${feature.featureName}-${index}`} 
+                                              variant="success" 
+                                              className="text-xs"
+                                            >
+                                              {feature.featureName}
+                                            </Badge>
+                                          ))}
+                                      </div>
+                                    </div>
+                                  )}
 
-                              {/* Inherited features */}
-                              {tier.features.filter(f => f.isInherited).length > 0 && (
-                                <div>
-                                  <div className="text-xs font-medium text-gray-600 mb-2">Inherited Features:</div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {tier.features
-                                      .filter(f => f.isInherited)
-                                      .map((feature, index) => (
-                                        <Badge 
-                                          key={feature.featureKey || `${feature.featureName}-${index}`} 
-                                          variant="default" 
-                                          className="text-xs opacity-75"
-                                        >
-                                          {feature.featureName}
-                                        </Badge>
-                                      ))}
-                                  </div>
+                                  {/* Inherited features */}
+                                  {tier.features.filter(f => f.isInherited).length > 0 && (
+                                    <div>
+                                      <div className="text-xs font-medium text-gray-600 mb-2">Inherited Features:</div>
+                                      <div className="flex flex-wrap gap-2">
+                                        {tier.features
+                                          .filter(f => f.isInherited)
+                                          .map((feature, index) => (
+                                            <Badge 
+                                              key={feature.featureKey || `${feature.featureName}-${index}`} 
+                                              variant="default" 
+                                              className="text-xs opacity-75"
+                                            >
+                                              {feature.featureName}
+                                            </Badge>
+                                          ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="text-sm text-gray-500 italic">
+                                  No features configured for this tier.
                                 </div>
                               )}
                             </div>

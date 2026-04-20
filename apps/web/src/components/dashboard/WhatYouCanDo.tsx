@@ -408,7 +408,7 @@ export default function WhatYouCanDo({ tier, tenantId }: WhatYouCanDoProps) {
       )}
 
       {/* Starter Tier Upgrade CTA - Show for Starter users */}
-      {tier.effective.level === 'starter' && (
+      {tier.effective.level === 'discovery' && (
         <Card className="border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-green-50">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
@@ -465,7 +465,7 @@ export default function WhatYouCanDo({ tier, tenantId }: WhatYouCanDoProps) {
       )}
 
       {/* Organization Tier Upgrade CTA - Show for Professional tier users */}
-      {(tier.effective.level === 'pro' || tier.effective.name?.toLowerCase().includes('professional')) && !tier.isChain && (
+      {(tier.effective.level === 'professional' || tier.effective.name?.toLowerCase().includes('professional')) && !tier.isChain && (
         <Card className="border-2 border-gradient-to-r from-purple-300 to-pink-300 bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">

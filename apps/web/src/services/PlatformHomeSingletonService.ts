@@ -289,7 +289,7 @@ export interface AdminDirectoryListing {
 
 export interface DirectoryFilters {
   status?: 'published' | 'draft' | 'featured';
-  tier?: 'google_only' | 'starter' | 'professional' | 'enterprise' | 'chain_starter' | 'chain_pro' | 'chain_enterprise';
+  tier?: 'google_only' | 'starter' | 'discovery' | 'commitment' | 'storefront' | 'enterprise' | 'chain_starter' | 'chain_pro' | 'chain_enterprise';
   quality?: 'low' | 'medium' | 'high';
   category?: string;
   search?: string;
@@ -1291,6 +1291,9 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
    * Create tier
    */
   async createTier(tierData: Omit<Tier, 'id' | 'createdAt' | 'updatedAt'>): Promise<Tier | null> {
+    // Auto-generate reason from tier data
+    const reason = `Creating new ${tierData.tierType} tier "${tierData.displayName}" (${tierData.tierKey}) - $${tierData.priceMonthly}/month, ${tierData.maxSkus === null ? 'unlimited' : tierData.maxSkus} SKUs, ${tierData.maxLocations === null ? 'unlimited' : tierData.maxLocations} location(s)`;
+
     const result = await this.makeDefaultRequest<Tier>(
       '/api/admin/tier-system/tiers',
       { 
@@ -1299,7 +1302,8 @@ export class PlatformHomeSingletonService extends TenantApiSingleton {
           ...tierData,
           id: `tier_${tierData.tierKey}`,
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
+          reason
         })
       },
       `platform-create-tier-${tierData.tierKey}`,

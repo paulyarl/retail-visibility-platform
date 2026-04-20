@@ -283,16 +283,19 @@ router.put('/:tenantId/users/:userId', requireTenantAdmin, async (req, res) => {
           organization: 5,
           enterprise: 4,
           professional: 3,
+          commitment: 3,
+          storefront: 2,
           starter: 2,
-          google_only: 1,
+          discovery: 1,
+          google_only: 0,
         };
 
-        let effectiveTier = 'starter';
+        let effectiveTier = 'discovery';
         let effectiveStatus = 'trial';
         let highestPriority = 0;
 
         for (const ut of ownedTenants) {
-          const tier = ut.tenants.subscription_tier || 'starter';
+          const tier = ut.tenants.subscription_tier || 'discovery';
           const status = ut.tenants.subscription_status || 'trial';
           const priority = tierPriority[tier] || 0;
           

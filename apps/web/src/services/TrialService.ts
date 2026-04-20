@@ -17,7 +17,7 @@ export interface TrialStatus {
 }
 
 export interface TrialActivationRequest {
-  trialTier: 'trial_google_only' | 'trial_starter' | 'trial_professional' | 'trial_chain_starter';
+  trialTier: 'trial_google_only' | 'trial_starter' | 'trial_professional' | 'trial_chain_starter'| 'trial_discovery'| 'trial_commitment'| 'trial_storefront';
   paymentMethodId?: string;
 }
 

@@ -131,13 +131,16 @@ export const TIER_FEATURES = {
 // NOTE: 'trial' is not a tier - it's a subscription status that can apply to any tier
 const TIER_HIERARCHY: Record<string, string[]> = {
   google_only: [],
+  discovery: [],
   starter: ['google_only'],
+  storefront: ['discovery', 'google_only'],
+  commitment: ['storefront', 'discovery', 'google_only'],
   professional: ['starter', 'google_only'],
-  enterprise: ['professional', 'starter', 'google_only'],
-  organization: ['professional', 'starter', 'google_only'],
-  chain_starter: ['starter', 'google_only'],
-  chain_professional: ['professional', 'starter', 'google_only'],
-  chain_enterprise: ['enterprise', 'professional', 'starter', 'google_only'],
+  enterprise: ['professional','commitment', 'starter', 'google_only'],
+  organization: ['professional','commitment', 'starter', 'google_only'],
+  chain_starter: ['starter','commitment', 'google_only'],
+  chain_professional: ['professional','commitment', 'starter', 'google_only'],
+  chain_enterprise: ['enterprise','commitment', 'professional', 'starter', 'google_only'],
 };
 
 // Feature to minimum required tier mapping
@@ -216,7 +219,10 @@ export function getTierDisplayName(tier: string): string {
   const displayNames: Record<string, string> = {
     trial: 'Trial',
     google_only: 'Google-Only',
+    discovery: 'Discovery',
     starter: 'Starter',
+    storefront: 'Storefront',
+    commitment: 'Commitment',
     professional: 'Professional',
     enterprise: 'Enterprise',
     organization: 'Organization',
@@ -234,7 +240,10 @@ export function getTierPricing(tier: string): number {
   const pricing: Record<string, number> = {
     trial: 0,
     google_only: 29,
+    discovery: 99,
     starter: 49,
+    storefront: 199,
+    commitment: 499,
     professional: 499,
     enterprise: 999,
     organization: 999,

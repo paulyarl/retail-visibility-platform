@@ -322,6 +322,12 @@ router.get('/tenants/:tenantId/orders/:orderId', authenticateToken, async (req, 
       customerName: order.customer_name,
       customerEmail: order.customer_email,
       customerPhone: order.customer_phone,
+      // Deposit order fields
+      checkoutMode: order.checkout_mode || 'full_payment',
+      depositCents: order.deposit_cents || 0,
+      remainingBalanceCents: order.remaining_balance_cents || 0,
+      pickupDeadline: order.pickup_deadline || null,
+      depositForfeitedAt: order.deposit_forfeited_at || null,
       shippingAddress: order.shipping_address_line1 ? {
         addressLine1: order.shipping_address_line1,
         addressLine2: order.shipping_address_line2,

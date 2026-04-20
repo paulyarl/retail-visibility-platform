@@ -7,7 +7,7 @@
  * NOTE: Trial tiers are wrappers that proxy to their base tiers for limits.
  */
 
-export type SubscriptionTier = 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization';
+export type SubscriptionTier = 'google_only'| 'discovery'|'storefront'|'commitment' | 'starter' | 'professional' | 'enterprise' | 'organization';
 
 /**
  * Map trial tiers to their base tiers for limit proxying
@@ -15,6 +15,9 @@ export type SubscriptionTier = 'google_only' | 'starter' | 'professional' | 'ent
 function getBaseTierForTrial(tier: string): SubscriptionTier {
   const trialToBaseMap: Record<string, SubscriptionTier> = {
     'trial_google_only': 'google_only',
+    'trial_discovery': 'discovery',
+    'trial_storefront': 'storefront',
+    'trial_commitment': 'commitment',
     'trial_starter': 'starter',
     'trial_professional': 'professional',
     'trial_chain_starter': 'starter', // Use starter as base for chain trial
@@ -23,7 +26,7 @@ function getBaseTierForTrial(tier: string): SubscriptionTier {
     'expired_trial': 'starter', // Fallback to starter for expired trials
   };
   
-  return trialToBaseMap[tier] || 'starter';
+  return trialToBaseMap[tier] || 'discovery';
 }
 
 export interface TierLimits {
@@ -35,6 +38,18 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   google_only: {
     name: 'Google-Only',
     maxSkus: 250,
+  },
+  discovery: {
+    name: 'Discovery',
+    maxSkus: 1000,
+  },
+  storefront: {
+    name: 'Storefront',
+    maxSkus: 5000,
+  },
+  commitment: {
+    name: 'Commitment',
+    maxSkus: 10000,
   },
   starter: {
     name: 'Starter',

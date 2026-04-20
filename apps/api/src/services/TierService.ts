@@ -16,7 +16,10 @@ import { prisma } from '../prisma';
 function getBaseTierForTrial(tierKey: string): string | null {
   const trialToBaseMap: Record<string, string> = {
     'trial_google_only': 'google_only',
+    'trial_discovery': 'discovery',
     'trial_starter': 'starter',
+    'trial_storefront': 'storefront',
+    'trial_commitment': 'commitment',
     'trial_professional': 'professional',
     'trial_chain_starter': 'chain_starter',
     'trial_chain_professional': 'chain_professional',
@@ -317,7 +320,7 @@ export async function checkTenantFeatureAccess(
     // Check BOTH org tier and tenant tier - grant access if EITHER has the feature
     // This handles cases where tenant has a higher tier than org, or vice versa
     const orgTier = tenant.organizations_list?.subscription_tier;
-    const tenantTier = tenant.subscription_tier || 'starter';
+    const tenantTier = tenant.subscription_tier || 'discovery';
     
     // console.log(`[checkTenantFeatureAccess] Org tier: ${orgTier}, Tenant tier: ${tenantTier}`);
     

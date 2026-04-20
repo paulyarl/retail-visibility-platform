@@ -68,6 +68,12 @@ interface OrderDetail {
     createdAt: string;
     completedAt?: string;
   }>;
+  // Deposit order fields
+  checkoutMode?: 'deposit' | 'full_payment';
+  depositCents?: number;
+  remainingBalanceCents?: number;
+  pickupDeadline?: string | null;
+  depositForfeitedAt?: string | null;
 }
 
 interface OrderDetailClientProps {
@@ -405,6 +411,80 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
               </div>
             </CardContent>
           </Card>
+
+          {/* Deposit Order Info */}
+          {order.checkoutMode === 'deposit' && (
+            <Card className="border-amber-200 bg-amber-50">
+              <CardHeader>
+                <CardTitle className="text-amber-800 flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Deposit Order
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white p-3 rounded-lg border border-amber-200">
+                    <p className="text-xs text-neutral-600 mb-1">Deposit Paid</p>
+                    <p className="text-lg font-bold text-neutral-900">{formatCurrency(order.depositCents || 0)}</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-amber-200">
+                    <p className="text-xs text-neutral-600 mb-1">Balance Due at Pickup</p>
+                    <p className="text-lg font-bold text-neutral-900">{formatCurrency(order.remainingBalanceCents || 0)}</p>
+                  </div>
+                </div>
+                
+                {order.pickupDeadline && !order.depositForfeitedAt && order.fulfillmentStatus !== 'fulfilled' && order.fulfillmentStatus !== 'cancelled' && (
+                  <div className={`p-3 rounded-lg border ${
+                    new Date(order.pickupDeadline) < new Date() 
+                      ? 'bg-red-100 border-red-300' 
+                      : new Date(order.pickupDeadline).getTime() - Date.now() < 24 * 60 * 60 * 1000 
+                        ? 'bg-orange-100 border-orange-300'
+                        : 'bg-amber-100 border-amber-200'
+                  }`}>
+                    <p className={`text-sm font-medium ${
+                      new Date(order.pickupDeadline) < new Date() 
+                        ? 'text-red-800' 
+                        : 'text-amber-800'
+                    }`}>
+                      {new Date(order.pickupDeadline) < new Date() 
+                        ? ' Pickup deadline has passed!' 
+                        : 'Pickup Deadline'}
+                    </p>
+                    <p className={`text-xs ${
+                      new Date(order.pickupDeadline) < new Date() 
+                        ? 'text-red-700' 
+                        : 'text-amber-700'
+                    }`}>
+                      {formatDate(order.pickupDeadline)}
+                    </p>
+                    {new Date(order.pickupDeadline) < new Date() ? (
+                      <p className="text-xs text-red-700 mt-1">
+                        Mark order as fulfilled to prevent deposit forfeiture.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-700 mt-1">
+                        Mark order as fulfilled when customer picks up to prevent forfeiture.
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {order.depositForfeitedAt && (
+                  <div className="p-3 rounded-lg bg-red-100 border border-red-300">
+                    <p className="text-sm font-medium text-red-800">Deposit Forfeited</p>
+                    <p className="text-xs text-red-700">This order was marked as forfeited on {formatDate(order.depositForfeitedAt)}</p>
+                  </div>
+                )}
+                
+                {order.fulfillmentStatus === 'fulfilled' && !order.depositForfeitedAt && (
+                  <div className="p-3 rounded-lg bg-green-100 border border-green-200">
+                    <p className="text-sm font-medium text-green-800">Deposit Order Completed</p>
+                    <p className="text-xs text-green-700">Order was fulfilled - no forfeiture triggered</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Fulfillment Management */}
           <Card>

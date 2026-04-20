@@ -219,7 +219,7 @@ router.post('/scan/:sessionId/lookup-barcode', authenticateToken, async (req: Re
     const tier = tenant.subscription_tier || 'starter';
     const status = tenant.subscription_status || 'active';
     const isInactive = status === 'canceled' || status === 'expired';
-    const isReadOnlyTier = tier === 'google_only';
+    const isReadOnlyTier = tier === 'google_only' || tier === 'discovery';
 
     if (isInactive || isReadOnlyTier) {
       return res.status(403).json({
@@ -356,7 +356,7 @@ router.post('/scan/:sessionId/commit', authenticateToken, async (req: Request, r
     const tier = tenant.subscription_tier || 'starter';
     const status = tenant.subscription_status || 'active';
     const isInactive = status === 'canceled' || status === 'expired';
-    const isReadOnlyTier = tier === 'google_only';
+    const isReadOnlyTier = tier === 'google_only' || tier === 'discovery';
 
     if (isInactive || isReadOnlyTier) {
       return res.status(403).json({

@@ -274,7 +274,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                 })
               ) : (
                 // Fallback to static tiers if API unavailable
-                (['starter', 'professional', 'enterprise', 'organization'] as SubscriptionTier[]).map((tier) => {
+                (['starter', 'discovery', 'commitment', 'storefront', 'professional', 'enterprise', 'organization'] as SubscriptionTier[]).map((tier) => {
                   const info = TIER_LIMITS[tier];
                   return (
                     <Card key={tier} className="border-2 border-neutral-200" withBorder padding="lg" radius="md">
@@ -423,7 +423,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   // Use dynamic tiers from API, fallback to static if unavailable
   const availableTiers = individualTiers.length > 0 ? 
     individualTiers.filter(tier => tier.tierKey !== 'expired_trial') :
-    (['starter', 'professional', 'enterprise', 'organization'] as SubscriptionTier[]).map(tier => ({
+    (['starter', 'discovery', 'commitment', 'storefront', 'professional', 'enterprise', 'organization'] as SubscriptionTier[]).map(tier => ({
       id: tier,
       tierKey: tier,
       name: tier,
@@ -434,7 +434,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
       maxLocations: TIER_LIMITS[tier].maxLocations,
       tierType: 'individual',
       isActive: true,
-      sortOrder: ['starter', 'professional', 'enterprise', 'organization'].indexOf(tier),
+      sortOrder: ['starter', 'discovery', 'commitment', 'storefront', 'professional', 'enterprise', 'organization'].indexOf(tier),
       features: TIER_LIMITS[tier].features,
       createdAt: '',
       updatedAt: '',
@@ -984,7 +984,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                       const isDenied = request.status === 'denied';
                       
                       // Determine if upgrade or downgrade
-                      const tierOrder = ['starter', 'professional', 'enterprise'];
+                      const tierOrder = ['starter', 'discovery', 'commitment', 'storefront', 'professional', 'enterprise'];
                       const chainTierOrder = ['chain_starter', 'chain_professional', 'chain_enterprise'];
                       const isChain = (request.currentTier as string).startsWith('chain_');
                       const order = isChain ? chainTierOrder : tierOrder;

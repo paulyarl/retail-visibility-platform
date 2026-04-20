@@ -58,8 +58,12 @@ export default function AdminDirectoryFeaturedManagement({ pendingTenants = [] }
   const getTierColor = (tier: string) => {
     switch (tier) {
       case 'starter': return 'bg-gray-100 text-gray-800';
+      case 'discovery': return 'bg-gray-100 text-gray-800';
+      case 'commitment': return 'bg-indigo-100 text-indigo-800';
+      case 'storefront': return 'bg-orange-100 text-orange-800';
       case 'professional': return 'bg-blue-100 text-blue-800';
-      case 'premium': return 'bg-purple-100 text-purple-800';
+      case 'enterprise': return 'bg-purple-100 text-purple-800';
+      
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -118,8 +122,8 @@ export default function AdminDirectoryFeaturedManagement({ pendingTenants = [] }
                     <div className="text-sm text-gray-500 font-mono">{tenant.id.slice(0, 8)}...</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getTierColor(tenant.subscriptionTier || 'starter')}`}>
-                      {tenant.subscriptionTier || 'starter'}
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getTierColor(tenant.subscriptionTier || 'discovery')}`}>
+                      {tenant.subscriptionTier || 'discovery'}
                     </span>
                   </div>
                 </div>
@@ -142,8 +146,8 @@ export default function AdminDirectoryFeaturedManagement({ pendingTenants = [] }
             </div>
             {selectedTenantData && (
               <div className="flex items-center gap-3">
-                <span className={`px-3 py-1 text-sm font-medium rounded-full ${getTierColor(selectedTenantData.subscriptionTier || 'starter')}`}>
-                  {selectedTenantData.subscriptionTier || 'starter'}
+                <span className={`px-3 py-1 text-sm font-medium rounded-full ${getTierColor(selectedTenantData.subscriptionTier || 'discovery')}`}>
+                  {selectedTenantData.subscriptionTier || 'discovery'}
                 </span>
                 <div className="text-sm text-gray-600">
                   <span className="font-mono text-xs">{selectedTenantData.id.slice(0, 8)}...</span>

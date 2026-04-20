@@ -81,6 +81,8 @@ export interface PaymentGateway {
   type: 'paypal' | 'square' | 'stripe';
   isActive: boolean;
   config?: Record<string, any>;
+  // Tier 3 Commitment - tenant tier for deposit checkout mode detection
+  tenant_tier?: string;
 }
 
 export interface OrderRequest {

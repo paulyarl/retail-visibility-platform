@@ -22,7 +22,7 @@ export default function AdminLimitsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingLimits, setEditingLimits] = useState<FeaturedProductsLimit | null>(null);
   const [saving, setSaving] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<string>('starter');
+  const [selectedTier, setSelectedTier] = useState<string>('discovery');
   const [focusedEdit, setFocusedEdit] = useState<{ tierKey: string; field: 'maxLocations' | 'priceMonthly' | 'maxSkus' } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
@@ -195,6 +195,9 @@ export default function AdminLimitsPage() {
         <div className="text-sm text-gray-600 space-y-1">
           <p><strong>Google-Only:</strong> 3-3-2-3-2 <span className="text-purple-600 font-medium">+6 Random</span> (very limited)</p>
           <p><strong>Starter:</strong> 8-12-6-10-6 <span className="text-purple-600 font-medium">+12 Random</span> (good starting point)</p>
+          <p><strong>Discovery:</strong> 12-18-9-15-9 <span className="text-purple-600 font-medium">+18 Random</span> (good starting point)</p>
+          <p><strong>Commitment:</strong> 20-25-15-20-12 <span className="text-purple-600 font-medium">+24 Random</span> (good starting point)</p>
+          <p><strong>Storefront:</strong> 30-35-25-30-20 <span className="text-purple-600 font-medium">+36 Random</span> (good starting point)</p>
           <p><strong>Professional:</strong> 15-20-12-15-10 <span className="text-purple-600 font-medium">+18 Random</span> (substantial)</p>
           <p><strong>Enterprise:</strong> 25-30-20-25-15 <span className="text-purple-600 font-medium">+48 Random</span> (generous)</p>
           <p><strong>Organization:</strong> 50-50-40-50-30 <span className="text-purple-600 font-medium">+24 Random</span> (unlimited-like)</p>
@@ -891,6 +894,9 @@ export default function AdminLimitsPage() {
                       <>
                         <option value="google_only">Google Only</option>
                         <option value="starter">Starter</option>
+                        <option value="discovery">Discovery</option>
+                        <option value="commitment">Commitment</option>
+                        <option value="storefront">Storefront</option>
                         <option value="professional">Professional</option>
                         <option value="enterprise">Enterprise</option>
                         <option value="organization">Organization</option>

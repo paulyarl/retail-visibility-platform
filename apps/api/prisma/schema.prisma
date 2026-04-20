@@ -1044,8 +1044,8 @@ model navigation_links {
   metadata            Json?    @default("{\"parentKey\": null, \"hasChildren\": false, \"childrenKeys\": [], \"nestingLevel\": 0}")
 
   @@index([is_enabled], map: "idx_navigation_links_is_enabled")
-  @@index([targets], map: "idx_navigation_links_targets", type: Gin)
   @@index([metadata], map: "idx_navigation_links_metadata_gin", type: Gin)
+  @@index([targets], map: "idx_navigation_links_targets", type: Gin)
 }
 
 model notification_logs {
@@ -1162,61 +1162,69 @@ model order_status_history {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model orders {
-  id                     String                  @id @db.VarChar(255)
-  tenant_id              String                  @db.VarChar(255)
-  customer_id            String?                 @db.VarChar(255)
-  order_number           String                  @unique @db.VarChar(255)
-  order_status           order_status            @default(draft)
-  payment_status         payment_status          @default(pending)
-  fulfillment_status     fulfillment_status      @default(unfulfilled)
-  subtotal_cents         Int                     @default(0)
-  tax_cents              Int                     @default(0)
-  shipping_cents         Int                     @default(0)
-  discount_cents         Int                     @default(0)
-  total_cents            Int                     @default(0)
-  currency               String                  @default("USD") @db.VarChar(3)
-  customer_email         String                  @db.VarChar(255)
-  customer_name          String?                 @db.VarChar(255)
-  customer_phone         String?                 @db.VarChar(50)
-  shipping_address_line1 String?                 @db.VarChar(255)
-  shipping_address_line2 String?                 @db.VarChar(255)
-  shipping_city          String?                 @db.VarChar(100)
-  shipping_state         String?                 @db.VarChar(100)
-  shipping_postal_code   String?                 @db.VarChar(20)
-  shipping_country       String?                 @default("US") @db.VarChar(2)
-  billing_address_line1  String?                 @db.VarChar(255)
-  billing_address_line2  String?                 @db.VarChar(255)
-  billing_city           String?                 @db.VarChar(100)
-  billing_state          String?                 @db.VarChar(100)
-  billing_postal_code    String?                 @db.VarChar(20)
-  billing_country        String?                 @default("US") @db.VarChar(2)
-  notes                  String?
-  internal_notes         String?
-  metadata               Json?                   @default("{}")
-  source                 String?                 @db.VarChar(50)
-  source_id              String?                 @db.VarChar(255)
-  ip_address             String?                 @db.VarChar(45)
-  user_agent             String?
-  confirmed_at           DateTime?               @db.Timestamp(6)
-  paid_at                DateTime?               @db.Timestamp(6)
-  fulfilled_at           DateTime?               @db.Timestamp(6)
-  cancelled_at           DateTime?               @db.Timestamp(6)
-  created_at             DateTime                @default(now()) @db.Timestamp(6)
-  updated_at             DateTime                @default(now()) @db.Timestamp(6)
-  shipping_provider      String?                 @db.VarChar(50)
-  digital_access_grants  digital_access_grants[]
-  order_items            order_items[]
-  order_status_history   order_status_history[]
-  tenants                tenants                 @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_orders_tenant_id")
-  payments               payments[]
-  refunds                refunds[]
-  shipments              shipments[]
+  id                      String                  @id @db.VarChar(255)
+  tenant_id               String                  @db.VarChar(255)
+  customer_id             String?                 @db.VarChar(255)
+  order_number            String                  @unique @db.VarChar(255)
+  order_status            order_status            @default(draft)
+  payment_status          payment_status          @default(pending)
+  fulfillment_status      fulfillment_status      @default(unfulfilled)
+  subtotal_cents          Int                     @default(0)
+  tax_cents               Int                     @default(0)
+  shipping_cents          Int                     @default(0)
+  discount_cents          Int                     @default(0)
+  total_cents             Int                     @default(0)
+  currency                String                  @default("USD") @db.VarChar(3)
+  customer_email          String                  @db.VarChar(255)
+  customer_name           String?                 @db.VarChar(255)
+  customer_phone          String?                 @db.VarChar(50)
+  shipping_address_line1  String?                 @db.VarChar(255)
+  shipping_address_line2  String?                 @db.VarChar(255)
+  shipping_city           String?                 @db.VarChar(100)
+  shipping_state          String?                 @db.VarChar(100)
+  shipping_postal_code    String?                 @db.VarChar(20)
+  shipping_country        String?                 @default("US") @db.VarChar(2)
+  billing_address_line1   String?                 @db.VarChar(255)
+  billing_address_line2   String?                 @db.VarChar(255)
+  billing_city            String?                 @db.VarChar(100)
+  billing_state           String?                 @db.VarChar(100)
+  billing_postal_code     String?                 @db.VarChar(20)
+  billing_country         String?                 @default("US") @db.VarChar(2)
+  notes                   String?
+  internal_notes          String?
+  metadata                Json?                   @default("{}")
+  source                  String?                 @db.VarChar(50)
+  source_id               String?                 @db.VarChar(255)
+  ip_address              String?                 @db.VarChar(45)
+  user_agent              String?
+  confirmed_at            DateTime?               @db.Timestamp(6)
+  paid_at                 DateTime?               @db.Timestamp(6)
+  fulfilled_at            DateTime?               @db.Timestamp(6)
+  cancelled_at            DateTime?               @db.Timestamp(6)
+  created_at              DateTime                @default(now()) @db.Timestamp(6)
+  updated_at              DateTime                @default(now()) @db.Timestamp(6)
+  shipping_provider       String?                 @db.VarChar(50)
+  checkout_mode           String?                 @db.VarChar(20)
+  deposit_percentage      Decimal?                @db.Decimal(5, 2)
+  deposit_cents           Int?                    @default(0)
+  remaining_balance_cents Int?                    @default(0)
+  deposit_forfeited_at    DateTime?               @db.Timestamp(6)
+  pickup_deadline         DateTime?               @db.Timestamp(6)
+  digital_access_grants   digital_access_grants[]
+  order_items             order_items[]
+  order_status_history    order_status_history[]
+  tenants                 tenants                 @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_orders_tenant_id")
+  payments                payments[]
+  refunds                 refunds[]
+  shipments               shipments[]
 
+  @@index([checkout_mode], map: "idx_orders_checkout_mode")
   @@index([customer_email], map: "idx_orders_customer_email")
   @@index([customer_id], map: "idx_orders_customer_id")
   @@index([fulfillment_status], map: "idx_orders_fulfillment_status")
   @@index([order_number], map: "idx_orders_order_number")
   @@index([payment_status], map: "idx_orders_payment_status")
+  @@index([pickup_deadline], map: "idx_orders_pickup_deadline")
   @@index([shipping_provider], map: "idx_orders_shipping_provider")
   @@index([source], map: "idx_orders_source")
   @@index([tenant_id, created_at(sort: Desc)], map: "idx_orders_tenant_id_created_at")
@@ -1275,50 +1283,58 @@ model outreach_feedback_list {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model payments {
-  id                        String          @id @db.VarChar(255)
-  order_id                  String          @db.VarChar(255)
-  tenant_id                 String          @db.VarChar(255)
-  amount_cents              Int
-  currency                  String          @default("USD") @db.VarChar(3)
-  payment_method            payment_method?
-  payment_status            payment_status  @default(pending)
-  gateway                   String?         @db.VarChar(50)
-  gateway_transaction_id    String?         @unique @db.VarChar(255)
-  gateway_customer_id       String?         @db.VarChar(255)
-  gateway_payment_method_id String?         @db.VarChar(255)
-  payment_method_details    Json?
-  authorized_at             DateTime?       @db.Timestamp(6)
-  captured_at               DateTime?       @db.Timestamp(6)
-  failed_at                 DateTime?       @db.Timestamp(6)
-  cancelled_at              DateTime?       @db.Timestamp(6)
-  error_code                String?         @db.VarChar(100)
-  error_message             String?
-  metadata                  Json?           @default("{}")
-  ip_address                String?         @db.VarChar(45)
-  created_at                DateTime        @default(now()) @db.Timestamp(6)
-  updated_at                DateTime        @default(now()) @db.Timestamp(6)
-  gateway_type              String?
-  gateway_authorization_id  String?
-  gateway_fee_cents         Int?            @default(0)
-  net_amount_cents          Int?
-  gateway_response          Json?           @default("{}")
-  authorization_expires_at  DateTime?       @db.Timestamp(6)
-  platform_fee_cents        Int?            @default(0)
-  platform_fee_percentage   Decimal?        @db.Decimal(5, 2)
-  platform_fee_fixed_cents  Int?            @default(0)
-  total_fees_cents          Int?            @default(0)
-  fee_waived                Boolean?        @default(false)
-  fee_waived_reason         String?
-  orders                    orders          @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payments_order_id")
-  tenants                   tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payments_tenant_id")
-  refunds                   refunds[]
+  id                            String          @id @db.VarChar(255)
+  order_id                      String          @db.VarChar(255)
+  tenant_id                     String          @db.VarChar(255)
+  amount_cents                  Int
+  currency                      String          @default("USD") @db.VarChar(3)
+  payment_method                payment_method?
+  payment_status                payment_status  @default(pending)
+  gateway                       String?         @db.VarChar(50)
+  gateway_transaction_id        String?         @unique @db.VarChar(255)
+  gateway_customer_id           String?         @db.VarChar(255)
+  gateway_payment_method_id     String?         @db.VarChar(255)
+  payment_method_details        Json?
+  authorized_at                 DateTime?       @db.Timestamp(6)
+  captured_at                   DateTime?       @db.Timestamp(6)
+  failed_at                     DateTime?       @db.Timestamp(6)
+  cancelled_at                  DateTime?       @db.Timestamp(6)
+  error_code                    String?         @db.VarChar(100)
+  error_message                 String?
+  metadata                      Json?           @default("{}")
+  ip_address                    String?         @db.VarChar(45)
+  created_at                    DateTime        @default(now()) @db.Timestamp(6)
+  updated_at                    DateTime        @default(now()) @db.Timestamp(6)
+  gateway_type                  String?
+  gateway_authorization_id      String?
+  gateway_fee_cents             Int?            @default(0)
+  net_amount_cents              Int?
+  gateway_response              Json?           @default("{}")
+  authorization_expires_at      DateTime?       @db.Timestamp(6)
+  platform_fee_cents            Int?            @default(0)
+  platform_fee_percentage       Decimal?        @db.Decimal(5, 2)
+  platform_fee_fixed_cents      Int?            @default(0)
+  total_fees_cents              Int?            @default(0)
+  fee_waived                    Boolean?        @default(false)
+  fee_waived_reason             String?
+  is_deposit_payment            Boolean?        @default(false)
+  deposit_percentage            Decimal?        @db.Decimal(5, 2)
+  deposit_forfeited             Boolean?        @default(false)
+  forfeited_at                  DateTime?       @db.Timestamp(6)
+  platform_forfeit_fee_cents    Int?            @default(0)
+  retailer_forfeit_amount_cents Int?            @default(0)
+  orders                        orders          @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payments_order_id")
+  tenants                       tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payments_tenant_id")
+  refunds                       refunds[]
 
   @@index([created_at, payment_status], map: "idx_payments_created_at_status")
+  @@index([deposit_forfeited], map: "idx_payments_deposit_forfeited")
   @@index([gateway], map: "idx_payments_gateway")
   @@index([gateway_authorization_id], map: "idx_payments_gateway_authorization")
   @@index([gateway_transaction_id], map: "idx_payments_gateway_transaction")
   @@index([gateway_transaction_id], map: "idx_payments_gateway_transaction_id")
   @@index([gateway_type], map: "idx_payments_gateway_type")
+  @@index([is_deposit_payment], map: "idx_payments_is_deposit_payment")
   @@index([order_id], map: "idx_payments_order_id")
   @@index([payment_status], map: "idx_payments_payment_status")
   @@index([tenant_id], map: "idx_payments_tenant_id")

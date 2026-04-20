@@ -64,8 +64,8 @@ function extractTierFromPrice(price: Stripe.Price | null): string {
   const tier = price.metadata.tier || price.metadata.plan || 'starter';
   
   // Validate tier
-  const validTiers = ['google_only', 'starter', 'professional', 'enterprise', 'organization'];
-  return validTiers.includes(tier) ? tier : 'starter';
+  const validTiers = ['google_only', 'starter', 'discovery','storefront', 'commitment','professional', 'enterprise', 'organization'];
+  return validTiers.includes(tier) ? tier : 'discovery';
 }
 
 /**
@@ -249,10 +249,10 @@ async function handleSubscriptionCreatedOrUpdated(subscription: any) {
     updateData.trial_ends_at = trialEndsAt;
   }
 
-  // IMPORTANT: Never downgrade to google_only via webhook
-  // google_only is an internal tier for expired trials only
-  if (tier === 'google_only') {
-    console.warn(`[Stripe Webhooks] Attempted to set google_only tier via webhook - ignoring`);
+  // IMPORTANT: Never downgrade to google_only or discovery via webhook
+  // google_only and discovery are internal tiers for expired trials only
+  if (tier === 'google_only' || tier === 'discovery') {
+    console.warn(`[Stripe Webhooks] Attempted to set google_only or discovery tier via webhook - ignoring`);
     delete updateData.subscription_tier;
   }
 

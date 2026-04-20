@@ -29,7 +29,53 @@ const QR_FEATURES_STARTER: QRCodeFeatures = {
   dynamicQR: false,
 };
 
-const QR_FEATURES_PRO: QRCodeFeatures = {
+const QR_FEATURES_DISCOVERY: QRCodeFeatures = {
+  enabled: true,
+  maxResolution: 512,
+  customColors: false,
+  customLogo: false,
+  bulkDownload: false,
+  analytics: false,
+  printTemplates: false,
+  whiteLabel: false,
+  dynamicQR: false,
+};
+
+const QR_FEATURES_STOREFRONT: QRCodeFeatures = {
+  enabled: true,
+  maxResolution: 1024,
+  customColors: true,
+  customLogo: false,
+  bulkDownload: true,
+  analytics: true,
+  printTemplates: true,
+  whiteLabel: false,
+  dynamicQR: false,
+};
+const QR_FEATURES_COMMITMENT: QRCodeFeatures = {
+  enabled: true,
+  maxResolution: 1024,
+  customColors: true,
+  customLogo: false,
+  bulkDownload: true,
+  analytics: true,
+  printTemplates: true,
+  whiteLabel: false,
+  dynamicQR: false,
+};
+
+const QR_FEATURES_PROFESSIONAL: QRCodeFeatures = {
+  enabled: true,
+  maxResolution: 1024,
+  customColors: true,
+  customLogo: false,
+  bulkDownload: true,
+  analytics: true,
+  printTemplates: true,
+  whiteLabel: false,
+  dynamicQR: false,
+};
+const QR_FEATURES_CHAIN_STARTER: QRCodeFeatures = {
   enabled: true,
   maxResolution: 1024,
   customColors: true,
@@ -66,17 +112,24 @@ const QR_FEATURES_DISABLED: QRCodeFeatures = {
 };
 
 export const QR_TIER_FEATURES: Record<SubscriptionTier, QRCodeFeatures> = {
-  google_only: QR_FEATURES_STARTER,
-  starter: QR_FEATURES_STARTER,
-  professional: QR_FEATURES_PRO,
+  google_only: QR_FEATURES_DISCOVERY,
+  discovery: QR_FEATURES_DISCOVERY,
+  storefront: QR_FEATURES_STOREFRONT,
+  commitment: QR_FEATURES_COMMITMENT,
+  starter: QR_FEATURES_STOREFRONT,
+  professional: QR_FEATURES_PROFESSIONAL,
+  chain_starter: QR_FEATURES_CHAIN_STARTER,
   enterprise: QR_FEATURES_ENTERPRISE,
   organization: QR_FEATURES_ENTERPRISE,
 
   // Trial wrappers inherit target tier features
-  trial_google_only: QR_FEATURES_STARTER,
-  trial_starter: QR_FEATURES_STARTER,
-  trial_professional: QR_FEATURES_PRO,
-  trial_chain_starter: QR_FEATURES_PRO,
+  trial_google_only: QR_FEATURES_DISCOVERY,
+  trial_discovery: QR_FEATURES_DISCOVERY,
+  trial_storefront: QR_FEATURES_STOREFRONT,
+  trial_commitment: QR_FEATURES_COMMITMENT,
+  trial_starter: QR_FEATURES_STOREFRONT,
+  trial_professional: QR_FEATURES_PROFESSIONAL,
+  trial_chain_starter: QR_FEATURES_CHAIN_STARTER,
 
   // Expired trial - no QR features
   expired_trial: QR_FEATURES_DISABLED,

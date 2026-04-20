@@ -13,25 +13,33 @@ interface TrialSetupModalProps {
 }
 
 const trialTiers = [
+ 
   {
-    key: 'trial_google_only',
-    name: 'Trial: Google Only',
-    description: 'Perfect for Google Business Profile optimization',
-    features: ['100 SKUs', '1 Location', 'Google sync', 'Basic analytics'],
+    key: 'trial_discovery',
+    name: 'Trial: Discovery',
+    description: 'Get Found on Google',
+    features: ['100 SKUs', '1 Location', 'Full catalog', 'Customer reviews'],
+    recommended: true
+  },
+  {
+    key: 'trial_commitment',
+    name: 'Trial: Commitment',
+    description: 'Capture Intent & Drive Foot Traffic',
+    features: ['500 SKUs', '1 Location', 'Full catalog', 'Customer reviews'],
     recommended: false
   },
   {
-    key: 'trial_starter',
-    name: 'Trial: Starter',
-    description: 'Great for small businesses getting started',
+    key: 'trial_storefront',
+    name: 'Trial: Storefront',
+    description: 'Your Own Platform Presence',
     features: ['250 SKUs', '1 Location', 'Full catalog', 'Customer reviews'],
-    recommended: true
+    recommended: false
   },
   {
     key: 'trial_professional',
     name: 'Trial: Professional',
     description: 'Ideal for growing businesses with multiple needs',
-    features: ['500 SKUs', '2 Locations', 'Advanced analytics', 'Priority support'],
+    features: ['750 SKUs', '2 Locations', 'Advanced analytics', 'Priority support'],
     recommended: false
   },
   {
@@ -44,7 +52,7 @@ const trialTiers = [
 ];
 
 export default function TrialSetupModal({ isOpen, onClose, onStartTrial, tenantId }: TrialSetupModalProps) {
-  const [selectedTier, setSelectedTier] = useState('trial_starter');
+  const [selectedTier, setSelectedTier] = useState('trial_discovery');
 
   const handleStartTrial = () => {
     onStartTrial(selectedTier);

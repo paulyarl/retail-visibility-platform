@@ -13,7 +13,7 @@ import { checkTierFeatureAccess, isValidTier } from '../../services/TierService'
 
 // Schema for trial setup request
 const trialSetupSchema = z.object({
-  trialTier: z.enum(['trial_google_only', 'trial_starter', 'trial_professional', 'trial_chain_starter']),
+  trialTier: z.enum(['trial_google_only', 'trial_discovery', 'trial_starter', 'trial_storefront','trial_commitment', 'trial_professional', 'trial_chain_starter']),
   paymentMethodId: z.string().optional(), // For future payment integration
 });
 
@@ -241,7 +241,7 @@ router.post('/:tenantId/trial-setup', async (req: any, res: any) => {
 
     // Validate request body
     const trialSetupSchema = z.object({
-      trialTier: z.enum(['trial_google_only', 'trial_starter', 'trial_professional', 'trial_chain_starter']),
+      trialTier: z.enum(['trial_google_only', 'trial_discovery', 'trial_starter', 'trial_storefront','trial_commitment', 'trial_professional', 'trial_chain_starter']),
       paymentMethodId: z.string().optional(),
     });
 

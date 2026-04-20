@@ -14,7 +14,7 @@
  * - PLATFORM_VIEWER: Read-only, cannot create tenants
  */
 
-export type TenantLimitTier = 'google_only' | 'starter' | 'professional' | 'enterprise' | 'organization';
+export type TenantLimitTier = 'google_only' | 'starter'| 'discovery' | 'commitment' | 'storefront' | 'professional' | 'enterprise' | 'organization';
 export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'canceled' | 'expired';
 
 /**
@@ -50,6 +50,18 @@ export const FEATURED_PRODUCTS_LIMITS: Record<TenantLimitTier, FeaturedProductsL
     store_selection: 3,
     trending: 3,
   },
+  discovery: {
+    bestseller: 3,
+    clearance: 3,
+    featured: 3,
+    new_arrival: 3,
+    recommended: 3,
+    sale: 3,
+    seasonal: 2,
+    staff_pick: 2,
+    store_selection: 3,
+    trending: 3,
+  },
   starter: {
     bestseller: 8,
     clearance: 8,
@@ -61,6 +73,30 @@ export const FEATURED_PRODUCTS_LIMITS: Record<TenantLimitTier, FeaturedProductsL
     staff_pick: 6,
     store_selection: 8,
     trending: 8,
+  },
+  storefront: {
+    bestseller: 8,
+    clearance: 8,
+    featured: 8,
+    new_arrival: 12,
+    recommended: 12,
+    sale: 10,
+    seasonal: 6,
+    staff_pick: 6,
+    store_selection: 8,
+    trending: 8,
+  },
+  commitment: {
+    bestseller: 15,
+    clearance: 15,
+    featured: 15,
+    new_arrival: 20,
+    recommended: 20,
+    sale: 15,
+    seasonal: 12,
+    staff_pick: 10,
+    store_selection: 15,
+    trending: 15,
   },
   professional: {
     bestseller: 15,
@@ -155,6 +191,29 @@ export const TENANT_LIMITS: Record<TenantLimitTier, TenantLimitConfig> = {
     upgradeToTier: 'professional',
   },
   
+  discovery: {
+    limit: 3,
+    displayName: 'Up to 3 Locations',
+    description: 'Perfect for small businesses with multiple locations',
+    upgradeMessage: 'Upgrade to Professional to manage up to 10 locations',
+    upgradeToTier: 'professional',
+  },
+  
+  storefront: {
+    limit: 3,
+    displayName: 'Up to 3 Locations',
+    description: 'Perfect for small businesses with multiple locations',
+    upgradeMessage: 'Upgrade to Professional to manage up to 10 locations',
+    upgradeToTier: 'professional',
+  },
+  
+  commitment: {
+    limit: 10,
+    displayName: 'Up to 10 Locations',
+    description: 'Great for growing chains',
+    upgradeMessage: 'Upgrade to Organization for unlimited locations',
+    upgradeToTier: 'organization',
+  },
   professional: {
     limit: 10,
     displayName: 'Up to 10 Locations',

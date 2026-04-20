@@ -143,6 +143,9 @@ export class SubscriptionValidationService {
   private getTierLevel(tier: string): number {
     const tierLevels = {
       'trial_starter': 0,
+      'trial_discovery': 0,
+      'trial_storefront': 0,
+      'trial_commitment': 0,
       'trial_pro': 1,
       'trial_enterprise': 2,
       'starter': 3,

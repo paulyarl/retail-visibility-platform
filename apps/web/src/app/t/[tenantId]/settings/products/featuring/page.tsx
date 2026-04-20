@@ -255,8 +255,12 @@ function SimpleTierBadge({ tier }: { tier: string }) {
         return { color: 'bg-blue-100 text-blue-700 border-blue-300', icon: '🔍', name: 'Google Only' };
       case 'starter':
         return { color: 'bg-neutral-100 text-neutral-700 border-neutral-300', icon: '🌱', name: 'Starter' };
-      case 'growth':
-        return { color: 'bg-green-100 text-green-700 border-green-300', icon: '📈', name: 'Growth' };
+      case 'discovery':
+        return { color: 'bg-green-100 text-green-700 border-blue-300', icon: '📈', name: 'Discovery' };
+      case 'commitment':
+        return { color: 'bg-green-100 text-green-700 border-indigo-300', icon: '📈', name: 'Commitment' };
+      case 'storefront':
+        return { color: 'bg-green-100 text-green-700 border-green-300', icon: '📈', name: 'Storefront' };
       case 'professional':
         return { color: 'bg-purple-100 text-purple-700 border-purple-300', icon: '⭐', name: 'Professional' };
       case 'enterprise':

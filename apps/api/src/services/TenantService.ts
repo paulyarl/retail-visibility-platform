@@ -718,7 +718,10 @@ export class TenantService {
       // Fallback limits if tier not found in database
       const defaultLimits: Record<string, { items: number; users: number; categories: number; storage: number }> = {
         google_only: { items: 250, users: 1, categories: 25, storage: 1024 * 1024 * 50 },
+        discovery: { items: 100, users: 1, categories: 10, storage: 1024 * 1024 * 25 },
         starter: { items: 500, users: 3, categories: 50, storage: 1024 * 1024 * 100 },
+        storefront: { items: 1000, users: 5, categories: 100, storage: 1024 * 1024 * 200 },
+        commitment: { items: 2500, users: 10, categories: 250, storage: 1024 * 1024 * 500 },
         professional: { items: 5000, users: 10, categories: 200, storage: 1024 * 1024 * 1024 },
         enterprise: { items: Infinity, users: Infinity, categories: Infinity, storage: Infinity },
         organization: { items: 10000, users: 50, categories: 500, storage: 1024 * 1024 * 1024 * 10 },

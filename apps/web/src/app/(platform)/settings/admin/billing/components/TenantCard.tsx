@@ -57,6 +57,9 @@ export default function TenantCard({ tenant, tiers, onUpdateTenant, isUpdating =
   const trialTiers = [
     { value: 'trial_google_only', label: 'Trial: Google Only ($0/mo)' },
     { value: 'trial_starter', label: 'Trial: Starter ($0/mo)' },
+    { value: 'trial_discovery', label: 'Trial: Discovery ($0/mo)' },
+    { value: 'trial_commitment', label: 'Trial: Commitment ($0/mo)' },
+    { value: 'trial_storefront', label: 'Trial: Storefront ($0/mo)' },
     { value: 'trial_professional', label: 'Trial: Professional ($0/mo)' },
     { value: 'trial_chain_starter', label: 'Trial: Chain Starter ($0/mo)' },
   ];

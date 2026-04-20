@@ -107,6 +107,9 @@ function getTierColor(tierType: string, tierKey: string): string {
   
   const colors: Record<string, string> = {
     google_only: 'bg-green-100 text-green-900',
+    discovery: 'bg-green-100 text-green-900',
+    commitment: 'bg-blue-100 text-blue-900',
+    storefront: 'bg-blue-100 text-blue-900',
     starter: 'bg-blue-100 text-blue-900',
     professional: 'bg-purple-100 text-purple-900',
     enterprise: 'bg-amber-100 text-amber-900',

@@ -17,7 +17,10 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 // Tier-based limits per hour
 const TIER_LIMITS = {
   google_only: 10,      // 10 searches/hour
+  discovery: 10,
+  storefront: 20,
   starter: 20,          // 20 searches/hour
+  commitment: 30,
   professional: 50,     // 50 searches/hour (matches Unsplash free tier)
   enterprise: 100,      // 100 searches/hour
   organization: 100,    // 100 searches/hour
@@ -74,6 +77,12 @@ export async function checkImageSearchLimit(
           upgradeMessage: tier === 'starter' 
             ? 'Upgrade to Professional for 50 searches/hour'
             : tier === 'google_only'
+            ? 'Upgrade to Starter for 20 searches/hour'
+            : tier === 'discovery'
+            ? 'Upgrade to Starter for 20 searches/hour'
+            : tier === 'storefront'
+            ? 'Upgrade to Starter for 20 searches/hour'
+            : tier === 'commitment'
             ? 'Upgrade to Starter for 20 searches/hour'
             : null,
         });

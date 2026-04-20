@@ -396,6 +396,33 @@ export default function PaymentGatewaysPage() {
         </div>
       </div>
 
+      {/* Tier-based Checkout Behavior Warning */}
+      <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+          <div>
+            <h3 className="font-semibold text-amber-900 mb-2">Checkout Behavior by Subscription Tier</h3>
+            <div className="space-y-2 text-sm text-amber-800">
+              <div className="flex items-start gap-2">
+                <span className="font-medium min-w-[120px]">Storefront:</span>
+                <span>Checkout is <strong>disabled</strong> - customers can browse but cannot place orders online.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-medium min-w-[120px]">Commitment:</span>
+                <span>Deposit checkout only - customers pay a deposit to reserve items, with balance due at pickup.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-medium min-w-[120px]">Professional+:</span>
+                <span>Full checkout available - customers can complete full payment or deposit payment at checkout.</span>
+              </div>
+            </div>
+            <p className="text-xs text-amber-600 mt-3">
+              Your current tier: <strong className="capitalize">{tenantTier}</strong>. Upgrade your plan to unlock additional checkout options.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {loading ? (
         <div className="h-64 bg-neutral-200 rounded animate-pulse"></div>
       ) : (

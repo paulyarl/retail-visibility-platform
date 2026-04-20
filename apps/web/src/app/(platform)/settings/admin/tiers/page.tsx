@@ -48,6 +48,9 @@ const TIER_FILTERS = [
   { value: 'all', label: 'All Tiers', color: '' },
   { value: 'google_only', label: '🔍 Google Only', color: 'bg-green-100 text-green-800' },
   { value: 'starter', label: '🌱 Starter', color: 'bg-blue-100 text-blue-800' },
+  { value: 'discovery', label: '🔍 Discovery', color: 'bg-cyan-100 text-cyan-800' },
+  { value: 'commitment', label: '🤝 Commitment', color: 'bg-teal-100 text-teal-800' },
+  { value: 'storefront', label: '🏪 Storefront', color: 'bg-lime-100 text-lime-800' },
   { value: 'professional', label: '👔 Professional', color: 'bg-purple-100 text-purple-800' },
   { value: 'enterprise', label: '🏢 Enterprise', color: 'bg-amber-100 text-amber-800' },
   { value: 'trial_google_only', label: 'Trial: Google Only', color: 'bg-emerald-100 text-emerald-800' },
@@ -71,7 +74,7 @@ export default function AdminTiersPage() {
   
   // Admin filtering states
   const [searchQuery, setSearchQuery] = useState("");
-  const [tierFilter, setTierFilter] = useState<'all' | 'google_only' | 'starter' | 'professional' | 'enterprise'>('all');
+  const [tierFilter, setTierFilter] = useState<'all' | 'google_only' | 'starter' | 'discovery' | 'commitment' | 'storefront' | 'professional' | 'enterprise'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'trial' | 'active' | 'past_due' | 'canceled'>('all');
 
   useEffect(() => {
@@ -247,6 +250,9 @@ const getTierColor = (tierType: string, tierKey: string) => {
   const colors: Record<string, string> = {
     google_only: 'bg-green-100 text-green-800',
     starter: 'bg-blue-100 text-blue-800',
+    discovery: 'bg-cyan-100 text-cyan-800',
+    commitment: 'bg-teal-100 text-teal-800',
+    storefront: 'bg-lime-100 text-lime-800',
     professional: 'bg-purple-100 text-purple-800',
     enterprise: 'bg-amber-100 text-amber-800',
     trial_google_only: 'bg-emerald-100 text-emerald-800',
@@ -270,6 +276,9 @@ const getTierOptions = () => {
   const trialTiers = [
     { key: 'trial_google_only', name: 'Trial: Google Only', price: 0 },
     { key: 'trial_starter', name: 'Trial: Starter', price: 0 },
+    { key: 'trial_discovery', name: 'Trial: Discovery', price: 0 },
+    { key: 'trial_commitment', name: 'Trial: Commitment', price: 0 },
+    { key: 'trial_storefront', name: 'Trial: Storefront', price: 0 },
     { key: 'trial_professional', name: 'Trial: Professional', price: 0 },
     { key: 'trial_chain_starter', name: 'Trial: Chain Starter', price: 0 },
     { key: 'expired_trial', name: 'Expired Trial', price: 0 },
@@ -313,6 +322,9 @@ const getGroupedTierOptions = () => {
   const trialTiers = [
     { key: 'trial_google_only', name: 'Trial: Google Only', price: 0 },
     { key: 'trial_starter', name: 'Trial: Starter', price: 0 },
+    { key: 'trial_discovery', name: 'Trial: Discovery', price: 0 },
+    { key: 'trial_commitment', name: 'Trial: Commitment', price: 0 },
+    { key: 'trial_storefront', name: 'Trial: Storefront', price: 0 },
     { key: 'trial_professional', name: 'Trial: Professional', price: 0 },
     { key: 'trial_chain_starter', name: 'Trial: Chain Starter', price: 0 },
     { key: 'expired_trial', name: 'Expired Trial', price: 0 },
@@ -413,6 +425,9 @@ const getTierInfo = (tierKey?: string) => {
                         <span className="text-2xl">
                           {tierOption.value === 'google_only' && '🔍'}
                           {tierOption.value === 'starter' && '🥉'}
+                          {tierOption.value === 'discovery' && '🔍'}
+                          {tierOption.value === 'commitment' && '🤝'}
+                          {tierOption.value === 'storefront' && '🏪'}
                           {tierOption.value === 'professional' && '🥈'}
                           {tierOption.value === 'enterprise' && '🥇'}
                           {tierOption.tier.tierType === 'organization' && '🏢'}
@@ -568,7 +583,7 @@ const getTierInfo = (tierKey?: string) => {
                           <div className="flex-shrink-0 flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
                             <div className="w-40">
                               <label className="text-xs font-medium text-neutral-700 mb-1 block">Subscription Tier</label>
-                              <select value={tenant.subscriptionTier || 'starter'} onChange={(e) => updateTier(tenant.id, e.target.value, tenant.subscriptionStatus || 'active')} disabled={isUpdating}
+                              <select value={tenant.subscriptionTier || 'discovery'} onChange={(e) => updateTier(tenant.id, e.target.value, tenant.subscriptionStatus || 'active')} disabled={isUpdating}
                                 className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg bg-white disabled:opacity-50">
                                 {getGroupedTierOptions().map((group, groupIndex) => (
                                   <optgroup key={`group-${groupIndex}`} label={group.label}>
@@ -581,7 +596,7 @@ const getTierInfo = (tierKey?: string) => {
                             </div>
                             <div className="w-40">
                               <label className="text-xs font-medium text-neutral-700 mb-1 block">Status</label>
-                              <select value={tenant.subscriptionStatus || 'active'} onChange={(e) => updateTier(tenant.id, tenant.subscriptionTier || 'starter', e.target.value)} disabled={isUpdating}
+                              <select value={tenant.subscriptionStatus || 'active'} onChange={(e) => updateTier(tenant.id, tenant.subscriptionTier || 'discovery', e.target.value)} disabled={isUpdating}
                                 className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg bg-white disabled:opacity-50">
                                 {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                               </select>

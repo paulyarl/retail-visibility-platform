@@ -1,6 +1,9 @@
 /**
  * Guest Checkout API Routes
  * For testing checkout flow without authentication
+ * 
+ * Tier 3 Commitment: Collects 10-15% deposit at checkout, remaining balance at pickup
+ * Tier 4 Enterprise: Full payment or deposit option (shopper choice)
  */
 
 import { Router, Request, Response } from 'express';
@@ -8,6 +11,12 @@ import { prisma } from '../prisma';
 import { generateOrderNumber, generateOrderItemId, generatePaymentId,generateOrderId } from '../lib/id-generator';
 import { calculateLineItem, calculateOrderTotals } from '../utils/order-calculations';
 import { customAlphabet } from 'nanoid';
+import {
+  getCheckoutModeForTier,
+  calculateDeposit,
+  getDepositPercentageForTenant,
+  CheckoutMode,
+} from '../utils/deposit-calculator';
 
 const router = Router();
 
@@ -76,12 +85,38 @@ router.post('/orders', async (req: Request, res: Response) => {
             id: tenant_id,
             name: 'Demo Store',
             slug: 'demo-store',
-            subscription_tier: 'starter',
+            subscription_tier: 'commitment', // Changed to commitment for testing
             subscription_status: 'active',
           },
         });
       }
     }
+
+    // Get tenant subscription tier to determine checkout mode
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenant_id },
+      select: { subscription_tier: true },
+    });
+    
+    const tenantTier = tenant?.subscription_tier || 'starter';
+    
+    // Tier validation: Only commitment, professional, and enterprise tiers can use checkout
+    // Storefront (tier 2) and discovery (tier 1) can display products but cannot process orders
+    const effectiveTier = tenantTier.startsWith('trial_') ? tenantTier.replace('trial_', '') : tenantTier;
+    const hasCheckoutAccess = effectiveTier === 'commitment' || 
+                              effectiveTier === 'professional' || 
+                              effectiveTier === 'enterprise';
+    
+    if (!hasCheckoutAccess) {
+      return res.status(403).json({
+        success: false,
+        error: 'checkout_not_available',
+        message: 'This store does not have checkout enabled. Please contact the store directly.',
+        tier: tenantTier,
+      });
+    }
+    
+    const checkoutMode: CheckoutMode = getCheckoutModeForTier(tenantTier);
 
     // Validate items and check stock availability
     for (const item of items) {
@@ -135,6 +170,24 @@ router.post('/orders', async (req: Request, res: Response) => {
     });
     const totals = calculateOrderTotals(line_items);
 
+    // Calculate deposit for Tier 3 commitment checkout
+    let depositCalculation = null;
+    let paymentAmount = totals.total_cents; // Default to full payment
+    
+    if (checkoutMode === 'deposit') {
+      const depositPercentage = await getDepositPercentageForTenant(tenant_id, prisma);
+      depositCalculation = calculateDeposit(totals.total_cents, depositPercentage);
+      paymentAmount = depositCalculation.depositCents;
+      
+      console.log('[Checkout] Tier 3 deposit calculation:', {
+        total: totals.total_cents,
+        depositPercentage: depositCalculation.depositPercentage,
+        depositCents: depositCalculation.depositCents,
+        remainingBalance: depositCalculation.remainingBalanceCents,
+        pickupDeadline: depositCalculation.pickupDeadline,
+      });
+    }
+
     // Generate order ID
     // const generateOrderId = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 10);
     
@@ -169,6 +222,12 @@ router.post('/orders', async (req: Request, res: Response) => {
         tax_cents: totals.tax_cents,
         shipping_cents: totals.shipping_cents,
         total_cents: totals.total_cents,
+        // Tier 3 deposit fields
+        checkout_mode: checkoutMode,
+        deposit_percentage: depositCalculation?.depositPercentage || null,
+        deposit_cents: depositCalculation?.depositCents || 0,
+        remaining_balance_cents: depositCalculation?.remainingBalanceCents || 0,
+        pickup_deadline: depositCalculation?.pickupDeadline || null,
         // Line items
         order_items: {
           create: line_items.map((item: any, index: number) => ({
@@ -202,12 +261,16 @@ router.post('/orders', async (req: Request, res: Response) => {
         order_id: order.id,
         gateway_type: 'paypal',
         payment_method: 'paypal',
-        amount_cents: order.total_cents,
-        platform_fee_cents: Math.round(order.total_cents * 0.03), // 3% platform fee
+        // For deposit orders, collect deposit amount; for full payment, collect total
+        amount_cents: paymentAmount,
+        platform_fee_cents: Math.round(paymentAmount * 0.03), // 3% platform fee
         gateway_fee_cents: 0,
-        net_amount_cents: order.total_cents,
+        net_amount_cents: paymentAmount,
         payment_status: 'pending',
         updated_at: new Date(),
+        // Tier 3 deposit payment fields
+        is_deposit_payment: checkoutMode === 'deposit',
+        deposit_percentage: depositCalculation?.depositPercentage || null,
       },
     });
 
@@ -219,11 +282,17 @@ router.post('/orders', async (req: Request, res: Response) => {
         total_cents: order.total_cents,
         created_at: order.created_at,
         order_items: (order as any).order_items,
+        // Include deposit info for frontend
+        checkout_mode: checkoutMode,
+        deposit_cents: order.deposit_cents,
+        remaining_balance_cents: order.remaining_balance_cents,
+        pickup_deadline: order.pickup_deadline,
       },
       payment: {
         id: payment.id,
         status: payment.payment_status,
         amount_cents: payment.amount_cents,
+        is_deposit_payment: payment.is_deposit_payment,
       },
     });
   } catch (error) {

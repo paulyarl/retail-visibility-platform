@@ -29,7 +29,7 @@ export interface AdminDirectoryListing {
 
 export interface DirectoryFilters {
   status?: 'published' | 'draft' | 'featured';
-  tier?: 'google_only' | 'starter' | 'professional' | 'enterprise' | 'chain_starter' | 'chain_pro' | 'chain_enterprise';
+  tier?: 'google_only' | 'starter'| 'discovery' | 'storefront' | 'commitment' | 'professional' | 'enterprise' | 'chain_starter' | 'chain_pro' | 'chain_enterprise';
   quality?: 'low' | 'medium' | 'high';
   category?: string;
   search?: string;

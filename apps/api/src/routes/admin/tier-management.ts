@@ -266,7 +266,10 @@ router.get('/tenants/:tenantId', async (req, res) => {
 const updateTenantTierSchema = z.object({
   subscriptionTier: z.enum([
     'google_only',
+    'discovery',
     'starter',
+    'storefront',
+    'commitment',
     'professional',
     'enterprise',
     'organization',
@@ -275,6 +278,9 @@ const updateTenantTierSchema = z.object({
     'chain_enterprise',
     'trial_google_only',
     'trial_starter',
+    'trial_discovery',
+    'trial_storefront',
+    'trial_commitment',
     'trial_professional',
     'trial_chain_starter',
     'expired_trial',
@@ -336,7 +342,10 @@ router.patch('/tenants/:tenantId', async (req, res) => {
     if (updateData.subscriptionTier && updateData.subscriptionTier !== (currentTenant as any).subscription_tier) {
       const tierLimits: Record<string, number> = {
         google_only: 250,
+        discovery: 100,
         starter: 500,
+        storefront: 2500,
+        commitment: 5000,
         professional: 5000,
         enterprise: Infinity,
         organization: 10000,
@@ -533,7 +542,10 @@ router.get('/stats', async (req, res) => {
     // Calculate MRR (Monthly Recurring Revenue) estimate
     const tierPricing: Record<string, number> = {
       google_only: 29,
+      discovery: 19,
       starter: 49,
+      storefront: 199,
+      commitment: 399,
       professional: 499,
       enterprise: 999,
       organization: 999,
@@ -581,7 +593,10 @@ const bulkUpdateSchema = z.object({
   tenantIds: z.array(z.string()).min(1, 'At least one tenant ID required'),
   subscriptionTier: z.enum([
     'google_only',
+    'discovery',
     'starter',
+    'storefront',
+    'commitment',
     'professional',
     'enterprise',
     'organization',

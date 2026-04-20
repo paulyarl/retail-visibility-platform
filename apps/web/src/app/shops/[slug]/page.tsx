@@ -171,7 +171,8 @@ export default async function ShopProfilePage({ params, searchParams }: ShopProf
 
   // Check if tenant has non-active status - show status panel instead of "not found"
   const showStatusPanel = tenantInfo ? (
-    tenantInfo.subscriptionTier === 'google_only' ||
+    tenantInfo.subscriptionTier === 'google_only' || 
+    tenantInfo.subscriptionTier === 'discovery' ||
     (tenantInfo.locationStatus && tenantInfo.locationStatus !== 'active') ||
     (tenantInfo.statusInfo && !tenantInfo.statusInfo.showStorefront) ||
     tenantInfo.showSubscriptionPanel === true

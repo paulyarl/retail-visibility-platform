@@ -45,6 +45,9 @@ const LOCATION_STATUSES = [
 ];
 
 const TIERS = [
+  { value: 'discovery', label: '🔍 Discovery', color: 'bg-cyan-100 text-cyan-800' },
+  { value: 'commitment', label: '🤝 Commitment', color: 'bg-teal-100 text-teal-800' },
+  { value: 'storefront', label: '🏪 Storefront', color: 'bg-lime-100 text-lime-800' },
   { value: 'starter', label: '🌱️ Starter', color: 'bg-blue-100 text-blue-800' },
   { value: 'professional', label: '👔 Professional', color: 'bg-purple-100 text-purple-800' },
   { value: 'enterprise', label: '🏢 Enterprise', color: 'bg-indigo-100 text-indigo-800' },
@@ -64,7 +67,7 @@ export default function AdminTenantsPage() {
   const [subscriptionFilter, setSubscriptionFilter] = useState<'all' | 'trial' | 'active' | 'past_due' | 'cancelled'>('all');
   const [locationFilter, setLocationFilter] = useState<'all' | 'active' | 'pending' | 'inactive' | 'closed' | 'archived'>('all');
   const [organizationFilter, setOrganizationFilter] = useState<'all' | 'chain' | 'standalone'>('all');
-  const [tierFilter, setTierFilter] = useState<'all' | 'starter' | 'professional' | 'enterprise' | 'custom'>('all');
+  const [tierFilter, setTierFilter] = useState<'all' | 'discovery' | 'commitment' | 'storefront' | 'starter' | 'professional' | 'enterprise' | 'custom'>('all');
 
   useEffect(() => {
     loadTenants();
@@ -128,7 +131,7 @@ export default function AdminTenantsPage() {
     }
     
     // Otherwise inherit organization's tier
-    return orgTier || 'starter';
+    return orgTier || 'discovery';
   };
 
   // Filter tenants based on admin criteria
