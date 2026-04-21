@@ -581,6 +581,11 @@ export class SubscriptionBillingService {
     status: string;
     activatedAt: Date;
     invoiceId?: string;
+    stripeSubscriptionId?: string;
+    requiresAction?: boolean;
+    clientSecret?: string;
+    paypalApprovalUrl?: string;
+    paypalSubscriptionId?: string;
     error?: string;
   }> {
     // Get pricing
@@ -616,7 +621,7 @@ export class SubscriptionBillingService {
       };
     }
 
-    // Charge via Stripe
+    // Charge via Stripe - Create Subscription for recurring billing
     if (paymentMethod.gatewayType === 'stripe' && this.stripe) {
       try {
         const tenant = await prisma.tenants.findUnique({
@@ -626,13 +631,32 @@ export class SubscriptionBillingService {
 
         const customer = await this.getOrCreateStripeCustomer(tenantId, tenant?.name || 'Unknown');
 
-        // Create payment intent
-        const paymentIntent = await this.stripe.paymentIntents.create({
-          amount: amount,
-          currency: 'usd',
+        // Attach payment method to customer for recurring charges
+        await this.stripe.paymentMethods.attach(
+          paymentMethod.paymentMethodToken,
+          { customer: customer.id }
+        );
+
+        // Set as default payment method for customer
+        await this.stripe.customers.update(customer.id, {
+          invoice_settings: {
+            default_payment_method: paymentMethod.paymentMethodToken,
+          },
+        });
+
+        // Get or create Stripe Price for this tier
+        const priceId = await this.getOrCreateStripePrice(tier, billingCycle, amount);
+
+        // Create Stripe Subscription for automatic recurring billing
+        const subscription = await this.stripe.subscriptions.create({
           customer: customer.id,
-          payment_method: paymentMethod.paymentMethodToken,
-          confirm: true,
+          items: [{ price: priceId }],
+          payment_behavior: 'default_incomplete',
+          payment_settings: {
+            payment_method_types: ['card'],
+            save_default_payment_method: 'on_subscription',
+          },
+          expand: ['latest_invoice'],
           metadata: {
             tenantId,
             tier,
@@ -640,31 +664,102 @@ export class SubscriptionBillingService {
           },
         });
 
-        if (paymentIntent.status === 'succeeded') {
-          // Create invoice record
-          const invoiceId = await this.createInvoice(tenantId, tier, amount, paymentIntent.id);
+        // Check if payment succeeded immediately
+        const invoice = subscription.latest_invoice as Stripe.Invoice;
+        
+        if (invoice && invoice.status === 'paid') {
+          // Record platform revenue for subscription
+          const config = await prisma.platform_payment_config.findUnique({
+            where: { id: 'platform_main' },
+          });
+          const platformFeePercent = config?.subscription_fee_percent ?? 0;
           
-          // Update tenant tier
-          await this.updateTenantTier(tenantId, tier);
+          if (platformFeePercent > 0) {
+            const platformFeeCents = Math.round((amount * platformFeePercent) / 100);
+            const gatewayFeeCents = Math.round(amount * 0.029 + 30); // Approximate Stripe fee
+            
+            const { stripeConnectService } = await import('../payments/StripeConnectService');
+            await stripeConnectService.recordRevenueTransaction({
+              tenantId,
+              transactionType: 'subscription',
+              grossAmountCents: amount,
+              platformFeeCents,
+              gatewayFeeCents,
+              netAmountCents: amount - platformFeeCents - gatewayFeeCents,
+              stripeTransactionId: subscription.id,
+            });
+          }
 
+          // Payment succeeded immediately
+          const invoiceId = await this.createInvoice(tenantId, tier, amount, subscription.id);
+          await this.updateTenantTier(tenantId, tier, subscription.id);
+          
+          // Send payment success email
+          try {
+            const { getBillingNotificationService } = await import('./BillingNotificationService');
+            await getBillingNotificationService().sendNotification({
+              tenantId,
+              type: 'payment_success',
+              tier,
+              amount,
+              billingCycle,
+              invoiceId,
+            });
+          } catch (emailError) {
+            console.error('[SubscriptionBilling] Failed to send payment success email:', emailError);
+          }
+          
           return {
             success: true,
             tier,
             status: 'active',
             activatedAt: new Date(),
             invoiceId,
+            stripeSubscriptionId: subscription.id,
+          };
+        } else if (invoice && invoice.status === 'open') {
+          // Payment requires action (3D Secure, etc.)
+          // Return client secret for frontend to handle
+          const paymentIntent = await this.stripe.paymentIntents.retrieve(
+            invoice.payment_intent as string
+          );
+          
+          return {
+            success: true,
+            tier,
+            status: 'pending',
+            activatedAt: new Date(),
+            requiresAction: true,
+            clientSecret: paymentIntent.client_secret || undefined,
+            stripeSubscriptionId: subscription.id,
           };
         } else {
+          // Payment failed
+          // Send payment failed email
+          try {
+            const { getBillingNotificationService } = await import('./BillingNotificationService');
+            await getBillingNotificationService().sendNotification({
+              tenantId,
+              type: 'payment_failed',
+              tier,
+              amount,
+              billingCycle,
+              reason: `Invoice status: ${invoice?.status || 'unknown'}`,
+            });
+          } catch (emailError) {
+            console.error('[SubscriptionBilling] Failed to send payment failed email:', emailError);
+          }
+          
           return {
             success: false,
             tier,
             status: 'failed',
             activatedAt: new Date(),
-            error: `Payment status: ${paymentIntent.status}`,
+            error: `Invoice status: ${invoice?.status || 'unknown'}`,
           };
         }
       } catch (error: any) {
-        console.error('[SubscriptionBilling] Stripe charge failed:', error);
+        console.error('[SubscriptionBilling] Stripe subscription failed:', error);
         return {
           success: false,
           tier,
@@ -675,43 +770,31 @@ export class SubscriptionBillingService {
       }
     }
 
-    // Charge via PayPal
+    // Charge via PayPal - Create Subscription for recurring billing
     if (paymentMethod.gatewayType === 'paypal') {
       try {
         const { payPalService } = await import('./PayPalService');
         
-        const result = await payPalService.chargePaymentToken(
-          paymentMethod.paymentMethodToken,
+        // Create PayPal subscription for automatic recurring billing
+        const result = await payPalService.createSubscription(
+          tenantId,
+          tier,
           amount,
-          `VisibleShelf ${tier} tier - ${billingCycle}`,
-          { tenantId, tier, billingCycle }
+          billingCycle
         );
 
-        if (result.success) {
-          // Create invoice record
-          const invoiceId = await this.createInvoice(tenantId, tier, amount, result.transactionId);
-          
-          // Update tenant tier
-          await this.updateTenantTier(tenantId, tier);
-
-          return {
-            success: true,
-            tier,
-            status: 'active',
-            activatedAt: new Date(),
-            invoiceId,
-          };
-        } else {
-          return {
-            success: false,
-            tier,
-            status: 'failed',
-            activatedAt: new Date(),
-            error: result.error || 'PayPal charge failed',
-          };
-        }
+        // Return approval URL for frontend to redirect
+        return {
+          success: true,
+          tier,
+          status: 'pending',
+          activatedAt: new Date(),
+          requiresAction: true,
+          paypalApprovalUrl: result.approvalUrl,
+          paypalSubscriptionId: result.subscriptionId,
+        };
       } catch (error: any) {
-        console.error('[SubscriptionBilling] PayPal charge failed:', error);
+        console.error('[SubscriptionBilling] PayPal subscription failed:', error);
         return {
           success: false,
           tier,
@@ -734,9 +817,19 @@ export class SubscriptionBillingService {
   /**
    * Update tenant tier and billing cycle
    */
-  async updateTenantTier(tenantId: string, tier: string): Promise<void> {
+  async updateTenantTier(
+    tenantId: string, 
+    tier: string, 
+    stripeSubscriptionId?: string,
+    billingCycle: 'monthly' | 'annual' = 'monthly'
+  ): Promise<void> {
     const now = new Date();
     const cycleEnd = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+
+    const metadata: any = {};
+    if (stripeSubscriptionId) {
+      metadata.stripeSubscriptionId = stripeSubscriptionId;
+    }
 
     await prisma.tenants.update({
       where: { id: tenantId },
@@ -746,8 +839,76 @@ export class SubscriptionBillingService {
         status_changed_at: now,
         billing_cycle_start: now,
         billing_cycle_end: cycleEnd,
+        ...(Object.keys(metadata).length > 0 && { metadata }),
       },
     });
+  }
+
+  /**
+   * Get or create Stripe Price for a tier
+   * Uses product/price lookup by metadata to avoid duplicates
+   */
+  async getOrCreateStripePrice(
+    tier: string,
+    billingCycle: 'monthly' | 'annual',
+    amountCents: number
+  ): Promise<string> {
+    if (!this.stripe) {
+      throw new Error('Stripe not configured');
+    }
+
+    // Look for existing product for this tier
+    const productName = `VisibleShelf ${tier} tier`;
+    const interval = billingCycle === 'monthly' ? 'month' : 'year';
+    
+    // Find existing product by metadata
+    const products = await this.stripe.products.list({
+      active: true,
+      limit: 100,
+    });
+    
+    let product = products.data.find(p => p.metadata?.tier === tier);
+    
+    if (!product) {
+      // Create new product
+      product = await this.stripe.products.create({
+        name: productName,
+        metadata: {
+          tier,
+          billingCycle,
+        },
+      });
+    }
+
+    // Find existing price for this product with matching interval
+    const prices = await this.stripe.prices.list({
+      product: product.id,
+      active: true,
+    });
+    
+    const existingPrice = prices.data.find(
+      p => p.recurring?.interval === interval && p.unit_amount === amountCents
+    );
+    
+    if (existingPrice) {
+      return existingPrice.id;
+    }
+
+    // Create new price
+    const price = await this.stripe.prices.create({
+      product: product.id,
+      unit_amount: amountCents,
+      currency: 'usd',
+      recurring: {
+        interval: interval as 'month' | 'year',
+      },
+      metadata: {
+        tier,
+        billingCycle,
+      },
+    });
+
+    return price.id;
   }
 
   /**

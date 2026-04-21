@@ -45,6 +45,47 @@ interface PayPalBillingAgreement {
   }>;
 }
 
+interface PayPalProduct {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  category: string;
+}
+
+interface PayPalPlan {
+  id: string;
+  product_id: string;
+  name: string;
+  status: string;
+  billing_cycles: Array<{
+    frequency: {
+      interval_unit: string;
+      interval_count: number;
+    };
+    tenure_type: string;
+    pricing_scheme: {
+      fixed_price: {
+        currency_code: string;
+        value: string;
+      };
+    };
+  }>;
+}
+
+interface PayPalSubscription {
+  id: string;
+  status: string;
+  billing_info?: {
+    next_billing_time?: string;
+    last_payment?: {
+      time: string;
+      amount: { value: string; currency_code: string };
+    };
+  };
+  links: Array<{ href: string; rel: string; method: string }>;
+}
+
 interface PayPalCaptureResponse {
   id: string;
   status: string;
@@ -435,6 +476,215 @@ class PayPalService {
       return response.ok;
     } catch (error) {
       console.error('[PayPal] Failed to delete payment token:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Create a PayPal product for subscription
+   * Products are required before creating billing plans
+   */
+  async createProduct(tier: string): Promise<string> {
+    const productId = `visibleshelf-${tier}-subscription`;
+    
+    try {
+      // Check if product already exists
+      const existing = await this.apiRequest<PayPalProduct>(`/v1/catalogs/products/${productId}`);
+      if (existing && existing.id) {
+        return existing.id;
+      }
+    } catch {
+      // Product doesn't exist, create it
+    }
+
+    const product = await this.apiRequest<PayPalProduct>(
+      '/v1/catalogs/products',
+      'POST',
+      {
+        id: productId,
+        name: `VisibleShelf ${tier} Tier`,
+        description: `VisibleShelf ${tier} tier subscription`,
+        type: 'SERVICE',
+        category: 'SOFTWARE',
+        image_url: 'https://visibleshelf.com/logo.png',
+        home_url: 'https://visibleshelf.com',
+      }
+    );
+
+    return product.id;
+  }
+
+  /**
+   * Create a PayPal billing plan for a tier
+   * Plans define pricing and billing frequency
+   */
+  async createPlan(
+    tier: string,
+    amountCents: number,
+    billingCycle: 'monthly' | 'annual'
+  ): Promise<string> {
+    const productId = await this.createProduct(tier);
+    const planId = `visibleshelf-${tier}-${billingCycle}`;
+    const amount = (amountCents / 100).toFixed(2);
+    const interval = billingCycle === 'monthly' ? 'MONTH' : 'YEAR';
+    const intervalCount = 1;
+
+    try {
+      // Check if plan already exists
+      const existing = await this.apiRequest<PayPalPlan>(`/v1/billing/plans/${planId}`);
+      if (existing && existing.id) {
+        return existing.id;
+      }
+    } catch {
+      // Plan doesn't exist, create it
+    }
+
+    const plan = await this.apiRequest<PayPalPlan>(
+      '/v1/billing/plans',
+      'POST',
+      {
+        id: planId,
+        product_id: productId,
+        name: `${tier} tier - ${billingCycle}`,
+        description: `VisibleShelf ${tier} tier ${billingCycle} subscription`,
+        status: 'ACTIVE',
+        billing_cycles: [{
+          frequency: {
+            interval_unit: interval,
+            interval_count: intervalCount,
+          },
+          tenure_type: 'REGULAR',
+          sequence: 1,
+          total_cycles: 0, // Infinite cycles
+          pricing_scheme: {
+            fixed_price: {
+              currency_code: 'USD',
+              value: amount,
+            },
+          },
+        }],
+        payment_preferences: {
+          auto_bill_outstanding: true,
+          setup_fee: {
+            currency_code: 'USD',
+            value: '0',
+          },
+          setup_fee_failure_action: 'CONTINUE',
+          payment_failure_threshold: 3,
+        },
+      }
+    );
+
+    return plan.id;
+  }
+
+  /**
+   * Create a PayPal subscription for recurring billing
+   * This is the main entry point for PayPal recurring subscriptions
+   */
+  async createSubscription(
+    tenantId: string,
+    tier: string,
+    amountCents: number,
+    billingCycle: 'monthly' | 'annual'
+  ): Promise<{
+    subscriptionId: string;
+    approvalUrl: string;
+  }> {
+    const planId = await this.createPlan(tier, amountCents, billingCycle);
+    const baseUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_APP_ORIGIN || 'http://localhost:3000';
+
+    const subscription = await this.apiRequest<PayPalSubscription>(
+      '/v1/billing/subscriptions',
+      'POST',
+      {
+        plan_id: planId,
+        custom_id: JSON.stringify({ tenantId, tier, billingCycle }),
+        application_context: {
+          brand_name: 'VisibleShelf',
+          locale: 'en-US',
+          shipping_preference: 'NO_SHIPPING',
+          user_action: 'SUBSCRIBE_NOW',
+          payment_method: {
+            payer_selected: 'PAYPAL',
+            payee_preferred: 'IMMEDIATE_PAYMENT_REQUIRED',
+          },
+          return_url: `${baseUrl}/settings/subscription?paypal=success`,
+          cancel_url: `${baseUrl}/settings/subscription?paypal=cancel`,
+        },
+      }
+    );
+
+    const approvalLink = subscription.links.find(l => l.rel === 'approve');
+    if (!approvalLink) {
+      throw new Error('PayPal subscription created but no approval link found');
+    }
+
+    return {
+      subscriptionId: subscription.id,
+      approvalUrl: approvalLink.href,
+    };
+  }
+
+  /**
+   * Get PayPal subscription details
+   */
+  async getSubscription(subscriptionId: string): Promise<PayPalSubscription | null> {
+    try {
+      return await this.apiRequest<PayPalSubscription>(`/v1/billing/subscriptions/${subscriptionId}`);
+    } catch (error) {
+      console.error('[PayPal] Failed to get subscription:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Cancel a PayPal subscription
+   */
+  async cancelSubscription(subscriptionId: string, reason: string): Promise<boolean> {
+    try {
+      await this.apiRequest(
+        `/v1/billing/subscriptions/${subscriptionId}/cancel`,
+        'POST',
+        { reason }
+      );
+      return true;
+    } catch (error) {
+      console.error('[PayPal] Failed to cancel subscription:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Suspend a PayPal subscription
+   */
+  async suspendSubscription(subscriptionId: string, reason: string): Promise<boolean> {
+    try {
+      await this.apiRequest(
+        `/v1/billing/subscriptions/${subscriptionId}/suspend`,
+        'POST',
+        { reason }
+      );
+      return true;
+    } catch (error) {
+      console.error('[PayPal] Failed to suspend subscription:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Reactivate a suspended PayPal subscription
+   */
+  async activateSubscription(subscriptionId: string, reason: string): Promise<boolean> {
+    try {
+      await this.apiRequest(
+        `/v1/billing/subscriptions/${subscriptionId}/activate`,
+        'POST',
+        { reason }
+      );
+      return true;
+    } catch (error) {
+      console.error('[PayPal] Failed to activate subscription:', error);
       return false;
     }
   }

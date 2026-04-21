@@ -385,9 +385,33 @@ router.post('/subscribe', requirePermission('CAN_MANAGE_TENANT_BILLING'), async 
     );
     
     if (result.success) {
+      // Check if tenant needs Stripe Connect onboarding for payouts
+      const stripeConnection = await prisma.merchant_stripe_connections.findUnique({
+        where: { tenant_id: tenantId },
+        select: { 
+          onboarding_status: true, 
+          stripe_payouts_enabled: true 
+        },
+      });
+      
+      const needsStripeConnect = !stripeConnection || 
+        stripeConnection.onboarding_status !== 'completed' ||
+        !stripeConnection.stripe_payouts_enabled;
+      
       res.json({
         success: true,
-        data: result,
+        data: {
+          ...result,
+          // Include Stripe Connect status for frontend to prompt onboarding
+          stripeConnect: {
+            needed: needsStripeConnect,
+            status: stripeConnection?.onboarding_status || null,
+            payoutsEnabled: stripeConnection?.stripe_payouts_enabled || false,
+            onboardingUrl: needsStripeConnect 
+              ? `/t/${tenantId}/settings/payment-gateways?stripe_connect=required`
+              : null,
+          },
+        },
       });
     } else {
       res.status(400).json({
@@ -1028,6 +1052,370 @@ router.post('/paypal/save-payment-method', requirePermission('CAN_MANAGE_TENANT_
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to save PayPal payment method',
+    });
+  }
+});
+
+// ==================
+// SUBSCRIPTION MANAGEMENT
+// ==================
+
+/**
+ * POST /api/subscription/cancel
+ * Cancel the current subscription
+ * Requires CAN_MANAGE_TENANT_BILLING permission
+ */
+router.post('/cancel', requirePermission('CAN_MANAGE_TENANT_BILLING'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    const { reason, immediately = false } = req.body;
+    
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'No tenant context',
+      });
+    }
+
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { 
+        subscription_tier: true, 
+        subscription_status: true,
+        metadata: true,
+        stripe_customer_id: true,
+      },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+      });
+    }
+
+    const metadata = tenant.metadata as any;
+    const stripeSubscriptionId = metadata?.stripeSubscriptionId;
+    const paypalSubscriptionId = metadata?.paypalSubscriptionId;
+
+    // Cancel Stripe subscription
+    if (stripeSubscriptionId) {
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+        apiVersion: '2025-02-24.acacia',
+      });
+
+      if (immediately) {
+        await stripe.subscriptions.cancel(stripeSubscriptionId);
+      } else {
+        // Cancel at period end
+        await stripe.subscriptions.update(stripeSubscriptionId, {
+          cancel_at_period_end: true,
+          cancellation_details: {
+            comment: reason,
+          },
+        });
+      }
+    }
+
+    // Cancel PayPal subscription
+    if (paypalSubscriptionId) {
+      const { payPalService } = await import('../services/subscription/PayPalService');
+      await payPalService.cancelSubscription(paypalSubscriptionId, reason || 'Customer requested cancellation');
+    }
+
+    // Update tenant status
+    await prisma.tenants.update({
+      where: { id: tenantId },
+      data: {
+        subscription_status: immediately ? 'canceled' : 'canceling',
+        status_changed_at: new Date(),
+      },
+    });
+
+    res.json({
+      success: true,
+      message: immediately ? 'Subscription canceled immediately' : 'Subscription will cancel at end of billing period',
+      status: immediately ? 'canceled' : 'canceling',
+    });
+  } catch (error: any) {
+    console.error('[Subscription] Cancel error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to cancel subscription',
+    });
+  }
+});
+
+/**
+ * POST /api/subscription/pause
+ * Pause/suspend the current subscription
+ * Requires CAN_MANAGE_TENANT_BILLING permission
+ */
+router.post('/pause', requirePermission('CAN_MANAGE_TENANT_BILLING'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    const { reason } = req.body;
+    
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'No tenant context',
+      });
+    }
+
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { metadata: true },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+      });
+    }
+
+    const metadata = tenant.metadata as any;
+    const paypalSubscriptionId = metadata?.paypalSubscriptionId;
+
+    // Stripe doesn't support pause - must cancel and recreate
+    // PayPal supports suspend
+    if (paypalSubscriptionId) {
+      const { payPalService } = await import('../services/subscription/PayPalService');
+      await payPalService.suspendSubscription(paypalSubscriptionId, reason || 'Customer requested pause');
+    }
+
+    // Update tenant status
+    await prisma.tenants.update({
+      where: { id: tenantId },
+      data: {
+        subscription_status: 'paused',
+        status_changed_at: new Date(),
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Subscription paused',
+      status: 'paused',
+    });
+  } catch (error: any) {
+    console.error('[Subscription] Pause error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to pause subscription',
+    });
+  }
+});
+
+/**
+ * POST /api/subscription/resume
+ * Resume a paused subscription
+ * Requires CAN_MANAGE_TENANT_BILLING permission
+ */
+router.post('/resume', requirePermission('CAN_MANAGE_TENANT_BILLING'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'No tenant context',
+      });
+    }
+
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { 
+        subscription_tier: true,
+        subscription_status: true,
+        metadata: true,
+      },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+      });
+    }
+
+    if (tenant.subscription_status !== 'paused') {
+      return res.status(400).json({
+        success: false,
+        error: 'Subscription is not paused',
+      });
+    }
+
+    const metadata = tenant.metadata as any;
+    const paypalSubscriptionId = metadata?.paypalSubscriptionId;
+
+    // Resume PayPal subscription
+    if (paypalSubscriptionId) {
+      const { payPalService } = await import('../services/subscription/PayPalService');
+      await payPalService.activateSubscription(paypalSubscriptionId, 'Customer requested resume');
+    }
+
+    // Update tenant status
+    await prisma.tenants.update({
+      where: { id: tenantId },
+      data: {
+        subscription_status: 'active',
+        status_changed_at: new Date(),
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Subscription resumed',
+      status: 'active',
+    });
+  } catch (error: any) {
+    console.error('[Subscription] Resume error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to resume subscription',
+    });
+  }
+});
+
+/**
+ * POST /api/subscription/change-tier
+ * Change subscription tier with proration
+ * Requires CAN_MANAGE_TENANT_BILLING permission
+ */
+router.post('/change-tier', requirePermission('CAN_MANAGE_TENANT_BILLING'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = getTenantId(req);
+    const { newTier, billingCycle = 'monthly' } = req.body;
+    
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'No tenant context',
+      });
+    }
+
+    if (!newTier) {
+      return res.status(400).json({
+        success: false,
+        error: 'New tier is required',
+      });
+    }
+
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: { 
+        subscription_tier: true,
+        subscription_status: true,
+        metadata: true,
+        stripe_customer_id: true,
+      },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found',
+      });
+    }
+
+    const metadata = tenant.metadata as any;
+    const stripeSubscriptionId = metadata?.stripeSubscriptionId;
+    const paypalSubscriptionId = metadata?.paypalSubscriptionId;
+
+    // Get pricing for new tier
+    const billingService = getSubscriptionBillingService();
+    const pricing = await billingService.getTierPricingByTier(newTier);
+    
+    if (!pricing) {
+      return res.status(400).json({
+        success: false,
+        error: `Tier pricing not found: ${newTier}`,
+      });
+    }
+
+    const amount = billingCycle === 'monthly' ? pricing.monthlyPriceCents : pricing.annualPriceCents;
+
+    // Change Stripe subscription
+    if (stripeSubscriptionId) {
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+        apiVersion: '2025-02-24.acacia',
+      });
+
+      // Get new price
+      const priceId = await billingService.getOrCreateStripePrice(newTier, billingCycle, amount);
+
+      // Update subscription with proration
+      const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+      
+      await stripe.subscriptions.update(stripeSubscriptionId, {
+        items: [{
+          id: subscription.items.data[0].id,
+          price: priceId,
+        }],
+        proration_behavior: 'create_prorations',
+        metadata: {
+          tenantId,
+          tier: newTier,
+          billingCycle,
+        },
+      });
+    }
+
+    // PayPal: Cancel old subscription and create new one
+    if (paypalSubscriptionId) {
+      const { payPalService } = await import('../services/subscription/PayPalService');
+      
+      // Cancel existing
+      await payPalService.cancelSubscription(paypalSubscriptionId, 'Tier change');
+      
+      // Create new subscription
+      const result = await payPalService.createSubscription(tenantId, newTier, amount, billingCycle);
+      
+      // Update metadata with new subscription ID
+      await prisma.tenants.update({
+        where: { id: tenantId },
+        data: {
+          metadata: {
+            ...metadata,
+            paypalSubscriptionId: result.subscriptionId,
+          },
+        },
+      });
+
+      // Return approval URL for PayPal
+      return res.json({
+        success: true,
+        message: 'PayPal subscription changed - approval required',
+        requiresAction: true,
+        paypalApprovalUrl: result.approvalUrl,
+        paypalSubscriptionId: result.subscriptionId,
+      });
+    }
+
+    // Update tenant tier
+    await prisma.tenants.update({
+      where: { id: tenantId },
+      data: {
+        subscription_tier: newTier,
+        status_changed_at: new Date(),
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Subscription tier changed',
+      tier: newTier,
+      billingCycle,
+    });
+  } catch (error: any) {
+    console.error('[Subscription] Change tier error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to change subscription tier',
     });
   }
 });

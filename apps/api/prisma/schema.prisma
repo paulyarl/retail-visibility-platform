@@ -1283,48 +1283,49 @@ model outreach_feedback_list {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model payments {
-  id                            String          @id @db.VarChar(255)
-  order_id                      String          @db.VarChar(255)
-  tenant_id                     String          @db.VarChar(255)
+  id                            String                       @id @db.VarChar(255)
+  order_id                      String                       @db.VarChar(255)
+  tenant_id                     String                       @db.VarChar(255)
   amount_cents                  Int
-  currency                      String          @default("USD") @db.VarChar(3)
+  currency                      String                       @default("USD") @db.VarChar(3)
   payment_method                payment_method?
-  payment_status                payment_status  @default(pending)
-  gateway                       String?         @db.VarChar(50)
-  gateway_transaction_id        String?         @unique @db.VarChar(255)
-  gateway_customer_id           String?         @db.VarChar(255)
-  gateway_payment_method_id     String?         @db.VarChar(255)
+  payment_status                payment_status               @default(pending)
+  gateway                       String?                      @db.VarChar(50)
+  gateway_transaction_id        String?                      @unique @db.VarChar(255)
+  gateway_customer_id           String?                      @db.VarChar(255)
+  gateway_payment_method_id     String?                      @db.VarChar(255)
   payment_method_details        Json?
-  authorized_at                 DateTime?       @db.Timestamp(6)
-  captured_at                   DateTime?       @db.Timestamp(6)
-  failed_at                     DateTime?       @db.Timestamp(6)
-  cancelled_at                  DateTime?       @db.Timestamp(6)
-  error_code                    String?         @db.VarChar(100)
+  authorized_at                 DateTime?                    @db.Timestamp(6)
+  captured_at                   DateTime?                    @db.Timestamp(6)
+  failed_at                     DateTime?                    @db.Timestamp(6)
+  cancelled_at                  DateTime?                    @db.Timestamp(6)
+  error_code                    String?                      @db.VarChar(100)
   error_message                 String?
-  metadata                      Json?           @default("{}")
-  ip_address                    String?         @db.VarChar(45)
-  created_at                    DateTime        @default(now()) @db.Timestamp(6)
-  updated_at                    DateTime        @default(now()) @db.Timestamp(6)
+  metadata                      Json?                        @default("{}")
+  ip_address                    String?                      @db.VarChar(45)
+  created_at                    DateTime                     @default(now()) @db.Timestamp(6)
+  updated_at                    DateTime                     @default(now()) @db.Timestamp(6)
   gateway_type                  String?
   gateway_authorization_id      String?
-  gateway_fee_cents             Int?            @default(0)
+  gateway_fee_cents             Int?                         @default(0)
   net_amount_cents              Int?
-  gateway_response              Json?           @default("{}")
-  authorization_expires_at      DateTime?       @db.Timestamp(6)
-  platform_fee_cents            Int?            @default(0)
-  platform_fee_percentage       Decimal?        @db.Decimal(5, 2)
-  platform_fee_fixed_cents      Int?            @default(0)
-  total_fees_cents              Int?            @default(0)
-  fee_waived                    Boolean?        @default(false)
+  gateway_response              Json?                        @default("{}")
+  authorization_expires_at      DateTime?                    @db.Timestamp(6)
+  platform_fee_cents            Int?                         @default(0)
+  platform_fee_percentage       Decimal?                     @db.Decimal(5, 2)
+  platform_fee_fixed_cents      Int?                         @default(0)
+  total_fees_cents              Int?                         @default(0)
+  fee_waived                    Boolean?                     @default(false)
   fee_waived_reason             String?
-  is_deposit_payment            Boolean?        @default(false)
-  deposit_percentage            Decimal?        @db.Decimal(5, 2)
-  deposit_forfeited             Boolean?        @default(false)
-  forfeited_at                  DateTime?       @db.Timestamp(6)
-  platform_forfeit_fee_cents    Int?            @default(0)
-  retailer_forfeit_amount_cents Int?            @default(0)
-  orders                        orders          @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payments_order_id")
-  tenants                       tenants         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payments_tenant_id")
+  is_deposit_payment            Boolean?                     @default(false)
+  deposit_percentage            Decimal?                     @db.Decimal(5, 2)
+  deposit_forfeited             Boolean?                     @default(false)
+  forfeited_at                  DateTime?                    @db.Timestamp(6)
+  platform_forfeit_fee_cents    Int?                         @default(0)
+  retailer_forfeit_amount_cents Int?                         @default(0)
+  orders                        orders                       @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payments_order_id")
+  tenants                       tenants                      @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payments_tenant_id")
+  platform_fee_invoice_items    platform_fee_invoice_items[]
   refunds                       refunds[]
 
   @@index([created_at, payment_status], map: "idx_payments_created_at_status")
@@ -2440,11 +2441,15 @@ model tenants {
   invitations                                                                            invitations[]
   location_status_logs                                                                   location_status_logs[]
   merchant_billing_gateways_merchant_billing_gateways_tenant_idTotenants                 merchant_billing_gateways[]        @relation("merchant_billing_gateways_tenant_idTotenants")
+  merchant_paypal_connections                                                            merchant_paypal_connections?
+  merchant_stripe_connections                                                            merchant_stripe_connections?
   oauth_tokens                                                                           oauth_tokens[]
   orders                                                                                 orders[]
   payments                                                                               payments[]
   photo_assets                                                                           photo_assets[]
+  platform_fee_invoices                                                                  platform_fee_invoices[]
   platform_fee_overrides                                                                 platform_fee_overrides[]
+  platform_revenue_transactions                                                          platform_revenue_transactions[]
   product_performances                                                                   product_performances[]
   product_variants                                                                       product_variants[]
   refunds                                                                                refunds[]
@@ -2719,6 +2724,186 @@ model webhook_events {
   @@index([event_id], map: "idx_webhook_events_event_id")
   @@index([event_type], map: "idx_webhook_events_event_type")
   @@index([processed], map: "idx_webhook_events_processed")
+}
+
+/// Platform-level payment configuration for revenue collection
+model platform_payment_config {
+  id                                   String    @id @default("platform_main") @db.VarChar(255)
+  stripe_platform_account_id           String?   @unique @db.VarChar(255)
+  stripe_platform_public_key           String?   @db.VarChar(255)
+  stripe_platform_secret_key_encrypted String?
+  stripe_webhook_secret_encrypted      String?
+  stripe_connect_client_id             String?   @db.VarChar(255)
+  stripe_connect_secret_encrypted      String?
+  default_platform_fee_percent         Float?    @default(2.0)
+  deposit_forfeit_fee_percent          Float?    @default(20.0)
+  subscription_fee_percent             Float?    @default(0)
+  platform_payout_schedule             String?   @default("monthly") @db.VarChar(50)
+  platform_payout_minimum_cents        Int?      @default(1000)
+  last_payout_at                       DateTime? @db.Timestamptz(6)
+  last_payout_amount_cents             Int?      @default(0)
+  total_payout_cents                   BigInt?   @default(0)
+  is_active                            Boolean?  @default(false)
+  onboarding_completed_at              DateTime? @db.Timestamptz(6)
+  onboarding_error                     String?
+  created_at                           DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                           DateTime? @default(now()) @updatedAt @db.Timestamptz(6)
+  metadata                             Json?     @default("{}")
+}
+
+/// Merchant Stripe Connect onboarding status
+model merchant_stripe_connections {
+  id                            String    @id @db.VarChar(255)
+  tenant_id                     String    @unique @db.VarChar(255)
+  stripe_account_id             String?   @unique @db.VarChar(255)
+  stripe_account_type           String?   @db.VarChar(50)
+  onboarding_status             String?   @default("pending") @db.VarChar(50)
+  onboarding_started_at         DateTime? @db.Timestamptz(6)
+  onboarding_completed_at       DateTime? @db.Timestamptz(6)
+  onboarding_expires_at         DateTime? @db.Timestamptz(6)
+  onboarding_link               String?
+  onboarding_error              String?
+  stripe_account_status         String?   @db.VarChar(50)
+  stripe_payouts_enabled        Boolean?  @default(false)
+  stripe_payments_enabled       Boolean?  @default(false)
+  stripe_requirements           Json?     @default("[]")
+  platform_fee_override_percent Float?
+  total_payout_cents            BigInt?   @default(0)
+  last_payout_at                DateTime? @db.Timestamptz(6)
+  created_at                    DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime? @default(now()) @updatedAt @db.Timestamptz(6)
+  metadata                      Json?     @default("{}")
+  tenants                       tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([stripe_account_id], map: "idx_merchant_stripe_account_id")
+  @@index([stripe_account_status], map: "idx_merchant_stripe_account_status")
+  @@index([onboarding_status], map: "idx_merchant_stripe_onboarding_status")
+  @@index([tenant_id], map: "idx_merchant_stripe_tenant_id")
+}
+
+/// Track all platform revenue transactions
+model platform_revenue_transactions {
+  id                    String    @id @db.VarChar(255)
+  tenant_id             String?   @db.VarChar(255)
+  order_id              String?   @db.VarChar(255)
+  payment_id            String?   @db.VarChar(255)
+  transaction_type      String    @db.VarChar(50)
+  gross_amount_cents    Int?      @default(0)
+  platform_fee_cents    Int?      @default(0)
+  gateway_fee_cents     Int?      @default(0)
+  net_amount_cents      Int?      @default(0)
+  stripe_transaction_id String?   @unique @db.VarChar(255)
+  stripe_transfer_id    String?   @db.VarChar(255)
+  stripe_payout_id      String?   @db.VarChar(255)
+  status                String?   @default("pending") @db.VarChar(50)
+  processed_at          DateTime? @db.Timestamptz(6)
+  failed_at             DateTime? @db.Timestamptz(6)
+  failure_reason        String?
+  created_at            DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime? @default(now()) @updatedAt @db.Timestamptz(6)
+  metadata              Json?     @default("{}")
+  tenants               tenants?  @relation(fields: [tenant_id], references: [id], onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_revenue_created_at")
+  @@index([order_id], map: "idx_revenue_order_id")
+  @@index([payment_id], map: "idx_revenue_payment_id")
+  @@index([status], map: "idx_revenue_status")
+  @@index([stripe_transaction_id], map: "idx_revenue_stripe_transaction_id")
+  @@index([tenant_id], map: "idx_revenue_tenant_id")
+  @@index([transaction_type], map: "idx_revenue_transaction_type")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model platform_fee_invoice_items {
+  id                    String                @id @db.VarChar(255)
+  invoice_id            String                @db.VarChar(255)
+  payment_id            String?               @db.VarChar(255)
+  order_id              String?               @db.VarChar(255)
+  gateway               String                @db.VarChar(50)
+  transaction_date      DateTime?             @db.Timestamptz(6)
+  gross_amount_cents    BigInt?               @default(0)
+  platform_fee_cents    BigInt?               @default(0)
+  fee_percentage        Float?
+  description           String?
+  created_at            DateTime?             @default(now()) @db.Timestamptz(6)
+  metadata              Json?                 @default("{}")
+  platform_fee_invoices platform_fee_invoices @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payments              payments?             @relation(fields: [payment_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([gateway], map: "idx_invoice_items_gateway")
+  @@index([invoice_id], map: "idx_invoice_items_invoice_id")
+  @@index([payment_id], map: "idx_invoice_items_payment_id")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model platform_fee_invoices {
+  id                         String                       @id @db.VarChar(255)
+  tenant_id                  String                       @db.VarChar(255)
+  period_start               DateTime                     @db.Timestamptz(6)
+  period_end                 DateTime                     @db.Timestamptz(6)
+  invoice_number             String?                      @unique @db.VarChar(50)
+  stripe_fees_cents          BigInt?                      @default(0)
+  paypal_fees_cents          BigInt?                      @default(0)
+  square_fees_cents          BigInt?                      @default(0)
+  clover_fees_cents          BigInt?                      @default(0)
+  other_fees_cents           BigInt?                      @default(0)
+  total_fees_cents           BigInt?                      @default(0)
+  stripe_transaction_count   Int?                         @default(0)
+  paypal_transaction_count   Int?                         @default(0)
+  square_transaction_count   Int?                         @default(0)
+  clover_transaction_count   Int?                         @default(0)
+  other_transaction_count    Int?                         @default(0)
+  status                     String?                      @default("pending") @db.VarChar(50)
+  due_date                   DateTime?                    @db.Timestamptz(6)
+  paid_at                    DateTime?                    @db.Timestamptz(6)
+  payment_method             String?                      @db.VarChar(50)
+  stripe_invoice_id          String?                      @unique @db.VarChar(255)
+  stripe_payment_intent_id   String?                      @db.VarChar(255)
+  waived_amount_cents        BigInt?                      @default(0)
+  waiver_reason              String?
+  adjusted_amount_cents      BigInt?                      @default(0)
+  adjustment_reason          String?
+  notes                      String?
+  created_at                 DateTime?                    @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime?                    @default(now()) @db.Timestamptz(6)
+  metadata                   Json?                        @default("{}")
+  platform_fee_invoice_items platform_fee_invoice_items[]
+  tenants                    tenants                      @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([due_date], map: "idx_fee_invoices_due_date")
+  @@index([invoice_number], map: "idx_fee_invoices_invoice_number")
+  @@index([period_start, period_end], map: "idx_fee_invoices_period")
+  @@index([status], map: "idx_fee_invoices_status")
+  @@index([stripe_invoice_id], map: "idx_fee_invoices_stripe_invoice_id")
+  @@index([tenant_id], map: "idx_fee_invoices_tenant_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model merchant_paypal_connections {
+  id                            String    @id @db.VarChar(255)
+  tenant_id                     String    @unique @db.VarChar(255)
+  paypal_merchant_id            String?   @unique @db.VarChar(255)
+  referral_id                   String?   @db.VarChar(255)
+  onboarding_status             String?   @default("pending") @db.VarChar(50)
+  onboarding_started_at         DateTime? @db.Timestamptz(6)
+  onboarding_completed_at       DateTime? @db.Timestamptz(6)
+  onboarding_error              String?
+  paypal_account_status         String?   @db.VarChar(50)
+  payments_enabled              Boolean?  @default(false)
+  primary_email                 String?   @db.VarChar(255)
+  primary_email_confirmed       Boolean?  @default(false)
+  platform_fee_override_percent Float?
+  total_payout_cents            BigInt?   @default(0)
+  last_payout_at                DateTime? @db.Timestamptz(6)
+  created_at                    DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime? @default(now()) @db.Timestamptz(6)
+  metadata                      Json?     @default("{}")
+  tenants                       tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([paypal_merchant_id], map: "idx_paypal_merchant_id")
+  @@index([onboarding_status], map: "idx_paypal_status")
+  @@index([tenant_id], map: "idx_paypal_tenant_id")
 }
 
 enum action {

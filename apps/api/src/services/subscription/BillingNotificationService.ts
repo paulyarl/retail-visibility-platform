@@ -15,6 +15,8 @@ export type BillingNotificationType =
   | 'payment_success'
   | 'payment_failed'
   | 'grace_period_warning'
+  | 'grace_period_final'
+  | 'payment_method_update_reminder'
   | 'subscription_canceled'
   | 'subscription_reactivated'
   | 'tier_changed'
@@ -135,9 +137,25 @@ class BillingNotificationService {
       case 'grace_period_warning':
         return {
           to: toEmail,
-          subject: `Action Required: Subscription Payment Overdue - ${businessName}`,
+          subject: `Action Required: Payment Overdue - ${businessName}`,
           html: this.buildGracePeriodWarningHtml(ownerName, businessName, data),
           text: this.buildGracePeriodWarningText(ownerName, businessName, data),
+        };
+
+      case 'grace_period_final':
+        return {
+          to: toEmail,
+          subject: `URGENT: Final Notice - Account Downgrade Tomorrow`,
+          html: this.buildGracePeriodFinalHtml(ownerName, businessName, data),
+          text: this.buildGracePeriodFinalText(ownerName, businessName, data),
+        };
+
+      case 'payment_method_update_reminder':
+        return {
+          to: toEmail,
+          subject: `Reminder: Update Your Payment Method - ${businessName}`,
+          html: this.buildPaymentMethodReminderHtml(ownerName, businessName, data),
+          text: this.buildPaymentMethodReminderText(ownerName, businessName, data),
         };
 
       case 'subscription_canceled':
@@ -269,6 +287,77 @@ ${days} days remaining in grace period.
 After ${days} days, your account will be downgraded to the free tier.
 
 Please update your payment method to maintain your current plan.
+
+Update your payment at: ${process.env.WEB_URL}/settings/subscription`;
+  }
+
+  // Email templates - Grace Period Final Warning (1 day)
+  private buildGracePeriodFinalHtml(name: string, business: string, data: BillingNotificationData): string {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626;">URGENT: Final Notice</h2>
+        <p>Hi ${name},</p>
+        <p>This is your final notice. Your subscription for <strong>${business}</strong> will be downgraded <strong>tomorrow</strong>.</p>
+        <div style="background: #fef2f2; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #dc2626;">
+          <p style="margin: 0; font-size: 18px; color: #dc2626;"><strong>1 DAY REMAINING</strong></p>
+          <p style="margin: 8px 0 0; color: #666;">Your account will lose access to paid features tomorrow.</p>
+        </div>
+        <p><strong>Update your payment method NOW to avoid losing access.</strong></p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/settings/subscription" style="background: #dc2626; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold;">Update Payment Now</a>
+        </p>
+        <p style="margin-top: 24px; color: #666; font-size: 14px;">
+          If you believe this is an error, please contact support immediately.
+        </p>
+      </div>
+    `;
+  }
+
+  private buildGracePeriodFinalText(name: string, business: string, data: BillingNotificationData): string {
+    return `URGENT: Final Notice
+
+Hi ${name},
+
+This is your final notice. Your subscription for ${business} will be downgraded TOMORROW.
+
+1 DAY REMAINING
+Your account will lose access to paid features tomorrow.
+
+UPDATE YOUR PAYMENT METHOD NOW to avoid losing access.
+
+Update your payment at: ${process.env.WEB_URL}/settings/subscription
+
+If you believe this is an error, please contact support immediately.`;
+  }
+
+  // Email templates - Payment Method Update Reminder
+  private buildPaymentMethodReminderHtml(name: string, business: string, data: BillingNotificationData): string {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #ea580c;">Payment Method Reminder</h2>
+        <p>Hi ${name},</p>
+        <p>This is a friendly reminder to update your payment method for <strong>${business}</strong>.</p>
+        <div style="background: #fff7ed; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0;"><strong>Current Plan:</strong> ${data.tier || 'N/A'}</p>
+          <p style="margin: 8px 0 0;"><strong>Amount Due:</strong> $${((data.amount || 0) / 100).toFixed(2)}</p>
+        </div>
+        <p>Your previous payment attempt was unsuccessful. Please update your payment details to continue your subscription without interruption.</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.WEB_URL}/settings/subscription" style="background: #ea580c; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Update Payment Method</a>
+        </p>
+      </div>
+    `;
+  }
+
+  private buildPaymentMethodReminderText(name: string, business: string, data: BillingNotificationData): string {
+    return `Hi ${name},
+
+This is a friendly reminder to update your payment method for ${business}.
+
+Current Plan: ${data.tier || 'N/A'}
+Amount Due: $${((data.amount || 0) / 100).toFixed(2)}
+
+Your previous payment attempt was unsuccessful. Please update your payment details to continue your subscription without interruption.
 
 Update your payment at: ${process.env.WEB_URL}/settings/subscription`;
   }

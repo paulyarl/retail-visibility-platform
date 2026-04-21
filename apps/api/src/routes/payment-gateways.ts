@@ -165,9 +165,29 @@ router.get('/:tenantId/payment-gateways', requireAuth, checkTenantAccess, async 
       ],
     });
 
+    // Also get Stripe Connect status for platform revenue collection
+    const stripeConnect = await prisma.merchant_stripe_connections.findUnique({
+      where: { tenant_id: tenantId },
+      select: {
+        onboarding_status: true,
+        stripe_account_id: true,
+        stripe_payouts_enabled: true,
+        stripe_payments_enabled: true,
+        platform_fee_override_percent: true,
+      },
+    });
+
     res.json({
       success: true,
       gateways,
+      // Include Stripe Connect status for platform revenue
+      stripeConnect: {
+        connected: stripeConnect?.onboarding_status === 'completed',
+        status: stripeConnect?.onboarding_status || null,
+        payoutsEnabled: stripeConnect?.stripe_payouts_enabled || false,
+        paymentsEnabled: stripeConnect?.stripe_payments_enabled || false,
+        feePercent: stripeConnect?.platform_fee_override_percent,
+      },
     });
   } catch (error: any) {
     console.error('[Payment Gateways] List error:', error);

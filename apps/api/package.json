@@ -93,6 +93,7 @@
     "speakeasy": "^2.0.0",
     "square": "^43.2.1",
     "stripe": "^17.7.0",
+    "stripe-cli": "^0.1.0",
     "tslib": "^2.6.2",
     "ua-parser-js": "^2.0.7",
     "uuid": "^13.0.0",

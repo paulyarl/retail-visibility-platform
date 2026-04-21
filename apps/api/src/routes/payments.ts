@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { authenticateToken } from '../middleware/auth';
 import { PaymentGatewayFactory } from '../services/payments/PaymentGatewayFactory';
 import { PlatformFeeCalculator } from '../services/payments/PlatformFeeCalculator';
+import { stripeConnectService } from '../services/payments/StripeConnectService';
 
 const router = Router();
 
@@ -229,6 +230,29 @@ router.post('/:orderId/payments/capture', async (req: Request, res: Response) =>
         updated_at: new Date(),
       },
     });
+
+    // Record platform revenue if Stripe Connect is active
+    if (payment.platform_fee_cents && payment.platform_fee_cents > 0) {
+      try {
+        const isActive = await stripeConnectService.isRevenueCollectionActive();
+        if (isActive) {
+          await stripeConnectService.recordRevenueTransaction({
+            tenantId: order.tenant_id,
+            orderId: order.id,
+            paymentId: payment.id,
+            transactionType: 'transaction_fee',
+            grossAmountCents: captureAmount,
+            platformFeeCents: payment.platform_fee_cents,
+            gatewayFeeCents: payment.gateway_fee_cents || 0,
+            netAmountCents: payment.net_amount_cents || (captureAmount - payment.platform_fee_cents - (payment.gateway_fee_cents || 0)),
+            stripeTransactionId: result.transactionId,
+          });
+        }
+      } catch (revenueError) {
+        console.error('[Payments] Failed to record revenue transaction:', revenueError);
+        // Don't fail the capture if revenue recording fails
+      }
+    }
 
     // Update order payment status
     await prisma.orders.update({

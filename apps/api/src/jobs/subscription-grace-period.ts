@@ -99,12 +99,31 @@ export async function processGracePeriodExpiry(): Promise<GracePeriodResult> {
 
       try {
         await trialService.downgradeToExpired(tenantId);
+        
+        // Send subscription canceled notification
+        const notificationService = getBillingNotificationService();
+        await notificationService.sendNotification({
+          tenantId,
+          type: 'subscription_canceled',
+          reason: 'Grace period expired',
+        }).catch(err => console.error('[GracePeriodJob] Failed to send cancellation email:', err));
+        
         console.log(`[GracePeriodJob] Demoted tenant ${tenantId} to expired_trial - grace period expired`);
         result.demoted++;
       } catch (error: any) {
         console.error(`[GracePeriodJob] Error demoting tenant ${tenantId}:`, error);
         result.errors.push(`Tenant ${tenantId}: ${error.message}`);
       }
+    }
+
+    // 4. Send grace period warning emails
+    try {
+      const notificationService = getBillingNotificationService();
+      const warningResults = await notificationService.sendGracePeriodWarnings();
+      console.log(`[GracePeriodJob] Grace period warnings sent: 7d=${warningResults.sevenDays}, 14d=${warningResults.fourteenDays}, 21d=${warningResults.twentyOneDays}, 28d=${warningResults.twentyEightDays}`);
+    } catch (error: any) {
+      console.error('[GracePeriodJob] Error sending grace period warnings:', error);
+      result.errors.push(`Grace period warnings: ${error.message}`);
     }
 
     console.log(`[GracePeriodJob] Complete. Trials: ${result.trialEndsProcessed}, Retries: ${result.retried}, Demoted: ${result.demoted}, Errors: ${result.errors.length}`);

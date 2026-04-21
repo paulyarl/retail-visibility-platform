@@ -311,7 +311,12 @@ app.use(cors({
 // Stripe signature verification requires raw body access
 import webhooksRoutes from './routes/webhooks';
 app.use('/api/webhooks', webhooksRoutes);
-console.log('✅ Webhooks routes mounted at /api/webhooks (Phase 3B: Payment Event Processing)');
+console.log('Webhooks routes mounted at /api/webhooks (Phase 3B: Payment Event Processing)');
+
+// Stripe Connect webhooks - requires raw body for signature verification
+import stripeConnectWebhooks from './routes/stripe-connect-webhooks';
+app.use('/api/webhooks/stripe-connect', express.raw({ type: 'application/json' }), stripeConnectWebhooks);
+console.log('Stripe Connect webhooks mounted at /api/webhooks/stripe-connect');
 
 app.use(express.json({ limit: "50mb" })); // keep large to support base64 in dev
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -6832,7 +6837,28 @@ console.log('✅ Admin sentry routes mounted at /api/admin/sentry');
 /* ------------------------------ admin manual billing ------------------------------ */
 import manualBillingRoutes from './routes/admin/manual-billing';
 app.use('/api/admin/manual-billing', manualBillingRoutes);
-console.log('✅ Admin manual billing routes mounted at /api/admin/manual-billing');
+console.log('Admin manual billing routes mounted at /api/admin/manual-billing');
+
+/* ------------------------------ admin platform revenue ------------------------------ */
+import platformRevenueRoutes from './routes/platform-revenue';
+app.use('/api/admin/platform-revenue', platformRevenueRoutes);
+console.log('Admin platform revenue routes mounted at /api/admin/platform-revenue');
+
+/* ------------------------------ platform fee invoices ------------------------------ */
+import platformFeeInvoiceRoutes from './routes/platform-fee-invoices';
+app.use('/api/admin/platform-fee-invoices', platformFeeInvoiceRoutes);
+console.log('Platform fee invoice routes mounted at /api/admin/platform-fee-invoices');
+
+/* ------------------------------ paypal connect ------------------------------ */
+import paypalConnectRoutes from './routes/paypal-connect';
+app.use('/api/admin/paypal-connect', paypalConnectRoutes);
+app.use('/api/tenants', paypalConnectRoutes);
+console.log('PayPal Connect routes mounted at /api/admin/paypal-connect and /api/tenants');
+
+/* ------------------------------ admin notification logs ------------------------------ */
+import notificationLogsRoutes from './routes/admin/notification-logs';
+app.use('/api/admin/notification-logs', notificationLogsRoutes);
+console.log('Admin notification logs routes mounted at /api/admin/notification-logs');
 
 /* ------------------------------ gbp advanced sync singleton ------------------------------ */
 import gbpAdvancedSyncSingletonRoutes from './routes/gbp-advanced-sync-singleton';
@@ -6981,7 +7007,12 @@ console.log('✅ Tenants routes mounted at /api/tenants');
 
 /* ------------------------------ payment gateways ------------------------------ */
 app.use('/api/tenants', paymentGatewaysRoutes);
-console.log('✅ Payment gateway routes mounted at /api/tenants/:tenantId/payment-gateways');
+console.log('Payment gateway routes mounted at /api/tenants/:tenantId/payment-gateways');
+
+/* ------------------------------ tenant stripe connect ------------------------------ */
+import tenantStripeConnectRoutes from './routes/tenant-stripe-connect';
+app.use('/api/tenants', tenantStripeConnectRoutes);
+console.log('Tenant Stripe Connect routes mounted at /api/tenants/:tenantId/stripe-connect');
 
 /* ------------------------------ fulfillment settings ------------------------------ */
 app.use('/api/tenants', fulfillmentSettingsRoutes);
