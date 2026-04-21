@@ -684,7 +684,7 @@ export default function SubscriptionControlTab() {
                           />
                         </Group>
                         <Text size="xs" c="dimmed" mt={4}>
-                          Selected: {controlForm.values.expiresAt.toLocaleDateString()}
+                          Selected: {controlForm.values.expiresAt ? new Date(controlForm.values.expiresAt).toLocaleDateString() : 'No date selected'}
                         </Text>
                       </>
                     )}

@@ -429,12 +429,12 @@ router.put('/subscription-control/:tenantId', async (req, res) => {
     const updatedTenant = await prisma.tenants.update({
       where: { id: tenantId },
       data: {
-        ...(enabled && { manual_subscription_control: enabled }),
-        manual_subscription_expires_at: expiresAt ? new Date(expiresAt) : null,
-        ...(reason && { manual_subscription_reason: reason }),
+        manual_subscription_control: enabled,
+        manual_subscription_expires_at: enabled && expiresAt ? new Date(expiresAt) : null,
+        manual_subscription_reason: enabled && reason ? reason : null,
         updated_at: new Date()
       }
-    } as any);
+    });
 
     console.log(`[ManualBilling] Subscription control updated for tenant ${tenantId}: enabled=${enabled}`);
 
