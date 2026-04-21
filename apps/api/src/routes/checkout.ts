@@ -119,46 +119,74 @@ router.post('/orders', async (req: Request, res: Response) => {
     const checkoutMode: CheckoutMode = getCheckoutModeForTier(tenantTier);
 
     // Validate items and check stock availability
+    // Fetch item details from database - frontend only needs to send id and quantity
+    const validatedItems: Array<{
+      id: string;
+      sku: string;
+      name: string;
+      quantity: number;
+      unit_price_cents: number;
+      list_price_cents?: number;
+      description?: string;
+      image_url?: string;
+    }> = [];
+
     for (const item of items) {
-      if (!item.sku || !item.name || !item.quantity || !item.unit_price_cents) {
+      // Only id and quantity are required from frontend
+      if (!item.id || !item.quantity) {
         return res.status(400).json({
           success: false,
           error: 'invalid_item',
-          message: 'Each item must have sku, name, quantity, and unit_price_cents',
+          message: 'Each item must have id and quantity',
         });
       }
 
-      // Check inventory stock if item has an ID
-      if (item.id) {
-        const inventoryItem = await prisma.inventory_items.findUnique({
-          where: { id: item.id },
+      // Fetch item details from inventory
+      const inventoryItem = await prisma.inventory_items.findUnique({
+        where: { id: item.id },
+      });
+
+      if (!inventoryItem) {
+        return res.status(400).json({
+          success: false,
+          error: 'item_not_found',
+          message: `Item with id ${item.id} not found in inventory`,
         });
-
-        if (!inventoryItem) {
-          return res.status(400).json({
-            success: false,
-            error: 'item_not_found',
-            message: `Item ${item.name} not found in inventory`,
-          });
-        }
-
-        if (inventoryItem.stock < item.quantity) {
-          return res.status(400).json({
-            success: false,
-            error: 'insufficient_stock',
-            message: `Insufficient stock for ${item.name}. Available: ${inventoryItem.stock}, Requested: ${item.quantity}`,
-            available_stock: inventoryItem.stock,
-            requested_quantity: item.quantity,
-          });
-        }
       }
+
+      if (inventoryItem.stock < item.quantity) {
+        return res.status(400).json({
+          success: false,
+          error: 'insufficient_stock',
+          message: `Insufficient stock for ${inventoryItem.name}. Available: ${inventoryItem.stock}, Requested: ${item.quantity}`,
+          available_stock: inventoryItem.stock,
+          requested_quantity: item.quantity,
+        });
+      }
+
+      // Use database values for the order
+      // If item is on sale (sale_price_cents is not null), use sale price; otherwise use regular price
+      const isOnSale = inventoryItem.sale_price_cents !== null && inventoryItem.sale_price_cents !== undefined;
+      const unitPriceCents = isOnSale ? inventoryItem.sale_price_cents! : inventoryItem.price_cents;
+      const listPriceCents = inventoryItem.price_cents; // Always store original price
+
+      validatedItems.push({
+        id: item.id,
+        sku: inventoryItem.sku || item.id,
+        name: inventoryItem.name,
+        quantity: item.quantity,
+        unit_price_cents: unitPriceCents,
+        list_price_cents: listPriceCents,
+        description: inventoryItem.description || undefined,
+        image_url: inventoryItem.image_url || undefined,
+      });
     }
 
     // Generate order number
     const order_number = await generateOrderNumber(tenant_id);
 
-    // Calculate totals
-    const line_items = items.map((item: any) => {
+    // Calculate totals using validated items from database
+    const line_items = validatedItems.map((item) => {
       const calculation = calculateLineItem(item.quantity, item.unit_price_cents);
       return {
         ...calculation,
@@ -166,6 +194,7 @@ router.post('/orders', async (req: Request, res: Response) => {
         name: item.name,
         description: item.description,
         image_url: item.image_url,
+        list_price_cents: item.list_price_cents,
       };
     });
     const totals = calculateOrderTotals(line_items);
@@ -189,12 +218,13 @@ router.post('/orders', async (req: Request, res: Response) => {
     }
 
     // Generate order ID
-    // const generateOrderId = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 10);
+    // Generate order ID first to avoid circular reference
+    const orderId = generateOrderId(tenant_id);
     
     // Create order
     const order = await prisma.orders.create({
       data: {
-        id: generateOrderId(tenant_id),
+        id: orderId,
         order_number,
         tenant_id,
         customer_email: customer.email,
@@ -230,20 +260,20 @@ router.post('/orders', async (req: Request, res: Response) => {
         pickup_deadline: depositCalculation?.pickupDeadline || null,
         // Line items
         order_items: {
-          create: line_items.map((item: any, index: number) => ({
-            id: generateOrderItemId(order.id),
+          create: line_items.map((item, index) => ({
+            id: generateOrderItemId(orderId),
             sku: item.sku,
             name: item.name,
             description: item.description,
             image_url: item.image_url,
             quantity: item.quantity,
             unit_price_cents: item.unit_price_cents,
-            list_price_cents: items[index]?.list_price_cents || null, // Capture original price if on sale
+            list_price_cents: validatedItems[index]?.list_price_cents || null, // Capture original price if on sale
             subtotal_cents: item.subtotal_cents,
             tax_cents: item.tax_cents || 0,
             discount_cents: item.discount_cents || 0,
             total_cents: item.total_cents,
-            inventory_item_id: items[index]?.id, // Link to inventory item
+            inventory_item_id: validatedItems[index]?.id, // Link to inventory item
             updated_at: new Date(),
           })),
         },
