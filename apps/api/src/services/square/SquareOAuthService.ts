@@ -43,7 +43,7 @@ export class SquareOAuthService {
   private getBaseUrl(): string {
     return this.environment === 'production'
       ? 'https://connect.squareup.com'
-      : 'https://connect.squareupsandbox.com';
+      : 'https://squareupsandbox.com';
   }
 
   /**
