@@ -625,27 +625,29 @@ function CheckoutPageContent() {
                       )}
                     </div>
 
-                    {/* Conditional Payment Form */}
-                    {paymentMethod === 'square' ? (
-                      <SquarePaymentForm
-                        amount={checkoutMode === 'deposit' && depositInfo ? depositInfo.depositCents : total}
-                        customerInfo={customerInfo}
-                        shippingAddress={shippingAddress ?? undefined}
-                        fulfillmentMethod={fulfillmentMethod}
-                        cartItems={mappedCartItems}
-                        onSuccess={handlePaymentSuccess}
-                        onBack={() => setCurrentStep('shipping')}
-                      />
-                    ) : (
-                      <PayPalPaymentForm
-                        amount={checkoutMode === 'deposit' && depositInfo ? depositInfo.depositCents : total}
-                        customerInfo={customerInfo}
-                        shippingAddress={shippingAddress ?? undefined}
-                        fulfillmentMethod={fulfillmentMethod}
-                        cartItems={mappedCartItems}
-                        onSuccess={handlePaymentSuccess}
-                        onBack={() => setCurrentStep('shipping')}
-                      />
+                    {/* Conditional Payment Form - only show if gateways are available */}
+                    {availableGateways.length > 0 && (
+                      paymentMethod === 'square' ? (
+                        <SquarePaymentForm
+                          amount={checkoutMode === 'deposit' && depositInfo ? depositInfo.depositCents : total}
+                          customerInfo={customerInfo}
+                          shippingAddress={shippingAddress ?? undefined}
+                          fulfillmentMethod={fulfillmentMethod}
+                          cartItems={mappedCartItems}
+                          onSuccess={handlePaymentSuccess}
+                          onBack={() => setCurrentStep('shipping')}
+                        />
+                      ) : (
+                        <PayPalPaymentForm
+                          amount={checkoutMode === 'deposit' && depositInfo ? depositInfo.depositCents : total}
+                          customerInfo={customerInfo}
+                          shippingAddress={shippingAddress ?? undefined}
+                          fulfillmentMethod={fulfillmentMethod}
+                          cartItems={mappedCartItems}
+                          onSuccess={handlePaymentSuccess}
+                          onBack={() => setCurrentStep('shipping')}
+                        />
+                      )
                     )}
                   </CardContent>
                 </Card>

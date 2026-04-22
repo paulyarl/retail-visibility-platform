@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@mantine/core';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Printer, Download, Mail, Phone, MapPin, Store, CheckCircle2, Package } from 'lucide-react';
+import { Printer, Download, Mail, Phone, MapPin, Store, CheckCircle2, Package, AlertTriangle, XCircle } from 'lucide-react';
 import QRCode from 'qrcode';
 import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
 import { tenantOrderService } from '@/services/TenantOrderService';
@@ -22,6 +22,7 @@ interface OrderReceiptProps {
     }>;
     subtotal: number;
     status: string;
+    fulfillmentStatus?: string;
     orderId?: string;
     paymentId?: string;
     gatewayTransactionId?: string;
@@ -42,6 +43,15 @@ interface OrderReceiptProps {
       postalCode: string;
       country: string;
     };
+    // Deposit order fields
+    checkoutMode?: 'deposit' | 'full_payment';
+    depositCents?: number;
+    remainingBalanceCents?: number;
+    pickupDeadline?: string | null;
+    depositForfeitedAt?: string | null;
+    // Cancellation
+    cancellationReason?: string;
+    cancelledAt?: string | null;
   };
   onPrint?: () => void;
   className?: string;
@@ -56,12 +66,12 @@ export default function OrderReceipt({ cart, onPrint, className = "" }: OrderRec
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Debug: Log cart data to see what's available
-  console.log('[OrderReceipt] Cart data:', {
-    customerInfo: cart.customerInfo,
-    shippingAddress: cart.shippingAddress,
-    tenantId: cart.tenantId,
-    orderId: cart.orderId
-  });
+  // console.log('[OrderReceipt] Cart data:', {
+  //   customerInfo: cart.customerInfo,
+  //   shippingAddress: cart.shippingAddress,
+  //   tenantId: cart.tenantId,
+  //   orderId: cart.orderId
+  // });
   
   const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`;
   const formatDate = (date: Date) => {
@@ -88,6 +98,12 @@ export default function OrderReceipt({ cart, onPrint, className = "" }: OrderRec
   const fulfillmentFee = cart.fulfillmentFee || 0;
   const total = cart.subtotal + platformFee + fulfillmentFee;
   
+  // Deposit order handling
+  const isDepositOrder = cart.checkoutMode === 'deposit';
+  const isDepositForfeited = isDepositOrder && cart.depositForfeitedAt;
+  const depositAmount = cart.depositCents || 0;
+  const remainingBalance = cart.remainingBalanceCents || (total - depositAmount);
+  
   const getFulfillmentLabel = () => {
     if (!cart.fulfillmentMethod) return 'Fulfillment';
     if (cart.fulfillmentMethod === 'pickup') return 'In-Store Pickup';
@@ -104,13 +120,13 @@ export default function OrderReceipt({ cart, onPrint, className = "" }: OrderRec
       try {
         // Fetch tenant profile
         const profile = await publicTenantInfoService.getBusinessProfile(cart.tenantId);
-        console.log('[OrderReceipt] Fetched tenant profile:', profile);
+        // console.log('[OrderReceipt] Fetched tenant profile:', profile);
         setTenantProfile(profile);
 
         // Fetch business hours for all orders (important for multi-store orders)
         const hours = await publicTenantInfoService.getBusinessHours(cart.tenantId);
         if (hours) {
-          console.log('[OrderReceipt] Fetched business hours:', hours);
+          // console.log('[OrderReceipt] Fetched business hours:', hours);
           setBusinessHours(hours);
         } else {
           console.error('[OrderReceipt] Failed to fetch business hours');
@@ -119,7 +135,7 @@ export default function OrderReceipt({ cart, onPrint, className = "" }: OrderRec
         // Fetch fulfillment settings for pickup ready time
         const fulfillmentSettings = await tenantOrderService.getFulfillmentSettings(cart.tenantId);
         if (fulfillmentSettings) {
-          console.log('[OrderReceipt] Fetched fulfillment settings:', fulfillmentSettings);
+          // console.log('[OrderReceipt] Fetched fulfillment settings:', fulfillmentSettings);
           setFulfillmentSettings(fulfillmentSettings);
         } else {
           console.error('[OrderReceipt] Failed to fetch fulfillment settings');
@@ -302,31 +318,61 @@ Transaction ID: ${cart.gatewayTransactionId || cart.paymentId || cart.orderId ||
 ═══════════════════════════════════════════════════════════════
 
 Thank you for your order!
-Questions? Contact us at support@example.com
+Questions? Contact us at support@visibleshelf.store
 
 Generated on ${new Date().toLocaleString()}
 `.trim();
   };
 
-  if (cart.status !== 'paid' && cart.status !== 'fulfilled') {
+  // Allow cancelled orders and forfeited deposit orders to show receipt
+  const isCancelled = cart.status === 'cancelled';
+  if (cart.status !== 'paid' && cart.status !== 'fulfilled' && !isDepositForfeited && !isCancelled) {
     return null;
   }
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* Success Header */}
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <div className="flex items-center gap-3">
-          <CheckCircle2 className="h-6 w-6 text-green-600" />
-          <div>
-            <h3 className="font-semibold text-green-900">Order Completed Successfully!</h3>
-            <p className="text-sm text-green-700">
-              Order ID: {cart.orderId || 'Processing...'}
-              {cart.paidAt && ` • Paid on ${formatDate(cart.paidAt)}`}
-            </p>
+      {/* Header - show appropriate status */}
+      {isCancelled ? (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <XCircle className="h-6 w-6 text-red-600" />
+            <div>
+              <h3 className="font-semibold text-red-900">Order Cancelled</h3>
+              <p className="text-sm text-red-700">
+                Order ID: {cart.orderId || 'Processing...'}
+                {cart.cancelledAt && ` · Cancelled on ${formatDate(new Date(cart.cancelledAt))}`}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      ) : isDepositForfeited ? (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-6 w-6 text-red-600" />
+            <div>
+              <h3 className="font-semibold text-red-900">Deposit Forfeited</h3>
+              <p className="text-sm text-red-700">
+                Order ID: {cart.orderId || 'Processing...'}
+                {cart.depositForfeitedAt && ` · Forfeited on ${formatDate(new Date(cart.depositForfeitedAt))}`}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="h-6 w-6 text-green-600" />
+            <div>
+              <h3 className="font-semibold text-green-900">Order Completed Successfully!</h3>
+              <p className="text-sm text-green-700">
+                Order ID: {cart.orderId || 'Processing...'}
+                {cart.paidAt && ` · Paid on ${formatDate(cart.paidAt)}`}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Receipt Card */}
       <Card className="overflow-hidden">
@@ -371,12 +417,27 @@ Generated on ${new Date().toLocaleString()}
                 </p>
               </div>
               <div className="text-right">
-                <span className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                  <CheckCircle2 className="h-4 w-4 mr-1" />
-                  {cart.status.charAt(0).toUpperCase() + cart.status.slice(1)}
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                  isCancelled ? 'bg-red-100 text-red-800' :
+                  isDepositForfeited ? 'bg-red-100 text-red-800' :
+                  'bg-green-100 text-green-800'
+                }`}>
+                  {isCancelled && <XCircle className="h-4 w-4 mr-1" />}
+                  {!isCancelled && !isDepositForfeited && <CheckCircle2 className="h-4 w-4 mr-1" />}
+                  {isDepositForfeited && <AlertTriangle className="h-4 w-4 mr-1" />}
+                  {isCancelled ? 'Cancelled' : isDepositForfeited ? 'Forfeited' : cart.status.charAt(0).toUpperCase() + cart.status.slice(1)}
                 </span>
               </div>
             </div>
+            
+            {/* Cancellation Reason */}
+            {isCancelled && cart.cancellationReason && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800">
+                  <span className="font-medium">Cancellation Reason:</span> {cart.cancellationReason}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Customer Information */}
@@ -664,10 +725,10 @@ Generated on ${new Date().toLocaleString()}
                       const isToday = new Date().toLocaleDateString('en-US', { weekday: 'long' }) === day;
                       
                       // Debug logging
-                      if (day === 'Monday') {
-                        console.log('[OrderReceipt] Business hours state:', businessHours);
-                        console.log('[OrderReceipt] Monday hours:', dayHours);
-                      }
+                      // if (day === 'Monday') {
+                        // console.log('[OrderReceipt] Business hours state:', businessHours);
+                        // console.log('[OrderReceipt] Monday hours:', dayHours);
+                      // }
                       
                       return (
                         <div key={day} className={`flex justify-between ${isToday ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
@@ -749,9 +810,57 @@ Generated on ${new Date().toLocaleString()}
                 </span>
               </div>
               <div className="flex justify-between font-semibold text-base pt-2 border-t border-gray-200">
-                <span>Total</span>
+                <span>Order Total</span>
                 <span>{formatCurrency(total)}</span>
               </div>
+              
+              {/* Deposit Order Info - context aware based on status */}
+              {isDepositOrder && depositAmount > 0 && (
+                <>
+                  {isDepositForfeited ? (
+                    // Forfeited deposit
+                    <div className="flex justify-between text-sm pt-3 mt-3 border-t border-gray-200 bg-red-50 -mx-4 px-4 py-2 rounded">
+                      <span className="text-red-800 font-medium">Deposit Forfeited</span>
+                      <span className="text-red-800 font-semibold">{formatCurrency(depositAmount)}</span>
+                    </div>
+                  ) : cart.fulfillmentStatus === 'fulfilled' ? (
+                    // Picked up - show what was paid
+                    <>
+                      <div className="flex justify-between text-sm pt-3 mt-3 border-t border-gray-200 bg-green-50 -mx-4 px-4 py-2 rounded">
+                        <span className="text-green-800 font-medium">Deposit Paid (10%)</span>
+                        <span className="text-green-800 font-semibold">{formatCurrency(depositAmount)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm bg-green-50 -mx-4 px-4 py-2 rounded-b">
+                        <span className="text-green-700">Balance Paid at Pickup</span>
+                        <span className="text-green-700 font-medium">{formatCurrency(remainingBalance)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    // Pending pickup
+                    <>
+                      <div className="flex justify-between text-sm pt-3 mt-3 border-t border-gray-200 bg-amber-50 -mx-4 px-4 py-2 rounded">
+                        <span className="text-amber-800 font-medium">Deposit Paid (10%)</span>
+                        <span className="text-amber-800 font-semibold">{formatCurrency(depositAmount)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm bg-amber-50 -mx-4 px-4 py-2">
+                        <span className="text-amber-700">Balance Due at Pickup</span>
+                        <span className="text-amber-700 font-medium">{formatCurrency(remainingBalance)}</span>
+                      </div>
+                      {cart.pickupDeadline && (
+                        <div className="text-xs text-amber-600 bg-amber-50 -mx-4 px-4 py-2 rounded-b">
+                          Pickup by {new Date(cart.pickupDeadline).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })} to avoid deposit forfeiture.
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
@@ -774,7 +883,7 @@ Generated on ${new Date().toLocaleString()}
           {/* Footer */}
           <div className="mt-6 pt-4 border-t border-gray-200 text-center text-sm text-gray-600">
             <p>Thank you for your order!</p>
-            <p>Questions? Contact us at support@example.com</p>
+            <p>Questions? Contact us at support@visibleshelf.store</p>
             <p className="text-xs mt-2">Generated on {new Date().toLocaleString()}</p>
           </div>
         </CardContent>

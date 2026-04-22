@@ -107,21 +107,21 @@ export default function OrdersClient({ tenantId, searchParams }: OrdersClientPro
       
       const data = await tenantOrderService.getOrders(tenantId, filters);
       
-      console.log('[OrdersClient] Service Response:', {
-        ordersCount: data.orders?.length,
-        pagination: data.pagination,
-        firstOrder: data.orders?.[0]
-      });
+      // console.log('[OrdersClient] Service Response:', {
+      //   ordersCount: data.orders?.length,
+      //   pagination: data.pagination,
+      //   firstOrder: data.orders?.[0]
+      // });
       
       if (data.orders) {
         setOrders(data.orders || []);
         setTotalPages(data.pagination?.totalPages || 1);
         setTotalCount(data.pagination?.total || 0);
-        console.log('[OrdersClient] State updated:', {
-          ordersCount: data.orders?.length,
-          totalPages: data.pagination?.totalPages,
-          totalCount: data.pagination?.total
-        });
+        // console.log('[OrdersClient] State updated:', {
+        //   ordersCount: data.orders?.length,
+        //   totalPages: data.pagination?.totalPages,
+        //   totalCount: data.pagination?.total
+        // });
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -133,11 +133,11 @@ export default function OrdersClient({ tenantId, searchParams }: OrdersClientPro
   const filterOrders = () => {
     let filtered = [...orders];
 
-    console.log('[OrdersClient] filterOrders called:', {
-      ordersCount: orders.length,
-      searchQuery,
-      hasSearchQuery: !!searchQuery.trim()
-    });
+    // console.log('[OrdersClient] filterOrders called:', {
+    //   ordersCount: orders.length,
+    //   searchQuery,
+    //   hasSearchQuery: !!searchQuery.trim()
+    // });
 
     // Search filter (status filtering now handled by API)
     if (searchQuery.trim()) {
@@ -153,9 +153,9 @@ export default function OrdersClient({ tenantId, searchParams }: OrdersClientPro
       );
     }
 
-    console.log('[OrdersClient] After filtering:', {
-      filteredCount: filtered.length
-    });
+    // console.log('[OrdersClient] After filtering:', {
+    //   filteredCount: filtered.length
+    // });
 
     setFilteredOrders(filtered);
   };

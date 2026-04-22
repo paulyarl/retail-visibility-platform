@@ -114,14 +114,14 @@ export const useFeaturedStores = (
       
       // Check cache first using universal cache manager
       const cached = await cacheManager.get<Store[]>(cacheKey);
-      console.log('[useFeaturedStores] Cache check:', {
-        cacheKey,
-        cached: !!cached,
-        cacheStats: cacheManager.getStats()
-      });
+      // console.log('[useFeaturedStores] Cache check:', {
+      //   cacheKey,
+      //   cached: !!cached,
+      //   cacheStats: cacheManager.getStats()
+      // });
       
       if (cached && Array.isArray(cached)) {
-        console.log('[useFeaturedStores] Cache HIT - serving from cache');
+        // console.log('[useFeaturedStores] Cache HIT - serving from cache');
         setStores(cached);
         const endTime = Date.now();
         const responseTime = endTime - startTime;
@@ -136,7 +136,7 @@ export const useFeaturedStores = (
         return;
       }
       
-      console.log('[useFeaturedStores] Cache MISS - fetching from API');
+      // console.log('[useFeaturedStores] Cache MISS - fetching from API');
       
       // Use the featured stores endpoint through singleton service
       const data = await recommendationsService.getFeaturedStores({
@@ -148,32 +148,32 @@ export const useFeaturedStores = (
         throw new Error('Failed to fetch featured stores: No response from service');
       }
       
-      console.log('[useFeaturedStores] API Response:', {
-        success: data.success,
-        dataKeys: data.data ? Object.keys(data.data) : 'no data',
-        stores: data.data?.stores,
-        fullResponse: data
-      });
+      // console.log('[useFeaturedStores] API Response:', {
+      //   success: data.success,
+      //   dataKeys: data.data ? Object.keys(data.data) : 'no data',
+      //   stores: data.data?.stores,
+      //   fullResponse: data
+      // });
       
       if (!data.success || !data.data || !data.data.stores) {
-        console.error('[useFeaturedStores] Invalid response format:', data);
+        // console.error('[useFeaturedStores] Invalid response format:', data);
         throw new Error('Invalid response format');
       }
 
       // Store in cache using universal cache manager
       await cacheManager.set(cacheKey, data.data.stores);
-      console.log('[useFeaturedStores] Stored in cache:', {
-        cacheKey,
-        storesCount: data.data.stores.length,
-        sampleStore: data.data.stores[0] ? {
-          id: data.data.stores[0].id,
-          name: data.data.stores[0].businessName,
-          city: data.data.stores[0].city,
-          state: data.data.stores[0].state,
-          productCount: data.data.stores[0].productCount,
-          isFeatured: data.data.stores[0].isFeatured
-        } : 'No stores'
-      });
+      // console.log('[useFeaturedStores] Stored in cache:', {
+      //   cacheKey,
+      //   storesCount: data.data.stores.length,
+      //   sampleStore: data.data.stores[0] ? {
+      //     id: data.data.stores[0].id,
+      //     name: data.data.stores[0].businessName,
+      //     city: data.data.stores[0].city,
+      //     state: data.data.stores[0].state,
+      //     productCount: data.data.stores[0].productCount,
+      //     isFeatured: data.data.stores[0].isFeatured
+      //   } : 'No stores'
+      // });
 
       // Store the fetched stores
       setStores(data.data.stores.map((store: any) => ({

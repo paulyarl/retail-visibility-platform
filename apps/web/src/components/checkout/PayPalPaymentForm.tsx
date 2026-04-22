@@ -81,7 +81,11 @@ function PayPalPaymentFormContent({
         throw new Error('Failed to create PayPal order');
       }
 
-      const { orderId: paypalOrderId } = response;
+      // Service wraps response in data property
+      const paypalOrderId = response.data?.orderId || response.orderId;
+      if (!paypalOrderId) {
+        throw new Error('No PayPal order ID in response');
+      }
       return paypalOrderId;
     } catch (error) {
       console.error('PayPal create order error:', error);
@@ -222,7 +226,7 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
         throw new Error(errorMsg);
       }
 
-      const orderData = orderResponse;
+      const orderData = orderResponse.data;
       setOrderId(orderData.order.id);
       setOrderNumber(orderData.order.order_number);
       setPaymentId(orderData.payment.id);

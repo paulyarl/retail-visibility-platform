@@ -20,13 +20,14 @@ router.get('/buyer', async (req, res) => {
     console.log('[Buyer Orders] Fetching orders for:', { email, phone });
 
     // Find orders by customer email or phone
+    // Include both paid and draft orders so customers can see/cancel incomplete orders
     const orders = await prisma.orders.findMany({
       where: {
         OR: [
           email ? { customer_email: email as string } : {},
           phone ? { customer_phone: phone as string } : {},
         ],
-        order_status: 'paid',
+        order_status: { in: ['paid', 'draft'] },
       },
       include: {
         order_items: {
@@ -119,6 +120,13 @@ router.get('/buyer', async (req, res) => {
             completedAt: refund.completed_at,
           })) || [],
           internalNotes: order.internal_notes || undefined,
+          // Extract cancellation reason from internal_notes
+          cancellationReason: order.internal_notes?.match(/(?:STORE|BUYER) CANCELLATION: (.+?)(?:\n|$)/)?.[1] || undefined,
+          // Deposit order fields
+          checkoutMode: order.checkout_mode || undefined,
+          depositCents: order.deposit_cents || undefined,
+          remainingBalanceCents: order.remaining_balance_cents || undefined,
+          pickupDeadline: order.pickup_deadline || undefined,
         };
       });
 
@@ -255,6 +263,8 @@ router.get('/:orderId', async (req, res) => {
         completedAt: refund.completed_at,
       })) || [],
       internalNotes: order.internal_notes,
+      // Extract cancellation reason from internal_notes
+      cancellationReason: order.internal_notes?.match(/(?:STORE|BUYER) CANCELLATION: (.+?)(?:\n|$)/)?.[1] || undefined,
     };
 
     res.json({
@@ -480,6 +490,7 @@ router.patch('/:orderId/cancel', async (req, res) => {
         id: updatedOrder.id,
         fulfillmentStatus: updatedOrder.fulfillment_status,
         cancelledAt: updatedOrder.cancelled_at,
+        cancellationReason: cancellationReason || 'No reason provided',
       },
     });
   } catch (error) {

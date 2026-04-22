@@ -156,7 +156,7 @@ export default function BuyerOrderHistory() {
     try {
       setConfirmingPickup(true);
       
-      const success = await tenantOrderService.confirmPickup(orderId);
+      const success = await tenantOrderService.confirmPickup(orderId, email, phone);
       
       if (success) {
         // Update local state
@@ -191,7 +191,7 @@ export default function BuyerOrderHistory() {
       
       const finalReason = cancellationReason === 'custom' ? customReason.trim() : cancellationReason;
       
-      const success = await tenantOrderService.cancelOrder(selectedOrder?.orderId || '', finalReason || 'Customer request');
+      const success = await tenantOrderService.cancelOrder(selectedOrder?.orderId || '', finalReason || 'Customer request', email, phone);
       
       if (success) {
         // Update local state
@@ -292,11 +292,11 @@ export default function BuyerOrderHistory() {
 
   // Show order detail modal
   if (selectedOrder) {
-    console.log('[Buyer Order Detail] Order data:', {
-      fulfillmentMethod: selectedOrder.fulfillmentMethod,
-      fulfillmentStatus: selectedOrder.fulfillmentStatus,
-      canConfirmPickup: selectedOrder.fulfillmentMethod === 'pickup' && selectedOrder.fulfillmentStatus !== 'fulfilled'
-    });
+    // console.log('[Buyer Order Detail] Order data:', {
+    //   fulfillmentMethod: selectedOrder.fulfillmentMethod,
+    //   fulfillmentStatus: selectedOrder.fulfillmentStatus,
+    //   canConfirmPickup: selectedOrder.fulfillmentMethod === 'pickup' && selectedOrder.fulfillmentStatus !== 'fulfilled'
+    // });
 
     const canConfirmPickup = 
       selectedOrder.fulfillmentMethod === 'pickup' && 
@@ -817,6 +817,7 @@ export default function BuyerOrderHistory() {
               items: selectedOrder.items,
               subtotal: selectedOrder.subtotal,
               status: selectedOrder.status,
+              fulfillmentStatus: selectedOrder.fulfillmentStatus,
               orderId: selectedOrder.orderNumber,
               paymentId: (selectedOrder as any).paymentId || undefined,
               gatewayTransactionId: (selectedOrder as any).gatewayTransactionId || undefined,
@@ -825,6 +826,15 @@ export default function BuyerOrderHistory() {
               fulfillmentFee: selectedOrder.fulfillmentFee,
               customerInfo: selectedOrder.customerInfo,
               shippingAddress: selectedOrder.shippingAddress || undefined,
+              // Deposit order fields
+              checkoutMode: (selectedOrder as any).checkoutMode || undefined,
+              depositCents: (selectedOrder as any).depositCents || undefined,
+              remainingBalanceCents: (selectedOrder as any).remainingBalanceCents || undefined,
+              pickupDeadline: (selectedOrder as any).pickupDeadline || undefined,
+              depositForfeitedAt: (selectedOrder as any).depositForfeitedAt || undefined,
+              // Cancellation fields
+              cancellationReason: (selectedOrder as any).cancellationReason || undefined,
+              cancelledAt: (selectedOrder as any).cancelledAt || undefined,
             }}
           />
         </div>

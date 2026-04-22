@@ -52,6 +52,16 @@ export interface TenantOrder {
   remainingBalanceCents?: number;
   pickupDeadline?: string | null;
   depositForfeitedAt?: string | null;
+  // Tenant/Merchant fields
+  tenantName?: string;
+  tenantLogo?: string | null;
+  tenantAddress?: string | null;
+  tenantCity?: string | null;
+  tenantState?: string | null;
+  tenantPostalCode?: string | null;
+  tenantCountry?: string | null;
+  tenantPhone?: string | null;
+  tenantEmail?: string | null;
 }
 
 export interface TenantOrderItem {
@@ -171,7 +181,7 @@ class TenantOrderService extends TenantApiSingleton {
         };
       }>(endpoint, {}, cacheKey, this.cacheTTL);
 
-      console.log('[TenantOrderService] API Response:', response);
+      // console.log('[TenantOrderService] API Response:', response);
 
       return {
         orders: response.data?.data?.orders || [],
@@ -199,7 +209,7 @@ class TenantOrderService extends TenantApiSingleton {
     try {
       const response = await this.makeDefaultRequest<{
         success: boolean;
-        order: TenantOrder;
+        data: TenantOrder;
       }>(
         `/api/tenants/${tenantId}/orders/${orderId}`,
         {},
@@ -207,7 +217,8 @@ class TenantOrderService extends TenantApiSingleton {
         this.cacheTTL
       );
 
-      return response.data?.order || null;
+      // API returns { success: true, data: { orderId, ... } }
+      return response.data?.data || null;
     } catch (error) {
       console.error('[TenantOrderService] Failed to get order:', error);
       return null;
@@ -447,7 +458,8 @@ class TenantOrderService extends TenantApiSingleton {
         `buyer-orders-${params.email || 'anonymous'}-${params.phone || 'anonymous'}-${params.page || 1}`
       );
 
-      return response;
+      // Return the data property which contains { success, orders, count }
+      return response.data;
     } catch (error) {
       console.error('[TenantOrderService] Failed to get buyer orders:', error);
       return null;
@@ -458,7 +470,7 @@ class TenantOrderService extends TenantApiSingleton {
    * Confirm order pickup
    * Updates order fulfillment status to picked up
    */
-  async confirmPickup(orderId: string): Promise<boolean> {
+  async confirmPickup(orderId: string, email?: string, phone?: string): Promise<boolean> {
     try {
       if (!orderId) {
         throw new Error('Order ID is required');
@@ -468,7 +480,7 @@ class TenantOrderService extends TenantApiSingleton {
         `/api/orders/${orderId}/pickup`,
         {
           method: 'PATCH',
-          body: JSON.stringify({})
+          body: JSON.stringify({ email, phone })
         },
         `pickup-confirm-${orderId}`
       );
@@ -484,7 +496,7 @@ class TenantOrderService extends TenantApiSingleton {
    * Cancel order
    * Updates order status to cancelled
    */
-  async cancelOrder(orderId: string, cancellationReason: string): Promise<boolean> {
+  async cancelOrder(orderId: string, cancellationReason: string, email?: string, phone?: string): Promise<boolean> {
     try {
       if (!orderId) {
         throw new Error('Order ID is required');
@@ -494,7 +506,7 @@ class TenantOrderService extends TenantApiSingleton {
         `/api/orders/${orderId}/cancel`,
         {
           method: 'PATCH',
-          body: JSON.stringify({ cancellationReason })
+          body: JSON.stringify({ cancellationReason, email, phone })
         },
         `order-cancel-${orderId}`
       );

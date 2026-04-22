@@ -213,6 +213,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
 
     try {
       // Use public request for public display of business hours
+      // Note: /api/tenant/ (singular) is public, /api/tenants/ (plural) requires auth
       const result = await this.makeDefaultRequest<{
         success: boolean;
         data: {
@@ -224,7 +225,7 @@ class PublicTenantInfoService extends PublicApiSingleton {
           timezone: string;
         };
       }>(
-        `/api/tenants/${tenantId}/business-hours`,
+        `/api/tenant/${tenantId}/business-hours`,
         {},
         `public-business-hours-${tenantId}`,
         this.cacheTTL

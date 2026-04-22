@@ -17,7 +17,8 @@ import {
   Phone,
   User,
   CreditCard,
-  ShoppingBag
+  ShoppingBag,
+  Store
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -74,6 +75,16 @@ interface OrderDetail {
   remainingBalanceCents?: number;
   pickupDeadline?: string | null;
   depositForfeitedAt?: string | null;
+  // Tenant/Merchant fields
+  tenantName?: string;
+  tenantLogo?: string | null;
+  tenantAddress?: string;
+  tenantCity?: string;
+  tenantState?: string;
+  tenantPostalCode?: string;
+  tenantCountry?: string;
+  tenantPhone?: string;
+  tenantEmail?: string;
 }
 
 interface OrderDetailClientProps {
@@ -398,9 +409,15 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
                     </div>
                   )}
                   <div className="flex justify-between text-lg font-bold text-neutral-900 pt-2 border-t">
-                    <span>Total Paid</span>
+                    <span>Order Total</span>
                     <span>{formatCurrency(order.total)}</span>
                   </div>
+                  {order.checkoutMode === 'deposit' && order.depositCents && (
+                    <div className="flex justify-between text-base font-semibold text-green-700 pt-1">
+                      <span>Deposit Paid</span>
+                      <span>{formatCurrency(order.depositCents)}</span>
+                    </div>
+                  )}
                   {order.payment && (
                     <div className="flex justify-between text-sm text-neutral-500 pt-1">
                       <span>Payment Method</span>
@@ -553,7 +570,7 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
                     <div className="pt-2 border-t border-neutral-200">
                       <p className="text-xs font-medium text-neutral-600 mb-1">Cancellation Reason:</p>
                       <p className="text-sm text-neutral-800 bg-white p-2 rounded border border-neutral-200">
-                        {order.internalNotes.split('BUYER CANCELLATION: ')[1]?.split('\n')[0] || 'No reason provided'}
+                        {order.internalNotes.match(/(?:STORE|BUYER) CANCELLATION: (.+?)(?:\n|$)/)?.[1] || 'No reason provided'}
                       </p>
                     </div>
                   )}
@@ -617,6 +634,63 @@ export default function OrderDetailClient({ tenantId, orderId }: OrderDetailClie
 
         {/* Sidebar - Right Column */}
         <div className="space-y-6">
+          {/* Merchant Information */}
+          <Card className="border-blue-200 bg-blue-50/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Store className="h-5 w-5" />
+                Merchant Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {order.tenantLogo && (
+                <div className="mb-3">
+                  <img src={order.tenantLogo} alt={order.tenantName || 'Store'} className="h-12 object-contain" />
+                </div>
+              )}
+              <div className="flex items-start gap-3">
+                <Store className="h-5 w-5 text-neutral-600 mt-0.5" />
+                <div>
+                  <p className="text-sm text-neutral-600">Store Name</p>
+                  <p className="font-medium text-neutral-900">{order.tenantName || 'N/A'}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <MapPin className="h-5 w-5 text-neutral-600 mt-0.5" />
+                <div>
+                  <p className="text-sm text-neutral-600">Address</p>
+                  <p className="font-medium text-neutral-900">
+                    {order.tenantAddress || 'Address not available'}
+                    {(order.tenantCity || order.tenantState) && (
+                      <><br />{order.tenantCity}{order.tenantCity && order.tenantState ? ', ' : ''}{order.tenantState} {order.tenantPostalCode}</>
+                    )}
+                  </p>
+                </div>
+              </div>
+              {order.tenantPhone && (
+                <div className="flex items-start gap-3">
+                  <Phone className="h-5 w-5 text-neutral-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-neutral-600">Phone</p>
+                    <p className="font-medium text-neutral-900">{order.tenantPhone}</p>
+                  </div>
+                </div>
+              )}
+              {order.tenantEmail && (
+                <div className="flex items-start gap-3">
+                  <Mail className="h-5 w-5 text-neutral-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-neutral-600">Email</p>
+                    <p className="font-medium text-neutral-900">{order.tenantEmail}</p>
+                  </div>
+                </div>
+              )}
+              <div className="pt-2 border-t border-neutral-200">
+                <p className="text-xs text-neutral-500">Platform ID: {tenantId}</p>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Customer Information */}
           <Card>
             <CardHeader>
