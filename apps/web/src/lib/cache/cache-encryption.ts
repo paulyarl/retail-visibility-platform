@@ -82,7 +82,8 @@ export class CacheEncryption {
     } catch (error) {
       console.warn('[CacheEncryption] Encryption failed:', error);
       // Fallback to plain data if encryption fails (for development/debugging)
-      return btoa(data);
+      // Prepend marker to identify unencrypted data
+      return `PLAIN:${data}`;
     }
   }
 
@@ -91,6 +92,11 @@ export class CacheEncryption {
    */
   static async decrypt(encryptedData: string, userId?: string): Promise<string> {
     try {
+      // Check for plain data fallback marker
+      if (encryptedData.startsWith('PLAIN:')) {
+        return encryptedData.slice(6); // Remove 'PLAIN:' prefix
+      }
+
       const combined = new Uint8Array(
         atob(encryptedData).split('').map(c => c.charCodeAt(0))
       );
@@ -115,6 +121,9 @@ export class CacheEncryption {
     } catch (error) {
       console.warn('[CacheEncryption] Decryption failed:', error);
       // Fallback to plain data if decryption fails (handles unencrypted legacy data)
+      if (encryptedData.startsWith('PLAIN:')) {
+        return encryptedData.slice(6);
+      }
       return encryptedData;
     }
   }

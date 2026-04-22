@@ -456,6 +456,18 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
           ? `${existingNotes}\n\n${cancellationNote}`
           : cancellationNote;
 
+        // Send order cancelled notification (async, don't wait)
+        const { getOrderNotificationService } = await import('../services/OrderNotificationService');
+        getOrderNotificationService().notifyOrderCancelled({
+          tenantId: tenantId,
+          orderId: orderId,
+          customerEmail: existingOrder.customer_email,
+          customerName: existingOrder.customer_name || undefined,
+          amount: existingOrder.total_cents,
+          reason: reason,
+          cancelledBy: 'merchant',
+        }).catch(err => console.error('[Tenant Orders] Failed to send cancellation notification:', err));
+
         // Process refund if order was paid
         if (existingOrder.payment_status === 'paid') {
           console.log('[Tenant Orders] Order is paid, initiating refund for order:', orderId);

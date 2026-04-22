@@ -82,8 +82,20 @@ router.get('/callback', async (req, res) => {
   } catch (error: any) {
     console.error('[Square OAuth] Callback error:', error);
     const webBaseUrl = process.env.WEB_URL || 'https://www.visibleshelf.store';
+    
+    // Try to extract tenantId from state for error redirect
+    let errorRedirectUrl = `${webBaseUrl}/settings/payment-gateways`;
+    if (req.query.state && typeof req.query.state === 'string') {
+      try {
+        const stateData = squareOAuth.verifyState(req.query.state);
+        errorRedirectUrl = `${webBaseUrl}/t/${stateData.tenantId}/settings/payment-gateways`;
+      } catch (e) {
+        // Keep default URL if state parsing fails
+      }
+    }
+    
     const errorMessage = encodeURIComponent(error.message || 'OAuth connection failed');
-    res.redirect(`${webBaseUrl}/settings/payment-gateways?error=square_oauth&message=${errorMessage}`);
+    res.redirect(`${errorRedirectUrl}?error=square_oauth&message=${errorMessage}`);
   }
 });
 

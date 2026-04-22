@@ -296,8 +296,10 @@ router.patch('/:orderId/pickup', async (req, res) => {
         id: true,
         customer_email: true,
         customer_phone: true,
+        customer_name: true,
         tenant_id: true,
         fulfillment_status: true,
+        total_cents: true,
         metadata: true,
       },
     });
@@ -347,6 +349,16 @@ router.patch('/:orderId/pickup', async (req, res) => {
 
     console.log('[Buyer Orders] Order marked as picked up:', orderId);
 
+    // Send order fulfilled notification (async, don't wait)
+    const { getOrderNotificationService } = await import('../services/OrderNotificationService');
+    getOrderNotificationService().notifyOrderFulfilled({
+      tenantId: order.tenant_id,
+      orderId: orderId,
+      customerEmail: order.customer_email,
+      customerName: order.customer_name || undefined,
+      amount: order.total_cents,
+    }).catch(err => console.error('[Buyer Orders] Failed to send fulfillment notification:', err));
+
     res.json({
       success: true,
       message: 'Order marked as picked up',
@@ -381,9 +393,11 @@ router.patch('/:orderId/cancel', async (req, res) => {
         id: true,
         customer_email: true,
         customer_phone: true,
+        customer_name: true,
         tenant_id: true,
         fulfillment_status: true,
         order_status: true,
+        total_cents: true,
         internal_notes: true,
       },
     });
@@ -449,6 +463,18 @@ router.patch('/:orderId/cancel', async (req, res) => {
     });
 
     console.log('[Buyer Orders] Order cancelled:', orderId, cancellationReason ? `Reason: ${cancellationReason}` : 'No reason provided');
+
+    // Send order cancelled notification (async, don't wait)
+    const { getOrderNotificationService } = await import('../services/OrderNotificationService');
+    getOrderNotificationService().notifyOrderCancelled({
+      tenantId: order.tenant_id,
+      orderId: orderId,
+      customerEmail: order.customer_email,
+      customerName: order.customer_name || undefined,
+      amount: order.total_cents,
+      reason: cancellationReason,
+      cancelledBy: 'buyer',
+    }).catch(err => console.error('[Buyer Orders] Failed to send cancellation notification:', err));
 
     // Process refund if order was paid
     if (order.order_status === 'paid') {

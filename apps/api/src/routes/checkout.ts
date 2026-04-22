@@ -304,6 +304,17 @@ router.post('/orders', async (req: Request, res: Response) => {
       },
     });
 
+    // Send order placed notification (async, don't wait)
+    const { getOrderNotificationService } = await import('../services/OrderNotificationService');
+    getOrderNotificationService().notifyOrderPlaced({
+      tenantId: order.tenant_id,
+      orderId: order.id,
+      orderNumber: order.order_number,
+      customerEmail: customer.email,
+      customerName: customer.name || `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || undefined,
+      amount: paymentAmount,
+    }).catch(err => console.error('[Checkout] Failed to send order notification:', err));
+
     res.status(201).json({
       success: true,
       order: {

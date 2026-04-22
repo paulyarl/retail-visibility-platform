@@ -60,10 +60,8 @@ function buildAuthorizationUrl(state: string): string {
   const params = new URLSearchParams({
     client_id: process.env.SQUARE_APPLICATION_ID!,
     scope: [
-      'ITEMS_READ',
-      'ITEMS_WRITE',
-      'INVENTORY_READ',
-      'INVENTORY_WRITE',
+      'PAYMENTS_READ',
+      'PAYMENTS_WRITE',
       'MERCHANT_PROFILE_READ',
     ].join(' '),
     session: 'false',

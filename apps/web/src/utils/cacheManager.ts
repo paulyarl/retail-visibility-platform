@@ -226,7 +226,17 @@ class CacheManager {
     }
 
     try {
-      const jsonString = JSON.stringify(data);
+      // Prevent circular reference errors
+      const jsonString = JSON.stringify(data, (key, value) => {
+        if (typeof value === 'object' && value !== null) {
+          if (value.constructor === Object || Array.isArray(value)) {
+            return value;
+          }
+          // Handle circular references and complex objects
+          return '[Object]';
+        }
+        return value;
+      });
       return await CacheEncryption.encrypt(jsonString, userId || this.defaultUserId);
     } catch (error) {
       console.warn('[CacheManager] Encryption failed, storing plain data:', error);

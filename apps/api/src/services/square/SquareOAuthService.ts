@@ -87,6 +87,7 @@ export class SquareOAuthService {
         client_secret: this.applicationSecret,
         code,
         grant_type: 'authorization_code',
+        redirect_uri: this.redirectUri,
       }),
     });
 
