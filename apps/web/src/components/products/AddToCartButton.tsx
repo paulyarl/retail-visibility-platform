@@ -54,10 +54,9 @@ export function AddToCartButton({
   layout = 'horizontal', // Default to side-by-side layout
 }: AddToCartButtonProps) {
   const router = useRouter();
-  const { addToCart, getCartByGateway } = useMultiCart();
+  const { addToCart, getCartByTenant } = useMultiCart();
   const [added, setAdded] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [addedToGateway, setAddedToGateway] = useState<string | null>(null);
   const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
   
   // Status indicator color
@@ -80,23 +79,9 @@ export function AddToCartButton({
       return;
     }
 
-    // Determine gateway type: product's assignment > tenant's default
-    // If neither available, we need to fetch from tenant config
-    let gatewayType = product.payment_gateway_type || defaultGatewayType;
-    
-    // If no gateway type available, try to fetch tenant's default gateway
-    if (!gatewayType && product.tenantId) {
-      try {
-        const { publicTenantInfoService } = await import('@/services/PublicTenantInfoService');
-        const gatewayStatus = await publicTenantInfoService.getPaymentGatewayStatus(product.tenantId);
-        gatewayType = gatewayStatus?.defaultGatewayType;
-      } catch (error) {
-        console.warn('[AddToCartButton] Failed to fetch gateway status:', error);
-      }
-    }
-    
-    // Note: Gateway validation handled during checkout process
-    // Product cards only need to know if gateway exists
+    // Determine suggested gateway from product assignment or tenant default
+    // This is just a suggestion - customer chooses at checkout
+    const suggestedGatewayType = product.payment_gateway_type || defaultGatewayType;
     
     // Use variant data if available, otherwise use product data
     const itemSku = variant?.sku || product.sku;
@@ -105,7 +90,7 @@ export function AddToCartButton({
     const itemSalePriceCents = variant?.sale_price_cents || product.salePriceCents;
     
     // Check if adding this quantity would exceed available stock
-    const cart = gatewayType ? getCartByGateway(product.tenantId, gatewayType) : null;
+    const cart = getCartByTenant(product.tenantId);
     const existingItem = cart?.cart.items.find(
       item => item.product_id === product.id && item.variant_id === variant?.id
     );
@@ -124,12 +109,8 @@ export function AddToCartButton({
     const listPriceCents = isOnSale ? product.priceCents : undefined;
     const discountCents = isOnSale ? (product.priceCents - product.salePriceCents!) * quantity : undefined;
 
-    // Add to gateway-specific cart
-    if (!gatewayType) {
-      console.error('[AddToCartButton] No gateway type available');
-      return;
-    }
-    await addToCart(product.tenantId, tenantName, gatewayType, {
+    // Add to tenant cart (gateway chosen at checkout)
+    await addToCart(product.tenantId, tenantName, {
       product_id: product.id,
       product_name: product.name,
       product_sku: itemSku,
@@ -142,18 +123,16 @@ export function AddToCartButton({
       variant_id: variant?.id,
       variant_name: variant?.variant_name,
       variant_attributes: variant?.attributes,
-      gateway_id: product.payment_gateway_id || undefined,
+      // Gateway suggestion (used at checkout)
+      suggested_gateway_type: suggestedGatewayType,
+      suggested_gateway_id: product.payment_gateway_id || undefined,
     }, product.tenantLogo || tenantLogo);
 
     setAdded(true);
     setShowSuccess(true);
-    if (gatewayType) {
-      setAddedToGateway(gatewayType);
-    }
     setTimeout(() => {
       setAdded(false);
       setShowSuccess(false);
-      setAddedToGateway(null);
     }, 3000);
   };
 
@@ -178,10 +157,8 @@ export function AddToCartButton({
     );
   }
 
-  const gatewayType = product.payment_gateway_type || defaultGatewayType || '';
-  const cart = gatewayType ? getCartByGateway(product.tenantId, gatewayType) : null;
+  const cart = getCartByTenant(product.tenantId);
   const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`;
-  const gatewayLabel = gatewayType === 'square' ? 'Square' : gatewayType === 'paypal' ? 'PayPal' : gatewayType;
 
   return (
     <div className={className}>
@@ -192,7 +169,7 @@ export function AddToCartButton({
             <div className="flex items-start gap-2 flex-1">
               <Check className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-green-900 text-sm">Added to {gatewayLabel} cart!</p>
+                <p className="font-semibold text-green-900 text-sm">Added to cart!</p>
                 <p className="text-xs text-green-700 mt-0.5">
                   {cart?.item_count || 0} {cart?.item_count === 1 ? 'item' : 'items'} • {formatCurrency(cart?.total_cents || 0)}
                 </p>

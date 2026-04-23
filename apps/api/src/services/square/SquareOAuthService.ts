@@ -316,6 +316,96 @@ export class SquareOAuthService {
   }
 
   /**
+   * Store a test token manually (for sandbox testing)
+   * @param tenantId - Tenant ID to associate token with
+   * @param accessToken - Square test access token
+   * @param refreshToken - Optional refresh token
+   * @param merchantId - Optional merchant ID
+   */
+  async storeTestToken(tenantId: string, accessToken: string, refreshToken?: string, merchantId?: string, applicationId?: string, locationId?: string): Promise<void> {
+    const now = new Date();
+    // Square test tokens typically expire in 30 days
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    await prisma.oauth_tokens.upsert({
+      where: {
+        tenant_id_gateway_type: {
+          tenant_id: tenantId,
+          gateway_type: 'square',
+        },
+      },
+      create: {
+        id: crypto.randomBytes(16).toString('hex'),
+        tenant_id: tenantId,
+        gateway_type: 'square',
+        access_token: this.tokenEncryption.encrypt(accessToken),
+        refresh_token: refreshToken ? this.tokenEncryption.encrypt(refreshToken) : null,
+        token_type: 'Bearer',
+        expires_at: expiresAt,
+        merchant_id: merchantId || null,
+        last_refreshed_at: now,
+        created_at: now,
+        updated_at: now,
+      },
+      update: {
+        access_token: this.tokenEncryption.encrypt(accessToken),
+        refresh_token: refreshToken ? this.tokenEncryption.encrypt(refreshToken) : null,
+        expires_at: expiresAt,
+        merchant_id: merchantId || null,
+        last_refreshed_at: now,
+        updated_at: now,
+      },
+    });
+
+    // Update payment gateway record
+    const existingGateway = await prisma.tenant_payment_gateways.findFirst({
+      where: {
+        tenant_id: tenantId,
+        gateway_type: 'square',
+      },
+    });
+
+    if (existingGateway) {
+      await prisma.tenant_payment_gateways.update({
+        where: { id: existingGateway.id },
+        data: {
+          oauth_connected: true,
+          oauth_merchant_id: merchantId || null,
+          is_active: true,
+          updated_at: now,
+          // Store application_id and location_id in config for frontend SDK
+          config: {
+            ...(existingGateway.config as object || {}),
+            application_id: applicationId,
+            location_id: locationId,
+          },
+        },
+      });
+    } else {
+      const gatewayId = `gateway_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      await prisma.tenant_payment_gateways.create({
+        data: {
+          id: gatewayId,
+          tenant_id: tenantId,
+          gateway_type: 'square',
+          is_active: true,
+          is_default: true,
+          oauth_connected: true,
+          oauth_merchant_id: merchantId || null,
+          config: {
+            application_id: applicationId,
+            location_id: locationId,
+          },
+          created_at: now,
+          updated_at: now,
+        },
+      });
+    }
+
+    console.log(`[Square OAuth] Test token stored successfully for tenant ${tenantId}`);
+  }
+
+  /**
    * Disconnect Square OAuth for a tenant
    * @param tenantId - Tenant ID to disconnect
    */

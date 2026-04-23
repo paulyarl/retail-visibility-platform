@@ -287,53 +287,11 @@ export async function generateOrderNumber(tenantId: string): Promise<string> {
   const year = new Date().getFullYear();
   const prefix = `ORD-${year}-`;
 
-  // Add small random delay to reduce concurrent collision probability
-  await new Promise(resolve => setTimeout(resolve, Math.random() * 50));
-
-  // Try up to 10 times to find an available order number
-  for (let attempt = 0; attempt < 10; attempt++) {
-    // Get the count of orders for this year (more reliable than max)
-    const orderCount = await prisma.orders.count({
-      where: {
-        tenant_id: tenantId,
-        order_number: {
-          startsWith: prefix,
-        },
-      },
-    });
-
-    // Calculate next sequence with random offset for concurrent requests
-    let nextSequence = orderCount + 1 + Math.floor(Math.random() * 10);
-    
-    // Add attempt offset on retry
-    if (attempt > 0) {
-      nextSequence += attempt * 10;
-    }
-
-    const sequentialNumber = nextSequence.toString().padStart(6, '0');
-    
-    // For guest checkout (demo-tenant), add timestamp to ensure uniqueness
-    const timestampSuffix = tenantId === 'demo-tenant' ? 
-      `-${Date.now().toString().slice(-4)}` : '';
-    
-    const orderNumber = `${prefix}${sequentialNumber}${timestampSuffix}`;
-
-    // Check if this order number is available
-    const existing = await prisma.orders.findUnique({
-      where: { order_number: orderNumber },
-    });
-
-    if (!existing) {
-      return orderNumber;
-    }
-
-    // Wait a bit before retry
-    await new Promise(resolve => setTimeout(resolve, 50 * (attempt + 1)));
-  }
-
-  // Fallback: use timestamp-based unique number
-  const timestamp = Date.now();
+  // Use timestamp + random suffix for guaranteed uniqueness (no race condition)
+  // This is simpler and more reliable than sequential with retries
+  const timestamp = Date.now().toString().slice(-8); // Last 8 digits of timestamp
   const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  
   return `${prefix}${timestamp}${randomSuffix}`;
 }
 

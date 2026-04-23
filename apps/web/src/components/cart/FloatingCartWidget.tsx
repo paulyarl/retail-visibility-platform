@@ -1,20 +1,57 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { useCartWidget } from '@/contexts/CartWidgetContext';
 import { Button } from '@mantine/core';
 import { ShoppingCart, X, Store, ArrowRight, ChevronDown, ChevronUp, Minimize2, Maximize2 } from 'lucide-react';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+
+interface TenantProfile {
+  id: string;
+  name: string;
+  logo_url?: string;
+}
 
 export function FloatingCartWidget() {
   const router = useRouter();
   const { carts } = useMultiCart();
   const { widgetState, setWidgetState } = useCartWidget();
+  const [tenantProfiles, setTenantProfiles] = useState<Record<string, TenantProfile>>({});
   
   // Calculate totals across all carts
   const totalItems = carts.reduce((sum, cart) => sum + cart.item_count, 0);
   const totalAcrossAllCarts = carts.reduce((sum, cart) => sum + cart.total_cents, 0);
+  
+  // Fetch tenant profiles for names and logos
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      const tenantIds = [...new Set(carts.map(c => c.cart.tenant_id))];
+      const profileData: Record<string, TenantProfile> = {};
+      
+      for (const tenantId of tenantIds) {
+        try {
+          const profile = await publicTenantInfoService.getTenantProfile(tenantId);
+          if (profile) {
+            profileData[tenantId] = {
+              id: tenantId,
+              name: profile.business_name || tenantId,
+              logo_url: profile.logo_url,
+            };
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch profile for tenant ${tenantId}:`, err);
+        }
+      }
+      
+      setTenantProfiles(profileData);
+    };
+    
+    if (carts.length > 0) {
+      fetchProfiles();
+    }
+  }, [carts]);
   
   // Auto-expand when first item is added
   useEffect(() => {
@@ -87,7 +124,12 @@ export function FloatingCartWidget() {
 
             {/* Cart List */}
             <div className="max-h-96 overflow-y-auto">
-              {carts.map((cartSummary) => (
+              {carts.map((cartSummary) => {
+                const tenantProfile = tenantProfiles[cartSummary.cart.tenant_id];
+                const displayName = tenantProfile?.name || cartSummary.cart.tenant_name || cartSummary.cart.tenant_id;
+                const displayLogo = tenantProfile?.logo_url || cartSummary.cart.tenant_logo;
+                
+                return (
                 <div
                   key={cartSummary.key}
                   className="p-3 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100 last:border-0"
@@ -97,15 +139,19 @@ export function FloatingCartWidget() {
                   }}
                 >
                   <div className="flex items-center gap-3">
-                    {/* Gateway Icon */}
+                    {/* Store Logo or Icon */}
                     <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                      <Store className="h-6 w-6 text-gray-400" />
+                      {displayLogo ? (
+                        <img src={displayLogo} alt={displayName} className="w-full h-full object-cover" />
+                      ) : (
+                        <Store className="h-6 w-6 text-gray-400" />
+                      )}
                     </div>
 
                     {/* Cart Info */}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 truncate">
-                        {cartSummary.cart.tenant_name} - {cartSummary.cart.gateway_type}
+                        {displayName}
                       </p>
                       <p className="text-sm text-gray-600">
                         {cartSummary.item_count} {cartSummary.item_count === 1 ? 'item' : 'items'}
@@ -119,7 +165,7 @@ export function FloatingCartWidget() {
                     </div>
                   </div>
                 </div>
-              ))}
+              );})}
             </div>
 
             {/* Footer Actions */}

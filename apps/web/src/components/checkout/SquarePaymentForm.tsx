@@ -36,6 +36,7 @@ interface SquarePaymentFormProps {
   }>;
   onSuccess: (orderNumber: string, gatewayTransactionId?: string) => void;
   onBack: () => void;
+  squareConfig?: { applicationId: string; locationId: string } | null;
 }
 
 interface SquarePaymentFormContentProps extends SquarePaymentFormProps {
@@ -54,6 +55,7 @@ function SquarePaymentFormContent({
   orderId,
   orderNumber,
   paymentId,
+  squareConfig,
 }: SquarePaymentFormContentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,21 +63,44 @@ function SquarePaymentFormContent({
   const [payments, setPayments] = useState<any>(null);
 
   useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 3;
+    let retryTimeout: NodeJS.Timeout;
+    
     const initializeSquare = async () => {
+      console.log('[SquarePaymentForm] initializeSquare called', {
+        hasSquareConfig: !!squareConfig,
+        squareConfig,
+        hasWindowSquare: !!window.Square,
+        cardInitialized: !!card,
+        retryCount
+      });
+      
       try {
         // Check if Square.js is loaded
         if (!window.Square) {
+          console.log('[SquarePaymentForm] Square.js not yet loaded, waiting...');
           throw new Error('Square.js failed to load. Please refresh the page.');
         }
 
-        // Check if required environment variables are available
-        const appId = process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID;
-        const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID;
+        // Use tenant-specific Square config or fall back to env vars
+        const appId = squareConfig?.applicationId || process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID;
+        const locationId = squareConfig?.locationId || process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID;
+        
+        console.log('[SquarePaymentForm] Config check', {
+          appId: appId ? 'present' : 'missing',
+          locationId: locationId ? 'present' : 'missing',
+          source: squareConfig ? 'tenant-config' : 'env-vars'
+        });
         
         if (!appId || !locationId) {
-          throw new Error('Square payment configuration is missing. Please contact support.');
+          // Config not yet loaded - will retry when squareConfig updates
+          console.log('[SquarePaymentForm] Waiting for Square config...');
+          return;
         }
 
+        console.log('[SquarePaymentForm] Initializing Square payments with appId:', appId);
+        
         // Initialize Square payments
         const paymentsInstance = window.Square.payments(appId, locationId);
         
@@ -83,25 +108,51 @@ function SquarePaymentFormContent({
           throw new Error('Failed to initialize Square payments instance');
         }
 
+        console.log('[SquarePaymentForm] Payments instance created, creating card...');
         setPayments(paymentsInstance);
 
-        const cardInstance = await paymentsInstance.card();
+        // Add timeout for card creation
+        const cardPromise = paymentsInstance.card();
+        const timeoutPromise = new Promise<null>((_, reject) => {
+          setTimeout(() => reject(new Error('Card initialization timed out')), 10000);
+        });
+        
+        const cardInstance = await Promise.race([cardPromise, timeoutPromise]) as any;
+        
+        if (!cardInstance) {
+          throw new Error('Failed to create card instance');
+        }
+        
+        console.log('[SquarePaymentForm] Card instance created, attaching to DOM...');
         await cardInstance.attach('#card-container');
+        console.log('[SquarePaymentForm] Card attached successfully');
         setCard(cardInstance);
       } catch (err) {
-        console.error('Square initialization error:', err);
-        setError(err instanceof Error ? err.message : 'Failed to initialize Square payment form');
+        console.error('[SquarePaymentForm] Initialization error:', err);
+        
+        // Retry on timeout or SDK initialization errors
+        const errorMessage = err instanceof Error ? err.message : '';
+        if ((errorMessage.includes('timed out') || errorMessage.includes('unable to be initialized')) && retryCount < maxRetries) {
+          retryCount++;
+          console.log(`[SquarePaymentForm] Retrying initialization (attempt ${retryCount}/${maxRetries})...`);
+          retryTimeout = setTimeout(initializeSquare, 2000);
+        } else {
+          setError(err instanceof Error ? err.message : 'Failed to initialize Square payment form');
+        }
       }
     };
 
     initializeSquare();
 
     return () => {
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
       if (card) {
         card.destroy();
       }
     };
-  }, []);
+  }, [squareConfig]);
 
   const handlePayment = async () => {
     if (!card || !payments) {
@@ -160,11 +211,19 @@ function SquarePaymentFormContent({
       )}
 
       <div className="space-y-4">
-        {/* Square Card Container */}
+        {/* Square Card Container - always rendered so Square SDK can attach */}
         <div 
           id="card-container" 
           className="min-h-[200px] p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800"
-        />
+        >
+          {/* Show loading inside container until card is ready */}
+          {!card && !error && (
+            <div className="flex items-center justify-center h-full min-h-[168px]">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <p className="ml-3 text-gray-600">Loading payment form...</p>
+            </div>
+          )}
+        </div>
 
         {/* Security Badge */}
         <div className="flex items-center justify-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
@@ -254,27 +313,22 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
           throw new Error(errorMsg);
         }
 
-        const { order } = orderResponse;
+        const responseData = orderResponse.data || orderResponse;
+        const order = responseData.order;
+        const payment = responseData.payment;
+        
+        if (!order?.id) {
+          console.error('[SquarePaymentForm] Invalid order response:', orderResponse);
+          throw new Error('Order creation returned invalid data');
+        }
+        
         setOrderId(order.id);
         setOrderNumber(order.order_number);
-
-        // Create payment record
-        const paymentResponse = await customerOrderService.createSquareCharge({
-          orderId: order.id,
-          paymentId: order.paymentId,
-          amount,
-          sourceId: '', // Will be set after tokenization
-          customerInfo,
-          shippingAddress,
-          cartItems,
-        });
-
-        if (!paymentResponse) {
-          throw new Error('Failed to create payment record');
+        
+        // Payment is created by the backend during order creation
+        if (payment?.id) {
+          setPaymentId(payment.id);
         }
-
-        const { payment } = paymentResponse;
-        setPaymentId(payment.id);
         setIsLoading(false);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment';
@@ -337,6 +391,7 @@ export default function SquarePaymentForm(props: SquarePaymentFormProps) {
       orderId={orderId}
       orderNumber={orderNumber}
       paymentId={paymentId}
+      squareConfig={props.squareConfig}
     />
   );
 }

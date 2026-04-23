@@ -75,11 +75,36 @@ function CheckoutPageContent() {
       country: string;
     };
   } | null>(null);
+  // Tenant display info (name, logo) - fetched from API for reliability
+  const [tenantDisplayName, setTenantDisplayName] = useState<string | null>(null);
+  const [tenantDisplayLogo, setTenantDisplayLogo] = useState<string | null>(null);
+  // Square config for tenant-specific credentials
+  const [squareConfig, setSquareConfig] = useState<{ applicationId: string; locationId: string } | null>(null);
 
-  // Get the cart for this tenant and gateway type from multi-cart system
-  const cart = tenantId && gatewayType ? getCart(tenantId, gatewayType) : null;
+  // Get the cart for this tenant (gateway selected at checkout)
+  const cart = tenantId ? getCart(tenantId) : null;
   const cartItems = cart?.items || [];
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price_cents * item.quantity), 0);
+
+  // Fetch tenant profile for name and logo
+  useEffect(() => {
+    const fetchTenantProfile = async () => {
+      if (!tenantId) return;
+      
+      try {
+        const profile = await tenantPublicService.getPublicTenantProfile(tenantId);
+        if (profile) {
+          const data = (profile as any).data || profile;
+          setTenantDisplayName(data.name || data.business_name || null);
+          setTenantDisplayLogo(data.logo_url || data.logoUrl || null);
+        }
+      } catch (error) {
+        console.warn('[Checkout] Failed to fetch tenant profile:', error);
+      }
+    };
+    
+    fetchTenantProfile();
+  }, [tenantId]);
 
   // Fetch available payment gateways and tenant tier info (public endpoint for checkout)
   useEffect(() => {
@@ -100,6 +125,23 @@ function CheckoutPageContent() {
         
         console.log('[Checkout] Active gateway types:', activeTypes);
         setAvailableGateways(activeTypes);
+        
+        // Extract Square config from active Square gateway
+        const squareGateway = gateways.find((g: any) => g.gateway_type === 'square' && g.is_active);
+        console.log('[Checkout] Square gateway found:', squareGateway);
+        console.log('[Checkout] Square gateway config:', squareGateway?.config);
+        if (squareGateway?.config) {
+          console.log('[Checkout] Setting Square config:', {
+            applicationId: squareGateway.config.application_id,
+            locationId: squareGateway.config.location_id
+          });
+          setSquareConfig({
+            applicationId: squareGateway.config.application_id,
+            locationId: squareGateway.config.location_id
+          });
+        } else {
+          console.log('[Checkout] No Square config found, squareGateway:', squareGateway);
+        }
         
         // Set default payment method to first available if current selection is not available
         if (activeTypes.length > 0 && !activeTypes.includes(paymentMethod)) {
@@ -195,7 +237,6 @@ function CheckoutPageContent() {
     if (cart) {
       console.log('[Checkout] Cart found:', { 
         tenantId: cart.tenant_id,
-        gatewayType: cart.gateway_type,
         itemCount: cart.items.length
       });
       
@@ -208,7 +249,7 @@ function CheckoutPageContent() {
       // Cart doesn't exist yet - give it a moment to load from localStorage
       console.log('[Checkout] No cart found, waiting for load...');
       const timer = setTimeout(() => {
-        const loadedCart = tenantId && gatewayType ? getCart(tenantId, gatewayType) : null;
+        const loadedCart = tenantId ? getCart(tenantId) : null;
         if (!loadedCart) {
           console.log('[Checkout] Cart still not found after delay, redirecting');
           router.push('/carts');
@@ -311,8 +352,8 @@ function CheckoutPageContent() {
     });
     
     // Clear the cart after successful payment
-    if (tenantId && gatewayType) {
-      clearCart(tenantId, gatewayType);
+    if (tenantId) {
+      clearCart(tenantId);
       
       // Trigger cart update event
       window.dispatchEvent(new Event('cart-updated'));
@@ -381,10 +422,10 @@ function CheckoutPageContent() {
             {/* Store Branding */}
             <div className="flex items-center gap-3 mb-4 p-4 bg-white rounded-lg border">
               <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                {cart.tenant_logo ? (
+                {(tenantDisplayLogo || cart.tenant_logo) ? (
                   <img
-                    src={cart.tenant_logo}
-                    alt={cart.tenant_name}
+                    src={tenantDisplayLogo || cart.tenant_logo || ''}
+                    alt={tenantDisplayName || cart.tenant_name}
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -393,7 +434,7 @@ function CheckoutPageContent() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Purchasing from</p>
-                <p className="font-semibold text-gray-900">{cart.tenant_name}</p>
+                <p className="font-semibold text-gray-900">{tenantDisplayName || cart.tenant_name}</p>
               </div>
             </div>
             
@@ -636,6 +677,7 @@ function CheckoutPageContent() {
                           cartItems={mappedCartItems}
                           onSuccess={handlePaymentSuccess}
                           onBack={() => setCurrentStep('shipping')}
+                          squareConfig={squareConfig}
                         />
                       ) : (
                         <PayPalPaymentForm

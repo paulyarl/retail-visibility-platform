@@ -1,31 +1,98 @@
 /**
  * Multi-Cart Checkout Component
- * Displays all carts grouped by tenant + gateway type
- * Allows sequential checkout processing
+ * Displays all carts (one per tenant)
+ * Allows gateway selection at checkout
  */
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { CreditCard, Loader2, CheckCircle, XCircle, Store } from 'lucide-react';
 import { CartSummary } from '@/lib/cart/cartManager';
 import { Button } from '@mantine/core';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+
+interface Gateway {
+  id: string;
+  gateway_type: string;
+  is_active: boolean;
+  is_default: boolean;
+  display_name?: string;
+}
 
 interface MultiCartCheckoutProps {
   carts: CartSummary[];
-  onCartProcessed: (tenantId: string, gatewayType: string) => void;
+  onCartProcessed: (tenantId: string) => void;
 }
 
 interface CheckoutStatus {
   [key: string]: 'pending' | 'processing' | 'success' | 'error';
 }
 
+interface TenantProfile {
+  id: string;
+  name: string;
+  logo_url?: string;
+}
+
 export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartCheckoutProps) {
   const router = useRouter();
   const [checkoutStatus, setCheckoutStatus] = useState<CheckoutStatus>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [tenantGateways, setTenantGateways] = useState<Record<string, Gateway[]>>({});
+  const [selectedGateways, setSelectedGateways] = useState<Record<string, string>>({});
+  const [tenantProfiles, setTenantProfiles] = useState<Record<string, TenantProfile>>({});
+
+  // Fetch available gateways and tenant profiles for each tenant
+  useEffect(() => {
+    const fetchData = async () => {
+      const tenantIds = [...new Set(carts.map(c => c.cart.tenant_id))];
+      const gatewayData: Record<string, Gateway[]> = {};
+      const profileData: Record<string, TenantProfile> = {};
+      
+      for (const tenantId of tenantIds) {
+        try {
+          // Fetch gateways
+          const gateways = await publicTenantInfoService.getPaymentGateways(tenantId);
+          gatewayData[tenantId] = gateways.filter(g => g.is_active);
+          // Set default gateway for each tenant
+          const defaultGateway = gateways.find(g => g.is_default) || gateways[0];
+          if (defaultGateway) {
+            setSelectedGateways(prev => ({
+              ...prev,
+              [tenantId]: defaultGateway.gateway_type
+            }));
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch gateways for tenant ${tenantId}:`, err);
+          gatewayData[tenantId] = [];
+        }
+        
+        try {
+          // Fetch tenant profile for name and logo
+          const profile = await publicTenantInfoService.getTenantProfile(tenantId);
+          if (profile) {
+            profileData[tenantId] = {
+              id: tenantId,
+              name: profile.business_name || tenantId,
+              logo_url: profile.logo_url,
+            };
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch profile for tenant ${tenantId}:`, err);
+        }
+      }
+      
+      setTenantGateways(gatewayData);
+      setTenantProfiles(profileData);
+    };
+    
+    if (carts.length > 0) {
+      fetchData();
+    }
+  }, [carts]);
 
   const getGatewayIcon = (gatewayType: string) => {
     switch (gatewayType.toLowerCase()) {
@@ -67,7 +134,13 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
 
   const handleCheckout = async (cartSummary: CartSummary) => {
     const { cart } = cartSummary;
-    const statusKey = `${cart.tenant_id}_${cart.gateway_type}`;
+    const statusKey = cart.tenant_id;
+    const gatewayType = selectedGateways[cart.tenant_id];
+
+    if (!gatewayType) {
+      console.error('[MultiCartCheckout] No gateway selected');
+      return;
+    }
 
     setCheckoutStatus(prev => ({ ...prev, [statusKey]: 'processing' }));
     setErrors(prev => {
@@ -80,8 +153,7 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
       // Navigate to checkout page with cart context
       const params = new URLSearchParams({
         tenantId: cart.tenant_id,
-        gatewayType: cart.gateway_type,
-        cartKey: cartSummary.key
+        gatewayType: gatewayType
       });
 
       router.push(`/checkout?${params.toString()}`);
@@ -161,22 +233,35 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
 
       {carts.map((cartSummary) => {
         const { cart, item_count, total_cents } = cartSummary;
-        const statusKey = `${cart.tenant_id}_${cart.gateway_type}`;
+        const statusKey = cart.tenant_id;
         const status = checkoutStatus[statusKey];
         const error = errors[statusKey];
+        const availableGateways = tenantGateways[cart.tenant_id] || [];
+        const selectedGateway = selectedGateways[cart.tenant_id];
+        
+        // Use fetched profile or fall back to cart data
+        const tenantProfile = tenantProfiles[cart.tenant_id];
+        const displayName = tenantProfile?.name || cart.tenant_name || cart.tenant_id;
+        const displayLogo = tenantProfile?.logo_url || cart.tenant_logo;
 
         return (
           <Card key={cartSummary.key} className="overflow-hidden">
             <CardHeader className="bg-gray-50 border-b">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {getGatewayIcon(cart.gateway_type)}
+                  <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
+                    {displayLogo ? (
+                      <img src={displayLogo} alt={displayName} className="w-full h-full object-cover" />
+                    ) : (
+                      <Store className="w-5 h-5 text-gray-500" />
+                    )}
+                  </div>
                   <div>
                     <CardTitle className="text-lg">
-                      {getGatewayLabel(cart.gateway_type)} Cart
+                      {displayName}
                     </CardTitle>
                     <p className="text-sm text-gray-600">
-                      {cart.tenant_name}
+                      {item_count} {item_count === 1 ? 'item' : 'items'}
                     </p>
                   </div>
                 </div>
@@ -198,11 +283,6 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
                     )}
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-900">{item.product_name}</h4>
-                      {item.gateway_display_name && (
-                        <p className="text-sm text-gray-500">
-                          via {item.gateway_display_name}
-                        </p>
-                      )}
                       <p className="text-sm text-gray-600">
                         Quantity: {item.quantity}
                       </p>
@@ -231,6 +311,37 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
                 </div>
               </div>
 
+              {/* Gateway Selection */}
+              {availableGateways.length > 1 && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm font-medium text-gray-700">Select Payment Method:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {availableGateways.map(gateway => (
+                      <button
+                        key={gateway.id}
+                        onClick={() => setSelectedGateways(prev => ({
+                          ...prev,
+                          [cart.tenant_id]: gateway.gateway_type
+                        }))}
+                        className={`px-4 py-2 rounded-lg border-2 transition-all flex items-center gap-2 ${
+                          selectedGateway === gateway.gateway_type
+                            ? 'border-primary-600 bg-primary-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        {getGatewayIcon(gateway.gateway_type)}
+                        <span className="text-sm font-medium">
+                          {gateway.display_name || getGatewayLabel(gateway.gateway_type)}
+                        </span>
+                        {gateway.is_default && (
+                          <span className="text-xs text-gray-500">(Default)</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Error Message */}
               {error && (
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -242,7 +353,7 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
               <div className="mt-6">
                 <Button
                   onClick={() => handleCheckout(cartSummary)}
-                  disabled={status === 'processing' || status === 'success'}
+                  disabled={status === 'processing' || status === 'success' || !selectedGateway}
                   className="w-full"
                   size="lg"
                 >
@@ -258,9 +369,14 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
                       Completed
                     </>
                   )}
-                  {!status && (
+                  {!status && selectedGateway && (
                     <>
-                      Checkout with {getGatewayLabel(cart.gateway_type)}
+                      Checkout with {getGatewayLabel(selectedGateway)}
+                    </>
+                  )}
+                  {!selectedGateway && (
+                    <>
+                      Select Payment Method
                     </>
                   )}
                   {status === 'error' && (
@@ -272,11 +388,13 @@ export default function MultiCartCheckout({ carts, onCartProcessed }: MultiCartC
               </div>
 
               {/* Payment Method Info */}
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  💳 This cart will be processed using {getGatewayLabel(cart.gateway_type)}
-                </p>
-              </div>
+              {selectedGateway && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    💳 This cart will be processed using {getGatewayLabel(selectedGateway)}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         );

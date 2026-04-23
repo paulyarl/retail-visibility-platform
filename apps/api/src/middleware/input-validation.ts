@@ -184,6 +184,11 @@ export function inputValidationMiddleware(req: Request, res: Response, next: Nex
       return next();
     }
 
+    // Skip for OAuth test token endpoints - tokens may contain patterns like '---' that trigger false positives
+    if (req.url === '/api/oauth/square/register-test-token' || req.url === '/api/oauth/paypal/register-test-token') {
+      return next();
+    }
+
     // Check for dangerous patterns in all input
     const allInput = { ...req.query, ...req.params, ...req.body };
     if (containsDangerousPatterns(allInput)) {

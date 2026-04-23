@@ -1,6 +1,6 @@
 /**
  * Multi-Cart Manager
- * Handles intelligent cart routing based on tenant + gateway type
+ * Handles cart management per tenant (gateway selection at checkout)
  */
 
 export interface CartItem {
@@ -12,9 +12,9 @@ export interface CartItem {
   price_cents: number; // unit_price_cents (effective price: sale price if on sale, otherwise list price)
   list_price_cents?: number; // Original list price (only set when item is on sale)
   discount_cents?: number; // Total discount amount (list_price - unit_price) * quantity
-  gateway_type: string;
-  gateway_id?: string;
-  gateway_display_name?: string;
+  // Gateway suggestion from product assignment (optional, used at checkout)
+  suggested_gateway_type?: string;
+  suggested_gateway_id?: string;
   // Product variant fields
   variant_id?: string; // Variant identifier if product has variants
   variant_name?: string; // Display name like "Large - Blue"
@@ -25,7 +25,6 @@ export interface Cart {
   tenant_id: string;
   tenant_name: string;
   tenant_logo?: string;
-  gateway_type: string;
   items: CartItem[];
   created_at: string;
   updated_at: string;
@@ -39,33 +38,32 @@ export interface CartSummary {
 }
 
 /**
- * Generate cart key based on tenant + gateway type
+ * Generate cart key based on tenant only
  */
-export function getCartKey(tenantId: string, gatewayType: string): string {
-  return `cart_${tenantId}_${gatewayType}`;
+export function getCartKey(tenantId: string): string {
+  return `cart_${tenantId}`;
 }
 
 /**
- * Parse cart key to extract tenant and gateway type
+ * Parse cart key to extract tenant
  */
-export function parseCartKey(key: string): { tenantId: string; gatewayType: string } | null {
-  const match = key.match(/^cart_([^_]+)_(.+)$/);
+export function parseCartKey(key: string): { tenantId: string } | null {
+  const match = key.match(/^cart_([^_]+)$/);
   if (!match) return null;
   
   return {
-    tenantId: match[1],
-    gatewayType: match[2]
+    tenantId: match[1]
   };
 }
 
 /**
- * Get a specific cart
+ * Get a specific tenant's cart
  */
-export function getCart(tenantId: string, gatewayType: string): Cart | null {
+export function getCart(tenantId: string): Cart | null {
   // Check if we're in the browser
   if (typeof window === 'undefined') return null;
   
-  const key = getCartKey(tenantId, gatewayType);
+  const key = getCartKey(tenantId);
   const data = localStorage.getItem(key);
   
   if (!data) return null;
@@ -91,13 +89,16 @@ export function getAllCarts(tenantId?: string): CartSummary[] {
     const key = localStorage.key(i);
     if (!key?.startsWith('cart_')) continue;
     
+    // Skip old gateway-wrapped cart keys (they have multiple underscores)
+    if (key.match(/^cart_[^_]+_[^_]+/)) continue;
+    
     const parsed = parseCartKey(key);
     if (!parsed) continue;
     
     // Filter by tenant if specified
     if (tenantId && parsed.tenantId !== tenantId) continue;
     
-    const cart = getCart(parsed.tenantId, parsed.gatewayType);
+    const cart = getCart(parsed.tenantId);
     if (!cart || cart.items.length === 0) continue;
     
     const total_cents = cart.items.reduce(
@@ -128,23 +129,25 @@ export function saveCart(cart: Cart): void {
   // Check if we're in the browser
   if (typeof window === 'undefined') return;
   
-  const key = getCartKey(cart.tenant_id, cart.gateway_type);
+  const key = getCartKey(cart.tenant_id);
   cart.updated_at = new Date().toISOString();
   localStorage.setItem(key, JSON.stringify(cart));
 }
 
 /**
- * Add item to cart (intelligent routing)
+ * Add item to cart (tenant-based, no gateway routing)
  */
 export function addToCart(
   tenantId: string,
   tenantName: string,
-  gatewayType: string,
-  item: Omit<CartItem, 'gateway_type'>,
+  item: Omit<CartItem, 'suggested_gateway_type' | 'suggested_gateway_id'> & { 
+    suggested_gateway_type?: string; 
+    suggested_gateway_id?: string;
+  },
   tenantLogo?: string
 ): void {
   // Get or create cart
-  let cart = getCart(tenantId, gatewayType);
+  let cart = getCart(tenantId);
   
   if (!cart) {
     // Create new cart
@@ -152,7 +155,6 @@ export function addToCart(
       tenant_id: tenantId,
       tenant_name: tenantName,
       tenant_logo: tenantLogo,
-      gateway_type: gatewayType,
       items: [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -163,10 +165,9 @@ export function addToCart(
   }
   
   // Check if item already exists
-  // Match by product_id, gateway_id, AND variant_id to allow multiple variants of same product
+  // Match by product_id AND variant_id to allow multiple variants of same product
   const existingIndex = cart.items.findIndex(
     i => i.product_id === item.product_id && 
-         i.gateway_id === item.gateway_id &&
          i.variant_id === item.variant_id
   );
   
@@ -175,10 +176,7 @@ export function addToCart(
     cart.items[existingIndex].quantity += item.quantity;
   } else {
     // Add new item
-    cart.items.push({
-      ...item,
-      gateway_type: gatewayType
-    });
+    cart.items.push(item);
   }
   
   saveCart(cart);
@@ -186,7 +184,7 @@ export function addToCart(
   // Dispatch custom event for same-tab updates
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('cart-updated', { 
-      detail: { tenantId, gatewayType, action: 'add' } 
+      detail: { tenantId, action: 'add' } 
     }));
   }
 }
@@ -196,34 +194,36 @@ export function addToCart(
  */
 export function updateCartItemQuantity(
   tenantId: string,
-  gatewayType: string,
   productId: string,
-  quantity: number
+  quantity: number,
+  variantId?: string
 ): void {
-  const cart = getCart(tenantId, gatewayType);
+  const cart = getCart(tenantId);
   if (!cart) return;
   
-  const item = cart.items.find(i => i.product_id === productId);
-  if (!item) return;
+  const itemIndex = cart.items.findIndex(i => 
+    i.product_id === productId && i.variant_id === variantId
+  );
+  if (itemIndex < 0) return;
   
   if (quantity <= 0) {
     // Remove item
-    cart.items = cart.items.filter(i => i.product_id !== productId);
+    cart.items.splice(itemIndex, 1);
   } else {
     // Update quantity
-    item.quantity = quantity;
+    cart.items[itemIndex].quantity = quantity;
   }
   
   if (cart.items.length === 0) {
     // Remove empty cart
-    clearCart(tenantId, gatewayType);
+    clearCart(tenantId);
   } else {
     saveCart(cart);
     
     // Dispatch custom event for same-tab updates
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('cart-updated', { 
-        detail: { tenantId, gatewayType, action: 'update' } 
+        detail: { tenantId, action: 'update' } 
       }));
     }
   }
@@ -234,25 +234,25 @@ export function updateCartItemQuantity(
  */
 export function removeFromCart(
   tenantId: string,
-  gatewayType: string,
-  productId: string
+  productId: string,
+  variantId?: string
 ): void {
-  updateCartItemQuantity(tenantId, gatewayType, productId, 0);
+  updateCartItemQuantity(tenantId, productId, 0, variantId);
 }
 
 /**
  * Clear specific cart
  */
-export function clearCart(tenantId: string, gatewayType: string): void {
+export function clearCart(tenantId: string): void {
   // Check if we're in the browser
   if (typeof window === 'undefined') return;
   
-  const key = getCartKey(tenantId, gatewayType);
+  const key = getCartKey(tenantId);
   localStorage.removeItem(key);
   
   // Dispatch custom event for same-tab updates
   window.dispatchEvent(new CustomEvent('cart-updated', { 
-    detail: { tenantId, gatewayType, action: 'clear' } 
+    detail: { tenantId, action: 'clear' } 
   }));
 }
 
@@ -262,7 +262,7 @@ export function clearCart(tenantId: string, gatewayType: string): void {
 export function clearAllCarts(tenantId?: string): void {
   const carts = getAllCarts(tenantId);
   carts.forEach(({ cart }) => {
-    clearCart(cart.tenant_id, cart.gateway_type);
+    clearCart(cart.tenant_id);
   });
 }
 
@@ -312,55 +312,80 @@ export async function migrateCartLogos(): Promise<void> {
 }
 
 /**
- * Migrate old single-cart format to multi-cart
+ * Migrate old gateway-wrapped carts to tenant-wrapped carts
+ * Merges multiple gateway carts into single tenant cart
  */
 export function migrateOldCarts(): void {
   const oldKeys: string[] = [];
   
-  // Find old cart keys (format: cart_{tenantId})
+  // Find old gateway-wrapped cart keys (format: cart_{tenantId}_{gatewayType})
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key?.match(/^cart_[^_]+$/)) {
+    // Match gateway-wrapped keys (have two or more underscores after 'cart_')
+    if (key?.match(/^cart_[^_]+_[^_]+/)) {
       oldKeys.push(key);
     }
   }
   
-  // Migrate each old cart
+  // Group old carts by tenant
+  const cartsByTenant: Record<string, Cart> = {};
+  
   oldKeys.forEach(oldKey => {
     try {
       const data = localStorage.getItem(oldKey);
       if (!data) return;
       
       const oldCart = JSON.parse(data);
-      const tenantId = oldKey.replace('cart_', '');
+      const match = oldKey.match(/^cart_([^_]+)_/);
+      if (!match) return;
       
-      // Group items by gateway type
-      const itemsByType: Record<string, CartItem[]> = {};
+      const tenantId = match[1];
       
-      oldCart.items?.forEach((item: CartItem) => {
-        const type = item.gateway_type || 'default';
-        if (!itemsByType[type]) itemsByType[type] = [];
-        itemsByType[type].push(item);
-      });
-      
-      // Create new carts
-      Object.entries(itemsByType).forEach(([type, items]) => {
-        const newCart: Cart = {
+      // Get or create merged cart for this tenant
+      if (!cartsByTenant[tenantId]) {
+        cartsByTenant[tenantId] = {
           tenant_id: tenantId,
           tenant_name: oldCart.tenant_name || 'Store',
-          gateway_type: type,
-          items,
+          tenant_logo: oldCart.tenant_logo,
+          items: [],
           created_at: oldCart.created_at || new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
-        saveCart(newCart);
+      }
+      
+      // Merge items, converting gateway_type to suggested_gateway_type
+      oldCart.items?.forEach((item: any) => {
+        const migratedItem: CartItem = {
+          product_id: item.product_id,
+          product_name: item.product_name,
+          product_sku: item.product_sku,
+          product_image: item.product_image,
+          quantity: item.quantity,
+          price_cents: item.price_cents,
+          list_price_cents: item.list_price_cents,
+          discount_cents: item.discount_cents,
+          suggested_gateway_type: item.gateway_type,
+          suggested_gateway_id: item.gateway_id,
+          variant_id: item.variant_id,
+          variant_name: item.variant_name,
+          variant_attributes: item.variant_attributes
+        };
+        cartsByTenant[tenantId].items.push(migratedItem);
       });
       
       // Remove old cart
       localStorage.removeItem(oldKey);
-      console.log(`[Cart] Migrated old cart: ${oldKey}`);
+      console.log(`[Cart] Migrated gateway-wrapped cart: ${oldKey}`);
     } catch (error) {
       console.error(`[Cart] Failed to migrate ${oldKey}:`, error);
+    }
+  });
+  
+  // Save merged carts
+  Object.values(cartsByTenant).forEach(cart => {
+    if (cart.items.length > 0) {
+      saveCart(cart);
+      console.log(`[Cart] Created tenant-wrapped cart for ${cart.tenant_id} with ${cart.items.length} items`);
     }
   });
 }

@@ -870,6 +870,54 @@ class TenantInfoService extends TenantApiSingleton {
   }
 
   /**
+   * Register Square test token (admin-only, for sandbox testing)
+   * Uses the /api/oauth/square/register-test-token endpoint
+   */
+  async registerSquareTestToken(tenantId: string, data: {
+    accessToken: string;
+    merchantId?: string;
+    applicationId: string;
+    locationId: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (!tenantId || !data.accessToken || !data.applicationId || !data.locationId) {
+        throw new Error('tenantId, accessToken, applicationId, and locationId are required');
+      }
+
+      const result = await this.makeDefaultRequest<any>(
+        '/api/oauth/square/register-test-token',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tenantId,
+            accessToken: data.accessToken,
+            merchantId: data.merchantId,
+            applicationId: data.applicationId,
+            locationId: data.locationId,
+          })
+        },
+        `oauth-square-test-token-${tenantId}`
+      );
+
+      if (!result.success) {
+        console.error('[TenantInfoService] Failed to register Square test token:', result.error);
+        const errorMsg = typeof result.error === 'string' ? result.error : 
+          (result.error as any)?.message || 'Failed to register test token';
+        return { success: false, error: errorMsg };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to register Square test token:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to register test token';
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  /**
    * Get tenant subdomain
    */
   async getTenantSubdomain(tenantId: string): Promise<any> {

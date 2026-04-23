@@ -71,14 +71,46 @@ export default function PaymentGatewaysPage() {
     square?: { connected: boolean; merchantId?: string; expiresAt?: Date };
   }>({});
   const [tenantTier, setTenantTier] = useState<string>('starter');
+  const [showSquareTestTokenInput, setShowSquareTestTokenInput] = useState(false);
+  const [squareTestToken, setSquareTestToken] = useState({
+    accessToken: '',
+    merchantId: '',
+    applicationId: '',
+    locationId: '',
+  });
+  const [savingTestToken, setSavingTestToken] = useState(false);
+  const [testTokenError, setTestTokenError] = useState<string | null>(null);
+  const [testTokenSuccess, setTestTokenSuccess] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (hasAccess && tenantId) {
       loadGateways();
       loadOAuthStatus();
       loadTenantTier();
+      checkAdminStatus();
     }
   }, [hasAccess, tenantId]);
+
+  const checkAdminStatus = async () => {
+    try {
+      // Use TenantInfoService for reliable role check
+      const data = await tenantInfoService.getCurrentUser();
+      
+      if (data?.user) {
+        const user = data.user;
+        console.log('[PaymentGateways] User from service:', user);
+        const role = user?.role?.toUpperCase();
+        const adminCheck = role === 'PLATFORM_ADMIN' || role === 'ADMIN';
+        console.log('[PaymentGateways] Role:', role, 'Is admin:', adminCheck);
+        setIsAdmin(adminCheck);
+      } else {
+        console.log('[PaymentGateways] No user data returned');
+      }
+    } catch (err) {
+      console.error('[PaymentGateways] Failed to check admin status:', err);
+    }
+  };
 
   useEffect(() => {
     // Check for OAuth callback messages
@@ -309,6 +341,45 @@ export default function PaymentGatewaysPage() {
     }
   };
 
+  const handleSaveSquareTestToken = async () => {
+    try {
+      setSavingTestToken(true);
+      setTestTokenError(null);
+      setTestTokenSuccess(false);
+      
+      if (!squareTestToken.accessToken) {
+        setTestTokenError('Access token is required');
+        return;
+      }
+      
+      if (!squareTestToken.applicationId || !squareTestToken.locationId) {
+        setTestTokenError('Application ID and Location ID are required for checkout');
+        return;
+      }
+      
+      const result = await tenantInfoService.registerSquareTestToken(tenantId, {
+        accessToken: squareTestToken.accessToken,
+        merchantId: squareTestToken.merchantId || undefined,
+        applicationId: squareTestToken.applicationId,
+        locationId: squareTestToken.locationId,
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to register test token');
+      }
+      
+      setTestTokenSuccess(true);
+      setSquareTestToken({ accessToken: '', merchantId: '', applicationId: '', locationId: '' });
+      setShowSquareTestTokenInput(false);
+      await loadOAuthStatus();
+      await loadGateways();
+    } catch (err: any) {
+      setTestTokenError(err.message);
+    } finally {
+      setSavingTestToken(false);
+    }
+  };
+
   if (accessLoading) {
     return (
       <div className="p-6">
@@ -334,6 +405,10 @@ export default function PaymentGatewaysPage() {
   const paypalGateways = gateways.filter(g => g.gateway_type === 'paypal');
   const squareGateways = gateways.filter(g => g.gateway_type === 'square');
   const canUseAdvancedPayment = checkTierFeature(tenantTier, 'payment_client_credentials');
+  
+  // Check if OAuth connections exist (these show as gateways with empty config but OAuth status)
+  const hasPayPalOAuth = oauthStatus.paypal?.connected;
+  const hasSquareOAuth = oauthStatus.square?.connected;
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -512,7 +587,7 @@ export default function PaymentGatewaysPage() {
               </div>
               </CardContent>
             </Card>
-          ) : paypalGateways.length > 0 ? (
+          ) : paypalGateways.length > 0 || hasPayPalOAuth ? (
             <div className="space-y-4">
               {paypalGateways.map((gateway) => (
                 <Card key={gateway.id}>
@@ -520,7 +595,14 @@ export default function PaymentGatewaysPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle>{gateway.config?.display_name || 'PayPal Account'}</CardTitle>
-                        <p className="text-sm text-neutral-600">Mode: {gateway.config?.mode || 'Unknown'}</p>
+                        <p className="text-sm text-neutral-600">
+                          {gateway.config?.client_id 
+                            ? `Mode: ${gateway.config?.mode || 'Unknown'}`
+                            : hasPayPalOAuth 
+                              ? 'Connected via OAuth'
+                              : 'Mode: Unknown'
+                          }
+                        </p>
                       </div>
                       <div className="flex items-center gap-2">
                         {gateway.is_default && (
@@ -538,16 +620,20 @@ export default function PaymentGatewaysPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-neutral-600">Client ID</p>
-                          <p className="font-mono text-xs">{gateway.config?.client_id?.substring(0, 20)}...</p>
+                      {gateway.config?.client_id && (
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-neutral-600">Client ID</p>
+                            <p className="font-mono text-xs">{gateway.config?.client_id?.substring(0, 20)}...</p>
+                          </div>
                         </div>
-                      </div>
+                      )}
                       <div className="flex gap-2 pt-4 border-t">
-                        <Button variant="outline" size="sm" onClick={() => handleEditPayPal(gateway)}>
-                          Edit
-                        </Button>
+                        {gateway.config?.client_id && (
+                          <Button variant="outline" size="sm" onClick={() => handleEditPayPal(gateway)}>
+                            Edit
+                          </Button>
+                        )}
                         <Button variant="outline" size="sm" onClick={() => handleToggleActive(gateway.id, gateway.is_active)}>
                           {gateway.is_active ? 'Deactivate' : 'Activate'}
                         </Button>
@@ -637,7 +723,7 @@ export default function PaymentGatewaysPage() {
             )}
           </div>
           
-          {squareGateways.length > 0 ? (
+          {squareGateways.length > 0 || hasSquareOAuth ? (
             <div className="space-y-4">
               {squareGateways.map((gateway) => (
                 <Card key={gateway.id}>
@@ -645,7 +731,14 @@ export default function PaymentGatewaysPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle>{gateway.config?.display_name || 'Square Account'}</CardTitle>
-                        <p className="text-sm text-neutral-600">Environment: {gateway.config?.environment || 'Unknown'}</p>
+                        <p className="text-sm text-neutral-600">
+                          {gateway.config?.application_id 
+                            ? `Environment: ${gateway.config?.environment || 'Unknown'}`
+                            : hasSquareOAuth 
+                              ? 'Connected via OAuth'
+                              : 'Environment: Unknown'
+                          }
+                        </p>
                       </div>
                       <div className="flex items-center gap-2">
                         {gateway.is_default && (
@@ -663,20 +756,24 @@ export default function PaymentGatewaysPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-neutral-600">Application ID</p>
-                          <p className="font-mono text-xs">{gateway.config?.application_id?.substring(0, 20)}...</p>
+                      {gateway.config?.application_id && (
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-neutral-600">Application ID</p>
+                            <p className="font-mono text-xs">{gateway.config?.application_id?.substring(0, 20)}...</p>
+                          </div>
+                          <div>
+                            <p className="text-neutral-600">Location ID</p>
+                            <p className="font-mono text-xs">{gateway.config?.location_id?.substring(0, 20)}...</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-neutral-600">Location ID</p>
-                          <p className="font-mono text-xs">{gateway.config?.location_id?.substring(0, 20)}...</p>
-                        </div>
-                      </div>
+                      )}
                       <div className="flex gap-2 pt-4 border-t">
-                        <Button variant="outline" size="sm" onClick={() => handleEditSquare(gateway)}>
-                          Edit
-                        </Button>
+                        {gateway.config?.application_id && (
+                          <Button variant="outline" size="sm" onClick={() => handleEditSquare(gateway)}>
+                            Edit
+                          </Button>
+                        )}
                         <Button variant="outline" size="sm" onClick={() => handleToggleActive(gateway.id, gateway.is_active)}>
                           {gateway.is_active ? 'Deactivate' : 'Activate'}
                         </Button>
@@ -831,6 +928,100 @@ export default function PaymentGatewaysPage() {
               />
             </CardContent>
           </Card>
+
+          {/* Admin-only: Square Test Token Input */}
+          {isAdmin && (
+            <Card className="mt-4 border-amber-200 bg-amber-50">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Crown className="h-4 w-4 text-amber-600" />
+                      Admin: Square Test Token
+                    </CardTitle>
+                    <p className="text-sm text-neutral-600">
+                      Manually register a Square sandbox test token (bypasses OAuth)
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSquareTestTokenInput(!showSquareTestTokenInput)}
+                  >
+                    {showSquareTestTokenInput ? 'Hide' : 'Show'}
+                  </Button>
+                </div>
+              </CardHeader>
+              {showSquareTestTokenInput && (
+                <CardContent>
+                  <div className="space-y-4">
+                    {testTokenSuccess && (
+                      <div className="bg-green-50 border border-green-200 rounded p-3 text-sm text-green-800">
+                        Test token registered successfully!
+                      </div>
+                    )}
+                    {testTokenError && (
+                      <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-800">
+                        {testTokenError}
+                      </div>
+                    )}
+                    <div className="bg-amber-100 border border-amber-300 rounded p-3 text-xs text-amber-800">
+                      <strong>How to get a test token:</strong>
+                      <ol className="list-decimal ml-4 mt-1 space-y-1">
+                        <li>Go to Square Developer Console</li>
+                        <li>Navigate to OAuth &gt; Test account authorizations</li>
+                        <li>Click "Show token" on an authorized test account</li>
+                        <li>Copy the access token and paste it below</li>
+                      </ol>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Access Token</label>
+                      <Input
+                        type="password"
+                        value={squareTestToken.accessToken}
+                        onChange={(e) => setSquareTestToken({...squareTestToken, accessToken: e.target.value})}
+                        placeholder="Enter Square test access token"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Application ID</label>
+                      <Input
+                        value={squareTestToken.applicationId}
+                        onChange={(e) => setSquareTestToken({...squareTestToken, applicationId: e.target.value})}
+                        placeholder="e.g., sandbox-sq0idb-xxxxxxxxxxxx"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Found in Square Developer Console &gt; Credentials</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Location ID</label>
+                      <Input
+                        value={squareTestToken.locationId}
+                        onChange={(e) => setSquareTestToken({...squareTestToken, locationId: e.target.value})}
+                        placeholder="e.g., Lxxxxxxxxxxxxxxx"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Found in Square Developer Console &gt; Locations</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Merchant ID (Optional)</label>
+                      <Input
+                        value={squareTestToken.merchantId}
+                        onChange={(e) => setSquareTestToken({...squareTestToken, merchantId: e.target.value})}
+                        placeholder="Enter Square merchant ID"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={handleSaveSquareTestToken} disabled={savingTestToken}>
+                        {savingTestToken ? 'Registering...' : 'Register Test Token'}
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowSquareTestTokenInput(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )}
         </div>
         </div>
       )}

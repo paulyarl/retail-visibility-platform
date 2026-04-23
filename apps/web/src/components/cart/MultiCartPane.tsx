@@ -77,7 +77,7 @@ export function MultiCartPane() {
                 {/* Cart Info */}
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900 truncate">
-                    {cartSummary.cart.tenant_name} - {cartSummary.cart.gateway_type}
+                    {cartSummary.cart.tenant_name}
                   </p>
                   <p className="text-sm text-gray-600">
                     {cartSummary.item_count} {cartSummary.item_count === 1 ? 'item' : 'items'} • {formatCurrency(cartSummary.total_cents)}

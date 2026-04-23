@@ -1,18 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMultiCart } from '@/hooks/useMultiCart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { ShoppingCart, Store, ArrowRight, Trash2, ShoppingBag, CheckCircle2, Package, Receipt, Edit, ChevronDown, ChevronUp, Plus, Minus } from 'lucide-react';
+import { ShoppingCart, Store, ArrowRight, Trash2, ShoppingBag, CheckCircle2, Package, Receipt, Edit, ChevronDown, ChevronUp, Plus, Minus, CreditCard } from 'lucide-react';
 import OrderReceipt from '@/components/checkout/OrderReceipt';
 import { PoweredByFooter } from '@/components/PoweredByFooter';
+import { publicTenantInfoService } from '@/services/PublicTenantInfoService';
+
+interface Gateway {
+  id: string;
+  gateway_type: string;
+  is_active: boolean;
+  is_default: boolean;
+  display_name?: string;
+}
+
+interface TenantInfo {
+  name: string;
+  logo_url?: string;
+}
 
 export default function MultiCartPage() {
   const router = useRouter();
   const { carts, clearCart: clearSpecificCart, updateQuantity, removeItem, totalItems } = useMultiCart();
   const [expandedCart, setExpandedCart] = useState<string | null>(null);
+  const [tenantGateways, setTenantGateways] = useState<Record<string, Gateway[]>>({});
+  const [tenantInfo, setTenantInfo] = useState<Record<string, TenantInfo>>({});
 
   const formatCurrency = (cents: number) => {
     return `$${(cents / 100).toFixed(2)}`;
@@ -56,11 +72,55 @@ export default function MultiCartPage() {
     router.push(`/checkout?tenantId=${tenantId}&gatewayType=${gatewayType}`);
   };
 
-  const handleClearCart = (tenantId: string, gatewayType: string) => {
+  // Fetch tenant info (name, logo) and available gateways for each tenant
+  useEffect(() => {
+    const fetchTenantData = async () => {
+      const tenantIds = [...new Set(carts.map(c => c.cart.tenant_id))];
+      const gatewayData: Record<string, Gateway[]> = {};
+      const tenantInfoData: Record<string, TenantInfo> = {};
+      
+      for (const tenantId of tenantIds) {
+        try {
+          // Fetch gateways and tenant profile in parallel
+          const [gateways, profile] = await Promise.all([
+            publicTenantInfoService.getPaymentGateways(tenantId),
+            publicTenantInfoService.getTenantProfile(tenantId).catch(() => null)
+          ]);
+          
+          gatewayData[tenantId] = gateways.filter((g: Gateway) => g.is_active);
+          
+          if (profile) {
+            const data = (profile as any).data || profile;
+            tenantInfoData[tenantId] = {
+              name: data.name || data.business_name || tenantId,
+              logo_url: data.logo_url || data.logoUrl
+            };
+          } else {
+            tenantInfoData[tenantId] = {
+              name: tenantId
+            };
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch data for tenant ${tenantId}:`, err);
+          gatewayData[tenantId] = [];
+          tenantInfoData[tenantId] = { name: tenantId };
+        }
+      }
+      
+      setTenantGateways(gatewayData);
+      setTenantInfo(tenantInfoData);
+    };
+    
+    if (carts.length > 0) {
+      fetchTenantData();
+    }
+  }, [carts]);
+
+  const handleClearCart = (tenantId: string) => {
     if (!confirm('Remove all items from this cart?')) {
       return;
     }
-    clearSpecificCart(tenantId, gatewayType);
+    clearSpecificCart(tenantId);
   };
 
   if (carts.length === 0) {
@@ -122,191 +182,177 @@ export default function MultiCartPage() {
           </CardContent>
         </Card>
 
-        {/* Cart List */}
-        <div className="space-y-4">
+        {/* Cart List - One cart per tenant */}
+        <div className="space-y-6">
           {carts.map((cartSummary) => {
             const { cart, item_count, total_cents } = cartSummary;
+            const availableGateways = tenantGateways[cart.tenant_id] || [];
+            const isExpanded = expandedCart === cartSummary.key;
+            const info = tenantInfo[cart.tenant_id];
+            const displayName = info?.name || cart.tenant_name;
+            const displayLogo = info?.logo_url || cart.tenant_logo;
+            
             return (
               <Card key={cartSummary.key} className="hover:shadow-lg transition-shadow">
                 <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row gap-6">
-                    {/* Store Info */}
-                    <div className="flex items-start gap-4 flex-1">
-                      {/* Store Logo */}
-                      <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                        {cart.tenant_logo ? (
-                          <img
-                            src={cart.tenant_logo}
-                            alt={cart.tenant_name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <Store className="h-8 w-8 text-gray-400" />
-                        )}
-                      </div>
-
-                      {/* Store Details */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-1">
-                          <h3 className="text-xl font-bold text-gray-900">
-                            {cart.tenant_name}
-                          </h3>
-                          <div className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium">
-                            {cart.gateway_type === 'square' ? 'Square' : cart.gateway_type === 'paypal' ? 'PayPal' : cart.gateway_type}
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
-                          <span className="flex items-center gap-1">
-                            <ShoppingBag className="h-4 w-4" />
-                            {item_count} {item_count === 1 ? 'item' : 'items'}
-                          </span>
-                        </div>
-
-                        {/* Item Preview */}
-                        <div className="space-y-1">
-                          {cart.items.slice(0, 3).map((item) => (
-                            <p key={item.product_id} className="text-sm text-gray-600 truncate">
-                              {item.quantity}x {item.product_name}
-                            </p>
-                          ))}
-                          {cart.items.length > 3 && (
-                            <p className="text-sm text-gray-500">
-                              +{cart.items.length - 3} more items
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                  {/* Tenant Header */}
+                  <div className="flex items-start gap-4 mb-4 pb-4 border-b">
+                    <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {displayLogo ? (
+                        <img
+                          src={displayLogo}
+                          alt={displayName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Store className="h-8 w-8 text-gray-400" />
+                      )}
                     </div>
-
-                    {/* Actions */}
-                    <div className="flex flex-col justify-between items-end gap-4 md:w-64">
-                      {/* Total */}
-                    <div className="text-right">
-                      <p className="text-sm text-gray-600 mb-1">Cart Total</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {formatCurrency(total_cents)}
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-gray-900">{displayName}</h3>
+                      <p className="text-sm text-gray-600">
+                        {item_count} {item_count === 1 ? 'item' : 'items'} · {formatCurrency(total_cents)}
                       </p>
                     </div>
-
-                    {/* Buttons */}
-                    <div className="flex flex-col gap-2 w-full">
-                      <Button
-                        onClick={() => handleCheckout(cart.tenant_id, cart.gateway_type)}
-                        className="w-full"
-                      >
-                        Checkout with {cart.gateway_type === 'square' ? 'Square' : 'PayPal'}
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-600">Total</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatCurrency(total_cents)}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Payment Options */}
+                  {availableGateways.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Choose Payment Method:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {availableGateways.map(gateway => (
+                          <Button
+                            key={gateway.id}
+                            onClick={() => handleCheckout(cart.tenant_id, gateway.gateway_type)}
+                            className={gateway.is_default ? 'bg-black hover:bg-gray-800' : 'bg-blue-600 hover:bg-blue-700'}
+                          >
+                            {gateway.gateway_type === 'square' ? (
+                              <div className="w-5 h-5 bg-white rounded flex items-center justify-center mr-2">
+                                <CreditCard className="w-3 h-3 text-black" />
+                              </div>
+                            ) : (
+                              <div className="w-5 h-5 bg-white rounded flex items-center justify-center mr-2">
+                                <CreditCard className="w-3 h-3 text-blue-600" />
+                              </div>
+                            )}
+                            Checkout with {gateway.display_name || (gateway.gateway_type === 'square' ? 'Square' : 'PayPal')}
+                            {gateway.is_default && <span className="ml-2 text-xs opacity-75">(Default)</span>}
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Cart Items */}
+                  <div className="space-y-3">
+                    {/* Item Preview */}
+                    {!isExpanded && (
+                      <div className="space-y-1">
+                        {cart.items.slice(0, 3).map((item) => (
+                          <p key={item.product_id} className="text-sm text-gray-600 truncate">
+                            {item.quantity}x {item.product_name}
+                            {item.variant_name && <span className="text-gray-400"> ({item.variant_name})</span>}
+                          </p>
+                        ))}
+                        {cart.items.length > 3 && (
+                          <p className="text-sm text-gray-500">
+                            +{cart.items.length - 3} more items
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Edit Controls */}
+                    <div className="flex gap-2 pt-2">
                       <Button
                         variant="outline"
+                        size="sm"
                         onClick={() => toggleCartExpanded(cartSummary.key)}
-                        className="w-full"
                       >
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Cart
-                        {expandedCart === cartSummary.key ? (
-                          <ChevronUp className="ml-2 h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="ml-2 h-4 w-4" />
-                        )}
+                        <Edit className="mr-1 h-3 w-3" />
+                        {isExpanded ? 'Hide Details' : 'Edit Cart'}
                       </Button>
                       <Button
                         variant="ghost"
-                        onClick={() => handleClearCart(cart.tenant_id, cart.gateway_type)}
-                        className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                        size="sm"
+                        onClick={() => handleClearCart(cart.tenant_id)}
+                        className="text-red-600 hover:text-red-700"
                       >
-                        <Trash2 className="mr-2 h-4 w-4" />
+                        <Trash2 className="mr-1 h-3 w-3" />
                         Clear Cart
                       </Button>
                     </div>
-                  </div>
-                </div>
-
-                {/* Expandable Cart Items Section */}
-                {expandedCart === cartSummary.key && (
-                  <div className="border-t border-gray-200 p-6 bg-gray-50">
-                    <h4 className="font-semibold text-gray-900 mb-4">Cart Items</h4>
-                    <div className="space-y-3">
-                      {cart.items.map((item) => (
-                        <div key={item.product_id} className="flex items-center gap-4 bg-white p-4 rounded-lg">
-                          {/* Product Image */}
-                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                            {item.product_image ? (
-                              <img
-                                src={item.product_image}
-                                alt={item.product_name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <ShoppingBag className="h-6 w-6 text-gray-400" />
-                            )}
-                          </div>
-
-                          {/* Product Info */}
-                          <div className="flex-1 min-w-0">
-                            <h5 className="font-medium text-gray-900 truncate">{item.product_name}</h5>
-                            <p className="text-sm text-gray-600">
-                              {formatCurrency(item.price_cents)} each
-                            </p>
-                          </div>
-
-                          {/* Quantity Controls */}
-                          <div className="flex items-center gap-2">
+                    
+                    {/* Expandable Cart Items */}
+                    {isExpanded && (
+                      <div className="mt-3 space-y-2">
+                        {cart.items.map((item) => (
+                          <div key={`${item.product_id}-${item.variant_id || 'default'}`} className="flex items-center gap-3 bg-white p-3 rounded border">
+                            <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+                              {item.product_image ? (
+                                <img src={item.product_image} alt={item.product_name} className="w-full h-full object-cover" />
+                              ) : (
+                                <ShoppingBag className="h-5 w-5 text-gray-400" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">{item.product_name}</p>
+                              {item.variant_name && (
+                                <p className="text-xs text-gray-500">{item.variant_name}</p>
+                              )}
+                              <p className="text-xs text-gray-600">{formatCurrency(item.price_cents)} each</p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateQuantity(cart.tenant_id, item.product_id, item.quantity - 1, item.variant_id)}
+                                disabled={item.quantity <= 1}
+                                className="h-7 w-7 p-0"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <span className="w-6 text-center text-sm">{item.quantity}</span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateQuantity(cart.tenant_id, item.product_id, item.quantity + 1, item.variant_id)}
+                                className="h-7 w-7 p-0"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <p className="text-sm font-medium w-16 text-right">{formatCurrency(item.price_cents * item.quantity)}</p>
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
-                              onClick={() => updateQuantity(cart.tenant_id, cart.gateway_type, item.product_id, item.quantity - 1)}
-                              disabled={item.quantity <= 1}
-                              className="h-8 w-8 p-0"
+                              onClick={() => removeItem(cart.tenant_id, item.product_id, item.variant_id)}
+                              className="text-red-600 h-7 w-7 p-0"
                             >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <span className="w-8 text-center font-medium">{item.quantity}</span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateQuantity(cart.tenant_id, cart.gateway_type, item.product_id, item.quantity + 1)}
-                              className="h-8 w-8 p-0"
-                            >
-                              <Plus className="h-4 w-4" />
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
-
-                          {/* Item Total */}
-                          <div className="text-right min-w-[80px]">
-                            <p className="font-semibold text-gray-900">
-                              {formatCurrency(item.price_cents * item.quantity)}
-                            </p>
-                          </div>
-
-                          {/* Remove Button */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeItem(cart.tenant_id, cart.gateway_type, item.product_id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Add More Items Button */}
-                    <div className="mt-4">
-                      <Button
-                        variant="outline"
-                        onClick={() => router.push(`/tenant/${cart.tenant_id}`)}
-                        className="w-full"
-                      >
-                        <Store className="mr-2 h-4 w-4" />
-                        Add More Items from {cart.tenant_name}
-                      </Button>
-                    </div>
+                        ))}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/tenant/${cart.tenant_id}`)}
+                          className="w-full mt-2"
+                        >
+                          <Store className="mr-1 h-3 w-3" />
+                          Add More Items from {cart.tenant_name}
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
             );
           })}
         </div>

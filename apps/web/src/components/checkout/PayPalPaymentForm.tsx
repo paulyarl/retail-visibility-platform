@@ -226,10 +226,21 @@ export default function PayPalPaymentForm(props: PayPalPaymentFormProps) {
         throw new Error(errorMsg);
       }
 
-      const orderData = orderResponse.data;
-      setOrderId(orderData.order.id);
-      setOrderNumber(orderData.order.order_number);
-      setPaymentId(orderData.payment.id);
+      const responseData = orderResponse.data || orderResponse;
+      const order = responseData.order;
+      const payment = responseData.payment;
+      
+      if (!order?.id) {
+        console.error('[PayPalPaymentForm] Invalid order response:', orderResponse);
+        throw new Error('Order creation returned invalid data');
+      }
+      
+      setOrderId(order.id);
+      setOrderNumber(order.order_number);
+      
+      if (payment?.id) {
+        setPaymentId(payment.id);
+      }
 
       setLoading(false);
     } catch (error) {

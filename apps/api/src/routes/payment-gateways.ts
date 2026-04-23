@@ -92,7 +92,7 @@ router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Respo
           gateway_type: true,
           is_active: true,
           is_default: true,
-          // Don't expose sensitive config data
+          config: true, // Include config for public credentials (application_id, location_id for Square)
         },
         orderBy: [
           { is_default: 'desc' },
@@ -267,12 +267,11 @@ router.post('/:tenantId/payment-gateways', requireAuth, checkTenantAccess, async
       });
     }
 
-    // If this is set as default, unset other defaults for this gateway type
+    // If this is set as default, unset all other defaults for this tenant
     if (is_default) {
       await prisma.tenant_payment_gateways.updateMany({
         where: {
           tenant_id: tenantId,
-          gateway_type,
           is_default: true,
         },
         data: {

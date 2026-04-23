@@ -198,4 +198,34 @@ router.post('/refresh', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * Manually register a Square test token (for sandbox testing)
+ * POST /api/oauth/square/register-test-token
+ */
+router.post('/register-test-token', requireAuth, async (req, res) => {
+  try {
+    const { tenantId, accessToken, refreshToken, merchantId, applicationId, locationId } = req.body;
+
+    if (!tenantId || !accessToken) {
+      return res.status(400).json({ error: 'tenantId and accessToken are required' });
+    }
+
+    if (!applicationId || !locationId) {
+      return res.status(400).json({ error: 'applicationId and locationId are required for Square SDK initialization' });
+    }
+
+    // Store the test token with config
+    await squareOAuth.storeTestToken(tenantId, accessToken, refreshToken, merchantId, applicationId, locationId);
+
+    res.json({ 
+      success: true, 
+      message: 'Square test token registered successfully',
+      note: 'This token will be used for Square API calls for this tenant'
+    });
+  } catch (error: any) {
+    console.error('[Square OAuth] Register test token error:', error);
+    res.status(500).json({ error: error.message || 'Failed to register test token' });
+  }
+});
+
 export default router;

@@ -7,8 +7,8 @@ import MultiCartCheckout from '@/components/cart/MultiCartCheckout';
 function MultiCartCheckoutContent() {
   const { carts, clearCart } = useMultiCart();
 
-  const handleCartProcessed = (tenantId: string, gatewayType: string) => {
-    clearCart(tenantId, gatewayType);
+  const handleCartProcessed = (tenantId: string) => {
+    clearCart(tenantId);
   };
 
   return (
