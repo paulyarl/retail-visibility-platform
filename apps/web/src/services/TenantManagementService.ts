@@ -1,6 +1,7 @@
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 import { TenantApiSingleton } from '../providers/base/TenantApiSingleton';
 import { StoreStatus } from '@/hooks/useStoreStatus';
+import { Tenant } from './TenantTierService';
 
 export interface TenantUsage {
   items: number;
@@ -217,6 +218,26 @@ class TenantManagementService extends TenantApiSingleton {
     } catch (error) {
       this.logError('Failed to get tenant usage', error);
       return null;
+    }
+  }
+
+  /**
+   * Get all tenants (for platform admin operations)
+   * Uses the /api/tenants endpoint
+   */
+  async getAllTenants(): Promise<Tenant[]> {
+    try {
+      const response = await this.makeDefaultRequest<{ tenants: Tenant[] }>(
+        '/api/tenants',
+        {},
+        'all-tenants',
+        this.PROFILE_TTL
+      );
+
+      return response.data?.tenants || [];
+    } catch (error) {
+      console.error('[TenantManagementService] Failed to get all tenants:', error);
+      return [];
     }
   }
 

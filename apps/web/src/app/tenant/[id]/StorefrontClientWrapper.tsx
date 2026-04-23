@@ -40,6 +40,7 @@ import LastViewed from '@/components/directory/LastViewed';
 import FulfillmentOptionsPane from '@/components/storefront/FulfillmentOptionsPane';
 import CollapsibleCatalogSidebar from '@/components/storefront/CollapsibleCatalogSidebar';
 import { StorefrontRecommendations } from './StorefrontClient';
+import { TenantQRCode } from '@/components/public/TenantQRCode';
 
 // import { useStoreContactData } from '@/hooks/useStoreContactData';
 
@@ -753,6 +754,16 @@ export default function StorefrontClientWrapper({
                       tenantId={tenantId}
                       categories={categories}
                       totalProducts={totalItems || 0}
+                    />
+                    {/* QR Code - under categories */}
+                    <TenantQRCode
+                      url={typeof window !== 'undefined' ? window.location.href : ''}
+                      tenantId={tenantId}
+                      label="Scan to Share"
+                      downloadName={businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+                      size={200}
+                      showDownload={true}
+                      className="mt-4"
                     />
                   </div>
 

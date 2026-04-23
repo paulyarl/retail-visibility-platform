@@ -123,6 +123,51 @@ export interface UpdateMerchantFeeRequest {
   platform_fee_override_percent: number | null;
 }
 
+export interface FeeTier {
+  id: string;
+  tier_name: string;
+  fee_percentage: string;
+  fee_fixed_cents: number;
+  min_transaction_cents: number;
+  max_transaction_cents: number | null;
+  min_transaction_count: number;
+  description: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeeOverride {
+  id: string;
+  tenant_id: string;
+  tenant_name?: string;
+  tenant_tier?: string;
+  fee_percentage: string;
+  fee_fixed_cents: number;
+  reason: string;
+  expires_at: string | null;
+  created_at: string;
+  approved_by: string;
+}
+
+export interface CreateFeeTierRequest {
+  tier_name: string;
+  fee_percentage: number;
+  fee_fixed_cents?: number;
+  min_transaction_cents?: number;
+  max_transaction_cents?: number | null;
+  min_transaction_count?: number;
+  description?: string;
+}
+
+export interface CreateFeeOverrideRequest {
+  tenant_id: string;
+  fee_percentage: number;
+  fee_fixed_cents?: number;
+  reason?: string;
+  expires_at?: string | null;
+}
+
 // ====================
 // SERVICE
 // ====================
@@ -530,6 +575,184 @@ class PlatformRevenueService extends AdminApiSingleton {
       payout_id: response.data?.payout_id || '',
       amount_cents: response.data?.amount_cents || 0,
     };
+  }
+
+  // ====================
+  // FEE TIERS
+  // ====================
+
+  /**
+   * Get all fee tiers
+   */
+  async getFeeTiers(): Promise<FeeTier[]> {
+    const response = await this.makeDefaultRequest<{
+      success: boolean;
+      tiers: FeeTier[];
+    }>(
+      '/api/admin/platform-revenue/fee-tiers',
+      {},
+      'fee-tiers',
+      5 * 60 * 1000
+    );
+
+    if (!response?.data?.success) {
+      console.error('[PlatformRevenueService] Failed to get fee tiers:', response?.error);
+      return [];
+    }
+
+    return response.data?.tiers || [];
+  }
+
+  /**
+   * Create a fee tier
+   */
+  async createFeeTier(data: CreateFeeTierRequest): Promise<FeeTier | null> {
+    const response = await this.makeDefaultRequest<{
+      success: boolean;
+      tier: FeeTier;
+    }>(
+      '/api/admin/platform-revenue/fee-tiers',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+      'create-fee-tier',
+      0
+    );
+
+    if (!response?.data?.success) {
+      console.error('[PlatformRevenueService] Failed to create fee tier:', response?.error);
+      return null;
+    }
+
+    this.invalidateCache('fee-tiers');
+    return response.data?.tier || null;
+  }
+
+  /**
+   * Update a fee tier
+   */
+  async updateFeeTier(id: string, data: Partial<CreateFeeTierRequest>): Promise<FeeTier | null> {
+    const response = await this.makeDefaultRequest<{
+      success: boolean;
+      tier: FeeTier;
+    }>(
+      `/api/admin/platform-revenue/fee-tiers/${id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      },
+      'update-fee-tier',
+      0
+    );
+
+    if (!response?.data?.success) {
+      console.error('[PlatformRevenueService] Failed to update fee tier:', response?.error);
+      return null;
+    }
+
+    this.invalidateCache('fee-tiers');
+    return response.data?.tier || null;
+  }
+
+  /**
+   * Delete a fee tier
+   */
+  async deleteFeeTier(id: string): Promise<boolean> {
+    const response = await this.makeDefaultRequest<{
+      success: boolean;
+    }>(
+      `/api/admin/platform-revenue/fee-tiers/${id}`,
+      {
+        method: 'DELETE',
+      },
+      'delete-fee-tier',
+      0
+    );
+
+    if (!response?.data?.success) {
+      console.error('[PlatformRevenueService] Failed to delete fee tier:', response?.error);
+      return false;
+    }
+
+    this.invalidateCache('fee-tiers');
+    return true;
+  }
+
+  // ====================
+  // FEE OVERRIDES
+  // ====================
+
+  /**
+   * Get all fee overrides
+   */
+  async getFeeOverrides(): Promise<FeeOverride[]> {
+    const response = await this.makeDefaultRequest<{
+      success: boolean;
+      overrides: FeeOverride[];
+    }>(
+      '/api/admin/platform-revenue/fee-overrides',
+      {},
+      'fee-overrides',
+      5 * 60 * 1000
+    );
+
+    if (!response?.data?.success) {
+      console.error('[PlatformRevenueService] Failed to get fee overrides:', response?.error);
+      return [];
+    }
+
+    return response.data?.overrides || [];
+  }
+
+  /**
+   * Create a fee override
+   */
+  async createFeeOverride(data: CreateFeeOverrideRequest): Promise<FeeOverride | null> {
+    const response = await this.makeDefaultRequest<{
+      success: boolean;
+      override: FeeOverride;
+    }>(
+      '/api/admin/platform-revenue/fee-overrides',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+      'create-fee-override',
+      0
+    );
+
+    if (!response?.data?.success) {
+      console.error('[PlatformRevenueService] Failed to create fee override:', response?.error);
+      return null;
+    }
+
+    this.invalidateCache('fee-overrides');
+    return response.data?.override || null;
+  }
+
+  /**
+   * Delete a fee override
+   */
+  async deleteFeeOverride(id: string): Promise<boolean> {
+    const response = await this.makeDefaultRequest<{
+      success: boolean;
+    }>(
+      `/api/admin/platform-revenue/fee-overrides/${id}`,
+      {
+        method: 'DELETE',
+      },
+      'delete-fee-override',
+      0
+    );
+
+    if (!response?.data?.success) {
+      console.error('[PlatformRevenueService] Failed to delete fee override:', response?.error);
+      return false;
+    }
+
+    this.invalidateCache('fee-overrides');
+    return true;
   }
 }
 

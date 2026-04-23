@@ -424,7 +424,18 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
       where: {
         id: orderId,
         tenant_id: tenantId
-      }
+      },
+      include: {
+        payments: {
+          where: { is_deposit_payment: true },
+          select: {
+            id: true,
+            amount_cents: true,
+            platform_fee_cents: true,
+            payment_status: true,
+          },
+        },
+      },
     });
 
     if (!existingOrder) {
@@ -444,6 +455,31 @@ router.put('/tenants/:tenantId/orders/:orderId/fulfillment', authenticateToken, 
         // Add shipping provider if provided
         if (shippingProvider) {
           updateData.shipping_provider = shippingProvider;
+        }
+
+        // Record platform revenue for deposit fulfillment
+        const depositPayment = existingOrder?.payments?.[0];
+        if (depositPayment && depositPayment.platform_fee_cents && depositPayment.platform_fee_cents > 0) {
+          try {
+            const { stripeConnectService } = await import('../services/payments/StripeConnectService');
+            const isActive = await stripeConnectService.isRevenueCollectionActive();
+            if (isActive) {
+              await stripeConnectService.recordRevenueTransaction({
+                tenantId: tenantId,
+                orderId: orderId,
+                paymentId: depositPayment.id,
+                transactionType: 'transaction_fee',
+                grossAmountCents: depositPayment.amount_cents,
+                platformFeeCents: depositPayment.platform_fee_cents,
+                gatewayFeeCents: 0,
+                netAmountCents: depositPayment.amount_cents - depositPayment.platform_fee_cents,
+              });
+              console.log('[Tenant Orders] Recorded deposit revenue:', depositPayment.platform_fee_cents, 'cents');
+            }
+          } catch (revenueError) {
+            console.error('[Tenant Orders] Failed to record deposit revenue:', revenueError);
+            // Don't fail the fulfillment if revenue recording fails
+          }
         }
       } else if (fulfillmentStatus === 'cancelled') {
         updateData.cancelled_at = new Date();

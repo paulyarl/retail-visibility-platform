@@ -792,34 +792,12 @@ export default function StorefrontFeaturedProducts({
           return;
         }
         
-        // Use the correct API endpoint that has category data
-        const response = await fetch(`/api/public/products?tenantId=${tenantId}&limit=50`, {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          cache: 'no-store', // We'll handle caching in the component
-        });
+        // Use the service method for caching and context awareness
+        const products = await storefrontSingletonService.getPublicProducts(tenantId, { limit: 50 });
         
-        const data = await response.json();
-        
-        // Debug: Log what the API actually returns
-        // console.log('[StorefrontFeaturedProducts] API Response:', {
-        //   success: data.success,
-        //   count: data.products?.length || 0,
-        //   sample: data.products?.slice(0, 2).map((p: any) => ({
-        //     id: p.id,
-        //     name: p.name,
-        //     categoryName: p.categoryName,
-        //     categorySlug: p.categorySlug,
-        //     allFields: Object.keys(p)
-        //   }))
-        // });
-        
-        //console.log(`ShopsFeaturedProducts data:`, data);
-        
-        if (data.products && isMounted) {
+        if (products && products.length > 0 && isMounted) {
           // Transform the data to match the expected format with all rich fields
-          const transformedProducts = data.products.map((product: any) => ({
+          const transformedProducts = products.map((product: any) => ({
             // Basic product info
             id: product.id,
             sku: product.sku,

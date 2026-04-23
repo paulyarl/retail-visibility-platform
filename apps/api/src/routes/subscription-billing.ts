@@ -938,6 +938,30 @@ router.post('/paypal/capture-order', requirePermission('CAN_MANAGE_TENANT_BILLIN
     
     await billingService.updateTenantTier(tenantId, tier);
 
+    // Record platform revenue for subscription
+    // Full subscription amount is platform revenue (SaaS subscription model)
+    try {
+      const gatewayFeeCents = Math.round(capture.amount * 0.029 + 30); // Approximate PayPal fee
+      
+      const { stripeConnectService } = await import('../services/payments/StripeConnectService');
+      const isActive = await stripeConnectService.isRevenueCollectionActive();
+      if (isActive) {
+        await stripeConnectService.recordRevenueTransaction({
+          tenantId,
+          transactionType: 'subscription',
+          grossAmountCents: capture.amount,
+          platformFeeCents: capture.amount, // Full subscription = platform revenue
+          gatewayFeeCents,
+          netAmountCents: capture.amount - gatewayFeeCents, // Platform keeps all after gateway fees
+          stripeTransactionId: capture.captureId,
+        });
+        console.log('[Subscription] Recorded PayPal revenue transaction:', capture.amount, 'cents platform revenue');
+      }
+    } catch (revenueError) {
+      console.error('[Subscription] Failed to record PayPal revenue transaction:', revenueError);
+      // Don't fail the capture if revenue recording fails
+    }
+
     res.json({
       success: true,
       data: {

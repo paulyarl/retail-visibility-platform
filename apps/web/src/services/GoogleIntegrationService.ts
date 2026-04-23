@@ -84,7 +84,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
   async getAuthUrl(tenantId: string): Promise<GoogleAuthUrl> {
     try {
       const result = await this.makeDefaultRequest<GoogleAuthUrl>(
-        `/google/auth?tenantId=${tenantId}`,
+        `/api/google/auth?tenantId=${tenantId}`,
         {},
         `google-auth-${tenantId}`
       );
@@ -106,8 +106,8 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
   async disconnect(tenantId: string): Promise<void> {
     try {
       const result = await this.makeDefaultRequest<void>(
-        `/google/disconnect?tenantId=${tenantId}`,
-        { method: 'POST' },
+        `/api/google/disconnect?tenantId=${tenantId}`,
+        { method: 'DELETE' },
         `google-disconnect-${tenantId}`
       );
       
@@ -128,7 +128,7 @@ class GoogleIntegrationService extends AuthenticatedApiSingleton {
   async getStatus(tenantId: string): Promise<GoogleAuthStatus> {
     try {
       const result = await this.makeDefaultRequest<GoogleAuthStatus>(
-        `/google/status?tenantId=${tenantId}`,
+        `/api/google/status?tenantId=${tenantId}`,
         {},
         `google-status-${tenantId}`
       );

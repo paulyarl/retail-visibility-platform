@@ -71,6 +71,14 @@ router.post('/payments/charge', async (req: Request, res: Response) => {
       },
     });
 
+    // Calculate platform fees using tier-based pricing
+    const { PlatformFeeCalculator } = await import('../services/payments/PlatformFeeCalculator');
+    const fees = await PlatformFeeCalculator.calculateFees(
+      order.tenant_id,
+      order.total_cents,
+      0 // Gateway fee will be updated by webhook
+    );
+
     console.log('PaymentIntent created:', {
       id: paymentIntent.id,
       client_secret: paymentIntent.client_secret ? paymentIntent.client_secret.substring(0, 10) + '...' : 'null',
@@ -87,9 +95,13 @@ router.post('/payments/charge', async (req: Request, res: Response) => {
         gateway_type: gatewayType,
         payment_method: paymentMethod.type === 'card' ? 'credit_card' : paymentMethod.type,
         amount_cents: order.total_cents,
-        platform_fee_cents: Math.round(order.total_cents * 0.03), // 3% platform fee
-        gateway_fee_cents: 0, // Will be updated by webhook
-        net_amount_cents: order.total_cents,
+        platform_fee_cents: fees.platformFeeCents,
+        platform_fee_percentage: fees.platformFeePercentage,
+        gateway_fee_cents: fees.gatewayFeeCents,
+        net_amount_cents: fees.netAmountCents,
+        total_fees_cents: fees.totalFeesCents,
+        fee_waived: fees.feeWaived,
+        fee_waived_reason: fees.feeWaivedReason,
         payment_status: 'pending',
         gateway_transaction_id: paymentIntent.id,
         gateway_response: paymentIntent,

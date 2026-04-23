@@ -5,6 +5,7 @@
  */
 
 import { TenantApiSingleton } from '@/providers/base/TenantApiSingleton';
+import { RequestType, ResponseType } from '@/providers/base/FlexibleApiSingleton';
 import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 
 export interface TierPricing {
@@ -323,6 +324,43 @@ class SubscriptionBillingService extends TenantApiSingleton {
     }
     
     return response.data!;
+  }
+
+  /**
+   * Download invoice PDF
+   * Uses the /api/subscription/invoices/:id/pdf endpoint
+   * Now uses responseType option to control response parsing
+   */
+  async downloadInvoicePdf(invoiceId: string, tenantId: string): Promise<Blob> {
+    if (!invoiceId || !tenantId) {
+      throw new Error('Invoice ID and tenant ID are required');
+    }
+
+    // Use makeDefaultRequest with responseType BLOB to get proper blob response
+    const result = await this.makeDefaultRequest<Blob>(
+      `/api/subscription/invoices/${invoiceId}/pdf`,
+      {
+        method: 'GET',
+        headers: {
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json',
+        },
+      },
+      `subscription-invoice-pdf-${invoiceId}`,
+      0, // No caching for PDF downloads
+      {
+        responseType: ResponseType.BLOB, // Use BLOB response type
+        requestType: RequestType.TENANT, // Explicitly set request type
+        context: AppContext.TENANT,
+        isolation: CacheIsolation.TENANT,
+      }
+    );
+    
+    if (!result.success) {
+      throw new Error(`Failed to download invoice PDF: ${result.error}`);
+    }
+    
+    return result.data!;
   }
 
   // ==================

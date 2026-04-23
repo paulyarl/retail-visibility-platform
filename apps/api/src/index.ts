@@ -6960,14 +6960,17 @@ import checkoutRoutes from './routes/checkout';
 import checkoutPaymentsRoutes from './routes/checkout-payments';
 import paypalRoutes from './routes/checkout/paypal';
 import squareCheckoutRoutes from './routes/checkout/square';
+import stripeCheckoutRoutes from './routes/checkout/stripe';
 import depositForfeitureRoutes from './routes/deposit-forfeiture';
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/checkout', checkoutPaymentsRoutes);
 app.use('/api/checkout/paypal', paypalRoutes);
 app.use('/api/checkout/square', squareCheckoutRoutes);
+app.use('/api/checkout/stripe', stripeCheckoutRoutes);
 app.use('/api/deposit-forfeiture', depositForfeitureRoutes);
 console.log('✅ PayPal checkout routes mounted at /api/checkout/paypal');
 console.log('✅ Square checkout routes mounted at /api/checkout/square');
+console.log('✅ Stripe checkout routes mounted at /api/checkout/stripe');
 console.log('✅ Deposit forfeiture routes mounted at /api/deposit-forfeiture');
 
 /* ------------------------------ buyer orders (Public - No Auth) ------------------------------ */

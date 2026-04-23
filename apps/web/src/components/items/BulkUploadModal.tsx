@@ -65,19 +65,16 @@ export default function BulkUploadModal({ tenantId, onClose, onSuccess }: BulkUp
       for (let i = 0; i < items.length; i += batchSize) {
         const batch = items.slice(i, i + batchSize);
         
-        // Upload batch
+        // Upload batch using service
+        const { itemsService } = await import('@/services/ItemsService');
         const promises = batch.map(async (item) => {
           try {
-            const res = await fetch(`/api/items?tenantId=${tenantId}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(item)
-            });
-
-            if (!res.ok) {
-              const error = await res.json();
-              throw new Error(error.message || 'Upload failed');
-            }
+            // Filter out incompatible status values
+            const cleanItem = {
+              ...item,
+              status: item.status === 'archived' ? 'draft' : item.status
+            };
+            await itemsService.createItemLegacy(tenantId, cleanItem);
           } catch (error) {
             uploadErrors.push(`${item.sku}: ${error instanceof Error ? error.message : 'Failed'}`);
           }

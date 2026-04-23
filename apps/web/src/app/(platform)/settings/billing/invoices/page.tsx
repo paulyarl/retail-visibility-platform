@@ -79,17 +79,8 @@ export default function InvoiceHistoryPage() {
   const handleDownloadInvoice = async (invoice: Invoice) => {
     try {
       const tenantId = user?.tenants?.[0]?.id || '';
-      const response = await fetch(`/api/subscription/invoices/${invoice.id}/pdf`, {
-        headers: {
-          'X-Tenant-ID': tenantId,
-        },
-      });
+      const blob = await subscriptionBillingService.downloadInvoicePdf(invoice.id, tenantId);
       
-      if (!response.ok) {
-        throw new Error('Failed to generate PDF');
-      }
-      
-      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

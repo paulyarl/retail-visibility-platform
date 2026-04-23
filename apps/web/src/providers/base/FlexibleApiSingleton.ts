@@ -11,7 +11,7 @@
  * Default request type can be overridden per service
  */
 
-import { EnhancedFlexibleApiSingleton, RequestType, RequestTarget, SingletonCacheOptions, PublicRequestOptions, TenantRequestOptions, AuthenticatedRequestOptions, AdminRequestOptions, ExternalRequestOptions, SystemRequestOptions, RequestOptions, ApiResult, AuthenticatedApiResponse, TenantApiResponse, AdminApiResponse, PublicApiResponse, ExternalApiResponse, SystemApiResponse, ApiEnhancedCacheOptions } from './EnhancedFlexibleApiSingleton';
+import { EnhancedFlexibleApiSingleton, RequestType, RequestTarget, ResponseType, SingletonCacheOptions, PublicRequestOptions, TenantRequestOptions, AuthenticatedRequestOptions, AdminRequestOptions, ExternalRequestOptions, SystemRequestOptions, RequestOptions, ApiResult, AuthenticatedApiResponse, TenantApiResponse, AdminApiResponse, PublicApiResponse, ExternalApiResponse, SystemApiResponse, ApiEnhancedCacheOptions } from './EnhancedFlexibleApiSingleton';
 import { clientTenantContextManager } from '@/lib/clientTenantContext';
 import { AppContext, CacheIsolation } from '../../utils/contextCacheManager';
 import { ContextAwareCacheOptions } from '../../services/contextAwareCacheService';
@@ -20,7 +20,8 @@ import { EnhancedCacheOptions } from '@/utils/contextAwareCacheManager';
 // Re-export all types for compatibility with existing services
 export {
   RequestType,
-  RequestTarget
+  RequestTarget,
+  ResponseType
 } from './EnhancedFlexibleApiSingleton';
 
 export type {
@@ -170,7 +171,8 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
    */
   private async executeUnifiedRequest<T>(
     url: string,
-    setupResult: { options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget }
+    setupResult: { options: RequestInit; cacheKey?: string; ttl: number; target: RequestTarget },
+    responseType?: ResponseType
   ): Promise<ApiResult<T>> {
     try {
       const response = await this.fetchWithCache(
@@ -247,7 +249,23 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
         } as ApiResult<T>;
       }
 
-      const data = await response.json();
+      // Handle different response types based on responseType option
+      let data: T;
+      switch (responseType) {
+        case ResponseType.BLOB:
+          data = (await response.blob()) as unknown as T;
+          break;
+        case ResponseType.TEXT:
+          data = (await response.text()) as unknown as T;
+          break;
+        case ResponseType.NONE:
+          data = null as T;
+          break;
+        case ResponseType.JSON:
+        default:
+          data = await response.json();
+          break;
+      }
       
       return {
         success: true,
@@ -1027,7 +1045,7 @@ export abstract class FlexibleApiSingleton extends EnhancedFlexibleApiSingleton 
 
     
     // Delegate to unified execution - single source of truth
-    return await this.executeUnifiedRequest<T>(url, setupResult);
+    return await this.executeUnifiedRequest<T>(url, setupResult, requestOptions?.responseType);
   }
 
   // ====================

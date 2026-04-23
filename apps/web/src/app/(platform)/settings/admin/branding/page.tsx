@@ -11,6 +11,7 @@ import { Upload, Palette, Type, Image as ImageIcon, Settings, Save, Loader2 } fr
 import PageHeader from '@/components/PageHeader';
 import { uploadImage, ImageUploadPresets, getAcceptString } from '@/lib/image-upload';
 import Image from 'next/image';
+import { brandingSettingsService } from '@/services/BrandingSettingsSingletonService';
 
 interface PlatformBranding {
   platformName: string;
@@ -75,13 +76,39 @@ export default function PlatformBrandingPage() {
 
   const fetchBranding = async () => {
     try {
-      const response = await fetch('/api/platform-settings');
-      if (response.ok) {
-        const data = await response.json();
-        setBranding(data);
-        setLogoPreview(data.logoUrl || '');
-        setFaviconPreview(data.faviconUrl || '');
-        setBannerPreview(data.bannerUrl || '');
+      const data = await brandingSettingsService.getBrandingSettings();
+      if (data) {
+        // Map PlatformSettings to PlatformBranding interface
+        const brandingData: PlatformBranding = {
+          platformName: data.platformName || '',
+          platformDescription: data.branding?.description || '',
+          logoUrl: data.logoUrl || null,
+          faviconUrl: data.faviconUrl || null,
+          bannerUrl: data.bannerUrl || null,
+          themePreset: data.themePreset || 'default',
+          themeColors: data.themeColors || {
+            primary: '#000000',
+            accent: '#000000',
+            neutral: '#000000'
+          },
+          themeFontFamily: data.themeFontFamily || 'default',
+          themeBorderRadius: data.themeBorderRadius || 'default',
+          themeButtonSize: data.themeButtonSize || 'default',
+          themeSpacing: data.themeSpacing || 1,
+          contactEmail: data.contactEmail || '',
+          contactPhone: data.contactPhone || '',
+          contactAddress: data.contactAddress || '',
+          contactWebsite: data.contactWebsite || '',
+          socialFacebook: data.socialFacebook || '',
+          socialTwitter: data.socialTwitter || '',
+          socialInstagram: data.socialInstagram || '',
+          socialLinkedIn: data.socialLinkedIn || '',
+          socialYoutube: data.socialYoutube || ''
+        };
+        setBranding(brandingData);
+        setLogoPreview(brandingData.logoUrl || '');
+        setFaviconPreview(brandingData.faviconUrl || '');
+        setBannerPreview(brandingData.bannerUrl || '');
         
         // Initialize contact and social media fields
         setContactEmail(data.contactEmail || '');
@@ -150,14 +177,37 @@ export default function PlatformBrandingPage() {
       formData.append('socialLinkedIn', socialLinkedIn);
       formData.append('socialYoutube', socialYoutube);
 
-      const response = await fetch('/api/platform-settings', {
-        method: 'POST',
-        body: formData,
-      });
+      const updatedBranding = await brandingSettingsService.updateBrandingSettingsWithFormData(formData);
 
-      if (response.ok) {
-        const updatedBranding = await response.json();
-        setBranding(updatedBranding);
+      if (updatedBranding) {
+        // Map PlatformSettings to PlatformBranding interface
+        const brandingData: PlatformBranding = {
+          platformName: updatedBranding.platformName || '',
+          platformDescription: updatedBranding.branding?.description || '',
+          logoUrl: updatedBranding.logoUrl || null,
+          faviconUrl: updatedBranding.faviconUrl || null,
+          bannerUrl: updatedBranding.bannerUrl || null,
+          themePreset: updatedBranding.themePreset || 'default',
+          themeColors: updatedBranding.themeColors || {
+            primary: '#000000',
+            accent: '#000000',
+            neutral: '#000000'
+          },
+          themeFontFamily: updatedBranding.themeFontFamily || 'default',
+          themeBorderRadius: updatedBranding.themeBorderRadius || 'default',
+          themeButtonSize: updatedBranding.themeButtonSize || 'default',
+          themeSpacing: updatedBranding.themeSpacing || 1,
+          contactEmail: updatedBranding.contactEmail || '',
+          contactPhone: updatedBranding.contactPhone || '',
+          contactAddress: updatedBranding.contactAddress || '',
+          contactWebsite: updatedBranding.contactWebsite || '',
+          socialFacebook: updatedBranding.socialFacebook || '',
+          socialTwitter: updatedBranding.socialTwitter || '',
+          socialInstagram: updatedBranding.socialInstagram || '',
+          socialLinkedIn: updatedBranding.socialLinkedIn || '',
+          socialYoutube: updatedBranding.socialYoutube || ''
+        };
+        setBranding(brandingData);
         setSuccess('Platform branding updated successfully!');
         toast('Platform branding updated successfully', { variant: 'success' });
       } else {

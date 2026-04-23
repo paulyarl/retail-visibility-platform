@@ -201,18 +201,69 @@ class ItemsService extends TenantApiSingleton {
         body: JSON.stringify(itemData)
       },
       `create-item-${tenantId}`,
-      0 // No caching for write operations
+      this.CLONE_TTL
     );
 
     if (!response.success) {
       console.error('[ItemsService] Failed to create item:', response.error);
-      return null;
+      throw response.error;
     }
 
     // Invalidate items cache for this tenant
-    await this.invalidateCache(`items-${tenantId}`);
+    await this.invalidateCache(`items-${tenantId}*`);
     
     return response.data || null;
+  }
+
+  /**
+   * Create item using legacy endpoint (for bulk upload compatibility)
+   * Uses the /api/items?tenantId=${tenantId} endpoint
+   */
+  async createItemLegacy(tenantId: string, itemData: Partial<Item>): Promise<Item | null> {
+    const response = await this.makeDefaultRequest<Item>(
+      `/api/items?tenantId=${tenantId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(itemData)
+      },
+      `create-item-legacy-${tenantId}`,
+      this.CLONE_TTL
+    );
+
+    if (!response.success) {
+      console.error('[ItemsService] Failed to create item (legacy):', response.error);
+      throw response.error;
+    }
+
+    // Invalidate items cache for this tenant
+    await this.invalidateCache(`items-${tenantId}*`);
+    
+    return response.data || null;
+  }
+
+  /**
+   * Create items in bulk
+   */
+  async createItemBulk(tenantId: string, itemData: Partial<Item>[]): Promise<Item[]> {
+    const response = await this.makeDefaultRequest<Item[]>(
+      `/api/tenants/${tenantId}/items/bulk`,
+      {
+        method: 'POST',
+        body: JSON.stringify(itemData)
+      },
+      `create-item-bulk-${tenantId}`,
+      this.CLONE_TTL
+    );
+
+    if (!response.success) {
+      console.error('[ItemsService] Failed to create items in bulk:', response.error);
+      throw response.error;
+    }
+
+    // Invalidate items cache for this tenant
+    await this.invalidateCache(`items-${tenantId}*`);
+    
+    return response.data || [];
   }
 
   /**

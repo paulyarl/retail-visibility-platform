@@ -283,6 +283,14 @@ router.post('/orders', async (req: Request, res: Response) => {
       },
     });
 
+    // Calculate platform fees using tier-based pricing
+    const { PlatformFeeCalculator } = await import('../services/payments/PlatformFeeCalculator');
+    const fees = await PlatformFeeCalculator.calculateFees(
+      order.tenant_id,
+      paymentAmount,
+      0 // Gateway fee will be updated later
+    );
+
     // Create payment record for the order
     const payment = await prisma.payments.create({
       data: {
@@ -293,9 +301,13 @@ router.post('/orders', async (req: Request, res: Response) => {
         payment_method: 'paypal',
         // For deposit orders, collect deposit amount; for full payment, collect total
         amount_cents: paymentAmount,
-        platform_fee_cents: Math.round(paymentAmount * 0.03), // 3% platform fee
-        gateway_fee_cents: 0,
-        net_amount_cents: paymentAmount,
+        platform_fee_cents: fees.platformFeeCents,
+        platform_fee_percentage: fees.platformFeePercentage,
+        gateway_fee_cents: fees.gatewayFeeCents,
+        net_amount_cents: fees.netAmountCents,
+        total_fees_cents: fees.totalFeesCents,
+        fee_waived: fees.feeWaived,
+        fee_waived_reason: fees.feeWaivedReason,
         payment_status: 'pending',
         updated_at: new Date(),
         // Tier 3 deposit payment fields

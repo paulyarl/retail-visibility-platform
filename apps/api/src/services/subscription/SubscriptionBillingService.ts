@@ -669,25 +669,27 @@ export class SubscriptionBillingService {
         
         if (invoice && invoice.status === 'paid') {
           // Record platform revenue for subscription
-          const config = await prisma.platform_payment_config.findUnique({
-            where: { id: 'platform_main' },
-          });
-          const platformFeePercent = config?.subscription_fee_percent ?? 0;
+          // Full subscription amount is platform revenue (SaaS subscription model)
+          const gatewayFeeCents = Math.round(amount * 0.029 + 30); // Approximate Stripe fee
           
-          if (platformFeePercent > 0) {
-            const platformFeeCents = Math.round((amount * platformFeePercent) / 100);
-            const gatewayFeeCents = Math.round(amount * 0.029 + 30); // Approximate Stripe fee
-            
+          try {
             const { stripeConnectService } = await import('../payments/StripeConnectService');
-            await stripeConnectService.recordRevenueTransaction({
-              tenantId,
-              transactionType: 'subscription',
-              grossAmountCents: amount,
-              platformFeeCents,
-              gatewayFeeCents,
-              netAmountCents: amount - platformFeeCents - gatewayFeeCents,
-              stripeTransactionId: subscription.id,
-            });
+            const isActive = await stripeConnectService.isRevenueCollectionActive();
+            if (isActive) {
+              await stripeConnectService.recordRevenueTransaction({
+                tenantId,
+                transactionType: 'subscription',
+                grossAmountCents: amount,
+                platformFeeCents: amount, // Full subscription = platform revenue
+                gatewayFeeCents,
+                netAmountCents: amount - gatewayFeeCents, // Platform keeps all after gateway fees
+                stripeTransactionId: subscription.id,
+              });
+              console.log('[Subscription] Recorded revenue transaction:', amount, 'cents platform revenue');
+            }
+          } catch (revenueError) {
+            console.error('[Subscription] Failed to record revenue transaction:', revenueError);
+            // Don't fail the subscription if revenue recording fails
           }
 
           // Payment succeeded immediately

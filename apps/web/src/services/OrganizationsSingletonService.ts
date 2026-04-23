@@ -260,6 +260,63 @@ class OrganizationsSingletonService extends TenantApiSingleton {
     return result.data || null;
   }
 
+  /**
+   * Propagate items to multiple tenants in an organization
+   * Uses the /api/organizations/:id/items/propagate endpoint
+   */
+  async propagateItems(
+    organizationId: string,
+    options: {
+      sourceItemId: string;
+      targetTenantIds: string[];
+      mode: 'create_only' | 'update_only' | 'create_or_update';
+    }
+  ): Promise<{
+    success: boolean;
+    summary: {
+      created: number;
+      updated: number;
+      skipped: number;
+      errors: number;
+    };
+    results: Array<{
+      tenantId: string;
+      action: 'created' | 'updated' | 'skipped' | 'error';
+      itemId?: string;
+      error?: string;
+    }>;
+  } | null> {
+    if (!organizationId) {
+      console.error('[OrganizationsSingleton] propagateItems: organizationId is required');
+      return null;
+    }
+
+    if (!options.sourceItemId || !options.targetTenantIds?.length) {
+      console.error('[OrganizationsSingleton] propagateItems: sourceItemId and targetTenantIds are required');
+      return null;
+    }
+
+    const result = await this.makeDefaultRequest<any>(
+      `/api/organizations/${organizationId}/items/propagate`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          sourceItemId: options.sourceItemId,
+          targetTenantIds: options.targetTenantIds,
+          mode: options.mode,
+        })
+      },
+      `org-propagate-items-${organizationId}-${options.sourceItemId}`
+    );
+
+    if (!result.success) {
+      console.error('[OrganizationsSingleton] Failed to propagate items:', result.error);
+      return null;
+    }
+
+    return result.data || null;
+  }
+
 
   private invalidateOrganizationCache(organizationId: string) {
     this.invalidateCache(`tenant-organization-${organizationId}`);

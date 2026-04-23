@@ -52,16 +52,13 @@ export default function EditBusinessProfileModal({
       setUploadingLogo(true);
       setError(null);
 
-      // Fetch the image from the URL
-      const response = await fetch(url);
-      if (!response.ok) {
+      // Fetch the image from URL using service with caching
+      const { imageFetchService } = await import('@/services/ImageFetchService');
+      const file = await imageFetchService.fetchExternalImageAsFile(url, 'logo.png');
+      
+      if (!file) {
         throw new Error('Failed to fetch image from URL');
       }
-
-      const blob = await response.blob();
-      
-      // Convert blob to File
-      const file = new File([blob], 'logo.png', { type: blob.type || 'image/png' });
 
       // Use centralized image upload middleware
       const result = await uploadImage(file, ImageUploadPresets.logo);

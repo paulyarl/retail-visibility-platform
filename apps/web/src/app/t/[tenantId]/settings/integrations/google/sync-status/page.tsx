@@ -92,9 +92,9 @@ export default function GBPSyncStatusPage() {
         const profile = await platformHomeService.getTenantProfile(tenantId);
         setTenantData(profile);
 
-        // Fetch business hours
-        const hoursRes = await fetch(`/api/business-hours/${tenantId}`);
-        const hours = hoursRes.ok ? await hoursRes.json() : null;
+        // Fetch business hours using service
+        const { businessHoursService } = await import('@/services/BusinessHoursService');
+        const hours = await businessHoursService.getBusinessHours(tenantId);
 
         // Fetch linked GBP location
         const linkedLocData = await platformHomeService.getGoogleBusinessLinkedLocation(tenantId);

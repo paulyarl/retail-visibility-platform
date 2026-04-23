@@ -56,12 +56,12 @@ export function PayPalSmartButtons({
   // Load PayPal SDK
   useEffect(() => {
     const loadPayPalSDK = async () => {
-      // Check if PayPal is configured on the backend
+      // Check if PayPal is configured on the backend using service
       try {
-        const response = await fetch('/api/subscription/paypal/config');
-        const data = await response.json();
+        const { subscriptionBillingService } = await import('@/services/SubscriptionBillingService');
+        const data = await subscriptionBillingService.getPayPalConfig();
         
-        if (!data.success || !data.data?.configured) {
+        if (!data.configured) {
           setError('PayPal is not configured');
           setLoading(false);
           return;
@@ -251,21 +251,12 @@ export function SavePayPalButton({ tenantId, onSuccess, onError }: SavePayPalPro
   const handleSavePayPal = async () => {
     setLoading(true);
     try {
-      // Create billing agreement
-      const response = await fetch('/api/subscription/paypal/create-billing-agreement', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to create billing agreement');
-      }
+      // Create billing agreement using service
+      const { subscriptionBillingService } = await import('@/services/SubscriptionBillingService');
+      const data = await subscriptionBillingService.createPayPalBillingAgreement();
 
       // Redirect to PayPal for approval
-      window.location.href = data.data.approvalUrl;
+      window.location.href = data.approvalUrl;
     } catch (err: any) {
       onError(err.message);
       setLoading(false);

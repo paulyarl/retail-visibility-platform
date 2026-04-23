@@ -123,6 +123,139 @@ class TenantInfoService extends TenantApiSingleton {
   }
 
   /**
+   * Get payment gateways with Stripe Connect status
+   * Uses the /api/tenants/:tenantId/payment-gateways endpoint
+   */
+  async getPaymentGatewaysWithStripeConnect(tenantId: string): Promise<{
+    gateways: PaymentGateway[];
+    stripeConnect: {
+      connected: boolean;
+      status: string | null;
+      payoutsEnabled: boolean;
+      paymentsEnabled: boolean;
+      feePercent?: number;
+    } | null;
+  }> {
+    try {
+      if (!tenantId) {
+        console.error('[TenantInfoService] getPaymentGatewaysWithStripeConnect: tenantId is required');
+        return { gateways: [], stripeConnect: null };
+      }
+
+      const result = await this.makeDefaultRequest<{ gateways: PaymentGateway[]; stripeConnect: any }>(
+        `/api/tenants/${tenantId}/payment-gateways`,
+        {},
+        `tenant-gateways-${tenantId}`,
+        this.cacheTTL,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
+      );
+      if (!result.success) {
+        console.error('[TenantInfoService] Failed to get payment gateways:', result.error);
+        return { gateways: [], stripeConnect: null };
+      }
+
+      return {
+        gateways: Array.isArray(result.data?.gateways) ? result.data.gateways : [],
+        stripeConnect: result.data?.stripeConnect || null,
+      };
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to get payment gateways:', error);
+      return { gateways: [], stripeConnect: null };
+    }
+  }
+
+  /**
+   * Start Stripe Connect onboarding for tenant
+   * Uses the /api/tenants/:tenantId/stripe-connect/onboard endpoint
+   */
+  async startStripeConnectOnboarding(tenantId: string): Promise<{
+    success: boolean;
+    onboardingUrl?: string;
+    error?: string;
+  }> {
+    try {
+      if (!tenantId) {
+        console.error('[TenantInfoService] startStripeConnectOnboarding: tenantId is required');
+        return { success: false, error: 'tenantId is required' };
+      }
+
+      const result = await this.makeDefaultRequest<{ success: boolean; onboarding_url?: string; error?: string }>(
+        `/api/tenants/${tenantId}/stripe-connect/onboard`,
+        {
+          method: 'POST',
+        },
+        undefined,
+        0,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
+      );
+      if (!result.success) {
+        console.error('[TenantInfoService] Failed to start Stripe Connect onboarding:', result.error);
+        const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to start onboarding';
+        return { success: false, error: errorMessage };
+      }
+
+      return {
+        success: result.data?.success ?? true,
+        onboardingUrl: result.data?.onboarding_url,
+      };
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to start Stripe Connect onboarding:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start onboarding';
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Refresh Stripe Connect status from Stripe API
+   * Uses the /api/tenants/:tenantId/stripe-connect/refresh endpoint
+   */
+  async refreshStripeConnectStatus(tenantId: string): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      if (!tenantId) {
+        console.error('[TenantInfoService] refreshStripeConnectStatus: tenantId is required');
+        return { success: false, error: 'tenantId is required' };
+      }
+
+      const result = await this.makeDefaultRequest<{ success: boolean; error?: string }>(
+        `/api/tenants/${tenantId}/stripe-connect/refresh`,
+        {
+          method: 'POST',
+        },
+        undefined,
+        0,
+        {
+          context: AppContext.TENANT,
+          isolation: CacheIsolation.TENANT,
+          requestType: RequestType.AUTHENTICATED
+        }
+      );
+
+      if (!result.success) {
+        console.error('[TenantInfoService] Failed to refresh Stripe Connect status:', result.error);
+        const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message || 'Failed to refresh status';
+        return { success: false, error: errorMessage };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('[TenantInfoService] Failed to refresh Stripe Connect status:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to refresh status';
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
    * Unlink a GBP (Google Business Profile) location from tenant
    * Uses the /api/tenants/:tenantId/gbp/unlink endpoint
    */

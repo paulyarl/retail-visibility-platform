@@ -353,7 +353,51 @@ export class TenantTierService extends AdminApiSingleton {
     }
 
     // Invalidate tier system cache
-    await this.invalidateCache('platform-tier-system-tiers*');
+    await this.invalidateTierCachePatterns();
+  }
+
+  /**
+   * Start a trial for a tenant
+   * Uses the /api/admin/trials/start endpoint
+   */
+  async startTrial(tenantId: string, targetTier: string, reason?: string): Promise<{
+    success: boolean;
+    tenantId: string;
+    tier: string;
+    trialEndsAt: string;
+  } | null> {
+    if (!tenantId || !targetTier) {
+      console.error('[TenantTierService] startTrial: tenantId and targetTier are required');
+      return null;
+    }
+
+    const result = await this.makeDefaultRequest<{
+      success: boolean;
+      tenantId: string;
+      tier: string;
+      trialEndsAt: string;
+    }>(
+      '/api/admin/trials/start',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          tenantId,
+          targetTier,
+          reason: reason || 'Trial started by admin via tiers page'
+        })
+      },
+      `platform-start-trial-${tenantId}`
+    );
+
+    if (!result.success) {
+      console.error('[TenantTierService] Failed to start trial:', result.error);
+      return null;
+    }
+
+    // Invalidate tier caches after trial start
+    await this.invalidateTierCachePatterns();
+
+    return result.data || null;
   }
 
   /**
@@ -382,7 +426,6 @@ export class TenantTierService extends AdminApiSingleton {
     // Invalidate tier system cache
     await this.invalidateTierCachePatterns();
 
-
     return result.data || null;
   }
 
@@ -404,9 +447,9 @@ export class TenantTierService extends AdminApiSingleton {
       console.error('[TenantTierService] Failed to delete tier:', result.error);
       throw result.error;
     }
- // Invalidate tier system cache
-    await this.invalidateTierCachePatterns();
 
+    // Invalidate tier system cache
+    await this.invalidateTierCachePatterns();
   }
 
   /**
@@ -422,11 +465,11 @@ export class TenantTierService extends AdminApiSingleton {
       {},
       `platform-tenant-tier-${tenantId}`,
       this.cacheTTL,
-        {
-          context: AppContext.TENANT,
-          isolation: CacheIsolation.TENANT,
-          requestType: RequestType.AUTHENTICATED
-        }
+      {
+        context: AppContext.TENANT,
+        isolation: CacheIsolation.TENANT,
+        requestType: RequestType.AUTHENTICATED
+      }
     );
 
     if (!result.success) {

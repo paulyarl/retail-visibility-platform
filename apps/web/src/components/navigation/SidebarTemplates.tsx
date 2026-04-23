@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import GeneralSidebar from '../GeneralSidebar';
-import NavigationStandards from '@/lib/navigation/NavigationStandards';
-import { NavigationHelpers } from '@/lib/navigation/NavigationHelpers';
+import { tenantManagementService } from '@/services/TenantManagementService';
+import { Tenant } from '@/services/TenantTierService';
+import GeneralSidebar from '@/components/GeneralSidebar';
 
-// NavItem type definition (copied from GeneralSidebar since it's not exported)
-type NavItem = {
+// Local NavItem interface (matching GeneralSidebar)
+type NavItem = { 
   label: string
   href: string
   icon?: React.ReactNode
@@ -16,7 +16,40 @@ type NavItem = {
   }
   children?: NavItem[]
   hierarchy?: number
+  accessLevel?: 'public' | 'user' | 'admin' | 'owner'
 }
+
+// Local NavigationHelpers
+const NavigationHelpers = {
+  sortByHierarchy: (items: NavItem[]): NavItem[] => {
+    return items.sort((a, b) => (a.hierarchy || 0) - (b.hierarchy || 0));
+  },
+  getStandardIcon: (type: string): React.ReactNode => {
+    // Return a simple placeholder icon
+    return <span>{type}</span>;
+  }
+};
+
+// Local NavigationStandards
+const NavigationStandards = {
+  GROUP_HIERARCHY: {
+    DASHBOARD: 10,
+    USER_PANEL: 11,
+    STORE_CENTER: 20,
+    STORE_PROFILE: 20,
+    STORE_SETTINGS: 22,
+    ADVANCED_FEATURES: 22,
+    BUSINESS_OPERATIONS: 20,
+    INVENTORY_MANAGEMENT: 40,
+    PLATFORM_DASHBOARD: 50,
+    PLATFORM_SETTINGS: 50,
+    PLATFORM_BILLING: 51,
+    PLATFORM_TIERS: 52,
+    PLATFORM_USERS: 53,
+    PLATFORM_INSIGHTS: 55,
+    PLATFORM_ADMIN: 56
+  }
+};
 
 // Tenant-scoped sidebar template
 export const TenantSidebarTemplate = () => {
@@ -328,18 +361,15 @@ export const AdminSidebarTemplate = () => {
 
 // Platform-scoped sidebar template
 export const PlatformSidebarTemplate = () => {
-  const [tenants, setTenants] = useState([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Fetch tenants for dynamic sidebar
+  // Fetch tenants for dynamic sidebar using service
   useEffect(() => {
     const fetchTenants = async () => {
       try {
-        const response = await fetch('/api/tenants');
-        if (response.ok) {
-          const data = await response.json();
-          setTenants(data.tenants || data || []);
-        }
+        const data = await tenantManagementService.getAllTenants();
+        setTenants(data);
       } catch (error) {
         console.error('Failed to fetch tenants:', error);
       } finally {
@@ -433,8 +463,8 @@ export const PlatformSidebarTemplate = () => {
             href: `/tenants/${tenant.id}`,
             badge: tenant.locationStatus ? {
               text: tenant.locationStatus,
-              variant: tenant.locationStatus === 'active' ? 'success' : 
-                      tenant.locationStatus === 'pending' ? 'warning' : 'default'
+              variant: (tenant.locationStatus === 'active' ? 'success' : 
+                      tenant.locationStatus === 'pending' ? 'warning' : 'default') as 'default' | 'success' | 'warning' | 'error' | 'org'
             } : undefined
           }))
         ] : [])

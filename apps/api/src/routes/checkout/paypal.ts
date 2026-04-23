@@ -204,6 +204,7 @@ router.post('/capture-order', async (req, res) => {
       where: { id: paymentId },
       data: {
         payment_status: 'paid',
+        captured_at: new Date(),
         updated_at: new Date(),
         gateway_response: captureData,
       },
@@ -214,6 +215,31 @@ router.post('/capture-order', async (req, res) => {
       where: { id: paymentId },
       include: { orders: true },
     });
+
+    // Record platform revenue transaction
+    if (payment && payment.platform_fee_cents && payment.platform_fee_cents > 0) {
+      try {
+        const { stripeConnectService } = await import('../../services/payments/StripeConnectService');
+        const isActive = await stripeConnectService.isRevenueCollectionActive();
+        if (isActive && payment.orders) {
+          await stripeConnectService.recordRevenueTransaction({
+            tenantId: payment.orders.tenant_id,
+            orderId: payment.orders.id,
+            paymentId: payment.id,
+            transactionType: 'transaction_fee',
+            grossAmountCents: payment.amount_cents,
+            platformFeeCents: payment.platform_fee_cents,
+            gatewayFeeCents: payment.gateway_fee_cents || 0,
+            netAmountCents: payment.net_amount_cents || (payment.amount_cents - payment.platform_fee_cents - (payment.gateway_fee_cents || 0)),
+            stripeTransactionId: captureData.id,
+          });
+          console.log('[PayPal] Recorded revenue transaction:', payment.platform_fee_cents, 'cents');
+        }
+      } catch (revenueError) {
+        console.error('[PayPal] Failed to record revenue transaction:', revenueError);
+        // Don't fail the capture if revenue recording fails
+      }
+    }
 
     if (payment?.orders) {
       await prisma.orders.update({

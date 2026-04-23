@@ -289,7 +289,7 @@ router.patch('/:orderId/pickup', async (req, res) => {
 
     console.log('[Buyer Orders] Marking order as picked up:', { orderId, email, phone, tenantId });
 
-    // Fetch the order
+    // Fetch the order with payment info
     const order = await prisma.orders.findUnique({
       where: { id: orderId },
       select: {
@@ -300,7 +300,18 @@ router.patch('/:orderId/pickup', async (req, res) => {
         tenant_id: true,
         fulfillment_status: true,
         total_cents: true,
+        checkout_mode: true,
+        deposit_cents: true,
         metadata: true,
+        payments: {
+          where: { is_deposit_payment: true },
+          select: {
+            id: true,
+            amount_cents: true,
+            platform_fee_cents: true,
+            payment_status: true,
+          },
+        },
       },
     });
 
@@ -348,6 +359,32 @@ router.patch('/:orderId/pickup', async (req, res) => {
     });
 
     console.log('[Buyer Orders] Order marked as picked up:', orderId);
+
+    // Record platform revenue for deposit fulfillment
+    // For deposit orders, the platform fee is captured when the order is fulfilled
+    const depositPayment = order?.payments?.[0];
+    if (depositPayment && depositPayment.platform_fee_cents && depositPayment.platform_fee_cents > 0) {
+      try {
+        const { stripeConnectService } = await import('../services/payments/StripeConnectService');
+        const isActive = await stripeConnectService.isRevenueCollectionActive();
+        if (isActive) {
+          await stripeConnectService.recordRevenueTransaction({
+            tenantId: order.tenant_id,
+            orderId: order.id,
+            paymentId: depositPayment.id,
+            transactionType: 'transaction_fee',
+            grossAmountCents: depositPayment.amount_cents,
+            platformFeeCents: depositPayment.platform_fee_cents,
+            gatewayFeeCents: 0,
+            netAmountCents: depositPayment.amount_cents - depositPayment.platform_fee_cents,
+          });
+          console.log('[Buyer Orders] Recorded deposit revenue:', depositPayment.platform_fee_cents, 'cents');
+        }
+      } catch (revenueError) {
+        console.error('[Buyer Orders] Failed to record deposit revenue:', revenueError);
+        // Don't fail the fulfillment if revenue recording fails
+      }
+    }
 
     // Send order fulfilled notification (async, don't wait)
     const { getOrderNotificationService } = await import('../services/OrderNotificationService');

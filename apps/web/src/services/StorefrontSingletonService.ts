@@ -401,6 +401,48 @@ class StorefrontSingletonService extends PublicApiSingleton {
   }
 
   /**
+   * Get public products for a tenant
+   * Uses the /api/public/products endpoint
+   */
+  async getPublicProducts(
+    tenantId: string,
+    options: {
+      limit?: number;
+      search?: string;
+      category?: string;
+    } = {}
+  ): Promise<StorefrontProduct[]> {
+    if (!tenantId) {
+      console.error('[StorefrontSingleton] getPublicProducts: tenantId is required');
+      return [];
+    }
+
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.append('tenantId', tenantId);
+      if (options.limit) queryParams.append('limit', options.limit.toString());
+      if (options.search) queryParams.append('search', options.search);
+      if (options.category) queryParams.append('category', options.category);
+
+      const endpoint = `/api/public/products?${queryParams.toString()}`;
+      const cacheKey = `public-products-${tenantId}-${queryParams.toString()}`;
+
+      const result = await this.makeDefaultRequest<{
+        products: StorefrontProduct[];
+        success: boolean;
+      }>(endpoint, {}, cacheKey, this.cacheTTL, {
+        context: AppContext.PRODUCT,
+        isolation: CacheIsolation.PRODUCT
+      });
+
+      return result.data?.products || [];
+    } catch (error) {
+      console.error('[StorefrontSingleton] Failed to get public products:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get total product count for a storefront
    * Uses the /api/storefront/:tenantId/products endpoint with limit=1
    */

@@ -9,6 +9,8 @@ export interface FeeCalculation {
   netAmountCents: number;
   feeWaived: boolean;
   feeWaivedReason?: string;
+  transactionCount?: number;
+  minTransactionCount?: number;
 }
 
 export class PlatformFeeCalculator {
@@ -62,8 +64,25 @@ export class PlatformFeeCalculator {
       }
     }
 
-    // 3. Get tier-based fees
+    // 3. Get tier-based fees and check transaction threshold
     const tierFees = await this.getTierFees(tenant.subscription_tier);
+    
+    // Check if tenant has free transactions remaining this month
+    if (tierFees.minTransactionCount > 0) {
+      const monthlyCount = await this.getMonthlyTransactionCount(tenantId);
+      if (monthlyCount < tierFees.minTransactionCount) {
+        // Within free transaction allowance
+        return this.applyFeeStructure(
+          transactionAmountCents,
+          gatewayFeeCents,
+          0,
+          0,
+          true,
+          `Free transaction ${monthlyCount + 1}/${tierFees.minTransactionCount} this month`
+        );
+      }
+    }
+    
     return this.applyFeeStructure(
       transactionAmountCents,
       gatewayFeeCents,
@@ -105,7 +124,7 @@ export class PlatformFeeCalculator {
    */
   private static async getTierFees(
     tier?: string | null
-  ): Promise<{ percentage: number; fixedCents: number }> {
+  ): Promise<{ percentage: number; fixedCents: number; minTransactionCount: number }> {
     const tierFee = await prisma.platform_fee_tiers.findFirst({
       where: {
         tier_name: tier || 'trial',
@@ -117,11 +136,33 @@ export class PlatformFeeCalculator {
       return {
         percentage: Number(tierFee.fee_percentage) || 0,
         fixedCents: tierFee.fee_fixed_cents || 0,
+        minTransactionCount: tierFee.min_transaction_count || 0,
       };
     }
 
-    // Default fallback: 2% fee
-    return { percentage: 2.0, fixedCents: 0 };
+    // Default fallback: 2% fee, no free transactions
+    return { percentage: 2.0, fixedCents: 0, minTransactionCount: 0 };
+  }
+
+  /**
+   * Get monthly transaction count for tenant
+   */
+  private static async getMonthlyTransactionCount(tenantId: string): Promise<number> {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const count = await prisma.payments.count({
+      where: {
+        tenant_id: tenantId,
+        payment_status: 'paid',
+        created_at: {
+          gte: startOfMonth,
+        },
+      },
+    });
+
+    return count;
   }
 
   /**

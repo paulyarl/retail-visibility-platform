@@ -90,6 +90,13 @@ export interface SystemRequestOptions {
   systemKey?: string;
 }
 
+export enum ResponseType {
+  JSON = 'json',
+  BLOB = 'blob',
+  TEXT = 'text',
+  NONE = 'none'
+}
+
 export interface RequestOptions {
   requestType?: RequestType;
   requestTarget?: RequestTarget;
@@ -99,6 +106,7 @@ export interface RequestOptions {
   ttl?: number;
   includeCredentials?: boolean; // Allow controlling credential inclusion
   ssrAuth?: { auth0Email?: string; auth0Id?: string }; // SSR: Auth headers for server-side requests
+  responseType?: ResponseType; // Control response parsing behavior
 }
 
 export interface ApiResult<T> {

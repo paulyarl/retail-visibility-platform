@@ -35,6 +35,7 @@ import { publicDirectoryService } from '@/services/PublicDirectoryService';
 import { recommendationsService } from '@/services/RecommendationsSingletonService';
 import StorefrontFeaturedProducts from '@/components/storefront/StorefrontFeaturedProducts';
 import LastViewed from '@/components/directory/LastViewed';
+import { TenantQRCode } from '@/components/public/TenantQRCode';
 
 // tenant private data
 import { tenantDirectoryService } from '@/services/TenantDirectorySingletonService';
@@ -792,11 +793,22 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
 
               {/* Product Categories - Browse More */}
               {!showStatusPanel && storefrontCategories.categories.length > 0 && (
-                <ProductCategoriesCollapsible
-                  categories={storefrontCategories.categories}
-                  tenantId={listing.tenantId}
-                  uncategorizedCount={storefrontCategories.uncategorizedCount}
-                />
+                <div className="space-y-4">
+                  <ProductCategoriesCollapsible
+                    categories={storefrontCategories.categories}
+                    tenantId={listing.tenantId}
+                    uncategorizedCount={storefrontCategories.uncategorizedCount}
+                  />
+                  {/* QR Code - under categories */}
+                  <TenantQRCode
+                    url={currentUrl}
+                    tenantId={listing.tenantId}
+                    label="Scan to Share"
+                    downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+                    size={200}
+                    showDownload={true}
+                  />
+                </div>
               )}
               
 

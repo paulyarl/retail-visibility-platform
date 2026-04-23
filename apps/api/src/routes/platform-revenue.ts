@@ -10,9 +10,39 @@
  * All routes require platform admin authentication.
  */
 
-import { Router, Request, Response } from 'express';
-import { requireAuth, requireAdmin } from '../middleware/auth';
+import { Request, Response, Router } from 'express';
 import { prisma } from '../prisma';
+import { requireAuth, requireAdmin } from '../middleware/auth';
+
+// Utility function to convert BigInt values to strings for JSON serialization
+const serializeBigInt = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
+  
+  if (typeof obj === 'bigint') {
+    return obj.toString();
+  }
+  
+  if (obj instanceof Date) {
+    return obj.toISOString();
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(serializeBigInt);
+  }
+  
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        result[key] = serializeBigInt(obj[key]);
+      }
+    }
+    return result;
+  }
+  
+  return obj;
+};
+
 import Stripe from 'stripe';
 
 const router = Router();
@@ -256,7 +286,8 @@ router.get('/merchants', requireAuth, requireAdmin, async (req: Request, res: Re
       const searchLower = (search as string).toLowerCase();
       filtered = connections.filter((c: any) => 
         c.tenants?.name?.toLowerCase().includes(searchLower) ||
-        c.stripe_account_id?.toLowerCase().includes(searchLower)
+        c.stripe_account_id?.toLowerCase().includes(searchLower) ||
+        c.tenant_id?.toLowerCase().includes(searchLower)
       );
     }
 
@@ -268,7 +299,7 @@ router.get('/merchants', requireAuth, requireAdmin, async (req: Request, res: Re
 
     res.json({
       success: true,
-      connections: result,
+      connections: serializeBigInt(result),
     });
   } catch (error) {
     console.error('[PlatformRevenue] Error getting merchants:', error);
@@ -563,23 +594,23 @@ router.get('/summary', requireAuth, requireAdmin, async (req: Request, res: Resp
 
     const summary = {
       total_transactions: transactions.length,
-      gross_volume_cents: transactions.reduce((sum, t) => sum + (t.gross_amount_cents || 0), 0),
-      platform_revenue_cents: transactions.reduce((sum, t) => sum + (t.platform_fee_cents || 0), 0),
-      gateway_fees_cents: transactions.reduce((sum, t) => sum + (t.gateway_fee_cents || 0), 0),
-      net_to_merchants_cents: transactions.reduce((sum, t) => sum + (t.net_amount_cents || 0), 0),
+      gross_volume_cents: transactions.reduce((sum: number, t: any) => sum + (t.gross_amount_cents || 0), 0),
+      platform_revenue_cents: transactions.reduce((sum: number, t: any) => sum + (t.platform_fee_cents || 0), 0),
+      gateway_fees_cents: transactions.reduce((sum: number, t: any) => sum + (t.gateway_fee_cents || 0), 0),
+      net_to_merchants_cents: transactions.reduce((sum: number, t: any) => sum + (t.net_amount_cents || 0), 0),
       pending_payouts_cents: transactions
-        .filter(t => t.status === 'pending' && t.transaction_type !== 'payout')
-        .reduce((sum, t) => sum + (t.platform_fee_cents || 0), 0),
+        .filter((t: any) => t.status === 'pending' && t.transaction_type !== 'payout')
+        .reduce((sum: number, t: any) => sum + (t.platform_fee_cents || 0), 0),
       by_type: {
         transaction_fees: transactions
-          .filter(t => t.transaction_type === 'transaction_fee')
-          .reduce((sum, t) => sum + (t.platform_fee_cents || 0), 0),
+          .filter((t: any) => t.transaction_type === 'transaction_fee')
+          .reduce((sum: number, t: any) => sum + (t.platform_fee_cents || 0), 0),
         deposit_forfeits: transactions
-          .filter(t => t.transaction_type === 'deposit_forfeit')
-          .reduce((sum, t) => sum + (t.platform_fee_cents || 0), 0),
+          .filter((t: any) => t.transaction_type === 'deposit_forfeit')
+          .reduce((sum: number, t: any) => sum + (t.platform_fee_cents || 0), 0),
         subscriptions: transactions
-          .filter(t => t.transaction_type === 'subscription')
-          .reduce((sum, t) => sum + (t.platform_fee_cents || 0), 0),
+          .filter((t: any) => t.transaction_type === 'subscription')
+          .reduce((sum: number, t: any) => sum + (t.platform_fee_cents || 0), 0),
       },
     };
 
@@ -642,8 +673,8 @@ router.get('/transactions', requireAuth, requireAdmin, async (req: Request, res:
 
     res.json({
       success: true,
-      transactions,
-      total,
+      transactions: serializeBigInt(transactions),
+      total: total?.toString(),
     });
   } catch (error) {
     console.error('[PlatformRevenue] Error getting transactions:', error);
@@ -693,11 +724,11 @@ router.get('/tenants/:tenantId/revenue', requireAuth, requireAdmin, async (req: 
     });
 
     const revenue = {
-      total_cents: transactions.reduce((sum, t) => sum + (t.gross_amount_cents || 0), 0),
-      platform_fees_cents: transactions.reduce((sum, t) => sum + (t.platform_fee_cents || 0), 0),
+      total_cents: transactions.reduce((sum: number, t: any) => sum + (t.gross_amount_cents || 0), 0),
+      platform_fees_cents: transactions.reduce((sum: number, t: any) => sum + (t.platform_fee_cents || 0), 0),
       forfeit_fees_cents: transactions
-        .filter(t => t.transaction_type === 'deposit_forfeit')
-        .reduce((sum, t) => sum + (t.platform_fee_cents || 0), 0),
+        .filter((t: any) => t.transaction_type === 'deposit_forfeit')
+        .reduce((sum: number, t: any) => sum + (t.platform_fee_cents || 0), 0),
       transaction_count: transactions.length,
     };
 
@@ -750,15 +781,15 @@ router.get('/payouts/pending', requireAuth, requireAdmin, async (req: Request, r
     });
 
     // Get tenant names
-    const tenantIds = merchantPending.map(m => m.tenant_id).filter(Boolean) as string[];
+    const tenantIds = merchantPending.map((m: any) => m.tenant_id).filter(Boolean) as string[];
     const tenants = await prisma.tenants.findMany({
       where: { id: { in: tenantIds } },
       select: { id: true, name: true },
     });
 
-    const tenantMap = new Map(tenants.map(t => [t.id, t.name]));
+    const tenantMap = new Map(tenants.map((t: any) => [t.id, t.name]));
 
-    const merchantPendingList = merchantPending.map(m => ({
+    const merchantPendingList = merchantPending.map((m: any) => ({
       tenant_id: m.tenant_id,
       tenant_name: tenantMap.get(m.tenant_id!) || 'Unknown',
       amount_cents: m._sum.net_amount_cents || 0,
@@ -887,6 +918,311 @@ router.post('/payouts/trigger', requireAuth, requireAdmin, async (req: Request, 
       success: false,
       error: 'payout_failed',
       message: error.message || 'Failed to trigger payout',
+    });
+  }
+});
+
+// ====================
+// FEE TIERS
+// ====================
+
+/**
+ * GET /api/admin/platform-revenue/fee-tiers
+ * Get all platform fee tiers
+ */
+router.get('/fee-tiers', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const tiers = await prisma.platform_fee_tiers.findMany({
+      orderBy: { tier_name: 'asc' },
+    });
+
+    res.json({
+      success: true,
+      tiers: tiers.map((tier: any) => ({
+        ...tier,
+        fee_percentage: tier.fee_percentage?.toString() || '0',
+        fee_fixed_cents: tier.fee_fixed_cents || 0,
+        min_transaction_count: tier.min_transaction_count || 0,
+      })),
+    });
+  } catch (error) {
+    console.error('[PlatformRevenue] Error getting fee tiers:', error);
+    res.status(500).json({
+      success: false,
+      error: 'tiers_fetch_failed',
+      message: 'Failed to fetch fee tiers',
+    });
+  }
+});
+
+/**
+ * POST /api/admin/platform-revenue/fee-tiers
+ * Create a new platform fee tier
+ */
+router.post('/fee-tiers', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const {
+      tier_name,
+      fee_percentage,
+      fee_fixed_cents = 0,
+      min_transaction_cents = 0,
+      max_transaction_cents = null,
+      min_transaction_count = 0,
+      description = '',
+    } = req.body;
+
+    if (!tier_name) {
+      return res.status(400).json({
+        success: false,
+        error: 'missing_fields',
+        message: 'tier_name is required',
+      });
+    }
+
+    const tier = await prisma.platform_fee_tiers.create({
+      data: {
+        id: `tier_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        tier_name,
+        fee_percentage,
+        fee_fixed_cents,
+        min_transaction_cents,
+        max_transaction_cents,
+        min_transaction_count,
+        description,
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+    });
+
+    res.json({
+      success: true,
+      tier: {
+        ...tier,
+        fee_percentage: tier.fee_percentage?.toString() || '0',
+        min_transaction_count: tier.min_transaction_count || 0,
+      },
+    });
+  } catch (error) {
+    console.error('[PlatformRevenue] Error creating fee tier:', error);
+    res.status(500).json({
+      success: false,
+      error: 'tier_create_failed',
+      message: 'Failed to create fee tier',
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/platform-revenue/fee-tiers/:id
+ * Update a platform fee tier
+ */
+router.put('/fee-tiers/:id', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const {
+      tier_name,
+      fee_percentage,
+      fee_fixed_cents,
+      min_transaction_cents,
+      max_transaction_cents,
+      min_transaction_count,
+      description,
+      is_active,
+    } = req.body;
+
+    const tier = await prisma.platform_fee_tiers.update({
+      where: { id },
+      data: {
+        ...(tier_name && { tier_name }),
+        ...(fee_percentage !== undefined && { fee_percentage }),
+        ...(fee_fixed_cents !== undefined && { fee_fixed_cents }),
+        ...(min_transaction_cents !== undefined && { min_transaction_cents }),
+        ...(max_transaction_cents !== undefined && { max_transaction_cents }),
+        ...(min_transaction_count !== undefined && { min_transaction_count }),
+        ...(description !== undefined && { description }),
+        ...(is_active !== undefined && { is_active }),
+        updated_at: new Date(),
+      },
+    });
+
+    res.json({
+      success: true,
+      tier: {
+        ...tier,
+        fee_percentage: tier.fee_percentage?.toString() || '0',
+      },
+    });
+  } catch (error) {
+    console.error('[PlatformRevenue] Error updating fee tier:', error);
+    res.status(500).json({
+      success: false,
+      error: 'tier_update_failed',
+      message: 'Failed to update fee tier',
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/platform-revenue/fee-tiers/:id
+ * Delete a platform fee tier
+ */
+router.delete('/fee-tiers/:id', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.platform_fee_tiers.delete({
+      where: { id },
+    });
+
+    res.json({
+      success: true,
+      message: 'Fee tier deleted',
+    });
+  } catch (error) {
+    console.error('[PlatformRevenue] Error deleting fee tier:', error);
+    res.status(500).json({
+      success: false,
+      error: 'tier_delete_failed',
+      message: 'Failed to delete fee tier',
+    });
+  }
+});
+
+// ====================
+// FEE OVERRIDES
+// ====================
+
+/**
+ * GET /api/admin/platform-revenue/fee-overrides
+ * Get all tenant fee overrides
+ */
+router.get('/fee-overrides', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const overrides = await prisma.platform_fee_overrides.findMany({
+      where: { is_active: true },
+      include: {
+        tenants: {
+          select: {
+            id: true,
+            name: true,
+            subscription_tier: true,
+          },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    res.json({
+      success: true,
+      overrides: overrides.map((o: any) => ({
+        id: o.id,
+        tenant_id: o.tenant_id,
+        tenant_name: o.tenants?.name,
+        tenant_tier: o.tenants?.subscription_tier,
+        fee_percentage: o.fee_percentage?.toString() || '0',
+        fee_fixed_cents: o.fee_fixed_cents || 0,
+        reason: o.reason,
+        expires_at: o.expires_at,
+        created_at: o.created_at,
+        approved_by: o.approved_by,
+      })),
+    });
+  } catch (error) {
+    console.error('[PlatformRevenue] Error getting fee overrides:', error);
+    res.status(500).json({
+      success: false,
+      error: 'overrides_fetch_failed',
+      message: 'Failed to fetch fee overrides',
+    });
+  }
+});
+
+/**
+ * POST /api/admin/platform-revenue/fee-overrides
+ * Create a tenant fee override
+ */
+router.post('/fee-overrides', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const {
+      tenant_id,
+      fee_percentage,
+      fee_fixed_cents = 0,
+      reason,
+      expires_at,
+    } = req.body;
+
+    if (!tenant_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'missing_tenant',
+        message: 'tenant_id is required',
+      });
+    }
+
+    // Deactivate any existing override for this tenant
+    await prisma.platform_fee_overrides.updateMany({
+      where: { tenant_id, is_active: true },
+      data: { is_active: false },
+    });
+
+    const override = await prisma.platform_fee_overrides.create({
+      data: {
+        id: `override_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        tenant_id,
+        fee_percentage,
+        fee_fixed_cents,
+        reason: reason || 'Admin override',
+        is_active: true,
+        expires_at: expires_at ? new Date(expires_at) : null,
+        approved_by: (req as any).user?.email || 'admin',
+        approved_by_email: (req as any).user?.email || 'admin',
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+    });
+
+    res.json({
+      success: true,
+      override: {
+        ...override,
+        fee_percentage: override.fee_percentage?.toString() || '0',
+      },
+    });
+  } catch (error) {
+    console.error('[PlatformRevenue] Error creating fee override:', error);
+    res.status(500).json({
+      success: false,
+      error: 'override_create_failed',
+      message: 'Failed to create fee override',
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/platform-revenue/fee-overrides/:id
+ * Deactivate a tenant fee override
+ */
+router.delete('/fee-overrides/:id', requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Soft delete by deactivating
+    await prisma.platform_fee_overrides.update({
+      where: { id },
+      data: { is_active: false },
+    });
+
+    res.json({
+      success: true,
+      message: 'Fee override deactivated',
+    });
+  } catch (error) {
+    console.error('[PlatformRevenue] Error deleting fee override:', error);
+    res.status(500).json({
+      success: false,
+      error: 'override_delete_failed',
+      message: 'Failed to delete fee override',
     });
   }
 });

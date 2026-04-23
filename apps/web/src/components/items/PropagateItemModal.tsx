@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getTenantOrganizationsSingleton } from '@/lib/singletons/TenantOrganizationsSingleton';
+import { organizationsService } from '@/services/OrganizationsSingletonService';
 
 interface Tenant {
   id: string;
@@ -94,24 +95,16 @@ export default function PropagateItemModal({
     setResult(null);
 
     try {
-      const res = await fetch(`/api/organizations/${organizationId}/items/propagate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sourceItemId: itemId,
-          targetTenantIds: selectedTenantIds,
-          mode,
-        }),
+      const data = await organizationsService.propagateItems(organizationId, {
+        sourceItemId: itemId,
+        targetTenantIds: selectedTenantIds,
+        mode,
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Failed to propagate item');
+      if (!data) {
+        throw new Error('Failed to propagate item');
       }
 
-      const data = await res.json();
       setResult(data);
       
       if (data.summary.created > 0 || data.summary.updated > 0) {

@@ -70,7 +70,7 @@ export default function PaymentGatewaysPage() {
     paypal?: { connected: boolean; merchantId?: string; expiresAt?: Date };
     square?: { connected: boolean; merchantId?: string; expiresAt?: Date };
   }>({});
-  const [tenantTier, setTenantTier] = useState<string>('starter');
+  const [tenantTier, setTenantTier] = useState<string>('discovery');
   const [showSquareTestTokenInput, setShowSquareTestTokenInput] = useState(false);
   const [squareTestToken, setSquareTestToken] = useState({
     accessToken: '',
@@ -82,6 +82,14 @@ export default function PaymentGatewaysPage() {
   const [testTokenError, setTestTokenError] = useState<string | null>(null);
   const [testTokenSuccess, setTestTokenSuccess] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [stripeConnect, setStripeConnect] = useState<{
+    connected: boolean;
+    status: string | null;
+    payoutsEnabled: boolean;
+    paymentsEnabled: boolean;
+    feePercent?: number;
+  } | null>(null);
+  const [stripeOnboardingLoading, setStripeOnboardingLoading] = useState(false);
 
   useEffect(() => {
     if (hasAccess && tenantId) {
@@ -118,6 +126,7 @@ export default function PaymentGatewaysPage() {
     const success = searchParams?.get('success');
     const errorParam = searchParams?.get('error');
     const message = searchParams?.get('message');
+    const stripeConnectStatus = searchParams?.get('stripe_connect');
 
     if (connected && success === 'true') {
       const gatewayName = connected === 'paypal' ? 'PayPal' : 'Square';
@@ -125,6 +134,15 @@ export default function PaymentGatewaysPage() {
       // Reload OAuth status after successful connection
       loadOAuthStatus();
       loadGateways();
+    } else if (stripeConnectStatus === 'complete') {
+      // Handle Stripe Connect completion
+      setOauthSuccess('Stripe Connect onboarding completed! Refreshing status...');
+      // Call the refresh endpoint to update status
+      refreshStripeConnectStatus();
+      // Reload gateways after a short delay
+      setTimeout(() => {
+        loadGateways();
+      }, 2000);
     } else if (errorParam) {
       const decodedMessage = message ? decodeURIComponent(message) : 'OAuth connection failed';
       setOauthError(decodedMessage);
@@ -167,18 +185,41 @@ export default function PaymentGatewaysPage() {
       setLoading(true);
       setError(null);
       
-      // Debug: Check what tokens are available
-      console.log('[PaymentGateways] Debug - checking tokens before API call:');
-      console.log('- localStorage access_token:', localStorage.getItem('access_token') ? 'present' : 'missing');
-      console.log('- localStorage auth_token:', localStorage.getItem('auth_token') ? 'present' : 'missing');
-      console.log('- Cookie auth_token:', document.cookie.includes('auth_token') ? 'present' : 'missing');
-      
-      const gateways = await tenantInfoService.getPaymentGateways(tenantId);
-      setGateways(gateways || []);
+      const { gateways, stripeConnect } = await tenantInfoService.getPaymentGatewaysWithStripeConnect(tenantId);
+      setGateways(gateways);
+      setStripeConnect(stripeConnect);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStripeConnectOnboard = async () => {
+    try {
+      setStripeOnboardingLoading(true);
+      const result = await tenantInfoService.startStripeConnectOnboarding(tenantId);
+      
+      if (result.success && result.onboardingUrl) {
+        window.location.href = result.onboardingUrl;
+      } else {
+        setError(result.error || 'Failed to start Stripe Connect onboarding');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect Stripe');
+    } finally {
+      setStripeOnboardingLoading(false);
+    }
+  };
+
+  const refreshStripeConnectStatus = async () => {
+    try {
+      const result = await tenantInfoService.refreshStripeConnectStatus(tenantId);
+      if (!result.success) {
+        console.error('Failed to refresh Stripe Connect status:', result.error);
+      }
+    } catch (err: any) {
+      console.error('Error refreshing Stripe Connect status:', err);
     }
   };
 
@@ -404,6 +445,7 @@ export default function PaymentGatewaysPage() {
 
   const paypalGateways = gateways.filter(g => g.gateway_type === 'paypal');
   const squareGateways = gateways.filter(g => g.gateway_type === 'square');
+  const stripeGateways = gateways.filter(g => g.gateway_type === 'stripe');
   const canUseAdvancedPayment = checkTierFeature(tenantTier, 'payment_client_credentials');
   
   // Check if OAuth connections exist (these show as gateways with empty config but OAuth status)
@@ -492,7 +534,12 @@ export default function PaymentGatewaysPage() {
               </div>
             </div>
             <p className="text-xs text-amber-600 mt-3">
-              Your current tier: <strong className="capitalize">{tenantTier}</strong>. Upgrade your plan to unlock additional checkout options.
+              Your current tier: <strong className="capitalize">{tenantTier}</strong>.
+              {['professional', 'enterprise', 'organization', 'chain_starter', 'chain_professional', 'chain_enterprise'].includes(tenantTier) ? (
+                <span className="text-green-700"> You have full checkout capabilities enabled.</span>
+              ) : (
+                <span> Upgrade your plan to unlock additional checkout options.</span>
+              )}
             </p>
           </div>
         </div>
@@ -1022,6 +1069,244 @@ export default function PaymentGatewaysPage() {
               )}
             </Card>
           )}
+        </div>
+
+        {/* Stripe Checkout Gateway */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <CreditCard className="w-6 h-6 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Stripe</h2>
+                <p className="text-sm text-neutral-600">Accept credit/debit cards via Stripe checkout</p>
+              </div>
+            </div>
+          </div>
+          
+          {stripeGateways.length > 0 || stripeConnect?.connected ? (
+            <div className="space-y-4">
+              {stripeGateways.map((gateway) => (
+                <Card key={gateway.id}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>{gateway.config?.display_name || 'Stripe Account'}</CardTitle>
+                        <p className="text-sm text-neutral-600">
+                          Accepts credit and debit cards
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {gateway.is_default && (
+                          <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
+                            Default
+                          </span>
+                        )}
+                        <span className={`px-2 py-1 text-xs font-medium rounded ${
+                          gateway.is_active ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-neutral-600'
+                        }`}>
+                          {gateway.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-2 pt-4 border-t">
+                      <Button variant="outline" size="sm" onClick={() => handleToggleActive(gateway.id, gateway.is_active)}>
+                        {gateway.is_active ? 'Deactivate' : 'Activate'}
+                      </Button>
+                      {!gateway.is_default && gateway.is_active && (
+                        <Button variant="outline" size="sm" onClick={() => handleSetDefault(gateway.id)}>
+                          Set as Default
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(gateway.id)} className="text-red-600">
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-8">
+                  <CreditCard className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
+                  <h3 className="font-medium text-neutral-900 mb-2">No Stripe Checkout Configured</h3>
+                  <p className="text-sm text-neutral-600 mb-4">
+                    Connect your Stripe account to accept credit card payments at checkout.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Stripe Connect Status */}
+          <Card className="mt-4 border-purple-200 bg-purple-50">
+            <CardHeader>
+              <CardTitle className="text-lg">Stripe Connect Status</CardTitle>
+              <p className="text-sm text-neutral-600">
+                {stripeConnect?.connected 
+                  ? 'Connected - ready to accept Stripe payments'
+                  : 'Connect Stripe to enable credit card checkout'
+                }
+              </p>
+            </CardHeader>
+            <CardContent>
+              {stripeConnect?.connected ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-neutral-600">Status</p>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
+                          Connected
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-neutral-600">Payouts</p>
+                      <p className="font-medium">
+                        {stripeConnect.payoutsEnabled ? (
+                          <span className="text-green-600">Enabled</span>
+                        ) : (
+                          <span className="text-amber-600">Pending</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-4 border-t">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => loadGateways()}
+                    >
+                      Refresh Status
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-amber-50 border border-amber-200 rounded p-4 text-sm text-amber-800">
+                    <p className="font-medium mb-1">Why connect Stripe?</p>
+                    <ul className="list-disc ml-4 space-y-1">
+                      <li>Accept credit and debit cards at checkout</li>
+                      <li>Automatic platform fee collection</li>
+                      <li>Fast payouts to your bank account</li>
+                    </ul>
+                  </div>
+                  <Button 
+                    onClick={handleStripeConnectOnboard}
+                    disabled={stripeOnboardingLoading}
+                    className="w-full"
+                  >
+                    {stripeOnboardingLoading ? 'Connecting...' : 'Connect Stripe Account'}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Stripe Connect for Payouts (Legacy Info) */}
+        <div className="hidden">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <CreditCard className="w-6 h-6 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Stripe Connect</h2>
+                <p className="text-sm text-neutral-600">Connect Stripe to receive payouts from platform revenue</p>
+              </div>
+            </div>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Payout Account</CardTitle>
+                  <p className="text-sm text-neutral-600">
+                    {stripeConnect?.connected 
+                      ? 'Your Stripe account is connected for receiving payouts'
+                      : 'Connect your Stripe account to receive payouts from subscription revenue and platform fees'
+                    }
+                  </p>
+                </div>
+                {stripeConnect?.connected && (
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
+                      Connected
+                    </span>
+                    {stripeConnect.payoutsEnabled && (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                        Payouts Active
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {stripeConnect?.connected ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-neutral-600">Status</p>
+                      <p className="font-medium capitalize">{stripeConnect.status || 'Active'}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-600">Payouts</p>
+                      <p className="font-medium">
+                        {stripeConnect.payoutsEnabled ? (
+                          <span className="text-green-600">Enabled</span>
+                        ) : (
+                          <span className="text-amber-600">Pending</span>
+                        )}
+                      </p>
+                    </div>
+                    {stripeConnect.feePercent && (
+                      <div>
+                        <p className="text-neutral-600">Custom Fee Override</p>
+                        <p className="font-medium">{stripeConnect.feePercent}%</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 pt-4 border-t">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => loadGateways()}
+                    >
+                      Refresh Status
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-amber-50 border border-amber-200 rounded p-4 text-sm text-amber-800">
+                    <p className="font-medium mb-1">Why connect Stripe?</p>
+                    <ul className="list-disc ml-4 space-y-1">
+                      <li>Receive automatic payouts from subscription revenue</li>
+                      <li>Collect platform fees from customer orders</li>
+                      <li>Track your earnings in real-time</li>
+                    </ul>
+                  </div>
+                  <Button 
+                    onClick={handleStripeConnectOnboard}
+                    disabled={stripeOnboardingLoading}
+                    className="w-full"
+                  >
+                    {stripeOnboardingLoading ? 'Connecting...' : 'Connect Stripe Account'}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
         </div>
       )}

@@ -195,33 +195,19 @@ export default function AdminTiersPage() {
       // Extract target tier from trial tier (e.g., trial_starter -> starter)
       const targetTier = currentTenant.subscriptionTier.replace('trial_', '');
 
-      // Call trial management API
-      const response = await fetch('/api/admin/trials/start', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tenantId,
-          targetTier,
-          reason: 'Trial started by admin via tiers page'
-        })
-      });
+      // Call trial management API using service
+      const result = await tenantTierService.startTrial(tenantId, targetTier, 'Trial started by admin via tiers page');
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to start trial');
+      if (!result) {
+        throw new Error('Failed to start trial');
       }
-
-      const result = await response.json();
 
       // Update tenant data with trial information
       setTenants(prev => prev.map(t => t.id === tenantId ? {
         ...t,
-        subscriptionTier: result.tenant.subscription_tier,
-        subscriptionStatus: result.tenant.subscription_status,
-        trialEndsAt: result.tenant.trial_ends_at,
-        subscriptionEndsAt: result.tenant.subscription_ends_at,
+        subscriptionTier: `trial_${targetTier}`,
+        subscriptionStatus: 'trial',
+        trialEndsAt: result.trialEndsAt,
       } : t));
 
       const tenantName = currentTenant.metadata?.businessName || currentTenant.name;

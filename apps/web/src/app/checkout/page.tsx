@@ -10,6 +10,7 @@ import FulfillmentMethodForm, { FulfillmentMethod } from '@/components/checkout/
 import { ShippingAddressForm } from '@/components/checkout/ShippingAddressForm';
 import PayPalPaymentForm from '@/components/checkout/PayPalPaymentForm';
 import SquarePaymentForm from '@/components/checkout/SquarePaymentForm';
+import StripePaymentForm from '@/components/checkout/StripePaymentForm';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ArrowLeft, ShoppingCart, Store, CreditCard, Wallet, Phone, Mail, MapPin, Globe } from 'lucide-react';
@@ -18,7 +19,7 @@ import { getCart, clearCart } from '@/lib/cart/cartManager';
 import { tenantPublicService } from '@/services/TenantPublicService';
 
 type CheckoutStep = 'review' | 'fulfillment' | 'shipping' | 'payment';
-type PaymentMethod = 'square' | 'paypal';
+type PaymentMethod = 'square' | 'paypal' | 'stripe';
 
 interface CustomerInfo {
   email: string;
@@ -662,6 +663,36 @@ function CheckoutPageContent() {
                               </div>
                             </button>
                           )}
+                          {/* Stripe Option - Only show if configured */}
+                          {availableGateways.includes('stripe') && (
+                            <button
+                              onClick={() => setPaymentMethod('stripe')}
+                              className={`w-full p-4 rounded-lg border-2 transition-all ${
+                                paymentMethod === 'stripe'
+                                  ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+                                  : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <CreditCard className="h-6 w-6 text-purple-600" />
+                                <div className="text-left flex-1">
+                                  <div className="font-medium text-neutral-900 dark:text-white">
+                                    Credit or Debit Card (Stripe)
+                                  </div>
+                                  <div className="text-sm text-neutral-600 dark:text-neutral-400">
+                                    Visa, Mastercard, Amex, Discover
+                                  </div>
+                                </div>
+                                {paymentMethod === 'stripe' && (
+                                  <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
+                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -678,6 +709,17 @@ function CheckoutPageContent() {
                           onSuccess={handlePaymentSuccess}
                           onBack={() => setCurrentStep('shipping')}
                           squareConfig={squareConfig}
+                        />
+                      ) : paymentMethod === 'stripe' ? (
+                        <StripePaymentForm
+                          amount={checkoutMode === 'deposit' && depositInfo ? depositInfo.depositCents : total}
+                          customerInfo={customerInfo}
+                          shippingAddress={shippingAddress ?? undefined}
+                          fulfillmentMethod={fulfillmentMethod}
+                          cartItems={mappedCartItems}
+                          onSuccess={handlePaymentSuccess}
+                          onBack={() => setCurrentStep('shipping')}
+                          tenantId={tenantId || ''}
                         />
                       ) : (
                         <PayPalPaymentForm

@@ -431,6 +431,7 @@ function mapTierLevel(tierId: string): TierInfo['level'] {
 function getTierLimit(tierId: string, type: 'products' | 'locations' | 'users'): number {
   // Simplified tier limits - in production you'd have a proper tier configuration
   const limits: Record<string, Record<string, number>> = {
+    'free': { products: 50, locations: 1, users: 2 },
     'starter': { products: 100, locations: 1, users: 5 },
     'discovery': { products: 100, locations: 1, users: 5 },
     'storefront': { products: 250, locations: 1, users: 5 },

@@ -63,6 +63,34 @@ class BrandingSettingsSingletonService extends AuthenticatedApiSingleton {
       return null;
     }
 
+    // Invalidate cache after update
+    this.invalidateCache('branding-settings');
+
+    return result.data || null;
+  }
+
+  /**
+   * Update branding settings with FormData (for file uploads)
+   * Uses the /api/platform-settings endpoint with multipart/form-data
+   */
+  async updateBrandingSettingsWithFormData(formData: FormData): Promise<PlatformSettings | null> {
+    const result = await this.makeDefaultRequest<PlatformSettings>(
+      '/api/platform-settings',
+      {
+        method: 'POST',
+        body: formData,
+      },
+      'branding-settings'
+    );
+
+    if (!result.success) {
+      console.error('[BrandingSettingsSingleton] Failed to update branding settings with FormData:', result.error);
+      return null;
+    }
+
+    // Invalidate cache after update
+    this.invalidateCache('branding-settings');
+
     return result.data || null;
   }
 }
