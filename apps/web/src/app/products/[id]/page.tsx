@@ -418,9 +418,15 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                   </h1>
                 </div>
                 {product.category && (
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                    {product.category.name}
-                  </p>
+                  <a 
+                    title={`Browse to store's ${product.category.name} products`} 
+                    className={`group relative inline-flex items-center gap-1 px-2 py-1 rounded-full hover:opacity-100 transition-opacity cursor-pointer no-underline`}
+                    href={`/tenant/${product.tenantId}?category=${product.category.slug}`}
+                  >
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                      {product.category.name}
+                    </p>
+                  </a>
                 )}
               </div>
             </div>
