@@ -43,7 +43,21 @@ export default function TierGainsWelcome({ currentTier, tierDisplayName, organiz
         secondaryButton: 'text-purple-600 hover:text-purple-700'
       };
     } else if (currentTier === 'enterprise') {
-      // Enterprise gets amber/orange theme
+      // Enterprise gets red/purple theme
+      return {
+        primary: 'red',
+        secondary: 'purple',
+        border: 'from-red-300 to-purple-300',
+        bg: 'from-red-50 to-purple-50',
+        dark: 'from-red-900/20 to-purple-900/20',
+        icon: 'from-red-500 to-purple-600',
+        primaryIcon: 'text-red-600 dark:red-800',
+        secondaryIcon: 'text-purple-600 dark:purple-800',
+        primaryButton: 'bg-red-600 hover:bg-red-700',
+        secondaryButton: 'text-red-600 hover:text-red-700'
+      };
+    } else if (currentTier === 'professional') {
+      // Professional gets amber/orange theme
       return {
         primary: 'amber',
         secondary: 'orange',
@@ -56,22 +70,8 @@ export default function TierGainsWelcome({ currentTier, tierDisplayName, organiz
         primaryButton: 'bg-amber-600 hover:bg-amber-700',
         secondaryButton: 'text-amber-600 hover:text-amber-700'
       };
-    } else if (currentTier === 'professional') {
-      // Professional gets blue/cyan theme
-      return {
-        primary: 'blue',
-        secondary: 'cyan',
-        border: 'from-blue-300 to-cyan-300',
-        bg: 'from-blue-50 to-cyan-50',
-        dark: 'from-blue-900/20 to-cyan-900/20',
-        icon: 'from-blue-500 to-cyan-600',
-        primaryIcon: 'text-blue-600 dark:blue-800',
-        secondaryIcon: 'text-cyan-600 dark:cyan-800',
-        primaryButton: 'bg-blue-600 hover:bg-blue-700',
-        secondaryButton: 'text-blue-600 hover:text-blue-700'
-      };
-    } else if (currentTier === 'starter') {
-      // Starter gets green/emerald theme (default)
+    } else if (currentTier === 'commitment') {
+      // Commitment gets green/emerald theme
       return {
         primary: 'green',
         secondary: 'emerald',
@@ -84,8 +84,36 @@ export default function TierGainsWelcome({ currentTier, tierDisplayName, organiz
         primaryButton: 'bg-green-600 hover:bg-green-700',
         secondaryButton: 'text-green-600 hover:text-green-700'
       };
+    } else if (currentTier === 'storefront') {
+      // Storefront gets purple/indigo theme
+      return {
+        primary: 'purple',
+        secondary: 'indigo',
+        border: 'from-purple-300 to-indigo-300',
+        bg: 'from-purple-50 to-indigo-50',
+        dark: 'from-purple-900/20 to-indigo-900/20',
+        icon: 'from-purple-500 to-indigo-600',
+        primaryIcon: 'text-purple-600 dark:purple-800',
+        secondaryIcon: 'text-indigo-600 dark:indigo-800',
+        primaryButton: 'bg-purple-600 hover:bg-purple-700',
+        secondaryButton: 'text-purple-600 hover:text-purple-700'
+      };
+    } else if (currentTier === 'discovery') {
+      // Discovery gets blue/purple theme
+      return {
+        primary: 'blue',
+        secondary: 'purple',
+        border: 'from-blue-300 to-purple-300',
+        bg: 'from-blue-50 to-purple-50',
+        dark: 'from-blue-900/20 to-purple-900/20',
+        icon: 'from-blue-500 to-purple-600',
+        primaryIcon: 'text-blue-600 dark:blue-800',
+        secondaryIcon: 'text-purple-600 dark:purple-800',
+        primaryButton: 'bg-blue-600 hover:bg-blue-700',
+        secondaryButton: 'text-blue-600 hover:text-blue-700'
+      };
     } else {
-      // Google-Only gets rose/pink theme
+      // Default gets rose/pink theme (for any unrecognized tiers)
       return {
         primary: 'rose',
         secondary: 'pink',

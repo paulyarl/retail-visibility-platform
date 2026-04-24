@@ -666,7 +666,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 phone: tenantProfile?.profileData?.phone_number,
                 email: tenantProfile?.profileData?.email,
                 website: tenantProfile?.profileData?.website,
-                address: `${tenantProfile?.profileData?.address_line1}, ${tenantProfile?.profileData?.city}, ${tenantProfile?.profileData?.state} ${tenantProfile?.profileData?.postal_code}`,
+                address: tenantProfile?.profileData?.state == null ? '' : `${tenantProfile?.profileData?.address_line1}, ${tenantProfile?.profileData?.city}, ${tenantProfile?.profileData?.state} ${tenantProfile?.profileData?.postal_code}`,
+
                 logoUrl: tenantProfile?.profileData?.logo_url,
                 socialLinks: tenantProfile?.profileData?.social_links || undefined,
               }

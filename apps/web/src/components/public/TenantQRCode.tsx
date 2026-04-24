@@ -37,7 +37,7 @@ export function TenantQRCode({
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [tenantLogo, setTenantLogo] = useState<string | null>(null);
-  const [tenantTier, setTenantTier] = useState<string>('starter');
+  const [tenantTier, setTenantTier] = useState<string>('discovery');
   const [isFetchingTierAndLogo, setIsFetchingTierAndLogo] = useState(true);
 
   // Fetch tenant tier and logo
@@ -73,7 +73,7 @@ export function TenantQRCode({
           } else if (organizationTier) {
             effectiveTier = organizationTier;
           } else {
-            effectiveTier = data.effective?.tier_key || data.tier || 'starter';
+            effectiveTier = data.effective?.tier_key || data.tier || 'discovery';
           }
           
           // Strip 'trial_' prefix if present
@@ -169,6 +169,187 @@ export function TenantQRCode({
     });
   };
 
+  // Shared tier utility functions (aligned with TierGainsWelcome)
+  const getTierColorPalette = (tier: string, organizationTier?: string | undefined) => {
+    if (organizationTier) {
+      // Organization tiers get purple/indigo theme
+      return {
+        primary: 'purple',
+        secondary: 'blue',
+        border: 'from-purple-300 to-indigo-300',
+        bg: 'from-purple-50 to-indigo-50',
+        dark: 'from-purple-900/20 to-indigo-900/20',
+        icon: 'from-purple-500 to-indigo-600',
+        primaryIcon: 'text-purple-600 dark:purple-800',
+        secondaryIcon: 'text-blue-600 dark:blue-800',
+        primaryButton: 'bg-purple-600 hover:bg-purple-700',
+        secondaryButton: 'text-purple-600 hover:text-purple-700'
+      };
+    } else if (tier === 'enterprise') {
+      // Enterprise gets red/purple theme
+      return {
+        primary: 'red',
+        secondary: 'purple',
+        border: 'from-red-300 to-purple-300',
+        bg: 'from-red-50 to-purple-50',
+        dark: 'from-red-900/20 to-purple-900/20',
+        icon: 'from-red-500 to-purple-600',
+        primaryIcon: 'text-red-600 dark:red-800',
+        secondaryIcon: 'text-purple-600 dark:purple-800',
+        primaryButton: 'bg-red-600 hover:bg-red-700',
+        secondaryButton: 'text-red-600 hover:text-red-700'
+      };
+    } else if (tier === 'professional') {
+      // Professional gets amber/orange theme
+      return {
+        primary: 'amber',
+        secondary: 'orange',
+        border: 'from-amber-300 to-orange-300',
+        bg: 'from-amber-50 to-orange-50',
+        dark: 'from-amber-900/20 to-orange-900/20',
+        icon: 'from-amber-500 to-orange-600',
+        primaryIcon: 'text-amber-600 dark:amber-800',
+        secondaryIcon: 'text-orange-600 dark:orange-800',
+        primaryButton: 'bg-amber-600 hover:bg-amber-700',
+        secondaryButton: 'text-amber-600 hover:text-amber-700'
+      };
+    } else if (tier === 'commitment') {
+      // Commitment gets green/emerald theme
+      return {
+        primary: 'green',
+        secondary: 'emerald',
+        border: 'from-green-300 to-emerald-300',
+        bg: 'from-green-50 to-emerald-50',
+        dark: 'from-green-900/20 to-emerald-900/20',
+        icon: 'from-green-500 to-emerald-600',
+        primaryIcon: 'text-green-600 dark:green-800',
+        secondaryIcon: 'text-emerald-600 dark:emerald-800',
+        primaryButton: 'bg-green-600 hover:bg-green-700',
+        secondaryButton: 'text-green-600 hover:text-green-700'
+      };
+    } else if (tier === 'storefront') {
+      // Storefront gets purple/indigo theme
+      return {
+        primary: 'purple',
+        secondary: 'indigo',
+        border: 'from-purple-300 to-indigo-300',
+        bg: 'from-purple-50 to-indigo-50',
+        dark: 'from-purple-900/20 to-indigo-900/20',
+        icon: 'from-purple-500 to-indigo-600',
+        primaryIcon: 'text-purple-600 dark:purple-800',
+        secondaryIcon: 'text-indigo-600 dark:indigo-800',
+        primaryButton: 'bg-purple-600 hover:bg-purple-700',
+        secondaryButton: 'text-purple-600 hover:text-purple-700'
+      };
+    } else if (tier === 'discovery') {
+      // Discovery gets blue/purple theme
+      return {
+        primary: 'blue',
+        secondary: 'purple',
+        border: 'from-blue-300 to-purple-300',
+        bg: 'from-blue-50 to-purple-50',
+        dark: 'from-blue-900/20 to-purple-900/20',
+        icon: 'from-blue-500 to-purple-600',
+        primaryIcon: 'text-blue-600 dark:blue-800',
+        secondaryIcon: 'text-purple-600 dark:purple-800',
+        primaryButton: 'bg-blue-600 hover:bg-blue-700',
+        secondaryButton: 'text-blue-600 hover:text-blue-700'
+      };
+    } else {
+      // Default gets rose/pink theme (for any unrecognized tiers)
+      return {
+        primary: 'rose',
+        secondary: 'pink',
+        border: 'from-rose-300 to-pink-300',
+        bg: 'from-rose-50 to-pink-50',
+        dark: 'from-rose-900/20 to-pink-900/20',
+        icon: 'from-rose-500 to-pink-600',
+        primaryIcon: 'text-rose-600 dark:rose-800',
+        secondaryIcon: 'text-pink-600 dark:pink-800',
+        primaryButton: 'bg-rose-600 hover:bg-rose-700',
+        secondaryButton: 'text-rose-600 hover:text-rose-700'
+      };
+    }
+  };
+
+  // Get tier-aware QR code quality settings (aligned with TierGainsWelcome logic)
+  const getTierQRSettings = (tier: string, organizationTier?: string | undefined) => {
+    const baseSize = size;
+    const colors = getTierColorPalette(tier, organizationTier);
+    
+    // Use organization tier logic if present
+    const effectiveTier = organizationTier || tier;
+    
+    switch (effectiveTier) {
+      case 'discovery':
+      case 'starter':
+      case 'chain_starter':
+        return {
+          renderSize: baseSize,           // 256px default
+          exportSize: baseSize,           // 256px export
+          errorCorrection: 'M' as const,
+          margin: 2,
+          quality: 'standard',
+          colors: colors
+        };
+        
+      case 'storefront':
+      case 'chain_storefront':
+        return {
+          renderSize: Math.min(baseSize * 1.5, 512),  // Up to 512px
+          exportSize: 512,                           // 512px export
+          errorCorrection: 'M' as const,
+          margin: 2,
+          quality: 'enhanced',
+          colors: colors
+        };
+        
+      case 'commitment':
+      case 'chain_commitment':
+        return {
+          renderSize: Math.min(baseSize * 2, 1024),   // Up to 1024px
+          exportSize: 1024,                          // 1024px export
+          errorCorrection: 'H' as const,              // Higher error correction for logo
+          margin: 3,
+          quality: 'premium',
+          colors: colors
+        };
+        
+      case 'professional':
+      case 'chain_professional':
+        return {
+          renderSize: Math.min(baseSize * 3, 2048),   // Up to 2048px
+          exportSize: 2048,                          // 2048px export
+          errorCorrection: 'H' as const,              // Higher error correction for logo
+          margin: 3,
+          quality: 'professional',
+          colors: colors
+        };
+        
+      case 'enterprise':
+      case 'organization':
+      case 'chain_enterprise':
+        return {
+          renderSize: Math.min(baseSize * 4, 2048),   // Up to 2048px
+          exportSize: 2048,                          // 2048px export
+          errorCorrection: 'H' as const,              // Highest error correction
+          margin: 4,
+          quality: 'enterprise',
+          colors: colors
+        };
+        
+      default:
+        return {
+          renderSize: baseSize,
+          exportSize: baseSize,
+          errorCorrection: 'M' as const,
+          margin: 2,
+          quality: 'standard',
+          colors: colors
+        };
+    }
+  };
+
   // Generate QR code
   const generateQRCode = async () => {
     if (qrImageUrl || !url) return;
@@ -176,44 +357,60 @@ export function TenantQRCode({
     setIsGenerating(true);
     try {
       const QRCode = (await import('qrcode')).default;
+      
+      // Extract organization tier from effective tier logic (same as TierGainsWelcome)
+      const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') : 
+                             tenantTier === 'organization' ? 'enterprise' : undefined;
+      
+      // Get tier-specific settings with organization tier support
+      const qrSettings = getTierQRSettings(tenantTier, organizationTier);
+      
+      // Create high-resolution canvas for export
+      const exportCanvas = document.createElement('canvas');
+      const exportCtx = exportCanvas.getContext('2d');
+      if (!exportCtx) throw new Error('Could not get canvas context');
 
-      const qrCanvas = document.createElement('canvas');
-      const qrCtx = qrCanvas.getContext('2d');
-      if (!qrCtx) throw new Error('Could not get canvas context');
+      exportCanvas.width = qrSettings.exportSize;
+      exportCanvas.height = qrSettings.exportSize;
 
-      qrCanvas.width = size;
-      qrCanvas.height = size;
-
-      const shouldApplyLogo = (
-        tenantTier === 'professional' ||
-        tenantTier === 'enterprise' ||
-        tenantTier === 'organization' ||
-        tenantTier === 'chain_professional' ||
-        tenantTier === 'chain_enterprise'
-      ) && tenantLogo;
-
-      await QRCode.toCanvas(qrCanvas, url, {
-        width: size,
-        margin: 2,
+      // Generate high-quality QR code
+      await QRCode.toCanvas(exportCanvas, url, {
+        width: qrSettings.exportSize,
+        margin: qrSettings.margin,
         color: {
           dark: '#000000',
           light: '#FFFFFF',
         },
-        errorCorrectionLevel: shouldApplyLogo ? 'H' : 'M',
+        errorCorrectionLevel: qrSettings.errorCorrection,
       });
 
-      let finalCanvas = qrCanvas;
+      let finalCanvas = exportCanvas;
+      
+      // Logo eligibility logic (aligned with TierGainsWelcome)
+      const effectiveTier = organizationTier || tenantTier;
+      const shouldApplyLogo = (
+        effectiveTier === 'commitment' ||
+        effectiveTier === 'professional' ||
+        effectiveTier === 'enterprise' ||
+        effectiveTier === 'organization' ||
+        tenantTier === 'chain_professional' ||
+        tenantTier === 'chain_enterprise'
+      ) && tenantLogo;
 
       if (shouldApplyLogo) {
         try {
-          finalCanvas = await overlayLogoOnQR(qrCanvas, tenantLogo!);
+          finalCanvas = await overlayLogoOnQR(exportCanvas, tenantLogo!);
         } catch (logoError) {
           console.warn('Failed to overlay logo, using plain QR code:', logoError);
         }
       }
 
-      const dataUrl = finalCanvas.toDataURL('image/png');
+      // Generate high-quality PNG with maximum quality
+      const dataUrl = finalCanvas.toDataURL('image/png', 1.0);
       setQrImageUrl(dataUrl);
+      
+      // Log quality level for debugging
+      console.log(`[TenantQRCode] Generated ${qrSettings.quality} quality QR code at ${qrSettings.exportSize}px for tier: ${tenantTier}${organizationTier ? ` (org: ${organizationTier})` : ''}`);
     } catch (error) {
       console.error('Failed to generate QR code:', error);
     } finally {
@@ -259,7 +456,7 @@ export function TenantQRCode({
           <img 
             src={qrImageUrl} 
             alt="QR Code" 
-            className="rounded-lg border border-neutral-200"
+            className="rounded-lg border border-neutral-200 shadow-sm"
             style={{ width: size, height: 'auto' }}
           />
         ) : (
@@ -281,13 +478,66 @@ export function TenantQRCode({
         )}
       </div>
       
-      {tenantLogo && tenantTier && (
-        <p className="text-xs text-neutral-500 mt-2 text-center">
-          Scan to visit page
-          {['professional', 'enterprise', 'organization', 'chain_professional', 'chain_enterprise'].includes(tenantTier) && (
-            <span className="block mt-1">✨ Branded with store logo</span>
-          )}
-        </p>
+      {tenantTier && (
+        <div className="mt-3 space-y-1">
+          <p className="text-xs text-neutral-500 text-center">
+            Scan to visit page
+          </p>
+          
+          {/* Tier-specific features */}
+          <div className="text-center">
+            {(() => {
+              // Extract organization tier for display logic
+              const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') : 
+                                     tenantTier === 'organization' ? 'enterprise' : undefined;
+              const effectiveTier = organizationTier || tenantTier;
+              const colors = getTierColorPalette(tenantTier, organizationTier);
+              
+              // Logo eligibility
+              const shouldShowLogo = (
+                effectiveTier === 'commitment' ||
+                effectiveTier === 'professional' ||
+                effectiveTier === 'enterprise' ||
+                effectiveTier === 'organization' ||
+                tenantTier === 'chain_professional' ||
+                tenantTier === 'chain_enterprise'
+              ) && tenantLogo;
+              
+              return (
+                <>
+                  {shouldShowLogo && (
+                    <span className={`block text-xs ${colors.primaryIcon} font-medium`}>✨ Branded with store logo</span>
+                  )}
+                  
+                  {/* Quality indicator */}
+                  {(() => {
+                    const settings = getTierQRSettings(tenantTier, organizationTier);
+                    const qualityLabels = {
+                      'standard': 'Standard Quality',
+                      'enhanced': 'Enhanced Quality',
+                      'premium': 'Premium Quality',
+                      'professional': 'Professional Quality',
+                      'enterprise': 'Enterprise Quality'
+                    };
+                    
+                    return settings.exportSize > size ? (
+                      <span className={`block text-xs mt-1 ${colors.secondaryIcon}`}>
+                        📏 {settings.exportSize}px export • {qualityLabels[settings.quality as keyof typeof qualityLabels] || settings.quality}
+                      </span>
+                    ) : null;
+                  })()}
+                  
+                  {/* Organization tier indicator */}
+                  {organizationTier && (
+                    <span className={`block text-xs mt-1 ${colors.primaryIcon}`}>
+                      🏢 Organization: {organizationTier.charAt(0).toUpperCase() + organizationTier.slice(1)} tier
+                    </span>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
       )}
     </div>
   );

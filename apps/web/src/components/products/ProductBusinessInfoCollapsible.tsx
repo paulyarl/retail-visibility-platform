@@ -44,6 +44,7 @@ export default function ProductBusinessInfoCollapsible({
 
     const metadata = tenant.metadata as any;
     // console.log(`metadata: ${JSON.stringify(metadata)}`);
+    // console.log(`metadata: ${(metadata)}`);
     const businessName = metadata?.businessName || tenant.name;
      const { status: hoursStatus } = useStoreStatus(product.tenantId, true); // Public scope
 
@@ -174,7 +175,7 @@ export default function ProductBusinessInfoCollapsible({
                                 </div>
                             )}
                             {/* Status */}
-                            {metadata?.address && (
+                            {hoursStatus && (
                                 <div className="flex items-start gap-3 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
                                     <svg className="h-6 w-6 text-neutral-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -190,7 +191,7 @@ export default function ProductBusinessInfoCollapsible({
                                 </div>
                             )}
                             {/* Status */}
-                            {metadata?.address && (
+                            {hoursStatus && (
                                 <div className="flex items-start gap-3 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
                                     <svg className="h-6 w-6 text-neutral-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
