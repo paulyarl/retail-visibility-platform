@@ -774,6 +774,16 @@ export default function StorefrontClientWrapper({
                       categories={categories}
                       totalProducts={totalItems || 0}
                     />
+                     {/* QR Code - under categories */}
+                    <TenantQRCode
+                      url={typeof window !== 'undefined' ? window.location.href : ''}
+                      tenantId={tenantId}
+                      label="Scan to Share"
+                      downloadName={businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+                      size={200}
+                      showDownload={true}
+                      className="mt-4"
+                    />
                   </div>
 
                   {/* Main Content Area */}
