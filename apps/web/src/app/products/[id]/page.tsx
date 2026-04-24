@@ -435,7 +435,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
               {/* Navigation Pills */}
               <div className="hidden sm:flex items-center gap-2 flex-wrap">
-                {tenantProfile?.slug && (
+                {tenantProfile?.slug && tenantProfile?.hasDirectory && !tenantProfile?.showSubscriptionPanel && (
                   <a
                     href={`/directory/${tenantProfile.slug}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors whitespace-nowrap"
@@ -639,6 +639,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 storeStatus={null}
                   gallery={gallery.length > 0 ? <ProductGallery gallery={gallery} productTitle={product.title} /> : undefined}
                   fulfillmentPane={<FulfillmentOptionsPane tenantId={product.tenantId} />}
+                  currentUrl={currentUrl}
                 />
               </TenantPaymentProvider>
             </div>

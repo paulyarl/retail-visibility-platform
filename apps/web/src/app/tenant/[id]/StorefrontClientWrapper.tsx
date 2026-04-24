@@ -759,7 +759,7 @@ export default function StorefrontClientWrapper({
                     />
                     {/* QR Code - under categories */}
                     <TenantQRCode
-                      url={typeof window !== 'undefined' ? window.location.href : ''}
+                      url={currentUrl}
                       tenantId={tenantId}
                       label="Scan to Share"
                       downloadName={businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
@@ -778,7 +778,7 @@ export default function StorefrontClientWrapper({
                     />
                      {/* QR Code - under categories */}
                     <TenantQRCode
-                      url={typeof window !== 'undefined' ? window.location.href : ''}
+                      url={currentUrl}
                       tenantId={tenantId}
                       label="Scan to Share"
                       downloadName={businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}

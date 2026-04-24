@@ -425,16 +425,79 @@ export function TenantQRCode({
     }
   }, [isFetchingTierAndLogo, url]);
 
-  const downloadQRCode = () => {
-    if (!qrImageUrl) return;
+  // Generate QR code at specific size for download
+  const generateQRCodeAtSize = async (targetSize: number): Promise<string> => {
+    const QRCode = (await import('qrcode')).default;
+    
+    // Extract organization tier from effective tier logic (same as TierGainsWelcome)
+    const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') : 
+                           tenantTier === 'organization' ? 'enterprise' : undefined;
+    
+    // Get tier-specific settings with organization tier support
+    const qrSettings = getTierQRSettings(tenantTier, organizationTier);
+    
+    // Create canvas for requested size
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not get canvas context');
 
-    const link = document.createElement('a');
-    link.href = qrImageUrl;
-    const name = downloadName || url.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    link.download = `qr-${name}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    canvas.width = targetSize;
+    canvas.height = targetSize;
+
+    // Generate QR code with tier-appropriate settings
+    await QRCode.toCanvas(canvas, url, {
+      width: targetSize,
+      margin: qrSettings.margin,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF',
+      },
+      errorCorrectionLevel: qrSettings.errorCorrection,
+    });
+
+    let finalCanvas = canvas;
+    
+    // Logo eligibility logic (aligned with TierGainsWelcome)
+    const effectiveTier = organizationTier || tenantTier;
+    const shouldApplyLogo = (
+      effectiveTier === 'commitment' ||
+      effectiveTier === 'professional' ||
+      effectiveTier === 'enterprise' ||
+      effectiveTier === 'organization' ||
+      tenantTier === 'chain_professional' ||
+      tenantTier === 'chain_enterprise'
+    ) && tenantLogo;
+
+    // Apply logo if eligible and size is appropriate for logo
+    if (shouldApplyLogo && targetSize >= 512) {
+      try {
+        finalCanvas = await overlayLogoOnQR(canvas, tenantLogo!);
+      } catch (logoError) {
+        console.warn('Failed to overlay logo, using plain QR code:', logoError);
+      }
+    }
+
+    // Generate data URL
+    return finalCanvas.toDataURL('image/png', 1.0);
+  };
+
+  const downloadQRCode = async (targetSize: number) => {
+    try {
+      setIsGenerating(true);
+      const dataUrl = await generateQRCodeAtSize(targetSize);
+      
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      const name = downloadName || url.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      link.download = `qr-${name}-${targetSize}px.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Failed to download QR code:', error);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -469,12 +532,72 @@ export function TenantQRCode({
         )}
         
         {showDownload && qrImageUrl && (
-          <button
-            onClick={downloadQRCode}
-            className="mt-3 px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
-          >
-            Download QR Code
-          </button>
+          <div className="mt-3 space-y-2">
+            {(() => {
+              // Extract organization tier for download options
+              const organizationTier = tenantTier.includes('chain_') ? tenantTier.replace('chain_', '') : 
+                                     tenantTier === 'organization' ? 'enterprise' : undefined;
+              const effectiveTier = organizationTier || tenantTier;
+              
+              // Define available sizes based on tier
+              const sizeOptions = (() => {
+                switch (effectiveTier) {
+                  case 'discovery':
+                  case 'starter':
+                  case 'chain_starter':
+                    return [
+                      { size: 256, label: 'Small (256px)', description: 'Mobile friendly' }
+                    ];
+                  case 'storefront':
+                  case 'chain_storefront':
+                    return [
+                      { size: 256, label: 'Small (256px)', description: 'Mobile friendly' },
+                      { size: 512, label: 'Medium (512px)', description: 'Web quality' }
+                    ];
+                  case 'commitment':
+                  case 'chain_commitment':
+                    return [
+                      { size: 256, label: 'Small (256px)', description: 'Mobile friendly' },
+                      { size: 512, label: 'Medium (512px)', description: 'Web quality' },
+                      { size: 1024, label: 'Large (1024px)', description: 'Print quality' }
+                    ];
+                  case 'professional':
+                  case 'chain_professional':
+                  case 'enterprise':
+                  case 'organization':
+                  case 'chain_enterprise':
+                    return [
+                      { size: 256, label: 'Small (256px)', description: 'Mobile friendly' },
+                      { size: 512, label: 'Medium (512px)', description: 'Web quality' },
+                      { size: 1024, label: 'Large (1024px)', description: 'Print quality' },
+                      { size: 2048, label: 'Extra Large (2048px)', description: 'Professional print' }
+                    ];
+                  default:
+                    return [
+                      { size: 256, label: 'Small (256px)', description: 'Mobile friendly' }
+                    ];
+                }
+              })();
+              
+              return (
+                <>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {sizeOptions.map((option) => (
+                      <button
+                        key={option.size}
+                        onClick={() => downloadQRCode(option.size)}
+                        disabled={isGenerating}
+                        className="px-3 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={option.description}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
         )}
       </div>
       

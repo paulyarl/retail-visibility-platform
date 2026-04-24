@@ -1009,9 +1009,10 @@ interface TierBasedLandingPageProps {
   gallery?: React.ReactNode;
   fulfillmentPane?: React.ReactNode;
   slug?: string;
+  currentUrl?: string;
 }
 
-export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fulfillmentPane, slug }: TierBasedLandingPageProps) {
+export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fulfillmentPane, slug, currentUrl }: TierBasedLandingPageProps) {
   const { settings: platformSettings } = usePlatformSettings();
   const [features, setFeatures] = useState<LandingPageFeatures | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1038,8 +1039,8 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   // console.log('[TierBasedLandingPage] Variants type:', typeof product.variants);
   // console.log('[TierBasedLandingPage] Product object keys:', Object.keys(product));
   const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
-  const currentUrl = `${baseUrl}/products/${product.id}`;
-  console.log('[TierBasedLandingPage] Current URL:', currentUrl);
+  const resolvedCurrentUrl = currentUrl || `${baseUrl}/products/${product.id}`;
+  console.log('[TierBasedLandingPage] Current URL:', resolvedCurrentUrl);
   
 
   // Calculate current pricing based on selected variant
@@ -1265,7 +1266,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
         <ProductActions 
           product={product} 
           tenant={tenant}
-          productUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/products/${product.id}`}
+          productUrl={resolvedCurrentUrl}
           variant="product"
         />
 
@@ -1652,7 +1653,7 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
         {/* QR Code CTA Section - Professional+ Tier */}
         {!showStatusPanel && safeFeatures.qrCodes && (
           <PublicQRCodeSection
-            productUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/products/${product.id}`}
+            productUrl={resolvedCurrentUrl}
             productName={product.name}
             tenantId={product.tenantId}
           />
