@@ -1038,12 +1038,13 @@ export function TierBasedLandingPage({ product, tenant, storeStatus, gallery, fu
   // console.log('[TierBasedLandingPage] Variants length:', product.variants?.length);
   // console.log('[TierBasedLandingPage] Variants type:', typeof product.variants);
   // console.log('[TierBasedLandingPage] Product object keys:', Object.keys(product));
-  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+  const baseUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
   const resolvedCurrentUrl = currentUrl || `${baseUrl}/products/${product.id}`;
-  console.log('[TierBasedLandingPage] Current URL:', resolvedCurrentUrl);
+  // console.log('[TierBasedLandingPage] Current URL:', resolvedCurrentUrl);
   
 
   // Calculate current pricing based on selected variant
+// ... (rest of the code remains the same)
   const currentPrice = selectedVariant?.price_cents ? selectedVariant.price_cents / 100 : product.price;
   const currentPriceCents = selectedVariant?.price_cents || product.priceCents;
   const getStock = (v: any) => v?.inventory_quantity ?? v?.stock ?? v?.variant_stock ?? v?.variant_inventory_quantity ?? 0;

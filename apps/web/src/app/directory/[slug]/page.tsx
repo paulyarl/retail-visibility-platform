@@ -489,7 +489,7 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
 
   const resolvedParams = use(params);
   const { slug: identifier } = resolvedParams;
-  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
+  const baseUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
   const currentUrl = `${baseUrl}/directory/${identifier}`;
   console.log(`Directory listing CurrentUrl: ${currentUrl}`);
   console.log(`Directory listing CurrentUrl: ${typeof window !== 'undefined' ? window.location.href : 'window not defined'}`);
