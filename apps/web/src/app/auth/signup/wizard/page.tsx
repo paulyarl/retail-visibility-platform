@@ -27,9 +27,12 @@ export default function SignupWizardPage() {
     phone: '',
     businessType: '',
     numberOfLocations: '1',
+    preferredTier: '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [checkingExistingUser, setCheckingExistingUser] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [existingUserData, setExistingUserData] = useState<any>(null);
   const router = useRouter();
   const { settings, loading: settingsLoading } = usePlatformSettings();
   const { isAuthenticated, user, isLoading: authLoading } = useAuth();
@@ -53,8 +56,8 @@ export default function SignupWizardPage() {
 
   // Check for existing authenticated user before showing data collection
   useEffect(() => {
-    // Only check when moving to step 5 (data collection)
-    if (step !== 5) return;
+    // Only check when moving to step 7 (data collection)
+    if (step !== 7) return;
     // Skip if still loading auth state
     if (authLoading) return;
     
@@ -67,10 +70,36 @@ export default function SignupWizardPage() {
         const hasTenants = user.tenants && user.tenants.length > 0;
         
         if (hasTenants) {
-          // User has tenants - redirect to their dashboard
+          // User has tenants - fetch their data and show review form
           const tenantId = user.tenants[0]?.id;
-          // console.log('[SignupWizard] User has tenants, redirecting to dashboard:', tenantId);
-          router.replace(`/t/${tenantId}/dashboard`);
+          // console.log('[SignupWizard] User has tenants, fetching data for review:', tenantId);
+          
+          try {
+            // Fetch existing tenant data
+            const response = await fetch(`/api/tenants/${tenantId}`);
+            if (response.ok) {
+              const tenantData = await response.json();
+              setExistingUserData(tenantData);
+              
+              // Pre-populate form with existing data
+              setFormData({
+                firstName: user.firstName || '',
+                lastName: user.lastName || '',
+                businessName: tenantData.businessName || '',
+                email: user.email || '',
+                phone: tenantData.phoneNumber || user.phone || '',
+                businessType: tenantData.businessType || '',
+                numberOfLocations: tenantData.numberOfLocations || '1',
+                preferredTier: tenantData.tier || '',
+              });
+              
+              setShowReviewForm(true);
+            }
+          } catch (error) {
+            console.error('Failed to fetch tenant data:', error);
+            // Fallback to dashboard if fetch fails
+            router.replace(`/t/${tenantId}/dashboard`);
+          }
         } else if (user.onboardingCompleted) {
           // User completed onboarding but has no tenants - redirect to dashboard
           // console.log('[SignupWizard] User completed onboarding, redirecting to dashboard');
@@ -86,8 +115,8 @@ export default function SignupWizardPage() {
     checkExistingUser();
   }, [step, isAuthenticated, user, authLoading, router]);
 
-  // Total steps: 4 benefit steps + 1 data collection = 5 total
-  const totalSteps = 5;
+  // Total steps: 6 benefit steps + 1 data collection = 7 total
+  const totalSteps = 7;
 
   const benefitSteps = [
     {
@@ -97,22 +126,34 @@ export default function SignupWizardPage() {
       highlight: "Free Storefront page + Directory listing included"
     },
     {
-      icon: "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4",
-      title: "POS Integration Made Simple",
-      description: "Connect your existing point-of-sale system and watch your inventory sync automatically. Support for Clover, Square, and other popular POS platforms. No manual updates needed.",
-      highlight: "Works with Clover, Square & more"
+      icon: "M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9",
+      title: "Tier 1 — Discovery: I Exist Online",
+      description: "People are finding your store on Google Search, Google Shopping, and Google Maps. Your business is discoverable by local shoppers through our Store Directory with featured products highlighted. Your complete inventory becomes available when you upgrade to Storefront.",
+      highlight: "Google visibility + Directory listing with featured products"
     },
     {
-      icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zM9 5a2 2 0 012-2h2a2 2 0 012 2v6a2 2 0 01-2 2H11a2 2 0 01-2-2V5z",
-      title: "Real-Time Inventory Visibility",
-      description: "Customers see exactly what you have in stock right now. When something sells in-store, it's instantly updated online. No more disappointed shoppers finding out you're sold out.",
-      highlight: "Inventory syncs in real-time"
+      icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+      title: "Tier 2 — Storefront: I Have a Store Online",
+      description: "Shoppers are browsing your complete store on the platform. They can see your full inventory, contact you directly, and explore your brand. You have a professional storefront page that showcases your business and products beautifully.",
+      highlight: "Branded storefront + Platform search & browse"
     },
     {
-      icon: "M13 10V3L4 14h7v7l9-11h-7z",
-      title: "Go Live in Minutes",
-      description: "Connect your POS, customize your Storefront, and start reaching local customers the same day. No technical expertise required. We handle the complexity so you can focus on your business.",
-      highlight: "Average setup time: 15 minutes"
+      icon: "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z",
+      title: "Tier 3 — Commitment: I Am Selling Online",
+      description: "Shoppers commit to buying and show up in-store. You can collect holding fees, manage reservations, and track conversions. Inventory availability indicators help shoppers make informed decisions. QR codes drive traffic to your store.",
+      highlight: "Add to cart + Holding fees + Shopper notifications"
+    },
+    {
+      icon: "M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z",
+      title: "Tier 4 — Professional: I Am a Full Online Retailer",
+      description: "You're closing the full sale online with complete payment collection, delivery fulfillment, and advanced analytics. Shoppers can buy completely online and you handle everything from payment to fulfillment. Priority directory placement drives more traffic.",
+      highlight: "Full online payments + Delivery + Advanced analytics"
+    },
+    {
+      icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+      title: "Tier 5 — Enterprise: I Run a Complete Business Operation",
+      description: "You have enterprise-grade tools with multi-location support, API access for custom integrations, and dedicated onboarding support. Advanced security, compliance features, and priority support help you scale your business operation efficiently.",
+      highlight: "Multi-location + API access + Enterprise support"
     }
   ];
 
@@ -123,6 +164,34 @@ export default function SignupWizardPage() {
     { value: 'grocery', label: 'Grocery Store' },
     { value: 'convenience', label: 'Convenience Store' },
     { value: 'other', label: 'Other' }
+  ];
+
+  const tierOptions = [
+    { 
+      value: 'discovery', 
+      label: 'Tier 1 — Discovery ($29/mo)',
+      description: 'I want people to find my products on Google and in the directory'
+    },
+    { 
+      value: 'storefront', 
+      label: 'Tier 2 — Storefront ($59/mo)',
+      description: 'I want a professional storefront where shoppers can browse my store'
+    },
+    { 
+      value: 'commitment', 
+      label: 'Tier 3 — Commitment ($99/mo)',
+      description: 'I want to sell online with add to cart and reservation features'
+    },
+    { 
+      value: 'professional', 
+      label: 'Tier 4 — Professional ($199/mo)',
+      description: 'I want complete online sales with payments and delivery'
+    },
+    { 
+      value: 'enterprise', 
+      label: 'Tier 5 — Enterprise ($499/mo)',
+      description: 'I need multi-location support and enterprise features'
+    }
   ];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -145,37 +214,81 @@ export default function SignupWizardPage() {
     setIsLoading(true);
 
     try {
-      // Save form data to onboarding state service (localStorage persists across Auth0 redirect)
-      // console.log('[SignupWizard] Saving formData to onboardingStateService:', formData);
-      onboardingStateService.savePhase1({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        businessName: formData.businessName,
-        businessType: formData.businessType,
-        phone: formData.phone,
-        email: formData.email,
-      });
-      
-      // Verify it was saved
-      const saved = onboardingStateService.getPhase1();
-      // console.log('[SignupWizard] Verified saved data:', saved);
+      if (showReviewForm && existingUserData) {
+        // Update existing user data
+        // console.log('[SignupWizard] Updating existing user data:', formData);
+        
+        try {
+          const response = await fetch(`/api/tenants/${existingUserData.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              businessName: formData.businessName,
+              businessType: formData.businessType,
+              phoneNumber: formData.phone,
+              tier: formData.preferredTier,
+              numberOfLocations: formData.numberOfLocations,
+            }),
+          });
 
-      // Redirect to Auth0 signup
-      // Auth0 will handle account creation and authentication
-      // After successful auth, user will be redirected back to /auth/callback then to onboarding
-      const returnTo = encodeURIComponent('/onboarding');
-      window.location.href = `/auth/login?screen_hint=signup&returnTo=${returnTo}`;
+          if (response.ok) {
+            // Save updated data to onboarding state service
+            onboardingStateService.savePhase1({
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+              businessName: formData.businessName,
+              businessType: formData.businessType,
+              phone: formData.phone,
+              email: formData.email,
+              preferredTier: formData.preferredTier,
+            });
+            
+            // Redirect to dashboard
+            router.replace(`/t/${existingUserData.id}/dashboard`);
+          } else {
+            throw new Error('Failed to update tenant data');
+          }
+        } catch (error) {
+          console.error('Update error:', error);
+          alert(error instanceof Error ? error.message : 'Update failed. Please try again.');
+        }
+      } else {
+        // New user signup flow
+        // Save form data to onboarding state service (localStorage persists across Auth0 redirect)
+        // console.log('[SignupWizard] Saving formData to onboardingStateService:', formData);
+        onboardingStateService.savePhase1({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          businessName: formData.businessName,
+          businessType: formData.businessType,
+          phone: formData.phone,
+          email: formData.email,
+          preferredTier: formData.preferredTier,
+        });
+        
+        // Verify it was saved
+        const saved = onboardingStateService.getPhase1();
+        // console.log('[SignupWizard] Verified saved data:', saved);
+
+        // Redirect to Auth0 signup
+        // Auth0 will handle account creation and authentication
+        // After successful auth, user will be redirected back to /auth/callback then to onboarding
+        const returnTo = encodeURIComponent('/onboarding');
+        window.location.href = `/auth/login?screen_hint=signup&returnTo=${returnTo}`;
+      }
     } catch (error) {
-      console.error('Signup error:', error);
-      alert(error instanceof Error ? error.message : 'Registration failed. Please try again.');
+      console.error('Submit error:', error);
+      alert(error instanceof Error ? error.message : 'Operation failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const renderStep = () => {
-    // Benefit steps 1-4
-    if (step >= 1 && step <= 4) {
+    // Benefit steps 1-6
+    if (step >= 1 && step <= 6) {
       const benefit = benefitSteps[step - 1];
       return (
         <div>
@@ -250,14 +363,211 @@ export default function SignupWizardPage() {
       );
     }
 
-    // Data collection step (step 5)
-    if (step === 5) {
+    // Data collection step (step 7)
+    if (step === 7) {
       // Show loading state while checking for existing user
       if (checkingExistingUser || authLoading) {
         return (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
             <p className="text-neutral-600">Checking your account...</p>
+          </div>
+        );
+      }
+      
+      // Show review form for existing users
+      if (showReviewForm && existingUserData) {
+        return (
+          <div>
+            <h3 className="text-xl font-semibold text-neutral-900 mb-6">
+              Welcome back, {user?.firstName || 'there'}! 👋
+            </h3>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <h4 className="font-semibold text-blue-900 mb-2">Review Your Information</h4>
+              <p className="text-blue-700 text-sm">
+                We found your existing business information. You can review and update it below, or continue to your dashboard.
+              </p>
+            </div>
+            
+            <form id="reviewForm" onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="firstName" className="block text-sm font-medium text-neutral-700 mb-1">
+                    First Name *
+                  </label>
+                  <input
+                    id="firstName"
+                    name="firstName"
+                    type="text"
+                    value={formData.firstName}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Your first name"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="lastName" className="block text-sm font-medium text-neutral-700 mb-1">
+                    Last Name *
+                  </label>
+                  <input
+                    id="lastName"
+                    name="lastName"
+                    type="text"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Your last name"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="businessName" className="block text-sm font-medium text-neutral-700 mb-1">
+                  Business Name *
+                </label>
+                <input
+                  id="businessName"
+                  name="businessName"
+                  type="text"
+                  value={formData.businessName}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Your business name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="businessType" className="block text-sm font-medium text-neutral-700 mb-1">
+                  Business Type *
+                </label>
+                <select
+                  id="businessType"
+                  name="businessType"
+                  value={formData.businessType}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  required
+                >
+                  <option value="">Select business type</option>
+                  {businessTypes.map(type => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="numberOfLocations" className="block text-sm font-medium text-neutral-700 mb-1">
+                  Number of Locations *
+                </label>
+                <select
+                  id="numberOfLocations"
+                  name="numberOfLocations"
+                  value={formData.numberOfLocations}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  required
+                >
+                  <option value="1">1 location</option>
+                  <option value="2-5">2-5 locations</option>
+                  <option value="6-20">6-20 locations</option>
+                  <option value="21+">21+ locations</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-neutral-700 mb-1">
+                  Email Address *
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="your@email.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-neutral-700 mb-1">
+                  Phone Number
+                </label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="(555) 123-4567"
+                />
+              </div>
+
+              <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-200">
+                <h4 className="font-semibold text-neutral-900 mb-3">Which tier best aligns with your goals?</h4>
+                <p className="text-sm text-neutral-600 mb-4">
+                  Based on the slides you just saw, which tier represents where you want to start your journey?
+                </p>
+                <div>
+                  <label htmlFor="preferredTier" className="block text-sm font-medium text-neutral-700 mb-2">
+                    Choose your starting tier *
+                  </label>
+                  <select
+                    id="preferredTier"
+                    name="preferredTier"
+                    value={formData.preferredTier}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  >
+                    <option value="">Select your preferred tier</option>
+                    {tierOptions.map(tier => (
+                      <option key={tier.value} value={tier.value}>
+                        {tier.label}
+                      </option>
+                    ))}
+                  </select>
+                  {formData.preferredTier && (
+                    <p className="text-xs text-neutral-500 mt-2">
+                      {tierOptions.find(t => t.value === formData.preferredTier)?.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </form>
+            
+            <div className="mt-6 flex justify-between">
+              <button
+                type="button"
+                onClick={() => router.replace(`/t/${existingUserData.id}/dashboard`)}
+                className="px-6 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              >
+                Skip to Dashboard
+              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="px-6 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  form="reviewForm"
+                  disabled={isLoading}
+                  className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Updating...' : 'Update Information'}
+                </button>
+              </div>
+            </div>
           </div>
         );
       }
@@ -407,13 +717,45 @@ export default function SignupWizardPage() {
               />
             </div>
 
+            <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-200">
+              <h4 className="font-semibold text-neutral-900 mb-3">Which tier best aligns with your goals?</h4>
+              <p className="text-sm text-neutral-600 mb-4">
+                Based on the slides you just saw, which tier represents where you want to start your journey?
+              </p>
+              <div>
+                <label htmlFor="preferredTier" className="block text-sm font-medium text-neutral-700 mb-2">
+                  Choose your starting tier *
+                </label>
+                <select
+                  id="preferredTier"
+                  name="preferredTier"
+                  value={formData.preferredTier}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  required
+                >
+                  <option value="">Select your preferred tier</option>
+                  {tierOptions.map(tier => (
+                    <option key={tier.value} value={tier.value}>
+                      {tier.label}
+                    </option>
+                  ))}
+                </select>
+                {formData.preferredTier && (
+                  <p className="text-xs text-neutral-500 mt-2">
+                    {tierOptions.find(t => t.value === formData.preferredTier)?.description}
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div className="bg-primary-50 rounded-xl p-4">
               <h4 className="font-semibold text-primary-900 mb-2">Start Your Free Trial</h4>
               <p className="text-primary-700 text-sm mb-2">
                 No credit card required. Full access to all features for 14 days.
               </p>
               <div className="text-xs text-primary-600">
-                After your trial, choose from Starter, Professional, or Enterprise plans.
+                After your trial, continue with your selected tier or upgrade anytime.
               </div>
             </div>
 
@@ -487,7 +829,7 @@ export default function SignupWizardPage() {
             {/* Progress Steps */}
             <div className="flex items-center justify-center mb-8">
               <div className="flex items-center space-x-2">
-                {[1, 2, 3, 4, 5].map((stepNumber) => (
+                {[1, 2, 3, 4, 5, 6, 7].map((stepNumber) => (
                   <div key={stepNumber} className="flex items-center">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
                       step >= stepNumber 
@@ -496,7 +838,7 @@ export default function SignupWizardPage() {
                     }`}>
                       {stepNumber}
                     </div>
-                    {stepNumber < 5 && (
+                    {stepNumber < 7 && (
                       <div className={`w-6 h-0.5 ml-2 ${
                         step > stepNumber ? 'bg-primary-600' : 'bg-neutral-200'
                       }`} />

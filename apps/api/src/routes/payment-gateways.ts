@@ -80,8 +80,8 @@ router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Respo
   try {
     const { tenantId } = req.params;
 
-    // Get gateways and tenant tier in parallel
-    const [gateways, tenant] = await Promise.all([
+    // Get gateways, tenant tier, and Stripe Connect status in parallel
+    const [gateways, tenant, stripeConnect] = await Promise.all([
       prisma.tenant_payment_gateways.findMany({
         where: { 
           tenant_id: tenantId,
@@ -105,10 +105,33 @@ router.get('/:tenantId/payment-gateways/public', async (req: Request, res: Respo
           subscription_tier: true,
         },
       }),
+      prisma.merchant_stripe_connections.findUnique({
+        where: { tenant_id: tenantId },
+        select: {
+          onboarding_status: true,
+          stripe_payouts_enabled: true,
+          stripe_payments_enabled: true,
+        },
+      }),
     ]);
 
+    // Add Stripe Connect as a gateway if it's active
+    const allGateways = [...gateways];
+    if (stripeConnect && stripeConnect.onboarding_status === 'completed' && stripeConnect.stripe_payments_enabled) {
+      // Add Stripe as a virtual gateway
+      allGateways.push({
+        id: 'stripe_connect',
+        gateway_type: 'stripe',
+        is_active: true,
+        is_default: false, // Stripe Connect is never default (it's for platform revenue)
+        config: {
+          display_name: 'Stripe',
+        },
+      });
+    }
+
     // Add tenant tier to each gateway for frontend deposit calculation
-    const gatewaysWithTier = gateways.map(gateway => ({
+    const gatewaysWithTier = allGateways.map(gateway => ({
       ...gateway,
       tenant_tier: tenant?.subscription_tier || null,
     }));

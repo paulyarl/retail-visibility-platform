@@ -809,6 +809,8 @@ export default function StoreDetailPage({ params }: StoreDetailPageProps) {
                     downloadName={listing.businessName?.toLowerCase().replace(/[^a-z0-9]/g, '-')}
                     size={200}
                     showDownload={true}
+                    className="mt-4"
+                    pageType="directory"
                   />
                 </div>
               )}

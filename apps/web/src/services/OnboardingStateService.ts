@@ -19,6 +19,9 @@ export interface Phase1Data {
   businessName: string;
   businessType: string;
   
+  // Tier preference
+  preferredTier?: string;
+  
   // Created tenant (after phase 1 completion)
   tenantId?: string;
   tenantSlug?: string;

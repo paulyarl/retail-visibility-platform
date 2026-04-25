@@ -605,7 +605,7 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
       setQrImageUrl(dataUrl);
       
       // Log quality level for debugging
-      console.log(`[ProductQRCode] Generated ${qrSettings.quality} quality QR code at ${qrSettings.exportSize}px for tier: ${tenantTier}${organizationTier ? ` (org: ${organizationTier})` : ''}`);
+      // console.log(`[ProductQRCode] Generated ${qrSettings.quality} quality QR code at ${qrSettings.exportSize}px for tier: ${tenantTier}${organizationTier ? ` (org: ${organizationTier})` : ''}`);
     } catch (error) {
       console.error('Failed to generate QR code:', error);
     } finally {
@@ -656,8 +656,16 @@ function PublicQRCodeSection({ productUrl, productName, tenantId }: { productUrl
       tenantTier === 'chain_enterprise'
     ) && tenantLogo;
 
-    // Apply logo if eligible and size is appropriate for logo
-    if (shouldApplyLogo && targetSize >= 512) {
+    // Apply logo if eligible (all sizes for higher tiers, 512px+ for lower tiers)
+    const logoMinSize = (
+      effectiveTier === 'professional' ||
+      effectiveTier === 'enterprise' ||
+      effectiveTier === 'organization' ||
+      tenantTier === 'chain_professional' ||
+      tenantTier === 'chain_enterprise'
+    ) ? 256 : 512;
+    
+    if (shouldApplyLogo && targetSize >= logoMinSize) {
       try {
         finalCanvas = await overlayLogoOnQR(canvas, tenantLogo!);
       } catch (logoError) {

@@ -150,8 +150,8 @@ export default function StorefrontClientWrapper({
 
   const baseUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000';
   const currentUrl = `${baseUrl}/tenant/${tenantId}`;
-  console.log(`Storefront CurrentUrl: ${currentUrl}`);
-  console.log(`Storefront CurrentUrl: ${typeof window !== 'undefined' ? window.location.href : 'window not defined'}`);
+  // console.log(`Storefront CurrentUrl: ${currentUrl}`);
+  // console.log(`Storefront CurrentUrl: ${typeof window !== 'undefined' ? window.location.href : 'window not defined'}`);
 
   // Handle view cart
   const handleViewCart = () => {
@@ -766,6 +766,7 @@ export default function StorefrontClientWrapper({
                       size={200}
                       showDownload={true}
                       className="mt-4"
+                      pageType="storefront"
                     />
                   </div>
 
@@ -785,6 +786,7 @@ export default function StorefrontClientWrapper({
                       size={200}
                       showDownload={true}
                       className="mt-4"
+                      pageType="storefront"
                     />
                   </div>
 

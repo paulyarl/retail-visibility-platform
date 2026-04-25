@@ -19,6 +19,8 @@ export interface TenantQRCodeProps {
   showDownload?: boolean;
   /** Additional container classes */
   className?: string;
+  /** Page type for filename differentiation */
+  pageType?: 'storefront' | 'directory' | 'product';
 }
 
 /**
@@ -33,6 +35,7 @@ export function TenantQRCode({
   size = 256,
   showDownload = true,
   className = '',
+  pageType,
 }: TenantQRCodeProps) {
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -410,7 +413,7 @@ export function TenantQRCode({
       setQrImageUrl(dataUrl);
       
       // Log quality level for debugging
-      console.log(`[TenantQRCode] Generated ${qrSettings.quality} quality QR code at ${qrSettings.exportSize}px for tier: ${tenantTier}${organizationTier ? ` (org: ${organizationTier})` : ''}`);
+      // console.log(`[TenantQRCode] Generated ${qrSettings.quality} quality QR code at ${qrSettings.exportSize}px for tier: ${tenantTier}${organizationTier ? ` (org: ${organizationTier})` : ''}`);
     } catch (error) {
       console.error('Failed to generate QR code:', error);
     } finally {
@@ -468,8 +471,16 @@ export function TenantQRCode({
       tenantTier === 'chain_enterprise'
     ) && tenantLogo;
 
-    // Apply logo if eligible and size is appropriate for logo
-    if (shouldApplyLogo && targetSize >= 512) {
+    // Apply logo if eligible (all sizes for higher tiers, 512px+ for lower tiers)
+    const logoMinSize = (
+      effectiveTier === 'professional' ||
+      effectiveTier === 'enterprise' ||
+      effectiveTier === 'organization' ||
+      tenantTier === 'chain_professional' ||
+      tenantTier === 'chain_enterprise'
+    ) ? 256 : 512;
+    
+    if (shouldApplyLogo && targetSize >= logoMinSize) {
       try {
         finalCanvas = await overlayLogoOnQR(canvas, tenantLogo!);
       } catch (logoError) {
@@ -488,8 +499,16 @@ export function TenantQRCode({
       
       const link = document.createElement('a');
       link.href = dataUrl;
-      const name = downloadName || url.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-      link.download = `qr-${name}-${targetSize}px.png`;
+      
+      // Create filename with page type prefix for better organization
+      let baseName = downloadName || url.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      
+      // Add page type prefix if specified
+      if (pageType) {
+        baseName = `${pageType}-${baseName}`;
+      }
+      
+      link.download = `qr-${baseName}-${targetSize}px.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

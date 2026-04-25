@@ -2412,38 +2412,65 @@ app.get("/public/tenant/:tenant_id/payment-gateways", async (req, res) => {
     const { tenant_id } = req.params;
     if (!tenant_id) return res.status(400).json({ error: "tenant_required" });
 
-    // Get tenant's payment gateways
-    const paymentGateways = await prisma.tenant_payment_gateways.findMany({
-      where: {
-        tenant_id: tenant_id,
+    // Get tenant's payment gateways and Stripe Connect status in parallel
+    const [paymentGateways, stripeConnect] = await Promise.all([
+      prisma.tenant_payment_gateways.findMany({
+        where: {
+          tenant_id: tenant_id,
+          is_active: true,
+        },
+        select: {
+          id: true,
+          gateway_type: true,
+          is_active: true,
+          is_default: true,
+          config: true,
+          created_at: true,
+        },
+        orderBy: [
+          { is_default: 'desc' },
+          { created_at: 'desc' },
+        ],
+      }),
+      prisma.merchant_stripe_connections.findUnique({
+        where: { tenant_id: tenant_id },
+        select: {
+          onboarding_status: true,
+          stripe_payouts_enabled: true,
+          stripe_payments_enabled: true,
+        },
+      }),
+    ]);
+
+    // Add Stripe Connect as a gateway if it's active
+    const allGateways = [...paymentGateways];
+    if (stripeConnect && stripeConnect.onboarding_status === 'completed' && stripeConnect.stripe_payments_enabled) {
+      // Add Stripe as a virtual gateway
+      allGateways.push({
+        id: 'stripe_connect',
+        gateway_type: 'stripe',
         is_active: true,
-      },
-      select: {
-        id: true,
-        gateway_type: true,
-        is_active: true,
-        is_default: true,
-        config: true,
-        created_at: true,
-      },
-      orderBy: [
-        { is_default: 'desc' },
-        { created_at: 'desc' },
-      ],
-    });
+        is_default: false, // Stripe Connect is never default (it's for platform revenue)
+        config: {
+          display_name: 'Stripe',
+        },
+        created_at: new Date(),
+      });
+    }
 
     // Check if tenant has any active payment gateways
-    const hasActivePaymentGateway = paymentGateways.length > 0;
+    const hasActivePaymentGateway = allGateways.length > 0;
     
-    // Get default gateway type (first one with is_default=true, or first active gateway)
-    const defaultGateway = paymentGateways.find(pg => pg.is_default) || paymentGateways[0];
+    // Get default gateway type (first one with is_default=true, or first active gateway, excluding Stripe Connect)
+    const nonStripeGateways = allGateways.filter(pg => pg.gateway_type !== 'stripe');
+    const defaultGateway = nonStripeGateways.find(pg => pg.is_default) || nonStripeGateways[0];
     const defaultGatewayType = defaultGateway?.gateway_type || null;
 
     res.json({
       success: true,
       hasActivePaymentGateway,
       defaultGatewayType,
-      gateways: paymentGateways.map(pg => {
+      gateways: allGateways.map(pg => {
         const config = pg.config as any || {};
         // Provide friendly display names for common gateways
         let displayName = config.display_name;
