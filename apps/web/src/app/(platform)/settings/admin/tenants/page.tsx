@@ -442,15 +442,32 @@ export default function AdminTenantsPage() {
                             </div>
                           </div>
                           
-                          <div className="flex items-center gap-2">
-                            <Link href={`/t/${tenant.id}`}>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link href={`/t/${tenant.id}/dashboard`}>
                               <Button variant="outline" size="sm">
-                                👁️ View Store
+                                👁️ View Dashboard
                               </Button>
                             </Link>
-                            <Link href={`/settings/admin/tiers?tenant=${tenant.id}/dashboard`}>
+                            <Link href={`/t/${tenant.id}/settings/payment-gateways`}>
                               <Button variant="outline" size="sm">
-                                ⚙️ Manage
+                                ⚙️ Manage Payment Gateway
+                              </Button>
+                            </Link>
+                            <Link href={`/settings/subscription?tenantId=${tenant.id}`}>
+                              <Button variant="outline" size="sm">
+                                ⚙️ Manage Subscription
+                              </Button>
+                            </Link>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link href={`/t/${tenant.id}/settings/location-status`}>
+                              <Button variant="outline" size="sm">
+                                👁️ View Status
+                              </Button>
+                            </Link>
+                            <Link href={`/t/${tenant.id}/settings/onboarding`}>
+                              <Button variant="outline" size="sm">
+                                ⚙️ Manage Profile
                               </Button>
                             </Link>
                           </div>

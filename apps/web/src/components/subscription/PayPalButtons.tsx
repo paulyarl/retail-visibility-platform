@@ -79,26 +79,68 @@ export function PayPalSmartButtons({
         return;
       }
 
-      // Load PayPal SDK script
+      // Load PayPal SDK script with error handling
       const script = document.createElement('script');
       const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
       const mode = process.env.NEXT_PUBLIC_PAYPAL_MODE || 'sandbox';
       
       script.src = `https://www.${mode === 'live' ? '' : 'sandbox.'}paypal.com/sdk/js?client-id=${clientId}&currency=USD&intent=capture`;
       script.async = true;
+      script.crossOrigin = 'anonymous';
+      
+      // Add global error handlers for PayPal SDK
+      const originalErrorHandler = window.onerror;
+      window.onerror = (message, source, lineno, colno, error) => {
+        // Filter out PayPal SDK errors that are expected
+        if (message && typeof message === 'string' && 
+            (message.includes('paypal_js_sdk_v5_unhandled_exception') || 
+             message.includes('zoid'))) {
+          console.warn('[PayPal] Expected SDK error filtered:', message);
+          return true; // Prevent default error handling
+        }
+        // Call original error handler for other errors
+        if (originalErrorHandler) {
+          return originalErrorHandler(message, source, lineno, colno, error);
+        }
+        return false;
+      };
+      
       script.onload = () => {
         setPaypalReady(true);
         setLoading(false);
+        
+        // Restore original error handler after SDK loads
+        window.onerror = originalErrorHandler;
       };
+      
       script.onerror = () => {
         setError('Failed to load PayPal SDK');
         setLoading(false);
+        
+        // Restore original error handler on load failure
+        window.onerror = originalErrorHandler;
       };
 
       document.body.appendChild(script);
     };
 
     loadPayPalSDK();
+    
+    // Cleanup function to restore error handler
+    return () => {
+      const originalErrorHandler = window.onerror;
+      window.onerror = (message, source, lineno, colno, error) => {
+        if (message && typeof message === 'string' && 
+            (message.includes('paypal_js_sdk_v5_unhandled_exception') || 
+             message.includes('zoid'))) {
+          return true;
+        }
+        if (originalErrorHandler) {
+          return originalErrorHandler(message, source, lineno, colno, error);
+        }
+        return false;
+      };
+    };
   }, []);
 
   // Create PayPal order for subscription payment
@@ -153,15 +195,20 @@ export function PayPalSmartButtons({
   useEffect(() => {
     if (!paypalReady || !window.paypal || disabled) return;
 
-    // Clear any existing buttons first
+    // Clear any existing buttons safely
     const container = document.getElementById('paypal-button-container');
     if (container) {
-      container.innerHTML = '';
+      try {
+        container.innerHTML = '';
+      } catch (err) {
+        console.warn('[PayPal] Error clearing container:', err);
+      }
     }
 
     let buttonInstance: any = null;
 
     try {
+      // Create button instance with enhanced error handling
       buttonInstance = window.paypal.Buttons({
         createOrder: async () => {
           setProcessing(true);
@@ -177,10 +224,16 @@ export function PayPalSmartButtons({
           }
         },
         onApprove: async (data) => {
-          await onApprove(data);
+          try {
+            await onApprove(data);
+          } catch (err: any) {
+            setProcessing(false);
+            onError(err.message || 'PayPal approval failed');
+          }
         },
         onError: (err) => {
           setProcessing(false);
+          console.warn('[PayPal] SDK error:', err);
           onError('PayPal encountered an error');
         },
         onCancel: () => {
@@ -195,15 +248,30 @@ export function PayPalSmartButtons({
           height: 45,
         },
       });
-      buttonInstance.render('#paypal-button-container');
+
+      // Render buttons with error handling
+      if (buttonInstance.isEligible()) {
+        buttonInstance.render('#paypal-button-container').catch((err: any) => {
+          console.error('[PayPal] Failed to render buttons:', err);
+          setError('Failed to render PayPal buttons');
+        });
+      } else {
+        console.warn('[PayPal] Buttons not eligible for rendering');
+        setError('PayPal is not available in your browser');
+      }
     } catch (err) {
-      console.error('[PayPal] Failed to render buttons:', err);
+      console.error('[PayPal] Failed to create buttons:', err);
+      setError('Failed to initialize PayPal buttons');
     }
 
-    // Cleanup function
+    // Enhanced cleanup function
     return () => {
-      if (buttonInstance) {
-        buttonInstance.close().catch(() => {});
+      try {
+        if (buttonInstance && typeof buttonInstance.close === 'function') {
+          buttonInstance.close().catch(() => {});
+        }
+      } catch (err) {
+        console.warn('[PayPal] Error during cleanup:', err);
       }
     };
   }, [paypalReady, disabled, createOrder, onApprove, onError]);

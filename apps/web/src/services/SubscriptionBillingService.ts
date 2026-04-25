@@ -371,13 +371,14 @@ class SubscriptionBillingService extends TenantApiSingleton {
    * Check if PayPal is configured
    */
   async getPayPalConfig(): Promise<{ configured: boolean; mode: string }> {
-    const response = await this.makeDefaultRequest<{ configured: boolean; mode: string }>(
+    const response = await this.makeDefaultRequest<{ success: boolean; data: { configured: boolean; mode: string } }>(
       '/api/subscription/paypal/config',
       { method: 'GET' },
       'paypal-config'
     );
     
-    return response.data || { configured: false, mode: 'sandbox' };
+    // The response is nested: response.data.data.configured
+    return response.data?.data || { configured: false, mode: 'sandbox' };
   }
 
   /**
