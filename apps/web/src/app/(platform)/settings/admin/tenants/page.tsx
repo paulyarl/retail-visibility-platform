@@ -448,7 +448,7 @@ export default function AdminTenantsPage() {
                                 👁️ View Store
                               </Button>
                             </Link>
-                            <Link href={`/settings/admin/tiers?tenant=${tenant.id}`}>
+                            <Link href={`/settings/admin/tiers?tenant=${tenant.id}/dashboard`}>
                               <Button variant="outline" size="sm">
                                 ⚙️ Manage
                               </Button>
