@@ -22,7 +22,9 @@ import {
   Modal,
   Timeline,
   Table,
-  Title
+  Title,
+  TextInput,
+  Textarea
 } from '@mantine/core';
 import { 
   IconBolt,
@@ -84,6 +86,14 @@ export function BillingWorkflowsReal({
 }: BillingWorkflowsRealProps) {
   const [selectedRule, setSelectedRule] = useState<any | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
+  const [createModalOpened, setCreateModalOpened] = useState(false);
+  const [newWorkflow, setNewWorkflow] = useState({
+    name: '',
+    description: '',
+    type: 'payment' as 'payment' | 'invoice' | 'trial' | 'subscription',
+    trigger: '',
+    enabled: true
+  });
 
   // Use real workflow service
   const { 
@@ -92,7 +102,8 @@ export function BillingWorkflowsReal({
     loading: workflowsLoading, 
     executeWorkflow, 
     toggleWorkflow, 
-    testWorkflow 
+    testWorkflow,
+    createWorkflow 
   } = useBillingWorkflows();
 
   // Calculate metrics from service data
@@ -181,6 +192,43 @@ export function BillingWorkflowsReal({
       await executeWorkflow(ruleId, triggerData);
     } catch (error) {
       console.error('Failed to execute workflow:', error);
+    }
+  };
+
+  const handleCreateWorkflow = async () => {
+    try {
+      const workflowData = {
+        name: newWorkflow.name,
+        description: newWorkflow.description,
+        type: newWorkflow.type,
+        enabled: newWorkflow.enabled,
+        status: 'active' as const,
+        trigger: newWorkflow.trigger,
+        conditions: {},
+        actions: [
+          {
+            id: 'action-1',
+            type: 'send_notification' as const,
+            config: { message: 'Workflow executed' },
+            status: 'pending' as const
+          }
+        ],
+        successRate: 0,
+        executionCount: 0,
+        errorCount: 0
+      };
+      
+      await createWorkflow(workflowData);
+      setCreateModalOpened(false);
+      setNewWorkflow({
+        name: '',
+        description: '',
+        type: 'payment',
+        trigger: '',
+        enabled: true
+      });
+    } catch (error) {
+      console.error('Failed to create workflow:', error);
     }
   };
 
@@ -274,7 +322,7 @@ export function BillingWorkflowsReal({
         <LoadingOverlay visible={isLoading || workflowsLoading} />
         <Group justify="space-between" mb="md">
           <Title order={3}>Automation Workflows</Title>
-          <Button leftSection={<IconBolt size="1rem" />}>
+          <Button leftSection={<IconBolt size="1rem" />} onClick={() => setCreateModalOpened(true)}>
             Create New Workflow
           </Button>
         </Group>
@@ -490,6 +538,67 @@ export function BillingWorkflowsReal({
             </Group>
           </Stack>
         )}
+      </Modal>
+
+      {/* Create Workflow Modal */}
+      <Modal 
+        opened={createModalOpened} 
+        onClose={() => setCreateModalOpened(false)}
+        title="Create New Workflow"
+        size="md"
+      >
+        <Stack gap="md">
+          <TextInput
+            label="Workflow Name"
+            placeholder="Enter workflow name"
+            value={newWorkflow.name}
+            onChange={(e) => setNewWorkflow({ ...newWorkflow, name: e.target.value })}
+            required
+          />
+          
+          <Textarea
+            label="Description"
+            placeholder="Describe what this workflow does"
+            value={newWorkflow.description}
+            onChange={(e) => setNewWorkflow({ ...newWorkflow, description: e.target.value })}
+            rows={3}
+          />
+          
+          <Select
+            label="Workflow Type"
+            data={[
+              { value: 'payment', label: 'Payment' },
+              { value: 'invoice', label: 'Invoice' },
+              { value: 'trial', label: 'Trial' },
+              { value: 'subscription', label: 'Subscription' }
+            ]}
+            value={newWorkflow.type}
+            onChange={(value) => setNewWorkflow({ ...newWorkflow, type: value as any })}
+          />
+          
+          <TextInput
+            label="Trigger"
+            placeholder="What triggers this workflow?"
+            value={newWorkflow.trigger}
+            onChange={(e) => setNewWorkflow({ ...newWorkflow, trigger: e.target.value })}
+            required
+          />
+          
+          <Switch
+            label="Enable workflow"
+            checked={newWorkflow.enabled}
+            onChange={(e) => setNewWorkflow({ ...newWorkflow, enabled: e.currentTarget.checked })}
+          />
+          
+          <Group justify="flex-end" gap="xs">
+            <Button variant="outline" onClick={() => setCreateModalOpened(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateWorkflow} disabled={!newWorkflow.name || !newWorkflow.trigger}>
+              Create Workflow
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
     </Stack>
   );

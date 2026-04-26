@@ -22,7 +22,9 @@ import {
   Modal,
   Timeline,
   Table,
-  Checkbox
+  Checkbox,
+  TextInput,
+  Textarea
 } from '@mantine/core';
 import { 
   IconBell,
@@ -50,11 +52,13 @@ import {
   IconMessage,
   IconNotification,
   IconFilter,
-  IconSearch
+  IconSearch,
+  IconPlayerPlay
 } from '@tabler/icons-react';
 import { PlatformRevenueTransaction } from '@/services/PlatformRevenueService';
 import { ManualInvoice, ServiceCharge } from '@/services/ManualBillingService';
 import { Tenant } from '../types';
+import { useNotifications } from '@/services/NotificationService';
 
 interface AdvancedNotificationsRealProps {
   revenueTransactions?: PlatformRevenueTransaction[];
@@ -97,78 +101,71 @@ export function AdvancedNotificationsReal({
   tenants,
   isLoading = false 
 }: AdvancedNotificationsRealProps) {
-  const [selectedRule, setSelectedRule] = useState<NotificationRule | null>(null);
+  const [selectedRule, setSelectedRule] = useState<any | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
-  const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
+  const [createModalOpened, setCreateModalOpened] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState('all');
+  const [newRule, setNewRule] = useState({
+    name: '',
+    description: '',
+    type: 'payment' as 'payment' | 'invoice' | 'trial' | 'subscription' | 'system',
+    trigger: '',
+    enabled: true,
+    template: 'default'
+  });
 
-  // Generate notification rules based on real data
-  const notificationRules: NotificationRule[] = [
-    {
-      id: 'payment-failure-alert',
-      name: 'Payment Failure Alert',
-      description: 'Notify when automatic payments fail',
-      type: 'email',
-      trigger: 'Payment processing failure',
-      condition: 'payment.status === failed',
-      recipients: ['billing@company.com', 'admin@company.com'],
-      enabled: true,
-      lastTriggered: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      triggerCount: 8,
-      successRate: 95
-    },
-    {
-      id: 'trial-expiry-warning',
-      name: 'Trial Expiry Warning',
-      description: 'Send reminders before trials expire',
-      type: 'email',
-      trigger: '7 days before trial expiry',
-      condition: 'trial.days_until_expiry <= 7',
-      recipients: ['success@company.com'],
-      enabled: true,
-      lastTriggered: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      triggerCount: 15,
-      successRate: 98
-    },
-    {
-      id: 'invoice-overdue-notice',
-      name: 'Invoice Overdue Notice',
-      description: 'Notify when invoices become overdue',
-      type: 'email',
-      trigger: 'Invoice becomes overdue',
-      condition: 'invoice.due_date < today && invoice.status !== paid',
-      recipients: ['billing@company.com'],
-      enabled: true,
-      lastTriggered: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      triggerCount: 4,
-      successRate: 92
-    },
-    {
-      id: 'service-charge-alert',
-      name: 'Service Charge Alert',
-      description: 'Notify when service charges are applied',
-      type: 'in_app',
-      trigger: 'Service charge applied',
-      condition: 'service_charge.created',
-      recipients: ['admin'],
-      enabled: true,
-      lastTriggered: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      triggerCount: 12,
-      successRate: 100
-    },
-    {
-      id: 'high-risk-tenant-alert',
-      name: 'High Risk Tenant Alert',
-      description: 'Alert for high-risk tenant activities',
-      type: 'email',
-      trigger: 'Tenant risk level changes',
-      condition: 'tenant.risk_level === high || tenant.risk_level === critical',
-      recipients: ['risk@company.com', 'billing@company.com'],
-      enabled: false,
-      lastTriggered: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      triggerCount: 3,
-      successRate: 100
+  // Use real notification service
+  const { 
+    rules, 
+    channels, 
+    metrics, 
+    loading: notificationsLoading, 
+    createRule, 
+    toggleRule, 
+    testRule 
+  } = useNotifications();
+
+  // Handle create notification rule
+  const handleCreateRule = async () => {
+    try {
+      const ruleData = {
+        name: newRule.name,
+        description: newRule.description,
+        type: newRule.type,
+        enabled: newRule.enabled,
+        status: 'active' as const,
+        trigger: newRule.trigger,
+        conditions: {},
+        channels: [
+          {
+            id: 'channel-1',
+            type: 'email' as const,
+            name: 'Primary Email',
+            enabled: true,
+            config: { template: newRule.template }
+          }
+        ],
+        template: newRule.template,
+        successRate: 0,
+        sentCount: 0,
+        errorCount: 0
+      };
+      
+      await createRule(ruleData);
+      setCreateModalOpened(false);
+      setNewRule({
+        name: '',
+        description: '',
+        type: 'payment',
+        trigger: '',
+        enabled: true,
+        template: 'default'
+      });
+    } catch (error) {
+      console.error('Failed to create notification rule:', error);
     }
-  ];
+  };
 
   // Generate notification events based on real data
   const notificationEvents: NotificationEvent[] = [
@@ -278,10 +275,10 @@ export function AdvancedNotificationsReal({
     }
   };
 
-  // Calculate real metrics
-  const activeRules = notificationRules.filter(rule => rule.enabled).length;
-  const totalRules = notificationRules.length;
-  const averageSuccessRate = Math.round(notificationRules.reduce((sum, rule) => sum + rule.successRate, 0) / notificationRules.length);
+  // Calculate metrics from service data
+  const activeRules = metrics?.activeRules || 0;
+  const totalRules = metrics?.totalRules || 0;
+  const averageSuccessRate = Math.round(metrics?.successRate || 0);
   const recentNotifications = notificationEvents.filter(event => {
     const eventTime = new Date(event.timestamp);
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -383,7 +380,7 @@ export function AdvancedNotificationsReal({
         <LoadingOverlay visible={isLoading} />
         <Group justify="space-between" mb="md">
           <Text size="lg" fw={500}>Notification Rules</Text>
-          <Button leftSection={<IconBell size="1rem" />}>
+          <Button leftSection={<IconBell size="1rem" />} onClick={() => setCreateModalOpened(true)}>
             Create New Rule
           </Button>
         </Group>
@@ -402,7 +399,7 @@ export function AdvancedNotificationsReal({
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {notificationRules.map((rule) => (
+            {rules.map((rule: any) => (
               <Table.Tr key={rule.id}>
                 <Table.Td>
                   <Stack gap="xs">
@@ -413,49 +410,56 @@ export function AdvancedNotificationsReal({
                 <Table.Td>
                   <Group gap="xs">
                     {getTypeIcon(rule.type)}
-                    <Badge size="sm" color={getTypeColor(rule.type)} variant="light">
-                      {rule.type}
-                    </Badge>
+                    <Text size="xs" style={{ textTransform: 'capitalize' }}>{rule.type}</Text>
                   </Group>
                 </Table.Td>
                 <Table.Td>
-                  <Text size="sm">{rule.trigger}</Text>
+                  <Text size="xs">{rule.trigger}</Text>
                 </Table.Td>
                 <Table.Td>
-                  <Text size="sm" lineClamp={1}>
-                    {rule.recipients.join(', ')}
-                  </Text>
+                  <Text size="xs">{rule.channels.length} channels</Text>
                 </Table.Td>
                 <Table.Td>
                   <Group gap="xs">
-                    <Text size="sm" fw={600}>{rule.successRate}%</Text>
-                    <Progress 
-                      value={rule.successRate} 
-                      color={rule.successRate >= 95 ? 'green' : rule.successRate >= 85 ? 'yellow' : 'red'}
-                      size="sm"
-                      w={50}
-                    />
+                    <Text size="xs" fw={600}>{Math.round(rule.successRate)}%</Text>
+                    <Progress size="xs" value={rule.successRate} color={rule.successRate >= 90 ? 'green' : rule.successRate >= 70 ? 'yellow' : 'red'} />
                   </Group>
                 </Table.Td>
                 <Table.Td>
-                  <Text size="sm">
-                    {rule.lastTriggered ? formatTimeAgo(rule.lastTriggered) : 'Never'}
-                  </Text>
+                  <Text size="xs">{rule.lastSent ? formatDate(rule.lastSent) : 'Never'}</Text>
                 </Table.Td>
                 <Table.Td>
                   <Switch
                     checked={rule.enabled}
-                    onChange={() => {}}
+                    onChange={() => toggleRule(rule.id)}
                     size="sm"
                   />
                 </Table.Td>
                 <Table.Td>
                   <Group gap="xs">
-                    <ActionIcon size="sm" variant="subtle">
+                    <ActionIcon 
+                      size="sm" 
+                      variant="subtle"
+                      onClick={() => testRule(rule.id)}
+                      title="Test notification rule"
+                    >
+                      <IconPlayerPlay size="0.875rem" />
+                    </ActionIcon>
+                    <ActionIcon 
+                      size="sm" 
+                      variant="subtle"
+                      onClick={() => {
+                        setSelectedRule(rule);
+                        setModalOpened(true);
+                      }}
+                    >
                       <IconEye size="0.875rem" />
                     </ActionIcon>
                     <ActionIcon size="sm" variant="subtle">
                       <IconEdit size="0.875rem" />
+                    </ActionIcon>
+                    <ActionIcon size="sm" variant="subtle">
+                      <IconTrash size="0.875rem" />
                     </ActionIcon>
                   </Group>
                 </Table.Td>
@@ -622,6 +626,81 @@ export function AdvancedNotificationsReal({
             </Group>
           </Stack>
         )}
+      </Modal>
+
+      {/* Create Notification Rule Modal */}
+      <Modal 
+        opened={createModalOpened} 
+        onClose={() => setCreateModalOpened(false)}
+        title="Create New Notification Rule"
+        size="md"
+      >
+        <Stack gap="md">
+          <TextInput
+            label="Rule Name"
+            placeholder="Enter rule name"
+            value={newRule.name}
+            onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
+            required
+          />
+          
+          <Textarea
+            label="Description"
+            placeholder="Describe what this notification rule does"
+            value={newRule.description}
+            onChange={(e) => setNewRule({ ...newRule, description: e.target.value })}
+            rows={3}
+          />
+          
+          <Select
+            label="Rule Type"
+            data={[
+              { value: 'payment', label: 'Payment' },
+              { value: 'invoice', label: 'Invoice' },
+              { value: 'trial', label: 'Trial' },
+              { value: 'subscription', label: 'Subscription' },
+              { value: 'system', label: 'System' }
+            ]}
+            value={newRule.type}
+            onChange={(value) => setNewRule({ ...newRule, type: value as any })}
+          />
+          
+          <TextInput
+            label="Trigger"
+            placeholder="What triggers this notification?"
+            value={newRule.trigger}
+            onChange={(e) => setNewRule({ ...newRule, trigger: e.target.value })}
+            required
+          />
+          
+          <Select
+            label="Template"
+            data={[
+              { value: 'default', label: 'Default Template' },
+              { value: 'payment-success', label: 'Payment Success' },
+              { value: 'payment-failure', label: 'Payment Failure' },
+              { value: 'invoice-due', label: 'Invoice Due' },
+              { value: 'trial-expiry', label: 'Trial Expiry' }
+            ]}
+            value={newRule.template}
+            onChange={(value) => setNewRule({ ...newRule, template: value || 'default' })}
+          />
+          
+          <Switch
+            label="Enable rule"
+            checked={newRule.enabled}
+            onChange={(e) => setNewRule({ ...newRule, enabled: e.currentTarget.checked })}
+          />
+          
+          <Group justify="flex-end" gap="xs">
+            <Button variant="outline" onClick={() => setCreateModalOpened(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateRule} disabled={!newRule.name || !newRule.trigger}>
+              Create Rule
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
     </Stack>
   );
