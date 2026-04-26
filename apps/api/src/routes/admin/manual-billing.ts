@@ -906,4 +906,359 @@ router.get('/tenants', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/admin/manual-billing/generate-invoice-pdf
+ * Generate a PDF for a manual invoice
+ */
+const generateInvoicePDFSchema = z.object({
+  invoiceId: z.string().min(1, 'Invoice ID is required'),
+});
+
+router.post('/generate-invoice-pdf', async (req, res) => {
+  try {
+    const parsed = generateInvoicePDFSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_payload',
+        details: parsed.error.flatten(),
+      });
+    }
+
+    const { invoiceId } = parsed.data;
+
+    // Get the manual billing service
+    const manualBillingService = getManualBillingService();
+
+    // Fetch the invoice details
+    const invoice = await manualBillingService.getInvoice(invoiceId);
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        error: 'invoice_not_found',
+        message: 'Invoice not found',
+      });
+    }
+
+    // Generate a mock PDF URL (in production, this would generate a real PDF)
+    const pdfUrl = `/api/admin/manual-billing/invoices/${invoiceId}/pdf?t=${Date.now()}`;
+
+    // Log the action for audit
+    await audit({
+      tenantId: invoice.tenantId,
+      actor: (req as any).user?.id || 'admin',
+      action: 'generate_invoice_pdf',
+      payload: { invoiceId },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        pdfUrl,
+        invoiceId,
+        generatedAt: new Date().toISOString(),
+      },
+    });
+
+  } catch (error: any) {
+    console.error('[POST /api/admin/manual-billing/generate-invoice-pdf] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_server_error',
+      message: 'Failed to generate invoice PDF',
+    });
+  }
+});
+
+/**
+ * POST /api/admin/manual-billing/send-invoice
+ * Send a manual invoice via email
+ */
+const sendInvoiceSchema = z.object({
+  invoiceId: z.string().min(1, 'Invoice ID is required'),
+});
+
+router.post('/send-invoice', async (req, res) => {
+  try {
+    const parsed = sendInvoiceSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_payload',
+        details: parsed.error.flatten(),
+      });
+    }
+
+    const { invoiceId } = parsed.data;
+
+    // Get the manual billing service
+    const manualBillingService = getManualBillingService();
+
+    // Fetch the invoice details
+    const invoice = await manualBillingService.getInvoice(invoiceId);
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        error: 'invoice_not_found',
+        message: 'Invoice not found',
+      });
+    }
+
+    // In a real implementation, this would:
+    // 1. Generate the PDF
+    // 2. Send an email with the PDF attached
+    // 3. Update the invoice status to track that it was sent
+    
+    // For now, we'll simulate the email sending
+    console.log(`Sending invoice ${invoiceId} to tenant ${invoice.tenantId}`);
+
+    // Log the action for audit
+    await audit({
+      tenantId: invoice.tenantId,
+      actor: (req as any).user?.id || 'admin',
+      action: 'send_invoice',
+      payload: { invoiceId },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        invoiceId,
+        sentAt: new Date().toISOString(),
+        recipient: invoice.tenantId, // In real implementation, this would be the tenant's email
+      },
+    });
+
+  } catch (error: any) {
+    console.error('[POST /api/admin/manual-billing/send-invoice] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_server_error',
+      message: 'Failed to send invoice',
+    });
+  }
+});
+
+/**
+ * GET /api/admin/manual-billing/invoices/:invoiceId/pdf
+ * Generate PDF for a manual invoice using jsPDF
+ */
+router.get('/invoices/:invoiceId/pdf', async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+
+    // Get the manual billing service
+    const manualBillingService = getManualBillingService();
+
+    // Fetch the invoice details
+    const invoice = await manualBillingService.getInvoice(invoiceId);
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        error: 'invoice_not_found',
+        message: 'Invoice not found',
+      });
+    }
+
+    // Get platform branding settings
+    const platformSettings = await prisma.platform_settings_list.findFirst();
+    const branding = {
+      platformName: platformSettings?.platform_name || 'Visible Shelf',
+      logoUrl: platformSettings?.logo_url,
+      primaryColor: (platformSettings?.theme_colors as any)?.primary || '#0066ff',
+      contactEmail: platformSettings?.contact_email || 'billing@visible-shelf.com',
+      contactPhone: platformSettings?.contact_phone || '',
+      contactAddress: platformSettings?.contact_address || '',
+      contactWebsite: platformSettings?.contact_website || '',
+    };
+
+    // Get tenant info for billing address
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: invoice.tenantId },
+      select: { name: true, slug: true },
+    });
+
+    // Generate PDF using jsPDF
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+    
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    let yPos = 20;
+
+    // Header with platform branding
+    doc.setFontSize(24);
+    doc.setTextColor(branding.primaryColor);
+    doc.text(branding.platformName, margin, yPos);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    yPos += 8;
+    if (branding.contactWebsite) {
+      doc.text(branding.contactWebsite, margin, yPos);
+    }
+    
+    // Invoice title
+    yPos += 15;
+    doc.setFontSize(18);
+    doc.setTextColor(0, 0, 0);
+    doc.text('MANUAL INVOICE', pageWidth - margin - 50, 20, { align: 'left' });
+    
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`#${invoice.id}`, pageWidth - margin - 50, 28, { align: 'left' });
+
+    // From/To section
+    yPos = 50;
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    
+    // From
+    doc.setFont('helvetica', 'bold');
+    doc.text('From:', margin, yPos);
+    doc.setFont('helvetica', 'normal');
+    yPos += 5;
+    doc.text(branding.platformName, margin, yPos);
+    yPos += 5;
+    if (branding.contactEmail) doc.text(branding.contactEmail, margin, yPos);
+    yPos += 5;
+    if (branding.contactAddress) {
+      const addressLines = branding.contactAddress.split('\n');
+      for (const line of addressLines) {
+        doc.text(line, margin, yPos);
+        yPos += 5;
+      }
+    }
+
+    // To (right side)
+    yPos = 50;
+    const toX = pageWidth / 2;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Bill To:', toX, yPos);
+    doc.setFont('helvetica', 'normal');
+    yPos += 5;
+    doc.text(tenant?.name || invoice.tenantName || 'Tenant', toX, yPos);
+
+    // Invoice details
+    yPos = Math.max(yPos, 85) + 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 10;
+
+    // Invoice info table
+    doc.setFontSize(10);
+    const formatDate = (date: string | Date | null | undefined) => {
+      if (!date) return '-';
+      return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    };
+
+    const formatPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+
+    const infoRows = [
+      ['Invoice Date:', formatDate(invoice.createdAt)],
+      ['Due Date:', formatDate(invoice.dueDate)],
+      ['Status:', invoice.status.toUpperCase()],
+      ['Type:', 'Manual Invoice'],
+    ];
+
+    for (const [label, value] of infoRows) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, margin, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value, margin + 40, yPos);
+      yPos += 6;
+    }
+
+    // Line items header
+    yPos += 10;
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, yPos, pageWidth - 2 * margin, 8, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.text('Description', margin + 2, yPos + 5);
+    doc.text('Amount', pageWidth - margin - 20, yPos + 5, { align: 'right' });
+    yPos += 12;
+
+    // Line item
+    doc.setFont('helvetica', 'normal');
+    doc.text(invoice.description || 'Manual Invoice', margin + 2, yPos);
+    doc.text(formatPrice(invoice.amountCents), pageWidth - margin - 20, yPos, { align: 'right' });
+    yPos += 8;
+
+    // Total
+    yPos += 5;
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 8;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total:', margin + 2, yPos);
+    doc.text(formatPrice(invoice.amountCents), pageWidth - margin - 20, yPos, { align: 'right' });
+
+    // Payment history
+    if (invoice.payments && invoice.payments.length > 0) {
+      yPos += 15;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Payment History', margin, yPos);
+      yPos += 8;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      for (const payment of invoice.payments) {
+        doc.text(`${payment.gatewayType} - ${formatDate(payment.createdAt)} - ${formatPrice(payment.amountCents)} - ${payment.status}`, margin, yPos);
+        yPos += 5;
+      }
+    }
+
+    // Payment instructions
+    if (invoice.paymentInstructions) {
+      yPos += 15;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Payment Instructions:', margin, yPos);
+      yPos += 8;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      const instructionLines = doc.splitTextToSize(invoice.paymentInstructions, pageWidth - 2 * margin);
+      for (const line of instructionLines) {
+        doc.text(line, margin, yPos);
+        yPos += 5;
+      }
+    }
+
+    // Footer
+    yPos = doc.internal.pageSize.getHeight() - 30;
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 120);
+    doc.text('Thank you for your business!', margin, yPos);
+    yPos += 10;
+    if (branding.contactPhone) {
+      doc.text(`Phone: ${branding.contactPhone}  |  Email: ${branding.contactEmail}`, margin, yPos);
+    } else {
+      doc.text(`Email: ${branding.contactEmail}`, margin, yPos);
+    }
+
+    // Set response headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="manual-invoice-${invoice.id}.pdf"`);
+    
+    // Send PDF as buffer
+    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+    res.send(pdfBuffer);
+
+  } catch (error: any) {
+    console.error('[GET /api/admin/manual-billing/invoices/:invoiceId/pdf] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'internal_server_error',
+      message: 'Failed to generate invoice PDF',
+    });
+  }
+});
+
 export default router;

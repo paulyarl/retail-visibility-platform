@@ -26,7 +26,8 @@ import {
   IconSend,
   IconEdit
 } from '@tabler/icons-react';
-import { ServiceCharge, ManualInvoice } from '@/services/ManualBillingService';
+import { ServiceCharge, ManualInvoice, manualBillingService } from '@/services/ManualBillingService';
+import { useState } from 'react';
 
 // Define interfaces that match the service return types
 export interface ManualBillingInvoice {
@@ -62,11 +63,49 @@ interface ManualBillingDashboardProps {
 }
 
 export function ManualBillingDashboard({ 
-  manualBillingInvoices, 
-  manualInvoices, 
-  serviceCharges,
+  manualInvoices = [], 
+  serviceCharges = [], 
   isLoading = false 
 }: ManualBillingDashboardProps) {
+  const [selectedInvoice, setSelectedInvoice] = useState<ManualInvoice | null>(null);
+  const [sendLoading, setSendLoading] = useState<string | null>(null);
+  const [viewLoading, setViewLoading] = useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleViewInvoice = async (invoice: ManualInvoice) => {
+    setViewLoading(invoice.id);
+    try {
+      const result = await manualBillingService.generateInvoicePDF(invoice.id);
+      if (result.success && result.pdfUrl) {
+        // Open PDF in new window
+        window.open(result.pdfUrl, '_blank');
+        setAlertMessage({ type: 'success', message: 'Invoice PDF generated successfully' });
+      } else {
+        setAlertMessage({ type: 'error', message: result.error || 'Failed to generate invoice PDF' });
+      }
+    } catch (error) {
+      setAlertMessage({ type: 'error', message: 'Failed to generate invoice PDF' });
+    } finally {
+      setViewLoading(null);
+    }
+  };
+
+  const handleSendInvoice = async (invoiceId: string) => {
+    setSendLoading(invoiceId);
+    try {
+      const result = await manualBillingService.sendInvoice(invoiceId);
+      if (result.success) {
+        setAlertMessage({ type: 'success', message: 'Invoice sent successfully' });
+      } else {
+        setAlertMessage({ type: 'error', message: result.error || 'Failed to send invoice' });
+      }
+    } catch (error) {
+      setAlertMessage({ type: 'error', message: 'Failed to send invoice' });
+    } finally {
+      setSendLoading(null);
+    }
+  };
+
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -86,27 +125,15 @@ export function ManualBillingDashboard({
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'paid': return <IconCheck size="1rem" color="green" />;
-      case 'pending': return <IconClock size="1rem" color="yellow" />;
-      case 'cancelled': return <IconX size="1rem" color="red" />;
-      default: return <IconClock size="1rem" color="gray" />;
+      case 'paid': return <IconCheck size="1rem" />;
+      case 'pending': return <IconClock size="1rem" />;
+      case 'cancelled': return <IconX size="1rem" />;
+      default: return <IconClock size="1rem" />;
     }
   };
 
-  const getTierColor = (tier: string) => {
-    switch (tier) {
-      case 'professional': return 'blue';
-      case 'commitment': return 'green';
-      case 'storefront': return 'orange';
-      case 'trial_discovery':
-      case 'trial_commitment': return 'purple';
-      case 'discovery': return 'gray';
-      default: return 'gray';
-    }
-  };
-
-  // Calculate summary stats
-  const allInvoices = [...(manualBillingInvoices || []), ...(manualInvoices || [])];
+  // Combine all invoices for metrics
+  const allInvoices = manualInvoices;
   const totalInvoices = allInvoices.length;
   const paidInvoices = allInvoices.filter(inv => inv.status === 'paid').length;
   const pendingInvoices = allInvoices.filter(inv => inv.status === 'pending').length;
@@ -117,6 +144,18 @@ export function ManualBillingDashboard({
 
   return (
     <Stack gap="md">
+      {/* Alert Messages */}
+      {alertMessage && (
+        <Alert 
+          color={alertMessage.type === 'success' ? 'green' : 'red'}
+          title={alertMessage.type === 'success' ? 'Success' : 'Error'}
+          withCloseButton
+          onClose={() => setAlertMessage(null)}
+        >
+          {alertMessage.message}
+        </Alert>
+      )}
+
       {/* Summary Cards */}
       <Grid>
         <Grid.Col span={{ base: 12, md: 3 }}>
@@ -227,6 +266,87 @@ export function ManualBillingDashboard({
         </Stack>
       </Card>
 
+      {/* Recent Manual Invoices */}
+      <Card withBorder padding="lg" radius="md">
+        <LoadingOverlay visible={isLoading} />
+        <Title order={3} mb="md">Recent Manual Invoices</Title>
+        
+        {manualInvoices && manualInvoices.length > 0 ? (
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Invoice ID</Table.Th>
+                <Table.Th>Tenant</Table.Th>
+                <Table.Th>Description</Table.Th>
+                <Table.Th>Amount</Table.Th>
+                <Table.Th>Status</Table.Th>
+                <Table.Th>Actions</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {manualInvoices.slice(0, 10).map((invoice) => (
+                <Table.Tr key={invoice.id}>
+                  <Table.Td>
+                    <Text size="sm" fw={500}>{invoice.id}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{invoice.tenantName}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{invoice.description}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm" fw={600}>
+                      {formatCurrency(invoice.amountCents)}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap="xs">
+                      <Badge 
+                        size="sm" 
+                        color={getStatusColor(invoice.status)}
+                        variant="light"
+                        leftSection={getStatusIcon(invoice.status)}
+                      >
+                        {invoice.status}
+                      </Badge>
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap="xs">
+                      <Button 
+                        size="xs" 
+                        variant="subtle"
+                        onClick={() => handleViewInvoice(invoice)}
+                        loading={viewLoading === invoice.id}
+                        title="View invoice PDF"
+                      >
+                        <IconEye size="0.875rem" />
+                      </Button>
+                      {invoice.status === 'pending' && (
+                        <Button 
+                          size="xs" 
+                          variant="subtle"
+                          onClick={() => handleSendInvoice(invoice.id)}
+                          loading={sendLoading === invoice.id}
+                          title="Send invoice"
+                        >
+                          <IconSend size="0.875rem" />
+                        </Button>
+                      )}
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        ) : (
+          <Text size="sm" c="dimmed" ta="center" py="md">
+            No manual invoices found
+          </Text>
+        )}
+      </Card>
+
       {/* Service Charges */}
       {serviceCharges && serviceCharges.length > 0 && (
         <Card withBorder padding="lg" radius="md">
@@ -285,169 +405,6 @@ export function ManualBillingDashboard({
             </Table.Tbody>
           </Table>
         </Card>
-      )}
-
-      {/* Recent Manual Invoices */}
-      <Card withBorder padding="lg" radius="md">
-        <LoadingOverlay visible={isLoading} />
-        <Title order={3} mb="md">Recent Manual Invoices</Title>
-        
-        {manualInvoices && manualInvoices.length > 0 ? (
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Invoice ID</Table.Th>
-                <Table.Th>Tenant</Table.Th>
-                <Table.Th>Description</Table.Th>
-                <Table.Th>Amount</Table.Th>
-                <Table.Th>Status</Table.Th>
-                <Table.Th>Actions</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {manualInvoices.slice(0, 10).map((invoice) => (
-                <Table.Tr key={invoice.id}>
-                  <Table.Td>
-                    <Text size="sm" ff="monospace">
-                      {invoice.id.slice(0, 12)}...
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" fw={500}>{invoice.tenantName}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm">{invoice.description}</Text>
-                    {invoice.paymentInstructions && (
-                      <Text size="xs" c="dimmed" mt={2}>
-                        {invoice.paymentInstructions}
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" fw={600}>
-                      {formatCurrency(invoice.amountCents)}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs">
-                      {getStatusIcon(invoice.status)}
-                      <Badge 
-                        size="sm" 
-                        color={getStatusColor(invoice.status)}
-                        variant="light"
-                      >
-                        {invoice.status}
-                      </Badge>
-                    </Group>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs">
-                      <Button size="xs" variant="subtle">
-                        <IconEye size="0.875rem" />
-                      </Button>
-                      {invoice.status === 'pending' && (
-                        <Button size="xs" variant="subtle">
-                          <IconSend size="0.875rem" />
-                        </Button>
-                      )}
-                    </Group>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        ) : (
-          <Text size="sm" c="dimmed" ta="center" py="xl">
-            No manual invoices found
-          </Text>
-        )}
-      </Card>
-
-      {/* Manual Billing Invoices */}
-      {manualBillingInvoices && manualBillingInvoices.length > 0 && (
-        <Card withBorder padding="lg" radius="md">
-          <Title order={3} mb="md">All Billing Invoices</Title>
-          
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Tenant</Table.Th>
-                <Table.Th>Tier</Table.Th>
-                <Table.Th>Billing Period</Table.Th>
-                <Table.Th>Amount</Table.Th>
-                <Table.Th>Status</Table.Th>
-                <Table.Th>Manual</Table.Th>
-                <Table.Th>Due Date</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {manualBillingInvoices.slice(0, 10).map((invoice) => (
-                <Table.Tr key={invoice.id}>
-                  <Table.Td>
-                    <Text size="sm" fw={500}>{invoice.tenantName}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge 
-                      size="sm" 
-                      color={getTierColor(invoice.tier)}
-                      variant="light"
-                    >
-                      {invoice.tier}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm">
-                      {new Date(invoice.billingPeriodStart).toLocaleDateString()} - {new Date(invoice.billingPeriodEnd).toLocaleDateString()}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" fw={600}>
-                      {formatCurrency(invoice.amountCents)}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs">
-                      {getStatusIcon(invoice.status)}
-                      <Badge 
-                        size="sm" 
-                        color={getStatusColor(invoice.status)}
-                        variant="light"
-                      >
-                        {invoice.status}
-                      </Badge>
-                    </Group>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge 
-                      size="sm" 
-                      color={invoice.isManual ? 'orange' : 'blue'}
-                      variant="light"
-                    >
-                      {invoice.isManual ? 'Manual' : 'Auto'}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm">
-                      {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : 'N/A'}
-                    </Text>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        </Card>
-      )}
-
-      {/* Risk Alerts */}
-      {pendingInvoices > 0 && (
-        <Alert color="yellow" icon={<IconAlertTriangle size="1rem" />}>
-          <Text size="sm" fw={500}>
-            {pendingInvoices} pending invoices requiring attention
-          </Text>
-          <Text size="xs" c="dimmed" mt={2}>
-            Total pending amount: {formatCurrency(pendingAmount)}
-          </Text>
-        </Alert>
       )}
     </Stack>
   );

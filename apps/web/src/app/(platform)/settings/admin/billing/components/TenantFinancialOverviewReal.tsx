@@ -144,6 +144,7 @@ export function TenantFinancialOverviewReal({
       case 'professional': return 'blue';
       case 'commitment': return 'green';
       case 'storefront': return 'orange';
+      case 'enterprise': return 'red';
       case 'trial_discovery':
       case 'trial_commitment': return 'purple';
       case 'discovery': return 'gray';

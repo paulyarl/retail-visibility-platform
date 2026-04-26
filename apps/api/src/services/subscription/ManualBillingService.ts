@@ -424,6 +424,85 @@ export class ManualBillingService {
   }
 
   /**
+   * Get a specific manual invoice by ID
+   */
+  async getInvoice(invoiceId: string): Promise<{
+    id: string;
+    amountCents: number;
+    description?: string;
+    status: string;
+    createdAt: Date;
+    dueDate?: Date;
+    paidAt?: Date;
+    tenantId: string;
+    tenantName: string;
+    tier: string;
+    paymentInstructions?: string;
+    payments?: Array<{
+      id: string;
+      gatewayType: string;
+      transactionId: string;
+      amountCents: number;
+      status: string;
+      createdAt: Date;
+    }>;
+  } | null> {
+    try {
+      const invoice = await prisma.subscription_invoices.findUnique({
+        where: { id: invoiceId },
+        include: {
+          tenants: {
+            select: {
+              id: true,
+              name: true,
+              subscription_tier: true,
+            },
+          },
+          subscription_payments: {
+            select: {
+              id: true,
+              gateway_type: true,
+              transaction_id: true,
+              amount_cents: true,
+              status: true,
+              created_at: true,
+            },
+          },
+        },
+      });
+
+      if (!invoice) {
+        return null;
+      }
+
+      return {
+        id: invoice.id,
+        amountCents: invoice.amount_cents,
+        description: invoice.payment_instructions || undefined,
+        status: invoice.status || 'unknown',
+        createdAt: invoice.created_at || new Date(),
+        dueDate: invoice.due_date || undefined,
+        paidAt: invoice.paid_at || undefined,
+        tenantId: invoice.tenant_id,
+        tenantName: invoice.tenants?.name || 'Unknown',
+        tier: invoice.tenants?.subscription_tier || 'unknown',
+        paymentInstructions: invoice.payment_instructions || undefined,
+        payments: invoice.subscription_payments.map(payment => ({
+          id: payment.id,
+          gatewayType: payment.gateway_type,
+          transactionId: payment.transaction_id || 'unknown',
+          amountCents: payment.amount_cents,
+          status: payment.status || 'unknown',
+          createdAt: payment.created_at || new Date(),
+        })),
+      };
+    } catch (error) {
+      console.error('Error fetching manual invoice:', error);
+      throw new Error('Failed to fetch manual invoice');
+    }
+  }
+
+  /**
    * Get all manual invoices (admin view)
    */
   async getAllManualInvoices(): Promise<Array<{
@@ -431,16 +510,14 @@ export class ManualBillingService {
     amountCents: number;
     description?: string;
     status: string;
-    dueDate: Date | null;
-    paidAt: Date | null;
-    paymentInstructions?: string;
-    adminCreatedBy?: string;
     createdAt: Date;
-    tenant: {
-      id: string;
-      name: string;
-    };
-    payments: Array<{
+    dueDate?: Date;
+    paidAt?: Date;
+    tenantId: string;
+    tenantName: string;
+    tier: string;
+    paymentInstructions?: string;
+    payments?: Array<{
       id: string;
       gatewayType: string;
       transactionId: string;
@@ -461,7 +538,8 @@ export class ManualBillingService {
           tenants: {
             select: {
               id: true,
-              name: true
+              name: true,
+              subscription_tier: true
             }
           }
         },
@@ -473,18 +551,19 @@ export class ManualBillingService {
         amountCents: invoice.amount_cents,
         description: invoice.payment_instructions || undefined,
         status: invoice.status || 'pending',
-        dueDate: invoice.due_date,
-        paidAt: invoice.paid_at,
-        paymentInstructions: invoice.payment_instructions || undefined,
-        adminCreatedBy: invoice.admin_created_by || undefined,
         createdAt: invoice.created_at || new Date(),
-        tenant: invoice.tenants || { id: 'unknown', name: 'Unknown Tenant' },
+        dueDate: invoice.due_date || undefined,
+        paidAt: invoice.paid_at || undefined,
+        tenantId: invoice.tenant_id,
+        tenantName: invoice.tenants?.name || 'Unknown',
+        tier: invoice.tenants?.subscription_tier || 'unknown',
+        paymentInstructions: invoice.payment_instructions || undefined,
         payments: invoice.subscription_payments.map(payment => ({
           id: payment.id,
           gatewayType: payment.gateway_type || 'manual',
-          transactionId: payment.transaction_id || '',
+          transactionId: payment.transaction_id || 'unknown',
           amountCents: payment.amount_cents,
-          status: payment.status || 'pending',
+          status: payment.status || 'unknown',
           createdAt: payment.created_at || new Date()
         }))
       }));

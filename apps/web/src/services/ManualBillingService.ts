@@ -298,24 +298,77 @@ class ManualBillingService extends AdminApiSingleton {
     error?: string;
   }> {
     try {
-      const result = await this.makeDefaultRequest(`/api/admin/manual-billing/invoices/${invoiceId}`, {
-        method: 'DELETE'
-      });
-      
-      // Invalidate cache to ensure fresh data
-      if (result.success) {
-        this.invalidateCache('all-manual-invoices');
-      }
-      
+      const result = await this.makeDefaultRequest('/api/admin/manual-billing/cancel-invoice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ invoiceId }),
+      }, `cancel-invoice-${invoiceId}`, this.cacheTTL);
+
       return {
         success: result.success,
-        error: typeof result.error === 'string' ? result.error : (result.error as any)?.message
+        error: typeof result.error === 'string' ? result.error : undefined
       };
     } catch (error) {
       console.error('Error cancelling invoice:', error);
       return {
         success: false,
-        error: 'Failed to cancel invoice'
+        error: error instanceof Error ? error.message : 'Failed to cancel invoice'
+      };
+    }
+  }
+
+  async sendInvoice(invoiceId: string): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      const result = await this.makeDefaultRequest('/api/admin/manual-billing/send-invoice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ invoiceId }),
+      }, `send-invoice-${invoiceId}`, this.cacheTTL);
+
+      return {
+        success: result.success,
+        error: typeof result.error === 'string' ? result.error : undefined
+      };
+    } catch (error) {
+      console.error('Error sending invoice:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to send invoice'
+      };
+    }
+  }
+
+  async generateInvoicePDF(invoiceId: string): Promise<{
+    success: boolean;
+    pdfUrl?: string;
+    error?: string;
+  }> {
+    try {
+      const result = await this.makeDefaultRequest('/api/admin/manual-billing/generate-invoice-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ invoiceId }),
+      }, `generate-pdf-${invoiceId}`, this.cacheTTL);
+
+      return {
+        success: result.success,
+        pdfUrl: (result.data as any)?.pdfUrl,
+        error: typeof result.error === 'string' ? result.error : undefined
+      };
+    } catch (error) {
+      console.error('Error generating invoice PDF:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to generate invoice PDF'
       };
     }
   }
