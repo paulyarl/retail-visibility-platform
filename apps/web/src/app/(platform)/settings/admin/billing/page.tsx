@@ -8,8 +8,27 @@ import BillingPagination from './components/BillingPagination';
 import BillingFilters from './components/BillingFilters';
 import { useBillingData } from './hooks/useBillingData';
 import { useBillingFilters } from './hooks/useBillingFilters';
+import { useAdminBillingData, useTenantFinancialData } from './hooks/useAdminBillingData';
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { tenantTierService } from '@/services/TenantTierService';
+import { adminBillingService } from '@/services/AdminBillingService';
+import { TenantSelectorDropdown } from './components/TenantSelectorDropdown';
+import { TenantFinancialOverviewFixed } from './components/TenantFinancialOverviewFixed';
+import { TenantFinancialOverviewReal } from './components/TenantFinancialOverviewReal';
+import { AccountHealthCardWorking } from './components/AccountHealthCardWorking';
+import { InvoiceManagement } from './components/InvoiceManagement';
+import { PaymentAnalyticsFixed } from './components/PaymentAnalyticsFixed';
+import { PaymentAnalyticsReal } from './components/PaymentAnalyticsReal';
+import { ManualBillingDashboard } from './components/ManualBillingDashboard';
+import { TenantRiskAssessment } from './components/TenantRiskAssessment';
+import { BillingWorkflowsFixed } from './components/BillingWorkflowsFixed';
+import { BillingWorkflowsReal } from './components/BillingWorkflowsReal';
+import { AdvancedNotificationsFixed } from './components/AdvancedNotificationsFixed';
+import { AdvancedNotificationsReal } from './components/AdvancedNotificationsReal';
+import { PredictiveAnalyticsFixed } from './components/PredictiveAnalyticsFixed';
+import { PredictiveAnalyticsReal } from './components/PredictiveAnalyticsReal';
+import { IntegrationHubSimple } from './components/IntegrationHubSimple';
+import { IntegrationHubReal } from './components/IntegrationHubReal';
 
 // Simple FileInvoice icon component
 const FileInvoiceIcon = () => (
@@ -26,9 +45,24 @@ export default function AdminBillingPage() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
+  const [selectedTenant, setSelectedTenant] = useState<string | null>(null);
   const theme = useMantineTheme();
 
   const { tenants, tiers, loading, tiersLoading, error: dataError, refetch } = useBillingData(refetchTrigger);
+
+  // Admin billing data hooks
+  const { 
+    revenueOverview, 
+    revenueTrends, 
+    revenueSummary, 
+    revenueTransactions,
+    manualBillingInvoices,
+    manualInvoices,
+    serviceCharges,
+    isLoading: adminLoading, 
+    error: adminError 
+  } = useAdminBillingData('90d');
+  const { financialMetrics, accountHealth, isLoading: tenantDataLoading } = useTenantFinancialData(selectedTenant);
 
   const {
     searchQuery,
@@ -109,6 +143,97 @@ export default function AdminBillingPage() {
       />
 
       <div className="mt-6 space-y-6">
+        {/* Enhanced Tenant Selector and Overview */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TenantSelectorDropdown
+            selectedTenant={selectedTenant}
+            onTenantSelect={setSelectedTenant}
+            showStats={true}
+          />
+          
+          {selectedTenant && (
+            <TenantFinancialOverviewReal
+              tenantId={selectedTenant}
+              tenantName={tenants.find(t => t.id === selectedTenant)?.name || 'Unknown'}
+              tenant={tenants.find(t => t.id === selectedTenant)}
+              revenueTransactions={revenueTransactions?.transactions}
+              manualInvoices={manualInvoices}
+              isLoading={tenantDataLoading}
+            />
+          )}
+        </div>
+
+        {/* Account Health Card */}
+        {selectedTenant && (
+          <AccountHealthCardWorking
+            tenantId={selectedTenant}
+            tenantName={tenants.find(t => t.id === selectedTenant)?.name || 'Unknown'}
+            accountHealth={accountHealth || undefined}
+            isLoading={tenantDataLoading}
+          />
+        )}
+
+        
+        {/* Invoice Management */}
+        <InvoiceManagement 
+          manualInvoices={manualInvoices}
+          manualBillingInvoices={manualBillingInvoices}
+          isLoading={adminLoading}
+        />
+
+        {/* Payment Analytics */}
+        <PaymentAnalyticsReal 
+          revenueSummary={revenueSummary || undefined}
+          revenueTransactions={revenueTransactions?.transactions}
+          isLoading={adminLoading}
+        />
+
+        {/* Manual Billing Dashboard */}
+        <ManualBillingDashboard 
+          manualBillingInvoices={manualBillingInvoices}
+          manualInvoices={manualInvoices}
+          serviceCharges={serviceCharges}
+          isLoading={adminLoading}
+        />
+
+        {/* Tenant Risk Assessment */}
+        <TenantRiskAssessment 
+          tenants={tenants}
+          isLoading={loading}
+        />
+
+        
+        {/* Phase 3: Advanced Automation */}
+        <BillingWorkflowsReal 
+          revenueTransactions={revenueTransactions?.transactions}
+          manualInvoices={manualInvoices}
+          serviceCharges={serviceCharges}
+          tenants={tenants}
+          isLoading={adminLoading}
+        />
+        <AdvancedNotificationsReal 
+          revenueTransactions={revenueTransactions?.transactions}
+          manualInvoices={manualInvoices}
+          serviceCharges={serviceCharges}
+          tenants={tenants}
+          isLoading={adminLoading}
+        />
+        <PredictiveAnalyticsReal 
+          revenueTransactions={revenueTransactions?.transactions}
+          manualInvoices={manualInvoices}
+          serviceCharges={serviceCharges}
+          tenants={tenants}
+          isLoading={adminLoading}
+        />
+        <IntegrationHubReal 
+          revenueTransactions={revenueTransactions?.transactions}
+          manualInvoices={manualInvoices}
+          serviceCharges={serviceCharges}
+          tenants={tenants}
+          isLoading={adminLoading}
+        />
+
+        {/* Original Billing Filters */}
         <BillingFilters
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}

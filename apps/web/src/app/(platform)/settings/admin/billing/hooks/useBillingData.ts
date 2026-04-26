@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { platformHomeService } from '@/services/PlatformHomeSingletonService';
+import { adminOperationsService } from '@/services/AdminOperationsService';
+import { manualBillingService } from '@/services/ManualBillingService';
 import { tenantTierService } from '@/services/TenantTierService';
 import { Tenant, DbTier } from '../types';
 
@@ -23,7 +24,8 @@ export function useBillingData(refetchTrigger = 0): UseBillingDataResult {
     async function loadTenants() {
       try {
         setLoading(true);
-        const tenantsArray = await platformHomeService.getTenants();
+        const result = await manualBillingService.getAllTenants();
+        const tenantsArray = Array.isArray(result) ? result : [];
         const transformedTenants = tenantsArray?.map((tenant: any) => ({
           id: tenant.id,
           name: tenant.name,
@@ -38,11 +40,14 @@ export function useBillingData(refetchTrigger = 0): UseBillingDataResult {
           effectiveExpiresAt: tenant.effectiveExpiresAt,
           effectiveExpiresType: tenant.effectiveExpiresType,
           effectiveExpiresSource: tenant.effectiveExpiresSource,
-          organization: tenant.organization ? { id: tenant.organization.id, name: tenant.organization.name } : null,
-          metadata: tenant.metadata,
-          organizationId: tenant.organizationId,
+          organization: tenant.organization || null,
+          organizationId: tenant.organizationId || null,
           createdAt: tenant.createdAt,
-          _count: tenant._count,
+          _count: tenant._count ? {
+            inventory_items: tenant._count.inventory_items || 0,
+            user_tenants: tenant._count.user_tenants || 0
+          } : undefined,
+          metadata: tenant.metadata,
         })) || [];
         setTenants(transformedTenants);
       } catch (e) {

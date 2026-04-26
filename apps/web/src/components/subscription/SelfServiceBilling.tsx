@@ -15,6 +15,8 @@ let useElementsHook: (() => any) | null = null;
 
 // Get Stripe publishable key from either env var name
 function getStripePublishableKey(): string | undefined {
+  console.log(`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}`);
+  console.log(`NEXT_PUBLIC_STRIPE_PUBLIC_KEY: ${process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY}`);
   return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY;
 }
 

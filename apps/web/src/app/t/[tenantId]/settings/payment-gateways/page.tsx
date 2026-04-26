@@ -107,10 +107,10 @@ export default function PaymentGatewaysPage() {
       
       if (data?.user) {
         const user = data.user;
-        console.log('[PaymentGateways] User from service:', user);
+        // console.log('[PaymentGateways] User from service:', user);
         const role = user?.role?.toUpperCase();
         const adminCheck = role === 'PLATFORM_ADMIN' || role === 'ADMIN';
-        console.log('[PaymentGateways] Role:', role, 'Is admin:', adminCheck);
+        // console.log('[PaymentGateways] Role:', role, 'Is admin:', adminCheck);
         setIsAdmin(adminCheck);
       } else {
         console.log('[PaymentGateways] No user data returned');
@@ -1201,7 +1201,7 @@ export default function PaymentGatewaysPage() {
                   <Button 
                     onClick={handleStripeConnectOnboard}
                     disabled={stripeOnboardingLoading}
-                    className="w-full"
+                    className="w-full text-white bg-black"
                   >
                     {stripeOnboardingLoading ? 'Connecting...' : 'Connect Stripe Account'}
                   </Button>
@@ -1299,7 +1299,7 @@ export default function PaymentGatewaysPage() {
                   <Button 
                     onClick={handleStripeConnectOnboard}
                     disabled={stripeOnboardingLoading}
-                    className="w-full"
+                    className="w-full text-white bg-black"
                   >
                     {stripeOnboardingLoading ? 'Connecting...' : 'Connect Stripe Account'}
                   </Button>

@@ -1145,4 +1145,8 @@ router.post('/:id/logo', authenticateToken, checkTenantAccess, async (req: Reque
   }
 });
 
+// Mount billing routes for tenants
+import tenantBillingRoutes from './tenant-billing';
+router.use('/:tenantId/billing', tenantBillingRoutes);
+
 export default router;

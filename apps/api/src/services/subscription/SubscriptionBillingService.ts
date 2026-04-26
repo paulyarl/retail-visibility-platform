@@ -304,22 +304,43 @@ export class SubscriptionBillingService {
     let expiryYear = metadata?.expiryYear;
 
     // For Stripe, get or create customer and attach payment method
-    if (gatewayType === 'stripe' && this.stripe) {
-      const customer = await this.getOrCreateStripeCustomer(tenantId, tenant.name);
-      
-      // Attach payment method to customer
-      await this.stripe.paymentMethods.attach(paymentMethodToken, {
-        customer: customer.id,
-      });
+    if (gatewayType === 'stripe') {
+      if (this.stripe) {
+        try {
+          const customer = await this.getOrCreateStripeCustomer(tenantId, tenant.name);
+          
+          // Attach payment method to customer
+          await this.stripe.paymentMethods.attach(paymentMethodToken, {
+            customer: customer.id,
+          });
 
-      // Get payment method details from Stripe
-      const pm = await this.stripe.paymentMethods.retrieve(paymentMethodToken);
-      
-      if (pm.card) {
-        cardLast4 = pm.card.last4;
-        cardBrand = pm.card.brand;
-        expiryMonth = pm.card.exp_month;
-        expiryYear = pm.card.exp_year;
+          // Get payment method details from Stripe
+          const pm = await this.stripe.paymentMethods.retrieve(paymentMethodToken);
+          
+          if (pm.card) {
+            cardLast4 = pm.card.last4;
+            cardBrand = pm.card.brand;
+            expiryMonth = pm.card.exp_month;
+            expiryYear = pm.card.exp_year;
+          }
+        } catch (stripeError: any) {
+          console.error('Stripe payment method error:', stripeError);
+          
+          // Provide helpful error message for configuration issues
+          if (stripeError.message?.includes('No such PaymentMethod') || 
+              stripeError.message?.includes('payment_method')) {
+            throw new Error(
+              'Stripe configuration mismatch: Frontend and backend are using different Stripe accounts. ' +
+              'Ensure NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY and STRIPE_SECRET_KEY are from the same Stripe account.'
+            );
+          } else {
+            throw stripeError;
+          }
+        }
+      } else {
+        throw new Error(
+          'Stripe not configured. Please set STRIPE_SECRET_KEY in your backend environment variables.'
+        );
       }
     }
 

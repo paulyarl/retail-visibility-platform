@@ -24,6 +24,9 @@ import adminAnalyticsRoutes from '../admin-analytics';
 import adminSecurityMonitoringRoutes from '../admin/security-monitoring';
 import navigationLinksRoutes from '../admin/navigation-links';
 import categoriesPropagateRoutes from '../admin/categories-propagate';
+import adminTenantBillingRoutes from '../admin/tenant-billing';
+import adminPlatformBillingRoutes from '../admin/platform-billing';
+import adminAutomationRoutes from '../admin/automation';
 
 /**
  * Mount admin routes
@@ -54,6 +57,9 @@ export function mountAdminRoutes(app: Express) {
   app.use('/api/admin/security', authenticateToken,  adminSecurityMonitoringRoutes);
   app.use('/api/admin/navigation-links', authenticateToken,  navigationLinksRoutes);
   app.use('/api/admin/categories', authenticateToken, categoriesPropagateRoutes);
+  app.use('/api/admin/billing', authenticateToken, adminTenantBillingRoutes);
+  app.use('/api/admin/billing', authenticateToken, adminPlatformBillingRoutes);
+  app.use('/api/admin/billing', authenticateToken, adminAutomationRoutes);
   
   // Tenant flags: accessible by platform admins OR store owners of that specific tenant
   app.use('/admin', authenticateToken, tenantFlagsRoutes);

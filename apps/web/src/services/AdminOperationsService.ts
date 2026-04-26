@@ -40,18 +40,27 @@ interface AdminUser {
 interface AdminTenant {
   id: string;
   name: string;
-  domain?: string;
-  status: 'active' | 'inactive' | 'suspended';
-  plan: string;
+  organizationId?: string;
+  subscriptionTier: string;
+  subscriptionStatus: string;
+  trialEndsAt?: string;
+  subscriptionEndsAt?: string;
+  graceEndsAt?: string;
   createdAt: string;
-  owner: {
+  organization?: {
     id: string;
-    email: string;
     name: string;
   };
-  userCount: number;
-  productCount: number;
-  orderCount: number;
+  _count: {
+    inventory_items: number;
+    user_tenants: number;
+  };
+  manualSubscriptionControl: boolean;
+  manualSubscriptionExpiresAt?: string;
+  manualSubscriptionReason?: string;
+  effectiveExpiresAt?: string;
+  effectiveExpiresType?: 'trial' | 'manual' | 'subscription';
+  effectiveExpiresSource?: 'automatic_trial' | 'manual_override';
 }
 
 interface SystemAlert {
@@ -159,7 +168,7 @@ class AdminOperationsService extends AdminApiSingleton {
       if (filters?.plan) params.append('plan', filters.plan);
       if (filters?.search) params.append('search', filters.search);
 
-      const result = await this.makeDefaultRequest<{ tenants: AdminTenant[]; pagination: any }>(
+      const result = await this.makeDefaultRequest<AdminTenant[]>(
         `/api/admin/tenants?${params.toString()}`,
         {},
         `admin-tenants-${page}-${limit}-${JSON.stringify(filters)}`,
@@ -171,7 +180,11 @@ class AdminOperationsService extends AdminApiSingleton {
         return { tenants: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
       }
 
-      return result.data || { tenants: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };
+      const tenants = result.data || [];
+      return { 
+        tenants, 
+        pagination: { page, limit, total: tenants.length, totalPages: Math.ceil(tenants.length / limit) }
+      };
     } catch (error) {
       console.error('[AdminOperationsService] Failed to get tenants:', error);
       return { tenants: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } };

@@ -20,8 +20,8 @@ export interface Tenant {
   organizationId?: string;
   createdAt?: string;
   _count?: {
-    items: number;
-    users: number;
+    inventory_items: number;
+    user_tenants: number;
   };
 }
 
