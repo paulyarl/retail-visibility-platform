@@ -66,9 +66,13 @@ export interface RecentActivity {
 
 export interface PaymentMethod {
   id: string;
-  type: 'card' | 'bank_account';
+  type: 'card' | 'bank_account' | 'paypal' | 'manual';
   last4: string;
   brand?: string;
+  cardBrand?: string;
+  cardLast4?: string;
+  gatewayType?: 'stripe' | 'paypal' | 'manual';
+  paypalEmail?: string;
   expiryMonth?: number;
   expiryYear?: number;
   isDefault: boolean;

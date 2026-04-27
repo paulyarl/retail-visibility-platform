@@ -73,7 +73,7 @@ interface RecentActivity {
   type: 'payment' | 'invoice' | 'subscription_change';
   title: string;
   amount?: number;
-  status: 'success' | 'failed' | 'pending';
+  status: 'success' | 'failed' | 'pending' | 'paid' | 'succeeded';
   date: Date;
 }
 
