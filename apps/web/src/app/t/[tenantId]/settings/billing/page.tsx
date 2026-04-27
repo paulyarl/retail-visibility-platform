@@ -222,7 +222,8 @@ const BillingOverviewCards = ({ overview }: { overview: BillingOverview }) => {
             <IconFileInvoice className="w-8 h-8 text-green-500" />
             <div>
               <Text size="xs" c="dimmed">Subscription</Text>
-              <Badge color={getStatusColor(overview.subscriptionStatus || 'unknown')} variant="light">
+              <Text size="sm" fw={500}>{overview.subscriptionTier || 'Starter'}</Text>
+              <Badge color={getStatusColor(overview.subscriptionStatus || 'unknown')} variant="light" mt={4}>
                 {(overview.subscriptionStatus || 'UNKNOWN').toUpperCase()}
               </Badge>
             </div>

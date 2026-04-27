@@ -7268,6 +7268,11 @@ console.log('✅ Bulk operations route mounted at /api/data/bulk-operations (CAN
 app.use('/api/tenants', authenticateToken, trialSetupRoutes);
 console.log(' Tenant trial setup routes mounted at /api/tenants');
 
+/* ------------------------------ tenant notifications ------------------------------ */
+import tenantNotificationsRoutes from './routes/tenant-notifications';
+app.use('/api/tenants', authenticateToken, tenantNotificationsRoutes);
+console.log('✅ Tenant notifications routes mounted at /api/tenants/:tenantId/notifications');
+
 /* ------------------------------ tenant categories (GBP) ------------------------------ */
 app.use('/api/tenant', authenticateToken, tenantCategoriesRoutes);
 console.log('✅ Tenant categories routes mounted at /api/tenant');

@@ -17,6 +17,7 @@ import {
 import PageHeader, { Icons } from '@/components/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useTenantNotifications } from '@/services/TenantNotificationService';
 
 interface BillingNotification {
   id: string;
@@ -40,10 +41,7 @@ export default function BillingNotificationsPage({ params }: { params: Promise<{
   const { user } = useAuth();
   const router = useRouter();
   const [tenantId, setTenantId] = useState<string>('');
-  const [notifications, setNotifications] = useState<BillingNotification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedNotification, setSelectedNotification] = useState<BillingNotification | null>(null);
+  const [selectedNotification, setSelectedNotification] = useState<any>(null);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [filter, setFilter] = useState<string>('all');
 
@@ -55,103 +53,38 @@ export default function BillingNotificationsPage({ params }: { params: Promise<{
     resolveTenantId();
   }, [params]);
 
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    error,
+    pagination,
+    loadNotifications,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    refreshNotifications
+  } = useTenantNotifications(tenantId);
+
   useEffect(() => {
     if (tenantId) {
-      loadNotifications();
+      loadNotifications({ page: 1, limit: 20 });
     }
   }, [tenantId]);
 
-  const loadNotifications = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Mock notifications data - replace with actual API call
-      const mockNotifications: BillingNotification[] = [
-        {
-          id: '1',
-          type: 'payment_reminder',
-          title: 'Payment Due Soon',
-          message: 'Your monthly subscription payment of $59.00 is due in 3 days',
-          severity: 'warning',
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-          read: false,
-          actionUrl: `/t/${tenantId}/settings/billing/payment-methods`,
-          actionText: 'Update Payment Method',
-          metadata: {
-            amount: 5900,
-            dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
-          }
-        },
-        {
-          id: '2',
-          type: 'new_invoice',
-          title: 'New Invoice Available',
-          message: 'Your monthly invoice for June 2024 is now available',
-          severity: 'info',
-          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-          read: false,
-          actionUrl: `/t/${tenantId}/settings/billing/invoices`,
-          actionText: 'View Invoice',
-          metadata: {
-            amount: 5900,
-            invoiceId: 'inv_123456'
-          }
-        },
-        {
-          id: '3',
-          type: 'payment_success',
-          title: 'Payment Successful',
-          message: 'Your monthly subscription payment of $59.00 has been processed successfully',
-          severity: 'success',
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-          read: true,
-          metadata: {
-            amount: 5900
-          }
-        },
-        {
-          id: '4',
-          type: 'risk_alert',
-          title: 'Payment Method Expiring Soon',
-          message: 'Your credit card ending in 4242 expires on 12/2024',
-          severity: 'warning',
-          createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-          read: true,
-          actionUrl: `/t/${tenantId}/settings/billing/payment-methods`,
-          actionText: 'Update Card',
-          metadata: {
-            riskScore: 65
-          }
-        }
-      ];
-      
-      setNotifications(mockNotifications);
-    } catch (err) {
-      setError('Failed to load notifications');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleNotificationClick = (notification: BillingNotification) => {
+  const handleNotificationClick = (notification: any) => {
     setSelectedNotification(notification);
     setShowNotificationModal(true);
     
     // Mark as read if unread
     if (!notification.read) {
-      setNotifications(prev => 
-        prev.map(n => 
-          n.id === notification.id ? { ...n, read: true } : n
-        )
-      );
+      markAsRead(notification.id);
     }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(n => ({ ...n, read: true }))
-    );
+  const handleDeleteNotification = async (notificationId: string) => {
+    await deleteNotification(notificationId);
+    setShowNotificationModal(false);
   };
 
   const getTypeIcon = (type: string) => {
@@ -201,14 +134,14 @@ export default function BillingNotificationsPage({ params }: { params: Promise<{
     }
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (dateString: string) => {
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
-    }).format(date);
+    }).format(new Date(dateString));
   };
 
   const formatCurrency = (amount: number) => {
@@ -224,8 +157,6 @@ export default function BillingNotificationsPage({ params }: { params: Promise<{
     return true;
   });
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-
   if (!tenantId) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -234,7 +165,7 @@ export default function BillingNotificationsPage({ params }: { params: Promise<{
     );
   }
 
-  if (loading) {
+  if (loading && notifications.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader size="lg" />
@@ -329,6 +260,7 @@ export default function BillingNotificationsPage({ params }: { params: Promise<{
                 variant="outline"
                 size="sm"
                 onClick={markAllAsRead}
+                disabled={loading}
               >
                 Mark All as Read
               </Button>
@@ -372,7 +304,7 @@ export default function BillingNotificationsPage({ params }: { params: Promise<{
                           )}
                         </div>
                         <Text size="sm" c="dimmed" mb="sm">{notification.message}</Text>
-                        <Text size="xs" c="dimmed">{formatDate(notification.createdAt)}</Text>
+                        <Text size="xs" c="dimmed">{formatDate(notification.created_at)}</Text>
                       </div>
                       
                       <div className="flex items-center gap-2">
@@ -388,17 +320,19 @@ export default function BillingNotificationsPage({ params }: { params: Promise<{
                       </div>
                     </div>
                     
-                    {notification.actionUrl && (
+                    {notification.action_url && (
                       <div className="mt-3">
                         <Button
                           size="xs"
                           variant="outline"
                           onClick={(e) => {
                             e.stopPropagation();
-                            router.push(notification.actionUrl!);
+                            if (notification.action_url) {
+                              router.push(notification.action_url);
+                            }
                           }}
                         >
-                          {notification.actionText}
+                          {notification.action_text}
                         </Button>
                       </div>
                     )}
@@ -440,16 +374,16 @@ export default function BillingNotificationsPage({ params }: { params: Promise<{
                       <span>{formatCurrency(selectedNotification.metadata.amount)}</span>
                     </div>
                   )}
-                  {selectedNotification.metadata.dueDate && (
+                  {selectedNotification.metadata?.due_date && (
                     <div className="flex justify-between">
                       <span>Due Date:</span>
-                      <span>{formatDate(selectedNotification.metadata.dueDate)}</span>
+                      <span>{formatDate(selectedNotification.metadata.due_date)}</span>
                     </div>
                   )}
-                  {selectedNotification.metadata.riskScore && (
+                  {selectedNotification.metadata?.risk_score && (
                     <div className="flex justify-between">
                       <span>Risk Score:</span>
-                      <span>{selectedNotification.metadata.riskScore}%</span>
+                      <span>{selectedNotification.metadata.risk_score}%</span>
                     </div>
                   )}
                 </div>
@@ -458,19 +392,29 @@ export default function BillingNotificationsPage({ params }: { params: Promise<{
             
             <div className="flex justify-between items-center pt-4 border-t">
               <Text size="sm" c="dimmed">
-                {formatDate(selectedNotification.createdAt)}
+                {formatDate(selectedNotification.created_at)}
               </Text>
               
-              {selectedNotification.actionUrl && (
+              <div className="flex gap-2">
+                {selectedNotification.action_url && (
+                  <Button
+                    onClick={() => {
+                      setShowNotificationModal(false);
+                      router.push(selectedNotification.action_url);
+                    }}
+                  >
+                    {selectedNotification.action_text}
+                  </Button>
+                )}
                 <Button
-                  onClick={() => {
-                    setShowNotificationModal(false);
-                    router.push(selectedNotification.actionUrl!);
-                  }}
+                  variant="outline"
+                  color="red"
+                  size="sm"
+                  onClick={() => handleDeleteNotification(selectedNotification.id)}
                 >
-                  {selectedNotification.actionText}
+                  Delete
                 </Button>
-              )}
+              </div>
             </div>
           </div>
         )}
