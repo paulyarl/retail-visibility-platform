@@ -352,6 +352,10 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
         trial_ends_at: true,
         subscription_ends_at: true,
         grace_ends_at: true,
+        city: true,
+        state: true,
+        country_code: true,
+        banner_url: true,
         ...(true as any && {
           manual_subscription_control: true,
           manual_subscription_expires_at: true,
@@ -473,7 +477,12 @@ router.get('/:id', authenticateToken, checkTenantAccess, async (req: Request, re
       // Effective expiration fields
       effectiveExpiresAt: effectiveExpiration?.expiresAt,
       effectiveExpiresType: effectiveExpiration?.type,
-      effectiveExpiresSource: effectiveExpiration?.source
+      effectiveExpiresSource: effectiveExpiration?.source,
+      // Location fields from business profile
+      city: (tenant as any).tenant_business_profiles_list?.city || null,
+      state: (tenant as any).tenant_business_profiles_list?.state || null,
+      countryCode: (tenant as any).tenant_business_profiles_list?.country_code || null,
+      bannerUrl: (tenant as any).tenant_business_profiles_list?.banner_url || null,
     };
 
     console.log(`[TENANTS] Returning tenant data:`, {
@@ -781,6 +790,10 @@ router.get('/:id/complete', authenticateToken, checkTenantAccess, async (req: Re
         tenant_business_profiles_list: {
           select: {
             logo_url: true,
+            city: true,
+            state: true,
+            country_code: true,
+            banner_url: true,
           },
         },
         _count: {
@@ -887,6 +900,11 @@ router.get('/:id/complete', authenticateToken, checkTenantAccess, async (req: Re
           productCount: usageInfo?.totalItems || 0,
           userCount: tenant._count.user_tenants,
         },
+        // Location fields from business profile
+        city: (tenant as any).tenant_business_profiles_list?.city || null,
+        state: (tenant as any).tenant_business_profiles_list?.state || null,
+        country_code: (tenant as any).tenant_business_profiles_list?.country_code || null,
+        banner_url: (tenant as any).tenant_business_profiles_list?.banner_url || null,
       },
       tier: tierInfo,
       usage: usageInfo,

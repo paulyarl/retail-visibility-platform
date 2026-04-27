@@ -98,29 +98,121 @@ router.get('/risk', requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: accessCheck.error });
     }
 
-    // Mock risk assessment data
+    // Fetch real data to calculate risk
+    const [paymentMethods, overdueInvoices] = await Promise.all([
+      prisma.merchant_billing_gateways.findMany({
+        where: { tenant_id: tenantId, is_active: true }
+      }),
+      prisma.subscription_invoices.findMany({
+        where: { 
+          tenant_id: tenantId, 
+          status: 'past_due',
+          due_date: { lt: new Date() }
+        }
+      })
+    ]);
+
+    const factors: any[] = [];
+    const recommendedActions: any[] = [];
+    let score = 0;
+
+    // Check for expired or expiring payment methods
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1; // 1-12
+    const currentYear = now.getFullYear();
+
+    for (const method of paymentMethods) {
+      const expiryMonth = method.expiry_month;
+      const expiryYear = method.expiry_year;
+      
+      if (expiryMonth && expiryYear) {
+        // Card expires at end of the expiry month
+        const expiryDate = new Date(expiryYear, expiryMonth, 0); // Last day of expiry month
+        const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysUntilExpiry < 0) {
+          // Already expired
+          factors.push({
+            type: 'expiring_card',
+            severity: 'critical',
+            description: `Payment method ending in ${method.card_last4} has expired`,
+            impact: 'Payments will fail',
+            timeframe: 'Expired'
+          });
+          score += 40;
+          recommendedActions.push({
+            type: 'payment_method',
+            priority: 'urgent',
+            title: 'Update Payment Method',
+            description: `Your card ending in ${method.card_last4} has expired`,
+            actionUrl: '/settings/billing/payment-methods',
+            actionText: 'Update Now'
+          });
+        } else if (daysUntilExpiry <= 30) {
+          // Expiring within 30 days
+          factors.push({
+            type: 'expiring_card',
+            severity: daysUntilExpiry <= 7 ? 'high' : 'medium',
+            description: `Payment method ending in ${method.card_last4} expires in ${daysUntilExpiry} days`,
+            impact: 'Next payment may fail',
+            timeframe: `${daysUntilExpiry} days`
+          });
+          score += daysUntilExpiry <= 7 ? 30 : 20;
+          recommendedActions.push({
+            type: 'payment_method',
+            priority: 'high',
+            title: 'Update Payment Method',
+            description: `Your card ending in ${method.card_last4} expires soon`,
+            actionUrl: '/settings/billing/payment-methods',
+            actionText: 'Update Now'
+          });
+        }
+      }
+    }
+
+    // Check for overdue invoices
+    if (overdueInvoices.length > 0) {
+      const totalOverdue = overdueInvoices.reduce((sum: number, inv) => sum + Number(inv.amount_cents), 0);
+      factors.push({
+        type: 'late_payments',
+        severity: 'high',
+        description: `${overdueInvoices.length} overdue invoice${overdueInvoices.length > 1 ? 's' : ''}`,
+        impact: 'Service may be suspended',
+        timeframe: 'Immediate'
+      });
+      score += 35;
+      recommendedActions.push({
+        type: 'payment_required',
+        priority: 'urgent',
+        title: 'Pay Overdue Invoices',
+        description: `You have ${overdueInvoices.length} overdue invoice${overdueInvoices.length > 1 ? 's' : ''} totaling $${(totalOverdue / 100).toFixed(2)}`,
+        actionUrl: '/settings/billing/invoices',
+        actionText: 'Pay Now'
+      });
+    }
+
+    // Determine risk level based on score
+    let level: 'low' | 'medium' | 'high' | 'critical' = 'low';
+    if (score >= 60) level = 'critical';
+    else if (score >= 40) level = 'high';
+    else if (score >= 20) level = 'medium';
+
+    // If no risk factors, return low risk
+    if (factors.length === 0) {
+      factors.push({
+        type: 'payment_stable',
+        severity: 'low',
+        description: 'All payments are up to date',
+        impact: 'No immediate action required',
+        timeframe: 'N/A'
+      });
+    }
+
     const risk = {
-      level: 'medium',
-      score: 45,
-      factors: [
-        {
-          type: 'expiring_card',
-          severity: 'medium',
-          description: 'Payment method expires in 22 days',
-          impact: 'Next payment may fail',
-          timeframe: '22 days'
-        }
-      ],
-      recommendedActions: [
-        {
-          type: 'payment_method',
-          priority: 'high',
-          title: 'Update Payment Method',
-          description: 'Your payment method is expiring soon',
-          actionUrl: '/settings/billing/payment-methods',
-          actionText: 'Update Now'
-        }
-      ]
+      level,
+      score: Math.min(score, 100),
+      factors,
+      recommendedActions
     };
 
     return res.status(200).json({ success: true, data: risk });
@@ -144,19 +236,79 @@ router.get('/actions', requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: accessCheck.error });
     }
 
-    // Mock action items
-    const actions = [
-      {
-        id: '1',
-        type: 'payment_method',
-        priority: 'high',
-        title: 'Update Payment Method',
-        description: 'Your payment method expires soon',
-        actionUrl: '/settings/billing/payment-methods',
-        actionText: 'Update Payment Method',
-        dueDate: new Date(Date.now() + 22 * 24 * 60 * 60 * 1000)
+    // Fetch real data to generate action items
+    const [paymentMethods, overdueInvoices] = await Promise.all([
+      prisma.merchant_billing_gateways.findMany({
+        where: { tenant_id: tenantId, is_active: true }
+      }),
+      prisma.subscription_invoices.findMany({
+        where: { 
+          tenant_id: tenantId, 
+          status: 'past_due',
+          due_date: { lt: new Date() }
+        }
+      })
+    ]);
+
+    const actions: any[] = [];
+    const now = new Date();
+
+    // Check for expired or expiring payment methods
+    for (const method of paymentMethods) {
+      const expiryMonth = method.expiry_month;
+      const expiryYear = method.expiry_year;
+      
+      if (expiryMonth && expiryYear) {
+        const expiryDate = new Date(expiryYear, expiryMonth, 0);
+        const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysUntilExpiry < 0) {
+          actions.push({
+            id: `expired-${method.id}`,
+            type: 'payment_method',
+            priority: 'urgent',
+            title: 'Update Payment Method',
+            description: `Your card ending in ${method.card_last4} has expired`,
+            actionUrl: '/settings/billing/payment-methods',
+            actionText: 'Update Now',
+            dueDate: now
+          });
+        } else if (daysUntilExpiry <= 30) {
+          actions.push({
+            id: `expiring-${method.id}`,
+            type: 'payment_method',
+            priority: 'high',
+            title: 'Update Payment Method',
+            description: `Your card ending in ${method.card_last4} expires soon`,
+            actionUrl: '/settings/billing/payment-methods',
+            actionText: 'Update Now',
+            dueDate: expiryDate
+          });
+        }
       }
-    ];
+    }
+
+    // Check for overdue invoices
+    for (const inv of overdueInvoices) {
+      actions.push({
+        id: `overdue-${inv.id}`,
+        type: 'payment_required',
+        priority: 'urgent',
+        title: 'Pay Overdue Invoice',
+        description: `Invoice #${inv.id.substring(0, 8)} is overdue - $${(Number(inv.amount_cents) / 100).toFixed(2)}`,
+        actionUrl: '/settings/billing/invoices',
+        actionText: 'Pay Now',
+        dueDate: inv.due_date || now
+      });
+    }
+
+    // Sort by priority (urgent first) then due date
+    const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+    actions.sort((a, b) => {
+      const priorityDiff = priorityOrder[a.priority as keyof typeof priorityOrder] - priorityOrder[b.priority as keyof typeof priorityOrder];
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    });
 
     return res.status(200).json({ success: true, data: actions });
   } catch (error: any) {
@@ -245,8 +397,16 @@ router.get('/recent-activity', requireAuth, async (req: Request, res: Response) 
       });
     }
 
-    // Sort by date descending and limit
-    activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Sort by date descending, but payments before invoices when same timestamp
+    // (payment happens after invoice, so it's "newer")
+    activities.sort((a, b) => {
+      const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+      if (dateDiff !== 0) return dateDiff;
+      // Same timestamp: payments come before invoices (payment is the later action)
+      if (a.type === 'payment' && b.type === 'invoice') return -1;
+      if (a.type === 'invoice' && b.type === 'payment') return 1;
+      return 0;
+    });
     const limitedActivities = activities.slice(0, limit);
 
     return res.status(200).json({ success: true, data: limitedActivities });
@@ -270,21 +430,90 @@ router.get('/payment-methods', requireAuth, async (req: Request, res: Response) 
       return res.status(404).json({ success: false, error: accessCheck.error });
     }
 
-    // Mock payment methods data
-    const paymentMethods = [
-      {
-        id: 'pm_card_1234567890',
-        type: 'card',
-        last4: '4242',
-        brand: 'visa',
-        expiryMonth: 12,
-        expiryYear: 2025,
-        isDefault: true,
-        createdAt: new Date('2024-01-15')
-      }
-    ];
+    // Fetch payment methods from merchant_billing_gateways
+    const methods = await prisma.merchant_billing_gateways.findMany({
+      where: { tenant_id: tenantId, is_active: true },
+      orderBy: { is_default: 'desc' }
+    });
 
-    return res.status(200).json({ success: true, data: paymentMethods });
+    if (methods.length > 0) {
+      const paymentMethods = methods.map(m => {
+        // Parse PayPal metadata from admin_notes if present
+        let paypalEmail: string | undefined;
+        if (m.gateway_type === 'paypal' && m.admin_notes) {
+          try {
+            const metadata = JSON.parse(m.admin_notes);
+            paypalEmail = metadata.paypalEmail;
+          } catch {}
+        }
+        
+        return {
+          id: m.id,
+          type: m.gateway_type === 'paypal' ? 'paypal' : 'card',
+          gatewayType: m.gateway_type || 'stripe',
+          last4: m.card_last4 || '****',
+          brand: m.card_brand || 'unknown',
+          cardBrand: m.card_brand,
+          cardLast4: m.card_last4,
+          paypalEmail,
+          expiryMonth: m.expiry_month,
+          expiryYear: m.expiry_year,
+          isDefault: m.is_default ?? false,
+          createdAt: m.created_at || new Date()
+        };
+      });
+      return res.status(200).json({ success: true, data: paymentMethods });
+    }
+
+    // No payment methods in gateway table - derive from payment history
+    const [tenant, invoices] = await Promise.all([
+      prisma.tenants.findUnique({
+        where: { id: tenantId },
+        select: { stripe_customer_id: true, billing_payment_method_id: true }
+      }),
+      prisma.subscription_invoices.findMany({
+        where: { tenant_id: tenantId },
+        select: { id: true }
+      })
+    ]);
+
+    const invoiceIds = invoices.map(i => i.id);
+    
+    const payments = invoiceIds.length > 0 
+      ? await prisma.subscription_payments.findMany({
+          where: { 
+            invoice_id: { in: invoiceIds },
+            status: 'succeeded'
+          },
+          orderBy: { created_at: 'desc' },
+          take: 5,
+          select: {
+            gateway_type: true,
+            created_at: true
+          }
+        })
+      : [];
+
+    // If tenant has Stripe customer ID, we could fetch from Stripe API
+    // For now, derive synthetic payment methods from payment history
+    const gatewayTypes = [...new Set(payments.map(p => p.gateway_type))];
+    
+    if (gatewayTypes.length > 0) {
+      const syntheticMethods = gatewayTypes.map((gateway, idx) => ({
+        id: `synthetic-${gateway}`,
+        type: gateway === 'stripe' ? 'card' : gateway,
+        last4: '****',
+        brand: gateway.toUpperCase(),
+        expiryMonth: null,
+        expiryYear: null,
+        isDefault: idx === 0,
+        createdAt: payments.find(p => p.gateway_type === gateway)?.created_at || new Date()
+      }));
+      return res.status(200).json({ success: true, data: syntheticMethods });
+    }
+
+    // No payment history either - return empty
+    return res.status(200).json({ success: true, data: [] });
   } catch (error: any) {
     console.error('[TenantBilling] Error getting payment methods:', error);
     return res.status(500).json({ success: false, error: 'Failed to get payment methods' });
@@ -415,10 +644,22 @@ router.get('/analytics', requireAuth, async (req: Request, res: Response) => {
     const payments = subscriptionInvoices.flatMap(inv => inv.subscription_payments || []);
 
     // Calculate totals
+    // Subscription fees = what tenant pays for subscription tier
     const subscriptionFees = subscriptionInvoices.reduce((sum, inv) => sum + Number(inv.amount_cents), 0);
-    const platformFees = platformFeeInvoices.reduce((sum, inv) => sum + Number(inv.total_fees_cents), 0);
-    const transactionFees = payments.reduce((sum, p) => sum + Number(p.amount_cents || 0), 0);
-    const totalSpent = subscriptionFees + platformFees + transactionFees;
+    
+    // Transaction fees = fees from payment gateways (stored in platform_fee_invoices)
+    const transactionFees = platformFeeInvoices.reduce((sum, inv) => 
+      sum + Number(inv.stripe_fees_cents || 0) 
+        + Number(inv.paypal_fees_cents || 0) 
+        + Number(inv.square_fees_cents || 0) 
+        + Number(inv.clover_fees_cents || 0) 
+        + Number(inv.other_fees_cents || 0), 0);
+    
+    // Platform fees = total fees billed to tenant (same as total_fees_cents)
+    const platformFees = platformFeeInvoices.reduce((sum, inv) => sum + Number(inv.total_fees_cents || 0), 0);
+    
+    // Total spent = subscription fees only (platform fees are separate charges, not part of subscription)
+    const totalSpent = subscriptionFees;
 
     // Build monthly breakdown
     const monthlyMap = new Map<string, { total: number; subscription: number; platformFees: number; transactionFees: number }>();
@@ -434,16 +675,13 @@ router.get('/analytics', requireAuth, async (req: Request, res: Response) => {
     for (const inv of platformFeeInvoices) {
       const monthKey = (inv.created_at || new Date()).toLocaleString('en-US', { month: 'long', year: 'numeric' });
       const existing = monthlyMap.get(monthKey) || { total: 0, subscription: 0, platformFees: 0, transactionFees: 0 };
-      existing.platformFees += Number(inv.total_fees_cents);
-      existing.total += Number(inv.total_fees_cents);
-      monthlyMap.set(monthKey, existing);
-    }
-    
-    for (const p of payments) {
-      const monthKey = (p.created_at || new Date()).toLocaleString('en-US', { month: 'long', year: 'numeric' });
-      const existing = monthlyMap.get(monthKey) || { total: 0, subscription: 0, platformFees: 0, transactionFees: 0 };
-      existing.transactionFees += Number(p.amount_cents || 0);
-      existing.total += Number(p.amount_cents || 0);
+      const invTransactionFees = Number(inv.stripe_fees_cents || 0) 
+        + Number(inv.paypal_fees_cents || 0) 
+        + Number(inv.square_fees_cents || 0) 
+        + Number(inv.clover_fees_cents || 0) 
+        + Number(inv.other_fees_cents || 0);
+      existing.platformFees += Number(inv.total_fees_cents || 0);
+      existing.transactionFees += invTransactionFees;
       monthlyMap.set(monthKey, existing);
     }
 

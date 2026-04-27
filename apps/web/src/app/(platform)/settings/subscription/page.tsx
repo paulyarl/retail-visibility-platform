@@ -13,7 +13,7 @@ import { isPlatformUser, isPlatformAdmin, type UserData } from '@/lib/auth/acces
 import { useAuth } from '@/contexts/AuthContext';
 import { ContextBadges } from '@/components/ContextBadges';
 import SubscriptionUsageBadge from '@/components/subscription/SubscriptionUsageBadge';
-import { useTenant } from '@/hooks/useApiQueries';
+import { useTenantComplete } from '@/hooks/dashboard/useTenantComplete';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUpgradeRequests } from '@/hooks/useApiQueries';
 import { useSubscriptionUsage } from '@/hooks/useSubscriptionUsage';
@@ -38,6 +38,10 @@ interface Tenant {
   effectiveExpiresType?: 'trial' | 'subscription' | 'manual';
   effectiveExpiresSource?: 'automatic_trial' | 'automatic_subscription' | 'manual_override';
   metadata?: any;
+  city?: string;
+  state?: string;
+  countryCode?: string;
+  bannerUrl?: string;
   _count?: {
     items: number;
   };
@@ -97,7 +101,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
   }
   
   // Use React Query hooks instead of manual API calls
-  const { data: tenant, isLoading, error } = useTenant(tenantId || '');
+  const { tenant, isLoading, error } = useTenantComplete(tenantId || '');
 
   // Debug: Log tenant data to check effective expiration fields
   // console.log('[SubscriptionPage] Tenant data:', tenant);
@@ -668,11 +672,11 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
               )}
               
               {/* Account Created */}
-              {tenant.created_at && (
+              {tenant.createdAt && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-neutral-600">Account Created</span>
                   <span className="text-sm font-medium text-neutral-900">
-                    {new Date(tenant.created_at).toLocaleDateString()}
+                    {new Date(tenant.createdAt).toLocaleDateString()}
                   </span>
                 </div>
               )}
@@ -733,11 +737,11 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
               )}
 
               {/* Organization Info */}
-              {tenant.organization_id && (
+              {tenant.organizationId && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-neutral-600">Organization ID</span>
                   <span className="text-sm font-medium text-neutral-900">
-                    {tenant.organization_id}
+                    {tenant.organizationId}
                   </span>
                 </div>
               )}
@@ -753,7 +757,7 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
               )}
 
               {/* Metadata Summary Card */}
-              {tenant.metadata && Object.keys(tenant.metadata).length > 0 && (
+              {tenant && (
                 <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 dark:bg-slate-800 dark:border-slate-700">
                   <div className="flex items-center gap-2 mb-2">
                     <svg className="w-4 h-4 text-slate-600 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -762,30 +766,34 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                     <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Tenant Information</span>
                   </div>
                   <div className="space-y-1 text-xs">
-                    {tenant.metadata.city && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-600 dark:text-slate-400">Tenant ID:</span>
+                      <span className="font-mono text-xs text-slate-800 dark:text-slate-200">{tenant.id}</span>
+                    </div>
+                    {tenant.city && (
                       <div className="flex justify-between">
                         <span className="text-slate-600 dark:text-slate-400">City:</span>
-                        <span className="font-medium text-slate-800 dark:text-slate-200">{tenant.metadata.city}</span>
+                        <span className="font-medium text-slate-800 dark:text-slate-200">{tenant.city}</span>
                       </div>
                     )}
-                    {tenant.metadata.state && (
+                    {tenant.state && (
                       <div className="flex justify-between">
                         <span className="text-slate-600 dark:text-slate-400">State:</span>
-                        <span className="font-medium text-slate-800 dark:text-slate-200">{tenant.metadata.state}</span>
+                        <span className="font-medium text-slate-800 dark:text-slate-200">{tenant.state}</span>
                       </div>
                     )}
-                    {tenant.metadata.country_code && (
+                    {tenant.countryCode && (
                       <div className="flex justify-between">
                         <span className="text-slate-600 dark:text-slate-400">Country:</span>
-                        <span className="font-medium text-slate-800 dark:text-slate-200">{tenant.metadata.country_code}</span>
+                        <span className="font-medium text-slate-800 dark:text-slate-200">{tenant.countryCode}</span>
                       </div>
                     )}
-                    {tenant.metadata.banner_url && (
+                    {tenant.bannerUrl && (
                       <div className="mt-2">
                         <span className="text-slate-600 dark:text-slate-400">Banner:</span>
                         <div className="mt-1 rounded overflow-hidden border border-slate-300 dark:border-slate-600">
                           <img 
-                            src={tenant.metadata.banner_url} 
+                            src={tenant.bannerUrl} 
                             alt="Tenant Banner" 
                             className="w-full h-16 object-cover"
                             onError={(e) => {
@@ -832,7 +840,10 @@ export default function SubscriptionPage({ tenantId: propTenantId }: { tenantId?
                     <span className="font-medium">Click "Add Card"</span> to activate Stripe for secure card payments
                   </p>
                   <p className="flex items-center gap-2">
-                    <span className="font-medium">Click "Change Plan"</span> to activate PayPal or select a different subscription tier
+                    <span className="font-medium">Click "Add PayPal"</span> to connect your PayPal account for payments
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <span className="font-medium">Click "Change Plan"</span> to select a different subscription tier
                   </p>
                 </div>
                 <div className="mt-3 p-2 bg-blue-100/50 rounded-md border border-blue-200 dark:bg-blue-800/30 dark:border-blue-600">

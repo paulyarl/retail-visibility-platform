@@ -36,6 +36,19 @@ interface TenantCompleteResponse {
     hasPublishedDirectory: boolean;
     hasProduct: boolean;
     googleProductCount: number;
+    // Additional fields needed by subscription page
+    service_level?: string;
+    grace_ends_at?: string;
+    effectiveExpiresAt?: string;
+    effectiveExpiresType?: 'trial' | 'manual' | 'subscription';
+    effectiveExpiresSource?: string;
+    reopening_date?: string;
+    subscriptionEndsAt?: string;
+    // Location fields
+    city?: string | null;
+    state?: string | null;
+    countryCode?: string | null;
+    bannerUrl?: string | null;
   };
   tier: {
     tier: string;
@@ -99,6 +112,7 @@ export interface UseTenantCompleteReturn {
   }>;
 
   loading: boolean;
+  isLoading: boolean; // Alias for loading
   error: string | null;
   refresh: () => Promise<void>;
 
@@ -168,6 +182,25 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
     throwOnError: false,
   });
 
+  // Fetch public profile for location data (city, state, country)
+  const { data: publicProfileData } = useQuery({
+    queryKey: ['tenant', 'public-profile', tenantId],
+    queryFn: async () => {
+      if (!tenantId) return null;
+      try {
+        const response = await fetch(`/api/public/tenant/${tenantId}/profile`);
+        const data = await response.json();
+        return data.success ? data.data : null;
+      } catch {
+        return null;
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    enabled: !!tenantId,
+    retry: 0,
+  });
+
   // Secondary query - usage data (deferred)
   const { data: usageData, isLoading: usageLoading } = useQuery({
     queryKey: ['tenant', 'usage', tenantId],
@@ -221,24 +254,41 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
   };
 
   // Build tenant from primary query
-  const tenant = tenantData?.tenant ? {
-    id: tenantData.tenant.id || tenantId!,
-    name: tenantData.tenant.name || 'Unknown',
-    organizationId: tenantData.tenant.organization_id || null,
-    subscriptionTier: tenantData.tenant.subscription_tier || 'basic',
-    subscriptionStatus: tenantData.tenant.subscription_status || 'active',
-    locationStatus: tenantData.tenant.location_status || 'active',
+  // The API returns data.profile (not data.tenant) from /complete endpoint
+  const rawProfile = (tenantData as any)?.profile || tenantData?.tenant;
+  const businessProfile = tenantData?.businessProfile;
+  
+  const tenant = rawProfile ? {
+    id: rawProfile.id || tenantId!,
+    name: rawProfile.name || 'Unknown',
+    organizationId: rawProfile.organization_id || rawProfile.organizationId || null,
+    subscriptionTier: rawProfile.subscription_tier || rawProfile.subscriptionTier || 'basic',
+    subscriptionStatus: rawProfile.subscription_status || rawProfile.subscriptionStatus || 'active',
+    locationStatus: rawProfile.location_status || rawProfile.locationStatus || 'active',
     subdomain: null,
-    createdAt: tenantData.tenant.created_at || new Date().toISOString(),
-    statusInfo: tenantData.tenant.statusInfo || null,
+    createdAt: rawProfile.created_at || rawProfile.createdAt || new Date().toISOString(),
+    statusInfo: rawProfile.statusInfo || null,
     stats: {
       productCount: usageData?.items || 0,
       userCount: 0
     },
-    slug: tenantData.tenant.slug || null,
-    hasPublishedDirectory: tenantData.tenant.hasPublishedDirectory || false,
+    slug: rawProfile.slug || null,
+    hasPublishedDirectory: rawProfile.hasPublishedDirectory || false,
     googleProductCount:  usageData?.items|| 0,
-    hasProduct: tenantData.tenant.hasProduct || false
+    hasProduct: rawProfile.hasProduct || false,
+    // Additional subscription fields
+    service_level: rawProfile.service_level || rawProfile.serviceLevel || null,
+    grace_ends_at: rawProfile.grace_ends_at || rawProfile.graceEndsAt || null,
+    effectiveExpiresAt: rawProfile.effective_expires_at || rawProfile.effectiveExpiresAt || null,
+    effectiveExpiresType: rawProfile.effective_expires_type || rawProfile.effectiveExpiresType || null,
+    effectiveExpiresSource: rawProfile.effective_expires_source || rawProfile.effectiveExpiresSource || null,
+    reopening_date: rawProfile.reopening_date || rawProfile.reopeningDate || null,
+    subscriptionEndsAt: rawProfile.subscription_ends_at || rawProfile.subscriptionEndsAt || null,
+    // Location fields - use publicProfileData as primary source (from tenant_business_profiles_list)
+    city: publicProfileData?.city || businessProfile?.city || rawProfile.city || null,
+    state: publicProfileData?.state || businessProfile?.state || rawProfile.state || null,
+    countryCode: publicProfileData?.countryCode || businessProfile?.country_code || rawProfile.country_code || rawProfile.countryCode || null,
+    bannerUrl: publicProfileData?.bannerUrl || businessProfile?.banner_url || rawProfile.banner_url || rawProfile.bannerUrl || null,
   } : null;
 
   // Build resolved tier from secondary query
@@ -395,6 +445,7 @@ export function useTenantComplete(tenantId: string | null, loadSecondary: boolea
       subscription_tier: t.subscription_tier,
     })) || [],
     loading,
+    isLoading: loading, // Alias for backward compatibility
     error: queryError,
     refresh: clearCacheAndRefresh,
 

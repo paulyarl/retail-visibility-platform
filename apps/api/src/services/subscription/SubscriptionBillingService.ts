@@ -78,6 +78,7 @@ interface BillingPaymentMethodRow {
   is_default: boolean | null;
   is_active: boolean | null;
   created_at: Date | null;
+  admin_notes?: string | null;
 }
 
 export class SubscriptionBillingService {
@@ -97,6 +98,20 @@ export class SubscriptionBillingService {
    * Map database row to camelCase interface
    */
   private mapPaymentMethodRow(row: BillingPaymentMethodRow): BillingPaymentMethod {
+    // Parse PayPal metadata from admin_notes if present
+    let paypalEmail: string | undefined;
+    let paypalAccountId: string | undefined;
+    
+    if (row.gateway_type === 'paypal' && row.admin_notes) {
+      try {
+        const parsed = JSON.parse(row.admin_notes);
+        paypalEmail = parsed.paypalEmail;
+        paypalAccountId = parsed.paypalAccountId;
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+    
     return {
       id: row.id,
       tenantId: row.tenant_id,
@@ -106,6 +121,8 @@ export class SubscriptionBillingService {
       cardBrand: row.card_brand || undefined,
       expiryMonth: row.expiry_month || undefined,
       expiryYear: row.expiry_year || undefined,
+      paypalEmail,
+      paypalAccountId,
       isDefault: row.is_default || false,
       isActive: row.is_active || false,
       createdAt: row.created_at || new Date(),
@@ -238,6 +255,7 @@ export class SubscriptionBillingService {
       is_default: row.is_default || false,
       is_active: row.is_active || false,
       created_at: row.created_at || new Date(),
+      admin_notes: row.admin_notes,
     }));
   }
 
@@ -267,6 +285,7 @@ export class SubscriptionBillingService {
       is_default: method.is_default || false,
       is_active: method.is_active || false,
       created_at: method.created_at || new Date(),
+      admin_notes: method.admin_notes,
     });
   }
 
@@ -348,8 +367,25 @@ export class SubscriptionBillingService {
     const existingMethods = await this.getPaymentMethods(tenantId);
     const isDefault = existingMethods.length === 0;
 
+    // For PayPal, check if this account is already registered to prevent duplicates
+    if (gatewayType === 'paypal' && metadata?.paypalAccountId) {
+      const existingPayPal = existingMethods.find(
+        m => m.gatewayType === 'paypal' && m.paypalAccountId === metadata.paypalAccountId
+      );
+      if (existingPayPal) {
+        console.log('[SubscriptionBilling] PayPal account already registered:', metadata.paypalAccountId);
+        // Return existing method instead of creating duplicate
+        return existingPayPal;
+      }
+    }
+
     // Insert payment method
     const id = generateBillingMethodId(tenantId);
+    
+    // Store PayPal metadata in admin_notes as JSON
+    const adminNotes = gatewayType === 'paypal' && metadata 
+      ? JSON.stringify({ paypalEmail: metadata.paypalEmail, paypalAccountId: metadata.paypalAccountId })
+      : null;
     
     await prisma.merchant_billing_gateways.create({
       data: {
@@ -363,6 +399,7 @@ export class SubscriptionBillingService {
         expiry_year: expiryYear || null,
         is_default: isDefault,
         is_active: true,
+        admin_notes: adminNotes,
       },
     });
 
@@ -390,6 +427,7 @@ export class SubscriptionBillingService {
       is_default: method.is_default || false,
       is_active: method.is_active || false,
       created_at: method.created_at || new Date(),
+      admin_notes: method.admin_notes,
     });
   }
 
@@ -1169,6 +1207,7 @@ export class SubscriptionBillingService {
       is_default: method.is_default || false,
       is_active: method.is_active || false,
       created_at: method.created_at || new Date(),
+      admin_notes: method.admin_notes,
     });
   }
 

@@ -15,6 +15,7 @@ import PageHeader, { Icons } from '@/components/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { tenantBillingService, type PaymentMethod } from '@/services/TenantBillingService';
+import { subscriptionBillingService } from '@/services/SubscriptionBillingService';
 import { StripeCardForm } from '@/components/billing/StripeCardForm';
 
 export default function PaymentMethodsPage({ params }: { params: Promise<{ tenantId: string }> }) {
@@ -27,6 +28,8 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
   const [showAddModal, setShowAddModal] = useState(false);
   const [addingPayment, setAddingPayment] = useState(false);
   const [defaultPaymentId, setDefaultPaymentId] = useState<string>('');
+  const [paymentType, setPaymentType] = useState<'card' | 'paypal'>('card');
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     const resolveTenantId = async () => {
@@ -39,6 +42,30 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
   useEffect(() => {
     if (tenantId) {
       loadPaymentMethods();
+    }
+  }, [tenantId]);
+
+  // Handle PayPal return URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paypalToken = urlParams.get('paypal-token');
+    const tokenId = urlParams.get('token') || urlParams.get('approval_token_id') || urlParams.get('token_id');
+    
+    if (paypalToken === 'success' && tokenId) {
+      const savePayPalMethod = async () => {
+        try {
+          setProcessing(true);
+          await subscriptionBillingService.savePayPalPaymentMethod(tokenId);
+          // Clear URL params
+          window.history.replaceState({}, '', window.location.pathname);
+          await loadPaymentMethods();
+        } catch (err: any) {
+          setError(err.message || 'Failed to save PayPal payment method');
+        } finally {
+          setProcessing(false);
+        }
+      };
+      savePayPalMethod();
     }
   }, [tenantId]);
 
@@ -61,13 +88,34 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
     }
   };
 
-  const handleAddPaymentMethod = async () => {
-    // Just show the modal - the Stripe form will handle the rest
-    setShowAddModal(true);
+  const handleAddPaymentMethod = (type: 'card' | 'paypal' = 'card') => {
+    setPaymentType(type);
+    if (type === 'paypal') {
+      handleAddPayPal();
+    } else {
+      setShowAddModal(true);
+    }
+  };
+
+  const handleAddPayPal = async () => {
+    try {
+      setProcessing(true);
+      const result = await subscriptionBillingService.createPayPalBillingAgreement();
+      const approvalUrl = (result as any)?.data?.approvalUrl || result?.approvalUrl;
+      if (approvalUrl) {
+        window.location.href = approvalUrl;
+      } else {
+        throw new Error('No approval URL returned from PayPal');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to add PayPal');
+      setProcessing(false);
+    }
   };
 
   const handlePaymentMethodSuccess = async () => {
     setShowAddModal(false);
+    setProcessing(false);
     await loadPaymentMethods();
   };
 
@@ -189,12 +237,21 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
             </p>
           </div>
           
-          <Button
-            leftSection={<IconPlus size="1rem" />}
-            onClick={() => setShowAddModal(true)}
-          >
-            Add Payment Method
-          </Button>
+          <Group gap="xs">
+            <Button
+              leftSection={<IconCreditCard size="1rem" />}
+              onClick={() => handleAddPaymentMethod('card')}
+            >
+              Add Card
+            </Button>
+            <Button
+              leftSection={<IconBrandPaypal size="1rem" />}
+              onClick={() => handleAddPaymentMethod('paypal')}
+              loading={processing}
+            >
+              Add PayPal
+            </Button>
+          </Group>
         </Group>
       </Card>
 
@@ -206,13 +263,23 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
               <IconCreditCard size="1.25rem" />
               Payment Methods
             </h3>
-            <Button 
-              size="xs" 
-              leftSection={<IconPlus size="0.875rem" />}
-              onClick={() => setShowAddModal(true)}
-            >
-              Add Payment Method
-            </Button>
+            <Group gap="xs">
+              <Button 
+                size="xs" 
+                leftSection={<IconCreditCard size="0.875rem" />}
+                onClick={() => handleAddPaymentMethod('card')}
+              >
+                Add Card
+              </Button>
+              <Button 
+                size="xs" 
+                leftSection={<IconBrandPaypal size="0.875rem" />}
+                onClick={() => handleAddPaymentMethod('paypal')}
+                loading={processing}
+              >
+                Add PayPal
+              </Button>
+            </Group>
           </div>
 
           {!Array.isArray(paymentMethods) || paymentMethods.length === 0 ? (
@@ -223,13 +290,27 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
               </div>
               
               {/* Payment Options when no saved methods */}
-              <div className="text-center">
-                <Button 
-                  leftSection={<IconPlus size="1rem" />}
-                  onClick={() => setShowAddModal(true)}
-                >
-                  Add Payment Method
-                </Button>
+              <div className="space-y-3 pt-2 border-t">
+                <Text size="sm" fw={500}>Add a payment method:</Text>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <Button 
+                    size="sm"
+                    variant="outline"
+                    leftSection={<IconCreditCard size="1rem" />}
+                    onClick={() => handleAddPaymentMethod('card')}
+                  >
+                    Add Card (Stripe)
+                  </Button>
+                  <Button 
+                    size="sm"
+                    variant="outline"
+                    leftSection={<IconBrandPaypal size="1rem" />}
+                    onClick={() => handleAddPaymentMethod('paypal')}
+                    loading={processing}
+                  >
+                    Add PayPal
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
@@ -292,7 +373,7 @@ export default function PaymentMethodsPage({ params }: { params: Promise<{ tenan
         <div className="space-y-3 text-sm text-gray-600">
           <div className="flex items-start gap-2">
             <IconCheck className="w-4 h-4 text-green-500 mt-0.5" />
-            <p>Your payment information is encrypted and securely stored by Stripe</p>
+            <p>Your payment information is encrypted and securely stored by Stripe or PayPal</p>
           </div>
           <div className="flex items-start gap-2">
             <IconCheck className="w-4 h-4 text-green-500 mt-0.5" />

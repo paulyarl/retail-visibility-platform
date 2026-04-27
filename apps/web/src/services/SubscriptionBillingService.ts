@@ -11,6 +11,7 @@ import { AppContext, CacheIsolation } from '@/utils/contextCacheManager';
 export interface TierPricing {
   id: string;
   tier: string;
+  displayName?: string;
   monthlyPriceCents: number;
   annualPriceCents: number;
   features: string[];

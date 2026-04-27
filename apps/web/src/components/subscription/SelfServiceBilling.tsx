@@ -382,6 +382,15 @@ export function SelfServiceBilling({
                   >
                     Add Card (Stripe)
                   </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    leftSection={<IconBrandPaypal size="1rem" />}
+                    onClick={handleAddPayPal}
+                    loading={processing}
+                  >
+                    Add PayPal
+                  </Button>
                 </div>
               </div>
             </div>
@@ -458,6 +467,15 @@ export function SelfServiceBilling({
                   onClick={() => setShowAddCard(true)}
                 >
                   Add Card (Stripe)
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  leftSection={<IconBrandPaypal size="1rem" />}
+                  onClick={handleAddPayPal}
+                  loading={processing}
+                >
+                  Add PayPal
                 </Button>
               </div>
             </div>
